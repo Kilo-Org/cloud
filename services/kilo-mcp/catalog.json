@@ -5886,6 +5886,44 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
+  "cloudAgentNext.getEgressAudit": {
+    "path": "cloudAgentNext.getEgressAudit",
+    "kind": "query",
+    "summary": "List recorded outbound HTTP requests for a cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getegressaudit",
+      "cursor",
+      "limit",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getEgressAudit List recorded outbound HTTP requests for a cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64. cloudagentnext getegressaudit cursor limit cloudagentsessionid cursor limit cloudAgentSessionId"
+  },
   "cloudAgentNext.getMessageResult": {
     "path": "cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -6300,6 +6338,10 @@
                 "maxLength": 254,
                 "pattern": "^[A-Za-z0-9.-]+$"
               }
+            },
+            "egressAudit": {
+              "description": "Opt in to egress auditing in any egress mode.",
+              "type": "boolean"
             },
             "sandboxAllocation": {
               "anyOf": [
@@ -6989,6 +7031,10 @@
                 "pattern": "^[A-Za-z0-9.-]+$"
               }
             },
+            "egressAudit": {
+              "description": "Opt in to egress auditing in any egress mode.",
+              "type": "boolean"
+            },
             "sandboxAllocation": {
               "anyOf": [
                 {
@@ -7601,9 +7647,40 @@
     },
     "tags": [
       "cloudagentnext",
-      "preparesession"
+      "preparesession",
+      "egressmode",
+      "egressallowlist",
+      "egressaudit",
+      "sandboxallocation",
+      "prompt",
+      "initialmessageid",
+      "initialpayload",
+      "autoinitiate",
+      "operationkey",
+      "kilosessionid",
+      "clonefromkilosessionid",
+      "cloneuptomessageid",
+      "callbacktarget",
+      "githubrepo",
+      "githubintegrationid",
+      "gitlabproject",
+      "bitbucketrepo",
+      "publicrepourl",
+      "mode",
+      "model",
+      "variant",
+      "profileid",
+      "envvars",
+      "setupcommands",
+      "mcpservers",
+      "runtimeskills",
+      "runtimeagents",
+      "upstreambranch",
+      "autocommit",
+      "attachments",
+      "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -16696,6 +16773,69 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
+  "organizations.cloudAgentNext.getEgressAudit": {
+    "path": "organizations.cloudAgentNext.getEgressAudit",
+    "kind": "query",
+    "summary": "List recorded outbound HTTP requests for an organization cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "limit": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getegressaudit",
+      "organizationid",
+      "cursor",
+      "limit",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getEgressAudit List recorded outbound HTTP requests for an organization cloud agent session, including destination hosts and allow or deny decisions. Use the cursor to page through up to 16,384 recent records per sandbox, shared across worktrees. Older records are pruned in chunks of 64. organizations cloudagentnext getegressaudit organizationid cursor limit cloudagentsessionid organizationId cursor limit cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.getMessageResult": {
     "path": "organizations.cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -17296,6 +17436,10 @@
                     "maxLength": 254,
                     "pattern": "^[A-Za-z0-9.-]+$"
                   }
+                },
+                "egressAudit": {
+                  "description": "Opt in to egress auditing in any egress mode.",
+                  "type": "boolean"
                 },
                 "organizationId": {
                   "type": "string",
@@ -17991,6 +18135,10 @@
                     "pattern": "^[A-Za-z0-9.-]+$"
                   }
                 },
+                "egressAudit": {
+                  "description": "Opt in to egress auditing in any egress mode.",
+                  "type": "boolean"
+                },
                 "organizationId": {
                   "type": "string",
                   "format": "uuid",
@@ -18613,9 +18761,40 @@
       "organizations",
       "cloudagentnext",
       "preparesession",
-      "organizationid"
+      "organizationid",
+      "egressmode",
+      "egressallowlist",
+      "egressaudit",
+      "sandboxallocation",
+      "prompt",
+      "initialmessageid",
+      "initialpayload",
+      "autoinitiate",
+      "operationkey",
+      "kilosessionid",
+      "clonefromkilosessionid",
+      "cloneuptomessageid",
+      "callbacktarget",
+      "githubrepo",
+      "githubintegrationid",
+      "gitlabproject",
+      "bitbucketrepo",
+      "publicrepourl",
+      "mode",
+      "model",
+      "variant",
+      "profileid",
+      "envvars",
+      "setupcommands",
+      "mcpservers",
+      "runtimeskills",
+      "runtimeagents",
+      "upstreambranch",
+      "autocommit",
+      "attachments",
+      "devcontainer"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid organizationId"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -28978,9 +29157,20 @@
     },
     "tags": [
       "providerreview",
-      "addcomment"
+      "addcomment",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "body",
+      "anchor",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.addComment Add a review comment to a pull request or merge request on GitLab or Bitbucket, optionally anchored to a specific file and line. providerreview addcomment"
+    "searchBlob": "providerReview.addComment Add a review comment to a pull request or merge request on GitLab or Bitbucket, optionally anchored to a specific file and line. providerreview addcomment platform organizationid projectpath mriid instancehint body anchor operationkey workspace reposlug prid platform organizationId projectPath mrIid instanceHint body anchor operationKey workspace repoSlug prId"
   },
   "providerReview.disableAutoMerge": {
     "path": "providerReview.disableAutoMerge",
@@ -29085,9 +29275,19 @@
     },
     "tags": [
       "providerreview",
-      "disableautomerge"
+      "disableautomerge",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "expectedheadsha",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.disableAutoMerge Turn off auto-merge for a merge request; GitLab only. providerreview disableautomerge"
+    "searchBlob": "providerReview.disableAutoMerge Turn off auto-merge for a merge request; GitLab only. providerreview disableautomerge platform organizationid projectpath mriid instancehint expectedheadsha operationkey workspace reposlug prid platform organizationId projectPath mrIid instanceHint expectedHeadSha operationKey workspace repoSlug prId"
   },
   "providerReview.enableAutoMerge": {
     "path": "providerReview.enableAutoMerge",
@@ -29194,9 +29394,19 @@
     },
     "tags": [
       "providerreview",
-      "enableautomerge"
+      "enableautomerge",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "expectedheadsha",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.enableAutoMerge Turn on auto-merge for a merge request so it merges automatically once checks pass; GitLab only. providerreview enableautomerge"
+    "searchBlob": "providerReview.enableAutoMerge Turn on auto-merge for a merge request so it merges automatically once checks pass; GitLab only. providerreview enableautomerge platform organizationid projectpath mriid instancehint expectedheadsha operationkey workspace reposlug prid platform organizationId projectPath mrIid instanceHint expectedHeadSha operationKey workspace repoSlug prId"
   },
   "providerReview.getCapabilities": {
     "path": "providerReview.getCapabilities",
@@ -29251,9 +29461,12 @@
     },
     "tags": [
       "providerreview",
-      "getcapabilities"
+      "getcapabilities",
+      "platform",
+      "organizationid",
+      "instancehint"
     ],
-    "searchBlob": "providerReview.getCapabilities Returns the provider's review capability vocabulary: which write operations (comment, reply, review, resolve, merge, auto-merge) the connected provider exposes. providerreview getcapabilities"
+    "searchBlob": "providerReview.getCapabilities Returns the provider's review capability vocabulary: which write operations (comment, reply, review, resolve, merge, auto-merge) the connected provider exposes. providerreview getcapabilities platform organizationid instancehint platform organizationId instanceHint"
   },
   "providerReview.getFileLines": {
     "path": "providerReview.getFileLines",
@@ -29386,9 +29599,21 @@
     },
     "tags": [
       "providerreview",
-      "getfilelines"
+      "getfilelines",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "ref",
+      "path",
+      "startline",
+      "endline",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.getFileLines Returns a slice of a changed file's diff lines and surrounding context for one path in the provider pull request. providerreview getfilelines"
+    "searchBlob": "providerReview.getFileLines Returns a slice of a changed file's diff lines and surrounding context for one path in the provider pull request. providerreview getfilelines platform organizationid projectpath mriid instancehint ref path startline endline workspace reposlug prid platform organizationId projectPath mrIid instanceHint ref path startLine endLine workspace repoSlug prId"
   },
   "providerReview.getMergeState": {
     "path": "providerReview.getMergeState",
@@ -29473,9 +29698,17 @@
     },
     "tags": [
       "providerreview",
-      "getmergestate"
+      "getmergestate",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.getMergeState Returns the merge gate state for the provider pull request: mergeability, conflicts, required approvals, failing or pending builds, drafts, and unresolved discussions, worded by the provider. providerreview getmergestate"
+    "searchBlob": "providerReview.getMergeState Returns the merge gate state for the provider pull request: mergeability, conflicts, required approvals, failing or pending builds, drafts, and unresolved discussions, worded by the provider. providerreview getmergestate platform organizationid projectpath mriid instancehint workspace reposlug prid platform organizationId projectPath mrIid instanceHint workspace repoSlug prId"
   },
   "providerReview.getPullRequest": {
     "path": "providerReview.getPullRequest",
@@ -29560,9 +29793,17 @@
     },
     "tags": [
       "providerreview",
-      "getpullrequest"
+      "getpullrequest",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.getPullRequest Returns the provider pull request detail (title, body, state, head, base, author, and review-relevant counts) for the given provider review ref. providerreview getpullrequest"
+    "searchBlob": "providerReview.getPullRequest Returns the provider pull request detail (title, body, state, head, base, author, and review-relevant counts) for the given provider review ref. providerreview getpullrequest platform organizationid projectpath mriid instancehint workspace reposlug prid platform organizationId projectPath mrIid instanceHint workspace repoSlug prId"
   },
   "providerReview.listChecks": {
     "path": "providerReview.listChecks",
@@ -29647,9 +29888,17 @@
     },
     "tags": [
       "providerreview",
-      "listchecks"
+      "listchecks",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.listChecks Lists the CI check runs (name, status, conclusion, and details URL) reported on the provider pull request head. providerreview listchecks"
+    "searchBlob": "providerReview.listChecks Lists the CI check runs (name, status, conclusion, and details URL) reported on the provider pull request head. providerreview listchecks platform organizationid projectpath mriid instancehint workspace reposlug prid platform organizationId projectPath mrIid instanceHint workspace repoSlug prId"
   },
   "providerReview.listDiscussions": {
     "path": "providerReview.listDiscussions",
@@ -29758,9 +30007,19 @@
     },
     "tags": [
       "providerreview",
-      "listdiscussions"
+      "listdiscussions",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "cursor",
+      "direction",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.listDiscussions Lists the review discussions (threads) of the provider pull request, including their comments, resolution state, and inline diff anchors. providerreview listdiscussions"
+    "searchBlob": "providerReview.listDiscussions Lists the review discussions (threads) of the provider pull request, including their comments, resolution state, and inline diff anchors. providerreview listdiscussions platform organizationid projectpath mriid instancehint cursor direction workspace reposlug prid platform organizationId projectPath mrIid instanceHint cursor direction workspace repoSlug prId"
   },
   "providerReview.listFiles": {
     "path": "providerReview.listFiles",
@@ -29869,9 +30128,19 @@
     },
     "tags": [
       "providerreview",
-      "listfiles"
+      "listfiles",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "cursor",
+      "direction",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.listFiles Lists the changed files of the provider pull request with their status, additions, deletions, and patch availability. providerreview listfiles"
+    "searchBlob": "providerReview.listFiles Lists the changed files of the provider pull request with their status, additions, deletions, and patch availability. providerreview listfiles platform organizationid projectpath mriid instancehint cursor direction workspace reposlug prid platform organizationId projectPath mrIid instanceHint cursor direction workspace repoSlug prId"
   },
   "providerReview.listInbox": {
     "path": "providerReview.listInbox",
@@ -29950,9 +30219,14 @@
     },
     "tags": [
       "providerreview",
-      "listinbox"
+      "listinbox",
+      "platform",
+      "organizationid",
+      "instancehint",
+      "cursor",
+      "direction"
     ],
-    "searchBlob": "providerReview.listInbox Lists the review inbox for the organization: open pull requests awaiting review, with the provider-correct review term and the viewer's review state. providerreview listinbox"
+    "searchBlob": "providerReview.listInbox Lists the review inbox for the organization: open pull requests awaiting review, with the provider-correct review term and the viewer's review state. providerreview listinbox platform organizationid instancehint cursor direction platform organizationId instanceHint cursor direction"
   },
   "providerReview.mergePullRequest": {
     "path": "providerReview.mergePullRequest",
@@ -30083,9 +30357,23 @@
     },
     "tags": [
       "providerreview",
-      "mergepullrequest"
+      "mergepullrequest",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "expectedheadsha",
+      "squash",
+      "deletebranch",
+      "committitle",
+      "commitmessage",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.mergePullRequest Merge a pull request or merge request, optionally squashing commits, deleting the source branch, and setting a commit message or title. providerreview mergepullrequest"
+    "searchBlob": "providerReview.mergePullRequest Merge a pull request or merge request, optionally squashing commits, deleting the source branch, and setting a commit message or title. providerreview mergepullrequest platform organizationid projectpath mriid instancehint expectedheadsha squash deletebranch committitle commitmessage operationkey workspace reposlug prid platform organizationId projectPath mrIid instanceHint expectedHeadSha squash deleteBranch commitTitle commitMessage operationKey workspace repoSlug prId"
   },
   "providerReview.replyToComment": {
     "path": "providerReview.replyToComment",
@@ -30204,9 +30492,21 @@
     },
     "tags": [
       "providerreview",
-      "replytocomment"
+      "replytocomment",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "discussionid",
+      "body",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid",
+      "commentid"
     ],
-    "searchBlob": "providerReview.replyToComment Reply to an existing review comment or discussion thread on a pull request or merge request. providerreview replytocomment"
+    "searchBlob": "providerReview.replyToComment Reply to an existing review comment or discussion thread on a pull request or merge request. providerreview replytocomment platform organizationid projectpath mriid instancehint discussionid body operationkey workspace reposlug prid commentid platform organizationId projectPath mrIid instanceHint discussionId body operationKey workspace repoSlug prId commentId"
   },
   "providerReview.resolveThread": {
     "path": "providerReview.resolveThread",
@@ -30313,9 +30613,20 @@
     },
     "tags": [
       "providerreview",
-      "resolvethread"
+      "resolvethread",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "discussionid",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid",
+      "threadid"
     ],
-    "searchBlob": "providerReview.resolveThread Mark a review comment thread as resolved on a pull request or merge request. providerreview resolvethread"
+    "searchBlob": "providerReview.resolveThread Mark a review comment thread as resolved on a pull request or merge request. providerreview resolvethread platform organizationid projectpath mriid instancehint discussionid operationkey workspace reposlug prid threadid platform organizationId projectPath mrIid instanceHint discussionId operationKey workspace repoSlug prId threadId"
   },
   "providerReview.submitReview": {
     "path": "providerReview.submitReview",
@@ -30524,9 +30835,21 @@
     },
     "tags": [
       "providerreview",
-      "submitreview"
+      "submitreview",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "event",
+      "body",
+      "comments",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid"
     ],
-    "searchBlob": "providerReview.submitReview Submit a review verdict on a pull request or merge request, such as approve, request changes, or comment, with an optional summary and inline comments. providerreview submitreview"
+    "searchBlob": "providerReview.submitReview Submit a review verdict on a pull request or merge request, such as approve, request changes, or comment, with an optional summary and inline comments. providerreview submitreview platform organizationid projectpath mriid instancehint event body comments operationkey workspace reposlug prid platform organizationId projectPath mrIid instanceHint event body comments operationKey workspace repoSlug prId"
   },
   "providerReview.unresolveThread": {
     "path": "providerReview.unresolveThread",
@@ -30633,9 +30956,20 @@
     },
     "tags": [
       "providerreview",
-      "unresolvethread"
+      "unresolvethread",
+      "platform",
+      "organizationid",
+      "projectpath",
+      "mriid",
+      "instancehint",
+      "discussionid",
+      "operationkey",
+      "workspace",
+      "reposlug",
+      "prid",
+      "threadid"
     ],
-    "searchBlob": "providerReview.unresolveThread Reopen a previously resolved review comment thread on a pull request or merge request. providerreview unresolvethread"
+    "searchBlob": "providerReview.unresolveThread Reopen a previously resolved review comment thread on a pull request or merge request. providerreview unresolvethread platform organizationid projectpath mriid instancehint discussionid operationkey workspace reposlug prid threadid platform organizationId projectPath mrIid instanceHint discussionId operationKey workspace repoSlug prId threadId"
   },
   "reviewMemory.approveAndOpenChangeRequest": {
     "path": "reviewMemory.approveAndOpenChangeRequest",

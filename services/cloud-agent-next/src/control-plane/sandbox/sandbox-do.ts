@@ -367,6 +367,7 @@ export type StoredProviderPin = {
   /** Stored kind of a placed key. Legacy prefixed keys have none. */
   sandboxKind?: SandboxKind;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 };
 
 export type EnsureAllocationInput = {
@@ -380,6 +381,7 @@ export type EnsureAllocationInput = {
   sandboxKind?: SandboxKind;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 };
 
 const wrapperSocketAttachmentSchema = z.object({
@@ -2200,7 +2202,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const provider = input.provider ?? 'cloudflare';
     if (
-      policy.data.egressMode === 'allowlist' &&
+      (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
       (provider !== 'cloudflare-containers' ||
         (input.sandboxKind === undefined
           ? !this.sandboxId.startsWith('ses-')
@@ -2230,6 +2232,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             }),
           }),
       ...(input.byoc ? { byoc: input.byoc } : {}),
+      ...(policy.data.egressAudit === true ? { egressAudit: true } : {}),
     };
   }
 
@@ -2454,7 +2457,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         sandboxSelection !== undefined &&
         (state.kind === 'stopped' ||
           sandboxSelection.egressMode === 'allowlist' ||
-          this.providerPin?.egressAllowlist !== undefined)
+          sandboxSelection.egressAudit === true ||
+          this.providerPin?.egressAllowlist !== undefined ||
+          this.providerPin?.egressAudit === true)
       ) {
         const repository = source.repository;
         selectedPin = this.pinFromInput(
@@ -2465,10 +2470,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       if (
         state.kind !== 'stopped' &&
-        (selectedPin?.egressAllowlist !== undefined ||
-          this.providerPin?.egressAllowlist !== undefined) &&
-        JSON.stringify(selectedPin?.egressAllowlist) !==
-          JSON.stringify(this.providerPin?.egressAllowlist)
+        (JSON.stringify(selectedPin?.egressAllowlist) !==
+          JSON.stringify(this.providerPin?.egressAllowlist) ||
+          (selectedPin?.egressAudit === true) !== (this.providerPin?.egressAudit === true))
       ) {
         throw new ProviderCreationError('invalid_configuration');
       }
@@ -5454,6 +5458,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           allocationName,
           ...(instance === undefined ? {} : { instance }),
           ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
+          ...(pin.egressAudit === true ? { egressAudit: true } : {}),
           getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
         });
       }
@@ -5570,8 +5575,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return null;
     }
+    if (!z.boolean().optional().safeParse(pin.egressAudit).success) {
+      throw new ProviderCreationError('invalid_configuration');
+    }
     if (pin.egressAllowlist !== undefined) {
       pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
+    }
+    if (pin.egressAllowlist !== undefined || pin.egressAudit === true) {
       if (
         pin.provider !== 'cloudflare-containers' ||
         (pin.sandboxKind === undefined

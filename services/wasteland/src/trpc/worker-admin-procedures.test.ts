@@ -59,7 +59,23 @@ async function authorityFor(actions: string[], target: WorkerAdminTarget) {
   });
 }
 
-function caller(workerAdmin: Awaited<ReturnType<typeof authorityFor>>) {
+async function noCapabilityAuthority() {
+  return createWorkerAdminAuthority({
+    mode: 'reject',
+    audience: 'wasteland-admin',
+    identity: { kiloUserId: CALLER, apiTokenPepper: 'pepper-1', env: 'test' },
+    legacyClaim: false,
+    capabilityToken: null,
+    jwks: null,
+    introspect: async () => ({ active: true }),
+    now: () => NOW * 1000,
+  });
+}
+
+function caller(
+  workerAdmin: Awaited<ReturnType<typeof authorityFor>>,
+  overrides: Partial<TRPCContext> = {}
+) {
   const ctx: TRPCContext = {
     env: {} as never,
     userId: CALLER,
@@ -68,6 +84,7 @@ function caller(workerAdmin: Awaited<ReturnType<typeof authorityFor>>) {
     legacyClaimLifetimeSeconds: null,
     apiTokenPepper: 'pepper-1',
     orgMemberships: [],
+    ...overrides,
   };
   return wrapped.createCaller(ctx);
 }
@@ -110,6 +127,18 @@ describe('real wasteland procedures respect the capability action allowlist', ()
     await expect(
       caller(authority).wasteland.getWasteland({ wastelandId: WASTELAND })
     ).resolves.toMatchObject({ name: 'Foreign wasteland' });
+  });
+
+  it('requireOwnerAccess rejects a non-owner org member', async () => {
+    await expect(
+      caller(await noCapabilityAuthority(), {
+        orgMemberships: [{ orgId: 'org-2', role: 'member', name: 'org' }],
+      }).wasteland.addMember({ wastelandId: WASTELAND, userId: 'user-9' })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: expect.stringContaining('Only wasteland owners'),
+    });
+    expect(unregister).not.toHaveBeenCalled();
   });
 
   it('adminListWastelands requires a service-scoped capability', async () => {

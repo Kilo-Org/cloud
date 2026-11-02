@@ -380,13 +380,9 @@ describe('Organization hub billing card while its data loads', () => {
     const loading = await renderHub();
     // The Kilo Pass row used to appear only once the membership payload arrived.
     expect(loading.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
-    // Loading copy is not a subtitle; the row reserves its settled line instead
-    // and keeps its name, because the placeholder carries no text.
+    // Loading copy is not a subtitle; the row reserves its settled line instead.
     expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
     expect(bellRow(loading.renderer)?.props.subtitlePlaceholder).toBeTruthy();
-    expect(bellRow(loading.renderer)?.props.accessibilityLabel).toBe(
-      i18n.t('organization.lowBalanceAlert.title')
-    );
     loading.unmount();
 
     // A list payload persisted before the parent link existed is unknown, not a

@@ -26,14 +26,12 @@ const query = vi.hoisted(() => ({
     rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
     truncated: undefined as boolean | undefined,
   },
-  isLoading: false,
   isError: false,
   isFetching: false,
   error: undefined as unknown,
   refetch: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => query }));
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -73,9 +71,6 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-// The section's loading card renders the UI skeleton; the real one reaches
-// expo-linear-gradient and the reanimated worklets, which stay unmocked here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({
@@ -113,7 +108,7 @@ function mount(serverWebUrl: string | null = PR_WEB_URL) {
           owner: 'kilo',
           repo: 'cloud',
           number: 7,
-          headSha: 'abc123',
+          checks: query,
         })}
       </ProviderPrWebUrlProvider>
     );
@@ -144,7 +139,6 @@ function setRuns(runs: Run[]) {
 }
 
 beforeEach(() => {
-  query.isLoading = false;
   query.isError = false;
   query.isFetching = false;
   query.error = undefined;

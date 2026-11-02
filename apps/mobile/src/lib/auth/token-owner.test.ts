@@ -142,6 +142,58 @@ describe('token-owner', () => {
       expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
     });
 
+    it('returns no token when the device locks between the read attempts', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      const getItemAsync = vi.mocked(SecureStore.getItemAsync);
+      const original = getItemAsync.getMockImplementation();
+      // The first attempt hits the transient rejection a device that just
+      // foregrounded gives, so the read backs off before its next attempt.
+      getItemAsync.mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain temporarily unavailable');
+      });
+
+      vi.useFakeTimers();
+      try {
+        const pending = getAuthTokenForRequest();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(getItemAsync).toHaveBeenCalledTimes(1);
+
+        // The lock lands during the backoff: the next attempt refuses the
+        // keychain, and that refusal must answer the caller with no token.
+        setProtectedDataAvailable(false);
+        await vi.advanceTimersByTimeAsync(250);
+
+        await expect(pending).resolves.toBeNull();
+        expect(getActiveToken()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+        if (original) {
+          getItemAsync.mockImplementation(original);
+        }
+      }
+    });
+
+    it('still serves a newer owner when the read refused because the device locked', async () => {
+      const getItemAsync = vi.mocked(SecureStore.getItemAsync);
+      const original = getItemAsync.getMockImplementation();
+      getItemAsync.mockImplementationOnce(() => {
+        // The read is refused because the device locked, and a newer owner was
+        // published while it ran.
+        setProtectedDataAvailable(false);
+        setActiveToken('newer-token', 9999);
+        throw new Error('User interaction is not allowed.');
+      });
+
+      try {
+        await expect(getAuthTokenForRequest()).resolves.toBe('newer-token');
+      } finally {
+        if (original) {
+          getItemAsync.mockImplementation(original);
+        }
+      }
+    });
+
     it('still rejects a cold read that fails for another reason', async () => {
       const getItemAsync = vi.mocked(SecureStore.getItemAsync);
       const original = getItemAsync.getMockImplementation();

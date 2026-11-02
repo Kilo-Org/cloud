@@ -87,8 +87,9 @@ export function clearActiveToken(): void {
  * stored credentials are scheduled for deletion. While iOS protected data is
  * unavailable the cold path returns no token too: a locked keychain refuses
  * every read, that refusal is the documented unreported state (see
- * `lib/protected-data`), and it must not become a rejected request. A held
- * token keeps serving, and the next unlocked read resolves the stored one.
+ * `lib/protected-data`), and it must not become a rejected request — whether
+ * the lock is known before the read or lands while it runs. A held token
+ * keeps serving, and the next unlocked read resolves the stored one.
  */
 export async function getAuthTokenForRequest(): Promise<string | null> {
   const active = getActiveToken();
@@ -108,7 +109,24 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
   if (isSignOutTeardownActive()) {
     return null;
   }
-  const token = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
+  let token: string | null = null;
+  try {
+    token = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
+  } catch (error) {
+    // The device can lock while the read is in flight, between its retries:
+    // the read then refuses to call the keychain and rejects. That refusal is
+    // the same expected, unreported state as the check above, so answer it
+    // with no token instead of failing the caller. A newer owner published
+    // while the read ran still wins, exactly as on the successful path.
+    const refusedOwner = getActiveToken();
+    if (refusedOwner) {
+      return refusedOwner.token;
+    }
+    if (isProtectedDataAvailable()) {
+      throw error;
+    }
+    return null;
+  }
   // A sign-in or refresh may have published a newer owner while the cold read
   // was in flight: prefer it and never overwrite it with the stale read.
   const published = getActiveToken();

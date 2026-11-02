@@ -286,12 +286,14 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // The plan count's copy as its own locale wrote it: text runs with the two
   // counts between them, in the order the template puts them. A slot that is
   // missing, or that lost one of the two placeholders, falls back to the
-  // English order, so a placeholder never reaches the screen.
+  // English order, so a placeholder never reaches the screen. The fallback
+  // carries its own spaces, as every catalog does: the line takes no inset
+  // between runs, so a run without them would read "3of7".
   const planSegments: ({ text: string } | { name: string })[] = (() => {
     const parts = (COPY.planProgress ?? '').split(/\{\{(done|total)\}\}/);
     const named = new Set(parts.filter((_, at) => at % 2 === 1));
     if (!named.has('done') || !named.has('total')) {
-      return [{ name: 'done' }, { text: 'of' }, { name: 'total' }];
+      return [{ name: 'done' }, { text: ' of ' }, { name: 'total' }];
     }
     return parts.map((part, at) => (at % 2 === 1 ? { name: part } : { text: part }));
   })();

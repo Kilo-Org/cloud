@@ -143,9 +143,8 @@ describe('session card layout: states', () => {
     });
     const shown = texts(banner);
     expect(shown).toContain('Editing auth.ts');
-    expect(shown).toContain('3');
-    expect(shown).toContain('of');
-    expect(shown).toContain('7');
+    // The plan count keeps the catalog's own spacing between its runs.
+    expect(shown.join('')).toContain('3 of 7');
     // The diff size is on the Lock Screen card too (spec "Content" rule 8).
     expect(shown).toContain('+120');
     expect(shown).toContain('−30');
@@ -454,15 +453,31 @@ describe('session card layout: locale word order', () => {
 
   it('keeps an affix the catalog attaches to a count attached to it', () => {
     // Azerbaijani writes the pair as "7-dən 3": the case ending belongs to the
-    // total, so no gap may be inserted between the count and its suffix.
-    const shown = texts(
-      renderWithCopy({ planProgress: '{{total}}-dən {{done}}' })({
-        ...BASE,
-        plan: { done: 3, total: 7, current: null },
-      }).banner
-    );
-    expect(shown.join('')).toContain('7-dən 3');
-    expect(shown.join('')).not.toContain('7 -dən');
+    // total, so nothing may sit between the count and its suffix. The text
+    // runs keep the catalog's own spacing, and the stack that draws them
+    // insets nothing of its own; either regression pulls the affix away.
+    const banner = renderWithCopy({ planProgress: '{{total}}-dən {{done}}' })({
+      ...BASE,
+      plan: { done: 3, total: 7, current: null },
+    }).banner;
+    const runs = texts(banner).filter(value => ['7', '-dən ', '3'].includes(value));
+    expect(runs).toEqual(['7', '-dən ', '3']);
+    const owner = collect(banner).find(item => {
+      if (item.kind !== 'HStack') {
+        return false;
+      }
+      const children = item.props.children;
+      const kids = Array.isArray(children) ? (children as unknown[]).flat(Infinity) : [children];
+      return kids.some(child => element(child)?.props.children === '-dən ');
+    });
+    expect(owner?.props.spacing).toBe(0);
+  });
+
+  it('keeps the English fallback readable when the plan slot is missing', () => {
+    // No baked copy: the layout falls back to the English order. The runs must
+    // carry their own spaces, because the line insets nothing between them.
+    const shown = texts(render({ ...BASE, plan: { done: 3, total: 7, current: null } }).banner);
+    expect(shown.filter(value => ['3', ' of ', '7'].includes(value))).toEqual(['3', ' of ', '7']);
   });
 
   it('fills the finished-in template instead of prefixing the duration', () => {

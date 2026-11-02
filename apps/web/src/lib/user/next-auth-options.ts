@@ -1016,7 +1016,9 @@ export const authOptions: NextAuthOptions = {
         if (isAccountLinking && linkingSession) {
           const linkingPrincipal = await getUserFromSession();
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
-            warnInSentry('SECURITY: Account link refused: the session does not match the link');
+            warnInSentry('SECURITY: Account link refused: the session does not match the link', {
+              extra: { provider: accountInfo.provider },
+            });
             // An organization-scoped connect starts on the organization's BYOK
             // card, which reads `openai_error`; return the refusal there the
             // same way the shared-services re-check below does.

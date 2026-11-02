@@ -26,6 +26,8 @@ import {
   sendAccountDeletionSupportNotification,
 } from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
@@ -41,6 +43,13 @@ jest.mock('@kilocode/web-shared/lib/email', () => {
 
 jest.mock('@/lib/user/gdpr-removal', () => ({
   performGdprRemoval: jest.fn(),
+}));
+
+// Starting a link writes the linking cookie through `next/headers`, which has no
+// request scope here; the offer list is what this suite checks against.
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual('@/lib/account-linking-session'),
+  createAccountLinkingSession: jest.fn(),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -123,13 +132,26 @@ describe('user router - getMe', () => {
 });
 
 describe('user router - linkAuthProvider', () => {
-  it('refuses an Apple link start', async () => {
+  it('starts a link for every provider the connected-accounts card offers', async () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
 
+    for (const { id } of AccountLinkingProviders) {
+      mockCreateLinkingSession.mockClear();
+      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
+        success: true,
+      });
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
+    }
+
+    // Apple is a sign-in method the card does not offer, so a link it starts
+    // cannot complete and must not open a linking session.
+    mockCreateLinkingSession.mockClear();
     await expect(caller.user.linkAuthProvider({ provider: 'apple' })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
   });
 });
 

@@ -56,7 +56,7 @@ import {
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
+import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
@@ -684,14 +684,15 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      // Account linking requires the web session that started it. Apple's
-      // callback is a cross-site form POST that carries no session cookie, so
-      // an Apple link cannot complete; refuse it here instead of letting the
-      // round trip end in a failure on /connected-accounts.
-      if (input.provider === 'apple') {
+      // Account linking requires the web session that started it, and a
+      // provider's callback carries that session only when it is a same-site
+      // GET. Refuse every provider the metadata does not offer for linking here
+      // instead of letting the round trip end in a failure on
+      // /connected-accounts.
+      if (!isAccountLinkingProvider(input.provider)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Apple cannot be added as a sign-in method.',
+          message: 'This sign-in method cannot be added to an account.',
         });
       }
       // An organization-scoped link records the organization on the linking

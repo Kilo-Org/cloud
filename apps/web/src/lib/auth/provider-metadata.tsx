@@ -61,13 +61,23 @@ export const LinkableAuthProviders = [...AllAuthProviders.filter(isLinkableAuthP
 export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as const;
 export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id), 'email'] as const;
 
-// Subset `/connected-accounts` may start a link for. Account linking requires
-// the web session that started it, and a provider's callback carries that
-// session only when it is a same-site GET; Apple's callback is a cross-site
-// form POST, so Apple is offered for sign-in only.
+// Providers whose callback does not carry the web session that started an
+// account link: the link requires that session, and Apple's callback is a
+// cross-site form POST. They stay sign-in methods only. This is the single
+// declaration of the exclusion; the offered list and the link start both read
+// what it produces.
+const LinkSessionUnavailableProviderIds = ['apple'] as const satisfies readonly AuthProviderId[];
+
+// Subset `/connected-accounts` may start a link for.
 export const AccountLinkingProviders = [
-  ...LinkableAuthProviders.filter(p => p.id !== 'apple'),
+  ...LinkableAuthProviders.filter(p => !LinkSessionUnavailableProviderIds.some(id => id === p.id)),
 ] as const;
+
+const AccountLinkingProviderIds = new Set<string>(AccountLinkingProviders.map(p => p.id));
+
+/** Whether `/connected-accounts` may start a link for `provider`. */
+export const isAccountLinkingProvider = (provider: AuthProviderId): boolean =>
+  AccountLinkingProviderIds.has(provider);
 
 // All auth methods (excludes fake-login, used for sign-in hints)
 // This is the same as all providers except fake-login

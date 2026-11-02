@@ -1935,7 +1935,7 @@
       "enterWholeNumber": "له 1 څخه تر 365 پورې یو صحیح عدد ولیکئ",
       "permissionNote": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ترتیبات بدل کړي.",
       "enableTracking": "د SLA تعقیب فعال کړئ",
-      "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح وروستۍ نېټې وټاکئ.",
+      "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح مهلتونه وټاکئ.",
       "deadlinesHeading": "د اصلاح مهلتونه (ورځې)"
     },
     "findingDetail": {
@@ -2023,7 +2023,7 @@
       "newFindingSeverityLabel": "د نوې موندنې لږ تر لږه شدت",
       "newFindingSubtitle": "هر ځل چې نوې موندنه همغږي شي، خبرتیا لېږل کېږي، د لومړي ځل همغږي کېدو پر مهال هم.",
       "slaLeadTimeError": "د ورځو شمېر له 1 تر 365 پورې یو صحیح عدد ولیکئ.",
-      "slaLeadTimeLabel": "د SLA تر وروستۍ نېټې مخکې خبرداری (ورځې)",
+      "slaLeadTimeLabel": "د SLA تر مهلت مخکې خبرداری (ورځې)",
       "slaPersonalTitle": "د SLA د خبرداریو په اړه برېښنالیک راواستوئ",
       "slaSection": "د SLA د خبرداری خبرتیا",
       "slaSeverityLabel": "د SLA د خبرتیا لږ تر لږه شدت",

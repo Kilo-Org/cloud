@@ -11,6 +11,7 @@ import {
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
 import {
   getByokCredentials,
   getCatalogModeByokCredentials,
@@ -97,6 +98,9 @@ function catalogModel(
     provider: {
       id,
       models_dev_id: id,
+      ...(id === 'zai-coding'
+        ? { openrouter_inference_provider_id: 'z-ai' as const }
+        : { provider_listing: syntheticDefinition.provider_listing }),
       ...apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
         supportedChatApis,

@@ -24,11 +24,10 @@ import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import {
-  decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastPasteDeniedCopy,
+  readPrLinkPasteClipboard,
   selectPrLinkClearButtonVisible,
-  selectPrLinkPasteEmptyReason,
 } from '@/lib/pr-review/pr-link-paste';
 import {
   getRecentPrs,
@@ -92,22 +91,22 @@ export function PrReviewEntryScreen() {
   };
 
   const handlePaste = async () => {
-    const clipboard = await Clipboard.getStringAsync();
-    const decision = decidePrLinkPaste(clipboard);
-    if (decision.kind === 'empty') {
-      // iOS answers a denied prompt with an empty read, so ask the prompt-free
-      // probe whether the clipboard still holds text before calling it empty.
-      const clipboardHasString = await Clipboard.hasStringAsync();
+    // Every tap ends in a visible result: the field is replaced, or a toast
+    // names why nothing could be pasted. The reader never rejects, so a
+    // refused or broken clipboard read cannot vanish into the press handler.
+    const outcome = await readPrLinkPasteClipboard(Clipboard);
+    if (outcome.kind === 'empty') {
+      // iOS answers a denied prompt with an empty read, so the reader asks the
+      // prompt-free probe whether the clipboard still holds text before calling
+      // it empty; a read that failed outright reports the same denial.
       announcingToast.error(
-        selectPrLinkPasteEmptyReason(clipboard, clipboardHasString) === 'denied'
-          ? prLinkToastPasteDeniedCopy()
-          : prLinkToastClipboardEmptyCopy()
+        outcome.reason === 'denied' ? prLinkToastPasteDeniedCopy() : prLinkToastClipboardEmptyCopy()
       );
       return;
     }
     // Replace the native field, ref and derived UI together, never append at the cursor.
-    writeField(decision.text);
-    if (decision.kind === 'non-url-text') {
+    writeField(outcome.text);
+    if (outcome.kind === 'non-url-text') {
       return;
     }
     handleSubmit();
@@ -143,12 +142,18 @@ export function PrReviewEntryScreen() {
   if (recent === null) {
     recentsBody = <PrReviewRecentsPending />;
   } else if (recent.length === 0) {
+    // The recents state is the last body of the inbox scroll, so it shares the
+    // screen with the INBOX section above it and never owns a clear region
+    // either: the full-size stack is what fell under the tab bar on a compact
+    // phone, and the footer's own gap already separates it from the RECENT
+    // eyebrow.
     recentsBody = (
       <EmptyState
         icon={SearchX}
         title={t('prReview.entry.noRecentPrs')}
         description={t('prReview.entry.noRecentPrsDescription')}
         placement="top"
+        compact
       />
     );
   } else {

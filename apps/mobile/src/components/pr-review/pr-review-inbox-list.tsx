@@ -40,14 +40,22 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 type InboxItem = ProviderInboxRow;
 
 /**
- * The one spacing both section headers of this screen sit under.
+ * The two spacings every section of this screen shares.
  *
  * The INBOX header follows the paste block (and its own reserved link-error
  * line) and the RECENT header follows the inbox body; the two breaks are the
  * same section-to-section relation, so they share one token instead of each
- * picking its own.
+ * picking its own. A header is closer to its own content than to the section
+ * above it — otherwise the gap under a body reads as its spacing and the
+ * eyebrow looks like the last line of the block it follows. `spacing.8`
+ * separates sections and `spacing.4` pairs a header with what it labels, the
+ * ladder DESIGN.md reserves for exactly this relation. At this app's inline
+ * 14-point rem they land on 28 dp and 14 dp; the RECENT section they replace
+ * had 21 dp above its header and 21 dp below it, so neither gap read as the
+ * section break.
  */
-const PR_REVIEW_SECTION_BREAK = { padding: 'pt-6' } as const;
+const PR_REVIEW_SECTION_BREAK = { padding: 'pt-8' } as const;
+const PR_REVIEW_SECTION_LABEL_GAP = 'gap-4';
 
 type PrReviewInboxListProps = {
   /**
@@ -128,16 +136,26 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         />
       }
       ListFooterComponent={
-        <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
-          {inbox.githubNeedsReconnect &&
-          view.kind !== 'reconnect' &&
-          !isOrganizationAccessView(view) ? (
-            <PrReviewReconnectNotice />
-          ) : null}
-          {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
-          <RecentEyebrow />
-          {recents}
-        </View>
+        // RECENT waits for the inbox to settle. While the skeletons are up the
+        // section would sit under a placeholder that is taller than most
+        // settled bodies, so the section either reserves that air (and lands
+        // under the tab bar on a compact phone) or jumps up when the inbox
+        // settles. Left out, nothing below the skeletons can move, and the
+        // section appears at the height the settled body leaves it.
+        view.kind === 'loading' ? null : (
+          <View className={`gap-6 px-6 pb-12 ${PR_REVIEW_SECTION_BREAK.padding}`}>
+            {inbox.githubNeedsReconnect &&
+            view.kind !== 'reconnect' &&
+            !isOrganizationAccessView(view) ? (
+              <PrReviewReconnectNotice />
+            ) : null}
+            {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
+            <View className={PR_REVIEW_SECTION_LABEL_GAP}>
+              <RecentEyebrow />
+              {recents}
+            </View>
+          </View>
+        )
       }
       onEndReached={() => {
         if (inbox.hasNextPage && !inbox.isFetchingNextPage) {

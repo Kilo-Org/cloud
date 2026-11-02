@@ -118,6 +118,40 @@ describe('plural families', () => {
     }
   });
 
+  it('reads counted options from property-key position only', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        // A value that names a count is not an option of the call.
+        `t('fixture.valueOnly', { label: count });`,
+        `t('fixture.arrowBody', { format: () => count });`,
+        `t('fixture.nestedArgument', { label: fmt({ count }) });`,
+        // A literal key in key position is an option, quoted or backticked.
+        `t('fixture.quotedKey', { 'count': n });`,
+        't(`fixture.backtickKey`, { `displayCount`: n });',
+        // Shorthand names the option too.
+        `t('fixture.shorthand', { count });`,
+        `t('fixture.trailingShorthand', { label: x, count });`,
+        // A bracket or a name inside a string value stays text.
+        `t('fixture.stringBracket', { label: 'a (b', count: 1 });`,
+        `t('fixture.stringComma', { label: 'a, count: x' });`,
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual([
+        'fixture.backtickKey',
+        'fixture.quotedKey',
+        'fixture.shorthand',
+        'fixture.stringBracket',
+        'fixture.trailingShorthand',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reviews every dynamic counted call and checks its possible keys', () => {
     expect(findUnlistedDynamicCalls()).toEqual([]);
     // `findCountlessFamilies` above walks the allowlist's keys too, so a stale

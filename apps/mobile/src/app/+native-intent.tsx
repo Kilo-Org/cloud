@@ -85,6 +85,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (fixtureRoute) {
       return fixtureRoute;
     }
+    if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    }
     // Dev-only profile picker sheet, reached through the development fixture path.
     const profilePickerRoute = profilePickerFixtureRoute(path);
     if (profilePickerRoute) {

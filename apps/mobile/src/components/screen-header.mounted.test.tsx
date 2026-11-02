@@ -999,6 +999,45 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
+  it('paints a placeholder on the reserved subtitle line while the name loads', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      subtitlePlaceholder: createElement('PlaceholderBar'),
+    });
+
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(1);
+    // The placeholder is painted over the reserved line, which still holds the
+    // height the name will take, so the placeholder and the name lay out the same.
+    const reserved = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(reserved).toHaveLength(1);
+    expect(reserved[0]?.children).toEqual(['\u00A0']);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('omits the subtitle line when the caller reserves no space for it', () => {
     const renderer = renderHeader({ title: 'Profile agents' });
     const subtitles = renderer.root.findAll(

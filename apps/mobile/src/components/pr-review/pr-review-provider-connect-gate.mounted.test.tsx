@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
+import { PrReviewOverviewSkeleton } from './pr-review-overview-skeleton';
 
 // Mutable so each test publishes the provider scope the layout would carry.
 const scopeState = vi.hoisted(() => ({
@@ -124,6 +125,10 @@ vi.mock('@/components/pr-review/pr-review-context-line', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The gate's pending body is the detail screen's frame: the real skeleton over a
+// stubbed scroller keeps the assertion on the gate's own choice of body.
+vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn() },
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
@@ -254,7 +259,8 @@ describe('organization GitLab reconnect state', () => {
     // organization's — a visible jump on the same route.
     organizationState.value = { organizationId: null, isLoaded: false, error: null };
     const renderer = mount('gitlab', null);
-    expect(renderer.root.findByType('ActivityIndicator')).toBeDefined();
+    expect(renderer.root.findAllByType(PrReviewOverviewSkeleton)).toHaveLength(1);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
     expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
   });
 

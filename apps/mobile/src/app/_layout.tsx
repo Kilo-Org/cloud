@@ -108,6 +108,7 @@ import {
   consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
+  wasLaunchAppRouteCaptured,
   wasLaunchLinkHandled,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
@@ -1010,6 +1011,10 @@ function RootLayoutNav({
         // same path once groups are stripped, so the resolved href of the route
         // actually on screen is the comparison, not the bare pathname.
         restoredRoute: lastRouteHrefFrom(globalHref, pathname, segments) ?? pathname,
+        // A launch that named one of the app's own routes is the screen this
+        // process was started for: the pending-deep-link consumer below opens
+        // it (with the layout anchors beneath it) instead of the record.
+        launchOpenedAppRoute: wasLaunchAppRouteCaptured(),
       })
     ) {
       return;

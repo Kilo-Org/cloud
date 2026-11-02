@@ -9,6 +9,7 @@
       "lowBalance": "Saldo ou bezwen atansyon",
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
+      "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
       "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Yon rezilta sekirite bezwen atansyon"
+      "body": "Yon chèk sekirite gen yon aktyalizasyon"
     }
   },
   "instanceLifecycle": {

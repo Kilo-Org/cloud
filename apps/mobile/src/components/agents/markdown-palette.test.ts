@@ -11,6 +11,7 @@ const colors = {
   primaryDisabled: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
+  secondaryFill: '#F0EEE6',
   muted: '#F0EEE6',
   mutedForeground: '#7A756B',
   destructive: '#C25647',

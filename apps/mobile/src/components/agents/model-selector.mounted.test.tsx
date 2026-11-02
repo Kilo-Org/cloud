@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
+import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -281,16 +282,17 @@ describe('ModelPickerOptionRow trailing alignment', () => {
 });
 
 // A provider section's header already names the provider, so its rows drop the
-// line that repeats it and keep the model id. Rows in FAVORITES, recommended and
-// all-models have no provider header above them and keep the line.
-describe('ModelPickerOptionRow provider line', () => {
+// line that repeats it. Rows in FAVORITES, recommended and all-models have no
+// provider header above them and keep the line. Every row shows the bare model
+// id under its name: the row name and the sheet title already say it is a model.
+describe('ModelPickerOptionRow provider and model id lines', () => {
   const providerOption = cliCatalogOption({
     displayId: 'anthropic-model-00',
     modelRef: { providerID: 'anthropic', modelID: 'anthropic-model-00' },
     provider: { id: 'anthropic', name: 'Anthropic' },
   });
   const providerLine = i18n.t('agentChat.modelSelector.provider', { id: 'anthropic' });
-  const modelIdLine = i18n.t('agentChat.modelSelector.modelId', { id: 'anthropic-model-00' });
+  const modelIdLine = 'anthropic-model-00';
 
   it('omits the provider line under a provider section and keeps the model id', () => {
     const texts = textStrings(renderRow(providerOption, { showProvider: false }).root);
@@ -304,6 +306,16 @@ describe('ModelPickerOptionRow provider line', () => {
 
     expect(texts).toContain(providerLine);
     expect(texts).toContain(modelIdLine);
+  });
+
+  it('renders the id line as the bare id, with no label in front of it', () => {
+    for (const showProvider of [false, true]) {
+      const idLines = textStrings(renderRow(providerOption, { showProvider }).root).filter(text =>
+        text.includes(modelIdLine)
+      );
+
+      expect(idLines).toEqual([modelIdLine]);
+    }
   });
 
   // The visible line is the duplicate, not the fact: a screen reader that lands
@@ -417,5 +429,31 @@ describe('ModelSelector loading chip', () => {
     const renderer = renderSelector({ value: option.id, options: [option] });
 
     expect(textStrings(renderer.root)).toContain(option.name);
+  });
+});
+
+// The chip's own node is its visual surface (28.3pt on device), so the touch
+// region has to come from hit slop, and only from the vertical axis: the chip
+// on the same line and the paste button beside it each own the space next to
+// it.
+describe('ModelSelector pill touch target', () => {
+  it('reaches the design target from its own frame plus vertical hit slop', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    const pill = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    )[0];
+    if (pill === undefined) {
+      throw new Error('model pill not found');
+    }
+    const slop = pill.props.hitSlop as { top?: number; bottom?: number };
+    const reach = CHIP_FRAME_DP + (slop.top ?? 0) + (slop.bottom ?? 0);
+
+    expect(reach).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(slop).not.toHaveProperty('left');
+    expect(slop).not.toHaveProperty('right');
+
+    renderer.unmount();
   });
 });

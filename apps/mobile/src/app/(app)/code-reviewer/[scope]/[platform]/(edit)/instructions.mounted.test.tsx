@@ -31,6 +31,10 @@ const queryError = vi.hoisted(() => ({
   props: [] as { variant?: string; onRetry?: () => void; isRetrying?: boolean }[],
 }));
 const save = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }));
+// The app's shared clipboard helper; the notice's action must go through it so
+// the copy gets the same confirmation toast and failure path as every other
+// copy in the app.
+const clipboardCopy = vi.hoisted(() => ({ performCopy: vi.fn() }));
 const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
 const preventRemove = vi.hoisted(() => ({
@@ -143,9 +147,12 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
+vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle', Copy: 'Copy' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  performCopy: clipboardCopy.performCopy,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ warn: '#f2b05f' }),
+  useThemeColors: () => ({ foreground: '#f5f5f5', warn: '#f2b05f' }),
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({
@@ -210,6 +217,26 @@ function triggerPreventRemove() {
 
 const STORED = 'first line\nsecond line\nthird line\nfourth line\nfifth line\nsixth line';
 
+// The shape the notice's copy action exists for: more lines than the field's
+// ten-line cap can show at once, with accents, curly quotes and an emoji, so a
+// copy that dropped, re-encoded or truncated anything would show.
+const LONG_STORED = [
+  'Regras gerais:',
+  '1. Prefira commits pequenos, com mensagem no imperativo.',
+  '2. “Nunca” reescreva histórico publicado: acrescente um commit.',
+  '3. Não use `any`; prefira `unknown` e estreite o tipo na origem.',
+  '4. Comentários explicam o porquê, não o quê.',
+  '5. Testes cobrem comportamento, não a implementação.',
+  '6. Sempre rode o lint e o typecheck antes de abrir o MR.',
+  '7. Não adicione dependências sem justificar no MR.',
+  '8. Migrações são aditivas; a remoção vem em um MR próprio.',
+  '9. Erros de rede têm retry limitado e mensagem clara.',
+  '10. Strings novas entram em todas as línguas.',
+  '11. Componentes novos reutilizam os compartilhados.',
+  '12. Emoji nos testes: 🧪 — mantenha o texto exato.',
+  'Fim.',
+].join('\n');
+
 // The TextInput mock records on every render; the last entry is the current
 // one. Six tests need the same lockstep lookup, so it lives here.
 function latestInput() {
@@ -234,6 +261,32 @@ function pressSaveButton(renderer: TestRenderer.ReactTestRenderer) {
   // typeof narrowing proves callable, not zero-arg; the screen's own Button
   // calls it the same way.
   (onPress as () => void)();
+}
+
+// The notice's copy action. The editor renders two buttons and Save is the
+// last, so the label it renders is what tells them apart.
+function findCopyButton(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Button')
+    .find(button =>
+      button
+        .findAll(node => String(node.type) === 'Text')
+        .some(text => text.props.children === i18n.t('common.copy'))
+    );
+}
+
+function pressCopyButton(renderer: TestRenderer.ReactTestRenderer) {
+  const button = findCopyButton(renderer);
+  if (!button) {
+    throw new Error('copy action not found');
+  }
+  const onPress = (button.props as Record<string, unknown>).onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError('copy action onPress is not a function');
+  }
+  act(() => {
+    (onPress as () => void)();
+  });
 }
 
 // Runs `trigger` inside act and lets the screen's async save (mutation, then
@@ -262,6 +315,7 @@ beforeEach(() => {
   save.mutate.mockReset();
   save.mutateAsync.mockReset();
   save.mutateAsync.mockResolvedValue({});
+  clipboardCopy.performCopy.mockReset();
   router.back.mockReset();
   router.push.mockReset();
   navigation.dispatch.mockReset();
@@ -661,6 +715,44 @@ describe('InstructionsRoute editor', () => {
     const input = latestInput();
     expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
     expect(input.accessibilityLabel).not.toBe('Custom instructions');
+  });
+});
+
+// The notice tells the reader to move the instructions into REVIEW.md, and the
+// field below it shows ten lines of a value that can be far longer. The action
+// beside the notice is the way out: it hands over the whole stored value in one
+// press through the app's shared clipboard helper, which owns the confirmation
+// toast and the failure path.
+describe('InstructionsRoute retirement notice copy action', () => {
+  it('copies the whole stored value, not the window the field shows', () => {
+    config.data = { customInstructions: LONG_STORED };
+    const renderer = mount();
+
+    pressCopyButton(renderer);
+
+    expect(clipboardCopy.performCopy).toHaveBeenCalledTimes(1);
+    expect(clipboardCopy.performCopy).toHaveBeenCalledWith(LONG_STORED);
+  });
+
+  it('copies the stored value while an unsaved edit sits in the field', () => {
+    config.data = { customInstructions: STORED };
+    const renderer = mount();
+    act(() => {
+      latestInput().onChangeText('an unsaved rewrite');
+    });
+
+    pressCopyButton(renderer);
+
+    // The notice retires the stored instructions; the edit is not saved yet, so
+    // it is not what the reader is being told to carry over.
+    expect(clipboardCopy.performCopy).toHaveBeenCalledWith(STORED);
+  });
+
+  it('offers no copy action when nothing is stored', () => {
+    config.data = { customInstructions: '' };
+    const renderer = mount();
+
+    expect(findCopyButton(renderer)).toBeUndefined();
   });
 });
 

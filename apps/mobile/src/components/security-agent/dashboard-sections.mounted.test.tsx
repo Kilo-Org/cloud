@@ -370,9 +370,7 @@ describe('DashboardSections repository card with an empty grant', () => {
     const state = emptyState(renderSections({ emptyGrant: true }));
 
     expect(state.props.description).toBe('securityAgent.repositories.noRepositoriesDescription');
-    expect(state.props.description).not.toBe(
-      'securityAgent.dashboard.noRepositoryDataDescription'
-    );
+    expect(state.props.description).not.toBe('securityAgent.dashboard.noRepositoryDataDescription');
   });
 
   it("offers the manager's repository settings as the step out", () => {

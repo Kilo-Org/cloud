@@ -723,7 +723,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               // box and the sections below keep their place when the link
               // arrives. Once the tiles are measured the link needs a
               // measured total, which the placeholder cannot read, so a scope
-              // that has synced keeps it out of the loading state.
+              // that has synced keeps it out of the loading state. A settled
+              // empty grant keeps it out too: the repository card below holds
+              // that state's step, and the placeholder already knows that
+              // shape.
               <View className="flex-row items-center gap-4">
                 <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
               </View>
@@ -761,8 +764,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         !repositoryPolicyReadOnly &&
         // An empty grant is the reason this empty state has no deadline to
         // show, and the repository card below carries its step out. This link
-        // would repeat that same destination from further away.
-        !repositoryScopeEmpty ? (
+        // would repeat that same destination from further away — but only once
+        // that card can render, which waits for the sync-status read: until
+        // then this link is the screen's only way to the repositories.
+        !(repositoryScopeEmpty && !lastSync.isPending) ? (
           <View className="flex-row items-center gap-4">
             {/* The refresh control in the filter row above is this screen's one
                 sync affordance; a second "Sync findings" link here repeated it

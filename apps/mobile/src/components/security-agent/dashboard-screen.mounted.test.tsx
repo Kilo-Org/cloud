@@ -924,9 +924,7 @@ describe('DashboardScreen repository card with an empty grant', () => {
     const root = renderScreen('org_123');
     const props = sectionsProps.props.at(-1);
 
-    expect(props?.emptyGrantAction?.label).toBe(
-      i18n.t('securityAgent.repositories.manageAccess')
-    );
+    expect(props?.emptyGrantAction?.label).toBe(i18n.t('securityAgent.repositories.manageAccess'));
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboard.manageRepositories')
     );
@@ -974,6 +972,21 @@ describe('DashboardScreen repository card with an empty grant', () => {
 
   it('keeps the SLA card link while the grant holds repositories', () => {
     repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The repository card renders only once the sync-status read settles, so
+  // taking this link away before then would leave a screen with an empty grant
+  // and nothing to press.
+  it('keeps the SLA card link until the card that carries the step can render', () => {
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    dashboardStats.isPending = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } } };
     const root = renderScreen('org_123');
 
     expect(renderedTexts(root.root)).toContain(

@@ -129,12 +129,15 @@ const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\)
 /**
  * Owners whose content a native dialog or sheet hosts.
  *
- * The platform positions that surface inside the window, and the frames React
- * Native reports for its content start at the surface's own origin — so for a
- * surface that covers only part of the window (a bottom sheet), a frame near the
- * surface's top says nothing about the window's top inset. A surface that fills
- * the window's content area starts where the window's content starts, and its
- * frames do describe the insets, so it must stay checked.
+ * The platform presents that surface in its own window and positions it there,
+ * so `getBoundingClientRect` reports every frame of its content from the
+ * surface's own origin: a bottom sheet whose top sits 307 dp down the app window
+ * measures its heading at y 0. The window's insets therefore do not describe
+ * those frames, and the surface owns them itself — `SessionPageSheet` pads the
+ * top inset on Android and sits below the status bar on iOS, as its own
+ * definition documents. No frame the probe can read distinguishes a surface that
+ * coincides with the window from one that does not, so a rule about the window's
+ * insets skips all of them rather than guessing from a height.
  */
 const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
 
@@ -144,16 +147,11 @@ export function hasPresentedOwner(probe: ProbeNode): boolean {
 }
 
 /**
- * True when a partial native dialog or sheet hosts the node's content, so the
- * frame is measured from that surface's origin rather than the window's.
+ * True when a native dialog or sheet hosts the node's content, so its frame is
+ * measured from that surface's origin rather than the window's.
  */
-export function insidePresentedSurface(node: LayoutNode, env: ProbeEnv): boolean {
-  const surface = [node, ...ancestors(node)].find(candidate => hasPresentedOwner(candidate.probe));
-  if (!surface) {
-    return false;
-  }
-  const contentHeight = env.window.height - env.safeArea.top - env.safeArea.bottom;
-  return surface.rect[3] < contentHeight - 1;
+export function insidePresentedSurface(node: LayoutNode): boolean {
+  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
 }
 
 function visibleContainer(style: ProbeNode['style']): boolean {

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { writeJson, type CellRun, type Exec, type RunOutcome } from './capture';
 import type { Finding, Rect } from './findings';
-import { insidePresentedSurface, normalize, parseDump } from './tree';
+import { hasPresentedOwner, parseDump } from './tree';
 
 export type RunMeta = {
   platform: string;
@@ -193,8 +193,7 @@ export function skippedRules(cells: readonly CellRun[], out: string) {
           cell: cell.id,
           target: screen.target,
           rule: 'safe-area',
-          reason:
-            'a partial native dialog or sheet hosts the content, so its frames are surface-local',
+          reason: 'a native dialog or sheet hosts the content, so its frames are surface-local',
         });
       }
       return entries;
@@ -202,11 +201,10 @@ export function skippedRules(cells: readonly CellRun[], out: string) {
   );
 }
 
-/** True when the snapshot holds a partial native dialog or sheet. */
+/** True when the snapshot holds content a native dialog or sheet hosts. */
 function hasPresentedSurface(dump: string): boolean {
   try {
-    const tree = normalize(parseDump(fs.readFileSync(dump, 'utf8')));
-    return tree.nodes.some(node => insidePresentedSurface(node, tree.env));
+    return parseDump(fs.readFileSync(dump, 'utf8')).nodes.some(hasPresentedOwner);
   } catch {
     return false;
   }

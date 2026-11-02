@@ -324,7 +324,7 @@ test('skippedRules lists the safe-area gap a presented surface leaves', () => {
       cell: 'base',
       target: 'sheet',
       rule: 'safe-area',
-      reason: 'a partial native dialog or sheet hosts the content, so its frames are surface-local',
+      reason: 'a native dialog or sheet hosts the content, so its frames are surface-local',
     },
   ]);
 });

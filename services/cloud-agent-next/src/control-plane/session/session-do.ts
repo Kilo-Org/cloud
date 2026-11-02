@@ -3197,12 +3197,26 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .filter(message => isTerminalMessage(message.state))
           .map(message => message.messageId)
       );
-      this.messageCallbacks.persistDrainedBatchCallback(
-        this.messages,
-        newlyTerminal,
-        undefined,
-        facts
-      );
+      const metadata = this.metadata;
+      if (metadata === null) return;
+      const consumedMetadata = this.ctx.storage.transactionSync(() => {
+        if (
+          !this.messageCallbacks.persistDrainedBatchCallback(
+            this.messages,
+            newlyTerminal,
+            metadata,
+            facts
+          )
+        ) {
+          return undefined;
+        }
+        const updated = { ...metadata };
+        delete updated.callback;
+        const serialized = serializeSessionMetadata(updated);
+        this.ctx.storage.kv.put(SESSION_METADATA_KEY, serialized);
+        return serialized;
+      });
+      if (consumedMetadata !== undefined) this.metadata = consumedMetadata;
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Cloud Agent callback write failed');
     }

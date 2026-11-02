@@ -2053,6 +2053,9 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           type: 'session.prompt',
           payload: { messageId: 'new-B' },
         });
+        expect(
+          await sessionStub.tryUpdate({ callbackTarget: { url: 'https://callback.test/hook' } })
+        ).toEqual({ success: true });
         wrapperB.send({
           type: 'session.outcome',
           sessionId,
@@ -2168,6 +2171,9 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       await runSessionAlarm(sessionStub);
       expect(reports).toHaveLength(1);
       expect(callbacks).toHaveLength(1);
+      expect(
+        await sessionStub.tryUpdate({ callbackTarget: { url: 'https://callback.test/hook' } })
+      ).toEqual({ success: true });
       let releaseResponse!: () => void;
       const response = new Promise<void>(resolve => {
         releaseResponse = resolve;
@@ -2408,6 +2414,9 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       );
 
       provider.failure = undefined;
+      expect(
+        await sessionStub.tryUpdate({ callbackTarget: { url: 'https://callback.test/hook' } })
+      ).toEqual({ success: true });
       await sessionStub.send(promptPayload('m2'));
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
       const launch = provider.launchEnvs[0];

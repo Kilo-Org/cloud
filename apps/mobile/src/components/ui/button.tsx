@@ -30,7 +30,12 @@ const buttonVariants = cva(
         secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
-        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // A soft accent action is low-emphasis, so it paints a tint of the
+        // accent rather than the full-strength surface user bubbles fill with.
+        // The tint is what keeps it behind a filled primary: in dark mode that
+        // primary already fills with #ffdd00, and a solid accent-soft button
+        // could not be told apart from it.
+        'accent-soft': 'bg-accent-soft-tint active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
         // min-h (not fixed h) so the button grows to fit text scaled by large
@@ -121,7 +126,7 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
     return colors.primary;
   }
   if (variant === 'accent-soft') {
-    return colors.accentSoftForeground;
+    return colors.accentSoftTintForeground;
   }
   if (variant === 'destructive') {
     return colors.destructiveSolidForeground;
@@ -143,7 +148,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
       secondary: 'text-secondary-foreground',
       ghost: 'text-foreground',
       link: 'text-primary group-active:underline',
-      'accent-soft': 'text-accent-soft-foreground',
+      'accent-soft': 'text-accent-soft-tint-foreground',
     },
     size: {
       default: '',

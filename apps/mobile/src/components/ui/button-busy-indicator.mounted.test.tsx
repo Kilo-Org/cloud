@@ -10,7 +10,7 @@ const theme = vi.hoisted(() => ({
     foreground: '#123456',
     primary: '#345678',
     primaryForeground: '#abcdef',
-    accentSoftForeground: '#1a1a10',
+    accentSoftTintForeground: '#1a1a10',
   },
 }));
 
@@ -52,16 +52,16 @@ beforeEach(() => {
 
 describe('Button busy indicator', () => {
   it('draws the accent-soft spinner in the ink its own label uses', () => {
-    // The label paints with `text-accent-soft-foreground`; the spinner beside it
-    // must follow the same token, so a palette change moves both states in
-    // either theme instead of leaving the spinner on its old value.
+    // The label paints with `text-accent-soft-tint-foreground`; the spinner
+    // beside it must follow the same token, so a palette change moves both
+    // states in either theme instead of leaving the spinner on its old value.
     expect(busySpinnerColor(render({ variant: 'accent-soft', loading: true }))).toBe('#1a1a10');
 
-    theme.colors.accentSoftForeground = '#0b0b0b';
+    theme.colors.accentSoftTintForeground = '#0b0b0b';
     try {
       expect(busySpinnerColor(render({ variant: 'accent-soft', loading: true }))).toBe('#0b0b0b');
     } finally {
-      theme.colors.accentSoftForeground = '#1a1a10';
+      theme.colors.accentSoftTintForeground = '#1a1a10';
     }
   });
 

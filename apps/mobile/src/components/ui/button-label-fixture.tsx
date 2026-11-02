@@ -61,7 +61,10 @@ export function ButtonLabelFixture() {
         <Button variant="accent-soft">
           <Text>Accent soft label</Text>
         </Button>
-        <Button variant="accent-soft" loading={loading}>
+        {/* Busy from the first frame: the gate opens this link without pressing
+            Toggle loading, and an idle button cannot show where the spinner
+            paints. */}
+        <Button variant="accent-soft" loading>
           <Text>Accent soft label</Text>
         </Button>
         <Text>Inline wait · static marker under reduced motion</Text>

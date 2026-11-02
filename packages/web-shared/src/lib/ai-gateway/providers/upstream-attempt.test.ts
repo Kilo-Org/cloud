@@ -176,7 +176,6 @@ describe('upstream model catalog validation', () => {
     'bytedance-seed/seed-2.0',
     'openai/gpt-4o',
     '~deepseek/deepseek-pro-latest',
-    exclusiveModel.public_id,
   ]);
 
   beforeEach(() => {
@@ -300,8 +299,9 @@ describe('upstream model catalog validation', () => {
   });
 
   it.each(['openrouter', 'vercel'] as const)(
-    '%s validates a Kilo-exclusive public ID before sending its backing wire ID',
+    '%s skips catalog validation for a Kilo-exclusive model',
     async providerId => {
+      jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
       const result = await attempt({
         providerId,
         requestedModel: exclusiveModel.public_id,
@@ -309,9 +309,7 @@ describe('upstream model catalog validation', () => {
       });
 
       expect(result.type).toBe('success');
-      expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
-        [exclusiveModel.public_id],
-      ]);
+      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
       expect(upstreamRequest).toHaveBeenCalledWith(
         expect.objectContaining({

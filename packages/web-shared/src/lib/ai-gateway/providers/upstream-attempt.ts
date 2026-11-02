@@ -17,6 +17,7 @@ import {
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -104,12 +105,11 @@ export async function sendUpstreamAttempt({
   }
 
   if (
-    providerContext.provider.type === 'openrouter' ||
-    providerContext.provider.type === 'vercel'
+    (providerContext.provider.type === 'openrouter' || providerContext.provider.type === 'vercel') &&
+    !isKiloExclusiveModel(requestedModel) &&
+    !(await isValidOpenRouterModelId(requestedModel))
   ) {
-    if (!(await isValidOpenRouterModelId(requestedModel))) {
-      return { type: 'invalid-openrouter-model' };
-    }
+    return { type: 'invalid-openrouter-model' };
   }
 
   const result = await upstreamRequest({

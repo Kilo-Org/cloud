@@ -4,7 +4,6 @@ import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
@@ -172,7 +171,7 @@ const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
 let warnedMissingOpenRouterModelMetadataFor: ReadonlySet<string> | null = null;
 
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
-  if (isKiloExclusiveModel(modelId) || legacyOpenRouterAliases.has(modelId)) {
+  if (legacyOpenRouterAliases.has(modelId)) {
     return true;
   }
   const openRouterModelIds = await getOpenRouterModelsFromDatabase();

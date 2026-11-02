@@ -48,6 +48,7 @@ type PermissionValues = {
   canViewSessions: boolean;
   canManageCredits: boolean;
   canExportApiRequestLogs: boolean;
+  canRequestSupportOrgAccess: boolean;
 };
 
 function AccountStatusBadge({ user }: { user: PlatformAdminUser }) {
@@ -192,6 +193,7 @@ export function PlatformAdminsContent() {
       canViewSessions: user.can_view_sessions,
       canManageCredits: user.can_manage_credits,
       canExportApiRequestLogs: user.can_export_api_request_logs,
+      canRequestSupportOrgAccess: user.can_request_support_org_access,
     });
   }
 
@@ -211,6 +213,10 @@ export function PlatformAdminsContent() {
       ...(permissionValues.canExportApiRequestLogs !==
         permissionTarget.can_export_api_request_logs && {
         canExportApiRequestLogs: permissionValues.canExportApiRequestLogs,
+      }),
+      ...(permissionValues.canRequestSupportOrgAccess !==
+        permissionTarget.can_request_support_org_access && {
+        canRequestSupportOrgAccess: permissionValues.canRequestSupportOrgAccess,
       }),
     };
 
@@ -607,6 +613,35 @@ export function PlatformAdminsContent() {
                     disabled={setPermissionsMutation.isPending}
                     onCheckedChange={canManageCredits =>
                       setPermissionValues(values => values && { ...values, canManageCredits })
+                    }
+                  />
+                </Label>
+              </div>
+
+              <div className="flex min-h-11 items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="permission-support-org-access">Support org access</Label>
+                  <p
+                    id="permission-support-org-access-help"
+                    className="text-muted-foreground text-sm"
+                  >
+                    Can request time-bounded read or approved-write access to a customer
+                    organization.
+                  </p>
+                </div>
+                <Label
+                  htmlFor="permission-support-org-access"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                >
+                  <Switch
+                    id="permission-support-org-access"
+                    aria-describedby="permission-support-org-access-help"
+                    checked={permissionValues.canRequestSupportOrgAccess}
+                    disabled={setPermissionsMutation.isPending}
+                    onCheckedChange={canRequestSupportOrgAccess =>
+                      setPermissionValues(
+                        values => values && { ...values, canRequestSupportOrgAccess }
+                      )
                     }
                   />
                 </Label>

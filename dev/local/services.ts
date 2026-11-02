@@ -121,10 +121,9 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
-  // Enterprise SSO is foundational to auth, so the WorkOS directory-event
-  // poller runs with the core stack. It has no local dependencies: it reaches
-  // the WorkOS API directly and keeps its cursor in its own Durable Object
-  // SQLite, so it needs neither Postgres nor the web app.
+  // A no-behavior placeholder for now (see services/scim-sync/README.md): it
+  // runs with the core stack so every local session exercises the Worker and
+  // its Durable Object binding. No dependencies and no secrets.
   'cloudflare-scim-sync': {
     group: 'core',
     dependsOn: [],

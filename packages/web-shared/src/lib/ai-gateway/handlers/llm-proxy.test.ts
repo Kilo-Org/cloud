@@ -220,11 +220,11 @@ jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
     }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
     .createFakeR2ClientModule()
 );
-jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => ({
   ...jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges'
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage'
   ),
-  recordEnkryptGuardrailCharge: jest.fn(async () => undefined),
+  recordEnkryptUsage: jest.fn(async () => undefined),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');

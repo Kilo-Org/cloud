@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one contrast guard per shipped surface shares this file's colour-math helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ROW_PALETTE } from '@/lib/agent-color';
@@ -343,18 +344,21 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 
 describe('disabled switch pair contrast (non-text)', () => {
   // The shared switch paints this pair for a disabled control on Android, in
-  // place of the brand on-track: `primary-disabled` under the regular grip for
-  // the on position, `muted-soft` with the mid neutral grip for the off one.
-  // iOS keeps the brand pair and fades it itself. The switch sits on a
-  // `secondary` row, so its tracks are measured over that. The floors are
-  // perception floors: the pair has to read as a control and the two positions
-  // have to stay apart. Light has no third neutral for the off track —
-  // `control-idle` equals `secondary` there — so the disabled off track is the
-  // same neutral as the enabled off track, and only its grip dims.
+  // place of the brand on-track: `primary-disabled` under a grip that sits
+  // below it in strength for the on position, `muted-soft` with the mid neutral
+  // grip for the off one. iOS keeps the brand pair and fades it itself. The
+  // switch sits on a `secondary` row, so its tracks are measured over that. The
+  // floors are perception floors: the pair has to read as a control and the two
+  // positions have to stay apart. Light has no third neutral for the off track
+  // — `control-idle` equals `secondary` there — so the disabled off track is
+  // the same neutral as the enabled off track, and only its grip dims.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  // [theme, palette, the grip the switch paints on the on track]. The on grip
+  // is the one colour a disabled pair cannot share with its enabled one: the
+  // scheme's on ink is what marks a control that still works.
   const themes = [
-    ['light', lightColors],
-    ['dark', darkColors],
+    ['light', lightColors, lightColors.primaryForeground],
+    ['dark', darkColors, darkColors.mutedSoft],
   ] as const;
 
   it('every theme: the disabled off track reads on the row surface', () => {
@@ -382,6 +386,29 @@ describe('disabled switch pair contrast (non-text)', () => {
         `muted-foreground vs muted-soft (${themeName})`
       ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
+  });
+
+  it('every theme: the disabled on grip reads on its own track', () => {
+    for (const [themeName, colors, onGrip] of themes) {
+      expect(
+        contrastRatio(onGrip, colors.primaryDisabled),
+        `on grip vs primary-disabled (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  // Regression: the disabled on grip once fell back to `primaryForeground` in
+  // both schemes, which dark defines as the near-black card colour. Android's
+  // thumb is wider than the track, so its outer arc lands on the row itself —
+  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
+  // remained of the pill read as a blank grey bar. The dark grip is the mid
+  // neutral instead: darker than its fill, and still a visible step off the
+  // near-black row its arc sits on.
+  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
+    expect(
+      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
+      'muted-soft vs secondary (dark)'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
   });
 });
 

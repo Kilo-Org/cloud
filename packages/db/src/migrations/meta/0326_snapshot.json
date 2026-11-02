@@ -1,5 +1,5 @@
 {
-  "id": "23bc6afc-323b-4e83-aa11-cad93bde06ad",
+  "id": "7929e453-5924-4033-98d9-c3a47fd5cb72",
   "prevId": "23004a70-bfcb-4146-a63c-ffdffbbf5fbf",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -26695,6 +26645,30 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "directory_id": {
+          "name": "directory_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "directory_group_id": {
+          "name": "directory_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "directory_idp_id": {
+          "name": "directory_idp_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_org_id": {
+          "name": "external_org_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -26757,6 +26731,70 @@
           "isUnique": true,
           "where": "(\"organizations\".\"settings\"->>'is_sales_demo')::boolean = true AND \"organizations\".\"deleted_at\" IS NULL",
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_organizations_directory_group_id": {
+          "name": "UQ_organizations_directory_group_id",
+          "columns": [
+            {
+              "expression": "directory_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"organizations\".\"directory_group_id\" IS NOT NULL AND \"organizations\".\"deleted_at\" IS NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_organizations_external_org_id": {
+          "name": "UQ_organizations_external_org_id",
+          "columns": [
+            {
+              "expression": "external_org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"organizations\".\"external_org_id\" IS NOT NULL AND \"organizations\".\"deleted_at\" IS NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_organizations_directory_idp_id": {
+          "name": "IDX_organizations_directory_idp_id",
+          "columns": [
+            {
+              "expression": "directory_idp_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"organizations\".\"directory_idp_id\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_organizations_directory_id": {
+          "name": "IDX_organizations_directory_id",
+          "columns": [
+            {
+              "expression": "directory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"organizations\".\"directory_id\" IS NOT NULL",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }

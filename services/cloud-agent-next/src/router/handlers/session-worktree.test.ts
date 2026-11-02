@@ -14,7 +14,14 @@ import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { CreateWorktreeChatInput, createSessionWorktreeHandlers } from './session-worktree.js';
+import {
+  CreateWorktreeChatInput,
+  continuedSiblingIntentFingerprint,
+  createSessionWorktreeHandlers,
+  runSiblingCreate,
+  type SiblingCreateRun,
+  type WorktreeSource,
+} from './session-worktree.js';
 
 const {
   admitOperationMock,
@@ -1728,5 +1735,109 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
       rowId: LEDGER_ROW_ID,
     });
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
+});
+
+describe('continuedSiblingIntentFingerprint', () => {
+  const base = {
+    workspaceId: WORKTREE_ID as `worktree_${string}`,
+    organizationId: undefined,
+    sourceKiloSessionId: SOURCE_KILO_SESSION_ID,
+    agent: { mode: 'code', model: 'test-model' },
+  };
+
+  it('ignores the display title so a same-key retry reuses the destination', async () => {
+    const first = await continuedSiblingIntentFingerprint(base);
+    const renamed = await continuedSiblingIntentFingerprint(base);
+    expect(first).toBe(renamed);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('still fingerprints the clone source and the agent selection', async () => {
+    const baseFingerprint = await continuedSiblingIntentFingerprint(base);
+    expect(
+      await continuedSiblingIntentFingerprint({
+        ...base,
+        sourceKiloSessionId: ALTERNATE_SOURCE_KILO_SESSION_ID,
+      })
+    ).not.toBe(baseFingerprint);
+    expect(
+      await continuedSiblingIntentFingerprint({
+        ...base,
+        agent: { mode: 'ask', model: 'other-model' },
+      })
+    ).not.toBe(baseFingerprint);
+  });
+});
+
+describe('runSiblingCreate clone registration rollback', () => {
+  function cloneSource(): WorktreeSource {
+    const metadata = sourceMetadata();
+    if (!metadata.workspace || !metadata.repository) {
+      throw new Error('source fixture is incomplete');
+    }
+    return {
+      ownership: ownershipRow() as WorktreeSource['ownership'],
+      metadata,
+      workspace: metadata.workspace as WorktreeSource['workspace'],
+      repository: metadata.repository,
+      worktreeId: WORKTREE_ID,
+    } as WorktreeSource;
+  }
+
+  function cloneRun(context: TRPCContext, db: WorkerDb): SiblingCreateRun {
+    return {
+      db,
+      ctx: context,
+      source: cloneSource(),
+      intent: 'continue_workspace_session',
+      operationKey: OPERATION_KEY,
+      organizationId: undefined,
+      options: {
+        fingerprint: 'a'.repeat(64),
+        requestedKiloSessionId: undefined,
+        agent: { mode: 'code', model: 'test-model' },
+        clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+        continuation: true,
+        title: SOURCE_KILO_SESSION_ID,
+      },
+      mapProgress: () => ({}) as never,
+    };
+  }
+
+  it('cleans up a cloned destination by clone source on registration rejection', async () => {
+    const { context, db, destinationStub } = fixture();
+    destinationStub.registerSessionFromMetadata.mockResolvedValueOnce({
+      success: false,
+      error: 'sensitive internal registration detail',
+    });
+
+    await expect(runSiblingCreate(cloneRun(context, db))).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'worktree_chat_registration_failed',
+    });
+    expect(deleteSessionForCloudAgentMock).toHaveBeenCalledWith({
+      sessionId: DESTINATION_KILO_SESSION_ID,
+      kiloUserId: USER_ID,
+      cloneSourceSessionId: SOURCE_KILO_SESSION_ID,
+    });
+  });
+
+  it('keeps onlyIfEmpty cleanup for a non-clone sibling rejection', async () => {
+    const { context, db, destinationStub } = fixture();
+    destinationStub.registerSessionFromMetadata.mockResolvedValueOnce({ success: false });
+
+    const run = cloneRun(context, db);
+    const nonCloneOptions = { ...run.options };
+    delete nonCloneOptions.clone;
+    await expect(runSiblingCreate({ ...run, options: nonCloneOptions })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'worktree_chat_registration_failed',
+    });
+    expect(deleteSessionForCloudAgentMock).toHaveBeenCalledWith({
+      sessionId: DESTINATION_KILO_SESSION_ID,
+      kiloUserId: USER_ID,
+      onlyIfEmpty: true,
+    });
   });
 });

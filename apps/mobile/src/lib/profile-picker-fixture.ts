@@ -15,14 +15,20 @@ import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
  * one. The fixture never presses a row, so the bridge's `onSelect` has nothing
  * to report.
  */
-const FIXTURE_PATH = /(?:^|\/)dev\/profile-picker-fixture\/?(?:[?#]|$)/;
+const FIXTURE_PATH = /(?:^|\/)dev\/profile-picker-fixture\/?(?:\?([^#]*))?(?:#.*)?$/;
 
 export function profilePickerFixtureRoute(path: string): string | null {
-  if (!FIXTURE_PATH.test(path)) {
+  const match = FIXTURE_PATH.exec(path);
+  if (!match) {
     return null;
   }
-  const query = path.split('#')[0]?.split('?')[1] ?? '';
-  const organizationId = new URLSearchParams(query).get('org') ?? undefined;
+  // `?org=` with no value names no organization, so it stays the personal
+  // scope; the hook turns any non-undefined id into an organization query.
+  const requestedOrganizationId = new URLSearchParams(match[1] ?? '').get('org');
+  const organizationId =
+    requestedOrganizationId === null || requestedOrganizationId === ''
+      ? undefined
+      : requestedOrganizationId;
   const bridge: ProfilePickerBridge = {
     organizationId,
     selectedOverrideProfileId: null,

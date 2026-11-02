@@ -319,6 +319,12 @@ export const controlPlaneRouteSpecSchema = z
       .object({ sourceAllocationId: z.string().min(1).max(256) })
       .strict()
       .optional(),
+    /**
+     * Server-only continuation marker. When set, the wrapper does not restore
+     * ingest transcript files over the workspace: the pushed branch already
+     * carries the source state. It is projected from session metadata.
+     */
+    continuation: z.literal(true).optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),

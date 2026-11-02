@@ -14,9 +14,9 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   enkryptCreditsToMicrodollars,
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
-  recordEnkryptGuardrailCharge,
-  type EnkryptGuardrailCharge,
-} from './charges';
+  recordEnkryptUsage,
+  type EnkryptUsageRecord,
+} from './usage';
 
 async function organizationWithMember() {
   const user = await insertTestUser();
@@ -39,11 +39,11 @@ async function organizationBalance(organizationId: string) {
   return row;
 }
 
-function charge(
+function usageRecord(
   organizationId: string,
   kiloUserId: string,
-  overrides: Partial<EnkryptGuardrailCharge> = {}
-): EnkryptGuardrailCharge {
+  overrides: Partial<EnkryptUsageRecord> = {}
+): EnkryptUsageRecord {
   return {
     organizationId,
     kiloUserId,
@@ -68,10 +68,10 @@ describe('enkryptCreditsToMicrodollars', () => {
   });
 });
 
-describe('recordEnkryptGuardrailCharge', () => {
+describe('recordEnkryptUsage', () => {
   it('writes a ledger row and debits the organization and member usage', async () => {
     const { user, organization } = await organizationWithMember();
-    await recordEnkryptGuardrailCharge(charge(organization.id, user.id));
+    await recordEnkryptUsage(usageRecord(organization.id, user.id));
 
     const rows = await db
       .select({
@@ -112,14 +112,14 @@ describe('recordEnkryptGuardrailCharge', () => {
     expect(memberUsage?.microdollarUsage).toBe(7 * MICRODOLLARS_PER_ENKRYPT_CREDIT);
   });
 
-  it('creates and reuses lookup values during concurrent charges without losing a debit', async () => {
+  it('creates and reuses lookup values for concurrent usage records without losing a debit', async () => {
     const { user, organization } = await organizationWithMember();
-    const apiKind = `test-api-${randomUUID()}` as EnkryptGuardrailCharge['apiKind'];
-    const decision = `test-decision-${randomUUID()}` as EnkryptGuardrailCharge['decision'];
+    const apiKind = `test-api-${randomUUID()}` as EnkryptUsageRecord['apiKind'];
+    const decision = `test-decision-${randomUUID()}` as EnkryptUsageRecord['decision'];
 
     await Promise.all(
       Array.from({ length: 5 }, () =>
-        recordEnkryptGuardrailCharge(charge(organization.id, user.id, { apiKind, decision }))
+        recordEnkryptUsage(usageRecord(organization.id, user.id, { apiKind, decision }))
       )
     );
 
@@ -169,13 +169,13 @@ describe('recordEnkryptGuardrailCharge', () => {
         return result;
       })
     );
-    const firstCharge = recordEnkryptGuardrailCharge(charge(first.organization.id, first.user.id));
-    let secondCharge: Promise<void> | undefined;
+    const firstUsageRecord = recordEnkryptUsage(usageRecord(first.organization.id, first.user.id));
+    let secondUsageRecord: Promise<void> | undefined;
 
     try {
-      await Promise.race([debitHeld.promise, firstCharge, deadline.promise]);
-      secondCharge = recordEnkryptGuardrailCharge(charge(second.organization.id, second.user.id));
-      await Promise.race([secondCharge, deadline.promise]);
+      await Promise.race([debitHeld.promise, firstUsageRecord, deadline.promise]);
+      secondUsageRecord = recordEnkryptUsage(usageRecord(second.organization.id, second.user.id));
+      await Promise.race([secondUsageRecord, deadline.promise]);
 
       expect(await organizationBalance(second.organization.id)).toEqual({
         microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
@@ -190,16 +190,16 @@ describe('recordEnkryptGuardrailCharge', () => {
       releaseDebit.resolve();
       clearTimeout(timeout);
       holdDebit.mockRestore();
-      await Promise.allSettled([firstCharge, secondCharge]);
+      await Promise.allSettled([firstUsageRecord, secondUsageRecord]);
     }
-    await firstCharge;
+    await firstUsageRecord;
   }, 15_000);
 
   it('records a failed call without debiting the organization', async () => {
     const { user, organization } = await organizationWithMember();
 
-    await recordEnkryptGuardrailCharge(
-      charge(organization.id, user.id, {
+    await recordEnkryptUsage(
+      usageRecord(organization.id, user.id, {
         decision: 'error',
         creditsCost: null,
         addedLatencyMs: null,
@@ -235,8 +235,8 @@ describe('recordEnkryptGuardrailCharge', () => {
 
   it('rolls back lookup values, usage, and financial changes when the transaction fails', async () => {
     const { user, organization } = await organizationWithMember();
-    const apiKind = `test-api-${randomUUID()}` as EnkryptGuardrailCharge['apiKind'];
-    const decision = `test-decision-${randomUUID()}` as EnkryptGuardrailCharge['decision'];
+    const apiKind = `test-api-${randomUUID()}` as EnkryptUsageRecord['apiKind'];
+    const decision = `test-decision-${randomUUID()}` as EnkryptUsageRecord['decision'];
     const transaction = db.transaction.bind(db);
     const failure = jest.spyOn(db, 'transaction').mockImplementationOnce(callback =>
       transaction(async tx => {
@@ -247,7 +247,7 @@ describe('recordEnkryptGuardrailCharge', () => {
 
     try {
       await expect(
-        recordEnkryptGuardrailCharge(charge(organization.id, user.id, { apiKind, decision }))
+        recordEnkryptUsage(usageRecord(organization.id, user.id, { apiKind, decision }))
       ).rejects.toThrow('transaction failed after debit');
     } finally {
       failure.mockRestore();

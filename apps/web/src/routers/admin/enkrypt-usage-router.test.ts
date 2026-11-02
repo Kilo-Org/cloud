@@ -7,17 +7,17 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
 
-describe('admin enkrypt guardrail charges router', () => {
-  it('lists the last 30 days of charges with organization and user details, and rejects non-admins', async () => {
+describe('admin enkrypt usage router', () => {
+  it('lists the last 30 days of usage records with organization and user details, and rejects non-admins', async () => {
     const admin = await insertTestUser({
-      google_user_email: 'admin-enkrypt-charges@example.com',
+      google_user_email: 'admin-enkrypt-usage@example.com',
       is_admin: true,
     });
     const user = await insertTestUser({
-      google_user_email: 'user-enkrypt-charges@example.com',
+      google_user_email: 'user-enkrypt-usage@example.com',
       is_admin: false,
     });
-    const organization = await createTestOrganization('Enkrypt Charges Org', user.id, 0);
+    const organization = await createTestOrganization('Enkrypt Usage Org', user.id, 0);
     const allowedAt = hoursAgo(2);
     const blockedAt = hoursAgo(1);
     const errorAt = hoursAgo(0.5);
@@ -91,13 +91,13 @@ describe('admin enkrypt guardrail charges router', () => {
       },
     ]);
 
-    await expect(
-      (await createCallerForUser(user.id)).admin.enkryptGuardrailCharges.list({})
-    ).rejects.toThrow('Admin access required');
+    await expect((await createCallerForUser(user.id)).admin.enkryptUsage.list({})).rejects.toThrow(
+      'Admin access required'
+    );
 
     const result = await (
       await createCallerForUser(admin.id)
-    ).admin.enkryptGuardrailCharges.list({ organizationId: organization.id });
+    ).admin.enkryptUsage.list({ organizationId: organization.id });
 
     expect(result.rows.map(row => [row.api_kind, row.decision, row.created_at])).toEqual([
       ['responses', 'error', errorAt],
@@ -105,8 +105,8 @@ describe('admin enkrypt guardrail charges router', () => {
       ['chat_completions', 'allowed', allowedAt],
     ]);
     expect(result.rows[1]).toMatchObject({
-      organization_name: 'Enkrypt Charges Org',
-      user_email: 'user-enkrypt-charges@example.com',
+      organization_name: 'Enkrypt Usage Org',
+      user_email: 'user-enkrypt-usage@example.com',
       session_id: 'ses_test',
       api_kind: 'messages',
     });
@@ -123,7 +123,7 @@ describe('admin enkrypt guardrail charges router', () => {
 
     const limited = await (
       await createCallerForUser(admin.id)
-    ).admin.enkryptGuardrailCharges.list({ organizationId: organization.id, limit: 1 });
+    ).admin.enkryptUsage.list({ organizationId: organization.id, limit: 1 });
     expect(limited.rows).toHaveLength(1);
     expect(limited.rows[0]).toEqual(result.rows[0]);
     expect(limited.summary).toEqual(result.summary);

@@ -1867,7 +1867,7 @@
       "discardDraftMessage": "Twoje polecenie zostanie usunięte.",
       "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
-      "remoteHint": "Uruchom `kilo remote` na swoim komputerze lub `/remote` w działającej sesji CLI, aby sterować lokalnym procesem kilo.",
+      "remoteHint": "Aby uruchomić sesję na swoim komputerze, uruchom na nim Kilo i pozostaw je uruchomione.",
       "continueFrom": "Kontynuujesz sesję {{title}}.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",

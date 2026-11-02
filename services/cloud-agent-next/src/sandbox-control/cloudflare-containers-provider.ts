@@ -121,6 +121,13 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     environmentSnapshots: true,
+    sessionSnapshots: {
+      async capture(ref, captureId) {
+        if (decodeOwnedProviderRef(ref) === null)
+          throw new ProviderCreationError('invalid_configuration');
+        return deps.getContainer(deps.logicalSandboxId).captureSnapshot(ref, captureId);
+      },
+    },
     ensureBillingAdmission,
     async isBillingBlocked(ref) {
       if (ref === null || decodeOwnedProviderRef(ref) === null) return false;

@@ -741,12 +741,14 @@
     "commit",
     "deleted",
     "dismissed",
+    "edit",
     "no changes needed",
     "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "search sessions",
     "superseded"
   ],
   "pt": [

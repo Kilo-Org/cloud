@@ -775,7 +775,12 @@
       "pendingComment_other": "pending comments",
       "submitCountOfTotal": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
       "submitReview": "Submit review",
-      "partialPostedMessage": "Posted {{displayFreshCount}} comment(s). {{displayStaleCount}} comment(s) point at an older commit and stayed in your queue.",
+      "partialPostedFresh_one": "Posted {{displayFreshCount}} comment. ",
+      "partialPostedFresh": "Posted {{displayFreshCount}} comments. ",
+      "partialPostedFresh_other": "Posted {{displayFreshCount}} comments. ",
+      "partialPostedStale_one": "{{displayStaleCount}} comment points at an older commit and stayed in your queue.",
+      "partialPostedStale": "{{displayStaleCount}} comments point at an older commit and stayed in your queue.",
+      "partialPostedStale_other": "{{displayStaleCount}} comments point at an older commit and stayed in your queue.",
       "blockedRequestChanges": "Add a summary or at least one comment to request changes.",
       "blockedComment": "Add a summary or at least one comment to post a comment review."
     },
@@ -1823,7 +1828,9 @@
       "analyzed": "Analyzed",
       "exploitabilityReasoning": "Exploitability reasoning",
       "suggestedFix": "Suggested fix",
+      "whereFound_one": "Where this was found ({{displayCount}})",
       "whereFound": "Where this was found ({{displayCount}})",
+      "whereFound_other": "Where this was found ({{displayCount}})",
       "fullReport": "Full generated report",
       "yes": "Yes",
       "no": "No"
@@ -1894,7 +1901,9 @@
       "breakdownMediumLow_one": "{{displayCount}} medium & low",
       "breakdownMediumLow_other": "{{displayCount}} medium & low",
       "dueThisWeek": "Due this week",
+      "dueThisWeekDetail_one": "{{exploitable}} of these confirmed exploitable",
       "dueThisWeekDetail": "{{exploitable}} of these confirmed exploitable",
+      "dueThisWeekDetail_other": "{{exploitable}} of these confirmed exploitable",
       "noDeadline": "No deadline",
       "reviewSlaAssignment": "Review SLA assignment",
       "allOpenFindingsTracked": "All open findings tracked"

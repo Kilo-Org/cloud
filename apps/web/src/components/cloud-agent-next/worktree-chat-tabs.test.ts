@@ -2,10 +2,12 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
+  getLatestOpenChatSessionId,
   getLoadingChatControlSession,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
   getWorkspaceControlSession,
+  isRestoredDocumentNavigation,
   parseWorktreeChatTabs,
   reduceWorktreeChatTabs,
   type WorktreeChatTabsAction,
@@ -391,6 +393,48 @@ describe('getNextOpenChatSessionId', () => {
     getNextOpenChatSessionId(openSessionIds, 'session-b');
 
     expect(openSessionIds).toEqual(['session-a', 'session-b', 'session-c']);
+  });
+});
+
+describe('getLatestOpenChatSessionId', () => {
+  it('skips closed chats, even the most recently updated one', () => {
+    expect(getLatestOpenChatSessionId(['session-c', 'session-b', 'session-a'], ['session-c'])).toBe(
+      'session-b'
+    );
+  });
+
+  it('returns null when every chat is closed', () => {
+    expect(getLatestOpenChatSessionId(['session-b', 'session-a'], ['session-a', 'session-b'])).toBe(
+      null
+    );
+    expect(getLatestOpenChatSessionId([], [])).toBeNull();
+  });
+});
+
+describe('isRestoredDocumentNavigation', () => {
+  const url = 'https://app.kilo.ai/cloud/chat?sessionId=session-a';
+
+  it.each(['reload', 'back_forward'])('treats a %s of the current address as restored', type => {
+    expect(isRestoredDocumentNavigation({ name: url, type }, url, false)).toBe(true);
+  });
+
+  it('treats a revived discarded document as restored', () => {
+    expect(isRestoredDocumentNavigation({ name: url, type: 'navigate' }, url, true)).toBe(true);
+  });
+
+  it('treats an opened link as a request to open the chat', () => {
+    expect(isRestoredDocumentNavigation({ name: url, type: 'navigate' }, url, false)).toBe(false);
+  });
+
+  it('ignores a document that loaded another address before navigating here', () => {
+    expect(
+      isRestoredDocumentNavigation(
+        { name: 'https://app.kilo.ai/cloud/sessions', type: 'reload' },
+        url,
+        true
+      )
+    ).toBe(false);
+    expect(isRestoredDocumentNavigation(undefined, url, true)).toBe(false);
   });
 });
 

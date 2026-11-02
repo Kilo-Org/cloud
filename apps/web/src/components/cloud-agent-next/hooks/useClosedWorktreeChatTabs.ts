@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   parseWorktreeChatTabs,
   reduceWorktreeChatTabs,
@@ -11,6 +11,8 @@ import {
 type ScopedClosedWorktreeChatTabs = {
   storageKey: string | null;
   tabs: WorktreeChatTabsState;
+  /** Set when the state was read from storage rather than written by this window. */
+  loadedFromStorage: boolean;
   storageUnavailable?: boolean;
 };
 
@@ -18,21 +20,26 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
   const [state, setState] = useState<ScopedClosedWorktreeChatTabs | null>(null);
   const stateRef = useRef<ScopedClosedWorktreeChatTabs | null>(null);
 
-  const getScopedState = useCallback(() => {
+  const getScopedState = useCallback((): ScopedClosedWorktreeChatTabs => {
     const current = stateRef.current;
     const fallback: ScopedClosedWorktreeChatTabs =
       current?.storageKey === storageKey
         ? current
-        : { storageKey, tabs: parseWorktreeChatTabs(null) };
+        : { storageKey, tabs: parseWorktreeChatTabs(null), loadedFromStorage: false };
     if (storageKey === null || fallback.storageUnavailable) return fallback;
     try {
-      return { storageKey, tabs: parseWorktreeChatTabs(window.localStorage.getItem(storageKey)) };
+      return {
+        storageKey,
+        tabs: parseWorktreeChatTabs(window.localStorage.getItem(storageKey)),
+        loadedFromStorage: true,
+      };
     } catch {
       return fallback;
     }
   }, [storageKey]);
 
-  useEffect(() => {
+  // Before paint, so closed tabs never flash open while the stored state loads.
+  useLayoutEffect(() => {
     const sync = () => {
       const loaded = getScopedState();
       stateRef.current = loaded;
@@ -43,8 +50,16 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
       if (event.storageArea && event.storageArea !== window.localStorage) return;
       if (storageKey !== null && (event.key === storageKey || event.key === null)) sync();
     };
+    // A page restored from the back-forward cache missed storage events while it was cached.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) sync();
+    };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('pageshow', onPageShow);
+    };
   }, [getScopedState, storageKey]);
 
   const update = useCallback(
@@ -52,7 +67,7 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
       const current = getScopedState();
       const tabs = reduceWorktreeChatTabs(current.tabs, action);
       const next: ScopedClosedWorktreeChatTabs =
-        tabs === current.tabs ? current : { ...current, tabs };
+        tabs === current.tabs ? current : { ...current, tabs, loadedFromStorage: false };
       stateRef.current = next;
       setState(next);
       if (storageKey !== null && next !== current) {
@@ -90,10 +105,11 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
     [update]
   );
 
+  const scopedState = state?.storageKey === storageKey ? state : null;
   return {
-    closedSessionIds: state?.storageKey === storageKey ? state.tabs.closedSessionIds : [],
-    sessionOrderByWorktree:
-      state?.storageKey === storageKey ? state.tabs.sessionOrderByWorktree : {},
+    closedSessionIds: scopedState?.tabs.closedSessionIds ?? [],
+    sessionOrderByWorktree: scopedState?.tabs.sessionOrderByWorktree ?? {},
+    loadedFromStorage: scopedState?.loadedFromStorage ?? false,
     openChatTab,
     closeChatTab,
     replaceChatTab,

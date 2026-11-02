@@ -213,6 +213,28 @@ export function getClosedWorktreeChatSessionIds(
   return closedSessionIds.toReversed().filter(sessionId => knownIds.has(sessionId));
 }
 
+export function getLatestOpenChatSessionId(
+  sessionIdsByRecency: readonly string[],
+  closedSessionIds: readonly string[]
+): string | null {
+  const closedIds = new Set(closedSessionIds);
+  return sessionIdsByRecency.find(sessionId => !closedIds.has(sessionId)) ?? null;
+}
+
+/**
+ * A reloaded, history-restored, or discarded-then-revived document shows the
+ * address it had, not one the user just asked to open, so its chat must not be
+ * reopened.
+ */
+export function isRestoredDocumentNavigation(
+  navigation: { name: string; type: string } | undefined,
+  currentUrl: string,
+  wasDiscarded: boolean
+): boolean {
+  if (!navigation || navigation.name !== currentUrl) return false;
+  return wasDiscarded || navigation.type === 'reload' || navigation.type === 'back_forward';
+}
+
 export function getNextOpenChatSessionId(
   openSessionIds: readonly string[],
   closingSessionId: string

@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -68,9 +69,11 @@ import { createdOnPlatformForFilter } from './hooks/sidebar-queries';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
+  getLatestOpenChatSessionId,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
   getWorktreeBranch,
+  isRestoredDocumentNavigation,
 } from './worktree-chat-tabs';
 import type { ComposerFocusRequest } from './useSessionComposerFocus';
 import {
@@ -107,6 +110,22 @@ type WorktreeChatTabs = {
   /** Drop a chat whose creation failed and close its tab. */
   discardLocalChat: (sessionId: string) => void;
 };
+
+let documentNavigationConsumed = false;
+
+/** Only the first chat address a document shows can be the one it was restored with. */
+function consumeRestoredDocumentNavigation(): boolean {
+  if (documentNavigationConsumed) return false;
+  documentNavigationConsumed = true;
+  const navigation = performance
+    .getEntriesByType('navigation')
+    .find((entry): entry is PerformanceNavigationTiming => 'type' in entry);
+  return isRestoredDocumentNavigation(
+    navigation,
+    window.location.href,
+    'wasDiscarded' in document && document.wasDiscarded === true
+  );
+}
 
 const UNTITLED_WORKTREE_DETAILS: SidebarWorktreeDetails = {
   name: null,
@@ -259,15 +278,14 @@ function CloudSidebarLayoutContent({
   const {
     closedSessionIds,
     sessionOrderByWorktree,
+    loadedFromStorage: closedTabsLoadedFromStorage,
     openChatTab,
     closeChatTab,
     replaceChatTab,
     forgetWorktreeTabs,
   } = useClosedWorktreeChatTabs(getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId));
-
-  useEffect(() => {
-    if (currentSessionId) openChatTab(currentSessionId);
-  }, [currentSessionId, openChatTab]);
+  const addressedSessionRef = useRef<{ sessionId: string | undefined } | null>(null);
+  const leftClosedSessionIdRef = useRef<string | null>(null);
 
   const manager = useManager();
   const activity = useAtomValue(manager.atoms.activity);
@@ -620,12 +638,14 @@ function CloudSidebarLayoutContent({
   );
 
   const openWorktree = useCallback(
-    (worktreeId: string) => {
+    (worktreeId: string, options?: { replace?: boolean }) => {
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       const chatPath = `${basePath}/chat`;
       const targetUrl = `${chatPath}?worktreeId=${worktreeId}`;
       if (pathname === chatPath) {
-        window.history.pushState(null, '', targetUrl);
+        window.history[options?.replace ? 'replaceState' : 'pushState'](null, '', targetUrl);
+      } else if (options?.replace) {
+        router.replace(targetUrl);
       } else {
         router.push(targetUrl);
       }
@@ -633,6 +653,61 @@ function CloudSidebarLayoutContent({
     },
     [organizationId, pathname, router]
   );
+
+  const openWorktreeFromSidebar = useCallback(
+    (worktreeId: string, sessionIdsByRecency: readonly string[]) => {
+      const sessionId = getLatestOpenChatSessionId(sessionIdsByRecency, closedSessionIds);
+      if (sessionId) {
+        selectSession(sessionId);
+      } else {
+        openWorktree(worktreeId);
+      }
+    },
+    [closedSessionIds, openWorktree, selectSession]
+  );
+
+  // Opening a chat's address reopens its tab. A window still showing a chat
+  // that was closed elsewhere, or a restored document, leaves it instead, so
+  // the closed chat cannot be reopened by a later reload.
+  useEffect(() => {
+    const addressed = addressedSessionRef.current;
+    if (addressed === null || addressed.sessionId !== currentSessionId) {
+      addressedSessionRef.current = { sessionId: currentSessionId };
+      leftClosedSessionIdRef.current = null;
+      const restored = addressed === null && consumeRestoredDocumentNavigation();
+      if (currentSessionId && !restored) {
+        openChatTab(currentSessionId);
+        return;
+      }
+    }
+    if (
+      !currentSessionId ||
+      !selectedWorktreeId ||
+      !closedTabsLoadedFromStorage ||
+      leftClosedSessionIdRef.current === currentSessionId ||
+      !closedSessionIds.includes(currentSessionId) ||
+      !worktreeChats.some(session => session.sessionId === currentSessionId)
+    ) {
+      return;
+    }
+    leftClosedSessionIdRef.current = currentSessionId;
+    const nextSessionId = openWorktreeChats[0]?.sessionId;
+    if (nextSessionId) {
+      openSessionInternal(nextSessionId, { replace: true });
+    } else {
+      openWorktree(selectedWorktreeId, { replace: true });
+    }
+  }, [
+    closedSessionIds,
+    closedTabsLoadedFromStorage,
+    currentSessionId,
+    openChatTab,
+    openSessionInternal,
+    openWorktree,
+    openWorktreeChats,
+    selectedWorktreeId,
+    worktreeChats,
+  ]);
 
   const closeSession = useCallback(
     (sessionId: string) => {
@@ -642,14 +717,15 @@ function CloudSidebarLayoutContent({
       closeChatTab(sessionId);
       if (sessionId !== currentSessionId) return;
 
+      // Replace, so going back does not land on, and reopen, the closed chat.
       const nextSessionId = getNextOpenChatSessionId(
         openWorktreeChats.map(session => session.sessionId),
         sessionId
       );
       if (nextSessionId) {
-        openSessionInternal(nextSessionId);
+        openSessionInternal(nextSessionId, { replace: true });
       } else {
-        openWorktree(selectedWorktreeId);
+        openWorktree(selectedWorktreeId, { replace: true });
       }
     },
     [
@@ -953,6 +1029,7 @@ function CloudSidebarLayoutContent({
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
               onOpenSession={selectSession}
+              onOpenWorktree={openWorktreeFromSidebar}
               organizationId={organizationId}
               onDeleteSession={setSessionPendingDeletion}
               onRenameSession={handleRenameSession}
@@ -988,6 +1065,7 @@ function CloudSidebarLayoutContent({
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}
             onOpenSession={selectSession}
+            onOpenWorktree={openWorktreeFromSidebar}
             organizationId={organizationId}
             onDeleteSession={setSessionPendingDeletion}
             onRenameSession={handleRenameSession}

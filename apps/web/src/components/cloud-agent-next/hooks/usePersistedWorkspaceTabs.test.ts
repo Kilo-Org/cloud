@@ -307,6 +307,42 @@ describe('usePersistedWorkspaceTabs', () => {
       expect(chatProbe?.closedSessionIds).toEqual([]);
     });
 
+    it('tells closures read from storage apart from this window’s own updates', () => {
+      dom.storage.set(
+        STORAGE_KEY,
+        JSON.stringify({ closedSessionIds: ['ses-1'], sessionOrderByWorktree: {} })
+      );
+      renderChats();
+      expect(chatProbe?.closedSessionIds).toEqual(['ses-1']);
+      expect(chatProbe?.loadedFromStorage).toBe(true);
+
+      act(() => chatProbe?.closeChatTab('ses-2'));
+      expect(chatProbe?.loadedFromStorage).toBe(false);
+
+      dispatchStorage();
+      expect(chatProbe?.loadedFromStorage).toBe(true);
+    });
+
+    it('resyncs a page restored from the back-forward cache', () => {
+      renderChats();
+      dom.storage.set(
+        STORAGE_KEY,
+        JSON.stringify({ closedSessionIds: ['ses-external'], sessionOrderByWorktree: {} })
+      );
+      const dispatchPageShow = (persisted: boolean) => {
+        const event = new window.Event('pageshow');
+        Object.assign(event, { persisted });
+        act(() => {
+          window.dispatchEvent(event);
+        });
+      };
+
+      dispatchPageShow(false);
+      expect(chatProbe?.closedSessionIds).toEqual([]);
+      dispatchPageShow(true);
+      expect(chatProbe?.closedSessionIds).toEqual(['ses-external']);
+    });
+
     it.each(['getItem', 'setItem'] as const)('keeps updates in memory when %s throws', method => {
       jest.spyOn(window.localStorage, method).mockImplementation(() => {
         throw new Error('unavailable');

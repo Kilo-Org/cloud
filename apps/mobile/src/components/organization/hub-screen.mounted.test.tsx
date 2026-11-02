@@ -448,4 +448,50 @@ describe('Organization hub billing card while its data loads', () => {
     expect(kiloPassQuery.enabled.at(-1)).toBe(true);
     settled.unmount();
   });
+
+  it('waits for the membership payload before asking for the parent-only summary', async () => {
+    // A persisted list entry still says "top-level" while the organization has
+    // since been moved under a parent, so the summary must not fire on that
+    // cached value: the membership payload decides.
+    membersQuery.data = undefined;
+    const pending = await renderHub();
+    expect(pending.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    pending.unmount();
+
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const child = await renderHub();
+    expect(child.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    child.unmount();
+
+    membersQuery.data = { parent_organization_id: null, settings: {} };
+    const topLevel = await renderHub();
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    topLevel.unmount();
+  });
+
+  it('offers the membership retry when the row cannot learn its parent link', async () => {
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = undefined;
+    membersQuery.isError = true;
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => String(node.props.accessibilityLabel).startsWith(i18n.t('kiloPass.title')));
+    if (!row) {
+      throw new Error('Kilo Pass row missing');
+    }
+    // The retryable state, not the placeholder that would never settle.
+    expect(row.props.accessibilityLabel).toBe(
+      `${i18n.t('kiloPass.title')}. ${i18n.t('organization.kiloPass.couldNotLoadStatus')}. ${i18n.t('common.retry')}`
+    );
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(membersQuery.refetch).toHaveBeenCalledOnce();
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
 });

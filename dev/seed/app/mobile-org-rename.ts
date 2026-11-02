@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { computeDatabaseUrl } from '@kilocode/db';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -43,8 +44,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('Provide one owned fake email matching kilo-<name>@example.com.');
   }
-  const databaseUrl = new URL(process.env.POSTGRES_URL ?? '');
+  // `computeDatabaseUrl()` names the missing variable, and `getSeedDb()`
+  // connects with the same URL, so the loopback check below sees the database
+  // the seed actually writes to.
+  const databaseUrl = new URL(computeDatabaseUrl());
   if (
+    process.env.USE_PRODUCTION_DB === 'true' ||
     !['localhost', '127.0.0.1', '[::1]'].includes(databaseUrl.hostname) ||
     process.env.NODE_ENV === 'production' ||
     process.env.SKIP_STRIPE_API !== 'true'

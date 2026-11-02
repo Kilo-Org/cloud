@@ -175,7 +175,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { extractTurnDeltaText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/turn-delta';
+import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -427,12 +427,13 @@ export async function handleLlmProxyRequest(
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
-        text: extractTurnDeltaText(requestBodyParsed, {
+        text: extractRequestText(requestBodyParsed, {
           includeToolResults: config.scanToolResults,
         }),
         config,
       };
-    })
+    }),
+    request.signal
   );
 
   const logClientDisconnect = () => {
@@ -1160,6 +1161,8 @@ export async function handleLlmProxyRequest(
     guardrailVerdict
   );
   if (guardrailRejection) {
+    // The disconnect was already logged; nobody reads this rejection.
+    if (request.signal.aborted) return guardrailRejection;
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,

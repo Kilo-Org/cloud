@@ -4,10 +4,16 @@ import path from 'node:path';
 import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
+  actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
   privilegedGuardTiers,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  SUPPORT_NEVER_KEYS,
+  SUPPORT_READ_ALLOWLIST,
+  SUPPORT_WRITE_ALLOWLIST,
+} from '@kilocode/web-shared/lib/admin/support-access';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const APP_ROOT = path.join(REPO_ROOT, 'apps/web/src/app');
@@ -376,6 +382,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
     'packages/web-shared/src/lib/admin/admin-access-log.ts',
     'packages/web-shared/src/lib/admin/privileged-access.ts',
     'packages/web-shared/src/lib/admin/privileged-inventory.ts',
+    'packages/web-shared/src/lib/admin/support-access.ts',
   ]);
 
   function serverFiles(): string[] {
@@ -433,5 +440,57 @@ describe('privileged inventory covers branch-level admin reads', () => {
     }
 
     expect(stale).toEqual([]);
+  });
+});
+
+describe('support access allowlists agree with the privileged inventory', () => {
+  const allowlist = [...SUPPORT_READ_ALLOWLIST, ...SUPPORT_WRITE_ALLOWLIST];
+
+  test('every allowlist entry resolves to the matching inventory action class', () => {
+    const problems: string[] = [];
+
+    for (const entry of allowlist) {
+      const access = entry.actionClass === 'support_write' ? 'write' : 'read';
+      const inventory = findPrivilegedInventoryEntry({
+        surface: entry.surface,
+        route: entry.key,
+        access,
+      });
+      if (!inventory) {
+        problems.push(`${entry.surface} ${entry.key} (no inventory entry)`);
+        continue;
+      }
+      const actionClass = actionClassForEntry(inventory, access);
+      if (actionClass !== entry.actionClass) {
+        problems.push(`${entry.key}: allowlist ${entry.actionClass}, inventory ${actionClass}`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('every tRPC allowlist key is a real procedure of the matching type', () => {
+    const problems: string[] = [];
+
+    for (const entry of allowlist) {
+      if (entry.surface !== 'trpc') continue;
+      const procedure = procedures[entry.key];
+      if (!procedure) {
+        problems.push(`${entry.key} (no procedure)`);
+        continue;
+      }
+      const expectedType = entry.actionClass === 'support_write' ? 'mutation' : 'query';
+      const actualType = procedure._def?.type ?? 'query';
+      if (actualType !== expectedType) {
+        problems.push(`${entry.key}: ${actualType}, expected ${expectedType}`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('the never list is disjoint from both allowlists', () => {
+    const keys = new Set(allowlist.map(entry => entry.key));
+    expect(SUPPORT_NEVER_KEYS.filter(key => keys.has(key))).toEqual([]);
   });
 });

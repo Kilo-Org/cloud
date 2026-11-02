@@ -34,6 +34,7 @@ export type PlatformAdminPermissions = {
   canViewSessions: boolean;
   canManageCredits: boolean;
   canExportApiRequestLogs: boolean;
+  canRequestSupportOrgAccess: boolean;
 };
 
 export type AdminStepUpState = { status: 'absent' };
@@ -41,6 +42,7 @@ export type AdminStepUpState = { status: 'absent' };
 export type SupportGrantSlot = {
   grantId: string;
   organizationId: string;
+  actionClass: 'support_read' | 'support_write';
   expiresAt: string;
 };
 

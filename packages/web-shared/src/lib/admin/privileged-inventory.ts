@@ -215,6 +215,11 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'user',
   }),
+  adminEntry('trpc.githubApps', 'githubApps.*', {
+    read: 'support_read',
+    write: 'support_write',
+    target: 'organization',
+  }),
   {
     id: 'trpc.securityAgent.getAuditReport',
     surface: 'trpc',

@@ -49,6 +49,7 @@ describe('AdminAssurance', () => {
           canViewSessions: false,
           canManageCredits: true,
           canExportApiRequestLogs: false,
+          canRequestSupportOrgAccess: false,
         },
       }),
       credential: 'human_bearer',

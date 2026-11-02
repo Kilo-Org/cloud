@@ -211,6 +211,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         authViaToken: authViaTokenFromHeaders(headersList),
         tokenSource: result.tokenSource ?? null,
         internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
       }),
       route: routeFromHeaders(headersList),
       method: methodFromHeaders(headersList, opts.requestMethod),
@@ -224,6 +225,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       authViaToken: true,
       tokenSource: result.tokenSource ?? null,
       internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
     });
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);

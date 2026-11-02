@@ -19,7 +19,6 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
 
   const result = await getAuthorizedOrgContext(organizationId, undefined, {
     surface: 'server-component',
-    requestMethod: 'GET',
   });
   if (!result.success) {
     if (result.nextResponse.status === 401) {

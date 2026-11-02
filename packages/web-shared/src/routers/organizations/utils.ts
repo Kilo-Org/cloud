@@ -56,6 +56,15 @@ function allowedRole(
   );
 }
 
+export function settle<T>(
+  promise: Promise<T>
+): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
+  return promise.then(
+    value => ({ ok: true as const, value }),
+    error => ({ ok: false as const, error })
+  );
+}
+
 export async function observeMembershipRole(
   loader: () => Promise<{ role: OrganizationRole }[]>,
   roles?: OrganizationRole[]
@@ -88,39 +97,40 @@ export async function loadEffectiveMembershipRows(
   userId: string,
   organizationId: Organization['id']
 ): Promise<{ role: OrganizationRole }[]> {
-  const directRows = await db
-    .select({ role: organization_memberships.role })
-    .from(organization_memberships)
-    .innerJoin(
-      organizations,
-      activeOrganizationJoinCondition(organization_memberships.organization_id)
-    )
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        eq(organization_memberships.organization_id, organizationId)
+  const [directRows, inheritedRows] = await Promise.all([
+    db
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .innerJoin(
+        organizations,
+        activeOrganizationJoinCondition(organization_memberships.organization_id)
       )
-    );
-
-  const inheritedRows = await db
-    .select({ role: organization_memberships.role })
-    .from(organizations)
-    .innerJoin(
-      parentOrganizations,
-      and(
-        eq(parentOrganizations.id, organizations.parent_organization_id),
-        isNull(parentOrganizations.deleted_at)
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, userId),
+          eq(organization_memberships.organization_id, organizationId)
+        )
+      ),
+    db
+      .select({ role: organization_memberships.role })
+      .from(organizations)
+      .innerJoin(
+        parentOrganizations,
+        and(
+          eq(parentOrganizations.id, organizations.parent_organization_id),
+          isNull(parentOrganizations.deleted_at)
+        )
       )
-    )
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, organizations.parent_organization_id),
-        eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+      .innerJoin(
+        organization_memberships,
+        and(
+          eq(organization_memberships.organization_id, organizations.parent_organization_id),
+          eq(organization_memberships.kilo_user_id, userId),
+          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+        )
       )
-    )
-    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at))),
+  ]);
 
   return [...directRows, ...inheritedRows];
 }
@@ -134,26 +144,38 @@ export async function ensureOrganizationAccess(
     // An admin elevation applies only to an organization that exists and is
     // live, matching getOrganizationById. A rejected request is not recorded
     // as an elevation.
-    const [organizationRows, observation] = await Promise.all([
+    const organizationResult = settle(
       db
         .select({ id: organizations.id })
         .from(organizations)
         .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-        .limit(1),
-      observeMembershipRole(() => loadEffectiveMembershipRows(ctx.user.id, organizationId), roles),
-    ]);
-    if (!organizationRows[0]) {
+        .limit(1)
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+      roles
+    );
+    const rowsResult = await organizationResult;
+    if (!rowsResult.ok) {
+      await recordKiloAdminElevation(ctx, {
+        reason: 'organization_access',
+        target: organizationTarget(organizationId),
+        ...observation,
+      });
+      throw rowsResult.error;
+    }
+    if (!rowsResult.value[0]) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Organization not found',
       });
     }
-    return await elevateViaKiloAdmin(ctx, {
+    await recordKiloAdminElevation(ctx, {
       reason: 'organization_access',
       target: organizationTarget(organizationId),
-      grant: 'owner',
       ...observation,
     });
+    return 'owner';
   }
   const rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId);
 
@@ -252,18 +274,17 @@ export async function getOrganizationsAccessRoles(
   if (ctx.user.is_admin) {
     // Only organizations that exist and are live are elevated, matching
     // getOrganizationById.
-    const liveIds = (
-      await db
+    const [liveOrgRows, rolesByOrg] = await Promise.all([
+      db
         .select({ id: organizations.id })
         .from(organizations)
-        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)))
-    ).map(row => row.id);
+        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at))),
+      observeBatchMembershipRoles(() => loadBatchMembershipRoles(ctx.user.id, uniqueIds)),
+    ]);
+    const liveIds = liveOrgRows.map(row => row.id);
     if (liveIds.length === 0) {
       return result;
     }
-    const rolesByOrg = await observeBatchMembershipRoles(() =>
-      loadBatchMembershipRoles(ctx.user.id, liveIds)
-    );
     const grant = await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access_batch',
       target: organizationsTarget(liveIds),
@@ -311,22 +332,24 @@ export async function ensureOrganizationAccessAndFetchOrg(
   roles?: OrganizationRole[]
 ): Promise<Organization> {
   if (ctx.user.is_admin) {
-    const [orgRows, observation] = await Promise.all([
+    const organizationResult = settle(
       db
         .select()
         .from(organizations)
-        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at))),
-      observeMembershipRole(() => loadEffectiveMembershipRows(ctx.user.id, organizationId), roles),
-    ]);
-    // Recorded before the NOT_FOUND below, so an admin probing a missing
-    // organization is still attributed.
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+      roles
+    );
     await recordKiloAdminElevation(ctx, {
       reason: 'organization_fetch',
       target: organizationTarget(organizationId),
       ...observation,
     });
-    const [org] = orgRows;
-
+    const rowsResult = await organizationResult;
+    if (!rowsResult.ok) throw rowsResult.error;
+    const [org] = rowsResult.value;
     if (!org) {
       throw new TRPCError({
         code: 'NOT_FOUND',

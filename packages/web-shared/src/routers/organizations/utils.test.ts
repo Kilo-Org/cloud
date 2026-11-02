@@ -176,24 +176,58 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
+  function failMembershipQueries() {
+    const originalSelect = db.select.bind(db);
+    return jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === organization_memberships) {
+                throw new Error('membership query failed');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+  }
+
   test('a membership observation failure never fails the admin request', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const organization = await orgOwnedByAnotherUser();
 
-    const originalSelect = db.select.bind(db);
-    let selectCalls = 0;
-    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
-      selectCalls += 1;
-      if (selectCalls === 2) throw new Error('membership observation failed');
-      return originalSelect(...args);
-    });
-
+    const selectSpy = failMembershipQueries();
     try {
       await expect(ensureOrganizationAccess(ctxFor(admin), organization.id)).resolves.toBe('owner');
     } finally {
       selectSpy.mockRestore();
     }
 
+    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+      kind: 'kilo_admin_elevation',
+      membershipRole: null,
+      wouldPassWithoutAdmin: null,
+    });
+  });
+
+  test('a membership observation failure never fails the batch admin request', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+
+    const selectSpy = failMembershipQueries();
+    let roles: Map<string, string>;
+    try {
+      roles = await getOrganizationsAccessRoles(ctxFor(admin), [organization.id]);
+    } finally {
+      selectSpy.mockRestore();
+    }
+
+    expect(roles.get(organization.id)).toBe('owner');
     expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
       kind: 'kilo_admin_elevation',
       membershipRole: null,

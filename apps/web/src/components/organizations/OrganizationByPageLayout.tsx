@@ -31,7 +31,6 @@ export async function OrganizationByPageLayout({
   const organizationId = decodeURIComponent(id);
   const result = await getAuthorizedOrgContext(organizationId, roles, {
     surface: 'server-component',
-    requestMethod: 'GET',
   });
   if (!result.success) {
     if (result.nextResponse.status === 401) {

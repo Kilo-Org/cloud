@@ -364,6 +364,16 @@ export async function isModernResourceDelegationRequest(requestHeaders: Headers)
   return verified.claims.tokenPurpose !== undefined;
 }
 
+function mintsWorkerAdminToken(
+  resource: ControlResource,
+  authority: ResourceDelegationAuthority,
+  options?: CreateControlTokenOptions
+): boolean {
+  return (
+    resource !== 'cloud-agent-next' && options?.extra?.isAdmin === true && authority.user.is_admin
+  );
+}
+
 async function createModernControlToken(
   authority: ResourceDelegationAuthority,
   resource: ControlResource,
@@ -379,14 +389,13 @@ async function createModernControlToken(
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
   const memberships =
     resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
-  const mintsAdmin =
-    resource !== 'cloud-agent-next' && options?.extra?.isAdmin === true && authority.user.is_admin;
-  if (mintsAdmin) {
+  if (mintsWorkerAdminToken(resource, authority, options)) {
     await recordKiloAdminElevationForRequest({
       user: authority.user,
       tokenSource: options?.tokenSource ?? authority.tokenSource,
       reason: 'delegated_resource_token_mint',
       target: serviceTarget(resource),
+      headersList: options?.headers,
     });
   }
   const payload = buildModernKiloTokenPayload({
@@ -496,11 +505,7 @@ export async function createControlTokenForRequest(
     const expiresIn =
       options?.legacyExpiresIn ??
       (resource === 'cloud-agent-next' ? TOKEN_EXPIRY.default : ONE_HOUR_SECONDS);
-    const mintsAdmin =
-      resource !== 'cloud-agent-next' &&
-      options?.extra?.isAdmin === true &&
-      authority.user.is_admin;
-    if (mintsAdmin) {
+    if (mintsWorkerAdminToken(resource, authority, options)) {
       await recordKiloAdminElevationForRequest({
         user: authority.user,
         tokenSource: options?.tokenSource,

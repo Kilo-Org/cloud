@@ -26,7 +26,7 @@ import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-
  *   - `"server-component"` — a React server component render (a page, a layout,
  *     or a server action), which has request headers but no tRPC context.
  *
- * `kind` — what produced the event (two values):
+ * `kind` — what produced the event (three values):
  *   - `"admin_guard"` — an explicit admin gate was satisfied. Emitted at the two
  *     choke points that protect the `/admin` console: `getUserFromAuth` with
  *     `adminOnly: true`, and the `adminProcedure` middleware.
@@ -35,6 +35,9 @@ import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-
  *     (e.g. reading any organization, querying sessions across all orgs). These
  *     paths pass through neither admin gate, so they emit here instead. Carries
  *     a `reason` and a `target`.
+ *   - `"privileged_access"` — observe-only measurement of a bearer credential
+ *     exercising a privileged action. Carries `credential`, `outcome`,
+ *     `actionClass`, and `wouldBlock`.
  *
  * Coverage note: `kind:"admin_guard"` alone covers only the `/admin` console
  * surface. Kilo's highest-value admin capability — an employee reading an
@@ -371,10 +374,19 @@ export type AdminAuditContext = {
   tokenSource?: string | null;
   /** Provenance derived once at the tRPC boundary, when available. */
   credential?: PrivilegedCredentialKind;
+  internalApiUse?: boolean;
   ip?: string | null;
   headersList?: Headers;
   trpcPath?: string;
   trpcType?: string;
+};
+
+/** Membership observation carried by an elevation event. */
+export type ElevationMembershipObservation = {
+  /** The actor's real role in the target org, when measured. */
+  membershipRole?: string | null;
+  /** Whether that real role alone would have authorized the request. */
+  wouldPassWithoutAdmin?: boolean | null;
 };
 
 /**
@@ -396,13 +408,6 @@ export type AdminAuditContext = {
  * `"session"` for a bearer-token request would silently break the compromise
  * discriminator this whole event exists to provide.
  */
-export type ElevationMembershipObservation = {
-  /** The actor's real role in the target org, when measured. */
-  membershipRole?: string | null;
-  /** Whether that real role alone would have authorized the request. */
-  wouldPassWithoutAdmin?: boolean | null;
-};
-
 export async function recordKiloAdminElevation(
   ctx: AdminAuditContext,
   params: { reason: KiloAdminElevationReason; target: string } & ElevationMembershipObservation
@@ -417,6 +422,7 @@ export async function recordKiloAdminElevation(
     await recordKiloAdminElevationForRequest({
       user: ctx.user,
       tokenSource: ctx.tokenSource,
+      internalApiUse: ctx.internalApiUse,
       reason: params.reason,
       target: params.target,
       membershipRole: params.membershipRole,
@@ -524,6 +530,8 @@ export async function recordKiloAdminElevationForRequest(
     method?: string;
     /** Use the caller's request headers instead of the ambient header store. */
     headersList?: Headers;
+    internalApiUse?: boolean;
+    delegatedWorkload?: boolean;
   } & ElevationMembershipObservation
 ): Promise<void> {
   let headersList = params.headersList;
@@ -546,6 +554,8 @@ function recordKiloAdminElevationFromHeaders(
     target: string;
     surface?: AdminAccessSurface;
     method?: string;
+    internalApiUse?: boolean;
+    delegatedWorkload?: boolean;
   } & ElevationMembershipObservation
 ): void {
   const authViaToken = authViaTokenFromHeaders(params.headersList);
@@ -554,6 +564,8 @@ function recordKiloAdminElevationFromHeaders(
   const credential = deriveCredentialKind({
     authViaToken,
     tokenSource: params.tokenSource ?? null,
+    internalApiUse: params.internalApiUse,
+    delegatedWorkload: params.delegatedWorkload,
   });
   emitAdminAccessEvent({
     surface: params.surface ?? 'rest',

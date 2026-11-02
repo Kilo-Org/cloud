@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
+      "syncing": "Sinkronizatzen…",
       "syncNow": "Sinkronizatu orain",
       "syncQueued": "Sinkronizazioa ilaran",
       "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri.",

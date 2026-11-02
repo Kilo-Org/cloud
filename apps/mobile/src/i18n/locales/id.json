@@ -1310,6 +1310,7 @@
       "repoSummaryHigh_other": "{{displayCount}} tinggi",
       "repositoryActionPlan": "Rencana tindakan repositori",
       "settings": "Pengaturan",
+      "syncing": "Menyinkronkan…",
       "syncNow": "Sinkronkan sekarang",
       "syncQueued": "Sinkronisasi diantrekan",
       "syncStatusUnavailable": "Status sinkronisasi tidak tersedia.",

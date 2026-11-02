@@ -1326,6 +1326,7 @@
       "repoSummaryHigh_other": "Wysoka krytyczność: {{displayCount}}",
       "repositoryActionPlan": "Plan działań dla repozytorium",
       "settings": "Ustawienia",
+      "syncing": "Synchronizowanie…",
       "syncNow": "Synchronizuj teraz",
       "syncQueued": "Dodano synchronizację do kolejki",
       "syncStatusUnavailable": "Status synchronizacji jest niedostępny.",

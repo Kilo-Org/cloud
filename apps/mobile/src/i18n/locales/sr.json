@@ -1817,6 +1817,7 @@
       "priorityFindingsPending": "Prioritetni nalazi prikazaće se nakon prve sinhronizacije.",
       "refreshFailed": "Osvežavanje nije uspelo. Prikazani su poslednji sinhronizovani podaci.",
       "settings": "Podešavanja",
+      "syncing": "Sinhronizacija u toku…",
       "syncNow": "Sinhronizuj sada",
       "syncQueued": "Sinhronizacija je dodata u red.",
       "syncStatusUnavailable": "Status sinhronizacije nije dostupan.",

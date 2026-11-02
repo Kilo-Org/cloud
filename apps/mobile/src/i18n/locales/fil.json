@@ -1794,6 +1794,7 @@
       "priorityFindingsPending": "Lalabas ang mga natukoy na isyung dapat unahin pagkatapos ng unang sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
+      "syncing": "Sini-sync…",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
       "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",

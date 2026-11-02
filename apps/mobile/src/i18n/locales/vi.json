@@ -1310,6 +1310,7 @@
       "repoSummaryHigh_other": "{{displayCount}} cao",
       "repositoryActionPlan": "Kế hoạch xử lý cho từng kho lưu trữ",
       "settings": "Cài đặt",
+      "syncing": "Đang đồng bộ…",
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",

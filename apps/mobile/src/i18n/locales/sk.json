@@ -1843,6 +1843,7 @@
       "priorityFindingsPending": "Priority nálezov sa zobrazia po prvej synchronizácii.",
       "refreshFailed": "Obnovenie zlyhalo — zobrazujú sa posledné synchronizované údaje.",
       "settings": "Nastavenia",
+      "syncing": "Synchronizuje sa…",
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená do frontu",
       "syncStatusUnavailable": "Stav synchronizácie nie je dostupný.",

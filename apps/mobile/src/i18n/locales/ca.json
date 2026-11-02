@@ -1817,6 +1817,7 @@
       "priorityFindingsPending": "Les prioritats apareixeran després de la primera sincronització.",
       "refreshFailed": "No s'ha pogut actualitzar; es mostren les últimes dades sincronitzades.",
       "settings": "Configuració",
+      "syncing": "Sincronitzant…",
       "syncNow": "Sincronitza ara",
       "syncQueued": "Sincronització en cua",
       "syncStatusUnavailable": "L'estat de la sincronització no està disponible.",

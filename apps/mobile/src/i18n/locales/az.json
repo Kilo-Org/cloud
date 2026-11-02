@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "İlk sinxronlaşdırmadan sonra prioritet tapıntıları görünəcək.",
       "refreshFailed": "Məlumatları yeniləmək mümkün olmadı. Son sinxronlaşdırılmış məlumatlar göstərilir.",
       "settings": "Parametrlər",
+      "syncing": "Sinxronlaşdırılır…",
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
       "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil.",

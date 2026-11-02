@@ -18,6 +18,7 @@ import {
   type SecurityAgentConfigPatch,
 } from '@/lib/security-agent';
 import {
+  isSecuritySyncInProgress,
   mapSecuritySyncOperationError,
   securityConfigMutationMessage,
   securityRetainsOperationKey,
@@ -283,6 +284,12 @@ export function useTriggerSecuritySync(scope: string) {
       }
     },
     onError: error => {
+      // The in-progress conflict is the sync already running, not a failed
+      // action: the dashboard shows it as progress, so an error toast would
+      // contradict the control the reader is looking at.
+      if (isSecuritySyncInProgress(error)) {
+        return;
+      }
       announcingToast.error(error.message);
     },
     onSuccess: result => {

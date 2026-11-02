@@ -1869,6 +1869,7 @@
       "priorityFindingsPending": "Is-sejbiet ta' prijorità se jidhru wara l-ewwel sinkronizzazzjoni.",
       "refreshFailed": "Ma setgħetx tiġi aġġornata d-dejta. Qed tintwera d-dejta tal-aħħar sinkronizzazzjoni.",
       "settings": "Issettjar",
+      "syncing": "Qed jissinkronizza…",
       "syncNow": "Sinkronizza issa",
       "syncQueued": "Is-sinkronizzazzjoni tqiegħdet fil-kju",
       "syncStatusUnavailable": "L-istat tas-sinkronizzazzjoni mhux disponibbli.",

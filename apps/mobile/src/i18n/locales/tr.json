@@ -1310,6 +1310,7 @@
       "repoSummaryHigh_other": "{{displayCount}} yüksek",
       "repositoryActionPlan": "Depo işlem planı",
       "settings": "Ayarlar",
+      "syncing": "Eşitleniyor…",
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",

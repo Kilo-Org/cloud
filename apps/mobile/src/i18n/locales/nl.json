@@ -1310,6 +1310,7 @@
       "repoSummaryHigh_other": "{{displayCount}} hoog",
       "repositoryActionPlan": "Actieplan per repository",
       "settings": "Instellingen",
+      "syncing": "Bezig met synchroniseren…",
       "syncNow": "Nu synchroniseren",
       "syncQueued": "Synchronisatie in de wachtrij gezet",
       "syncStatusUnavailable": "De synchronisatiestatus is niet beschikbaar.",

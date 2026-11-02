@@ -1862,6 +1862,7 @@
       "priorityFindingsPending": "Priority findings will appear after the first sync.",
       "refreshFailed": "Could not refresh — showing last synced data.",
       "settings": "Settings",
+      "syncing": "Syncing…",
       "syncNow": "Sync now",
       "syncQueued": "Sync queued",
       "syncStatusUnavailable": "Sync status unavailable"

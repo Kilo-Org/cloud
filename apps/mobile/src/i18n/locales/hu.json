@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "A fontosság szerint rangsorolt találatok az első szinkronizálás után jelennek meg.",
       "refreshFailed": "Nem sikerült a frissítés. Az utolsó szinkronizálás adatai láthatók.",
       "settings": "Beállítások",
+      "syncing": "Szinkronizálás folyamatban…",
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorba állítva",
       "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el.",

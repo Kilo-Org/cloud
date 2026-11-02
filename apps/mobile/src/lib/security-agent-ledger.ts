@@ -127,6 +127,20 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
 }
 
 /**
+ * True when the failure is the ledger refusing a duplicate of an action that is
+ * still in flight: the same operation key is admitted and has not settled yet.
+ * For a sync that is not a failure at all — the first submit is still running —
+ * so the dashboard presents it as a running sync instead of copy with a retry
+ * that would collide again.
+ */
+export function isSecuritySyncInProgress(error: unknown): boolean {
+  if (error instanceof SecurityMutationError) {
+    return error.copyKey === IN_PROGRESS_KEY_BY_SURFACE.sync;
+  }
+  return isOperationInProgress(error);
+}
+
+/**
  * Whether a retry reuses the operation key. Two different questions a failure
  * answers: can a retry succeed (`isSecuritySyncRetryable`), and is the key
  * still the intent's. A definitive pre-acceptance rejection settles the ledger

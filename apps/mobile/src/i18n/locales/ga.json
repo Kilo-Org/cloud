@@ -1869,6 +1869,7 @@
       "priorityFindingsPending": "Beidh torthaí tosaíochta le feiceáil tar éis an chéad sioncronaithe.",
       "refreshFailed": "Níorbh fhéidir na sonraí a athnuachan. Tá sonraí ón sioncronú deireanach á dtaispeáint.",
       "settings": "Socruithe",
+      "syncing": "Ag sioncronú…",
       "syncNow": "Sioncronaigh anois",
       "syncQueued": "Sioncronú curtha sa scuaine",
       "syncStatusUnavailable": "Níl stádas an tsioncronaithe ar fáil.",

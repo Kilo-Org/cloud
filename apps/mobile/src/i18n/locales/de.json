@@ -1310,6 +1310,7 @@
       "repoSummaryHigh_other": "{{displayCount}} hoch",
       "repositoryActionPlan": "Maßnahmenplan für Repositories",
       "settings": "Einstellungen",
+      "syncing": "Synchronisierung läuft…",
       "syncNow": "Jetzt synchronisieren",
       "syncQueued": "Synchronisierung in die Warteschlange aufgenommen",
       "syncStatusUnavailable": "Der Synchronisierungsstatus ist nicht verfügbar.",

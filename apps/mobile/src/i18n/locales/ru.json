@@ -1326,6 +1326,7 @@
       "repoSummaryHigh_other": "Высокая: {{displayCount}}",
       "repositoryActionPlan": "План действий по репозиторию",
       "settings": "Настройки",
+      "syncing": "Синхронизация…",
       "syncNow": "Синхронизировать сейчас",
       "syncQueued": "Синхронизация в очереди",
       "syncStatusUnavailable": "Статус синхронизации недоступен.",

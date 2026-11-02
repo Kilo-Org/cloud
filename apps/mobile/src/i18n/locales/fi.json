@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Havaintojen tärkeysjärjestys näkyy ensimmäisen synkronoinnin jälkeen.",
       "refreshFailed": "Päivitys epäonnistui — näytetään viimeksi synkronoidut tiedot.",
       "settings": "Asetukset",
+      "syncing": "Synkronoidaan…",
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi lisättiin jonoon",
       "syncStatusUnavailable": "Synkronoinnin tilaa ei ole saatavilla",

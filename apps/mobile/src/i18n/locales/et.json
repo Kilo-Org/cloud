@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Prioriteetsed leiud ilmuvad pärast esimest sünkroonimist.",
       "refreshFailed": "Värskendamine ebaõnnestus — kuvatakse viimati sünkroonitud andmeid.",
       "settings": "Seaded",
+      "syncing": "Sünkroonimine…",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
       "syncStatusUnavailable": "Sünkroonimise olek pole saadaval",

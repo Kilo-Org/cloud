@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Penemuan keutamaan akan muncul selepas penyegerakan pertama.",
       "refreshFailed": "Tidak dapat memuat semula data. Data daripada penyegerakan terakhir dipaparkan.",
       "settings": "Tetapan",
+      "syncing": "Sedang menyegerakkan…",
       "syncNow": "Segerakkan sekarang",
       "syncQueued": "Penyegerakan dimasukkan ke dalam baris gilir",
       "syncStatusUnavailable": "Status penyegerakan tidak tersedia.",

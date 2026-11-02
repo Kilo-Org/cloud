@@ -1326,6 +1326,7 @@
       "repoSummaryHigh_other": "високої критичності: {{displayCount}}",
       "repositoryActionPlan": "План дій для репозиторіїв",
       "settings": "Налаштування",
+      "syncing": "Синхронізується…",
       "syncNow": "Синхронізувати зараз",
       "syncQueued": "Синхронізацію додано до черги",
       "syncStatusUnavailable": "Стан синхронізації недоступний.",

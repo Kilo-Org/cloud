@@ -1817,6 +1817,7 @@
       "priorityFindingsPending": "Prioritārie konstatējumi būs redzami pēc pirmās sinhronizēšanas.",
       "refreshFailed": "Neizdevās atsvaidzināt datus. Tiek rādīti pēdējās sinhronizācijas dati.",
       "settings": "Iestatījumi",
+      "syncing": "Sinhronizēšana…",
       "syncNow": "Sinhronizēt tagad",
       "syncQueued": "Sinhronizācija pievienota rindai",
       "syncStatusUnavailable": "Sinhronizācijas statuss nav pieejams.",

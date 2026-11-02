@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Prioriteitsbevindings sal verskyn nadat die eerste sinkronisasie voltooi is.",
       "refreshFailed": "Die data kon nie verfris word nie. Die laaste gesinkroniseerde data word gewys.",
       "settings": "Instellings",
+      "syncing": "Sinkroniseer tans…",
       "syncNow": "Sinkroniseer nou",
       "syncQueued": "Sinkronisasie in die tou geplaas",
       "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie.",

@@ -1342,6 +1342,7 @@
       "repoSummaryHigh_other": "{{displayCount}} عالية الخطورة",
       "repositoryActionPlan": "خطة عمل المستودع",
       "settings": "الإعدادات",
+      "syncing": "جارٍ المزامنة…",
       "syncNow": "المزامنة الآن",
       "syncQueued": "أُضيفت المزامنة إلى قائمة الانتظار.",
       "syncStatusUnavailable": "حالة المزامنة غير متاحة.",

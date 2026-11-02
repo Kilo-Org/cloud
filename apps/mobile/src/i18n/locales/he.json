@@ -1318,6 +1318,7 @@
       "repoSummaryHigh_other": "{{displayCount}} בחומרה גבוהה",
       "repositoryActionPlan": "תוכנית פעולה למאגר",
       "settings": "הגדרות",
+      "syncing": "מסנכרן…",
       "syncNow": "סנכרון עכשיו",
       "syncQueued": "הסנכרון נוסף לתור",
       "syncStatusUnavailable": "מצב הסנכרון אינו זמין.",

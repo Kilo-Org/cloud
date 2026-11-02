@@ -1895,6 +1895,7 @@
       "priorityFindingsPending": "Bydd canfyddiadau blaenoriaeth yn ymddangos ar ôl y cysoni cyntaf.",
       "refreshFailed": "Ni ellid adnewyddu'r data. Dangosir y data o'r cysoniad diwethaf.",
       "settings": "Gosodiadau",
+      "syncing": "Wrthi'n cysoni…",
       "syncNow": "Cysoni nawr",
       "syncQueued": "Cysoniad yn y ciw",
       "syncStatusUnavailable": "Nid yw'r statws cysoni ar gael.",

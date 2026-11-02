@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Abubuwan da za a fara yi daga cikin matsalolin da aka gano za su bayyana bayan an yi daidaitawa ta farko.",
       "refreshFailed": "An kasa sabuntawa — ana nuna bayanan da aka daidaita a ƙarshe.",
       "settings": "Saituna",
+      "syncing": "Ana daidaitawa…",
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An saka daidaitawa a jerin jira",
       "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba.",

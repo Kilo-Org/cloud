@@ -1794,6 +1794,7 @@
       "priorityFindingsPending": "ቅድሚያ የሚሰጣቸው ግኝቶች ከመጀመሪያው መመሳሰል በኋላ ይታያሉ።",
       "refreshFailed": "ማደስ አልተቻለም። ለመጨረሻ ጊዜ የተመሳሰለው ውሂብ እየታየ ነው።",
       "settings": "ቅንብሮች",
+      "syncing": "በማመሳሰል ላይ…",
       "syncNow": "አሁን ያመሳስሉ",
       "syncQueued": "ማመሳሰል ወደ ወረፋ ገብቷል።",
       "syncStatusUnavailable": "የማመሳሰል ሁኔታን ማግኘት አልተቻለም።",

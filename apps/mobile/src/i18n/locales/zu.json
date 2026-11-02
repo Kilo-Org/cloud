@@ -1794,6 +1794,7 @@
       "priorityFindingsPending": "Okutholakele okubalulekile kuzovela ngemva kokuvumelanisa okokuqala.",
       "refreshFailed": "Asikwazanga ukuvuselela idatha. Kuboniswa idatha egcine ukuvumelaniswa.",
       "settings": "Izilungiselelo",
+      "syncing": "Kuyavumelanisa…",
       "syncNow": "Vumelanisa manje",
       "syncQueued": "Ukuvumelanisa kufakwe emgqeni",
       "syncStatusUnavailable": "Isimo sokuvumelanisa asitholakali.",

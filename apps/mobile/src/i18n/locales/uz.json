@@ -1791,6 +1791,7 @@
       "priorityFindingsPending": "Birinchi sinxronlashdan so'ng ustuvor muammolar ko'rsatiladi.",
       "refreshFailed": "Yangilash imkoni bo'lmadi — oxirgi sinxronlangan ma'lumotlar ko'rsatilmoqda.",
       "settings": "Sozlamalar",
+      "syncing": "Sinxronlanmoqda…",
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
       "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi.",

@@ -935,7 +935,7 @@
       "optionsFor": "د {{title}} خبرو اترو غوراوي",
       "options": "د خبرو اترو غوراوي",
       "renameTitle": "د خبرو اترو د نوم بدلول",
-      "renamePlaceholder": "نوی نوم",
+      "renamePlaceholder": "نوی نوم ولیکئ",
       "couldNotReachBot": "له بوټ سره اړیکه ټینګه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "messageDeliveryFailed": "پیغام بوټ ته و نه رسېد.",
       "couldNotSignIn": "خبرو اترو ته ننوتل ناکام شول.",
@@ -1618,7 +1618,7 @@
     },
     "decision": {
       "pass": "بریالی",
-      "block": "بندول",
+      "block": "بند شوی",
       "noDecision": "پرېکړه نشته",
       "noResult": "پایله نشته"
     },
@@ -3775,7 +3775,7 @@
       "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
       "repositoryRequired": "د اجنټ پیل کولو لپاره زېرمتون ته اړتیا ده. Kilo خلاص کړئ او یو وټاکئ، بیا یې وچلوئ.",
       "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
-      "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
+      "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — د اجنټ پیل لاهم نشي کولی ترې کار واخلي. په Kilo کې بل زېرمتون وټاکئ."
     }
   },
   "launcher": {

@@ -257,6 +257,7 @@ export async function handleAudioTranscriptionsRequest(
     provider: provider.id,
     requested_model: requestedModelLowerCased,
     is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
+    custom_llm_pricing: null,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,

@@ -46,7 +46,7 @@ export type RewriteModelResponseParams = {
   kind: GatewayRequest['kind'];
   isFree: boolean;
   userByok: boolean;
-  customLlmPricing?: CustomPricingTiers;
+  customLlmPricing: CustomPricingTiers | null;
   logging: RequestLoggingParams;
   responseTransforms: ProviderResponseTransforms | null;
 };

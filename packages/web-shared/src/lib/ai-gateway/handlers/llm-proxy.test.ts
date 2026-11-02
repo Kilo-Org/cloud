@@ -3503,7 +3503,7 @@ describe('custom LLM requests', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       is_free: true,
-      custom_llm_pricing: undefined,
+      custom_llm_pricing: null,
     });
   });
 

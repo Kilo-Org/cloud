@@ -131,7 +131,7 @@ export type MicrodollarUsageContext = {
   requested_model: string;
   readonly is_free: boolean;
   /** The requested custom LLM's pricing, which takes precedence over custom pricing. */
-  custom_llm_pricing?: CustomPricingTiers;
+  custom_llm_pricing: CustomPricingTiers | null;
   promptInfo: PromptInfo;
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;

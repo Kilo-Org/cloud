@@ -662,11 +662,13 @@ export async function handleLlmProxyRequest(
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // Anonymous callers cannot use private custom LLMs, so for them a private
-  // custom LLM id must behave exactly like an unknown id.
+  // A public custom LLM owns its id, so it is publicly free exactly when it sets
+  // no pricing. Anonymous callers cannot use private custom LLMs, so for them a
+  // private custom LLM id must behave exactly like an unknown id.
   const isPubliclyFreeModel =
-    (customLlm !== null && !isPrivateCustomLlm && !customLlm.definition.pricing) ||
-    isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+    customLlm !== null && !isPrivateCustomLlm
+      ? !customLlm.definition.pricing
+      : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -808,6 +810,7 @@ export async function handleLlmProxyRequest(
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
             is_free: false,
+            custom_llm_pricing: null,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -1054,7 +1057,7 @@ export async function handleLlmProxyRequest(
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
-    custom_llm_pricing: customLlm?.definition.pricing,
+    custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),

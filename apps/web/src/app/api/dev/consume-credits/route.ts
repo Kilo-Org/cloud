@@ -75,6 +75,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       provider: 'dev-tools',
       requested_model: 'manual-consumption',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: '',
         system_prompt_length: 0,

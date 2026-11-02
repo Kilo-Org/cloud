@@ -25,6 +25,7 @@ const makeContext = (
   provider: 'openrouter',
   is_free: false,
   user_byok: false,
+  custom_llm_pricing: null,
   ...overrides,
 });
 

@@ -933,6 +933,7 @@ describe('logMicrodollarUsage', () => {
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -2382,6 +2383,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       project_id: null,
       requested_model: 'provider/requested-model',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,

@@ -14,7 +14,8 @@ import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
  * this one already runs: a section pushed from there renders it from cache, and
  * a cold deep link pays one small summary read. The subtitle line is reserved
  * whether or not the name is known yet, so the arrival of a long name cannot
- * move the body.
+ * move the body, and while that read is in flight the line holds a placeholder
+ * bar instead of reading as an empty slot.
  */
 export function ProfileSectionHeader({
   profileId,
@@ -30,6 +31,12 @@ export function ProfileSectionHeader({
 }>) {
   const overview = useAgentProfileOverview(profileId, organizationId);
   return (
-    <ScreenHeader title={title} subtitle={overview.data?.name} reserveSubtitle onBack={onBack} />
+    <ScreenHeader
+      title={title}
+      subtitle={overview.data?.name}
+      subtitleLoading={overview.isPending}
+      reserveSubtitle
+      onBack={onBack}
+    />
   );
 }

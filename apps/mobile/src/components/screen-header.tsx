@@ -8,6 +8,7 @@ import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'rea
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useHeaderBack } from '@/lib/hooks/use-header-back';
@@ -126,6 +127,14 @@ type ScreenHeaderProps = {
    * text, so it scales with the font size the way the real line does.
    */
   reserveSubtitle?: boolean;
+  /**
+   * The caller's subtitle is on its way. The reserved line then paints a
+   * placeholder bar the size of the name it will hold, so a loading header
+   * reads complete instead of showing an empty slot. The bar sits over the
+   * reserved text, which keeps the line's height at every font size, so
+   * neither the placeholder nor the name moves the body.
+   */
+  subtitleLoading?: boolean;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -280,6 +289,7 @@ export function ScreenHeader({
   titleNumberOfLines = 1,
   subtitle,
   reserveSubtitle = false,
+  subtitleLoading = false,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -447,22 +457,37 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {subtitle || reserveSubtitle ? (
-        <Text
-          variant="muted"
-          className={cn('mt-0.5', centerTitle && 'text-center', !subtitle && 'opacity-0')}
-          // One line: the subtitle is context for the title, so it truncates at
-          // its tail instead of taking a second line and moving the body. The
-          // reserved copy is a no-break space in the same style, so the height
-          // it holds is the height the name will take.
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          accessible={Boolean(subtitle)}
-          accessibilityElementsHidden={!subtitle}
-          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
-        >
-          {subtitle ?? '\u00A0'}
-        </Text>
+      {subtitle || reserveSubtitle || subtitleLoading ? (
+        <View className={cn('mt-0.5', centerTitle && 'items-center')}>
+          {subtitleLoading && !subtitle ? (
+            // The reserved text below still holds the line's height, so the bar
+            // is painted over it rather than sizing the slot itself.
+            <View
+              className={cn(
+                'absolute inset-0 justify-center',
+                centerTitle ? 'items-center' : 'items-start'
+              )}
+              pointerEvents="none"
+            >
+              <Skeleton className="h-3.5 w-24 rounded-full" />
+            </View>
+          ) : null}
+          <Text
+            variant="muted"
+            className={cn(centerTitle && 'text-center', !subtitle && 'opacity-0')}
+            // One line: the subtitle is context for the title, so it truncates at
+            // its tail instead of taking a second line and moving the body. The
+            // reserved copy is a no-break space in the same style, so the height
+            // it holds is the height the name will take.
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            accessible={Boolean(subtitle)}
+            accessibilityElementsHidden={!subtitle}
+            importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+          >
+            {subtitle ?? '\u00A0'}
+          </Text>
+        </View>
       ) : null}
     </View>
   );

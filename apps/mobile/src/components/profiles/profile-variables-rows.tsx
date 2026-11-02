@@ -22,10 +22,10 @@ import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
-/** Content-shaped rows in the same slot and height as a loaded variable row. */
+/** Content-shaped rows in the same slot, height and gap as loaded variable rows. */
 export function VariablesSkeleton() {
   return (
-    <View className="gap-2">
+    <View className="gap-3">
       {[0, 1, 2].map(index => (
         <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
       ))}

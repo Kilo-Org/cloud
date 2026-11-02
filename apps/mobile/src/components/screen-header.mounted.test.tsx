@@ -72,6 +72,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000' }),
@@ -996,6 +997,44 @@ describe('ScreenHeader mounted', () => {
     expect(name?.children).toEqual(['Shared Agency Review Profile']);
     expect(name?.props.className).not.toContain('opacity-0');
     expect(name?.props.className).toContain('text-center');
+    renderer.unmount();
+  });
+
+  it('paints a placeholder on the reserved subtitle line while the name loads', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      subtitleLoading: true,
+    });
+
+    const bars = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Skeleton'
+    );
+    expect(bars).toHaveLength(1);
+    // The bar is painted over the reserved line, which still holds the height
+    // the name will take, so the placeholder and the name lay out the same.
+    const reserved = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(reserved).toHaveLength(1);
+    expect(reserved[0]?.children).toEqual(['\u00A0']);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Skeleton'
+      )
+    ).toHaveLength(0);
     renderer.unmount();
   });
 

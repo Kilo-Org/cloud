@@ -1130,3 +1130,18 @@ describe('profile runtime delivery', () => {
     ).toEqual(runtimeSkills);
   });
 });
+
+describe('continuation marker projection', () => {
+  it('projects the server-only continuation marker into the route spec', () => {
+    const { spec } = buildControlPlaneSessionRegistration(
+      metadata({ continuation: true }),
+      selection
+    );
+    expect(spec.continuation).toBe(true);
+  });
+
+  it('omits the marker for a normal session', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(spec.continuation).toBeUndefined();
+  });
+});

@@ -218,11 +218,10 @@ const MetadataAgentSchema = z
   .object({
     mode: z.string().optional(),
     model: z.string().optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    // Variant values are provider-specific (for example `budget-32768`), and a
+    // continued session may forward an empty string. Keep `""` distinct from an
+    // absent variant; do not widen any other public input.
+    variant: z.string().max(50).optional(),
     appendSystemPrompt: z.string().max(10000).optional(),
   })
   .strip();
@@ -450,6 +449,13 @@ export const CurrentSessionMetadataSchema = z
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
     clone: MetadataCloneSchema.optional(),
+    /**
+     * Server-only marker set by the `continueHostedWorkspace` handler. It makes
+     * the wrapper skip transcript file restoration: the pushed branch is the
+     * source of truth. Never set from client input; a metadata clone is not this
+     * signal.
+     */
+    continuation: z.literal(true).optional(),
     initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),

@@ -5336,6 +5336,87 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     }
   );
 
+  it('resumes an ownership-absent continuation clone with the worktree placement', async () => {
+    const input = request({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      ownershipTitle: 'Local session',
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'agent-manager',
+        clientProvenance: 'agent-manager',
+        workspaceContinuation: true,
+      },
+    });
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    const storedProgress = await canonicalProgress(input, {
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: storedProgress }),
+    });
+    // No ownership row: the clone create resumes the stored destination IDs.
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    createCliSessionMock.mockResolvedValueOnce({ status: 'ready' });
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    // The clone resume now sends the worktree id and location it previously
+    // omitted, plus the copied source title.
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloudAgentWorktreeId: WORKTREE_ID,
+        cloudAgentWorktreeLocation: { sandboxId, provider: 'cloudflare' },
+        title: 'Local session',
+      })
+    );
+    expect(createdMetadata(doStub)).toMatchObject({ continuation: true });
+  });
+
+  it('registers a continuation clone resume without an initial turn and without re-cloning', async () => {
+    const input = request({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      ownershipTitle: 'Local session',
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'agent-manager',
+        clientProvenance: 'agent-manager',
+        workspaceContinuation: true,
+      },
+    });
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    const storedProgress = await canonicalProgress(input, {
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: storedProgress }),
+    });
+    // Ownership present but no DO metadata: resume through the register path.
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    // A clone-only continuation never re-clones and never admits an initial turn.
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject({
+      continuation: true,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    });
+  });
+
   it.each([
     {
       label: 'isolated Vercel sandbox',

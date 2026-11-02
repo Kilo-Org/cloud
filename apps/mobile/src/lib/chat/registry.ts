@@ -552,14 +552,20 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
 /**
  * Whether a kept question and the slot's question are one attempt: a retry that
  * was interrupted after the slot wrote its record and before the kept list
- * dropped it leaves both, and one question is drawn once.
+ * dropped it leaves both, and one question is drawn once. The images are
+ * compared by what they are, so two questions that carry different pictures stay
+ * two.
  */
 function sameAttempt(kept: Displaced, asked: Asked): boolean {
   return (
     kept.text === asked.text &&
     kept.model === asked.model &&
     kept.effort === asked.effort &&
-    kept.images.length === asked.images.length
+    kept.images.length === asked.images.length &&
+    kept.images.every(
+      (image, index) =>
+        image.data === asked.images[index].data && image.media === asked.images[index].media
+    )
   );
 }
 
@@ -731,13 +737,23 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
       { text: displaced.text, images: displaced.images },
       { model: displaced.model, effort: displaced.effort }
     );
-    /* The write can fail on a storage that is full or already shut. The list in
-       memory is what is drawn, and the next write of it carries the trim; until
-       then a reopen drops the entry that repeats the slot's question. */
+    /* The question is the slot's now, or waiting behind the answer arriving.
+       It is written down there before the kept list drops it, so a record of
+       the words exists at every moment; a write that refuses leaves the kept
+       entry in place, and a reopen draws that one attempt once. The chat may
+       have moved onto another session while it was asked, so both writes name
+       the session it is on now. */
+    const at = snapshotOf(current).sessionId;
     try {
-      await rememberKept(current, snapshotOf(current).displaced);
+      await rememberAsked(at, {
+        text: displaced.text,
+        images: displaced.images,
+        model: displaced.model,
+        effort: displaced.effort,
+      });
+      await rememberKept(at, snapshotOf(at).displaced);
     } catch {
-      /* The kept list in memory is already without the question. */
+      /* The kept entry stays written down, which is the words' copy. */
     }
     return;
   }

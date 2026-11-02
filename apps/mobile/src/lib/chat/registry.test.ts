@@ -1171,6 +1171,38 @@ describe('a question a later send took the slot from', () => {
     ]);
   });
 
+  it('draws two questions that say the same words with different pictures', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('pictures', place);
+    const words = { text: 'what is this', model: 'kilo/one', effort: null };
+    storedQuestions.set(
+      `chat-asked-target:pictures`,
+      JSON.stringify({ ...words, images: [{ media: 'image/jpeg', data: 'BBBB' }] })
+    );
+    storedQuestions.set(
+      'chat-kept-questions:pictures',
+      JSON.stringify([
+        {
+          id: 1,
+          ...words,
+          images: [{ media: 'image/jpeg', data: 'AAAA' }],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'pictures');
+    await settled();
+
+    // Same words, different picture: two questions, both on screen.
+    expect(asMessages(snapshotOf('pictures')).map(one => one.info.id)).toEqual([
+      'pictures:displaced:1',
+      'pictures:asked',
+    ]);
+  });
+
   it('opens again with what a later send kept', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });

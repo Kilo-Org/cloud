@@ -29,6 +29,7 @@ import {
   NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_LINE_HEIGHT,
   resolveNewSessionPromptHeight,
+  shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import {
@@ -183,6 +184,14 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
   });
+
+  // The draft's own laid-out height, reported by the input on every content
+  // change. The field keeps its size, so this only decides whether a vertical
+  // drag over the field scrolls the draft or the form behind it: a drag over a
+  // field whose text fits belongs to the form, exactly as it did when the field
+  // grew to its text and only scrolled once the cap stopped it.
+  const [contentHeight, setContentHeight] = useState(0);
+  const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
 
   const promptInputStyle = {
     color: colors.foreground,
@@ -446,9 +455,11 @@ export function NewSessionPrompt({
           ]}
           onChangeText={handlePromptChange}
           onSelectionChange={handlePromptSelectionChange}
-          // The field keeps its height, so a draft taller than it scrolls
-          // inside rather than growing the card.
-          scrollEnabled
+          onContentSizeChange={event => {
+            const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
+            setContentHeight(current => (current === next ? current : next));
+          }}
+          scrollEnabled={promptScrolls}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           returnKeyType={returnSendsMessage ? 'send' : 'default'}
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}

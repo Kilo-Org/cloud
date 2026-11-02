@@ -1261,6 +1261,10 @@ describe('createSessionManager', () => {
         expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
 
         // A real switch still drops them: they never apply to another session.
+        // The catalog above already cleared the remote pick, so it is re-set
+        // here for the switch to have something to drop.
+        mgr.setRemoteModelOverride(remoteOverride);
+        mgr.setCloudAgentModelOverride(cloudAgentOverride);
         await mgr.switchSession(kiloId('ses-2'));
         expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
         expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();

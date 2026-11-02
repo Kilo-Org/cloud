@@ -77,6 +77,7 @@ const FRONTEND = profile({ id: 'frontend', name: 'Frontend', skillCount: 2 });
 function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePickerSheetProps {
   return {
     candidates: [BACKEND, FRONTEND],
+    isOrganizationContext: false,
     hasProfiles: true,
     selectedOverrideProfileId: null,
     defaultProfileApplies: false,
@@ -142,8 +143,8 @@ describe('ProfilePickerSheet', () => {
     expect(renderer.root.findByType('PickerSheet' as never).props.title).toBe('Pick a profile');
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'No profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).toContain('3 vars · 1 MCP · 1 cmd · 2 setup cmds · 1 agent');
     expect(checkedStates(renderer)).toEqual([true, false, false]);
@@ -154,14 +155,37 @@ describe('ProfilePickerSheet', () => {
     expect(checkedStates(renderer)).toEqual([false, false, true]);
   });
 
+  it('groups rows by owner in an organization scope, organization first', () => {
+    const agency = profile({ id: 'agency', name: 'Agency', ownerType: 'organization' });
+    const renderer = mount({
+      // Personal row first, so the order can only come from the owner split.
+      candidates: [FRONTEND, agency],
+      isOrganizationContext: true,
+    });
+
+    expect(texts(renderer)).toEqual(expect.arrayContaining(['Organization', 'Personal']));
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Agency, Organization',
+      'Frontend, Personal',
+    ]);
+  });
+
+  it('renders no owner heading in a personal scope', () => {
+    const renderer = mount();
+
+    expect(texts(renderer)).not.toContain('Organization');
+    expect(texts(renderer)).not.toContain('Personal');
+  });
+
   it('selects a candidate, and clears it when the checked row is tapped again', () => {
     const onSelect = vi.fn<() => void>();
     const renderer = mount({ selectedOverrideProfileId: 'backend', onSelect });
 
-    press(radio(renderer, 'Frontend'));
+    press(radio(renderer, 'Frontend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith('frontend');
 
-    press(radio(renderer, 'Backend'));
+    press(radio(renderer, 'Backend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 
@@ -187,8 +211,8 @@ describe('ProfilePickerSheet', () => {
     // the Environment chip shows, so the checked row and the chip agree.
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'Default profile: Backend',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).toContain('Default profile');
     expect(texts(renderer)).toContain('Resolves to Backend');
@@ -201,8 +225,8 @@ describe('ProfilePickerSheet', () => {
 
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'Default profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
   });
@@ -214,8 +238,8 @@ describe('ProfilePickerSheet', () => {
 
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'No profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
   });

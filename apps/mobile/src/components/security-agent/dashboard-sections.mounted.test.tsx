@@ -10,6 +10,7 @@ import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { DashboardSections, DashboardSectionsSkeleton } from './dashboard-sections';
 
 // The counted bucket helper is spied on: a line that names three counts can
@@ -180,6 +181,44 @@ describe('DashboardSections priority card', () => {
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
     expect(card.findAllByType('Pressable')).toHaveLength(1);
   });
+
+  // Regression: the all-clear row was sized by its one text line plus `py-3`,
+  // which renders under the design target, so only that band was tappable. The
+  // floor has to sit on the row's own class — `hitSlop` would not move the rect
+  // a control-size audit measures.
+  it('carries the shared row floor on the card it opens', () => {
+    const card = priorityCard(renderSections({ neverSynced: false }));
+
+    for (const pressable of card.findAllByType('Pressable')) {
+      expect(String(pressable.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(pressable.props.hitSlop).toBeUndefined();
+    }
+  });
+
+  it('carries the shared row floor on the priority finding it opens', () => {
+    const card = priorityCard(
+      renderSections({
+        neverSynced: false,
+        data: dashboardData({
+          priorityFinding: {
+            id: 'finding-1',
+            severity: 'critical',
+            title: 'Unescaped shell argument',
+            repoFullName: 'drain-e2e-labs/notes',
+            analysisStatus: 'complete',
+            isExploitable: true,
+            suggestedAction: 'Escape the argument',
+            slaDueAt: null,
+            daysOverdue: null,
+          },
+        }),
+      })
+    );
+
+    const pressables = card.findAllByType('Pressable');
+    expect(pressables).toHaveLength(1);
+    expect(String(pressables[0]?.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+  });
 });
 
 describe('DashboardSections stat rows', () => {
@@ -240,6 +279,40 @@ describe('DashboardSections repository row', () => {
       ['repoCritical', 1],
       ['repoHigh', 1],
     ]);
+  });
+
+  // Regression: the row was sized by its content alone, so a row that painted
+  // its name line without a summary measured under the design target. The floor
+  // sits on the row's own class because a control-size audit reads that node's
+  // rect, and `hitSlop` would not move it.
+  it('carries the shared row floor on every repository row', () => {
+    const repoHealth: DashboardData['repoHealth'] = ['one', 'two', 'three'].map((slug, index) => ({
+      repoFullName: `drain-e2e-labs/${slug}`,
+      open: 3,
+      critical: 1,
+      high: 1,
+      medium: 1,
+      low: 0,
+      overdue: 2,
+      exploitable: 1,
+      needsAction: 3,
+      slaCompliancePercent: index * 10,
+      slaComplianceMeasured: true,
+    }));
+    const rows = renderSections({
+      neverSynced: false,
+      data: dashboardData({ repoHealth }),
+    })
+      .root.findAllByType('Pressable')
+      .filter(pressable =>
+        copy(pressable).some(text => String(text).startsWith('drain-e2e-labs/'))
+      );
+
+    expect(rows).toHaveLength(repoHealth.length);
+    for (const row of rows) {
+      expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(row.props.hitSlop).toBeUndefined();
+    }
   });
 });
 

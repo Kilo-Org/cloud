@@ -338,9 +338,7 @@ export function ModelPickerOptionRow({
             ) : null}
             {option.displayId ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
-                {option.modelRef
-                  ? t('agentChat.modelSelector.modelId', { id: option.displayId })
-                  : option.displayId}
+                {option.displayId}
               </Text>
             ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}

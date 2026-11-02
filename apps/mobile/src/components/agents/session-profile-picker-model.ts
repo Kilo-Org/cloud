@@ -27,6 +27,12 @@ type ProfileLayerSource = 'repo-binding' | 'default' | 'explicit';
 export type SessionProfilePickerProfile = ProfileCountCounts & {
   id: string;
   name: string;
+  /**
+   * The owner tag `agentProfiles.listCombined` carries. `agentProfiles.list`
+   * leaves it off, and an untagged row is personal — the rule
+   * `profileOwnerType` applies to every profile list.
+   */
+  ownerType?: 'user' | 'organization';
 };
 
 export type SessionProfilePickerInput<

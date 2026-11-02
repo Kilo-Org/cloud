@@ -16,6 +16,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export type QueryErrorVariant =
   | 'neutral'
@@ -97,6 +98,7 @@ export function QueryError({
   refreshControl,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const meta = variantMeta(t, variant);
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
@@ -107,15 +109,17 @@ export function QueryError({
       icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
-        <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
+        <AccessibleStatus message={descriptionText} tone="status" className="text-center text-sm" />
       }
       className={className}
       placement={placement}
       refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
+      iconColor={colors.destructive}
       iconSize={32}
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
+      compactTitleClassName="text-destructive"
       action={
         action ??
         (onRetry && (

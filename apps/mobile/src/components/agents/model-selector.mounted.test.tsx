@@ -281,16 +281,17 @@ describe('ModelPickerOptionRow trailing alignment', () => {
 });
 
 // A provider section's header already names the provider, so its rows drop the
-// line that repeats it and keep the model id. Rows in FAVORITES, recommended and
-// all-models have no provider header above them and keep the line.
-describe('ModelPickerOptionRow provider line', () => {
+// line that repeats it. Rows in FAVORITES, recommended and all-models have no
+// provider header above them and keep the line. Every row shows the bare model
+// id under its name: the row name and the sheet title already say it is a model.
+describe('ModelPickerOptionRow provider and model id lines', () => {
   const providerOption = cliCatalogOption({
     displayId: 'anthropic-model-00',
     modelRef: { providerID: 'anthropic', modelID: 'anthropic-model-00' },
     provider: { id: 'anthropic', name: 'Anthropic' },
   });
   const providerLine = i18n.t('agentChat.modelSelector.provider', { id: 'anthropic' });
-  const modelIdLine = i18n.t('agentChat.modelSelector.modelId', { id: 'anthropic-model-00' });
+  const modelIdLine = 'anthropic-model-00';
 
   it('omits the provider line under a provider section and keeps the model id', () => {
     const texts = textStrings(renderRow(providerOption, { showProvider: false }).root);
@@ -304,6 +305,16 @@ describe('ModelPickerOptionRow provider line', () => {
 
     expect(texts).toContain(providerLine);
     expect(texts).toContain(modelIdLine);
+  });
+
+  it('renders the id line as the bare id, with no label in front of it', () => {
+    for (const showProvider of [false, true]) {
+      const idLines = textStrings(renderRow(providerOption, { showProvider }).root).filter(text =>
+        text.includes(modelIdLine)
+      );
+
+      expect(idLines).toEqual([modelIdLine]);
+    }
   });
 
   // The visible line is the duplicate, not the fact: a screen reader that lands

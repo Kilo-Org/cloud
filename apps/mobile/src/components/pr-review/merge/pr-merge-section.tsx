@@ -274,24 +274,19 @@ export function PrMergeSection({
 
   // Mergeable — single "Merge" CTA.
   return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.mergeTitle')}
-      </Text>
-      <Button
-        onPress={() => {
-          const m: PrMergeMethod = defaultMergeMethodFor(overview.repo);
-          router.push(
-            mergeSheetHref({ owner, repo, number: overview.number, mode: 'merge', method: m })
-          );
-        }}
-        accessibilityLabel={t('prReview.merge.mergePullRequest')}
-      >
-        <View className="flex-row items-center gap-2">
-          <GitMerge size={14} color={colors.primaryForeground} />
-          <Text>{t('prReview.merge.merge')}</Text>
-        </View>
-      </Button>
-    </View>
+    <Button
+      onPress={() => {
+        const m: PrMergeMethod = defaultMergeMethodFor(overview.repo);
+        router.push(
+          mergeSheetHref({ owner, repo, number: overview.number, mode: 'merge', method: m })
+        );
+      }}
+      accessibilityLabel={t('prReview.merge.mergePullRequest')}
+    >
+      <View className="flex-row items-center gap-2">
+        <GitMerge size={14} color={colors.primaryForeground} />
+        <Text>{t('prReview.merge.merge')}</Text>
+      </View>
+    </Button>
   );
 }

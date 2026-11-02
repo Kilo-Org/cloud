@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { usePathname } from 'expo-router';
-import { CenteredState } from '@/components/centered-state';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +12,7 @@ import { GitHubIcon } from '@/components/icons/github-icon';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
+import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -198,14 +198,7 @@ function GitHubConnectGate({
   }
 
   if (view === 'loading') {
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <CenteredState>
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
-        </CenteredState>
-      </View>
-    );
+    return <PrReviewGateLoading />;
   }
 
   if (view === 'connect' || view === 'reconnect') {

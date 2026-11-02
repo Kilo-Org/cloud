@@ -59,7 +59,7 @@ export const darkColors = {
   destructiveSolidForeground: '#FFFFFF',
   border: 'rgba(255, 255, 255, 0.07)',
   card: '#17171A',
-  selection: '#4F5A10',
+  selection: '#647214',
   selectionForeground: '#F2F0EB',
   ink2: '#C4C1B8',
   mutedSoft: '#56544F',

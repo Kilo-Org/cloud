@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Text, TextClassContext } from '@/components/ui/text';
+import { COMPACT_BUTTON_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +35,8 @@ const buttonVariants = cva(
       size: {
         // min-h (not fixed h) so the button grows to fit text scaled by large
         // Dynamic Type instead of clipping the label; the min still guarantees
-        // the 48pt action / 44pt default/lg / 36pt-plus-hitSlop sm target.
+        // the 48pt action / 44pt default/lg / 46pt-reach sm target, whose 36pt
+        // frame carries the rest as `COMPACT_BUTTON_HIT_SLOP`.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] rounded-md px-3 py-1.5',
@@ -66,10 +68,6 @@ const buttonGapVariants = cva('', {
     size: 'default',
   },
 });
-
-// sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
-// without changing the compact visual size.
-const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 
 // While `loading` is on, the spinner replaces the label instead of sitting
 // beside it. The label stays in the row at zero opacity, so a content-sized
@@ -266,7 +264,7 @@ function Button({
           // opting into the loading layout; `loading` still wins when it is set.
           busy: loading ?? accessibilityState?.busy,
         }}
-        hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
+        hitSlop={hitSlop ?? (size === 'sm' ? COMPACT_BUTTON_HIT_SLOP : undefined)}
         {...props}
       >
         {usesBusyLayout ? (

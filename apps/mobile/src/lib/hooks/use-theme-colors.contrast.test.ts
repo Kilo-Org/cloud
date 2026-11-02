@@ -228,8 +228,10 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
 
 describe('selected tab pill contrast (WCAG AA text)', () => {
   // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
-  // the muted olive in both themes: the dark accent (#ffdd00) as a full pill
-  // glares on the dark page, so dark mode must not fall back to it.
+  // the light theme's olive at the value the dark page needs: the dark accent
+  // (#ffdd00) as a full pill glares on the dark page, and the unlifted light
+  // value recedes into it, so dark mode lifts the same hue and must not fall
+  // back to the accent.
   it('light theme: selectionForeground vs selection >= 4.5:1', () => {
     const ratio = contrastRatio(lightColors.selectionForeground, lightColors.selection);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
@@ -242,6 +244,19 @@ describe('selected tab pill contrast (WCAG AA text)', () => {
 
   it('dark theme: the selected fill is not the dark accent', () => {
     expect(darkColors.selection).not.toBe(darkColors.primary);
+  });
+
+  // The fill is the selected state's own indicator, so WCAG 1.4.11 asks for 3:1
+  // against the page it sits on and against `secondary`, the unselected fill of
+  // the pill and the row surface under the tab. A value that clears the label
+  // but recedes into the dark page leaves the selection unreadable.
+  it('dark theme: the selected fill stands >= 3:1 off the page and off secondary', () => {
+    expect(contrastRatio(darkColors.selection, darkColors.background)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+    expect(contrastRatio(darkColors.selection, darkColors.secondary)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
   });
 });
 

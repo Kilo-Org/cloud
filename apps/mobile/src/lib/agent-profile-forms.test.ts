@@ -189,10 +189,16 @@ describe('variable keys', () => {
     expect(cleanVariableKey('ALREADY_OK')).toBe('ALREADY_OK');
   });
 
-  it('validates the 1..256 non-empty bound', () => {
+  it('keeps a cleaned key starting with a digit acceptable to the server', () => {
+    expect(cleanVariableKey('1var')).toBe('_1VAR');
+    expect(cleanVariableKey('2.0-version')).toBe('_2_0_VERSION');
+    expect(cleanVariableKey('_1VAR')).toBe('_1VAR');
+  });
+
+  it('validates the 1..128 non-empty bound', () => {
     expect(isValidVariableKey('API_KEY')).toBe(true);
-    expect(isValidVariableKey('a'.repeat(256))).toBe(true);
-    expect(isValidVariableKey('a'.repeat(257))).toBe(false);
+    expect(isValidVariableKey('a'.repeat(128))).toBe(true);
+    expect(isValidVariableKey('a'.repeat(129))).toBe(false);
     expect(isValidVariableKey('   ')).toBe(false);
   });
 });

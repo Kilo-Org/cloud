@@ -6,7 +6,8 @@ import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
-import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
+import { SheetHeader } from '@/components/sheet-header';
+import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 

@@ -19,7 +19,7 @@ import {
   type ProviderReviewErrorKind,
 } from '@kilocode/app-shared/provider-review';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import type { Owner } from '@/lib/integrations/core/types';
+import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
@@ -308,18 +308,50 @@ async function resolveIntegration(
 }
 
 /**
- * Resolve the active integration for the owner and return a fresh token plus
- * the server-derived instance URL. The inbox has no project to verify, so it
- * uses this instead of authorizeProject.
+ * The integration's cached repository set, resolved before a token is
+ * released. A catalogue that cannot be read (non-numeric provider ids) yields
+ * no repositories: the same fail-closed rule authorizeProject applies when it
+ * cannot make its match, so neither read widens past the cache.
+ */
+function readCachedRepositories(integration: PlatformIntegration): PlatformRepository[] {
+  try {
+    return requireNumericPlatformRepositories(integration.repositories) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The connection's credentials plus the repository scope they are bounded by:
+ * the cached repository full paths, which a workspace-wide read intersects its
+ * rows with. A connection with an empty catalogue has no listable project.
+ */
+export type GitLabOwnerAccess = {
+  accessToken: string;
+  /** Server-derived instance base URL — never a caller-supplied value. */
+  instanceUrl: string;
+  /** The integration's cached repository full paths, in their stored casing. */
+  repositoryFullNames: string[];
+  owner: GitLabReviewOwner;
+};
+
+/**
+ * Resolve the active integration for the owner and return a fresh token, the
+ * server-derived instance URL, and the cached repository paths. The inbox has
+ * no single project to verify, so it uses this instead of authorizeProject and
+ * bounds its rows with the repository set returned here.
  */
 export async function authorizeOwner(
   owner: GitLabReviewOwner,
   instanceHint?: string
-): Promise<{ accessToken: string; instanceUrl: string; owner: GitLabReviewOwner }> {
+): Promise<GitLabOwnerAccess> {
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
+  const repositoryFullNames = readCachedRepositories(integration).map(
+    repository => repository.full_name
+  );
   try {
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
-    return { accessToken, instanceUrl, owner };
+    return { accessToken, instanceUrl, repositoryFullNames, owner };
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }
@@ -345,13 +377,7 @@ export async function authorizeProject(
   const requested = cleanProjectPath(projectPath);
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
 
-  let repositories: ReturnType<typeof requireNumericPlatformRepositories>;
-  try {
-    repositories = requireNumericPlatformRepositories(integration.repositories);
-  } catch {
-    repositories = null;
-  }
-  const match = repositories?.find(
+  const match = readCachedRepositories(integration).find(
     repo => repo.full_name.toLowerCase() === requested.toLowerCase()
   );
   if (!match) {

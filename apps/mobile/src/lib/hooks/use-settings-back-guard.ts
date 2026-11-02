@@ -1,6 +1,6 @@
 import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
-import { useNavigation, usePreventRemove, useRouter } from 'expo-router';
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
@@ -33,12 +33,24 @@ export function useSecurityAgentSettingsRedirect(
   }: Readonly<{ skipRedirect?: boolean; dirty?: boolean }> = {}
 ) {
   const router = useRouter();
-  // Undoing an edit must retry a disabled redirect that the dirty guard cancelled.
-  useEffect(() => {
-    if (isEnabled === false && !skipRedirect) {
-      router.replace(getSecurityAgentPath(scope, 'settings'));
-    }
-  }, [isEnabled, router, scope, skipRedirect, dirty]);
+  const settingsHref = getSecurityAgentPath(scope, 'settings');
+  const bounce = isEnabled === false && !skipRedirect;
+  // A focus effect, not an effect on the config alone: the config of a link
+  // that opens this screen can already be cached, so the bounce dispatches
+  // from the screen's first commit - before the link's own navigation lands.
+  // That navigation then focuses this route over the overview it replaced,
+  // and a config-keyed effect would never run again for an unchanged config,
+  // leaving the disabled screen focused and blank. Re-asserting the bounce on
+  // every focus (and on the deps below) recovers that, and any reader who
+  // returns to the route.
+  useFocusEffect(
+    useCallback(() => {
+      if (bounce) {
+        router.replace(settingsHref);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- `dirty` re-asserts the bounce after an edit is undone, which the guard cancelled while the draft was dirty
+    }, [bounce, dirty, router, settingsHref])
+  );
 }
 
 export type SettingsBackGuardResult = {

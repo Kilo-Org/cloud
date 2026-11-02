@@ -112,8 +112,7 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
 }
 
 // Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
-// but is identical in both themes (global.css --accent-soft-foreground).
+// buttonTextVariants below).
 function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
   if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
     return colors.foreground;
@@ -122,7 +121,7 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
     return colors.primary;
   }
   if (variant === 'accent-soft') {
-    return '#1A1A10';
+    return colors.accentSoftForeground;
   }
   if (variant === 'destructive') {
     return colors.destructiveSolidForeground;
@@ -279,8 +278,19 @@ function Button({
           normalizedChildren
         )}
         {loading && size !== 'icon' ? (
-          <View className={BUTTON_BUSY_OVERLAY_CLASS}>
-            <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
+          // The button already carries the busy state and its name, so the
+          // indicator inside it stays out of the accessibility tree instead of
+          // adding a second stop that reads only the wait.
+          <View
+            className={BUTTON_BUSY_OVERLAY_CLASS}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <ActivityIndicator
+              accessible={false}
+              size="small"
+              color={spinnerColor(variant, colors)}
+            />
           </View>
         ) : null}
         {size === 'icon' ? busyIndicator : null}

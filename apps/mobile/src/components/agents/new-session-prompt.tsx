@@ -1,9 +1,12 @@
 /* eslint-disable max-lines -- The new-session prompt owns its uncontrolled input, starter chips, counter, newline control, voice dictation, and attachment strip end-to-end in one cohesive surface. */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   TextInput as RNTextInput,
@@ -45,6 +48,7 @@ import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
 import {
   applyVoiceDraftAtSelection,
@@ -65,9 +69,22 @@ import {
 // Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
+/** The input's `py-2`: the inset between the field's edge and its text box. */
+const PROMPT_INPUT_VERTICAL_INSET = 8;
+/** A sub-pixel scroll is not a hidden line above the field. */
+const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
+// LinearGradient is not NativeWind-mapped; the physical style object follows
+// the skeleton.tsx overlay pattern. It starts at the text box, where a scrolled
+// field clips its topmost line.
+const PROMPT_TOP_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: PROMPT_INPUT_VERTICAL_INSET,
+} as const;
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -192,6 +209,21 @@ export function NewSessionPrompt({
   // grew to its text and only scrolled once the cap stopped it.
   const [contentHeight, setContentHeight] = useState(0);
   const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  // A scrolled draft is clipped at the text box's top edge, so its topmost
+  // visible line is a slice of the line above. The fade below covers that band
+  // so the slice never bottoms against the toolbar. It stays off at scroll
+  // offset 0, where the first line is whole: dimming a readable line is worse
+  // than the slice it would hide.
+  const [promptScrolled, setPromptScrolled] = useState(false);
+  // The fade only has a slice to cover while the field scrolls: a draft that
+  // fits leaves the input unscrollable, so any scroll state left over from a
+  // longer draft must not dim its first line.
+  const promptTopFade = promptScrolls && promptScrolled;
+
+  function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = event.nativeEvent.contentOffset.y > PROMPT_SCROLLED_THRESHOLD;
+    setPromptScrolled(current => (current === next ? current : next));
+  }
 
   const promptInputStyle = {
     color: colors.foreground,
@@ -433,48 +465,67 @@ export function NewSessionPrompt({
         />
       ) : null}
       <View className="px-2 pt-2">
-        <RNTextInput
-          ref={promptInputRef}
-          placeholder={t('agentChat.newSession.promptPlaceholder')}
-          placeholderTextColor={colors.mutedForeground}
-          multiline
-          defaultValue={initialPrompt}
-          // No dimming while a create is in flight: the field stays editable
-          // (an in-flight create must not steal the IME from the pinned
-          // footer), so it must not read as disabled. The busy affordance is
-          // the Start button's own spinner. An edit made mid-flight is not
-          // discarded: the creator cancels the attempt before it dispatches
-          // and keeps this draft (see `createSessionFromDraft`).
-          className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
-          style={[
-            promptInputStyle,
-            { height: promptHeight },
-            Platform.OS === 'android'
-              ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
-              : undefined,
-          ]}
-          onChangeText={handlePromptChange}
-          onSelectionChange={handlePromptSelectionChange}
-          onContentSizeChange={event => {
-            const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
-            setContentHeight(current => (current === next ? current : next));
-          }}
-          scrollEnabled={promptScrolls}
-          maxLength={PROMPT_INPUT_MAX_CHARS}
-          returnKeyType={returnSendsMessage ? 'send' : 'default'}
-          submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
-          onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
-          maxFontSizeMultiplier={1}
-          // Focus on arrival only when the form has nothing left to configure
-          // (the host resolves this) and no share payload prefills it: the
-          // keyboard it raises would otherwise shrink the frame past the
-          // repository, Environment and Advanced sections the session still
-          // needs before it can start.
-          autoFocus={takesFocusOnMount}
-          // Android's IME swaps the app for its full-screen extract editor in a
-          // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
-          disableFullscreenUI
-        />
+        <View>
+          <RNTextInput
+            ref={promptInputRef}
+            placeholder={t('agentChat.newSession.promptPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            defaultValue={initialPrompt}
+            // No dimming while a create is in flight: the field stays editable
+            // (an in-flight create must not steal the IME from the pinned
+            // footer), so it must not read as disabled. The busy affordance is
+            // the Start button's own spinner. An edit made mid-flight is not
+            // discarded: the creator cancels the attempt before it dispatches
+            // and keeps this draft (see `createSessionFromDraft`).
+            className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
+            style={[
+              promptInputStyle,
+              { height: promptHeight },
+              Platform.OS === 'android'
+                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                : undefined,
+            ]}
+            onChangeText={handlePromptChange}
+            onSelectionChange={handlePromptSelectionChange}
+            onContentSizeChange={event => {
+              const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
+              setContentHeight(current => (current === next ? current : next));
+              if (!shouldEnableComposerInputScroll(next, promptHeight)) {
+                // The draft fits again: the field is back at its top, where the
+                // first line is whole.
+                setPromptScrolled(false);
+              }
+            }}
+            onScroll={handlePromptScroll}
+            scrollEnabled={promptScrolls}
+            maxLength={PROMPT_INPUT_MAX_CHARS}
+            returnKeyType={returnSendsMessage ? 'send' : 'default'}
+            submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+            onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
+            maxFontSizeMultiplier={1}
+            // Focus on arrival only when the form has nothing left to configure
+            // (the host resolves this) and no share payload prefills it: the
+            // keyboard it raises would otherwise shrink the frame past the
+            // repository, Environment and Advanced sections the session still
+            // needs before it can start.
+            autoFocus={takesFocusOnMount}
+            // Android's IME swaps the app for its full-screen extract editor in a
+            // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+            disableFullscreenUI
+          />
+          {promptTopFade ? (
+            <LinearGradient
+              pointerEvents="none"
+              // The card's own color, so the slice fades into the surface
+              // behind it instead of drawing a bar of its own.
+              colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={[PROMPT_TOP_FADE_STYLE, { height: promptLineHeight }]}
+            />
+          ) : null}
+        </View>
         {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}

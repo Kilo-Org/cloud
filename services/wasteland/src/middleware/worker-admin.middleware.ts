@@ -57,6 +57,9 @@ export const resolveWorkerAdminMiddleware = createMiddleware<WastelandEnv>(async
   });
 
   c.set('workerAdmin', authority);
+  if (authority.capabilityError !== null) {
+    return c.json({ error: 'Invalid worker admin capability' }, 401);
+  }
   return next();
 });
 

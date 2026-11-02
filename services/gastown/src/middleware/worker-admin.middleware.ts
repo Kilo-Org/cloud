@@ -74,6 +74,9 @@ export const resolveWorkerAdminMiddleware = createMiddleware<GastownEnv>(async (
   });
 
   c.set('workerAdmin', authority);
+  if (authority.capabilityError !== null) {
+    return c.json({ success: false, error: 'Invalid worker admin capability' }, 401);
+  }
   return next();
 });
 

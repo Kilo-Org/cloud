@@ -32,7 +32,7 @@ export function selectProfilesListErrorView({
     return { variant: 'offline', showRetry: true, titleKey: 'profiles.loadFailed' };
   }
   const code = readTrpcErrorField(error, 'code');
-  const variant = trpcErrorVariant(code);
+  const variant = trpcErrorVariant(error);
   return {
     variant,
     showRetry: !isTerminalTrpcCode(code),

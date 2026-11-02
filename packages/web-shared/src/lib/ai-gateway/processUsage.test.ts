@@ -54,8 +54,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
@@ -188,7 +190,7 @@ describe('processOpenRouterUsage', () => {
     );
 
     test('bills the reported cost from providers that never report is_byok', () => {
-      const result = processOpenRouterUsage(usage, coreProps, 'martian');
+      const result = processOpenRouterUsage(usage, coreProps, 'direct-byok');
 
       expect(result.cost_mUsd).toBe(75966);
       expect(result.is_byok).toBeNull();
@@ -1703,7 +1705,7 @@ describe('logMicrodollarUsage', () => {
 
         expect(fetchGeneration).toHaveBeenCalledWith(
           'gen-stt-123',
-          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+          expect.objectContaining({ type: 'openrouter', apiKey: expectedApiKey })
         );
       }
     );
@@ -1842,24 +1844,32 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.is_free).toBe(true);
   });
 
-  test.each(['deleted', 'unavailable'] as const)(
-    'keeps a selected custom LLM free when its catalog entry is %s',
-    async catalogState => {
+  test.each([
+    ['custom', 'deleted'],
+    ['custom', 'unavailable'],
+    ['custom-public', 'deleted'],
+    ['custom-public', 'unavailable'],
+  ] as const)(
+    'preserves selected %s usage when its catalog entry is %s',
+    async (provider, catalogState) => {
       const user = await insertTestUser({
-        id: `test-${catalogState}-custom-llm-user`,
+        id: `test-${catalogState}-${provider}-llm-user`,
         microdollars_used: 1000,
-        google_user_email: `${catalogState}-custom-llm@example.com`,
+        google_user_email: `${catalogState}-${provider}-llm@example.com`,
       });
       const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
-      const modelId = `acme/${catalogState}-custom-model`;
-      await insertCustomLlmForTest(modelId);
+      const modelId = `acme/${catalogState}-${provider}-model`;
+      await insertCustomLlmForTest(
+        modelId,
+        provider === 'custom-public' ? publicCustomLlmDefinition(['acme']) : customLlmDefinition()
+      );
       const catalogReadSpy = jest.spyOn(readDb, 'select');
       try {
         expect(await isCustomLlm(modelId)).toBe(true);
         const usageContext: MicrodollarUsageContext = {
           ...createBaseUsageContext(user),
           organizationId: organization.id,
-          provider: 'custom',
+          provider,
           requested_model: modelId,
           is_free: true,
         };
@@ -1880,7 +1890,13 @@ describe('logMicrodollarUsage', () => {
         const usageRecord = await db.query.microdollar_usage.findFirst({
           where: eq(microdollar_usage.id, result.usageId),
         });
-        expect(usageRecord).toMatchObject({ provider: 'custom', cost: 0, cache_discount: 0 });
+        expect(usageRecord).toMatchObject({
+          provider,
+          model: modelId,
+          requested_model: modelId,
+          cost: 0,
+          cache_discount: 0,
+        });
         const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
           where: eq(microdollar_usage_metadata.id, result.usageId),
         });
@@ -2058,6 +2074,12 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage_metadata.id, result.usageId),
     });
     expect(metadataRecord).toMatchObject({ non_inference_cost: 7000, market_cost: 12_316 });
+    const [usageViewRecord] = await db
+      .select({ non_inference_cost: microdollar_usage_view.non_inference_cost })
+      .from(microdollar_usage_view)
+      .where(eq(microdollar_usage_view.id, result.usageId))
+      .limit(1);
+    expect(usageViewRecord?.non_inference_cost).toBe(7000);
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 13_316);
   });
 

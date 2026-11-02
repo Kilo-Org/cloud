@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -52,12 +52,20 @@ type NewSessionProfileOverrideProps = {
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
   /**
-   * The Organization section above Run on: the active account the create is
-   * attributed to. The body renders it for every entry point — switchable on
-   * the ordinary entry, a read-only scope row on the clone entry.
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
    */
-  organizationSection?: React.ReactNode;
+  accountSection?: React.ReactNode;
 };
+
+/**
+ * Space the advanced configuration keeps above itself when its expansion
+ * scrolls the composer, so the disclosure row it just revealed does not sit
+ * flush against the frame's top edge.
+ */
+const ADVANCED_CONFIG_REVEAL_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -104,10 +112,12 @@ export function NewSessionConfigureForm({
   onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
+  autoFocusPrompt = true,
   groups,
   isRetrying,
   onChangeRepo,
   onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -126,7 +136,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
-  organizationSection,
+  accountSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -186,8 +196,21 @@ export function NewSessionConfigureForm({
     setFrameHeight(current => (current === next ? current : next));
   }
 
+  // The composer's scroll body, so the advanced configuration can bring its
+  // expanded content into view instead of growing below the fold. The panel
+  // reports its own offset once per expansion, after that content has laid
+  // out; the clamp keeps a panel near the top from overshooting.
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const revealAdvancedConfig = useCallback((contentOffset: number) => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, contentOffset - ADVANCED_CONFIG_REVEAL_GAP),
+      animated: true,
+    });
+  }, []);
+
   const body = (
     <ScrollView
+      ref={scrollRef}
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
@@ -231,10 +254,11 @@ export function NewSessionConfigureForm({
           belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
+          autoFocusOnMount={autoFocusPrompt}
         />
       </View>
 
-      {/* The block under the card the frame must still show: the Organization
+      {/* The block under the card the frame must still show: the Account
           section when the entry point renders one, then the Run on row and its
           refresh control. Each child's own `mt-*` lives inside this wrapper, so
           the prompt's frame fit reserves the block's whole footprint. */}
@@ -244,7 +268,7 @@ export function NewSessionConfigureForm({
           setRunTargetHeight(current => (current === next ? current : next));
         }}
       >
-        {organizationSection}
+        {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}
           runOnInstance={runOnInstance}
@@ -268,7 +292,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       {isRemote ? (
-        <Text className="mt-2 text-xs text-muted-foreground">
+        <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
@@ -282,6 +306,7 @@ export function NewSessionConfigureForm({
           isRetrying={isRetrying}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           recents={recents}
@@ -338,6 +363,7 @@ export function NewSessionConfigureForm({
           onManualCommandsChange={onManualCommandsChange}
           disabled={isStarting}
           onRepoDefaults={onOpenRepoDefaults}
+          onRequestReveal={revealAdvancedConfig}
         />
       ) : null}
     </ScrollView>

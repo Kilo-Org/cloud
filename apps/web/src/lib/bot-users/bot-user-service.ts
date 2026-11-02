@@ -156,30 +156,37 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
   try {
     const botId = generateBotUserId(organizationId, botType);
 
-    const [existingBot] = await db
-      .select()
-      .from(kilocode_users)
-      .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
-      .limit(1);
+    const selectBotUser = async (): Promise<User | undefined> => {
+      const [bot] = await db
+        .select()
+        .from(kilocode_users)
+        .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
+        .limit(1);
+      return bot;
+    };
 
-    let botUser: User;
+    let botUser = await selectBotUser();
 
-    if (existingBot) {
-      if (existingBot.blocked_at !== null || existingBot.blocked_reason !== null) {
-        throw new Error(`Cannot use blocked bot user ${botId}`);
+    if (!botUser) {
+      try {
+        botUser = await insertBotUser({
+          id: botId,
+          email: generateBotUserEmail(organizationId, botType),
+          displayName: getBotDisplayName(botType),
+        });
+      } catch (error) {
+        // A concurrent create won the insert; reuse its row.
+        if (!isUniqueViolation(error)) throw error;
+        botUser = await selectBotUser();
+        if (!botUser) throw error;
       }
-      logExceptInTest('[ensureBotUserForOrg] Using existing bot user', {
-        botId,
-        organizationId,
-      });
-      botUser = existingBot;
-    } else {
-      botUser = await insertBotUser({
-        id: botId,
-        email: generateBotUserEmail(organizationId, botType),
-        displayName: getBotDisplayName(botType),
-      });
     }
+
+    if (botUser.blocked_at !== null || botUser.blocked_reason !== null) {
+      throw new Error(`Cannot use blocked bot user ${botId}`);
+    }
+
+    logExceptInTest('[ensureBotUserForOrg] Bot user is ready', { botId, organizationId });
 
     await ensureBotIsOrgMember(botUser.id, organizationId);
 

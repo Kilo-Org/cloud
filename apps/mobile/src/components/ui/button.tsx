@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Text, TextClassContext } from '@/components/ui/text';
+import { COMPACT_BUTTON_HIT_SLOP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -13,23 +14,45 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
-        destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-[#0000000D]',
-        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-[#0000000D]',
-        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
+        destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // The dark card surface sits a step above the near-black background, and
+        // the default hairline (7% white) is too faint to separate the control
+        // from it, so an outlined control would read as unpainted black-on-black
+        // in dark mode. Same surface/border pair the app's other dark cards use.
+        outline:
+          'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // A destructive action that shares a footer with a filled primary must
+        // not compete with it for attention: the fill stays with the safe,
+        // forward action, so the destructive one keeps its warning ink and
+        // outline and paints no fill of its own.
+        'outline-destructive':
+          'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // A filled neutral action keeps its own fill rather than the surface
+        // token: `--secondary` is also the dark card an outlined control paints
+        // (above), so a filled action in that colour reads as the same control
+        // as the outlined one beside it, as it did in the discard-draft sheet
+        // and the permission card. `--secondary-fill` equals `--secondary` in
+        // light and takes a visible step above it in dark.
+        secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
         'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
-        // min-h (not fixed h) so the button grows to fit text scaled by large
-        // Dynamic Type instead of clipping the label; the min still guarantees
-        // the 48pt action / 44pt default/lg / 36pt-plus-hitSlop sm target.
+        // min-h (not fixed h) so a button with a label grows to fit text scaled
+        // by large Dynamic Type instead of clipping it; the min still guarantees
+        // the 48pt action / 44pt default/lg / 46pt-reach sm target, whose 36pt
+        // frame carries the rest as `COMPACT_BUTTON_HIT_SLOP`.
+        // `icon` has no label to scale, so it is exactly the shared icon target
+        // (`ICON_TARGET_BOX_CLASS`): the audit reads the node's own view rect, so
+        // a smaller frame plus `hitSlop` would still measure under Android's
+        // 48dp minimum. The glyph keeps its own size and the box centres it.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
         action: 'min-h-[48px] px-4 py-2',
-        icon: 'h-[44px] w-[44px]',
+        icon: ICON_TARGET_BOX_CLASS,
       },
     },
     defaultVariants: {
@@ -55,10 +78,6 @@ const buttonGapVariants = cva('', {
     size: 'default',
   },
 });
-
-// sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
-// without changing the compact visual size.
-const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 
 // While `loading` is on, the spinner replaces the label instead of sitting
 // beside it. The label stays in the row at zero opacity, so a content-sized
@@ -115,7 +134,13 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   if (variant === 'accent-soft') {
     return '#1A1A10';
   }
-  // default, destructive
+  if (variant === 'destructive') {
+    return colors.destructiveSolidForeground;
+  }
+  if (variant === 'outline-destructive') {
+    return colors.destructive;
+  }
+  // default
   return colors.primaryForeground;
 }
 
@@ -123,8 +148,9 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
   variants: {
     variant: {
       default: 'text-primary-foreground',
-      destructive: 'text-destructive-foreground',
+      destructive: 'text-destructive-solid-foreground',
       outline: 'text-foreground',
+      'outline-destructive': 'text-destructive',
       secondary: 'text-secondary-foreground',
       ghost: 'text-foreground',
       link: 'text-primary group-active:underline',
@@ -175,7 +201,12 @@ function Button({
   // contrasts with the ink label, so the label stays legible. A busy primary
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
-  const isDimmed = isDisabled && !isPrimary;
+  // Dimming is a disabled signal, and a busy control has nothing visible to
+  // signal with: the label is already transparent and the spinner sits alone in
+  // the slot. Halving the control's opacity then halves the indicator too, which
+  // leaves an icon-only button looking empty on a dark surface. Keep the busy
+  // control at full strength in both themes.
+  const isDimmed = isDisabled && !isPrimary && !loading;
   // On Android, a node's accessible name is only rewritten while the incoming
   // state still carries `busy`. A loading button therefore keeps announcing its
   // busy state after the request settles unless its label prop holds a real
@@ -235,8 +266,15 @@ function Button({
         role="button"
         disabled={isDisabled}
         accessibilityLabel={resolvedLabel}
-        accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
-        hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
+        accessibilityState={{
+          ...accessibilityState,
+          disabled: isDisabled,
+          // A caller that shows its own busy response (for example an icon that
+          // spins while the same glyph stays drawn) declares `busy` without
+          // opting into the loading layout; `loading` still wins when it is set.
+          busy: loading ?? accessibilityState?.busy,
+        }}
+        hitSlop={hitSlop ?? (size === 'sm' ? COMPACT_BUTTON_HIT_SLOP : undefined)}
         {...props}
       >
         {usesBusyLayout ? (

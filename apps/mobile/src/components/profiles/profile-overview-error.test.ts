@@ -1,3 +1,4 @@
+import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import { selectProfileOverviewErrorView } from '@/components/profiles/profile-overview-error';
@@ -30,6 +31,14 @@ describe('selectProfileOverviewErrorView', () => {
   it('offers retry for an error without a code while the device is confirmed offline', () => {
     expect(selectProfileOverviewErrorView(new Error('aborted'), 'offline')).toEqual({
       variant: 'offline',
+      showRetry: true,
+      staleRow: false,
+    });
+  });
+
+  it('names a deadline abort as the retryable slow-response state', () => {
+    expect(selectProfileOverviewErrorView(new RequestDeadlineError(15_000), 'online')).toEqual({
+      variant: 'timeout',
       showRetry: true,
       staleRow: false,
     });

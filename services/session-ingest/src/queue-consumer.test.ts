@@ -58,6 +58,7 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
+import { INGEST_CHUNK_MAX_BYTES } from './util/ingest-limits';
 
 const encoder = new TextEncoder();
 
@@ -283,6 +284,138 @@ describe('queue', () => {
       { 'message/msg_compacted': expectedR2Key }
     );
     expect(deleteObject).toHaveBeenCalledWith('staging/items');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('passes a slim oversized kilo_meta and its R2 reference into ingest', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    mockIngestWithR2(ingest);
+    const limit = vi.fn(async () => [{ session_id: 'ses_meta' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    // Data above MAX_INGEST_ITEM_BYTES (100) but within MAX_SINGLE_ITEM_BYTES (500), so the
+    // item reaches the projection path instead of being skipped during streaming.
+    const data = { platform: 'x'.repeat(100) };
+    const body = JSON.stringify({ data: [{ type: 'kilo_meta', data }] });
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/meta',
+              kiloUserId: 'usr_meta',
+              sessionId: 'ses_meta',
+              ingestVersion: 1,
+              ingestedAt: 456,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_meta/ses_meta/kilo_meta/456';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    const [sentItems] = ingest.mock.calls[0] as unknown as [Array<{ data: unknown }>];
+    expect(sentItems).toEqual([{ type: 'kilo_meta', data }]);
+    // The DO keeps its metadata source bounded: the projection is the parsed item's
+    // bounded fields, and the RPC payload stays far inside the chunk budget.
+    expect(encoder.encode(JSON.stringify(sentItems)).byteLength).toBeLessThan(
+      INGEST_CHUNK_MAX_BYTES
+    );
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'kilo_meta', data }],
+      'usr_meta',
+      'ses_meta',
+      1,
+      456,
+      { kilo_meta: expectedR2Key }
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/meta');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('passes a slim oversized session_status and its R2 reference into ingest', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    mockIngestWithR2(ingest);
+    const limit = vi.fn(async () => [{ session_id: 'ses_status' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    const data = { status: 'x'.repeat(100), previousStatus: 'busy' };
+    const body = JSON.stringify({ data: [{ type: 'session_status', data }] });
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/status',
+              kiloUserId: 'usr_status',
+              sessionId: 'ses_status',
+              ingestVersion: 1,
+              ingestedAt: 456,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_status/ses_status/session_status/456';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    const [sentItems] = ingest.mock.calls[0] as unknown as [Array<{ data: unknown }>];
+    expect(sentItems).toEqual([{ type: 'session_status', data }]);
+    expect(encoder.encode(JSON.stringify(sentItems)).byteLength).toBeLessThan(
+      INGEST_CHUNK_MAX_BYTES
+    );
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'session_status', data }],
+      'usr_status',
+      'ses_status',
+      1,
+      456,
+      { session_status: expectedR2Key }
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/status');
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });

@@ -65,7 +65,6 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  request: GatewayRequest,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
@@ -279,13 +278,11 @@ export async function applyVercelSettings(
     if (userByok.length === 0) {
       throw new Error('Invalid state: userByok should be null or not empty');
     }
-    // Only honor the caller's own `provider.ignore` here. The organization /
-    // group `provider.only` allow-list must NOT constrain BYOK selection:
-    // direct BYOK uses the user's own credentials and is intentionally exempt
-    // from organization model/provider restrictions (see ai-gateway AGENTS.md).
-    // Filtering by it also silently drops providers whose OpenRouter slug has
-    // no Vercel BYOK equivalent, turning previously working requests into hard
-    // failures.
+    // Only honor the caller's own `provider.ignore` here. `getProvider` has
+    // already dropped keys outside the organization provider allow-list (see
+    // `isVercelUserByokProviderAllowed`). Filtering by `provider.only` again
+    // would also drop keys whose provider has no OpenRouter slug, which the
+    // allow-list cannot name.
     const ignoredProviders = new Set(
       (requestToMutate.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
     );

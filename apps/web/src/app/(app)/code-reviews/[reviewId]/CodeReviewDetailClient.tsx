@@ -56,10 +56,15 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
 
   const retriggerMutation = useMutation(
     trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
+      onSuccess: async result => {
+        if (!result.success) {
+          // Dispatch marked the review failed again, so the retry never started.
+          toast.error('Failed to retrigger code review', { description: result.error });
+        } else {
+          toast.success('Code review retriggered', {
+            description: 'The code review has been queued for processing.',
+          });
+        }
         await queryClient.invalidateQueries({
           queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
         });
@@ -326,7 +331,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                   className="gap-2"
                 >
                   <RotateCcw
-                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                   />
                   {retriggerMutation.isPending ? 'Retrying...' : 'Retry'}
                 </Button>

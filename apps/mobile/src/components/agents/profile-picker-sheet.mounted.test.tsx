@@ -77,6 +77,7 @@ const FRONTEND = profile({ id: 'frontend', name: 'Frontend', skillCount: 2 });
 function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePickerSheetProps {
   return {
     candidates: [BACKEND, FRONTEND],
+    isOrganizationContext: false,
     hasProfiles: true,
     selectedOverrideProfileId: null,
     defaultProfileApplies: false,
@@ -142,8 +143,8 @@ describe('ProfilePickerSheet', () => {
     expect(renderer.root.findByType('PickerSheet' as never).props.title).toBe('Pick a profile');
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'No profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).toContain('3 vars · 1 MCP · 1 cmd · 2 setup cmds · 1 agent');
     expect(checkedStates(renderer)).toEqual([true, false, false]);
@@ -154,14 +155,37 @@ describe('ProfilePickerSheet', () => {
     expect(checkedStates(renderer)).toEqual([false, false, true]);
   });
 
+  it('groups rows by owner in an organization scope, organization first', () => {
+    const agency = profile({ id: 'agency', name: 'Agency', ownerType: 'organization' });
+    const renderer = mount({
+      // Personal row first, so the order can only come from the owner split.
+      candidates: [FRONTEND, agency],
+      isOrganizationContext: true,
+    });
+
+    expect(texts(renderer)).toEqual(expect.arrayContaining(['Organization', 'Personal']));
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Agency, Organization',
+      'Frontend, Personal',
+    ]);
+  });
+
+  it('renders no owner heading in a personal scope', () => {
+    const renderer = mount();
+
+    expect(texts(renderer)).not.toContain('Organization');
+    expect(texts(renderer)).not.toContain('Personal');
+  });
+
   it('selects a candidate, and clears it when the checked row is tapped again', () => {
     const onSelect = vi.fn<() => void>();
     const renderer = mount({ selectedOverrideProfileId: 'backend', onSelect });
 
-    press(radio(renderer, 'Frontend'));
+    press(radio(renderer, 'Frontend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith('frontend');
 
-    press(radio(renderer, 'Backend'));
+    press(radio(renderer, 'Backend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 
@@ -178,18 +202,46 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({
       selectedOverrideProfileId: 'backend',
       defaultProfileApplies: true,
+      defaultProfileName: BACKEND.name,
       onSelect,
     });
 
     // Clearing the override hands the session to the default, so the row says
-    // which profile that is instead of claiming no profile.
+    // which profile that is instead of claiming no profile. The name is what
+    // the Environment chip shows, so the checked row and the chip agree.
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'Default profile: Backend',
+      'Backend, Personal',
+      'Frontend, Personal',
+    ]);
+    expect(texts(renderer)).toContain('Default profile');
+    expect(texts(renderer)).toContain('Resolves to Backend');
+    press(radio(renderer, 'Default profile: Backend'));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps the generic default row when the resolved profile name is unknown', () => {
+    const renderer = mount({ defaultProfileApplies: true });
+
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'Default profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
-    press(radio(renderer, 'Default profile'));
-    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
+  });
+
+  it('does not name a default on the No profile row when none applies', () => {
+    // A name without an applicable default must not leak onto the row that
+    // clears the override: that row means the session runs on no profile.
+    const renderer = mount({ defaultProfileName: BACKEND.name });
+
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Backend, Personal',
+      'Frontend, Personal',
+    ]);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
   });
 
   it('leaves every row unchecked and shows the attention copy for a stale override', () => {

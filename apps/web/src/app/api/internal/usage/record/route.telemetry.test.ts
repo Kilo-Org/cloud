@@ -108,8 +108,11 @@ describe('usage writer telemetry caller context', () => {
     const logs = [console.log, console.info, console.warn, console.error].flatMap(
       log => jest.mocked(log).mock.calls
     );
-    expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0][0])).toMatchObject({
+    const timings = logs
+      .map(([line]) => JSON.parse(line))
+      .filter(line => line.type === 'usage_record_timing');
+    expect(timings).toHaveLength(1);
+    expect(timings[0]).toMatchObject({
       type: 'usage_record_timing',
       usage_id: id,
       outcome: 'recorded',

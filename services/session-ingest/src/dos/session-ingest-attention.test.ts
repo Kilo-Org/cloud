@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  assistantExcerptIsComplete,
   attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
@@ -61,42 +62,50 @@ describe('extractTextFromPartItemData', () => {
 });
 
 describe('buildAssistantExcerpt', () => {
-  it('joins multiple text parts in order and trims the result', () => {
-    const rows = [
-      JSON.stringify({ type: 'text', text: 'Hello ' }),
-      JSON.stringify({ type: 'text', text: 'world' }),
-      JSON.stringify({ type: 'text', text: '  ' }),
-    ];
-    expect(buildAssistantExcerpt(rows)).toBe('Hello world');
+  it('joins multiple text pieces in order and trims the result', () => {
+    expect(buildAssistantExcerpt(['Hello ', 'world', '  '])).toBe('Hello world');
   });
 
-  it('skips non-text parts when building the excerpt', () => {
-    const rows = [
-      JSON.stringify({ type: 'tool', tool: 'bash' }),
-      JSON.stringify({ type: 'text', text: 'done' }),
-    ];
-    expect(buildAssistantExcerpt(rows)).toBe('done');
-  });
-
-  it('returns an empty string when there are no text parts', () => {
-    expect(buildAssistantExcerpt([JSON.stringify({ type: 'tool', tool: 'bash' })])).toBe('');
+  it('returns an empty string when there are no text pieces', () => {
+    expect(buildAssistantExcerpt([])).toBe('');
+    expect(buildAssistantExcerpt([''])).toBe('');
   });
 
   it('collapses newlines and repeated whitespace into single spaces', () => {
-    const rows = [JSON.stringify({ type: 'text', text: 'First line.\n\nSecond   line.' })];
-    expect(buildAssistantExcerpt(rows)).toBe('First line. Second line.');
+    expect(buildAssistantExcerpt(['First line.\n\nSecond   line.'])).toBe(
+      'First line. Second line.'
+    );
   });
 
   it('truncates a long excerpt to 100 characters with an ellipsis', () => {
-    const rows = [JSON.stringify({ type: 'text', text: 'a'.repeat(250) })];
-    const excerpt = buildAssistantExcerpt(rows);
+    const excerpt = buildAssistantExcerpt(['a'.repeat(250)]);
     expect(excerpt).toHaveLength(100);
     expect(excerpt).toBe('a'.repeat(97) + '...');
   });
 
   it('keeps an excerpt at exactly 100 characters untouched', () => {
-    const rows = [JSON.stringify({ type: 'text', text: 'b'.repeat(100) })];
-    expect(buildAssistantExcerpt(rows)).toBe('b'.repeat(100));
+    expect(buildAssistantExcerpt(['b'.repeat(100)])).toBe('b'.repeat(100));
+  });
+});
+
+describe('assistantExcerptIsComplete', () => {
+  it('marks exactly the point where later text cannot change the excerpt', () => {
+    const filled = 'a'.repeat(100);
+    // A prefix at the excerpt length is not settled: one more character turns the untrimmed text
+    // into the truncated form with an ellipsis.
+    expect(assistantExcerptIsComplete(filled)).toBe(false);
+    expect(buildAssistantExcerpt([filled, 'b'])).toBe(buildAssistantExcerpt([`${filled}b`]));
+
+    const past = `${filled}b`;
+    expect(assistantExcerptIsComplete(past)).toBe(true);
+    expect(buildAssistantExcerpt([past])).toBe(buildAssistantExcerpt([`${past}c`]));
+    expect(buildAssistantExcerpt([past])).toBe('a'.repeat(97) + '...');
+  });
+
+  it('counts collapsed characters, not raw ones, so whitespace alone never completes it', () => {
+    expect(assistantExcerptIsComplete(' '.repeat(500))).toBe(false);
+    expect(assistantExcerptIsComplete(`${'a'.repeat(101)}${'\n'.repeat(500)}`)).toBe(true);
+    expect(assistantExcerptIsComplete(`  ${'a'.repeat(101)}\n\n`)).toBe(true);
   });
 });
 

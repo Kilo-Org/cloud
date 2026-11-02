@@ -7,8 +7,9 @@ import {
 
 export default {
   id: 'chutes-byok',
+  openrouter_inference_provider_id: 'chutes',
   models_dev_id: 'chutes',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://llm.chutes.ai/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

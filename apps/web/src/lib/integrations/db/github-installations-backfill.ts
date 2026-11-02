@@ -1,4 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
 
@@ -8,6 +9,7 @@ export type GitHubInstallationBackfillResult = {
   scanned: number;
   canonicalCreated: number;
   linked: number;
+  roleAssigned: number;
   skipped: number;
   skippedInvalid: number;
   skippedDeduplicated: number;
@@ -41,6 +43,7 @@ export async function backfillGitHubInstallations(
     scanned: rows.length,
     canonicalCreated: 0,
     linked: 0,
+    roleAssigned: 0,
     skipped: 0,
     skippedInvalid: 0,
     skippedDeduplicated: 0,
@@ -134,7 +137,7 @@ export async function backfillGitHubInstallations(
         )
         .limit(1);
       if (!canonical) return;
-      const updated = await tx
+      const linked = await tx
         .update(platform_integrations)
         .set({ github_installation_id: canonical.id })
         .where(
@@ -146,8 +149,27 @@ export async function backfillGitHubInstallations(
             isNull(platform_integrations.suspended_at),
             isNull(platform_integrations.auth_invalid_at)
           )
-        );
-      if ((updated.rowCount ?? 0) === 1) result.linked++;
+        )
+        .returning({ id: platform_integrations.id });
+      if (linked.length !== 1) return;
+      result.linked++;
+      // Linking a legacy row to its canonical installation is the last writer
+      // that could leave a real organization installation without a connection
+      // role, which the organization Security Agent reads to decide between its
+      // setup state and its dashboard. The row is classified by the shared
+      // definition once the link exists: its canonical clause reads the linked
+      // record, so a link to a suspended, deleted or auth-invalid record keeps
+      // the row roleless, and the claim and sibling rules apply unchanged. The
+      // pre-link row cannot be classified by that clause, which is why the
+      // definition is evaluated after the link instead of inside its SET.
+      const [classified] = await tx
+        .update(platform_integrations)
+        .set({ github_connection_role: 'workflow' })
+        .where(and(eq(platform_integrations.id, row.id), organizationWorkflowGitHubConnectionSql()))
+        .returning({ role: platform_integrations.github_connection_role });
+      if (row.github_connection_role === null && classified?.role === 'workflow') {
+        result.roleAssigned++;
+      }
     });
   }
   return result;

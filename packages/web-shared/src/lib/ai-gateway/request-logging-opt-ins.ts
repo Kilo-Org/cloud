@@ -50,7 +50,8 @@ export async function getRequestLoggingOptIns(
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
   () => getRequestLoggingOptIns(readDb),
   REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
-  []
+  [],
+  { name: 'requestLoggingOptIns' }
 );
 
 export async function createRequestLoggingOptIn(

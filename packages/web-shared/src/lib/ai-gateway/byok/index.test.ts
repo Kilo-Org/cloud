@@ -1,4 +1,13 @@
-import { afterEach, describe, expect, jest, test } from '@jest/globals';
+// The Sentry client is the reporting boundary: the mock counts reports without sending them.
+// Its function is created inside the factory because jest.mock is hoisted above const
+// declarations; retrieve it with jest.requireMock instead.
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
+
+import type * as SentryNextjs from '@sentry/nextjs';
+import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
@@ -21,6 +30,9 @@ import type { ByokApiKeySettings, EncryptedData } from '@kilocode/db/schema-type
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { inArray } from 'drizzle-orm';
+
+const mockedCaptureException = jest.requireMock<typeof SentryNextjs>('@sentry/nextjs')
+  .captureException as unknown as jest.Mock;
 
 const createdUserIds: string[] = [];
 const createdOrganizationIds: string[] = [];
@@ -351,6 +363,7 @@ describe('envelope-encrypted BYOK rows', () => {
   const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
 
   afterEach(() => {
+    mockedCaptureException.mockClear();
     global.fetch = originalFetch;
     if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
     else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
@@ -362,13 +375,14 @@ describe('envelope-encrypted BYOK rows', () => {
     ownerId: string,
     secret: string,
     dek: string,
-    legacy?: EncryptedData
+    legacy?: EncryptedData,
+    providerId: UserByokProviderId = 'anthropic'
   ) {
     const [row] = await db
       .insert(byok_api_keys)
       .values({
         kilo_user_id: ownerId,
-        provider_id: 'anthropic',
+        provider_id: providerId,
         encrypted_api_key:
           legacy ??
           encryptApiKey('legacy-value-must-not-be-read', randomBytes(32).toString('base64')),
@@ -464,5 +478,50 @@ describe('envelope-encrypted BYOK rows', () => {
       { decryptedAPIKey: openaiSecret, providerId: 'openai' },
     ]);
     await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('502');
+  });
+
+  test('reports a key that keeps failing once per window and still fails closed', async () => {
+    const user = await createUser();
+    await insertEnvelopeRow(user.id, 'secret', randomBytes(32).toString('base64'));
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    const fetchMock = jest.fn(async () => new Response('{}', { status: 400 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('status 400');
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('status 400');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'byok_decrypt' },
+    });
+  });
+
+  test('reports each failing key on its own', async () => {
+    const user = await createUser();
+    await insertEnvelopeRow(user.id, 'secret', randomBytes(32).toString('base64'));
+    await insertEnvelopeRow(
+      user.id,
+      'other-secret',
+      randomBytes(32).toString('base64'),
+      undefined,
+      'openai'
+    );
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    global.fetch = jest.fn(
+      async () => new Response('{}', { status: 400 })
+    ) as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic', 'openai'])).rejects.toThrow(
+      'status 400'
+    );
+    expect(mockedCaptureException).toHaveBeenCalledTimes(2);
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic', 'openai'])).rejects.toThrow(
+      'status 400'
+    );
+    expect(mockedCaptureException).toHaveBeenCalledTimes(2);
   });
 });

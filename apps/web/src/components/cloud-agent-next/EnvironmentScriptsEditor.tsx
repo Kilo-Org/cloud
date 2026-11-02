@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils';
 export function EnvironmentScriptsEditor({
   script,
   onChange,
+  readOnly = false,
 }: {
   script: string;
   onChange: (script: string) => void;
+  readOnly?: boolean;
 }) {
   const id = useId();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -23,6 +25,7 @@ export function EnvironmentScriptsEditor({
       <input
         ref={fileInput}
         type="file"
+        disabled={readOnly}
         accept=".sh,.bash,.txt,text/plain,application/x-sh"
         className="hidden"
         aria-label="Choose setup script file"
@@ -54,19 +57,22 @@ export function EnvironmentScriptsEditor({
       <div className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor={id}>Setup script</Label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInput.current?.click()}
-          >
-            <Upload className="mr-2 size-3.5" />
-            Choose file
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInput.current?.click()}
+            >
+              <Upload className="mr-2 size-3.5" />
+              Choose file
+            </Button>
+          )}
         </div>
         <Textarea
           id={id}
           value={script}
+          readOnly={readOnly}
           onChange={event => onChange(event.target.value)}
           rows={10}
           placeholder={'#!/bin/bash\npnpm install'}
@@ -89,7 +95,9 @@ export function EnvironmentScriptsEditor({
         </p>
       </div>
       <p id={`${id}-help`} className="text-muted-foreground text-xs">
-        Runs before the agent starts. For longer setup, call a script in your repository.
+        {readOnly
+          ? 'Runs before the agent starts.'
+          : 'Runs before the agent starts. For longer setup, call a script in your repository.'}
       </p>
       {fileError && (
         <p role="alert" className="text-destructive text-sm">

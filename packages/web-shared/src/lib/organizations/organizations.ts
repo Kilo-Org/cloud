@@ -665,9 +665,10 @@ export async function getOrganizationMembers(
         member.dailyUsageLimitUsdMicrodollars != null
           ? fromMicrodollars(member.dailyUsageLimitUsdMicrodollars)
           : null,
-      currentDailyUsageUsd: member.currentDailyUsageUsdMicrodollars
-        ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
-        : null,
+      currentDailyUsageUsd:
+        member.currentDailyUsageUsdMicrodollars != null
+          ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
+          : null,
     })),
     ...pendingInvitations.map(invitation => ({
       email: invitation.email,
@@ -863,7 +864,6 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
         kilo_user_id: userId,

@@ -17,21 +17,21 @@ import {
   type GlanceableSessionRow,
   type GlanceableStatusKind,
 } from './glanceable-agents-snapshot';
-import { parseTimestamp } from './utils';
+import { timestampMs } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 export const HOME_WIDGET_TITLE_LIMIT = 120;
 const titleSchema = z.string().max(HOME_WIDGET_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
+/** SHA-256 hex of the exact visible approval target; grants no authority. */
+const approvalKeySchema = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/)
+  .nullable();
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({
-  /** SHA-256 hex of the exact visible approval target; grants no authority. */
-  approvalKey: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
+  approvalKey: approvalKeySchema.default(null),
   primaryTitle: titleSchema.nullable(),
   waitingAgents: z
     .array(
@@ -80,26 +80,20 @@ export const homeWidgetPresentationSchema = z.object({
   scheduledAgents: homeWidgetDetailsSchema.shape.scheduledAgents,
   canCreate: z.boolean(),
   canApprove: z.boolean(),
-  approvalKey: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable(),
+  approvalKey: approvalKeySchema,
 });
 export type HomeWidgetPresentation = z.infer<typeof homeWidgetPresentationSchema>;
-export type HomeWidgetTimelineEntry = { at: number; home: HomeWidgetPresentation };
+/** One native aging boundary and the presentation policy that holds from it. */
+export const homeWidgetTimelineEntrySchema = z.object({
+  at: z.number().finite(),
+  home: homeWidgetPresentationSchema,
+});
+export type HomeWidgetTimelineEntry = z.infer<typeof homeWidgetTimelineEntrySchema>;
 export const homeWidgetResponseSchema = homeWidgetDataSchema.extend({
   home: homeWidgetPresentationSchema,
   refreshAt: z.number().finite(),
   /** Optional for persisted older responses; current server producers always supply it. */
-  presentationTimeline: z
-    .array(
-      z.object({
-        at: z.number().finite(),
-        home: homeWidgetPresentationSchema,
-      })
-    )
-    .max(3)
-    .optional(),
+  presentationTimeline: z.array(homeWidgetTimelineEntrySchema).max(3).optional(),
 });
 export type HomeWidgetResponse = z.infer<typeof homeWidgetResponseSchema>;
 export type HomeWidgetSessionRow = GlanceableSessionRow & {
@@ -120,14 +114,6 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
     : QUIET_REFRESH_MS;
 }
 
-function usableTime(value: string | undefined | null): number | null {
-  if (value == null) {
-    return null;
-  }
-  const at = parseTimestamp(value).getTime();
-  return Number.isFinite(at) ? at : null;
-}
-
 /**
  * Code points that occupy no display width: directional marks and embeddings, the invisible
  * operators, and the zero-width space. ZWNJ and ZWJ stay, because they join the glyphs of
@@ -138,7 +124,7 @@ const NON_PRINTING_TITLE_CHARACTERS =
 
 /** ISO 8601 form of a row time, or null when it does not parse. */
 function isoTime(value: string | undefined | null): string | null {
-  const at = usableTime(value);
+  const at = timestampMs(value);
   return at === null ? null : new Date(at).toISOString();
 }
 
@@ -158,12 +144,12 @@ export function buildHomeWidgetDetails(
     .sort(
       (a, b) =>
         Number(b.approvalKey != null) - Number(a.approvalKey != null) ||
-        (usableTime(a.statusUpdatedAt) ?? Infinity) - (usableTime(b.statusUpdatedAt) ?? Infinity)
+        (timestampMs(a.statusUpdatedAt) ?? Infinity) - (timestampMs(b.statusUpdatedAt) ?? Infinity)
     );
   const scheduled = sessions
     .filter(row => row.status === 'scheduled')
     .sort(
-      (a, b) => (usableTime(a.scheduledAt) ?? Infinity) - (usableTime(b.scheduledAt) ?? Infinity)
+      (a, b) => (timestampMs(a.scheduledAt) ?? Infinity) - (timestampMs(b.scheduledAt) ?? Infinity)
     );
   const primaryKind = PRIORITY.find(kind =>
     sessions.some(row => glanceableStatusKind(row.status) === kind)
@@ -177,8 +163,8 @@ export function buildHomeWidgetDetails(
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(
               (a, b) =>
-                (usableTime(b.statusUpdatedAt) ?? -Infinity) -
-                (usableTime(a.statusUpdatedAt) ?? -Infinity)
+                (timestampMs(b.statusUpdatedAt) ?? -Infinity) -
+                (timestampMs(a.statusUpdatedAt) ?? -Infinity)
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
@@ -221,8 +207,8 @@ export function buildHomeWidgetPresentation(
   const primaryKind = terminal ? null : (PRIORITY.find(kind => snapshot[kind] > 0) ?? null);
   const checkedAt =
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
-  const confirmedAt = usableTime(checkedAt);
-  const wake = snapshot.scheduled > 0 ? usableTime(snapshot.scheduledAt) : null;
+  const confirmedAt = timestampMs(checkedAt);
+  const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
   const scheduledAt = wake === null ? null : new Date(wake).toISOString();
   return {
     status: terminal
@@ -267,7 +253,7 @@ export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
   const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
-  const wake = terminal || snapshot.scheduled === 0 ? null : usableTime(snapshot.scheduledAt);
+  const wake = terminal || snapshot.scheduled === 0 ? null : timestampMs(snapshot.scheduledAt);
   // An overdue wake is not proof of running and must not create a busy refresh loop.
   return wake !== null && wake > now ? Math.min(next, wake) : next;
 }
@@ -280,10 +266,10 @@ export function buildHomeWidgetPresentationTimeline(
   const times = [now];
   const { snapshot } = data;
   if (!isTerminalGlanceableStatus(snapshot.status)) {
-    const checked = usableTime(buildHomeWidgetPresentation(data, now).checkedAt);
+    const checked = timestampMs(buildHomeWidgetPresentation(data, now).checkedAt);
     const staleAt = checked === null ? null : checked + refreshInterval(snapshot);
     if (staleAt !== null && staleAt > now) times.push(staleAt);
-    const wake = snapshot.scheduled > 0 ? usableTime(snapshot.scheduledAt) : null;
+    const wake = snapshot.scheduled > 0 ? timestampMs(snapshot.scheduledAt) : null;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);
   }
   return times

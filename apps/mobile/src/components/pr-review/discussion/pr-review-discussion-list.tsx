@@ -15,6 +15,8 @@ import { DiscussionThread } from '@/components/pr-review/discussion/discussion-t
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
 import {
   type DiscussionListItem,
   type PrCommentKind,
@@ -30,6 +32,9 @@ import { useTRPC } from '@/lib/trpc';
 const noopReactionToggle = () => {
   // Conversation comments are read-only (A2.3): no reaction mutations.
 };
+
+// The card's `p-3.5` (12.25dp) top inset, measured to the author row's circle.
+const CARD_TOP_PADDING = commentAuthorRowTopPadding(12.25);
 
 type PrReviewDiscussionListProps = {
   readonly owner: string;
@@ -194,7 +199,10 @@ export function PrReviewDiscussionList({
         if (item.kind === 'comment') {
           return (
             <View className="px-4 pb-3">
-              <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
+              <View
+                style={CARD_TOP_PADDING}
+                className="gap-2.5 rounded-xl border border-border bg-card px-3.5 pb-3.5"
+              >
                 <CommentRow
                   comment={item.comment}
                   owner={owner}
@@ -319,6 +327,7 @@ function ListFooter({
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={onRetryLoadMore}
           accessibilityLabel={t('prReview.discussion.retryLoadingMore')}
         >

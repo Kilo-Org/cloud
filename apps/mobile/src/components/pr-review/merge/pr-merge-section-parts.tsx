@@ -53,7 +53,7 @@ export function TerminalChip({
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.merge')}
+        {t('prReview.merge.mergeTitle')}
       </Text>
       <View className="rounded-lg bg-secondary p-4">
         <Text className="text-sm text-muted-foreground">{label}</Text>

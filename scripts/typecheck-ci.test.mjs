@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -98,6 +99,67 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
     env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
   });
   assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
+});
+
+// The reset runs before install and again after the job, so it must never reach
+// anything except the checkout's own node_modules tree.
+test('pnpm reset keeps every deletion inside the checkout', t => {
+  const base = mkdtempSync(join(tmpdir(), 'pnpm-cache-reset-'));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+
+  const shared = join(base, 'shared');
+  const sharedFile = join(shared, 'cache', 'content');
+  mkdirSync(join(shared, 'cache'), { recursive: true });
+  writeFileSync(sharedFile, 'shared content');
+
+  const runCleanup = workspace =>
+    spawnSync(process.execPath, [pnpmCleanup], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_WORKSPACE: workspace },
+    });
+
+  const linked = join(base, 'linked');
+  mkdirSync(linked);
+  symlinkSync(shared, join(linked, 'node_modules'));
+  const linkedResult = runCleanup(linked);
+  assert.equal(linkedResult.status, 0, linkedResult.stderr);
+  assert.match(linkedResult.stdout, /::warning::/);
+  assert.equal(readFileSync(sharedFile, 'utf8'), 'shared content');
+  assert.equal(lstatSync(join(linked, 'node_modules')).isSymbolicLink(), true);
+
+  const fileRoot = join(base, 'file-root');
+  mkdirSync(fileRoot);
+  writeFileSync(join(fileRoot, 'node_modules'), 'not a directory');
+  const fileResult = runCleanup(fileRoot);
+  assert.equal(fileResult.status, 0, fileResult.stderr);
+  assert.match(fileResult.stdout, /::warning::/);
+  assert.equal(readFileSync(join(fileRoot, 'node_modules'), 'utf8'), 'not a directory');
+
+  const linkedWorkspace = join(base, 'symlinked-workspace');
+  const realWorkspace = join(base, 'real-workspace');
+  mkdirSync(join(realWorkspace, 'node_modules', '.pnpm'), { recursive: true });
+  writeFileSync(join(realWorkspace, 'node_modules', '.modules.yaml'), 'stale metadata');
+  symlinkSync(shared, join(realWorkspace, 'node_modules', 'shared-package'));
+  symlinkSync(realWorkspace, linkedWorkspace);
+  const symlinkedWorkspaceResult = runCleanup(linkedWorkspace);
+  assert.equal(symlinkedWorkspaceResult.status, 0, symlinkedWorkspaceResult.stderr);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', '.pnpm')), false);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', '.modules.yaml')), false);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', 'shared-package')), false);
+  assert.equal(readFileSync(sharedFile, 'utf8'), 'shared content');
+
+  const withoutWorkspace = { ...process.env };
+  delete withoutWorkspace.GITHUB_WORKSPACE;
+  const missingResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: withoutWorkspace,
+  });
+  assert.notEqual(missingResult.status, 0);
+  assert.match(missingResult.stderr, /GITHUB_WORKSPACE is required/);
+
+  const relativeResult = runCleanup('relative/checkout');
+  assert.notEqual(relativeResult.status, 0);
+  assert.match(relativeResult.stderr, /absolute/);
 });
 
 // A frozen-lockfile install without a warm dependency source refetches every

@@ -232,6 +232,18 @@ describe('subscribeLastRoute (the restart read)', () => {
     expect(consumeLastRouteForRepair('u1')).toBeNull();
   });
 
+  it('a mirrored picker route reads as absent', async () => {
+    // A build before pickers were excluded could persist the sheet that was on
+    // top. Replaying it reopens the expired shell over the start route, with no
+    // screen behind it to reopen the picker from.
+    store.set(KEY, recordFor('/(app)/agent-chat/repo-picker', 'u1'));
+    await _hydrateLastRouteForTests();
+
+    expect(getLastRouteSnapshot()).toBeNull();
+    expect(getLastRoute('u1')).toBeNull();
+    expect(consumeLastRouteForRepair('u1')).toBeNull();
+  });
+
   it.each([
     [
       '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews',

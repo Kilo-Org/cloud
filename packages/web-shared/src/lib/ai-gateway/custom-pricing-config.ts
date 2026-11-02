@@ -23,5 +23,6 @@ export async function readCustomPricingConfig(): Promise<CustomPricingConfig> {
 export const getCustomPricingConfig = createCachedFetch(
   readCustomPricingConfig,
   60_000,
-  EMPTY_CUSTOM_PRICING_CONFIG
+  EMPTY_CUSTOM_PRICING_CONFIG,
+  { name: 'customPricingConfig' }
 );

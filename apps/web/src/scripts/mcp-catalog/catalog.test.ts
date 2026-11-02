@@ -155,6 +155,23 @@ describe('mcp-catalog catalog', () => {
       }
     });
 
+    it('withholds every MCP guardrail policy mutation', () => {
+      const mutations = collectCatalogLeaves(rootRouter).filter(
+        leaf => leaf.path.startsWith('organizations.mcpGuardrails.') && leaf.type === 'mutation'
+      );
+      expect(mutations.map(leaf => leaf.path).sort()).toEqual([
+        'organizations.mcpGuardrails.add',
+        'organizations.mcpGuardrails.approveConnection',
+        'organizations.mcpGuardrails.delete',
+        'organizations.mcpGuardrails.setEnforcement',
+        'organizations.mcpGuardrails.setStatus',
+        'organizations.mcpGuardrails.update',
+      ]);
+      for (const leaf of mutations) {
+        expect(isDenylistedPath(leaf.path)).toBe(true);
+      }
+    });
+
     it('withholds paid scheduling consent while exposing scheduled report reads', () => {
       const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
         leaf.path.startsWith('agentBriefing.')
@@ -242,6 +259,22 @@ describe('mcp-catalog catalog', () => {
       expect(schema?.['required']).toEqual(
         expect.arrayContaining(['organizationId', 'name', 'color'])
       );
+    });
+
+    it('keeps searchable field tags across union and intersection branches', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('cloudAgentNext.prepareSession', [
+            z.intersection(
+              z.object({ egressAudit: z.boolean().optional() }),
+              z.union([z.object({ prompt: z.string() }), z.object({ cloneFrom: z.string() })])
+            ),
+          ]),
+        ]),
+        new Map([['cloudAgentNext.prepareSession', 'Prepares a session.']])
+      );
+      expect(rows[0]?.tags).toEqual(expect.arrayContaining(['egressaudit', 'prompt', 'clonefrom']));
+      expect(rows[0]?.searchBlob).toContain('egressAudit');
     });
 
     it('keeps every constraint when two chained schemas declare the same key', () => {

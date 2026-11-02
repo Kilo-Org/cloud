@@ -7,9 +7,12 @@ import { Pressable, View } from 'react-native';
 import { BriefingScorecard } from './briefing-card';
 import { BriefingFilterControls } from './briefing-filter-controls';
 import { BriefingPeriodLabel } from './briefing-period-label';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Newspaper } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -20,6 +23,7 @@ import {
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -78,6 +82,19 @@ export function BriefingListScreen() {
       );
   const loading = query.isPending && !offline;
   const failure = !loading && query.isError && reports.length === 0;
+  const listEmpty = !loading && !failure && reports.length === 0;
+  // The empty state's own button is the settings entry point while it is on screen,
+  // so the header carries the action only in the states that button does not cover.
+  const emptySettingsAction = noEnabledContexts === true && listEmpty;
+  // The hint explains an empty list of an enabled brief. With no context enabled
+  // the list is empty for a different reason, and the settings action is that
+  // reason's way out, so claiming a scheduled brief would have activity here
+  // would be wrong.
+  const emptyDescription =
+    listEmpty && !emptySettingsAction
+      ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
+      : undefined;
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
     footer = (
@@ -100,15 +117,17 @@ export function BriefingListScreen() {
         showBackButton
         backFallback={'/(app)/(tabs)/(0_home)' as Href}
         headerRight={
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() => {
-              router.push(`${BRIEFING_PATH}/settings` as Href);
-            }}
-          >
-            <Text>{t('agentBriefing.settings')}</Text>
-          </Button>
+          emptySettingsAction ? undefined : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => {
+                router.push(`${BRIEFING_PATH}/settings` as Href);
+              }}
+            >
+              <Text>{t('agentBriefing.settings')}</Text>
+            </Button>
+          )
         }
       />
       <View className="gap-3 px-4 pb-3">
@@ -119,9 +138,13 @@ export function BriefingListScreen() {
           organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
           onSelectOrganization={setOrganizationId}
         />
-        <Text className="text-xs text-muted-foreground">
-          {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
-        </Text>
+        {/* The empty state carries the hint when it prints one, so the same
+            sentence is not shown twice on one screen. */}
+        {emptyDescription === undefined ? (
+          <Text className="text-xs text-muted-foreground">
+            {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
+          </Text>
+        ) : null}
         {offline || (query.isError && reports.length > 0) ? (
           <Text className="text-xs text-muted-foreground">
             {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
@@ -142,7 +165,31 @@ export function BriefingListScreen() {
           }}
         />
       )}
-      {!loading && !failure && (
+      {/* The empty state owns the body so the shared centered form measures the
+          band the header and the filters leave, instead of sitting at the top
+          of a list that has nothing to scroll. */}
+      {listEmpty && (
+        <EmptyState
+          icon={Newspaper}
+          title={t(emptyLabel)}
+          description={emptyDescription}
+          refreshControl={refreshControl}
+          action={
+            emptySettingsAction ? (
+              <Button
+                className={STATE_ACTION_CLASS}
+                variant="outline"
+                onPress={() => {
+                  router.push(`${BRIEFING_PATH}/settings` as Href);
+                }}
+              >
+                <Text>{t('agentBriefing.settings')}</Text>
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+      {!loading && !failure && reports.length > 0 && (
         <FlashList
           data={reports}
           keyExtractor={report => report.id}
@@ -177,24 +224,6 @@ export function BriefingListScreen() {
               <BriefingScorecard report={item} />
             </Pressable>
           )}
-          ListEmptyComponent={
-            <View className="gap-2 p-8">
-              <Text className="text-center">{t(emptyLabel)}</Text>
-              {noEnabledContexts ? (
-                <Button
-                  onPress={() => {
-                    router.push(`${BRIEFING_PATH}/settings` as Href);
-                  }}
-                >
-                  <Text>{t('agentBriefing.settings')}</Text>
-                </Button>
-              ) : (
-                <Text className="text-center text-sm text-muted-foreground">
-                  {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
-                </Text>
-              )}
-            </View>
-          }
           ListFooterComponent={footer}
         />
       )}

@@ -8,6 +8,7 @@ import { Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 import { type RemoteMcpServerRow } from './mcp-settings-state';
 
@@ -202,6 +203,7 @@ function McpServerRow({
             key={retrying ? 'retrying' : 'idle'}
             variant="secondary"
             size="sm"
+            className={STATE_ACTION_CLASS}
             loading={retrying}
             accessibilityLabel={t('modelChat.mcp.retryServerA11y', { name: row.name })}
             onPress={onRetry}

@@ -71,6 +71,31 @@ describe('SQL helpers', () => {
     expect(sqlString("vendor/o'model")).toBe("'vendor/o''model'");
   });
 
+  it('escapes quotes and backslashes into one literal per value', () => {
+    const cases: Array<[value: string, literal: string]> = [
+      ['', "''"],
+      ['openai/gpt-6.1-sol', "'openai/gpt-6.1-sol'"],
+      ["vendor/o'model", "'vendor/o''model'"],
+      ['a\\b', "'a\\\\b'"],
+      ['\\', "'\\\\'"],
+      ['a\\', "'a\\\\'"],
+      ["a\\'b", "'a\\\\''b'"],
+      ["\\''", "'\\\\'''''"],
+    ];
+
+    for (const [value, literal] of cases) {
+      expect(sqlString(value)).toBe(literal);
+    }
+  });
+
+  it('encodes control characters as hex escapes', () => {
+    expect(sqlString('a\nb\tc\u0000d\u007fe')).toBe("'a\\x0ab\\x09c\\x00d\\x7fe'");
+  });
+
+  it('leaves printable non-ASCII text unchanged', () => {
+    expect(sqlString('モデル/λ')).toBe("'モデル/λ'");
+  });
+
   it('formats milliseconds as a whole-second DateTime', () => {
     expect(sqlDateTime(Date.parse('2026-10-02T12:00:00.999Z'))).toBe('toDateTime(1790942400)');
   });

@@ -2,7 +2,7 @@ import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
-import { fetchCustomLlmsFromDatabase, isPublicCustomLlm } from './custom-llm-catalog';
+import { getCustomLlmsById, isPublicCustomLlm } from './custom-llm-catalog';
 import { isCustomLlmDeniedInCountry } from './country-deny-list';
 
 const PRIVATE_CUSTOM_LLM_DESCRIPTION =
@@ -51,13 +51,16 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
 }
 
 /** Non-public custom LLMs granted to the organization or one of the groups.
- * Public custom LLMs are part of the regular gateway catalog. */
+ * Public custom LLMs are part of the regular gateway catalog.
+ * Reads the shared catalog cache, so a model list request costs no database
+ * round trip while the cache is fresh, and an unreadable catalog omits custom
+ * LLMs instead of failing the list, as it already does for public ones. */
 export async function listAvailableCustomLlms(
   organizationId: string,
   groupIds: readonly string[],
   countryCode: string | null
 ) {
-  return (await fetchCustomLlmsFromDatabase())
+  return [...(await getCustomLlmsById()).values()]
     .filter(
       row =>
         !isPublicCustomLlm(row.definition) &&

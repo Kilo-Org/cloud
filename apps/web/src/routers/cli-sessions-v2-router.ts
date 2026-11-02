@@ -78,6 +78,11 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import {
+  isGitHubOwnerName,
+  isGitHubRepositoryName,
+  parseGitHubOwnerRepo,
+} from '@/lib/integrations/platforms/github/repository-coordinates';
+import {
   pullRequestUrlMatchesRepo,
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
@@ -241,47 +246,12 @@ const PG_MAX_INTEGER = 2_147_483_647;
 export const REFRESH_THROTTLE_MS = 60_000;
 
 /**
- * Parse a git URL into `{ owner, repo }` when it points at GitHub. Returns
- * `null` for non-GitHub hosts or URLs that cannot be parsed into exactly
- * `owner/repo`. Handles https, ssh:// and SCP-style
- * (`git@github.com:owner/repo.git`) URLs, plus trailing `.git` suffixes.
+ * Parse a git URL into `{ owner, repo }` when it points at GitHub and both
+ * parts stay inside GitHub's name charset. The canonical implementation lives
+ * in the GitHub platform module so the batch review-decision path and this
+ * router share one rule.
  */
-export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
-  const segments = cleaned.split('/').filter(Boolean);
-  if (segments.length !== 2) {
-    return null;
-  }
-  const [owner, repo] = segments;
-  if (!owner || !repo) {
-    return null;
-  }
-  return { owner, repo };
-}
+export { parseGitHubOwnerRepo };
 
 export const associatedPrSchema = z.object({
   url: z.string(),
@@ -356,8 +326,9 @@ type SessionPrFields = {
 
 /**
  * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts or URLs that do not resolve to
- * `owner/repo/pull/N`. Accepts a trailing subpath (e.g. `/files`), query
+ * `null` for non-GitHub hosts, URLs that do not resolve to
+ * `owner/repo/pull/N`, and owner or repo values outside GitHub's name charset.
+ * Accepts a trailing subpath (e.g. `/files`), query
  * string, and fragment, matching the mobile parser so a pasted PR URL is
  * never skipped during refresh. A PR URL has more than two path segments,
  * so `parseGitHubOwnerRepo` cannot parse it.
@@ -395,7 +366,10 @@ export function parseGitHubPrUrl(
   }
   const [owner, repo, , numberStr] = segments;
   const number = Number(numberStr);
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+  if (!isGitHubOwnerName(owner) || !isGitHubRepositoryName(repo)) {
+    return null;
+  }
+  if (!Number.isInteger(number) || number <= 0) {
     return null;
   }
   return { owner, repo, number };
@@ -1739,6 +1713,11 @@ export const cliSessionsV2Router = createTRPCRouter({
           : pageResult),
         watermarkEventId,
         preparationAttempts,
+        // The access check already read the row, so the page can answer the
+        // session's parent without a second full-session query. Always
+        // present: `null` means a root session, and a client that opens this
+        // session has no further read to make.
+        parentSessionId: session.parent_session_id,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),

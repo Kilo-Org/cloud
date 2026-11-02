@@ -17,11 +17,16 @@ import { collectAccessibilityLabels, collectText } from './review-memory-screen.
 vi.mock('@/components/code-reviewer/review-memory-proposal-sheet', () => ({
   ReviewMemoryProposalSheet: 'ReviewMemoryProposalSheet',
 }));
+// The screen reads route focus to close the proposal sheet when the route is
+// left, and the sheet's own suite owns that behavior; the state contract below
+// only needs the hook to exist.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 
 const summary = vi.hoisted(() => ({
   isPending: false,
   isError: false,
   isFetching: false,
+  error: null as unknown,
   data: null as unknown,
   refetch: vi.fn(),
 }));
@@ -29,6 +34,7 @@ const summary = vi.hoisted(() => ({
 const proposals = vi.hoisted(() => ({
   isPending: false,
   isError: false,
+  error: null as unknown,
   isFetching: false,
   isFetchingNextPage: false,
   hasNextPage: false,
@@ -138,6 +144,7 @@ vi.mock('react-native', () => ({
   },
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   Pressable: (props: {
     children?: unknown;
@@ -237,11 +244,13 @@ beforeEach(() => {
   summary.isPending = false;
   summary.isError = false;
   summary.isFetching = false;
+  summary.error = null;
   summary.data = null;
   summary.refetch.mockClear();
   proposals.isPending = false;
   proposals.isError = false;
   proposals.isFetching = false;
+  proposals.error = null;
   proposals.isFetchingNextPage = false;
   proposals.hasNextPage = false;
   proposals.data = null;
@@ -281,6 +290,17 @@ describe('ReviewMemoryScreen retryable errors', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+
+  it('names a lost membership and offers no Retry for the summary read', () => {
+    summary.isError = true;
+    summary.error = { data: { code: 'UNAUTHORIZED' } };
+
+    renderScreen();
+
+    expect(queryErrors.errors).toHaveLength(1);
+    expect(queryErrors.errors[0]?.variant).toBe('permission');
+    expect(queryErrors.errors[0]?.onRetry).toBeUndefined();
   });
 
   it('renders a retryable error with Retry when the first proposals page fails', () => {

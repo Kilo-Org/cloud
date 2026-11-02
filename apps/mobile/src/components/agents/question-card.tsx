@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, type TextInput, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -170,7 +171,7 @@ export function QuestionCard({
   }
 
   function handleSubmit() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onAnswer(buildAnswers());
   }
 
@@ -184,7 +185,7 @@ export function QuestionCard({
   }
 
   function handleRetrySkip() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onReject();
   }
 

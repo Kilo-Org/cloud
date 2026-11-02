@@ -157,6 +157,42 @@ function setup() {
 }
 
 describe('review saved capture reads', () => {
+  it('uses the exact file scope and entry revision for current captures without guessing legacy layers', () => {
+    const snapshot = savedCapture(9).snapshot;
+    assert.ok(snapshot);
+    const entry = {
+      path: anchor.path,
+      revision: 3,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 1,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+    };
+    snapshot.files = [
+      { ...entry, scope: 'uncommitted', revision: 7 },
+      { ...entry, scope: 'against-base-branch' },
+    ];
+    const current = currentWorktreeReviewCapture(scope, 'workspace_source', snapshot, {
+      path: anchor.path,
+      scope: 'against-base-branch',
+    });
+    assert.equal(current?.scope, 'against-base-branch');
+    assert.equal(current?.revision, 3);
+    assert.equal(
+      currentWorktreeReviewCapture(scope, 'workspace_source', snapshot, { path: anchor.path }),
+      null
+    );
+    assert.equal(
+      currentWorktreeReviewCapture(scope, 'workspace_source', snapshot, {
+        path: 'missing.ts',
+        scope: 'uncommitted',
+      }),
+      null
+    );
+    assert.equal(currentWorktreeReviewCapture(scope, 'workspace_source', snapshot)?.revision, 9);
+  });
   it('keeps late inactive sibling reads behind newer revisions', async () => {
     const context = setup();
     const sibling = 'workspace_inactive_sibling';

@@ -504,7 +504,6 @@ function ConnectDoltHubDialog({
   const [manualOpen, setManualOpen] = useState(false);
   const [manualToken, setManualToken] = useState('');
   const [manualOrg, setManualOrg] = useState('');
-  const [rigHandle, setRigHandle] = useState('');
   // One-shot guard so a slow username fetch never overwrites whatever the
   // user has typed. Reset to false in the close handler so the next open
   // re-prefills if the cache changed in the meantime.
@@ -541,7 +540,6 @@ function ConnectDoltHubDialog({
       setOauthDolthubOrg('');
       setManualToken('');
       setManualOrg('');
-      setRigHandle('');
       setManualOpen(false);
       prefilledRef.current = false;
     },
@@ -568,7 +566,6 @@ function ConnectDoltHubDialog({
         wastelandId,
         dolthubToken: oauthToken,
         dolthubOrg: username,
-        rigHandle: rigHandle.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -586,7 +583,6 @@ function ConnectDoltHubDialog({
       wastelandId,
       dolthubToken: manualToken,
       dolthubOrg: manualOrg,
-      rigHandle: rigHandle.trim() || undefined,
     });
   }
 
@@ -643,23 +639,6 @@ function ConnectDoltHubDialog({
                   value={oauthDolthubOrg}
                   onChange={e => setOauthDolthubOrg(e.target.value)}
                   placeholder="my-username"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  data-form-type="other"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-
-              <FieldGroup label="Rig handle" hint="Optional identifier for this connection.">
-                <Input
-                  name="rig-handle"
-                  value={rigHandle}
-                  onChange={e => setRigHandle(e.target.value)}
-                  placeholder="my-rig"
                   autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="off"

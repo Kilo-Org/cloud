@@ -7,8 +7,9 @@ import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-g
 
 export default {
   id: 'xiaomi-token-plan-sgp',
+  openrouter_inference_provider_id: 'xiaomi',
   models_dev_id: 'xiaomi-token-plan-sgp',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://token-plan-sgp.xiaomimimo.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

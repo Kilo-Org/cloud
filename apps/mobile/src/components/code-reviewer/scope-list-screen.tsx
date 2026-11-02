@@ -4,9 +4,9 @@ import { Building2, User } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -31,7 +31,7 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.codeReviewer')} />
+      <ReviewerHeader title={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {isError && (
           <QueryError

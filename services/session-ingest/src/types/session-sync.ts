@@ -15,6 +15,13 @@ const storageKeySegmentSchema = z
     message: 'storage key segments must not contain / or U+0000',
   });
 
+// Status labels are short tokens (`idle`, `busy`, `question`, `scheduled`, …). The
+// bound keeps the value set open while stopping one field from dominating the item's
+// size and its RPC projection.
+const SESSION_STATUS_MAX_CHARS = 256;
+// An ISO-8601 timestamp, with room for every offset/precision variant.
+const SESSION_STATUS_TIMESTAMP_MAX_CHARS = 64;
+
 /**
  * Item-type roots that start an item id (`message/<id>`, `part/<messageId>/<id>`,
  * `agent_notification/<id>`). An identity segment equal to one of these roots is refused.
@@ -48,7 +55,11 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('kilo_meta'),
     data: z.object({
-      platform: z.string().min(1),
+      // A short producer label (`cli`, `vscode`, `cloud-agent-web`, …). The bound is far
+      // above every known label and above the 100-character cap the web create contract
+      // applies to the same value, so no accepted label is lost, while one field can no
+      // longer dominate the item's size (and its RPC projection).
+      platform: z.string().min(1).max(256),
       orgId: z.uuid().optional(),
       gitUrl: z.string().max(2048).optional(),
       gitBranch: z.string().max(256).optional(),
@@ -102,13 +113,15 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       // `validateAndParseIngestPayload` skip the whole item, so the status would
       // never reach `cli_sessions_v2.status` or the `session.status.updated`
       // event. Any string is relayed as-is rather than dropped or coerced to `idle`.
-      status: z.string(),
+      // Only its length is bounded: status labels are short, and an unbounded string
+      // could dominate the item's size and its RPC projection.
+      status: z.string().max(SESSION_STATUS_MAX_CHARS),
       // Wake time for a `scheduled` session (ISO-8601). Absent for every other
       // status and when the producer omits it; null is tolerated like the stored
       // row schema, because a missing time must never drop the item.
-      scheduledAt: z.string().nullable().optional(),
+      scheduledAt: z.string().max(SESSION_STATUS_TIMESTAMP_MAX_CHARS).nullable().optional(),
       occurredAt: z.string().datetime().optional(),
-      previousStatus: z.string().nullable().optional(),
+      previousStatus: z.string().max(SESSION_STATUS_MAX_CHARS).nullable().optional(),
       transitionId: z
         .string()
         .regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/)

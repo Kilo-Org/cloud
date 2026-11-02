@@ -4,14 +4,19 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import {
+  ProfileDescriptionField,
+  ProfileNameField,
+} from '@/components/profiles/profile-bound-field';
 import { SheetHeader } from '@/components/sheet-header';
-import { FormField } from '@/components/ui/form-field';
 import { Lock } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription } from '@/lib/agent-profile-forms';
+import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 
 /** One manual environment variable as the sheet saves it. */
 type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
@@ -50,37 +55,39 @@ export function SaveProfileSheet({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const nameRef = useRef('');
+  const nameField = useProfileNameField();
   const descriptionRef = useRef('');
   const [setAsDefault, setSetAsDefault] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
+  // Both numbers are counted messages, so the line agrees with each one instead
+  // of naming a fixed plural; it shares the wording of every profile surface.
+  const summary = formatProfileCountItems(
+    t,
+    draftProfileCountItems(envVars.length, setupCommands.length)
+  ).join(' · ');
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
-      nameRef.current.trim().length > 0 || descriptionRef.current.trim().length > 0 || setAsDefault,
+      nameField.valueRef.current.trim().length > 0 ||
+      descriptionRef.current.trim().length > 0 ||
+      setAsDefault,
     onDiscard: onClose,
   });
 
   const submit = async () => {
-    const name = nameRef.current.trim();
-    const description = descriptionRef.current.trim();
-
-    const nameIssue = validateProfileName(name);
-    if (nameIssue !== null) {
-      setNameError(
-        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
-      );
+    const name = nameField.commit();
+    if (name === null) {
       return;
     }
+    const description = descriptionRef.current.trim();
+
     if (validateProfileDescription(description) !== null) {
       setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
-    setNameError(null);
     setDescriptionError(null);
 
     setIsSubmitting(true);
@@ -114,33 +121,17 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
-        <FormField
-          label={t('profiles.nameLabel')}
+        <ProfileNameField
           defaultValue=""
-          placeholder={t('profiles.namePlaceholder')}
-          error={nameError ?? undefined}
+          error={nameField.error}
           disabled={isSubmitting}
-          required
-          autoCapitalize="sentences"
           autoCorrect={false}
-          returnKeyType="next"
-          onChangeText={value => {
-            nameRef.current = value;
-            if (nameError !== null) {
-              setNameError(validateProfileName(value.trim()) === null ? null : nameError);
-            }
-          }}
+          onChangeText={nameField.handleChangeText}
         />
-        <FormField
-          label={t('profiles.descriptionLabel')}
+        <ProfileDescriptionField
           defaultValue=""
-          placeholder={t('profiles.descriptionPlaceholder')}
           error={descriptionError ?? undefined}
           disabled={isSubmitting}
-          multiline
-          textAlignVertical="top"
-          className="min-h-20 leading-[1.25rem]"
-          autoCapitalize="sentences"
           autoCorrect={false}
           onChangeText={value => {
             descriptionRef.current = value;
@@ -162,22 +153,21 @@ export function SaveProfileSheet({
           />
         </View>
 
-        <View className="gap-1 rounded-lg bg-muted p-3">
-          <Text className="text-sm font-medium text-foreground">
-            {t('agentChat.newSession.profileSummary', {
-              vars: envVars.length,
-              commands: setupCommands.length,
-            })}
-          </Text>
-          {hasSecrets ? (
-            <View className="mt-1 flex-row items-center gap-1.5">
-              <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">
-                {t('agentChat.newSession.secretsEncrypted')}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        {summary.length > 0 || hasSecrets ? (
+          <View className="gap-1 rounded-lg bg-muted p-3">
+            {summary.length > 0 ? (
+              <Text className="text-sm font-medium text-foreground">{summary}</Text>
+            ) : null}
+            {hasSecrets ? (
+              <View className="mt-1 flex-row items-center gap-1.5">
+                <Lock size={12} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.newSession.secretsEncrypted')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

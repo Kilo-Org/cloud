@@ -429,17 +429,20 @@ describe('downloaded startup in the allocation owner', () => {
   it.each([
     { label: 'non-web', createdOnPlatform: 'cloud-agent', sandboxId: NON_WEB_SANDBOX },
     { label: 'absent', createdOnPlatform: undefined, sandboxId: ABSENT_PLATFORM_SANDBOX },
-  ])('keeps a $label platform on the baseline', async ({ createdOnPlatform, sandboxId }) => {
-    const h = await setup(sandboxId, {}, scopedEnv);
-    await prepare(h, {
-      orgId: TARGET_ORG,
-      ...(createdOnPlatform === undefined ? {} : { createdOnPlatform }),
-      sandboxKind: 'isolated',
-    });
-    await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
-    const startup = h.provider.launches[0]!;
-    expect(startup.options?.nativeImage).toBe('all-in-one');
-  });
+  ])(
+    'selects the scoped target for a $label platform',
+    async ({ createdOnPlatform, sandboxId }) => {
+      const h = await setup(sandboxId, {}, scopedEnv);
+      await prepare(h, {
+        orgId: TARGET_ORG,
+        ...(createdOnPlatform === undefined ? {} : { createdOnPlatform }),
+        sandboxKind: 'isolated',
+      });
+      await waitFor(async () => expect((await record(h))?.startupMode).toBe('downloaded'));
+      const startup = h.provider.launches[0]!;
+      expect(startup.options?.nativeImage).toBe('runtime-free');
+    }
+  );
   it('retains the scoped selection through the snapshot-to-image fallback', async () => {
     const h = await setup(SCOPED_FALLBACK_SANDBOX, { snapshotFailed: true }, scopedEnv);
     await prepare(h, {

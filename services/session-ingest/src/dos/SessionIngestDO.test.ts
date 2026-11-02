@@ -34,6 +34,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
 import { ingestItems, ingestMeta } from '../db/sqlite-schema';
+import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../ingest/briefing-excerpt';
 import { INACTIVITY_TIMEOUT_MS, POST_CLOSE_DRAIN_MS } from './session-metrics';
 
 describe('SessionIngestDO ingest ordering', () => {
@@ -76,6 +77,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           operations.push('alarm');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -142,7 +144,7 @@ describe('SessionIngestDO ingest ordering', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => {
         operations.push('waitUntil');
         waitUntilPromises.push(promise);
@@ -216,6 +218,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           throw new Error('alarm failed');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -262,7 +265,7 @@ describe('SessionIngestDO ingest ordering', () => {
     drizzleMocks.db = db;
 
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
     const env = { SESSION_INGEST_R2: { delete: vi.fn() } } as never;
@@ -352,7 +355,7 @@ describe('SessionIngestDO session-ready push', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => waitUntilPromises.push(promise)),
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -625,7 +628,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       operations.push('deleteAlarm');
     });
     const state = {
-      storage: { setAlarm: vi.fn(), deleteAlarm },
+      storage: { setAlarm: vi.fn(), deleteAlarm, transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
 
@@ -774,7 +777,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
     /** Pre-seeded ingest_meta rows (throttle state, prior status, etc.). */
     seedMeta?: Record<string, string | null>;
     /** Pre-seeded message item rows returned by cost SELECT .all(). */
-    seedMessageRows?: Array<{ item_data: string }>;
+    seedMessageRows?: Array<{
+      item_data: string;
+      item_id?: string;
+      /** Stored contribution; omitted means a row that predates the column. */
+      cost_usd?: number | null;
+    }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
     r2Objects?: Record<string, string>;
@@ -783,10 +791,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
   function makeLiveHarness(options: LiveHarnessOptions = {}) {
     const meta = new Map<string, string | null>(Object.entries(options.seedMeta ?? {}));
     const messageRows = options.seedMessageRows ?? [];
-    const metricsSeedRows = messageRows.map(row => ({
-      item_type: 'message',
-      item_data: row.item_data,
-    }));
+
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
       string,
@@ -797,9 +802,27 @@ describe('SessionIngestDO live activity + cost persist', () => {
         item_data: string;
         ingested_at: number | null;
         item_data_r2_key: string | null;
+        cost_usd: number | null;
       }
     >();
+    // Seeded message rows are stored rows: the full cost scan projects them like any other
+    // inline message row, so it stays a true recomputation of what the DO holds.
+    messageRows.forEach((row, index) => {
+      const itemId = row.item_id ?? `message/seed-${index}`;
+      itemRows.set(itemId, {
+        id: index + 1,
+        item_id: itemId,
+        item_type: 'message',
+        item_data: row.item_data,
+        ingested_at: null,
+        item_data_r2_key: null,
+        cost_usd: row.cost_usd ?? null,
+      });
+    });
     let costScanCount = 0;
+    // Replaced-row projections that returned a stored message body: the CASE materializes
+    // one only for a row that has no stored contribution.
+    let messageBodyReads = 0;
 
     type SelectKind =
       | 'meta_get'
@@ -814,6 +837,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     let eqKey: string | undefined;
     let boundKeys: string[] = [];
     let selectLimit = Infinity;
+    let orderedQuery = false;
     let partRowsRead = 0;
 
     const selectQuery = {
@@ -827,7 +851,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
         boundKeys = params.filter((p): p is string => typeof p === 'string');
         return selectQuery;
       }),
-      orderBy: vi.fn(() => selectQuery),
+      orderBy: vi.fn(() => {
+        orderedQuery = true;
+        return selectQuery;
+      }),
       limit: vi.fn((limit: number) => {
         selectLimit = limit;
         return selectQuery;
@@ -837,7 +864,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
           (selectKind === 'item_guard' || selectKind === 'parent_message') &&
           eqKey !== undefined
         ) {
-          return itemRows.get(eqKey);
+          const row = itemRows.get(eqKey);
+          if (row === undefined) return undefined;
+          if (selectKind !== 'item_guard') return row;
+          // The replaced-row projection materializes a body only for a row that has no
+          // stored contribution, like the SQL CASE it models.
+          if (row.item_type === 'message' && row.cost_usd === null) messageBodyReads += 1;
+          return {
+            ...row,
+            legacy_item_data: row.cost_usd === null ? row.item_data : null,
+          };
         }
         if (eqKey !== undefined && meta.has(eqKey)) {
           return { value: meta.get(eqKey) };
@@ -864,14 +900,20 @@ describe('SessionIngestDO live activity + cost persist', () => {
           return rows;
         }
         if (selectKind === 'metrics_items') {
-          return [
-            ...metricsSeedRows,
-            ...[...itemRows.values()].filter(row => row.item_type !== 'session_diff'),
-          ];
+          return [...itemRows.values()].filter(row => row.item_type !== 'session_diff');
         }
         if (selectKind === 'message_cost') {
+          const rows = [...itemRows.values()]
+            .filter(row => row.item_type === 'message' && row.item_data_r2_key === null)
+            .sort(
+              (left, right) =>
+                (right.ingested_at ?? 0) - (left.ingested_at ?? 0) || right.id - left.id
+            )
+            .map(row => ({ item_data: row.item_data }));
+          // The completed-turn lookup is ordered and bounded; the cost scan is neither.
+          if (orderedQuery) return rows.slice(0, selectLimit);
           costScanCount += 1;
-          return messageRows;
+          return rows;
         }
         return [];
       }),
@@ -880,6 +922,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     const db = {
       select: vi.fn((columns?: unknown) => {
         selectLimit = Infinity;
+        orderedQuery = false;
         const cols = columns as Record<string, unknown> | undefined;
         boundKeys = [];
         if (cols && 'item_type' in cols && !('item_id' in cols)) {
@@ -915,11 +958,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
             item_data?: string;
             item_data_r2_key?: string | null;
             ingested_at?: number | null;
+            cost_usd?: number | null;
           }) => ({
             onConflictDoUpdate: vi.fn(() => ({
               run: vi.fn(() => {
                 if (values.key !== undefined) {
                   meta.set(values.key, values.value ?? null);
+                  if (inTransaction) metaWritesInTransaction.add(values.key);
                 } else if (values.item_id !== undefined) {
                   itemRows.set(values.item_id, {
                     id: itemRows.get(values.item_id)?.id ?? itemRows.size + 1,
@@ -928,10 +973,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
                     item_data: values.item_data ?? '{}',
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
+                    cost_usd: values.cost_usd ?? null,
                   });
-                  if (values.item_type === 'message' && values.item_data) {
-                    messageRows.push({ item_data: values.item_data });
-                  }
                 }
               }),
             })),
@@ -964,6 +1007,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     let alarmAt: number | null = null;
+    let inTransaction = false;
+    const metaWritesInTransaction = new Set<string>();
     const storage = {
       setAlarm: vi.fn(async (at: number) => {
         alarmAt = at;
@@ -971,6 +1016,23 @@ describe('SessionIngestDO live activity + cost persist', () => {
       getAlarm: vi.fn(async () => alarmAt),
       deleteAlarm: vi.fn(async () => {
         alarmAt = null;
+      }),
+      transactionSync: vi.fn((fn: () => unknown) => {
+        // Model SQLite's rollback: a throw discards every row and meta write the callback made.
+        const rowsBefore = new Map([...itemRows].map(([key, row]) => [key, { ...row }]));
+        const metaBefore = new Map(meta);
+        inTransaction = true;
+        try {
+          return fn();
+        } catch (error) {
+          itemRows.clear();
+          for (const [key, row] of rowsBefore) itemRows.set(key, row);
+          meta.clear();
+          for (const [key, value] of metaBefore) meta.set(key, value);
+          throw error;
+        } finally {
+          inTransaction = false;
+        }
       }),
     };
     const state = {
@@ -1043,6 +1105,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
       get costScanCount() {
         return costScanCount;
       },
+      get messageBodyReads() {
+        return messageBodyReads;
+      },
+      metaWritesInTransaction,
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
@@ -1392,6 +1458,134 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.r2Get).not.toHaveBeenCalled();
   });
 
+  it('builds the excerpt from at most the source-row limit', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 200 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `text-${index}`, messageID: 'final', type: 'text', text: 'x' },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        {
+          signalId: 'final',
+          kind: 'completed',
+          messageExcerpt: 'x'.repeat(BRIEFING_MAX_EXCERPT_SOURCE_ROWS),
+        },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('limits the excerpt read to a text byte budget', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 40 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `blank-${index}`, messageID: 'final', type: 'text', text: ' '.repeat(1000) },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [{ signalId: 'final', kind: 'completed', messageExcerpt: '' }],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('keeps the snippet of a large single text part', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'long-text',
+            messageID: 'final',
+            type: 'text',
+            text: `${'z'.repeat(20_000)} tail`,
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        { signalId: 'final', kind: 'completed', messageExcerpt: `${'z'.repeat(97)}...` },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBe(1);
+  });
+
   it('does not reuse a prior producer timestamp for a legacy status transition', async () => {
     const harness = makeLiveHarness({
       seedMeta: {
@@ -1666,6 +1860,33 @@ describe('SessionIngestDO live activity + cost persist', () => {
       expect(harness.alarmAt).toBeNull();
     });
 
+    it('reports a running total that no longer matches the stored rows', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const harness = makeLiveHarness({
+          seedMeta: {
+            kiloUserId: 'usr_live',
+            sessionId: 'ses_live',
+            runningAssistantCostUsd: '0.5',
+            metricsAlarmAt: String(Date.now() - 1),
+          },
+          seedMessageRows: [
+            { item_data: JSON.stringify(assistantItem('existing-turn', 0.25).data) },
+          ],
+        });
+
+        await harness.durableObject.alarm();
+
+        expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          'SessionIngestDO session cost total diverges from its stored rows',
+          expect.objectContaining({ storedUsd: 0.5, recomputedUsd: 0.25 })
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('keeps a newer open alarm that interleaves with metrics emission', async () => {
       const harness = makeLiveHarness({
         seedMeta: {
@@ -1812,6 +2033,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       item_data: '{}',
       ingested_at: 5000,
       item_data_r2_key: null,
+      cost_usd: null,
     });
 
     await harness.durableObject.ingest(
@@ -1994,11 +2216,248 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    // cost scan runs at least once (attention path may also select message rows)
-    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
+    // No stored total yet: the idle transition seeds it with the one full read.
+    expect(harness.costScanCount).toBe(1);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('keeps the running cost equal to a full recomputation across message versions', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // First persist of a session without a stored total seeds it from the stored rows.
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // A newer version of the same message replaces its contribution: no history read, and
+    // the 30s window keeps this batch from persisting.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    // The idle transition forces the persist and reads the stored total.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('persists a stored total without reading the message history', async () => {
+    const priorCost = JSON.stringify(assistantItem('prior', 0.5).data);
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        runningAssistantCostUsd: '0.5',
+        lastCostPersistedMicrodollars: '100000',
+        lastCostPersistedAtMs: String(Date.now()),
+      },
+      seedMessageRows: [{ item_data: priorCost }],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(0);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('seeds a session without a stored total once', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { status: 'busy' },
+      seedMessageRows: [
+        { item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+        { item_data: JSON.stringify(assistantItem('m2', 0.25).data) },
+      ],
+    });
+    const idle = [{ type: 'session_status' as const, data: { status: 'idle' } }];
+
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 1_000);
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'busy' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 3_000);
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('drops an offloaded message body from the running total', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // The same message now stores its body in R2, where the cost sum does not read it.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000,
+      { 'message/m1': 'items/m1-blob' }
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0');
+
+    // Nothing to persist: the stored total did not grow.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('commits the running total in the same transaction as the stored rows', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // The first batch has no total yet, so the seeding write runs after the transaction.
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(false);
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(true);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('moves the running total from the stored contribution of the row it replaces', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+
+    expect(harness.messageBodyReads).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('reads a pre-column row body once and uses its stored contribution afterwards', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { runningAssistantCostUsd: '0.25' },
+      seedMessageRows: [
+        { item_id: 'message/m1', item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+      ],
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.costScanCount).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.75)],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.75');
+  });
+
+  it('discards stored rows and the running total when a batch throws after a row write', async () => {
+    const harness = makeLiveHarness({ seedMeta: { runningAssistantCostUsd: '0.25' } });
+    const unstringifiable: Record<string, unknown> = { ...assistantItem('m2', 0.5).data };
+    unstringifiable.self = unstringifiable;
+
+    await expect(
+      harness.durableObject.ingest(
+        [assistantItem('m1', 0.1), { type: 'message', data: unstringifiable } as never],
+        'usr_live',
+        'ses_live',
+        1,
+        2_000
+      )
+    ).rejects.toThrow();
+
+    expect(harness.itemRows.has('message/m1')).toBe(false);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
   });
 
   it('user-only message batch does not open cost persist (KB-4)', async () => {
@@ -2037,7 +2496,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
   });
 
   it('decreased recomputed cost does not move lastCostPersistedMicrodollars backward (KB-7)', async () => {
-    // Prior persist was 200000; R2 offload left '{}' so recompute yields 0 → gate closed.
+    // Prior persist was 200000; R2 offload left '{}' so the recomputation yields only the
+    // 0.01 inline upsert → gate closed.
     const harness = makeLiveHarness({
       seedMeta: {
         lastCostPersistedMicrodollars: '200000',
@@ -2172,7 +2632,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     const state = {
-      storage: { setAlarm: vi.fn(), getAlarm: vi.fn(async () => null), deleteAlarm: vi.fn() },
+      storage: {
+        setAlarm: vi.fn(),
+        getAlarm: vi.fn(async () => null),
+        deleteAlarm: vi.fn(),
+        transactionSync: (fn: () => unknown) => fn(),
+      },
       waitUntil,
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -2592,6 +3057,34 @@ describe('SessionIngestDO clone primitives', () => {
       })
     ).toMatchObject({ status: 'complete' });
     expect(harness.items).toHaveLength(2);
+  });
+
+  it('drops a destination running cost when staged rows are written', () => {
+    const harness = makeCloneHarness();
+    harness.meta.set('runningAssistantCostUsd', '0.5');
+    harness.meta.set('cloneSourceSessionId', 'src');
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: JSON.stringify({ role: 'assistant', cost: 0.25 }),
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: { ingestedAt: 1, id: 1 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 1,
+    });
+
+    // The staged rows now describe the cost; the destination recomputes it from them.
+    expect(harness.meta.has('runningAssistantCostUsd')).toBe(false);
+    expect(harness.meta.get('cloneSourceSessionId')).toBe('src');
+    expect(harness.items.map(row => row.item_id)).toEqual(['message/a']);
   });
 
   it('resumes an incomplete same-source stage with the persisted next cursor', async () => {

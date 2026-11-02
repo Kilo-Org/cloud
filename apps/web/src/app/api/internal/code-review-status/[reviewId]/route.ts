@@ -51,7 +51,10 @@ import {
   setCommitStatus,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  resolveReviewProviderIntegration,
+  reviewOwnerScope,
+} from '@/lib/code-reviews/provider-integration';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -771,6 +774,10 @@ function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
  * When `gateResult` is `'fail'` and the review completed successfully (no system error),
  * the conclusion is set to `'failure'` — the agent determined that the review found
  * blocking issues (based on the `gate_threshold` setting in the agent config).
+ *
+ * `errorMessage` is read only to classify the failure. Every string this returns is
+ * authored here or in the copy modules: the check run is published to the pull request,
+ * which may be public, so the callback's own text never becomes part of it.
  */
 function mapStatusToCheckRun(
   reviewStatus: string,
@@ -835,12 +842,14 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
+    // Authored copy only: the check run renders on the pull request, which may be
+    // public. The raw callback text stays on the review and attempt rows and in the
+    // logs, where only the owning account and Kilo can read it.
     failed: actionRequiredCopy
       ? actionRequiredCopy.checkSummary
       : billingFailure
         ? 'Review could not start because the account has insufficient credits.'
-        : (terminalReasonCopy?.checkSummary ??
-          (errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.')),
+        : (terminalReasonCopy?.checkSummary ?? 'Review failed.'),
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -904,10 +913,8 @@ function getGitLabStatusDescription(
     const terminalReasonCopy = getCodeReviewTerminalReasonCopy(terminalReason);
     if (terminalReasonCopy) return terminalReasonCopy.checkSummary;
   }
-  if (reviewStatus === 'failed' && errorMessage) {
-    const desc = `Review failed: ${errorMessage}`;
-    return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
-  }
+  // Fixed sentence, never the callback text: a commit status renders on the merge
+  // request, which may be public. See the failure row in the Kilo app for detail.
   if (reviewStatus === 'failed') return 'Kilo Code Review failed';
   return undefined;
 }
@@ -1155,6 +1162,21 @@ export async function POST(
     const isManualReview = manualConfig !== null;
     const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
 
+    // Every provider side effect below runs with the review owner's own integration. A review
+    // row whose integration belongs to another owner resolves to null, so the completion still
+    // records while no foreign credential is used.
+    const reviewOwner = reviewOwnerScope(review);
+    let ownerScopedIntegrationResolved = false;
+    let ownerScopedIntegration: PlatformIntegration | null = null;
+    const getOwnerScopedIntegration = async (): Promise<PlatformIntegration | null> => {
+      if (!shouldPublishToProvider || !reviewOwner) return null;
+      if (!ownerScopedIntegrationResolved) {
+        ownerScopedIntegrationResolved = true;
+        ownerScopedIntegration = await resolveReviewProviderIntegration(review, reviewOwner);
+      }
+      return ownerScopedIntegration;
+    };
+
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
@@ -1233,7 +1255,7 @@ export async function POST(
             attemptId: preUpdateAttemptId,
             reviewId,
             platform: review.platform,
-            platformIntegrationId: review.platform_integration_id,
+            platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
             repoFullName: review.repo_full_name,
             prNumber: review.pr_number,
             previousSummaryBody: review.previous_summary_body,
@@ -1347,7 +1369,7 @@ export async function POST(
           attemptId: preUpdateAttemptId,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,
@@ -1692,10 +1714,7 @@ export async function POST(
     }
 
     // Fetch integration once — used for gate check updates and post-completion actions
-    const integration =
-      shouldPublishToProvider && review.platform_integration_id
-        ? await getIntegrationById(review.platform_integration_id)
-        : null;
+    const integration = await getOwnerScopedIntegration();
 
     if (status === 'completed') {
       if (review.platform === PLATFORM.GITHUB) {
@@ -1703,7 +1722,7 @@ export async function POST(
           attemptId: attempt.id,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,

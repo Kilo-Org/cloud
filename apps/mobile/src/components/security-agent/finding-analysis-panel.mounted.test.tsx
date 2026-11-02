@@ -38,6 +38,8 @@ const startAnalysis = vi.hoisted(() => ({
 
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
+  values: new Map<string, unknown>(),
+  props: [] as { label: string; valueDirection: string | undefined }[],
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -49,6 +51,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
@@ -80,8 +83,10 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string }) => {
+  KvRow: (props: { label: string; value: unknown; valueDirection?: string }) => {
     kvRows.labels.push(props.label);
+    kvRows.values.set(props.label, props.value);
+    kvRows.props.push({ label: props.label, valueDirection: props.valueDirection });
     return null;
   },
 }));
@@ -157,6 +162,7 @@ function renderPanel(
 describe('FindingAnalysisPanel completion-copy gate', () => {
   beforeEach(() => {
     kvRows.labels = [];
+    kvRows.values.clear();
     capacity.runningCount = 0;
     capacity.concurrencyLimit = 3;
     capacity.isLoading = false;
@@ -320,6 +326,45 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
 
     expect(kvRows.labels).toContain('Triage confidence');
   });
+
+  // `security_findings.analysis` is jsonb with a compile-time type only, so a
+  // stored analysis written before a field existed (or seeded) reaches the
+  // panel without it. The panel renders the rows it has and labels the rest as
+  // not recorded instead of throwing into the panel's error boundary.
+  it.each<{ name: string; analysis: Record<string, unknown>; expected: [string, string][] }>([
+    {
+      name: 'triage without confidence or suggested action',
+      analysis: { triage: { needsSandboxReasoning: 'Runtime dependency.' } },
+      expected: [
+        ['Triage confidence', i18n.t('securityAgent.analysis.notRecorded')],
+        ['Suggested action', i18n.t('securityAgent.analysis.notRecorded')],
+      ],
+    },
+    {
+      name: 'sandbox without suggested action',
+      analysis: {
+        sandboxAnalysis: {
+          isExploitable: 'unknown',
+          exploitabilityReasoning: 'Needs review.',
+          summary: 'Needs review.',
+          suggestedFix: 'Upgrade it.',
+          analysisAt: '2026-06-17T11:44:59.000Z',
+        },
+      },
+      expected: [
+        ['Exploitable', i18n.t('common.unknown')],
+        ['Suggested action', i18n.t('securityAgent.analysis.notRecorded')],
+      ],
+    },
+  ])('renders an analysis whose $name', ({ analysis, expected }) => {
+    const tree = renderPanel(analysisFixture({ status: 'completed', analysis }));
+
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+    expect(kvRows.labels).toEqual(expect.arrayContaining(expected.map(([label]) => label)));
+    for (const [label, value] of expected) {
+      expect(kvRows.values.get(label)).toBe(value);
+    }
+  });
 });
 
 describe('FindingAnalysisPanel stale analysis action', () => {
@@ -418,5 +463,70 @@ describe('FindingAnalysisPanel stale analysis action', () => {
     )[0];
     act(retry?.props.onPress as () => void);
     expect(capacity.refetch).toHaveBeenCalledOnce();
+  });
+});
+
+describe('FindingAnalysisPanel identifier values', () => {
+  beforeEach(() => {
+    kvRows.labels = [];
+    kvRows.props = [];
+  });
+
+  /** The captured Model row; fails the test when the panel did not draw it. */
+  function modelRow(): { label: string; valueDirection: string | undefined } {
+    const row = kvRows.props.find(candidate => candidate.label === i18n.t('common.model'));
+    expect(row, 'the panel draws the Model row').toBeDefined();
+    return row as { label: string; valueDirection: string | undefined };
+  }
+
+  it('isolates the analysed model left-to-right', () => {
+    renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
+
+    expect(modelRow().valueDirection).toBe('ltr');
+  });
+
+  // The stored analysis can name the model without the sandbox result that
+  // usually carries it; that value is still an identifier.
+  it('isolates a model named only by the analysis record', () => {
+    renderPanel(
+      analysisFixture({
+        status: 'completed',
+        analysis: {
+          sandboxAnalysis: { ...staleAnalysis().sandboxAnalysis, modelUsed: undefined },
+          analysisModel: 'kilo-auto/balanced',
+        },
+      })
+    );
+
+    expect(modelRow()).toMatchObject({ valueDirection: 'ltr' });
+    expect(kvRows.values.get(i18n.t('common.model'))).toBe('kilo-auto/balanced');
+  });
+
+  it('keeps the unrecorded model copy in the interface direction', () => {
+    renderPanel(
+      analysisFixture({
+        status: 'completed',
+        analysis: {
+          sandboxAnalysis: { ...staleAnalysis().sandboxAnalysis, modelUsed: undefined },
+        },
+      })
+    );
+
+    expect(modelRow().valueDirection).toBeUndefined();
+    expect(kvRows.values.get(i18n.t('common.model'))).toBe(
+      i18n.t('securityAgent.analysis.notRecorded')
+    );
+  });
+
+  // A path's leading separator is neutral, so an RTL paragraph would move it
+  // to the end of the run and draw the rest of the path back to front.
+  it('isolates a located path left-to-right', () => {
+    const tree = renderPanel(analysisFixture({ status: 'completed', analysis: staleAnalysis() }));
+
+    const [location] = tree.root.findAll(
+      node => Object.is(node.type, 'Text') && node.props.children === 'src/a.ts'
+    );
+    expect(location, 'the panel draws the located path').toBeDefined();
+    expect(location?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
   });
 });

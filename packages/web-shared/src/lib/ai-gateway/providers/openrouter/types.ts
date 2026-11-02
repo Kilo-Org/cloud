@@ -82,7 +82,7 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // OpenRouter specific field we do not support
+  // Forwarded as providerOptions.gateway.models on the Vercel path
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 
@@ -102,10 +102,18 @@ export type SharedGatewayRequestProperties = {
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
+// https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+export type ThinkingBlockBinding = {
+  prefix_mismatch_behavior?: 'error' | 'drop_block';
+  /** Deprecated alias of `prefix_mismatch_behavior`; sending both is rejected. */
+  mismatch_behavior?: 'error' | 'drop_block';
+};
+
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
 /**

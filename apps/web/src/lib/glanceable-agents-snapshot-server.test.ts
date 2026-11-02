@@ -2,7 +2,7 @@ import type { ActiveSession } from '@/lib/active-sessions-list';
 import { listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications/schemas';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 

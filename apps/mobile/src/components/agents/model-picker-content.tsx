@@ -1,5 +1,5 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,6 +23,7 @@ import {
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
@@ -134,7 +135,8 @@ export function ModelPickerContent() {
 
   const handleSelectVariant = useCallback(
     (variant: string) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedVariantRef.current = variant;
       setSelectedVariant(variant);
@@ -155,12 +157,16 @@ export function ModelPickerContent() {
       if (option.unavailable || !bridge) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       const selection = resolveModelPickerSelection(bridge, option.id, selectedVariantRef.current);
       if (!selection) {
         return;
       }
 
+      // The pick is applied: close the search keyboard with it, so the chosen
+      // row's check mark and its thinking-effort chips are visible whether or
+      // not the sheet stays open for a variant choice.
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedModelRef.current = option.id;
       selectedVariantRef.current = selection.variant;
@@ -199,6 +205,7 @@ export function ModelPickerContent() {
           selected={item.model.id === selectedModel}
           selectedVariant={selectedVariant}
           isFavorite={item.isFavorite}
+          showProvider={item.showsProvider}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
@@ -332,8 +339,7 @@ export function ModelPickerContent() {
           // callbacks are absent.
           keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
           getItemType={(item: ModelPickerRow | undefined) => item?.type}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          {...SEARCHABLE_PICKER_LIST_PROPS}
           renderItem={renderItem}
         />
       )}

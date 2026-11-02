@@ -1,3 +1,26 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
+
+/**
+ * Hide the remaining-characters counter until the draft nears the limit.
+ */
+export const PROMPT_COUNTER_VISIBLE_REMAINING = 1000;
+
+/**
+ * The counter's remaining count for a draft of `length` characters, or `null`
+ * while the counter stays hidden.
+ *
+ * The prompt card renders this and nothing else about the draft's length, so a
+ * keystroke that keeps the result `null` publishes no state and re-renders
+ * nothing: a draft that never nears the limit costs one comparison per change
+ * rather than a card render.
+ */
+export function resolvePromptCounterRemaining(length: number): number | null {
+  const remaining = CLOUD_AGENT_PROMPT_MAX_LENGTH - length;
+  return remaining <= PROMPT_COUNTER_VISIBLE_REMAINING ? remaining : null;
+}
+
 type NewSessionPromptControlInput = {
   attachmentsCount: number;
   attachmentMax: number;
@@ -9,7 +32,7 @@ type NewSessionPromptControlInput = {
 type NewSessionPromptControlState = {
   /** Mirrors the "Start session" button's disabled state. */
   createDisabled: boolean;
-  /** Whether the prompt has non-whitespace text — the upstream canCreate gate. */
+  /** Whether the prompt has text a reader can see — the upstream canCreate gate. */
   hasPrompt: boolean;
   /**
    * Whether the controls that mutate the draft or the payload — the paste
@@ -28,17 +51,19 @@ type NewSessionPromptControlState = {
 /**
  * Validates the live, post-settlement prompt value for `createSession`.
  * Returns the trimmed prompt when the user has something to send, or `null`
- * when the live draft is empty or whitespace-only — for example when an
- * interim voice transcript was replaced by an empty final transcript (no
- * speech recognized). Returning `null` lets the caller no-op without
- * firing prepareSession, surfacing a toast, or navigating. The empty case
- * is its own supported state: the voice controller has already presented
- * its own "no speech" feedback, so the composer should preserve the
- * user's draft and screen state.
+ * when the live draft holds nothing a reader can see — only whitespace,
+ * zero-width or control characters, which is what an interim voice transcript
+ * replaced by an empty final transcript leaves (no speech recognized), and
+ * what a draft padded with invisible characters would otherwise send as an
+ * empty prompt on a billed session. Returning `null` lets the caller no-op
+ * without firing prepareSession, surfacing a toast, or navigating. The empty
+ * case is its own supported state: the voice controller has already presented
+ * its own "no speech" feedback, so the composer should preserve the user's
+ * draft and screen state.
  */
 export function resolveNewSessionPromptForCreate(rawPrompt: string): string | null {
-  const trimmed = rawPrompt.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  const prompt = composerPromptText(rawPrompt);
+  return prompt === '' ? null : prompt;
 }
 
 /**
@@ -64,7 +89,7 @@ export function resolveNewSessionPromptControlState(
   input: NewSessionPromptControlInput
 ): NewSessionPromptControlState {
   const { attachmentsCount, attachmentMax, isCreating, rawPrompt, voiceInputActive } = input;
-  const hasPrompt = rawPrompt.trim().length > 0;
+  const hasPrompt = hasVisibleComposerText(rawPrompt);
   const createDisabled = isCreating;
   const voiceDisabled = isCreating;
   const paperclipDisabled = isCreating || voiceInputActive || attachmentsCount >= attachmentMax;

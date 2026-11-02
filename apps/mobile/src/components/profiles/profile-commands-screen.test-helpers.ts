@@ -13,14 +13,11 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 type TestCommand = { sequence: number; command: string };
 
-/** The profile detail the mocked `useAgentProfile` returns. */
-export type TestProfileDetail = { id: string; commands: TestCommand[] };
+/** The setup-command list the mocked `useAgentProfileCommands` returns. */
+export type TestCommands = TestCommand[];
 
-export function testProfile(commands: string[] = []): TestProfileDetail {
-  return {
-    id: 'profile-1',
-    commands: commands.map((command, sequence) => ({ sequence, command })),
-  };
+export function testCommands(commands: string[] = []): TestCommands {
+  return commands.map((command, sequence) => ({ sequence, command }));
 }
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {

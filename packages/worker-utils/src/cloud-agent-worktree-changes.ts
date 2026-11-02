@@ -39,6 +39,15 @@ export const worktreeChangesComparisonSchema = z
   })
   .strict();
 
+export const worktreeChangesScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
+
+export function worktreeFileIdentity(file: {
+  path: string;
+  scope?: z.infer<typeof worktreeChangesScopeSchema>;
+}): string {
+  return file.scope === undefined ? file.path : `${file.scope}\0${file.path}`;
+}
+
 export const worktreeChangesFileSchema = z
   .object({
     path: z
@@ -52,6 +61,7 @@ export const worktreeChangesFileSchema = z
         'Expected a repository-relative path'
       ),
     status: z.enum(['added', 'modified', 'deleted']),
+    scope: worktreeChangesScopeSchema.optional(),
     additions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     deletions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     tracked: z.boolean(),
@@ -77,6 +87,10 @@ const captureFields = {
 export const worktreeChangesCaptureSchema = z
   .object(captureFields)
   .strict()
+  .refine(
+    capture => new Set(capture.files.map(worktreeFileIdentity)).size === capture.files.length,
+    'Worktree summary identities must be unique'
+  )
   .refine(
     capture =>
       new TextEncoder().encode(JSON.stringify(capture)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
@@ -111,11 +125,13 @@ const savedWorktreeChangesSnapshotSchema = z
   })
   .strict()
   .refine(
-    snapshot => new Set(snapshot.files.map(file => file.path)).size === snapshot.files.length,
-    'Saved worktree summary paths must be unique'
+    snapshot => new Set(snapshot.files.map(worktreeFileIdentity)).size === snapshot.files.length,
+    'Saved worktree summary identities must be unique'
   );
 
 export type WorktreeChangesSnapshot = z.infer<typeof savedWorktreeChangesSnapshotSchema>;
+
+const worktreeTextEncoder = new TextEncoder();
 
 export function finalizeWorktreeChangesSnapshot(
   candidate: unknown
@@ -123,20 +139,47 @@ export function finalizeWorktreeChangesSnapshot(
   const parsed = savedWorktreeChangesSnapshotSchema.safeParse(candidate);
   if (!parsed.success) return null;
 
-  for (let length = parsed.data.files.length; length >= 0; length--) {
-    const snapshot = {
-      ...parsed.data,
-      files: parsed.data.files.slice(0, length),
-      truncated: parsed.data.truncated || length !== parsed.data.files.length,
-    };
-    if (
-      new TextEncoder().encode(JSON.stringify(snapshot)).byteLength <= MAX_WORKTREE_CHANGES_BYTES
-    ) {
-      return snapshot;
+  const { files } = parsed.data;
+  const asSnapshot = (length: number, truncated: boolean): WorktreeChangesSnapshot => ({
+    ...parsed.data,
+    files: files.slice(0, length),
+    truncated,
+  });
+  const sizeOf = (value: unknown) => worktreeTextEncoder.encode(JSON.stringify(value)).byteLength;
+
+  const complete = asSnapshot(files.length, parsed.data.truncated);
+  if (sizeOf(complete) <= MAX_WORKTREE_CHANGES_BYTES) return complete;
+  if (files.length === 0) return null;
+
+  // Every shorter prefix reports `truncated: true`, and an array element serializes exactly
+  // like the standalone value, so one measurement of the file-less snapshot plus one per file
+  // sizes any prefix: the fixed part, the summed element bytes, and one comma per separator.
+  // The measurement already carries the four bytes of `truncated: true`, and `false` costs one
+  // byte more, which only the complete snapshot above can use.
+  const filelessBytes = sizeOf(asSnapshot(0, true));
+  const cumulativeBytes = [0];
+  let cumulative = 0;
+  for (const file of files) {
+    cumulative += sizeOf(file);
+    cumulativeBytes.push(cumulative);
+  }
+  const truncatedBytes = (length: number): number =>
+    filelessBytes + cumulativeBytes[length] + Math.max(length - 1, 0);
+
+  if (truncatedBytes(0) > MAX_WORKTREE_CHANGES_BYTES) return null;
+
+  let fitting = 0;
+  let exceeding = files.length - 1;
+  while (fitting < exceeding) {
+    const middle = Math.ceil((fitting + exceeding) / 2);
+    if (truncatedBytes(middle) <= MAX_WORKTREE_CHANGES_BYTES) {
+      fitting = middle;
+    } else {
+      exceeding = middle - 1;
     }
   }
 
-  return null;
+  return asSnapshot(fitting, true);
 }
 
 export const worktreeChangesSnapshotSchema = z.unknown().transform((value, context) => {
@@ -184,6 +227,7 @@ export const worktreeFileRecordSchema = z
     schemaVersion: z.literal(WORKTREE_FILE_SCHEMA_VERSION),
     revision: worktreeChangesRevisionSchema,
     path: worktreeChangesFileSchema.shape.path,
+    scope: worktreeChangesScopeSchema.optional(),
     diff: z.discriminatedUnion('status', [
       z
         .object({
@@ -227,21 +271,50 @@ export const worktreeFileRecordSchema = z
     'Worktree file record exceeds the size limit'
   );
 
+export const worktreeRecoverySchema = z
+  .object({
+    files: z
+      .array(
+        z
+          .object({
+            path: worktreeChangesFileSchema.shape.path,
+            status: worktreeChangesFileSchema.shape.status,
+            patch: z.string().optional(),
+          })
+          .strict()
+      )
+      .max(MAX_WORKTREE_CHANGES_FILES),
+  })
+  .strict()
+  .refine(
+    value => new Set(value.files.map(file => file.path)).size === value.files.length,
+    'Recovery paths must be unique'
+  )
+  .refine(
+    value =>
+      new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
+    'Worktree recovery exceeds the size limit'
+  );
+
+export type WorktreeRecovery = z.infer<typeof worktreeRecoverySchema>;
+
 export const worktreeSnapshotCaptureSchema = z
   .object({
     summary: worktreeChangesCaptureSchema,
     files: z.array(worktreeFileRecordSchema).max(MAX_WORKTREE_CHANGES_FILES),
+    recovery: worktreeRecoverySchema.optional(),
   })
   .strict()
   .refine(({ summary, files }) => {
     if (files.length !== summary.files.length) return false;
-    const listedFiles = new Map(summary.files.map(file => [file.path, file]));
+    const listedFiles = new Map(summary.files.map(file => [worktreeFileIdentity(file), file]));
     if (listedFiles.size !== summary.files.length) return false;
     const paths = new Set<string>();
     return files.every(file => {
-      const listed = listedFiles.get(file.path);
-      if (!listed || paths.has(file.path) || file.revision !== summary.revision) return false;
-      paths.add(file.path);
+      const identity = worktreeFileIdentity(file);
+      const listed = listedFiles.get(identity);
+      if (!listed || paths.has(identity) || file.revision !== summary.revision) return false;
+      paths.add(identity);
       return (
         file.content.status === 'unavailable' ||
         file.content.source === (listed.status === 'deleted' ? 'deleted-original' : 'current')
@@ -257,6 +330,7 @@ export const worktreeSnapshotCaptureSchema = z
 export const worktreeFileQuerySchema = z
   .object({
     path: worktreeChangesFileSchema.shape.path,
+    scope: worktreeChangesScopeSchema.optional(),
     expectedRevision: worktreeChangesRevisionSchema,
   })
   .strict();

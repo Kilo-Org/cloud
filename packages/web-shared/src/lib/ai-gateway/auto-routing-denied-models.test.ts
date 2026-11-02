@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -10,9 +10,15 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
+  getOrganizationByokProviderIds,
+  hasInferenceProviderUserByokForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
   candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  deniedAutoRoutingCandidates,
   deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
@@ -28,6 +34,15 @@ jest.mock(
     getProviderSlugsForModel: jest.fn(),
   })
 );
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
+  getOrganizationByokProviderIds: jest.fn(async () => []),
+  hasInferenceProviderUserByokForModel: jest.fn(async () => false),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
+  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   ...jest.requireActual<object>(
     '@kilocode/web-shared/lib/organizations/effective-model-access.server'
@@ -169,6 +184,116 @@ describe('collectDeniedAutoRoutingModelIds', () => {
       ).resolves.toEqual([]);
       expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
     });
+  });
+});
+
+describe('deniedAutoRoutingCandidates with organization inference provider keys', () => {
+  // Catalog-mode keys serving Kimi through Moonshot AI and GLM through Z.AI.
+  const catalogServingProviders = [
+    ['moonshotai/kimi-k2.6', 'moonshotai'],
+    ['z-ai/glm-5.2', 'z-ai'],
+  ] as const;
+
+  beforeEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockClear().mockResolvedValue(['openai']);
+    jest
+      .mocked(getDirectByokCatalogModelIds)
+      .mockClear()
+      .mockImplementation(async (_owner, isServingAllowed) => {
+        const served = new Set<string>();
+        for (const [modelId, providerId] of catalogServingProviders) {
+          if (await isServingAllowed?.(modelId, providerId)) served.add(modelId);
+        }
+        return served;
+      });
+    jest
+      .mocked(hasInferenceProviderUserByokForModel)
+      .mockClear()
+      .mockImplementation(async modelId => modelId !== 'deepseek/deepseek-v4');
+    jest
+      .mocked(getProviderSlugsForModel)
+      .mockImplementation(async modelId =>
+        modelId.startsWith('anthropic/') ? new Set(['anthropic']) : new Set(['other'])
+      );
+  });
+
+  afterEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValue([]);
+    jest.mocked(getDirectByokCatalogModelIds).mockReset().mockResolvedValue(new Set());
+    jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
+  });
+
+  it('admits models outside the provider allow-list that an inference provider key serves', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationProviderCeiling: ['anthropic'],
+        organizationModelDenyList: ['openai/o3'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5', 'openai/o3', 'deepseek/deepseek-v4']
+    );
+
+    expect(denied.sort()).toEqual(['deepseek/deepseek-v4', 'openai/o3']);
+    expect(jest.mocked(getOrganizationByokProviderIds).mock.calls).toEqual([[readDb, 'org-1']]);
+    expect(getDirectByokCatalogModelIds).toHaveBeenCalledWith(
+      { type: 'organization', id: 'org-1' },
+      expect.any(Function)
+    );
+    expect(
+      jest
+        .mocked(hasInferenceProviderUserByokForModel)
+        .mock.calls.map(([id]) => id)
+        .sort()
+    ).toEqual(['deepseek/deepseek-v4', 'openai/gpt-5']);
+  });
+
+  it('keeps denying models outside the member grant', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: ['anthropic/claude'],
+          providerAllowList: [],
+        },
+        organizationProviderCeiling: ['anthropic'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5']
+    );
+
+    expect(denied).toEqual(['openai/gpt-5']);
+    expect(getOrganizationByokProviderIds).not.toHaveBeenCalled();
+  });
+
+  it('admits a catalog model only when the provider allow-list names its key provider', async () => {
+    jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
+
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationProviderCeiling: ['anthropic', 'z-ai'],
+      }),
+      ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2']
+    );
+
+    expect(denied).toEqual(['moonshotai/kimi-k2.6']);
+  });
+
+  it('admits a catalog model whose key provider a selected grant names', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: [],
+          providerAllowList: ['z-ai'],
+        },
+      }),
+      ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2']
+    );
+
+    expect(denied).toEqual(['moonshotai/kimi-k2.6']);
+    expect(hasInferenceProviderUserByokForModel).not.toHaveBeenCalled();
   });
 });
 

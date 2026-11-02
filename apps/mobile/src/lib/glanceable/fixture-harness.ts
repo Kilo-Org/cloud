@@ -8,7 +8,7 @@ import {
   buildSessionLiveActivityContentState,
   type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import { Platform } from 'react-native';
 
 import {

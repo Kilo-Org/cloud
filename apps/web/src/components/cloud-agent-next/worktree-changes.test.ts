@@ -9,10 +9,12 @@ import {
   createWorktreeChangesRefresher,
   deserializeWorktreeChangesViewMode,
   formatWorktreeChangesBaseBranch,
+  getWorktreeChangesFileKey,
   getWorktreeChangesQueryKey,
   getWorktreeChangesTotals,
   getWorktreeFileQueryKey,
   groupWorktreeChangesByDirectory,
+  groupWorktreeChangesByScope,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -53,6 +55,17 @@ function messages(overrides: Partial<Parameters<typeof worktreeChangesMessages>[
 }
 
 describe('getWorktreeChangesTotals', () => {
+  it('counts a file in both comparisons once', () => {
+    expect(
+      getWorktreeChangesTotals({
+        ...snapshot,
+        files: [
+          { ...snapshot.files[0], scope: 'uncommitted' },
+          { ...snapshot.files[0], scope: 'against-base-branch' },
+        ],
+      })
+    ).toEqual({ fileCount: 1, additions: 4, deletions: 2, countsComplete: true });
+  });
   it.each([null, undefined])('returns null for an unavailable snapshot: %p', missing => {
     expect(getWorktreeChangesTotals(missing)).toBeNull();
   });
@@ -184,6 +197,44 @@ describe('getWorktreeChangesTotals', () => {
   });
 });
 
+describe('scoped changes sections', () => {
+  const uncommitted: WorktreeChangesFile = { ...snapshot.files[0], scope: 'uncommitted' };
+  const committed: WorktreeChangesFile = { ...snapshot.files[0], scope: 'against-base-branch' };
+
+  it('orders uncommitted before against base branch and retains the same path in both', () => {
+    expect(groupWorktreeChangesByScope([committed, uncommitted])).toEqual([
+      { label: 'Uncommitted', scope: 'uncommitted', files: [uncommitted] },
+      { label: 'Against base branch', scope: 'against-base-branch', files: [committed] },
+    ]);
+  });
+
+  it('shows both sections even when one is empty', () => {
+    expect(groupWorktreeChangesByScope([committed])[0].files).toEqual([]);
+    expect(groupWorktreeChangesByScope([])).toHaveLength(2);
+  });
+
+  it('does not mislabel legacy combined captures as either comparison', () => {
+    expect(groupWorktreeChangesByScope(snapshot.files)[2]).toEqual({
+      label: 'Saved changes',
+      scope: undefined,
+      files: snapshot.files,
+    });
+  });
+
+  it('preserves selection by comparison and prefers uncommitted on removal', () => {
+    const committedKey = getWorktreeChangesFileKey(committed);
+    expect(resolveWorktreeChangesSelection(committedKey, [committed, uncommitted])).toBe(
+      committedKey
+    );
+    expect(resolveWorktreeChangesSelection(committedKey, [uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
+    expect(resolveWorktreeChangesSelection(null, [committed, uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
+  });
+});
+
 describe('worktree changes capability', () => {
   it('uses the control ID rather than a Kilo or legacy session ID', () => {
     expect(canOpenWorktreeChanges('workspace_12345678-1234-4234-9234-123456789abc', false)).toBe(
@@ -204,7 +255,11 @@ describe('worktree changes capability', () => {
 
 describe('saved worktree changes cache', () => {
   let queryClient: QueryClient;
-  const scope = { cloudAgentSessionId: 'workspace-chat-a', worktreeId: 'worktree-a' };
+  const scope = {
+    userId: 'user-alice',
+    cloudAgentSessionId: 'workspace-chat-a',
+    worktreeId: 'worktree-a',
+  };
   const queryKey = getWorktreeChangesQueryKey(scope);
 
   beforeEach(() => {
@@ -304,13 +359,50 @@ describe('saved worktree changes cache', () => {
   });
 
   it('falls back to isolated sessions without colliding with a worktree of the same name', () => {
-    const sessionKey = getWorktreeChangesQueryKey({ cloudAgentSessionId: 'worktree-a' });
+    const sessionKey = getWorktreeChangesQueryKey({
+      userId: scope.userId,
+      cloudAgentSessionId: 'worktree-a',
+    });
     queryClient.setQueryData(queryKey, { snapshot });
     expect(queryClient.getQueryData(sessionKey)).toBeUndefined();
     queryClient.setQueryData(sessionKey, { snapshot });
     expect(
       queryClient.getQueryData(
-        getWorktreeChangesQueryKey({ cloudAgentSessionId: 'workspace-chat-b' })
+        getWorktreeChangesQueryKey({
+          userId: scope.userId,
+          cloudAgentSessionId: 'workspace-chat-b',
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('serves nothing to another user for the same session, worktree and organization', () => {
+    queryClient.setQueryData(queryKey, { snapshot });
+    const aliceFileKey = getWorktreeFileQueryKey({
+      ...scope,
+      path: 'src/file.ts',
+      expectedRevision: snapshot.revision,
+    });
+    queryClient.setQueryDefaults(aliceFileKey, { structuralSharing: true });
+    queryClient.setQueryData(aliceFileKey, { revision: snapshot.revision, text: 'saved file' });
+    for (const other of [
+      { ...scope, userId: 'user-bob' },
+      { ...scope, userId: 'user-bob', organizationId: 'organization-a' },
+    ]) {
+      expect(queryClient.getQueryData(getWorktreeChangesQueryKey(other))).toBeUndefined();
+    }
+    expect(queryClient.getQueryData(aliceFileKey)).toEqual({
+      revision: snapshot.revision,
+      text: 'saved file',
+    });
+    expect(
+      queryClient.getQueryData(
+        getWorktreeFileQueryKey({
+          ...scope,
+          userId: 'user-bob',
+          path: 'src/file.ts',
+          expectedRevision: snapshot.revision,
+        })
       )
     ).toBeUndefined();
   });
@@ -329,6 +421,7 @@ describe('saved worktree changes cache', () => {
     for (const overrides of [
       { worktreeId: 'worktree-b' },
       { organizationId: 'organization-a' },
+      { userId: 'user-bob' },
       { path: 'src/other.ts' },
       { expectedRevision: 4 },
       { worktreeId: undefined },
@@ -341,7 +434,7 @@ describe('saved worktree changes cache', () => {
 });
 
 describe('worktree changes refresh coordination', () => {
-  const queryKey = ['worktree-changes', 'personal', 'workspace-a'];
+  const queryKey = ['worktree-changes', 'user-alice', null, ['session', 'workspace-a']] as const;
   const saved = (revision: number): GetWorktreeChangesOutput => ({
     snapshot: { ...snapshot, revision },
   });
@@ -454,7 +547,11 @@ describe('worktree changes refresh coordination', () => {
 
   it('discards queued reads on disposal without touching another session cache', async () => {
     queryClient.setQueryData(queryKey, saved(3));
-    const otherKey = ['worktree-changes', 'organization-b', 'workspace-b'];
+    const otherKey = getWorktreeChangesQueryKey({
+      userId: 'user-alice',
+      cloudAgentSessionId: 'workspace-b',
+      organizationId: 'organization-b',
+    });
     queryClient.setQueryData(otherKey, saved(1));
     const first = Promise.withResolvers<GetWorktreeChangesOutput>();
     const started = Promise.withResolvers<void>();

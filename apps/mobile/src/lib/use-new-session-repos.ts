@@ -1,9 +1,10 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import {
+  bitbucketRowsUnlisted,
   dedupeRepositoriesByPlatformAndFullName,
   detectRepositoryPlatform,
   type NewSessionRepository,
@@ -21,7 +22,10 @@ import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -40,6 +44,13 @@ type UseNewSessionReposResult = {
   /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. A control that opens
+   * the flow stays busy from the tap until the flow ends, because the first step
+   * is a network round trip (GitHub's install-state mint) that otherwise leaves
+   * the tap looking inert.
+   */
+  connectingProvider: RepositoryPlatform | null;
   refreshReposForceFresh: () => Promise<void>;
 };
 
@@ -211,10 +222,11 @@ export function useNewSessionRepos({
     integrationInstalled: gitlabQuery.data?.integrationInstalled,
     repositoryCount: gitlabRepositories.length,
   });
+  const bitbucketStatusRaw = bitbucketQuery.data?.status;
   const bitbucketStatus = resolveBitbucketStatus({
     isLoading: bitbucketQuery.isLoading,
     isError: bitbucketQuery.isError,
-    status: bitbucketQuery.data?.status,
+    status: bitbucketStatusRaw,
     repositoryCount: bitbucketRepositories.length,
   });
 
@@ -233,6 +245,7 @@ export function useNewSessionRepos({
           key: 'bitbucket',
           status: bitbucketStatus,
           repositories: bitbucketRepositories,
+          rowsUnlisted: bitbucketRowsUnlisted(bitbucketStatusRaw),
         },
         recents: recentlyUsed,
       }),
@@ -244,6 +257,7 @@ export function useNewSessionRepos({
       gitlabStatus,
       gitlabRepositories,
       bitbucketStatus,
+      bitbucketStatusRaw,
       bitbucketRepositories,
       recentlyUsed,
     ]
@@ -323,44 +337,73 @@ export function useNewSessionRepos({
   }, [refreshGitHubForceFresh, forceFreshGitLab, forceFreshBitbucket]);
 
   // ── Per-provider connect ──────────────────────────────────────────
-  const openGitLabIntegration = useCallback(() => {
-    void (async () => {
-      try {
-        await openAuthorizationAndWaitForReturn(
-          getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
-        );
-        await forceFreshGitLab();
-      } catch {
-        toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
-      }
-    })();
+  /**
+   * The provider whose connect flow is running, or null. The flow's first step
+   * (GitHub mints an install state over the network; all three then open the
+   * browser and refetch on return) takes long enough that a control without this
+   * flag reads as inert: nothing happens until the network settles.
+   */
+  const [connectingProvider, setConnectingProvider] = useState<RepositoryPlatform | null>(null);
+  // Mirrors the state so a second tap inside the same frame — before the
+  // disabled button re-renders — still cannot start a second flow.
+  const connectingProviderRef = useRef<RepositoryPlatform | null>(null);
+
+  const openGitLabIntegration = useCallback(async () => {
+    try {
+      const wait = await openAuthorizationAndWaitForReturn(
+        getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
+      );
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+        },
+      });
+      await forceFreshGitLab();
+    } catch {
+      toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+    }
   }, [organizationId, forceFreshGitLab]);
 
-  const openBitbucketIntegration = useCallback(() => {
+  const openBitbucketIntegration = useCallback(async () => {
     if (!organizationId) {
       return;
     }
-    void (async () => {
-      try {
-        await openAuthorizationAndWaitForReturn(
-          getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
-        );
-        await forceFreshBitbucket();
-      } catch {
-        toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-      }
-    })();
+    try {
+      const wait = await openAuthorizationAndWaitForReturn(
+        getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
+      );
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
+        },
+      });
+      await forceFreshBitbucket();
+    } catch {
+      toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
+    }
   }, [organizationId, forceFreshBitbucket]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
-      if (platform === 'github') {
-        openGitHubIntegration();
-      } else if (platform === 'gitlab') {
-        openGitLabIntegration();
-      } else {
-        openBitbucketIntegration();
+      if (connectingProviderRef.current !== null) {
+        return;
       }
+      connectingProviderRef.current = platform;
+      setConnectingProvider(platform);
+      void (async () => {
+        try {
+          if (platform === 'github') {
+            await openGitHubIntegration();
+          } else if (platform === 'gitlab') {
+            await openGitLabIntegration();
+          } else {
+            await openBitbucketIntegration();
+          }
+        } finally {
+          connectingProviderRef.current = null;
+          setConnectingProvider(null);
+        }
+      })();
     },
     [openGitHubIntegration, openGitLabIntegration, openBitbucketIntegration]
   );
@@ -388,6 +431,7 @@ export function useNewSessionRepos({
     isRetrying,
     reposSettled,
     openIntegration,
+    connectingProvider,
     refreshReposForceFresh,
   };
 }

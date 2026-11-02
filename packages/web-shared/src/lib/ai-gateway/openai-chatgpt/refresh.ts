@@ -28,8 +28,8 @@ import type { OpenAiChatGptConnection } from './types';
  * connection. The stored access token is returned unchanged while it has more
  * than `REFRESH_WINDOW_SECONDS` left; otherwise the refresh request runs under
  * a row lock that is held for that one request, so one refresh happens per
- * connection even across concurrent instances, and neither a retry nor its
- * backoff sleep keeps the lock or a pool connection open.
+ * connection even across concurrent instances, and neither a retry, its backoff
+ * sleep, nor a stalled token endpoint keeps the lock or a pool connection open.
  *
  * Nothing here ever logs, returns or embeds a token or the client secret in an
  * exception message: only the OAuth error code and the user id are logged.
@@ -50,6 +50,15 @@ export const OPENAI_CHATGPT_REFRESH_INITIAL_BACKOFF_MS = 250;
  * budget instead of sleeping for however long the header names.
  */
 export const OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS = 10_000;
+
+/**
+ * Bound on one token request. The request runs inside the transaction that holds
+ * the connection row lock, so a stalled token endpoint must give the row, the
+ * pool connection and any sibling instance waiting on it back promptly. A normal
+ * exchange answers in well under a second; three attempts with their backoff
+ * stay inside the gateway request budget.
+ */
+export const OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS = 5_000;
 
 /** Shown when the connection can no longer be refreshed and must be reconnected. */
 export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
@@ -72,6 +81,9 @@ const TERMINAL_REFRESH_ERROR_CODES: Record<string, true> = {
 
 /** A conflict is a lost race against a sibling refresh; retrying can win. */
 const RETRYABLE_REFRESH_ERROR_CODE = 'refresh_token_conflict';
+
+/** The code logged, and never the credential, when the request budget runs out. */
+const REFRESH_REQUEST_TIMEOUT_ERROR_CODE = 'request_timeout';
 
 /**
  * The outcome of resolving a usable delegated access token. `terminal` is
@@ -131,8 +143,12 @@ function refreshRequestHeaders(): string {
  * Posts the refresh grant. `resource` repeats the exact value used in the
  * original authorization request; omitting it returns a token scoped to
  * nothing, which would silently break every OpenAI call.
+ *
+ * `signal` bounds the whole exchange, response body included: the request runs
+ * while the transaction holds the connection row lock, so it may not outlive its
+ * budget.
  */
-async function postRefreshRequest(refreshToken: string): Promise<Response> {
+async function postRefreshRequest(refreshToken: string, signal: AbortSignal): Promise<Response> {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
@@ -147,6 +163,7 @@ async function postRefreshRequest(refreshToken: string): Promise<Response> {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: body.toString(),
+    signal,
   });
 }
 
@@ -253,8 +270,8 @@ function isRetryableRefreshFailure(response: Response, errorCode: string | undef
  * persists the rotated pair on success, before the lock is released. A retryable
  * failure returns `retry`: the caller then releases the lock, backs off outside
  * it, and re-reads the row on the next attempt. Holding the lock for exactly one
- * request keeps a backed-off refresh from blocking a sibling instance or a
- * connection-pool slot across the wait.
+ * bounded request keeps a backed-off refresh, or a stalled token endpoint, from
+ * blocking a sibling instance or a connection-pool slot.
  */
 async function attemptRefresh(
   tx: OpenAiChatGptDatabase,
@@ -268,8 +285,21 @@ async function attemptRefresh(
     return { kind: 'terminal' };
   }
 
-  const response = await postRefreshRequest(refreshToken);
-  const body = await readResponseBody(response);
+  const signal = AbortSignal.timeout(OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  let body: unknown;
+  try {
+    response = await postRefreshRequest(refreshToken, signal);
+    body = await readResponseBody(response);
+  } catch (error) {
+    // The budget running out is transient, exactly like a 429 or a 5xx: report a
+    // retry so this transaction ends now and the caller's backoff, outside the
+    // lock, decides whether another attempt is worth it. Any other thrown error
+    // keeps its existing one-shot failure path.
+    if (!signal.aborted) throw error;
+    logRefreshFailure(owner, REFRESH_REQUEST_TIMEOUT_ERROR_CODE);
+    return { kind: 'retry' };
+  }
 
   if (response.ok) {
     const accessToken = readStringField(body, 'access_token');
@@ -300,6 +330,13 @@ async function attemptRefresh(
 
       return { kind: 'access_token', accessToken };
     }
+  }
+
+  // The budget can also run out while the body is still arriving; the read then
+  // yields nothing, which must be a stall rather than an OAuth answer to act on.
+  if (signal.aborted) {
+    logRefreshFailure(owner, REFRESH_REQUEST_TIMEOUT_ERROR_CODE);
+    return { kind: 'retry' };
   }
 
   const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;

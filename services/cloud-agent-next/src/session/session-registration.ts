@@ -188,15 +188,14 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider' | 'sandboxKind'>
 ): void {
-  if (input.runtime?.egressMode !== 'allowlist') return;
+  if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
   if (
     allocation.sandboxProvider !== 'cloudflare-containers' ||
     allocation.sandboxKind === 'shared'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message:
-        'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
+      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
     });
   }
 }
@@ -662,6 +661,57 @@ function effectiveSessionRegistrationInput(
     ...input,
     finalization: { ...input.finalization, autoCommit: false },
   };
+}
+
+// Discovery hints must not fail an authorized create; ledger retries repair missed writes.
+async function recordParentChildSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  child: {
+    cloudAgentSessionId: string;
+    initialMessageId?: string;
+    worktreeId?: string;
+  }
+): Promise<void> {
+  const parentSessionId = input.parentCloudAgentSessionId;
+  if (parentSessionId === undefined) return;
+  try {
+    await withDORetry(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+      stub =>
+        stub.recordCloudAgentChildSession({
+          cloudAgentSessionId: child.cloudAgentSessionId,
+          ...(child.initialMessageId === undefined
+            ? {}
+            : { initialMessageId: child.initialMessageId }),
+          ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
+        }),
+      'recordCloudAgentChildSession'
+    );
+  } catch (error) {
+    logger
+      .withFields({
+        parentCloudAgentSessionId: parentSessionId,
+        cloudAgentSessionId: child.cloudAgentSessionId,
+        ...(child.initialMessageId === undefined
+          ? {}
+          : { initialMessageId: child.initialMessageId }),
+        ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .warn('Failed to record Cloud Agent child session registry hint');
+  }
+}
+
+function recordedChildWorktreeId(
+  row: OperationLedgerRow,
+  cloudAgentSessionId: string
+): CloudAgentWorktreeId | undefined {
+  if (row.canonical_result?.[SESSION_CREATE_WORKTREE_ENABLED_KEY] !== true) return undefined;
+  const parsed = cloudAgentWorktreeIdSchema.safeParse(
+    `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
+  );
+  return parsed.success ? parsed.data : undefined;
 }
 
 async function issueSessionRuntimeAuthorization(
@@ -1266,6 +1316,9 @@ function buildSessionRegistrationCommand(
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
       ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
+      ...(input.runtime?.egressAudit === undefined
+        ? {}
+        : { egressAudit: input.runtime.egressAudit }),
       ...(input.runtime?.egressMode === 'allowlist'
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
@@ -1372,6 +1425,13 @@ export async function registerNewSession(
     });
   }
 
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    ...(allocation.initialTurn === undefined
+      ? {}
+      : { initialMessageId: allocation.initialTurn.messageId }),
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
   logger.info('Session registered for lazy preparation');
   return allocation;
 }
@@ -1495,6 +1555,12 @@ async function registerAndAdmitInitialTurn(
     throwAdmissionError(admission);
   }
 
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    initialMessageId: admission.messageId,
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
+
   logger.info('Session registered with initial message admitted');
   const result: StartedSessionResult = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -1604,6 +1670,14 @@ async function registerAllocatedSession(
   // `rebuildRecordedSessionAllocation`, so the DO belongs to the same ledger row. Keep that
   // property if either entry changes; otherwise an unrelated conflict would be
   // swallowed as success here.
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    ...(allocation.initialTurn === undefined
+      ? {}
+      : { initialMessageId: allocation.initialTurn.messageId }),
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
+  });
+
   logger.info('Session registered for lazy preparation');
   const result = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -1834,7 +1908,9 @@ export async function sessionCreateIntentFingerprint(
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'allowlist'
+        input.runtime?.sandboxAllocation ||
+        input.runtime?.egressMode === 'allowlist' ||
+        input.runtime?.egressAudit === true
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -1847,6 +1923,7 @@ export async function sessionCreateIntentFingerprint(
                     ),
                   }
                 : {}),
+              ...(input.runtime.egressAudit === true ? { egressAudit: true } : {}),
             }
           : undefined,
       options: input.options
@@ -1898,7 +1975,9 @@ async function assertCreateIntentUnchanged(
     // saved choice is resolved after admission and is not part of the fingerprint.
     (!options?.freshAdmission &&
       !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)) ||
-    ((selectable !== undefined || input.runtime?.egressMode === 'allowlist') &&
+    ((selectable !== undefined ||
+      input.runtime?.egressMode === 'allowlist' ||
+      input.runtime?.egressAudit === true) &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -2008,6 +2087,11 @@ export async function createSessionWithLedger(
         : {}),
     },
   });
+  // A row admitted in another organization scope belongs to a different
+  // operation, so it is refused before any stored state is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
   assertSessionOperationIdentity(admission.row, {
     userId: ctx.userId,
     intent: 'create_cloud',
@@ -2068,9 +2152,16 @@ async function replaySettledCreate(
     // so the client clears the key.
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
+  const initialMessage = canonicalInitialMessage(row);
+  const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
+  await recordParentChildSession(input, ctx, {
+    cloudAgentSessionId: ids.cloudAgentSessionId,
+    ...(initialMessage === undefined ? {} : { initialMessageId: initialMessage.messageId }),
+    ...(worktreeId === undefined ? {} : { worktreeId }),
+  });
   return {
     ...ids,
-    ...(options?.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
+    ...(options?.includeInitialMessage ? (initialMessage ?? {}) : {}),
     replayed: true,
   };
 }
@@ -2472,6 +2563,7 @@ async function readSessionMetadata(
     metadata !== null &&
     ((metadata.workspace?.egressMode ?? 'unrestricted') !==
       (input.runtime?.egressMode ?? 'unrestricted') ||
+      (metadata.workspace?.egressAudit ?? false) !== (input.runtime?.egressAudit ?? false) ||
       JSON.stringify(metadata.workspace?.egressAllowlist ?? []) !==
         JSON.stringify(egressAllowlistSchema.parse(input.runtime?.egressAllowlist ?? [])))
   ) {
@@ -2602,6 +2694,7 @@ async function reconcileLedgerCreate(
 
   const confirm = () =>
     confirmInitialMessageAdmitted({
+      input,
       ctx,
       db,
       row,
@@ -2662,6 +2755,11 @@ async function reconcileLedgerCreate(
         inOrganization: input.options?.kilocodeOrganizationId != null,
       }),
     });
+    const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
+    await recordParentChildSession(input, ctx, {
+      cloudAgentSessionId: ids.cloudAgentSessionId,
+      ...(worktreeId === undefined ? {} : { worktreeId }),
+    });
     return {
       ...ids,
       ...(options.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),
@@ -2672,6 +2770,7 @@ async function reconcileLedgerCreate(
 }
 
 async function confirmInitialMessageAdmitted(args: {
+  input: SessionRegistrationInput;
   ctx: SessionRegistrationContext;
   db: WorkerDb;
   row: OperationLedgerRow;
@@ -2727,6 +2826,12 @@ async function confirmInitialMessageAdmitted(args: {
   if (failed) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
+  const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
+  await recordParentChildSession(args.input, ctx, {
+    cloudAgentSessionId: ids.cloudAgentSessionId,
+    initialMessageId,
+    ...(worktreeId === undefined ? {} : { worktreeId }),
+  });
   return {
     ...ids,
     ...(args.includeInitialMessage ? (canonicalInitialMessage(row) ?? {}) : {}),

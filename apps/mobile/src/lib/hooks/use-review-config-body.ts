@@ -20,6 +20,34 @@ export type ReviewConfigBody = {
   retry: () => void;
 };
 
+/** The retryable error surface a config read's failure needs. */
+export type ReviewConfigFailure = {
+  variant: 'server' | 'offline';
+  onRetry: () => void;
+  isRetrying: boolean;
+};
+
+/**
+ * The error surface for a config read, or null while the body is drawable.
+ *
+ * `error` retries the failed read; `exhausted` is a read that stayed pending
+ * with nothing in flight even after its one automatic restart, so the action
+ * re-arms that restart cycle. A screen's own body switch reads this once and
+ * paints a single error shape instead of classifying the read again.
+ */
+export function reviewConfigFailure(
+  { body, exhausted, retry }: ReviewConfigBody,
+  isRetrying: boolean
+): ReviewConfigFailure | null {
+  if (body.status === 'error') {
+    return { variant: body.variant, onRetry: body.refetch, isRetrying };
+  }
+  if (exhausted) {
+    return { variant: 'server', onRetry: retry, isRetrying };
+  }
+  return null;
+}
+
 /**
  * The reviewer config read's body surface, with the app's probe-backed
  * connectivity and the restart of a read that nothing is fetching.

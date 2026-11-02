@@ -1,5 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -57,7 +58,7 @@ export function ChatRow({
   const preview = chat.preview.trim() === chat.title.trim() ? '' : chat.preview;
 
   function confirmDelete() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    notificationHaptic(Haptics.NotificationFeedbackType.Warning);
     confirm({
       title: t('modelChat.list.deleteTitle'),
       message: title,
@@ -69,7 +70,7 @@ export function ChatRow({
   }
 
   function openActions() {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     showActionSheetWithOptions(
       {
         ...themedSheet,

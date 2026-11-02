@@ -59,6 +59,9 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
+// The shared scope guard renders the route's invalid state, whose icon set
+// pulls the native icon module the mounted project cannot load.
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/finding-filter-modal', () => ({
   FindingFilterModal: 'FindingFilterModal',

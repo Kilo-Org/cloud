@@ -4,7 +4,12 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
+  type ModelRestrictions,
 } from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -21,6 +26,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { TRPCError } from '@trpc/server';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 export {
   getOrganizationAutoRoute,
   hasOrganizationAutoRoute,
@@ -87,6 +98,55 @@ export function getOrganizationAutoSettings(
   organization: Organization
 ): OrganizationAutoModelSettings | undefined {
   return organization.settings.org_auto_model;
+}
+
+/** The organization's default model access policy, using the organization settings being validated. */
+async function resolveDefaultModelPolicy(
+  organization: OrganizationAutoPolicyOrganization,
+  dbClient: typeof readDb | DrizzleTransaction
+): Promise<EffectiveOrganizationModelPolicy> {
+  const context = await getOrganizationGroupPolicyContext({
+    organizationId: organization.id,
+    subject: { type: 'defaultAccess' },
+    ...('rollback' in dbClient ? { tx: dbClient } : { fromDb: dbClient }),
+  });
+  return evaluateEffectiveModelAccessPolicy({
+    ...context,
+    organization: {
+      ...context.organization,
+      plan: organization.plan,
+      settings: organization.settings,
+    },
+  });
+}
+
+/**
+ * Like requests and the organization model list, the provider allow-list does not exclude a model
+ * that the default model access policy explicitly grants, that a catalog-mode direct BYOK key
+ * serves when the policy admits the key's provider (see `getAllowedDirectByokCatalogModelIds`), or
+ * that a provider key exempt from the allow-list serves (see `allowsInferenceProviderUserByok`).
+ */
+async function isAllowedAutoTarget(
+  organization: OrganizationAutoPolicyOrganization,
+  restrictions: ModelRestrictions,
+  modelId: string,
+  dbClient: typeof readDb | DrizzleTransaction
+): Promise<boolean> {
+  if (await createAllowPredicateFromRestrictions(restrictions)(modelId)) return true;
+  if (!restrictions.providerAllowList) return false;
+  const policy = await resolveDefaultModelPolicy(organization, dbClient);
+  if ((await getEffectiveModelDecision(policy, modelId)).allowed) return true;
+  if ((await getAllowedDirectByokCatalogModelIds(organization.id, policy)).has(modelId))
+    return true;
+  const isAllowedWithoutProviderAllowList = createAllowPredicateFromRestrictions({
+    ...restrictions,
+    providerAllowList: undefined,
+  });
+  return (
+    (await isAllowedWithoutProviderAllowList(modelId)) &&
+    (await modelsServedByOrganizationInferenceProviderUserByok(organization.id, [modelId])).length >
+      0
+  );
 }
 
 export type OrganizationAutoTargetValidationResult =
@@ -174,8 +234,8 @@ export async function validateOrganizationAutoTarget(
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
       };
     }
-    // A catalog-mode key serves the model only under its catalog id, which organization model
-    // policies cover, so a stored bespoke target resolves to that id.
+    // A catalog-mode key serves the model only under its catalog id, which organization model and
+    // provider policies cover, so a stored bespoke target resolves to that id.
     if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
       const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
       if (!catalogModelId) {
@@ -236,8 +296,14 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-  if (!(await isAllowed(catalogModel.id))) {
+  if (
+    !(await isAllowedAutoTarget(
+      organization,
+      restrictions,
+      catalogModel.id,
+      options.dbClient ?? readDb
+    ))
+  ) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,

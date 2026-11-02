@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_WORKTREE_CHANGES_BYTES,
   MAX_WORKTREE_CHANGES_FILES,
@@ -63,6 +63,51 @@ const savedFile = {
 } satisfies WorktreeFileRecord;
 
 describe('cloud agent worktree changes contracts', () => {
+  it('accepts the same path in separate scopes and rejects duplicate or mismatched identities', () => {
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summaries = scopes.map(scope => ({ ...file, scope }));
+    const records = scopes.map(scope => ({ ...savedFile, scope }));
+    const scopedCapture = { summary: capture(summaries), files: records };
+    expect(worktreeSnapshotCaptureSchema.parse(scopedCapture)).toEqual(scopedCapture);
+    expect(
+      worktreeChangesSnapshotSchema.parse({
+        ...snapshot,
+        files: summaries.map(file => ({ ...file, revision: snapshot.revision })),
+      }).files
+    ).toHaveLength(2);
+    expect(
+      worktreeSnapshotCaptureSchema.safeParse({
+        ...scopedCapture,
+        files: [records[0], records[0]],
+      }).success
+    ).toBe(false);
+    expect(
+      worktreeSnapshotCaptureSchema.safeParse({
+        summary: capture([summaries[0]]),
+        files: [savedFile],
+      }).success
+    ).toBe(false);
+    expect(
+      worktreeChangesCaptureSchema.safeParse(capture([summaries[0], summaries[0]])).success
+    ).toBe(false);
+    for (const scope of scopes) {
+      expect(
+        worktreeFileQuerySchema.parse({ path: file.path, scope, expectedRevision: 3 })
+      ).toEqual({
+        path: file.path,
+        scope,
+        expectedRevision: 3,
+      });
+    }
+    for (const scope of ['combined', null]) {
+      expect(worktreeChangesFileSchema.safeParse({ ...file, scope }).success).toBe(false);
+      expect(worktreeFileRecordSchema.safeParse({ ...savedFile, scope }).success).toBe(false);
+      expect(
+        worktreeFileQuerySchema.safeParse({ path: file.path, scope, expectedRevision: 3 }).success
+      ).toBe(false);
+    }
+  });
+
   it('distinguishes no saved snapshot from a successful empty capture', () => {
     expect(getWorktreeChangesOutputSchema.parse({ snapshot: null })).toEqual({ snapshot: null });
     const empty = { ...snapshot, files: [] };
@@ -150,19 +195,70 @@ describe('cloud agent worktree changes contracts', () => {
         files: legacy.files.map(entry => ({ ...entry, revision: legacy.revision })),
       },
     ]) {
-      const normalized = worktreeChangesSnapshotSchema.parse(input);
-      expect(normalized.files).toEqual(
-        input.files.slice(0, normalized.files.length).map(entry => ({
+      const withSavedRevision = (entries: typeof input.files) =>
+        entries.map(entry => ({
           ...entry,
           revision: 'revision' in entry ? entry.revision : input.revision,
-        }))
+        }));
+      const normalized = worktreeChangesSnapshotSchema.parse(input);
+      expect(normalized.files).toEqual(
+        withSavedRevision(input.files.slice(0, normalized.files.length))
       );
       expect(normalized.files.length).toBeLessThan(input.files.length);
       expect(normalized.truncated).toBe(true);
       expect(new TextEncoder().encode(JSON.stringify(normalized)).byteLength).toBeLessThanOrEqual(
         MAX_WORKTREE_CHANGES_BYTES
       );
+      expect(
+        new TextEncoder().encode(
+          JSON.stringify({
+            ...normalized,
+            files: withSavedRevision(input.files.slice(0, normalized.files.length + 1)),
+          })
+        ).byteLength
+      ).toBeGreaterThan(MAX_WORKTREE_CHANGES_BYTES);
     }
+  });
+
+  it('sizes a full near-limit manifest from per-file measurements', () => {
+    const files = Array.from({ length: MAX_WORKTREE_CHANGES_FILES }, (_, index) => ({
+      ...file,
+      revision: snapshot.revision,
+      path: `${index}/${'漢"\\\n'.repeat(25)}`,
+    }));
+    const input = { ...snapshot, files };
+    expect(new TextEncoder().encode(JSON.stringify(input)).byteLength).toBeGreaterThan(
+      MAX_WORKTREE_CHANGES_BYTES
+    );
+
+    const encode = TextEncoder.prototype.encode;
+    const stringify = JSON.stringify;
+    let encodedBytes = 0;
+    let stringified = 0;
+    const encodeSpy = vi.spyOn(TextEncoder.prototype, 'encode').mockImplementation(function (
+      this: TextEncoder,
+      into?: string
+    ) {
+      const result = encode.call(this, into);
+      encodedBytes += result.byteLength;
+      return result;
+    });
+    const stringifySpy = vi.spyOn(JSON, 'stringify').mockImplementation((value, ...rest) => {
+      stringified += 1;
+      return stringify(value, ...rest);
+    });
+    let normalized: WorktreeChangesSnapshot;
+    try {
+      normalized = worktreeChangesSnapshotSchema.parse(input);
+    } finally {
+      encodeSpy.mockRestore();
+      stringifySpy.mockRestore();
+    }
+
+    expect(normalized.files.length).toBeLessThan(files.length);
+    expect(normalized.truncated).toBe(true);
+    expect(stringified).toBeLessThanOrEqual(2 * MAX_WORKTREE_CHANGES_FILES);
+    expect(encodedBytes).toBeLessThanOrEqual(4 * MAX_WORKTREE_CHANGES_BYTES);
   });
 
   it('keeps an empty truncated manifest canonical', () => {

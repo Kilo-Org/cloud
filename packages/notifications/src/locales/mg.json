@@ -9,6 +9,7 @@
       "lowBalance": "Mila jerena ny balan-nao",
       "spendAlert": "Mila jerena ny fandaniana",
       "securityFinding": "Misy hitan'ny fiarovana mila jerena",
+      "securityUpdate": "Misy fanavaozana ny fisavana fiarovana",
       "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Misy hitan'ny fiarovana mila jerena"
+      "body": "Misy fanavaozana ny fisavana fiarovana"
     }
   },
   "instanceLifecycle": {

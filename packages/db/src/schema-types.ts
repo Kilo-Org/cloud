@@ -1286,8 +1286,8 @@ export const ENKRYPT_DETECTOR_IDS = [
 ] as const satisfies readonly EnkryptDetectorId[];
 
 /**
- * Blocking Enkrypt AI input scan of each gateway chat turn. Flagged turns are always blocked, and
- * so is every turn while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
+ * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always
+ * blocked, and so is every request while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
  * Default. `scan_tool_results` defaults to true so organizations enabled before it existed keep
  * scanning tool results.
  *
@@ -1306,6 +1306,59 @@ export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrail
 export const OrganizationEnkryptSettingsSchema = z.object({
   input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
 });
+
+export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
+export type OrganizationGuardrailType = (typeof ORGANIZATION_GUARDRAIL_TYPES)[number];
+
+/** Matches the `organization_guardrails_name_check` constraint. */
+export const MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH = 500;
+
+export const ORGANIZATION_GUARDRAIL_STATUSES = ['enabled', 'disabled'] as const;
+export type OrganizationGuardrailStatus = (typeof ORGANIZATION_GUARDRAIL_STATUSES)[number];
+
+export const ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES = ['off', 'shadow', 'enforce'] as const;
+export const OrganizationGuardrailEnforcementSchema = z.enum(
+  ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES
+);
+export type OrganizationGuardrailEnforcement = z.infer<
+  typeof OrganizationGuardrailEnforcementSchema
+>;
+
+export const OrganizationSkillGuardrailsSchema = z.object({
+  enabled: z.boolean(),
+  scan_before_use: z.boolean(),
+});
+export type OrganizationSkillGuardrails = z.infer<typeof OrganizationSkillGuardrailsSchema>;
+
+export const OrganizationGuardrailsSettingsSchema = z.object({
+  mcp: z.object({ enforcement: OrganizationGuardrailEnforcementSchema }).optional(),
+  skill: OrganizationSkillGuardrailsSchema.optional(),
+});
+
+export type OrganizationGuardrailsSettings = z.infer<typeof OrganizationGuardrailsSettingsSchema>;
+
+export type OrganizationMcpGuardrailConfig =
+  | { kind: 'remote'; url: string }
+  | {
+      kind: 'package';
+      ecosystem: 'npm' | 'pypi';
+      identifier: string;
+      min_version: string | null;
+    };
+
+export type OrganizationGuardrailConfig = OrganizationMcpGuardrailConfig;
+
+export type OrganizationGuardrailSource = {
+  registry: 'kilo_marketplace' | 'mcp_registry' | 'custom';
+  id: string | null;
+};
+
+export const ORGANIZATION_MCP_CONNECT_DECISIONS = ['allowed', 'denied'] as const;
+export type OrganizationMcpConnectDecision = (typeof ORGANIZATION_MCP_CONNECT_DECISIONS)[number];
+
+export type OrganizationMcpConnectTarget =
+  | { kind: 'remote'; url: string }
+  | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
@@ -1350,6 +1403,7 @@ const OrganizationSettingsSchema = z.object({
   // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
+  guardrails: OrganizationGuardrailsSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1549,6 +1603,9 @@ export const AuditLogAction = z.enum([
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
+  'organization.guardrail.add',
+  'organization.guardrail.update',
+  'organization.guardrail.remove',
 ]);
 
 // --- EncryptedData ---
@@ -2339,6 +2396,11 @@ export const NormalizedProvider = z.object({
       className: z.string().optional(),
     })
     .optional(),
+  /**
+   * Set on a direct BYOK provider that only serves an organization's own keys in catalog mode.
+   * Provider allow-lists can name it, but Kilo's own routes never use it.
+   */
+  byokOnly: z.literal(true).optional(),
   models: z.array(OpenRouterModel),
 });
 

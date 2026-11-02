@@ -5,6 +5,7 @@ import { ProviderCreationError } from './provider.js';
 const GIT_DOMAINS = [
   'github.com',
   'api.github.com',
+  'uploads.github.com',
   'codeload.github.com',
   'raw.githubusercontent.com',
   'objects.githubusercontent.com',

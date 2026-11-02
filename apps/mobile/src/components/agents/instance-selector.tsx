@@ -73,6 +73,11 @@ export function InstanceSelector({
   // loading or empty — only the "open the picker" path is gated.
   const canOpenPicker = !disabled;
   const label = selectorLabel({ value, isLoading, pendingComputer });
+  // A target is selected in every state but the loading copy and the unbound
+  // computer: the Cloud Agent default is a real value, not a placeholder, so it
+  // takes the same foreground ink as a bound instance. Placeholder ink would
+  // read as "nothing chosen yet" beside the account value above it.
+  const isPlaceholder = value === null && (isLoading || pendingComputer);
 
   function handlePress() {
     if (!canOpenPicker) {
@@ -103,7 +108,10 @@ export function InstanceSelector({
       )}
     >
       <Text
-        className={cn('flex-1 text-base', value ? 'text-foreground' : 'text-muted-foreground')}
+        className={cn(
+          'flex-1 text-base',
+          isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
+        )}
         numberOfLines={1}
       >
         {label}

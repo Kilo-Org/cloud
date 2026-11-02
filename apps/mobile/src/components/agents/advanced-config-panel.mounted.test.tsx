@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { SelectableText } from '@/components/ui/selectable-text';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -131,11 +132,15 @@ function listState(overrides: Partial<ListState> = {}): ListState {
 function ControlledPanel({
   organizationId,
   initialSelectedProfileId,
+  initialCommands = [],
+  disabled = false,
   onSelectProfile,
   onRequestReveal,
 }: {
   organizationId?: string;
   initialSelectedProfileId?: string | null;
+  initialCommands?: string[];
+  disabled?: boolean;
   onSelectProfile?: (id: string | null) => void;
   onRequestReveal?: (contentOffset: number) => void;
 }) {
@@ -145,9 +150,10 @@ function ControlledPanel({
   // The panel's manual env vars/commands are the session's state now, so the
   // harness owns them the way the new-session body does.
   const [manualVars, setManualVars] = useState<VariableEdit[]>([]);
-  const [manualCommands, setManualCommands] = useState<string[]>([]);
+  const [manualCommands, setManualCommands] = useState<string[]>(initialCommands);
   return createElement(AdvancedConfigPanel, {
     organizationId,
+    disabled,
     selectedProfileId,
     onSelectProfile: id => {
       onSelectProfile?.(id);
@@ -167,6 +173,8 @@ function mount(
     mocks?: Mutations;
     organizationId?: string;
     selectedProfileId?: string | null;
+    initialCommands?: string[];
+    disabled?: boolean;
     onSelectProfile?: (id: string | null) => void;
     onRequestReveal?: (contentOffset: number) => void;
   } = {}
@@ -178,6 +186,8 @@ function mount(
     ref.current = TestRenderer.create(
       createElement(ControlledPanel, {
         organizationId: options.organizationId,
+        disabled: options.disabled,
+        initialCommands: options.initialCommands,
         initialSelectedProfileId: options.selectedProfileId,
         onSelectProfile: options.onSelectProfile,
         onRequestReveal: options.onRequestReveal,
@@ -525,6 +535,21 @@ describe('AdvancedConfigPanel', () => {
     // A 21st row is refused even if the disabled control is pressed.
     press(buttonByText(renderer, 'Add command'));
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
+  });
+
+  it('keeps a busy command row a dimmed field instead of read-only text', () => {
+    const renderer = mount({ disabled: true, initialCommands: ['pnpm install'] });
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    const row = field(renderer, 'Command 1');
+    expect(row.props.disabled).toBe(true);
+    expect(row.props.defaultValue).toBe('pnpm install');
+
+    // A busy row is still the same field, so starting a session never reflows
+    // the editor into a read-only value.
+    expect(renderer.root.findAllByType(SelectableText)).toHaveLength(0);
+
+    renderer.unmount();
   });
 
   it('counts the characters left on a setup command and names the bound', () => {

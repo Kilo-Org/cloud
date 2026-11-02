@@ -224,6 +224,11 @@ describe('PrReviewOverview first body frame', () => {
     const { queryClient, unmount } = await renderWithProviders(
       createElement(PrReviewOverview, props)
     );
+    // This case settles the checks read itself, so it also runs alone: the
+    // other case releases the same read, and resolving twice is a no-op.
+    act(() => {
+      reads.releaseChecks();
+    });
     await waitFor(() => rendered.names.includes('merge'));
     const paintedFrames = bodyFrames().length;
 

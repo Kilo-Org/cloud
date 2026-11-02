@@ -225,7 +225,7 @@ function writeSessionBytes(session: FixtureSession): void {
  * an index for files that are not there), then the domain and the root signal
  * the extension needs to re-enumerate.
  */
-export function seedArtifactMirrorFixture(): void {
+function seedArtifactMirrorFixture(): void {
   for (const session of FIXTURE_SESSIONS) {
     writeSessionBytes(session);
   }
@@ -236,7 +236,7 @@ export function seedArtifactMirrorFixture(): void {
 }
 
 /** Drop the fixture mirror so the location goes back to empty. */
-export function releaseArtifactMirrorFixture(): void {
+function releaseArtifactMirrorFixture(): void {
   clearArtifactMirror();
   notifyArtifactsChanged();
   log('released');

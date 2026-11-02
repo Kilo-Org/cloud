@@ -23,20 +23,26 @@ function ineligible(reason: string): LauncherParseResult {
 
 const NPM_RELEASE = /^v*(?:\d+|[xX*])(?:\.(?:\d+|[xX*])){0,2}$/;
 const NPM_THREE_PART_RELEASE = /^v*(?:\d+|[xX*])\.(?:\d+|[xX*])\.(?:\d+|[xX*])$/;
+const NPM_FULL_VERSION = /^v*\d+\.\d+\.\d+$/;
 const NPM_RELEASE_TAIL =
   /^(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
-// npm reads a version-shaped wildcard, such as `1.x`, `1.2.x`, `v1.x` or `x`, as a range over
-// versions and refuses to use one as a dist-tag name. A wildcard anywhere else, as in `release.x`,
-// leaves an ordinary tag, so only the version-shaped form is a range here. semver takes a
-// prerelease or build tail only after a full three-part release, so `1.2.x+build` is a range while
-// `1.x+build` and `release.x+build` are tags.
+// npm reads a release such as `1`, `1.2`, `x`, `1.x` or `1.x.0` as a range over versions and
+// refuses to use one as a dist-tag name; only a full three-part version names one release. A
+// wildcard anywhere else, as in `release.x`, leaves an ordinary tag, so the release has to be
+// version-shaped here. semver takes a prerelease or build tail only after a full three-part
+// release, so `1.2.x+build` is a range while `1.x+build` and `release.x+build` are tags.
 function isNpmRange(suffix: string): boolean {
   const separator = suffix.search(/[-+]/);
   const release = separator === -1 ? suffix : suffix.slice(0, separator);
-  if (!NPM_RELEASE.test(release) || !/[xX*]/.test(release)) return false;
-  if (separator === -1) return true;
-  return NPM_THREE_PART_RELEASE.test(release) && NPM_RELEASE_TAIL.test(suffix.slice(separator));
+  if (!NPM_RELEASE.test(release)) return false;
+  if (
+    separator !== -1 &&
+    !(NPM_THREE_PART_RELEASE.test(release) && NPM_RELEASE_TAIL.test(suffix.slice(separator)))
+  ) {
+    return false;
+  }
+  return /[xX*]/.test(release) || !NPM_FULL_VERSION.test(release);
 }
 
 function parseNpmSpec(spec: string): LauncherParseResult {

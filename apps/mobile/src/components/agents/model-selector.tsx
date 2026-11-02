@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
-import { CHIP_BOX_CLASS, CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -214,10 +214,7 @@ export function ModelSelector({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
-      className={cn(
-        CHIP_BOX_CLASS,
-        'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70'
-      )}
+      className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
         <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>

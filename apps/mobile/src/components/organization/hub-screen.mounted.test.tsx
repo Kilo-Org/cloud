@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One suite covers the hub's rename control, its settings availability, and the billing card's loading states, all against the same mocked data layer. */
 // The organization hub's rename control is icon-only. Before this slice it
 // rendered a bare `<Pencil size={16} />`, so its accessibility node was the
 // 16dp glyph and the audit read it below the 28dp floor. This suite pins the
@@ -29,9 +30,10 @@ const boundary = vi.hoisted(() => ({
   seatCount: { used: 1, total: 1 },
 }));
 const routerPush = vi.hoisted(() => vi.fn());
+const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
-    | { parent_organization_id: null; settings: { minimum_balance?: number } }
+    | { parent_organization_id: string | null; settings: { minimum_balance?: number } }
     | undefined,
   isLoading: false,
   isError: false,
@@ -63,7 +65,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
-  useOrgKiloPassSummary: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
+    kiloPassQuery.enabled.push(enabled);
+    return { data: undefined, isError: false, refetch: vi.fn() };
+  },
 }));
 
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
@@ -205,6 +210,7 @@ beforeEach(() => {
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
   routerPush.mockClear();
+  kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
   membersQuery.isPaused = false;
@@ -364,10 +370,11 @@ describe('Organization hub billing card while its data loads', () => {
   }
 
   it('keeps every row from the first frame and reserves the subtitle line', async () => {
-    const settled = await renderHub();
-    expect(bellRow(settled.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
-    expect(bellRow(settled.renderer)?.props.subtitlePlaceholder).toBeUndefined();
-    settled.unmount();
+    const hub = await renderHub();
+    expect(bellRow(hub.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
+    expect(bellRow(hub.renderer)?.props.subtitlePlaceholder).toBeUndefined();
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    hub.unmount();
 
     membersQuery.data = undefined;
     const loading = await renderHub();
@@ -383,11 +390,23 @@ describe('Organization hub billing card while its data loads', () => {
     boundary.parentOrganizationId = undefined;
     const upgraded = await renderHub();
     expect(upgraded.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
     upgraded.unmount();
 
+    // Either payload saying "child" removes the row and keeps the parent-only
+    // summary query off.
     boundary.parentOrganizationId = 'org-parent';
+    membersQuery.data = { parent_organization_id: null, settings: {} };
     const child = await renderHub();
     expect(child.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
     child.unmount();
+
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const cachedChild = await renderHub();
+    expect(cachedChild.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    cachedChild.unmount();
   });
 });

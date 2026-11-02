@@ -75,20 +75,22 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // knows from its first frame whether this org has a Kilo Pass row instead of
   // adding one a request later and pushing the rows under it down. A device
   // that persisted the list before that field existed hydrates an entry
-  // without it; that is "unknown", not "child", so the row renders in its
-  // loading state rather than appearing when the refreshed list lands.
-  const parentOrganizationId = org?.parentOrganizationId;
-  // `null` is a top-level organization and a missing field is a list payload
-  // persisted before this field existed; both keep the row. Only a child
-  // organization, which carries its parent's id, has no Kilo Pass row.
-  const isChildOrganization = (parentOrganizationId ?? null) !== null;
+  // without it, so the membership payload is the fallback for that case and
+  // for anything else that does not know the link yet.
+  const listParentLink = org?.parentOrganizationId;
+  const parentLink =
+    listParentLink === undefined ? orgWithMembers.data?.parent_organization_id : listParentLink;
+  // An unknown link keeps the row: it renders in its loading state instead of
+  // appearing once a payload lands. Both payloads describe the same
+  // organization, so either one saying "child" removes it.
+  const isChildOrganization = parentLink != null;
   const showKiloPassRow = isMoneyRole(role) && !isChildOrganization;
   // The summary API is parent-only (`organizationParentBillingProcedure`
-  // rejects child orgs and non-billing roles), so it fires only once the link
+  // rejects child orgs and non-billing roles), so it fires only once a payload
   // confirms a top-level organization.
   const kiloPassSummary = useOrgKiloPassSummary(
     organizationId,
-    isMoneyRole(role) && parentOrganizationId === null
+    isMoneyRole(role) && parentLink === null
   );
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);

@@ -85,8 +85,9 @@ test('landscape expects the base height as width', () => {
 
 test('every right-to-left language the app ships is classified as right-to-left', () => {
   // `RTL_LANGUAGES` in apps/mobile/src/i18n/languages.ts: a language missing from
-  // this tool's list captures the rtl cell unmirrored and, when the app is already
-  // set to it, fails every left-to-right cell with env-mismatch.
+  // this tool's list loses the left-to-right fallback when the app is already set
+  // to it (every left-to-right cell then reports env-mismatch), and `scan
+  // --source uiautomator` labels its screenshots left-to-right.
   for (const language of ['ar', 'he', 'fa', 'ur', 'ckb', 'ps']) {
     assert.equal(isRtlLanguage(language), true, language);
   }

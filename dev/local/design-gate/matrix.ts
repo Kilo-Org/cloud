@@ -19,10 +19,11 @@ const WIDTH_TOLERANCE_DP = 2;
 export const TAP_TARGET = { min: 28, touch: 44 } as const;
 // Every right-to-left language the mobile app ships (`RTL_LANGUAGES` in
 // `apps/mobile/src/i18n/languages.ts`), plus `iw`, the legacy tag a device may
-// still report for Hebrew. A language missing here reads as left-to-right: the
-// rtl cell then captures it unmirrored, and a run against an app already set to
-// that language reports `env-mismatch` on every left-to-right cell because the
-// language it keeps is not recognized as needing the fallback.
+// still report for Hebrew. A language missing here reads as left-to-right, which
+// breaks two consumers: `runMatrix` skips the left-to-right fallback for a run
+// whose baseline app language is that language, so every left-to-right cell
+// reports `env-mismatch` instead of measuring, and `scan --source uiautomator`
+// labels that language's screenshots left-to-right.
 const RTL_LANGUAGES: Record<string, true> = {
   ar: true,
   ckb: true,

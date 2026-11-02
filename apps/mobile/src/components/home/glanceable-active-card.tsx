@@ -58,8 +58,9 @@ type GlanceableActiveCardProps = {
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index. With no sessions it is the zero state: every
- * count reads 0 and the newest block centers `Nothing running`.
+ * header opens the live index. With no sessions it is the zero state, and four
+ * zero counts would only restate its one message: the counters are left out and
+ * the empty message takes the card's body.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -92,34 +93,49 @@ export function GlanceableActiveCard({
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
+  const empty = newestSession === null;
 
   return (
-    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
-      <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => {
-          const isPrimary = line.kind === primaryKind;
-          return (
-            <View key={line.kind} className={COUNT_ROW_CLASS}>
-              <SessionStatusIcon kind={line.kind} />
-              <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
-              <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
-                <Text
-                  className={cn(
-                    'shrink text-sm',
-                    isPrimary ? 'text-foreground' : 'text-muted-foreground'
-                  )}
-                >
-                  {t(line.labelKey)}
-                </Text>
-                {line.kind === 'scheduled' && scheduledWake !== null ? (
-                  <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
-                ) : null}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-      <View className={DIVIDER_CLASS} />
+    <View
+      className={cn(
+        CARD_CLASS,
+        embedded && 'rounded-none border-0 bg-transparent',
+        // The frame reserves the counts card's height, so the zero state fills
+        // that height with its one message instead of leaving a band below it.
+        empty && 'flex-1'
+      )}
+    >
+      {empty ? null : (
+        <>
+          <View className={COUNTS_CLASS}>
+            {COUNT_LINES.map(line => {
+              const isPrimary = line.kind === primaryKind;
+              return (
+                <View key={line.kind} className={COUNT_ROW_CLASS}>
+                  <SessionStatusIcon kind={line.kind} />
+                  <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
+                  <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                    <Text
+                      className={cn(
+                        'shrink text-sm',
+                        isPrimary ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                    >
+                      {t(line.labelKey)}
+                    </Text>
+                    {line.kind === 'scheduled' && scheduledWake !== null ? (
+                      <Text className="max-w-full text-xs text-muted-foreground">
+                        {scheduledWake}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <View className={DIVIDER_CLASS} />
+        </>
+      )}
       {/* Keyed by the newest session: the zero state has to be its own host
           view. React Native copies the previous props and applies only the keys
           it receives, so a label this component stops passing keeps its old
@@ -128,6 +144,7 @@ export function GlanceableActiveCard({
           per zero state is the same remedy the PR-review inbox slot uses. */}
       <CardControl
         key={newestSession?.id ?? 'no-session'}
+        className={empty ? 'flex-1' : undefined}
         disabled={newestSession === null}
         onPress={() => {
           if (newestSession !== null) {
@@ -137,7 +154,7 @@ export function GlanceableActiveCard({
         accessibilityRole={newestSession === null ? undefined : 'button'}
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
       >
-        <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
+        <View className={cn(NEWEST_BLOCK_CLASS, empty && 'flex-1 items-center')}>
           {newestTitle !== null && newestKind !== null ? (
             <>
               <Text className="text-sm text-foreground">{newestTitle}</Text>

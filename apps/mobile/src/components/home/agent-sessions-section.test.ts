@@ -296,12 +296,14 @@ describe('Home live section', () => {
     expect(text()).toContain('a1');
   });
 
-  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
+  it('draws the zero state as its one message, without four zero counts', async () => {
     await render();
-    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
-      expect(text()).toContain(`0\n${label}`);
-    }
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    // The count rows' labels are the only place the card names the four
+    // states, so their absence proves the card dropped the zero counts.
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).not.toContain(label);
+    }
     // Nothing to open: the newest block is not a button.
     expect(
       nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')

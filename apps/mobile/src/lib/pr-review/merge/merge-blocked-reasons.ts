@@ -291,11 +291,12 @@ function isAllowedMergeMethod(value: string): value is AllowedMergeMethod {
 /**
  * The method name for a value that arrives on the wire (`lowercase` GitHub codes,
  * and whatever a provider sends). Prose that names the method interpolates this,
- * never the code itself; a value this build does not know stays as received.
+ * never the code itself; a value this build does not know is passed on exactly as
+ * received.
  */
 export function prMergeMethodName(method: string): string {
-  const normalized = method.toLowerCase();
-  return isAllowedMergeMethod(normalized) ? prMergeShortLabel(normalized) : normalized;
+  const code = method.toLowerCase();
+  return isAllowedMergeMethod(code) ? prMergeShortLabel(code) : method;
 }
 
 /** The default method the picker selects on first open. */

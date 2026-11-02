@@ -313,7 +313,7 @@ describe('prMergeMethodName', () => {
   });
 
   it('keeps a value this build does not know as the provider sent it', () => {
-    expect(prMergeMethodName('FastForward')).toBe('fastforward');
+    expect(prMergeMethodName('FastForward')).toBe('FastForward');
   });
 
   // The sentence exists in every catalog and the label is what fills it, so a

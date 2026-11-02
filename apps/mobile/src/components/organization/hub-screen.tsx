@@ -277,7 +277,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
                 subtitlePlaceholder={
-                  lowBalanceLoading ? <Skeleton className="mt-0.5 h-4 w-12 rounded" /> : undefined
+                  lowBalanceLoading ? (
+                    <Skeleton className="mt-0.5 h-4 w-12 rounded bg-muted-soft" />
+                  ) : undefined
                 }
                 accessibilityLabel={lowBalanceAccessibilityLabel}
                 trailing={
@@ -378,7 +380,7 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       <View className="flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         {state.loading ? (
-          <Skeleton className="mt-0.5 h-4 w-28 rounded" />
+          <Skeleton className="mt-0.5 h-4 w-28 rounded bg-muted-soft" />
         ) : (
           <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
         )}

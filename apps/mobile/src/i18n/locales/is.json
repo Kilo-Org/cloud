@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Þýða samantektir tóla",
     "toolSummaryTranslationSubtitle": "Sendu hverja samantekt tóls til líkans til að þýða hana á tungumál appsins þíns. Upprunalega textinn birtist ef þýðing mistekst.",
     "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað.",
+    "translateSummaries": "Þýða samantektir",
     "autoExpandThinkingInactiveSubtitle": "Hefur engin áhrif á meðan upplýsingar um hugsun eru faldar."
   },
   "prReview": {

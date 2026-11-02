@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
     "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
     "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model).",
+    "translateSummaries": "Käännä yhteenvedot",
     "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu."
   },
   "prReview": {

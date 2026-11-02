@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "បកប្រែសេចក្តីសង្ខេបឧបករណ៍",
     "toolSummaryTranslationSubtitle": "ផ្ញើសេចក្តីសង្ខេបឧបករណ៍នីមួយៗទៅម៉ូដែលដើម្បីបកប្រែវាទៅជាភាសាកម្មវិធីរបស់អ្នក។ អត្ថបទដើមត្រូវបានបង្ហាញប្រសិនបើការបកប្រែបរាជ័យ។",
     "toolSummaryTranslationModelUnavailableNotice": "ម៉ូដែលនេះលែងផ្តល់ជូនទៀតទេ។ ចុច $t(common.model) ដើម្បីជ្រើសរើសមួយផ្សេងទៀត។",
+    "translateSummaries": "បកប្រែសេចក្តីសង្ខេប",
     "autoExpandThinkingInactiveSubtitle": "មិនមានប្រសិទ្ធភាពទេ នៅពេលលាក់ព័ត៌មានលម្អិតនៃការគិត។"
   },
   "prReview": {

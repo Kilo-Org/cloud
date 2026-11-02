@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tafsiri muhtasari wa zana",
     "toolSummaryTranslationSubtitle": "Tuma muhtasari wa kila zana kwa modeli ili kuutafsiri katika lugha ya programu yako. Ikiwa tafsiri itashindwa, asili itaonyeshwa.",
     "toolSummaryTranslationModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(common.model) kuchagua nyingine.",
+    "translateSummaries": "Tafsiri muhtasari",
     "autoExpandThinkingInactiveSubtitle": "Hakuna athari wakati maelezo ya mawazo yamefichwa."
   },
   "prReview": {

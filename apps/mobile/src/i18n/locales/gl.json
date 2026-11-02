@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Traduce os resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro.",
+    "translateSummaries": "Traduce os resumos",
     "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos."
   },
   "prReview": {

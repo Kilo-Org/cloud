@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Перекладати підсумки інструментів",
     "toolSummaryTranslationSubtitle": "Надсилай кожен підсумок інструмента моделі, щоб перекласти його мовою твого застосунку. Якщо переклад не вдасться, показується оригінал.",
     "toolSummaryTranslationModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(common.model), щоб вибрати іншу.",
+    "translateSummaries": "Перекладати підсумки",
     "autoExpandThinkingInactiveSubtitle": "Не дає ефекту, поки подробиці міркувань приховано."
   },
   "notifications": {

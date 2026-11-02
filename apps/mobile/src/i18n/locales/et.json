@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tõlgi tööriistade kokkuvõtted",
     "toolSummaryTranslationSubtitle": "Saada iga tööriista kokkuvõte mudelile, et see sinu rakenduse keelde tõlkida. Tõlke ebaõnnestumisel kuvatakse originaal.",
     "toolSummaryTranslationModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(common.model), et valida teine.",
+    "translateSummaries": "Tõlgi kokkuvõtted",
     "autoExpandThinkingInactiveSubtitle": "Ei oma mõju, kui mõttekäigu üksikasjad on peidetud."
   },
   "prReview": {

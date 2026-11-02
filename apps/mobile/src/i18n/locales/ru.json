@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Переводить сводки инструментов",
     "toolSummaryTranslationSubtitle": "Отправляйте каждый обзор инструмента модели, чтобы перевести его на язык вашего приложения. Если перевод не удался, показывается оригинал.",
     "toolSummaryTranslationModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(common.model), чтобы выбрать другую.",
+    "translateSummaries": "Переводить сводки",
     "autoExpandThinkingInactiveSubtitle": "Не действует, пока скрыты подробности рассуждений."
   },
   "notifications": {

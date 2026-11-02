@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Adikao ny famintinana fitaovana",
     "toolSummaryTranslationSubtitle": "Alefaso any amin'ny maodely ny famintinana fitaovana tsirairay mba hadika azy amin'ny fitenin'ny rindranasa. Asehoy ny voalohany raha tsy mahomby ny fandikana.",
     "toolSummaryTranslationModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(common.model) hisafidianana ny hafa.",
+    "translateSummaries": "Adikao ny famintinana",
     "autoExpandThinkingInactiveSubtitle": "Tsy misy akony raha afeno ny antsipirian'ny fisainana."
   },
   "prReview": {

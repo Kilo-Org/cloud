@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Μετάφραση συνόψεων εργαλείων",
     "toolSummaryTranslationSubtitle": "Στείλε κάθε σύνοψη εργαλείου σε ένα μοντέλο για να μεταφραστεί στη γλώσσα της εφαρμογής σου. Το πρωτότυπο εμφανίζεται αν αποτύχει η μετάφραση.",
     "toolSummaryTranslationModelUnavailableNotice": "Αυτό το μοντέλο δεν προσφέρεται πλέον. Πατήστε $t(common.model) για να διαλέξετε άλλο.",
+    "translateSummaries": "Μετάφραση συνόψεων",
     "autoExpandThinkingInactiveSubtitle": "Δεν έχει κανένα αποτέλεσμα όσο οι λεπτομέρειες σκέψης είναι κρυμμένες."
   },
   "prReview": {

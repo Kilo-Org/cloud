@@ -134,7 +134,7 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
 
     expect(findPreferenceRow(renderer).props).toMatchObject({
       icon: 'WandSparkles',
-      title: 'Translate tool summaries',
+      title: 'Translate summaries',
       subtitle:
         'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
       value: false,

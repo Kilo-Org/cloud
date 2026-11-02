@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "මෙවලම් සාරාංශ පරිවර්තනය කරන්න",
     "toolSummaryTranslationSubtitle": "සෑම මෙවලම් සාරාංශයක්ම ඔබේ යෙදුමේ භාෂාවට පරිවර්තනය කිරීමට ආකෘතියකට යවන්න. පරිවර්තනය අසාර්ථක වුවහොත් මුල් පිටපත පෙන්වයි.",
     "toolSummaryTranslationModelUnavailableNotice": "මෙම ආකෘතිය තවදුරටත් ලබා දෙන්නේ නැත. තවත් එකක් තෝරන්න $t(common.model) තට්ටු කරන්න.",
+    "translateSummaries": "සාරාංශ පරිවර්තනය කරන්න",
     "autoExpandThinkingInactiveSubtitle": "සිතීමේ විස්තර සඟවා ඇති විට කිසිදු බලපෑමක් නොමැත."
   },
   "prReview": {

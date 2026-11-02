@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "翻译工具摘要",
     "toolSummaryTranslationSubtitle": "将每个工具摘要发送给模型，翻译成你的应用语言。翻译失败时将显示原文。",
     "toolSummaryTranslationModelUnavailableNotice": "此模型已不再提供。点按$t(common.model)选择其他模型。",
+    "translateSummaries": "翻译摘要",
     "autoExpandThinkingInactiveSubtitle": "思考详情处于隐藏状态时不产生任何效果。"
   },
   "notifications": {

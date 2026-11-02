@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "د وسایلو لنډیزونه وژباړه",
     "toolSummaryTranslationSubtitle": "هر د وسیلې لنډیز یو ماډل ته واستوه ترڅو یې ستاسو د اپلیکیشن ژبې ته وژباړي. که ژباړه ناکامه شي، اصلي نسخه ښودل کیږي.",
     "toolSummaryTranslationModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(common.model) ته ټک ووهئ.",
+    "translateSummaries": "لنډیزونه وژباړه",
     "autoExpandThinkingInactiveSubtitle": "کله چې د فکر جزئیات پټ وي، اثر نه لري."
   },
   "prReview": {

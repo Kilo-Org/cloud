@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Oversæt værktøjssammendrag",
     "toolSummaryTranslationSubtitle": "Send hvert værktøjssammendrag til en model for at oversætte det til dit appsprog. Originalen vises, hvis oversættelsen mislykkes.",
     "toolSummaryTranslationModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(common.model) for at vælge en anden.",
+    "translateSummaries": "Oversæt sammendrag",
     "autoExpandThinkingInactiveSubtitle": "Ingen effekt, mens detaljer om ræsonnement er skjult."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Araç özetlerini çevir",
     "toolSummaryTranslationSubtitle": "Her araç özetini uygulama dilinize çevirmesi için bir modele gönderin. Çeviri başarısız olursa özgün metin gösterilir.",
     "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun.",
+    "translateSummaries": "Özetleri çevir",
     "autoExpandThinkingInactiveSubtitle": "Düşünce ayrıntıları gizliyken hiçbir etkisi olmaz."
   },
   "notifications": {

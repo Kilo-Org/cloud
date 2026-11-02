@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Išversti įrankių suvestines",
     "toolSummaryTranslationSubtitle": "Siųsk kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į tavo programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
     "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą.",
+    "translateSummaries": "Išversti suvestines",
     "autoExpandThinkingInactiveSubtitle": "Nėra poveikio, kai slepiama mąstymo informacija."
   },
   "prReview": {

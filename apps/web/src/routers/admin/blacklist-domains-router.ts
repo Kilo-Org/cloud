@@ -19,6 +19,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import { recordAdminAction, type AdminActionContext } from '@/lib/admin/admin-action-audit';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -35,6 +36,58 @@ async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
   if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
   return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+}
+
+// A bulk import can change thousands of entries; name domains in the audit row
+// only for small edits and summarize larger ones as a count.
+const AUDIT_DOMAIN_NAME_LIMIT = 2;
+
+function describeDomainChange(domains: string[], verb: 'added' | 'removed'): string | null {
+  if (domains.length === 0) return null;
+  if (domains.length <= AUDIT_DOMAIN_NAME_LIMIT) return `${verb} ${domains.join(', ')}`;
+  return `${domains.length} domains ${verb}`;
+}
+
+async function recordBlacklistChange(
+  ctx: AdminActionContext,
+  change: {
+    addedDomains: string[] | null;
+    removedDomains: string[] | null;
+    totalDomains: number;
+  }
+): Promise<void> {
+  const { addedDomains, removedDomains, totalDomains } = change;
+
+  if (addedDomains === null || removedDomains === null) {
+    await recordAdminAction(ctx, {
+      action: 'blacklist_domains.set',
+      target: null,
+      message: 'Domain blacklist updated (change details unavailable)',
+      metadata: { addedCount: null, removedCount: null, totalDomains, diffAvailable: false },
+    });
+    return;
+  }
+
+  if (addedDomains.length === 0 && removedDomains.length === 0) return;
+
+  const parts = [
+    describeDomainChange(addedDomains, 'added'),
+    describeDomainChange(removedDomains, 'removed'),
+  ].filter(part => part !== null);
+
+  await recordAdminAction(ctx, {
+    action: 'blacklist_domains.set',
+    target: null,
+    message: `Domain blacklist: ${parts.join('; ')}`,
+    metadata: {
+      addedCount: addedDomains.length,
+      removedCount: removedDomains.length,
+      totalDomains,
+      diffAvailable: true,
+      ...(addedDomains.length <= AUDIT_DOMAIN_NAME_LIMIT && { addedDomains }),
+      ...(removedDomains.length <= AUDIT_DOMAIN_NAME_LIMIT && { removedDomains }),
+    },
+  });
 }
 
 async function readConfig(): Promise<BlacklistDomainsConfig> {
@@ -73,9 +126,15 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     } catch (error) {
       captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
     }
-    const previousDomains = new Set((previous?.domains ?? []).map(d => d.toLowerCase().trim()));
+    const previousDomains = new Set(
+      (previous?.domains ?? []).map(d => d.toLowerCase().trim()).filter(Boolean)
+    );
+    const normalizedSet = new Set(normalizedDomains);
     const addedDomains = previous
       ? normalizedDomains.filter(domain => !previousDomains.has(domain))
+      : null;
+    const removedDomains = previous
+      ? [...previousDomains].filter(domain => !normalizedSet.has(domain))
       : null;
 
     // An omitted field keeps the stored list so a stale admin tab cannot
@@ -100,6 +159,12 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     await redisClient.mset({
       [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
       [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
+    });
+
+    await recordBlacklistChange(ctx, {
+      addedDomains,
+      removedDomains,
+      totalDomains: normalizedDomains.length,
     });
 
     // The list is already live for auth checks at this point, so a backfill

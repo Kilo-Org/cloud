@@ -100,6 +100,9 @@ const failedAnswer: StoredMessage = {
 
 const messages = [...turns, failedAnswer];
 
+/** The fixture never sends a retry; the row only needs the handler to draw its action. */
+const ignoreRetry = (): void => undefined;
+
 export function TranscriptStyleFixture() {
   const { t } = useTranslation();
 
@@ -123,7 +126,7 @@ export function TranscriptStyleFixture() {
       />
       <PartDetailSheetHost messages={messages}>
         {messages.map(message => (
-          <MessageBubble key={message.info.id} message={message} onRetryMessage={() => {}} />
+          <MessageBubble key={message.info.id} message={message} onRetryMessage={ignoreRetry} />
         ))}
       </PartDetailSheetHost>
     </View>

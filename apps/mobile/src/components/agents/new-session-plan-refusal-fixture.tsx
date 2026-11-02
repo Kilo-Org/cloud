@@ -28,7 +28,7 @@ const MODEL_OPTIONS: ModelOption[] = [
   { id: 'fixture/model', name: 'Fixture Model', variants: [], isPreferred: false },
 ];
 
-const noop = (): void => {};
+const noop = (): void => undefined;
 
 export function NewSessionPlanRefusalFixture() {
   const { t } = useTranslation();

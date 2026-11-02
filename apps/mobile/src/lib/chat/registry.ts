@@ -743,6 +743,7 @@ export async function say(
       model,
       effort,
       images,
+      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
       ...(question.from == null ? {} : { from: question.from }),
     });
     current = await ontoForUse(current, { model, effort }, held);
@@ -1024,11 +1025,12 @@ function withoutAnswered(
  * records are stale and the open drops them rather than drawing a failed bubble
  * beside the answer.
  *
- * The match is anchored rather than made by words alone: the kept record says
- * how many turns came before the question was said, so only a turn at or after
- * that count can be its answer. Without the kept record — a write that dropped
- * it while the slot's stayed — only the newest user turn counts, because the
- * answer to a question asked again is the newest exchange.
+ * The match is anchored where the question was asked: an answer is a question
+ * turn after the turns the conversation already held, and it is the newest one,
+ * because a retry is always the newest ask. That is what tells a repeat of the
+ * same words from the attempt that was answered earlier — and it is why a turn
+ * of tool results, which is stored as a user turn with no text, is not a
+ * question.
  */
 function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: readonly Displaced[]) {
   const from = asked?.from;
@@ -1036,11 +1038,10 @@ function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: reado
     return { asked, kept };
   }
   const named = kept.find(one => one.id === from);
-  const anchor = named?.afterTurns ?? 0;
-  const answeredAt = turns.findIndex(
-    (turn, index) => index >= anchor && says(turn, { text: asked.text, images: asked.images })
-  );
-  const answered = answeredAt !== -1 && (named !== undefined || answeredAt === lastUserTurn(turns));
+  const anchor = Math.max(named?.afterTurns ?? 0, asked.after ?? 0);
+  const newest = newestQuestionTurn(turns);
+  const answered =
+    newest >= anchor && says(turns[newest], { text: asked.text, images: asked.images });
   if (!answered) {
     return { asked, kept };
   }
@@ -1051,18 +1052,24 @@ function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: reado
 }
 
 /** Where the newest question the conversation holds sits, or -1 when it holds none. */
-function lastUserTurn(turns: readonly Turn[]): number {
+function newestQuestionTurn(turns: readonly Turn[]): number {
   for (let index = turns.length - 1; index >= 0; index -= 1) {
-    if (turns[index]?.role === 'user') {
+    const turn = turns[index];
+    if (turn?.role === 'user' && asksSomething(turn)) {
       return index;
     }
   }
   return -1;
 }
 
+/** Whether a user turn is a question rather than what the tools answered with. */
+function asksSomething(turn: Turn): boolean {
+  return turn.parts.some(part => part.kind === 'text' || part.kind === 'image');
+}
+
 /** Whether a stored turn is that question: the same words and the same pictures. */
-function says(turn: Turn, question: Question): boolean {
-  if (turn.role !== 'user') {
+function says(turn: Turn | undefined, question: Question): boolean {
+  if (turn?.role !== 'user') {
     return false;
   }
   const text = turn.parts.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join('');

@@ -46,6 +46,10 @@ const askedSchema = z.object({
   model: z.string(),
   // The kept question this one asks again, when it is a retry of one.
   from: z.union([z.string(), z.number()]).transform(String).nullable().optional(),
+  /* How many turns the conversation held when this was asked. An answer to it is
+     one of the turns after that count, which is how a question repeated later is
+     told from the same words answered earlier. */
+  after: z.number().int().nonnegative().optional(),
   // A question remembered before efforts existed asked with the model's default.
   effort: z.enum(EFFORTS).nullable().default(null),
   // A question remembered before images existed carries none.
@@ -80,7 +84,12 @@ export function newKeptId(): string {
 }
 
 /** A question with no answer, the target and effort it was asked of, and its images. */
-export type Asked = Question & ChatTarget & { readonly from?: string | null };
+export type Asked = Question &
+  ChatTarget & {
+    readonly from?: string | null;
+    /** How many stored turns came before it, so its answer is searched after them. */
+    readonly after?: number;
+  };
 
 export async function rememberAsked(sessionId: string, asked: Asked): Promise<void> {
   await setItem(SCOPE, sessionId, JSON.stringify(asked));

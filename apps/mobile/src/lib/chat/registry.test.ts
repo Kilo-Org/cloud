@@ -1432,6 +1432,96 @@ describe('a question a later send took the slot from', () => {
     expect(written.map(one => one.id)).toEqual(['a']);
   });
 
+  it('does not fold a retry whose answer never came when the same words were answered before', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('retry-lost', place);
+    /* "hi" failed and was kept; "hi" sent again was answered, which stored its
+       turn; then the kept one was asked again and its answer never came. The
+       answer the store holds is not the retry's. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_15',
+        sessionId: 'retry-lost',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_16',
+        sessionId: 'retry-lost',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:retry-lost',
+      JSON.stringify({ ...words, from: 'a', after: 2 })
+    );
+    storedQuestions.set('chat-kept-questions:retry-lost', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'retry-lost');
+    await settled();
+
+    // Its bubble and its Retry stay: the stored turn is not the answer to it.
+    const held = snapshotOf('retry-lost');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+  });
+
+  it('folds a question whose answer is the newest question after tool results', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('tooled', place);
+    /* The answer used the chat's tool, so its results are stored as a user turn
+       with no text, after the question and before the answer's own words. */
+    const words = {
+      text: 'what time is it',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_17',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_18',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p2', kind: 'toolResult', callId: 'c1', body: '12:00', failed: false }],
+      },
+      {
+        id: 'trn_19',
+        sessionId: 'tooled',
+        role: 'assistant',
+        parts: [{ id: 'p3', kind: 'text', body: 'noon' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:tooled', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:tooled', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'tooled');
+    await settled();
+
+    const held = snapshotOf('tooled');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+  });
+
   it('drops the kept record a stored answer already answered', async () => {
     storedHistory = [];
     await releaseChat(opened);
@@ -1554,6 +1644,8 @@ describe('a question a later send took the slot from', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      // The answer in front of it is a turn the store already holds.
+      after: 1,
     });
 
     // The answer in front of it lands, so the retry is asked and becomes the slot's.
@@ -2097,6 +2189,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
       });
 
       await retryChat(opened);
@@ -2205,6 +2298,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
       });
       await retryChat(opened);
       expect(asked).toHaveLength(2);

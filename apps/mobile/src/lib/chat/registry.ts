@@ -738,11 +738,22 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
     /* The chat may have moved onto another session while it was asked, so both
        writes name the session it is on now. */
     const at = snapshotOf(current);
-    /* A question that joined the waiting line is not in the slot, and it is
-       held in memory only, as every queued question is: writing it down here
-       would put it over the slot's record and claim it was asked. The kept
-       entry stays written down instead, so the words survive a restart. */
-    if (at.asked !== null) {
+    /* A retry that found an answer still arriving joined the waiting line: the
+       slot then holds that answer's question, not this one, and a question that
+       waits is held in memory only, as every queued question is. Writing it
+       down there would put it over the record of the question being answered
+       and claim it was asked; the kept entry stays written down instead, so the
+       words survive a restart. */
+    const slot =
+      at.asked === null
+        ? null
+        : {
+            text: at.asked,
+            images: at.askedImages,
+            model: at.askedModel ?? at.model,
+            effort: at.askedEffort,
+          };
+    if (slot !== null && sameAttempt(displaced, slot)) {
       try {
         await rememberAsked(at.sessionId, {
           text: displaced.text,

@@ -1203,6 +1203,34 @@ describe('a question a later send took the slot from', () => {
     ]);
   });
 
+  it('leaves the slot record with the question being answered when a retry only waits', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving now, with its own record in the slot.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    await settled();
+
+    // It waits behind the answer, and the slot still records that answer's question.
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first']);
+    expect(await askedIn(opened)).toEqual({
+      text: 'third',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+  });
+
   it('opens again with what a later send kept', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });

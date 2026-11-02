@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { workspaceBootstrapError } from '../bootstrap-error.js';
 import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
-import { gitOperationError } from '../git-errors.js';
+import { gitOperationError, type GitRouteClass } from '../git-errors.js';
 import { isSyntheticReviewRef } from '../git-review-ref.js';
 import type { ExecResult } from '../utils.js';
 
@@ -14,6 +14,7 @@ type Redact = (text: string) => string;
 export async function refreshAdoptedRepository(input: {
   git: WorkspaceGit;
   remoteUrl: string;
+  route: GitRouteClass;
   redact: Redact;
   branch?: string;
   branchMode?: ControlPlaneRouteSpec['branchMode'];
@@ -22,7 +23,7 @@ export async function refreshAdoptedRepository(input: {
   async function checked(args: string[], options?: { network?: true }): Promise<void> {
     const result = await git(args, options);
     if (result.exitCode === 0) return;
-    const error = gitOperationError(result, 'checkout', redact);
+    const error = gitOperationError(result, 'clone', redact, input.route);
     const operation = args[0] === 'remote' ? `remote ${args[1]}` : args[0];
     error.message = `${error.message} (git ${operation})`;
     throw error;
@@ -35,7 +36,7 @@ export async function refreshAdoptedRepository(input: {
     const remoteRef = `refs/remotes/origin/${input.branch}`;
     const found = await git(['show-ref', '--verify', '--quiet', remoteRef]);
     if (found.exitCode === 0) return remoteRef;
-    if (found.exitCode !== 1) throw gitOperationError(found, 'checkout', redact);
+    if (found.exitCode !== 1) throw gitOperationError(found, 'checkout', redact, input.route);
     if (input.branchMode !== 'working') {
       throw workspaceBootstrapError(
         'git_branch_missing',

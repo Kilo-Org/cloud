@@ -29,7 +29,7 @@ import {
   type ProcessOutputStream,
   type ProcessSpawn,
 } from '../utils.js';
-import { WrapperBootstrapError } from '../bootstrap-error.js';
+import { WrapperBootstrapError, workspaceBootstrapError } from '../bootstrap-error.js';
 import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
 import {
   credentialFreeGitUrl,
@@ -665,12 +665,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     setStep: (step: ControlPlanePreparationStep) => void
   ): Promise<void> {
     const git = spec.git;
-    if (!git) throw new Error('A snapshot workspace requires a repository');
     setStep('restore');
+    if (!git) {
+      throw workspaceBootstrapError(
+        'workspace_setup_unknown',
+        'A snapshot workspace requires a repository',
+        undefined,
+        false
+      );
+    }
     await withinStep('restore', timers.restoreMs, async signal => {
       emitProgress(spec.sessionId, 'restore');
       const startRef = await refreshAdoptedRepository({
         remoteUrl: credentialFreeGitUrl(git.url),
+        route: git.token ? 'managed' : 'direct',
         redact,
         branch: spec.branch,
         branchMode: spec.branchMode,

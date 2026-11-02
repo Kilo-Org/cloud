@@ -2695,10 +2695,25 @@ describe('adopting an environment snapshot', () => {
     expect(
       harness.logs.some(
         line =>
-          line.includes('Repository checkout failed (git fetch)') &&
-          line.includes('matcher=unmatched')
+          line.includes('Repository clone failed (git fetch)') &&
+          line.includes('matcher=unmatched') &&
+          line.includes('operation=clone route=direct')
       )
     ).toBe(true);
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
+  });
+
+  it('reports a missing repository as a restore failure and preserves the snapshot', async () => {
+    const harness = adoptHarness();
+
+    await harness.manager.prepare(routeSpec({ git: undefined, setupCommands: ['npm install'] }));
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'restore',
+      subtype: 'workspace_setup_unknown',
+    });
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     expect(harness.stamp()).toEqual(FOREIGN_STAMP);
   });
 
@@ -2742,6 +2757,7 @@ describe('adopting an environment snapshot', () => {
     });
     expect(harness.logs.join('\n')).not.toContain('git-secret');
     expect(harness.logs.join('\n')).toContain('matcher=git_authentication_failed');
+    expect(harness.logs.join('\n')).toContain('operation=clone route=managed');
   });
 
   it('stops after bounded fetch retries without cloning', async () => {

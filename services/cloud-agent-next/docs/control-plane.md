@@ -663,7 +663,7 @@ The wrapper owns the step timeouts and retries:
 | Step | Bound | Retry |
 |---|---|---|
 | Clone or fetch | 6 min total | Network errors: 3 attempts with backoff |
-| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
+| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; failures preserve the workspace and fail preparation |
 | Checkout, branch restore | In the clone budget | No |
 | Setup commands | Current per-command limits | No; a failure fails preparation |
 | Kilo runtime start | 2 min | 1 retry |
@@ -958,7 +958,7 @@ them through one development-only override.
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
-| Wrapper | Adopt an environment snapshot | 2 min | Empty the directory and clone |
+| Wrapper | Adopt an environment snapshot | 2 min | Preserve the workspace and fail preparation |
 | Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |
 | Wrapper | SSE silence | 30 s | Health request |
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
@@ -984,7 +984,7 @@ them through one development-only override.
 | Startup report lost | Sandbox DO, 5 min | Same as "Wrapper never connects" | Queued fail at the deadline |
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
 | Environment snapshot cannot be used (lookup, start) | Sandbox DO, container DO | Start from the image | None; a cold start |
-| Environment snapshot git preparation fails | Wrapper | Bounded network retries; preserve workspace, no clone | Queued fail (`workspace_setup_failed`) with classified subtype |
+| Environment snapshot git preparation fails | Wrapper | Bounded network retries; preserve workspace, no clone | Queued fail (`workspace_setup_failed`) with classified subtype for git command failures; budget timeouts have no subtype |
 | Setup command fails | Wrapper | None | Queued fail with the command output visible |
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |

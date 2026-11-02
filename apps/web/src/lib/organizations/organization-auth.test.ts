@@ -1,7 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { getAuthorizedOrgContext } from './organization-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  organization_memberships,
+  organizations,
+  support_access_grants,
+} from '@kilocode/db/schema';
+import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq, isNotNull } from 'drizzle-orm';
@@ -27,6 +32,9 @@ describe('getAuthorizedOrgContext', () => {
   });
 
   afterEach(async () => {
+    setSupportAccessModeForTest(null);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(support_access_grants);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_memberships);
     // Self-referential organization FKs require unlinking children before deleting all orgs.
@@ -402,6 +410,95 @@ describe('getAuthorizedOrgContext', () => {
         expect(result.nextResponse.status).toBe(404);
       }
     });
+  });
+
+  test('denies inherited access when the parent organization is soft-deleted', async () => {
+    const parentOwner = await insertTestUser({ is_admin: false });
+    const [childOrganization] = await db
+      .insert(organizations)
+      .values({ name: 'Child Of Deleted Parent', parent_organization_id: testOrganizationId })
+      .returning();
+    await db.insert(organization_memberships).values({
+      organization_id: testOrganizationId,
+      kilo_user_id: parentOwner.id,
+      role: 'owner',
+      invited_by: 'test-admin',
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, testOrganizationId));
+
+    const result = await getAuthorizedOrgContext(childOrganization.id, undefined, {
+      getUserFromAuthOverride: async () => ({
+        user: parentOwner,
+        authFailedResponse: null,
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.nextResponse.status).toBe(404);
+    }
+  });
+
+  test('enforce admits an allowlisted REST read with a support grant', async () => {
+    setSupportAccessModeForTest('enforce');
+    const admin = await insertTestUser({
+      is_admin: true,
+      can_request_support_org_access: true,
+    });
+    const now = new Date();
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: admin.id,
+      organization_id: testOrganizationId,
+      action_class: 'support_read',
+      status: 'active',
+      reason: 'investigating a customer report',
+      requested_duration_seconds: 1800,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+    });
+
+    const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      supportKey: '/api/organizations/[id]/defaults',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.user.role).toBe('member');
+      expect(result.data.access.kind).toBe('support');
+    }
+  });
+
+  test('enforce denies a REST read whose route is not allowlisted', async () => {
+    setSupportAccessModeForTest('enforce');
+    const admin = await insertTestUser({
+      is_admin: true,
+      can_request_support_org_access: true,
+    });
+    const now = new Date();
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: admin.id,
+      organization_id: testOrganizationId,
+      action_class: 'support_read',
+      status: 'active',
+      reason: 'investigating a customer report',
+      requested_duration_seconds: 1800,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+    });
+
+    const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      supportKey: '/api/organizations/[id]/user-tokens',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.nextResponse.status).toBe(404);
+    }
   });
 
   describe('authentication failures', () => {

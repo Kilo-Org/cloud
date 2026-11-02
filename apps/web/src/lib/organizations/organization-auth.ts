@@ -1,25 +1,22 @@
 import 'server-only';
-import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
-import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
-import {
-  organizationTarget,
-  recordKiloAdminElevationForRequest,
-  type AdminAccessSurface,
-} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import type { AdminAccessSurface } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, inArray, and, isNull } from 'drizzle-orm';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { resolveOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
-  loadEffectiveMembershipRows,
-  observeMembershipRole,
-} from '@kilocode/web-shared/routers/organizations/utils';
+  findSupportAllowEntry,
+  supportStandInRole,
+  type OrganizationAccess,
+  type SupportActionClass,
+  type SupportSurface,
+} from '@kilocode/web-shared/lib/admin/support-access';
+import { TRPCError } from '@trpc/server';
 import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
@@ -28,6 +25,12 @@ const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies O
 
 type UserWithRole = User & {
   readonly role: OrganizationRole;
+};
+
+type AuthorizedOrgData = {
+  user: UserWithRole;
+  organization: Organization;
+  access: OrganizationAccess;
 };
 const UUIDSchema = z.uuid();
 type DataOrNextError<T> = CustomResult<
@@ -61,19 +64,30 @@ export async function getAuthorizedOrgContext(
     surface?: AdminAccessSurface;
     /** The actual Request method when the caller has one. */
     requestMethod?: string;
+    /**
+     * Exact allowlist key for a support grant. Omitted means support is never
+     * accepted here, even in enforce mode.
+     */
+    supportKey?: string | null;
+    /** Required for a REST write; REST reads default to `support_read`. */
+    requiredActionClass?: SupportActionClass;
+    /**
+     * Credential issuers and other never-list surfaces pass this so a support
+     * grant cannot substitute for membership.
+     */
+    memberOnly?: boolean;
   } = {}
-): Promise<DataOrNextError<{ user: UserWithRole; organization: Organization }>> {
+): Promise<DataOrNextError<AuthorizedOrgData>> {
   const { getUserFromAuthOverride, surface, requestMethod } = options;
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
       : getUserFromAuth;
 
-  const { authFailedResponse, user, tokenSource, internalApiUse, cloudAgentAuthority } =
-    await getUserFromAuthFn({
-      adminOnly: false,
-      requestMethod,
-    });
+  const { authFailedResponse, user, tokenSource, internalApiUse } = await getUserFromAuthFn({
+    adminOnly: false,
+    requestMethod,
+  });
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
   }
@@ -86,86 +100,85 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
-  if (user.is_admin) {
-    const organizationResult = getOrganizationById(organizationId).then(
-      value => ({ ok: true as const, value }),
-      error => ({ ok: false as const, error })
+  let access: OrganizationAccess;
+  try {
+    access = await resolveOrganizationAccess(
+      {
+        user,
+        tokenSource,
+        internalApiUse,
+        trpcType: requestMethod,
+        auditSurface: surface ?? 'rest',
+        auditMethod: requestMethod,
+      },
+      organizationId,
+      {
+        roles,
+        member: options.memberOnly ? 'only' : undefined,
+        surface: (surface ?? 'rest') as SupportSurface,
+        supportKey: options.supportKey ?? null,
+        requiredActionClass: options.requiredActionClass,
+        auditReason: 'organization_access_rest',
+      }
     );
-    const observation = await observeMembershipRole(
-      () => loadEffectiveMembershipRows(user.id, organizationId),
-      roles
-    );
-    await recordKiloAdminElevationForRequest({
-      user,
-      tokenSource,
-      internalApiUse,
-      delegatedWorkload: cloudAgentAuthority !== undefined,
-      reason: 'organization_access_rest',
-      target: organizationTarget(organizationId),
-      surface,
-      method: requestMethod,
-      ...observation,
-    });
-    const lookup = await organizationResult;
-    if (!lookup.ok) throw lookup.error;
-    const organization = lookup.value;
-    if (!organization) {
+  } catch (accessError) {
+    if (accessError instanceof TRPCError) {
+      warnInSentry(
+        `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
+      );
       const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
       return { success: false, nextResponse: res };
     }
-    return successResult({
-      data: {
-        user: { ...user, role: 'owner' },
-        organization,
-      },
-    });
+    throw accessError;
   }
-  const directRows = await db
-    .select({
-      role: organization_memberships.role,
-      organization: organizations,
-    })
-    .from(organization_memberships)
-    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, user.id),
-        eq(organization_memberships.organization_id, organizationId),
-        isNull(organizations.deleted_at)
-      )
-    );
 
-  const inheritedRows = await db
-    .select({
-      role: organization_memberships.role,
-      organization: organizations,
-    })
-    .from(organizations)
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, organizations.parent_organization_id),
-        eq(organization_memberships.kilo_user_id, user.id),
-        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-      )
-    )
-    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
-
-  const rows = [...directRows, ...inheritedRows];
-  const role = allowedRole(rows, roles);
-
-  if (!role) {
-    warnInSentry(
-      `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
-    );
+  const organization = await getOrganizationById(organizationId);
+  if (!organization) {
     const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     return { success: false, nextResponse: res };
   }
-  const organization = rows.find(row => row.role === role)?.organization ?? rows[0].organization;
+
   return successResult({
     data: {
-      user: { ...user, role },
+      user: { ...user, role: roleForAccess(access, surface, options.supportKey) },
       organization,
+      access,
     },
   });
+}
+
+function roleForAccess(
+  access: OrganizationAccess,
+  surface: AdminAccessSurface | undefined,
+  supportKey: string | null | undefined
+): OrganizationRole {
+  if (access.kind === 'member' || access.kind === 'legacy_admin') return access.role;
+  const entry =
+    supportKey === null || supportKey === undefined
+      ? undefined
+      : findSupportAllowEntry({
+          surface: (surface ?? 'rest') as SupportSurface,
+          key: supportKey,
+          actionClass: access.actionClass,
+        });
+  if (!entry) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Explicit support access is required for this organization',
+    });
+  }
+  return supportStandInRole(entry);
+}
+
+/**
+ * Only allowlisted REST reads use this. It guarantees the caller supplied an
+ * exact support key so a grant cannot be accepted without an inventory match.
+ */
+export async function getAuthorizedOrgContextOrSupport(
+  id: Organization['id'],
+  supportKey: string,
+  roles?: OrganizationRole[],
+  options: Omit<Parameters<typeof getAuthorizedOrgContext>[2], 'supportKey'> = {}
+) {
+  return getAuthorizedOrgContext(id, roles, { ...options, supportKey });
 }

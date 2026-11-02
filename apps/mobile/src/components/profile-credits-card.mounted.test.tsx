@@ -1109,7 +1109,7 @@ describe('CreditsCard balance row', () => {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        node.props.className === 'min-w-0 flex-row items-center gap-1'
+        String(node.props.className).includes('min-w-0 flex-row items-center gap-1')
     );
   }
 

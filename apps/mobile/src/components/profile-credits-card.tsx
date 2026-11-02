@@ -304,7 +304,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             className={cn('min-w-0 gap-1', stackBalance ? 'items-stretch' : 'flex-1 flex-row')}
             layout={LinearTransition.duration(200)}
           >
-            <View className="min-w-0 flex-row items-center gap-1">
+            <View className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}>
               <View className="min-w-0 flex-1 gap-1">
                 <ScrollView horizontal className="min-w-0">
                   <Text

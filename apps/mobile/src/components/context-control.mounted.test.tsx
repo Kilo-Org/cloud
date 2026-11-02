@@ -346,7 +346,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
     expect(opened.map(row => row.selected)).toEqual([false, true]);
     expect(opened.map(row => row.role)).toEqual(['button', 'button']);
-    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    // Rows divide themselves only: the full rule that closes the list belongs
+    // to the dismiss row's area, not to the last account.
+    expect(opened.map(row => row.divider)).toEqual([true, false]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });

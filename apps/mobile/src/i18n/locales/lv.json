@@ -1638,6 +1638,9 @@
       "set": "Iestatīts",
       "notSet": "Nav iestatīts",
       "nSelected": "Atlasīts: {{displayCount}}",
+      "nSelected_one": "Atlasīts: {{displayCount}}",
+      "nSelected_other": "Atlasīts: {{displayCount}}",
+      "nSelected_zero": "Atlasīts: {{displayCount}}",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
     },
     "decision": {

@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Alle aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
+      "nSelected_one": "{{displayCount}} geselecteerd",
+      "nSelected_other": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "set": "Ingesteld",
       "notSet": "Niet ingesteld"

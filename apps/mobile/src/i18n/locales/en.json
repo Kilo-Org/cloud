@@ -1682,7 +1682,9 @@
       "allAreas": "All areas",
       "set": "Set",
       "notSet": "Not set",
+      "nSelected_one": "{{displayCount}} selected",
       "nSelected": "{{displayCount}} selected",
+      "nSelected_other": "{{displayCount}} selected",
       "proposedReviewMdGuidance": "Proposed REVIEW.md guidance"
     },
     "decision": {

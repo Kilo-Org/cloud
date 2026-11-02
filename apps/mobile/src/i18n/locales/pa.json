@@ -1616,6 +1616,8 @@
       "set": "ਸੈੱਟ ਕੀਤਾ ਹੋਇਆ",
       "notSet": "ਸੈੱਟ ਨਹੀਂ ਹੈ",
       "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_one": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_other": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
     "decision": {

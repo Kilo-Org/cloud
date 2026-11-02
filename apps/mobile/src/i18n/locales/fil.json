@@ -1616,6 +1616,8 @@
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
+      "nSelected_one": "{{displayCount}} napili",
+      "nSelected_other": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },
     "decision": {

@@ -1638,6 +1638,9 @@
       "set": "Configurat",
       "notSet": "Nu este configurat",
       "nSelected": "{{displayCount}} selectate",
+      "nSelected_one": "{{displayCount}} selectate",
+      "nSelected_other": "{{displayCount}} selectate",
+      "nSelected_few": "{{displayCount}} selectate",
       "proposedReviewMdGuidance": "Instrucțiuni propuse pentru REVIEW.md"
     },
     "decision": {

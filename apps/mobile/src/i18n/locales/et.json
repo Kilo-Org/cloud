@@ -1616,6 +1616,8 @@
       "set": "Määratud",
       "notSet": "Pole määratud",
       "nSelected": "Valitud {{displayCount}}",
+      "nSelected_one": "Valitud {{displayCount}}",
+      "nSelected_other": "Valitud {{displayCount}}",
       "proposedReviewMdGuidance": "Soovitatud REVIEW.md-juhised"
     },
     "decision": {

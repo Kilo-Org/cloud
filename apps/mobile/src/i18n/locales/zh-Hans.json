@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "所有方面",
       "nSelected": "已选 {{displayCount}} 项",
+      "nSelected_one": "已选 {{displayCount}} 项",
+      "nSelected_other": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "set": "已设置",
       "notSet": "未设置"

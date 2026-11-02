@@ -1638,6 +1638,9 @@
       "set": "Definit",
       "notSet": "No definit",
       "nSelected": "{{displayCount}} àrees seleccionades",
+      "nSelected_one": "{{displayCount}} àrees seleccionades",
+      "nSelected_other": "{{displayCount}} àrees seleccionades",
+      "nSelected_many": "{{displayCount}} àrees seleccionades",
       "proposedReviewMdGuidance": "Pautes proposades per a REVIEW.md"
     },
     "decision": {

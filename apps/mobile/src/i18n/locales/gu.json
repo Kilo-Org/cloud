@@ -1616,6 +1616,8 @@
       "set": "ગોઠવેલું",
       "notSet": "ગોઠવેલું નથી",
       "nSelected": "{{displayCount}} પસંદ કરેલ",
+      "nSelected_one": "{{displayCount}} પસંદ કરેલ",
+      "nSelected_other": "{{displayCount}} પસંદ કરેલ",
       "proposedReviewMdGuidance": "REVIEW.md માટે સૂચવેલી માર્ગદર્શિકા"
     },
     "decision": {

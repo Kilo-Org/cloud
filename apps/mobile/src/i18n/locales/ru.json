@@ -1090,6 +1090,10 @@
     "overview": {
       "allAreas": "Все области",
       "nSelected": "Выбрано: {{displayCount}}",
+      "nSelected_one": "Выбрано: {{displayCount}}",
+      "nSelected_other": "Выбрано: {{displayCount}}",
+      "nSelected_few": "Выбрано: {{displayCount}}",
+      "nSelected_many": "Выбрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Предложения для REVIEW.md",
       "set": "Задано",
       "notSet": "Не задано"

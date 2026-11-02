@@ -1616,6 +1616,8 @@
       "set": "I caktuar",
       "notSet": "I pacaktuar",
       "nSelected": "{{displayCount}} të zgjedhura",
+      "nSelected_one": "{{displayCount}} të zgjedhura",
+      "nSelected_other": "{{displayCount}} të zgjedhura",
       "proposedReviewMdGuidance": "Udhëzime të propozuara për REVIEW.md"
     },
     "decision": {

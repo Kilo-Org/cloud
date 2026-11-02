@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "सभी क्षेत्र",
       "nSelected": "{{displayCount}} चयनित",
+      "nSelected_one": "{{displayCount}} चयनित",
+      "nSelected_other": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",
       "set": "तय है",
       "notSet": "तय नहीं है"

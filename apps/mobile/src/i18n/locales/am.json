@@ -1616,6 +1616,8 @@
       "set": "ተዘጋጅቷል",
       "notSet": "አልተዘጋጀም",
       "nSelected": "{{displayCount}} የተመረጡ",
+      "nSelected_one": "{{displayCount}} የተመረጡ",
+      "nSelected_other": "{{displayCount}} የተመረጡ",
       "proposedReviewMdGuidance": "ለREVIEW.md የቀረቡ መመሪያዎች"
     },
     "decision": {

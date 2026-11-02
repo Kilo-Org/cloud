@@ -1616,6 +1616,8 @@
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_one": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_other": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
     "decision": {

@@ -1616,6 +1616,8 @@
       "set": "සකසා ඇත",
       "notSet": "සකසා නැත",
       "nSelected": "{{displayCount}} ක් තෝරා ඇත",
+      "nSelected_one": "{{displayCount}} ක් තෝරා ඇත",
+      "nSelected_other": "{{displayCount}} ක් තෝරා ඇත",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
     "decision": {

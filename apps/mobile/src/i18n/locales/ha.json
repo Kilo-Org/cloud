@@ -1616,6 +1616,8 @@
       "set": "An saita",
       "notSet": "Ba a saita ba",
       "nSelected": "An zaɓi {{displayCount}}",
+      "nSelected_one": "An zaɓi {{displayCount}}",
+      "nSelected_other": "An zaɓi {{displayCount}}",
       "proposedReviewMdGuidance": "Ƙa'idodin REVIEW.md da aka ba da shawara"
     },
     "decision": {

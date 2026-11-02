@@ -1660,6 +1660,10 @@
       "set": "Зададзена",
       "notSet": "Не зададзена",
       "nSelected": "{{displayCount}} выбрана",
+      "nSelected_one": "{{displayCount}} выбрана",
+      "nSelected_other": "{{displayCount}} выбрана",
+      "nSelected_few": "{{displayCount}} выбрана",
+      "nSelected_many": "{{displayCount}} выбрана",
       "proposedReviewMdGuidance": "Прапанаваныя рэкамендацыі для REVIEW.md"
     },
     "decision": {

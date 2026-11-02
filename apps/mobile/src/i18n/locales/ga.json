@@ -1682,6 +1682,11 @@
       "set": "Socraithe",
       "notSet": "Gan socrú",
       "nSelected": "{{displayCount}} roghnaithe",
+      "nSelected_one": "{{displayCount}} roghnaithe",
+      "nSelected_other": "{{displayCount}} roghnaithe",
+      "nSelected_few": "{{displayCount}} roghnaithe",
+      "nSelected_many": "{{displayCount}} roghnaithe",
+      "nSelected_two": "{{displayCount}} roghnaithe",
       "proposedReviewMdGuidance": "Treoir REVIEW.md molta"
     },
     "decision": {

@@ -1616,6 +1616,8 @@
       "set": "तोकिएको",
       "notSet": "तोकिएको छैन",
       "nSelected": "{{displayCount}} चयन गरिएको",
+      "nSelected_one": "{{displayCount}} चयन गरिएको",
+      "nSelected_other": "{{displayCount}} चयन गरिएको",
       "proposedReviewMdGuidance": "REVIEW.md का लागि प्रस्तावित निर्देशनहरू"
     },
     "decision": {

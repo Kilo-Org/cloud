@@ -1616,6 +1616,8 @@
       "set": "دیاری کراوە",
       "notSet": "دیاری نەکراوە",
       "nSelected": "{{displayCount}} هەڵبژێردراو",
+      "nSelected_one": "{{displayCount}} هەڵبژێردراو",
+      "nSelected_other": "{{displayCount}} هەڵبژێردراو",
       "proposedReviewMdGuidance": "ڕێنمایی پێشنیارکراوی REVIEW.md"
     },
     "decision": {

@@ -1616,6 +1616,8 @@
       "set": "მითითებულია",
       "notSet": "არ არის მითითებული",
       "nSelected": "არჩეულია {{displayCount}}",
+      "nSelected_one": "არჩეულია {{displayCount}}",
+      "nSelected_other": "არჩეულია {{displayCount}}",
       "proposedReviewMdGuidance": "შემოთავაზებული მითითებები REVIEW.md-ისთვის"
     },
     "decision": {

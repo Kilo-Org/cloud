@@ -1616,6 +1616,8 @@
       "set": "Белгіленген",
       "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
+      "nSelected_one": "{{displayCount}} таңдалды",
+      "nSelected_other": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
     "decision": {

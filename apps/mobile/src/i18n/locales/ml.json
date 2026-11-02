@@ -1616,6 +1616,8 @@
       "set": "സജ്ജമാക്കി",
       "notSet": "സജ്ജമാക്കിയിട്ടില്ല",
       "nSelected": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_one": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_other": "{{displayCount}} തിരഞ്ഞെടുത്തു",
       "proposedReviewMdGuidance": "REVIEW.md-നായി മുന്നോട്ടുവച്ച മാർഗ്ഗനിർദ്ദേശങ്ങൾ"
     },
     "decision": {

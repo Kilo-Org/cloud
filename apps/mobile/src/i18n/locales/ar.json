@@ -1096,6 +1096,12 @@
     "overview": {
       "allAreas": "جميع المجالات",
       "nSelected": "{{displayCount}} محدد",
+      "nSelected_one": "{{displayCount}} محدد",
+      "nSelected_other": "{{displayCount}} محدد",
+      "nSelected_few": "{{displayCount}} محدد",
+      "nSelected_many": "{{displayCount}} محدد",
+      "nSelected_two": "{{displayCount}} محدد",
+      "nSelected_zero": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "set": "محدّد",
       "notSet": "غير محدّد"

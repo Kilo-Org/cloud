@@ -1660,6 +1660,10 @@
       "set": "Nastaveno",
       "notSet": "Nenastaveno",
       "nSelected": "{{displayCount}} vybráno",
+      "nSelected_one": "{{displayCount}} vybráno",
+      "nSelected_other": "{{displayCount}} vybráno",
+      "nSelected_few": "{{displayCount}} vybráno",
+      "nSelected_many": "{{displayCount}} vybráno",
       "proposedReviewMdGuidance": "Návrhy pokynů do REVIEW.md"
     },
     "decision": {

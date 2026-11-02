@@ -1087,6 +1087,9 @@
     "overview": {
       "allAreas": "כל התחומים",
       "nSelected": "{{displayCount}} נבחרו",
+      "nSelected_one": "{{displayCount}} נבחרו",
+      "nSelected_other": "{{displayCount}} נבחרו",
+      "nSelected_two": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
       "set": "הוגדר",
       "notSet": "לא הוגדר"

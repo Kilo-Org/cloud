@@ -1090,6 +1090,10 @@
     "overview": {
       "allAreas": "Усі напрями",
       "nSelected": "Вибрано: {{displayCount}}",
+      "nSelected_one": "Вибрано: {{displayCount}}",
+      "nSelected_other": "Вибрано: {{displayCount}}",
+      "nSelected_few": "Вибрано: {{displayCount}}",
+      "nSelected_many": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
       "set": "Встановлено",
       "notSet": "Не встановлено"

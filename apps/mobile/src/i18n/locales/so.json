@@ -1616,6 +1616,8 @@
       "set": "La dejiyay",
       "notSet": "Lama dejin",
       "nSelected": "{{displayCount}} ayaa la doortay",
+      "nSelected_one": "{{displayCount}} ayaa la doortay",
+      "nSelected_other": "{{displayCount}} ayaa la doortay",
       "proposedReviewMdGuidance": "Hagaha REVIEW.md ee la soo jeediyay"
     },
     "decision": {

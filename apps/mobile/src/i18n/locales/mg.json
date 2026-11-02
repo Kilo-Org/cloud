@@ -1616,6 +1616,8 @@
       "set": "Voafaritra",
       "notSet": "Tsy voafaritra",
       "nSelected": "{{displayCount}} voafidy",
+      "nSelected_one": "{{displayCount}} voafidy",
+      "nSelected_other": "{{displayCount}} voafidy",
       "proposedReviewMdGuidance": "Torolalana naroso ho an'ny REVIEW.md"
     },
     "decision": {

@@ -1660,6 +1660,10 @@
       "set": "Nustatyta",
       "notSet": "Nenustatyta",
       "nSelected": "Pasirinkta {{displayCount}}",
+      "nSelected_one": "Pasirinkta {{displayCount}}",
+      "nSelected_other": "Pasirinkta {{displayCount}}",
+      "nSelected_few": "Pasirinkta {{displayCount}}",
+      "nSelected_many": "Pasirinkta {{displayCount}}",
       "proposedReviewMdGuidance": "Siūlomos REVIEW.md gairės"
     },
     "decision": {

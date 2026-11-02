@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tradueix els resums d'eines",
     "toolSummaryTranslationSubtitle": "Envia cada resum d'eina a un model perquè el tradueixi a la llengua de la teva aplicació. Es mostra l'original si la traducció falla.",
     "toolSummaryTranslationModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(common.model) per triar-ne un altre.",
+    "translateSummaries": "Tradueix els resums",
     "autoExpandThinkingInactiveSubtitle": "No té cap efecte mentre els detalls del raonament estan amagats."
   },
   "prReview": {

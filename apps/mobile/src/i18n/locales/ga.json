@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Aistrigh achoimrí uirlisí",
     "toolSummaryTranslationSubtitle": "Seol gach achoimre uirlise chuig samhail chun í a aistriú go teanga do aipe. Taispeántar an bunleagan má theipeann ar an aistriúchán.",
     "toolSummaryTranslationModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(common.model) chun ceann eile a roghnú.",
+    "translateSummaries": "Aistrigh achoimrí",
     "autoExpandThinkingInactiveSubtitle": "Níl aon éifeacht agus sonraí an mhachnaimh i bhfolach."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Eszközösszefoglalók fordítása",
     "toolSummaryTranslationSubtitle": "Küldd el az egyes eszközösszefoglalókat egy modellnek, hogy lefordítsa őket az alkalmazásod nyelvére. Ha a fordítás nem sikerül, az eredeti jelenik meg.",
     "toolSummaryTranslationModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(common.model) elemre egy másik kiválasztásához.",
+    "translateSummaries": "Összefoglalók fordítása",
     "autoExpandThinkingInactiveSubtitle": "Nincs hatása, amíg a gondolkodás részletei el vannak rejtve."
   },
   "prReview": {

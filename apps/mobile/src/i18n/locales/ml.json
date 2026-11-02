@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ടൂൾ സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
     "toolSummaryTranslationSubtitle": "ഓരോ ടൂൾ സംഗ്രഹവും നിങ്ങളുടെ ആപ്പിന്റെ ഭാഷയിലേക്ക് വിവർത്തനം ചെയ്യാൻ ഒരു മോഡലിലേക്ക് അയയ്ക്കുക. വിവർത്തനം പരാജയപ്പെട്ടാൽ യഥാർത്ഥ പാഠം കാണിക്കും.",
     "toolSummaryTranslationModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(common.model) ടാപ്പ് ചെയ്യുക.",
+    "translateSummaries": "സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
     "autoExpandThinkingInactiveSubtitle": "ചിന്തയുടെ വിശദാംശങ്ങൾ മറയ്ക്കപ്പെട്ടിരിക്കുമ്പോൾ ഇതിന് ഫലമുണ്ടാകില്ല."
   },
   "prReview": {

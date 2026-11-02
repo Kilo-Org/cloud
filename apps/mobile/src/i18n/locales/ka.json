@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
     "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
     "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს.",
+    "translateSummaries": "შეჯამებების თარგმნა",
     "autoExpandThinkingInactiveSubtitle": "მსჯელობის დეტალების დამალვისას ეფექტს არ მოახდენს."
   },
   "prReview": {

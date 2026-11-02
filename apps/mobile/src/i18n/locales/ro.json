@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tradu rezumatele instrumentelor",
     "toolSummaryTranslationSubtitle": "Trimite fiecare rezumat de instrument unui model pentru a-l traduce în limba aplicației tale. Originalul este afișat dacă traducerea eșuează.",
     "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul.",
+    "translateSummaries": "Tradu rezumatele",
     "autoExpandThinkingInactiveSubtitle": "Nu are efect cât timp detaliile raționamentului sunt ascunse."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Fassara taƙaitaccen bayanin kayan aiki",
     "toolSummaryTranslationSubtitle": "Aika kowane taƙaitaccen bayanin kayan aiki zuwa ga samfuri don fassara shi zuwa harshen manhajar ka. Ana nuna na asali idan fassarar ta kasa.",
     "toolSummaryTranslationModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(common.model) don zaɓar wani.",
+    "translateSummaries": "Fassara taƙaitaccen bayani",
     "autoExpandThinkingInactiveSubtitle": "Babu wani tasiri idan an ɓoye bayanan tunani."
   },
   "prReview": {

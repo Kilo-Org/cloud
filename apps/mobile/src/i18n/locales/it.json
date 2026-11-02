@@ -2438,6 +2438,7 @@
     "toolSummaryTranslation": "Traduci i riepiloghi degli strumenti",
     "toolSummaryTranslationSubtitle": "Invia ogni riepilogo di strumento a un modello per tradurlo nella lingua della tua app. Se la traduzione non riesce, viene mostrato l'originale.",
     "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro.",
+    "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
   "addCredits": {

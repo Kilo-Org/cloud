@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Hulpmiddelsamenvattingen vertalen",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelsamenvatting naar een model om die naar je app-taal te vertalen. Het origineel wordt getoond als de vertaling mislukt.",
     "toolSummaryTranslationModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(common.model) om een ander te kiezen.",
+    "translateSummaries": "Samenvattingen vertalen",
     "autoExpandThinkingInactiveSubtitle": "Heeft geen effect zolang de details van de gedachtegang verborgen zijn."
   },
   "notifications": {

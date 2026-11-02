@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ترجمه خلاصه‌های ابزار",
     "toolSummaryTranslationSubtitle": "هر خلاصه ابزار را به یک مدل بفرست تا آن را به زبان برنامه شما ترجمه کند. در صورت شکست ترجمه، متن اصلی نمایش داده می‌شود.",
     "toolSummaryTranslationModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(common.model) ضربه بزنید.",
+    "translateSummaries": "ترجمه خلاصه‌ها",
     "autoExpandThinkingInactiveSubtitle": "تا زمانی که جزئیات تفکر پنهان باشند، اثری ندارد."
   },
   "prReview": {

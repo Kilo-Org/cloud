@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Ittraduċi s-sommarji tal-għodod",
     "toolSummaryTranslationSubtitle": "Ibgħat kull sommarju tal-għodda lil mudell biex jittraduċih fil-lingwa tal-app tiegħek. L-oriġinal jintwera jekk it-traduzzjoni tfalli.",
     "toolSummaryTranslationModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(common.model) biex tagħżel ieħor.",
+    "translateSummaries": "Ittraduċi s-sommarji",
     "autoExpandThinkingInactiveSubtitle": "L-ebda effett meta d-dettalji tal-ħsieb ikunu moħbija."
   },
   "prReview": {

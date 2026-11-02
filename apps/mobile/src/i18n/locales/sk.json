@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Preložiť súhrny nástrojov",
     "toolSummaryTranslationSubtitle": "Pošli každý súhrn nástroja modelu, aby ho preložil do jazyka tvojej aplikácie. Ak preklad zlyhá, zobrazí sa originál.",
     "toolSummaryTranslationModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(common.model) vyberte iný.",
+    "translateSummaries": "Preložiť súhrny",
     "autoExpandThinkingInactiveSubtitle": "Nemá žiadny účinok, keď sú podrobnosti uvažovania skryté."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ಸಾಧನ ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
     "toolSummaryTranslationSubtitle": "ಪ್ರತಿ ಸಾಧನ ಸಾರಾಂಶವನ್ನು ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಗೆ ಅನುವಾದಿಸಲು ಮಾದರಿಗೆ ಕಳುಹಿಸಿ. ಅನುವಾದ ವಿಫಲವಾದರೆ ಮೂಲವನ್ನು ತೋರಿಸಲಾಗುತ್ತದೆ.",
     "toolSummaryTranslationModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(common.model) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "translateSummaries": "ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
     "autoExpandThinkingInactiveSubtitle": "ಯೋಚನೆಯ ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿದಾಗ ಯಾವುದೇ ಪರಿಣಾಮ ಇರುವುದಿಲ್ಲ."
   },
   "prReview": {

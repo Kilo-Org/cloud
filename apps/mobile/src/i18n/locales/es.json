@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Traducir resúmenes de herramientas",
     "toolSummaryTranslationSubtitle": "Envía cada resumen de herramienta a un modelo para traducirlo al idioma de tu app. Se muestra el original si la traducción falla.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(common.model) para elegir otro.",
+    "translateSummaries": "Traducir resúmenes",
     "autoExpandThinkingInactiveSubtitle": "No tiene ningún efecto mientras los detalles del razonamiento estén ocultos."
   },
   "notifications": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "టూల్ సారాంశాలను అనువదించండి",
     "toolSummaryTranslationSubtitle": "ప్రతి టూల్ సారాంశాన్ని మీ యాప్ భాషలోకి అనువదించడానికి మోడల్‌కు పంపండి. అనువాదం విఫలమైతే అసలైనది చూపబడుతుంది.",
     "toolSummaryTranslationModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(common.model) ని నొక్కండి.",
+    "translateSummaries": "సారాంశాలను అనువదించండి",
     "autoExpandThinkingInactiveSubtitle": "ఆలోచన వివరాలు దాచబడి ఉన్నప్పుడు ఎటువంటి ప్రభావం ఉండదు."
   },
   "prReview": {

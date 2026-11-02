@@ -2026,8 +2026,7 @@ export function SessionDetailContent({
   const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
   const isReadOnlyFooterPlaceholderVisible =
     isSessionStatePending && !hasBlockingInteraction && isReadOnly;
-  const isComposerSkeletonVisible =
-    isSessionStatePending && !hasBlockingInteraction && !isReadOnly;
+  const isComposerSkeletonVisible = isSessionStatePending && !hasBlockingInteraction && !isReadOnly;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.

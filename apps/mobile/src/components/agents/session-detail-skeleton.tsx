@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -80,16 +80,26 @@ export function SessionReadOnlyFooterPlaceholder() {
 }
 
 /**
- * Holds the composer's place while the session loads. Without it the composer
- * pops in on resolve and shoves the transcript up by its own height.
- * Geometry follows ChatComposer: a BlurBar wrapping the input row's
- * `p-2.5 px-3`.
+ * Holds the composer's place while the session loads: the route paints it
+ * before the session's metadata arrives, and the session screen paints it while
+ * an open that will end in a composer still has nothing to show. Without it the
+ * composer pops in on resolve and shoves the transcript up by its own height.
+ *
+ * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
+ * `p-2.5 px-3`, the field's 44 dp box at `rounded-[20px]`, and the two trailing
+ * controls at their own tap-target size — `ms-3` is the row's
+ * COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module owns it.
  */
 export function SessionComposerSkeleton() {
+  const control = Platform.OS === 'android' ? 'h-12 w-12' : 'h-11 w-11';
   return (
     <BlurBar>
-      <View className="flex-row items-center p-2.5 px-3">
-        <Skeleton className="h-9 flex-1 rounded-2xl" />
+      <View className="p-2.5 px-3">
+        <View className="flex-row items-center">
+          <Skeleton className="h-11 flex-1 rounded-[20px]" />
+          <Skeleton className={`ms-3 rounded-full ${control}`} />
+          <Skeleton className={`ms-3 rounded-full ${control}`} />
+        </View>
       </View>
     </BlurBar>
   );

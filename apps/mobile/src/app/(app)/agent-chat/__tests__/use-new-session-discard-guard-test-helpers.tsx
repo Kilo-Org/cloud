@@ -56,6 +56,7 @@ const usePreventRemoveMock = vi.hoisted(() =>
 // test stubs them. `Alert` stays mocked only so a regression that reaches for
 // the native confirm again fails here.
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Alert: { alert: alertMock },
   I18nManager: { isRTL: false },
   Modal: 'Modal',

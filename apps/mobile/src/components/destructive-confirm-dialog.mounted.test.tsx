@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',

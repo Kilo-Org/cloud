@@ -19,6 +19,7 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
  */
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
   View: 'View',

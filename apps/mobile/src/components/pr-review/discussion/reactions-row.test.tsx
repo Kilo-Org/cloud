@@ -9,6 +9,7 @@ const { moveFocus } = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',

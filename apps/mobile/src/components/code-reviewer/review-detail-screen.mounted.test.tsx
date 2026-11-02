@@ -82,6 +82,7 @@ const spectatorStream = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {

@@ -30,6 +30,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.col
 const Pressable = 'Pressable' as ElementType;
 const Check = 'Check' as ElementType;
 const View = 'View' as ElementType;
+const ScrollView = 'ScrollView' as ElementType;
 const AXE = ['Personal', 'Acme Corp', 'Cancel'];
 const mounted: { unmount: () => void }[] = [];
 
@@ -108,6 +109,11 @@ beforeEach(() => {
   onClose.mockReset();
 });
 
+/** The account list: the one scrollable region inside the sheet. */
+function list(renderer: ReactTestRenderer) {
+  return renderer.root.find(node => node.type === ScrollView);
+}
+
 describe('ContextPickerSheet', () => {
   it('renders nothing while it is closed', async () => {
     const renderer = await mount({ visible: false });
@@ -163,5 +169,31 @@ describe('ContextPickerSheet', () => {
       (sheet(renderer).props.onClose as () => void)();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Cancel outside the scrolling list, so no account count can scroll it away', async () => {
+    const renderer = await mount();
+
+    const scroll = list(renderer);
+    const cancel = renderer.root.find(
+      node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
+    );
+    expect(scroll.findAll(node => node === cancel)).toHaveLength(0);
+    // Every account row is inside the list; the heading sits above it.
+    expect(scroll.findAll(accountRow)).toHaveLength(AXE.length - 1);
+  });
+
+  it('bounds the list to half the window and lets the sheet size to its content', async () => {
+    const renderer = await mount();
+    const style: unknown = list(renderer).props.style;
+    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
+      throw new Error('the account list must carry its own height bound');
+    }
+
+    // A detent sheet hands its content the window height on Android, so the list
+    // carries the bound that keeps the sheet sized to its content (mocked window
+    // height 800).
+    expect(style.maxHeight).toBe(400);
+    expect(sheet(renderer).props.snapPoints).toBeUndefined();
   });
 });

@@ -22,7 +22,17 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
+const windowSize = vi.hoisted(() => ({ height: 800, os: 'ios' }));
+vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+  Platform: {
+    get OS() {
+      return windowSize.os;
+    },
+  },
+  View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: windowSize.height }),
+}));
 
 // Models the parts of `@expo/ui/community/bottom-sheet` this suite depends on:
 // `index` drives a native presentation, a dismissal reports through a guard that
@@ -136,6 +146,8 @@ beforeEach(() => {
   nativeSheet.mounts = 0;
   nativeSheet.synchronous = false;
   nativeSheet.dismiss = () => undefined;
+  windowSize.height = 800;
+  windowSize.os = 'ios';
   for (const ui of mounted.splice(0)) {
     ui.unmount();
   }
@@ -204,6 +216,39 @@ describe('Sheet', () => {
     }
 
     expect(node.props.handleComponent).toBeNull();
+  });
+
+  it('bounds a detent sheet content to the smallest detent on Android, less the handle band', async () => {
+    windowSize.os = 'android';
+    const { renderer } = await mount({ snapPoints: ['50%', '90%'] });
+
+    // The detent sheet's content host is the window height on Android, so the
+    // frame's own room has to bound it: 50% of 800 less the native handle band.
+    const frame = renderer.root.findAllByProps({ testID: 'sheet-content' })[0]?.parent;
+    expect(frame?.props.style).toEqual({ height: 352 });
+  });
+
+  it('leaves a content-sized sheet unbounded so it can size to its content', async () => {
+    windowSize.os = 'android';
+    const { renderer } = await mount();
+
+    const frame = renderer.root.findAllByProps({ testID: 'sheet-content' })[0]?.parent;
+    expect(frame?.props.style).toBeUndefined();
+  });
+
+  it('leaves a detent sheet unbounded where the platform sizes content to the detent', async () => {
+    const { renderer } = await mount({ snapPoints: ['50%', '90%'] });
+
+    const frame = renderer.root.findAllByProps({ testID: 'sheet-content' })[0]?.parent;
+    expect(frame?.props.style).toBeUndefined();
+  });
+
+  it('leaves a full-window detent unbounded, since its frame already excludes the system bars', async () => {
+    windowSize.os = 'android';
+    const { renderer } = await mount({ snapPoints: ['100%'] });
+
+    const frame = renderer.root.findAllByProps({ testID: 'sheet-content' })[0]?.parent;
+    expect(frame?.props.style).toBeUndefined();
   });
 
   it('starts the dismiss animation and unmounts only once the native sheet reports it', async () => {

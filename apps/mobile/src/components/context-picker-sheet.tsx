@@ -1,5 +1,5 @@
 import { Check } from '@/components/ui/icons';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
@@ -8,8 +8,12 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-/** Two detents: the account list at half height, then nearly full. */
-const SHEET_SNAP_POINTS = ['50%', '90%'];
+/**
+ * The share of the window the account list may fill before it scrolls. The
+ * heading and Cancel keep their room at the sheet's own edges, so a long
+ * membership list scrolls inside the list instead of pushing them off.
+ */
+const LIST_MAX_WINDOW_FRACTION = 0.5;
 
 type ContextPickerSheetProps = {
   visible: boolean;
@@ -28,6 +32,14 @@ type ContextPickerSheetProps = {
  * The account picker sheet draws its divider and current-account check from
  * the app palette. Each row is an action button whose selected state parallels
  * the visible check, so the account choice is available beyond color.
+ *
+ * The sheet sizes to its content rather than to a fixed detent: a detent sheet
+ * hands its React content the window height on Android (`fitToContents` is off
+ * whenever `snapPoints` are passed), so a list with flex slack overflowed the
+ * frame and left the rows past the frame — and Cancel, which sits below the
+ * list — outside the sheet. A content-sized sheet keeps the heading, the rows
+ * and Cancel in the frame at any membership count, and the list scrolls once it
+ * reaches `LIST_MAX_WINDOW_FRACTION` of the window.
  */
 export function ContextPickerSheet({
   visible,
@@ -66,20 +78,23 @@ function ContextPickerSheetBody({
 }: Readonly<Omit<ContextPickerSheetProps, 'visible'>>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const cancelLabel = options[cancelButtonIndex] ?? '';
 
   return (
-    <Sheet visible onClose={onClose} snapPoints={SHEET_SNAP_POINTS}>
-      {/* The sheet fills the detent, so the row list takes the slack and
-          scrolls: a long account list can never push Cancel off the bottom. */}
-      <View className="flex-1" style={{ paddingBottom: insets.bottom + 12 }}>
+    <Sheet visible onClose={onClose}>
+      <View style={{ paddingBottom: insets.bottom + 12 }}>
         <Text
           accessibilityRole="header"
           className="px-3 py-3 text-center text-sm font-semibold text-muted-foreground"
         >
           {title}
         </Text>
-        <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          nestedScrollEnabled
+          style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}
+          showsVerticalScrollIndicator={false}
+        >
           {options.map((label, index) => {
             if (index === cancelButtonIndex) {
               return null;

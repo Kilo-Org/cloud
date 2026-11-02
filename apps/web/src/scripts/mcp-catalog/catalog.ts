@@ -92,7 +92,7 @@ export function isDenylistedPath(path: string): boolean {
 
 /**
  * Procedure builders that reject non-admin users. `packages/web-shared/src/lib/trpc/init.ts`
- * builds every admin-only procedure from `adminProcedure`, and the other three
+ * builds every admin-only procedure from `adminProcedure`, and the other
  * variants in `apps/web/src/lib/trpc/admin-procedures.ts` chain on it, so a
  * chain whose head is any of these is admin-guarded.
  */
@@ -101,6 +101,7 @@ export const ADMIN_GUARD_PROCEDURES = [
   'creditManagerProcedure',
   'superadminProcedure',
   'sessionViewerProcedure',
+  'apiRequestLogExporterProcedure',
 ] as const;
 
 /** Instruction every generated summary must follow. */

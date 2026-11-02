@@ -157,7 +157,10 @@ function MessageBubbleImpl({
       : onRetryMessage !== undefined;
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className="gap-1 px-4 py-1">
+      /* The actions close the turn rather than opening the next one: the space
+         under them is the gap between turns, so a Retry is never read as part of
+         the message that follows it. */
+      <View className="gap-1 px-4 pt-1 pb-[16px]">
         <Text
           className="text-sm text-destructive"
           accessibilityLabel={

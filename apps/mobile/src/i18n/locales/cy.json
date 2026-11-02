@@ -741,6 +741,8 @@
       "checkFailedTitleBitbucket": "Ni lwyddwyd i wirio'r cysylltiad Bitbucket.",
       "providerCheckFailedMessage": "Nid yw statws y cysylltiad ar gael nes iddo lwytho.",
       "reconnectTitle": "Ailgysylltu â GitHub",
+      "reconnectTitleGitLab": "Ailgysylltu â GitLab",
+      "reconnectTitleBitbucket": "Ailgysylltu â Bitbucket",
       "reconnectDescription": "Dirymwyd eich cysylltiad GitHub.",
       "gitlabDescription": "Adolygu ceisiadau uno ar ffôn",
       "gitlabInstanceMismatchTitle": "Mae cysylltiad GitLab ar gyfer enghraifft arall",

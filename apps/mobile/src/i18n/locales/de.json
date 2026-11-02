@@ -2714,6 +2714,8 @@
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
+      "reconnectTitleGitLab": "GitLab erneut verbinden",
+      "reconnectTitleBitbucket": "Bitbucket erneut verbinden",
       "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
       "gitlabDescription": "Merge-Requests mobil prüfen",
       "gitlabInstanceMismatchTitle": "GitLab-Verbindung gehört zu einer anderen Instanz",

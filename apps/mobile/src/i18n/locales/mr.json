@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket कनेक्शन तपासता आले नाही.",
       "providerCheckFailedMessage": "हे लोड होईपर्यंत कनेक्शनची स्थिती उपलब्ध नाही.",
       "reconnectTitle": "GitHub पुन्हा कनेक्ट करा",
+      "reconnectTitleGitLab": "GitLab पुन्हा कनेक्ट करा",
+      "reconnectTitleBitbucket": "Bitbucket पुन्हा कनेक्ट करा",
       "reconnectDescription": "तुमचे GitHub कनेक्शन रद्द झाले आहे.",
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्टचे पुनरावलोकन करा",
       "gitlabInstanceMismatchTitle": "GitLab कनेक्शन दुसर्‍या इन्स्टन्ससाठी आहे",

@@ -12,9 +12,16 @@ export function userCanViewSessions(user: User): boolean {
   return user.is_admin && user.can_view_sessions;
 }
 
-// The permission check reads the primary so a granted or revoked permission
+export function userCanExportApiRequestLogs(user: User): boolean {
+  return user.is_admin && user.can_export_api_request_logs;
+}
+
+// Permission checks read the primary so a granted or revoked permission
 // applies to a session that is already signed in.
-export async function canCurrentUserViewSessions(kiloUserId: string): Promise<boolean> {
+async function currentUserHasPermission(
+  kiloUserId: string,
+  hasPermission: (user: User) => boolean
+): Promise<boolean> {
   const currentUser = await db.query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, kiloUserId),
   });
@@ -23,5 +30,13 @@ export async function canCurrentUserViewSessions(kiloUserId: string): Promise<bo
     return false;
   }
 
-  return currentUser.blocked_reason === null && userCanViewSessions(currentUser);
+  return currentUser.blocked_reason === null && hasPermission(currentUser);
+}
+
+export function canCurrentUserViewSessions(kiloUserId: string): Promise<boolean> {
+  return currentUserHasPermission(kiloUserId, userCanViewSessions);
+}
+
+export function canCurrentUserExportApiRequestLogs(kiloUserId: string): Promise<boolean> {
+  return currentUserHasPermission(kiloUserId, userCanExportApiRequestLogs);
 }

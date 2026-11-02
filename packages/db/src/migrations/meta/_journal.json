@@ -2269,6 +2269,13 @@
       "when": 1793629222598,
       "tag": "0323_enkrypt_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 324,
+      "version": "7",
+      "when": 1793632306051,
+      "tag": "0324_admin_api_request_log_export_permission",
+      "breakpoints": true
     }
   ]
 }

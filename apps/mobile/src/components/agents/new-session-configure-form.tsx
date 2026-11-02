@@ -292,7 +292,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       {isRemote ? (
-        <Text className="mt-2 text-xs text-muted-foreground">
+        <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}

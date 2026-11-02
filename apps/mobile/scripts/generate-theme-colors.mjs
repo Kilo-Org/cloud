@@ -20,6 +20,7 @@ export const TOKEN_KEYS = [
   ['primaryDisabled', '--primary-disabled'],
   ['secondary', '--secondary'],
   ['secondaryForeground', '--secondary-foreground'],
+  ['secondaryFill', '--secondary-fill'],
   ['muted', '--muted'],
   ['mutedForeground', '--muted-foreground'],
   ['destructive', '--destructive'],

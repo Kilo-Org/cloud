@@ -2,7 +2,11 @@ import 'server-only';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
-import type { AdminAccessSurface } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  organizationTarget,
+  recordKiloAdminElevation,
+  type AdminAccessSurface,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -10,9 +14,12 @@ import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   effectiveMembershipRole,
+  loadEffectiveMembershipRows,
   loadEffectiveMembershipRowsWithOrganization,
+  observeMembershipRole,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { evaluateSupportAccess } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   findSupportAllowEntry,
@@ -88,14 +95,76 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
-  let memberRows: Awaited<ReturnType<typeof loadEffectiveMembershipRowsWithOrganization>> = [];
-  try {
-    memberRows = await loadEffectiveMembershipRowsWithOrganization(user.id, organizationId);
-  } catch (membershipError) {
-    if (!user.is_admin) throw membershipError;
+  const mode = getSupportAccessMode();
+
+  if (user.is_admin && mode !== 'enforce') {
+    // Parent ordering: record the elevation before awaiting the organization
+    // lookup, so a missing/deleted organization or a DB error is still
+    // attributed. In observe, also evaluate the would-be support decision.
+    const organizationResult = getOrganizationById(organizationId).then(
+      value => ({ ok: true as const, value }),
+      error => ({ ok: false as const, error })
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(user.id, organizationId),
+      roles
+    );
+    const evaluation =
+      mode === 'observe'
+        ? await evaluateSupportAccess({
+            actorKiloUserId: user.id,
+            organizationId,
+            requiredActionClass:
+              options.requiredActionClass ??
+              (requestMethod === 'GET' ? 'support_read' : 'support_write'),
+            roles,
+            surface: (surface ?? 'rest') as SupportSurface,
+            key: options.supportKey ?? null,
+            supportActionId: options.supportKey ?? null,
+          })
+        : null;
+    await recordKiloAdminElevation(
+      {
+        user,
+        tokenSource,
+        internalApiUse,
+        delegatedWorkload: cloudAgentAuthority !== undefined,
+        auditSurface: surface ?? 'rest',
+        auditMethod: requestMethod,
+      },
+      {
+        reason: 'organization_access_rest',
+        target: organizationTarget(organizationId),
+        ...observation,
+        supportDecision: evaluation?.decision ?? null,
+        supportGrantId: evaluation?.grantId ?? null,
+        supportActionId: options.supportKey ?? null,
+        inventoryId: null,
+      }
+    );
+    const lookup = await organizationResult;
+    if (!lookup.ok) throw lookup.error;
+    const organization = lookup.value;
+    if (!organization) {
+      const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return { success: false, nextResponse: res };
+    }
+    return successResult({
+      data: {
+        user: { ...user, role: 'owner' },
+        organization,
+        access: {
+          kind: 'legacy_admin',
+          role: 'owner',
+          wouldBe: evaluation?.decision ?? null,
+        },
+      },
+    });
   }
+
+  const memberRows = await loadEffectiveMembershipRowsWithOrganization(user.id, organizationId);
   const memberRole = effectiveMembershipRole(memberRows, roles);
-  if (memberRole && (!user.is_admin || getSupportAccessMode() === 'enforce')) {
+  if (memberRole) {
     const organization = memberRows.find(row => row.role === memberRole)?.organization;
     if (organization) {
       return successResult({
@@ -106,6 +175,20 @@ export async function getAuthorizedOrgContext(
         },
       });
     }
+  }
+
+  if (!user.is_admin) {
+    warnInSentry(
+      `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
+    );
+    const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    return { success: false, nextResponse: res };
+  }
+
+  const organization = await getOrganizationById(organizationId);
+  if (!organization) {
+    const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    return { success: false, nextResponse: res };
   }
 
   let access: OrganizationAccess;
@@ -127,6 +210,8 @@ export async function getAuthorizedOrgContext(
         supportKey: options.supportKey ?? null,
         requiredActionClass: options.requiredActionClass,
         auditReason: 'organization_access_rest',
+        membershipRows: memberRows,
+        organizationIsLive: true,
       }
     );
   } catch (accessError) {
@@ -138,12 +223,6 @@ export async function getAuthorizedOrgContext(
       return { success: false, nextResponse: res };
     }
     throw accessError;
-  }
-
-  const organization = await getOrganizationById(organizationId);
-  if (!organization) {
-    const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-    return { success: false, nextResponse: res };
   }
 
   return successResult({

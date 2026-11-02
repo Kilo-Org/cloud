@@ -212,6 +212,10 @@ export type ResolveOrganizationAccessOptions = {
   auditReason?: KiloAdminElevationReason;
   /** `ensureOrganizationAccessAndFetchOrg` attributes the attempt before the fetch. */
   skipOrganizationLiveness?: boolean;
+  /** Reuse a membership read the caller already performed. */
+  membershipRows?: { role: OrganizationRole }[];
+  /** Reuse a liveness check the caller already performed. */
+  organizationIsLive?: boolean;
 };
 
 function supportKeyFor(
@@ -290,16 +294,20 @@ export async function resolveOrganizationAccess(
   organizationId: Organization['id'],
   options: ResolveOrganizationAccessOptions = {}
 ): Promise<OrganizationAccess> {
-  let rows: Awaited<ReturnType<typeof loadEffectiveMembershipRows>>;
+  let rows: { role: OrganizationRole }[];
   let membershipObserved = true;
-  try {
-    rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId);
-  } catch (membershipError) {
-    // Elevation telemetry must never be the reason a request fails, and an
-    // admin fallback still has to work when the membership read is unavailable.
-    if (!ctx.user.is_admin) throw membershipError;
-    membershipObserved = false;
-    rows = [];
+  if (options.membershipRows) {
+    rows = options.membershipRows;
+  } else {
+    try {
+      rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId);
+    } catch (membershipError) {
+      // Elevation telemetry must never be the reason a request fails, and an
+      // admin fallback still has to work when the membership read is unavailable.
+      if (!ctx.user.is_admin) throw membershipError;
+      membershipObserved = false;
+      rows = [];
+    }
   }
   const mode: SupportAccessMode = getSupportAccessMode();
   const isAdmin = ctx.user.is_admin;
@@ -321,11 +329,11 @@ export async function resolveOrganizationAccess(
     });
   }
 
-  if (!options.skipOrganizationLiveness && !(await isLiveOrganization(organizationId))) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Organization not found',
-    });
+  if (!options.skipOrganizationLiveness) {
+    const live = options.organizationIsLive ?? (await isLiveOrganization(organizationId));
+    if (!live) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
   }
 
   if (rows.length > 0) {
@@ -501,7 +509,7 @@ export async function requireLiveOrganizationForPlatformAdmin(
     reason: 'organization_access',
     target: organizationTarget(organizationId),
     ...observation,
-    supportDecision: getSupportAccessMode() === 'off' ? null : 'deny_not_allowlisted',
+    supportDecision: null,
   });
 }
 
@@ -670,7 +678,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
   organizationId: Organization['id'],
   roles?: OrganizationRole[]
 ): Promise<Organization> {
-  if (ctx.user.is_admin && getSupportAccessMode() !== 'enforce') {
+  if (ctx.user.is_admin && getSupportAccessMode() === 'off') {
     const organizationResult = settle(
       db
         .select()
@@ -703,14 +711,16 @@ export async function ensureOrganizationAccessAndFetchOrg(
   }
 
   if (ctx.user.is_admin) {
-    await resolveOrganizationAccess(ctx, organizationId, {
-      roles,
-      auditReason: 'organization_fetch',
-    });
     const organization = await getOrganizationById(organizationId);
     if (!organization) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
     }
+    await resolveOrganizationAccess(ctx, organizationId, {
+      roles,
+      auditReason: 'organization_fetch',
+      membershipRows: rows,
+      organizationIsLive: true,
+    });
     return organization;
   }
 

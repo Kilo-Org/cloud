@@ -135,6 +135,24 @@ describe('getAuthorizedOrgContext', () => {
       });
     });
 
+    test('records the elevation before returning 404 for a missing organization', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+      try {
+        const result = await getAuthorizedOrgContext(crypto.randomUUID(), undefined, {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) expect(result.nextResponse.status).toBe(404);
+      } finally {
+        setAdminAccessSinkForTest(null);
+      }
+      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+        reason: 'organization_access_rest',
+      });
+    });
+
     test('should allow admin users even if they are not in organization_memberships', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
 

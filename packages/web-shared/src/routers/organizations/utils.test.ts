@@ -5,6 +5,7 @@ import {
   ensureOrganizationAccessAndFetchOrg,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
+  requireLiveOrganizationForPlatformAdmin,
 } from './utils';
 import {
   setAdminAccessSinkForTest,
@@ -701,6 +702,42 @@ describe('mode-aware support organization access', () => {
       membershipRole: 'owner',
       wouldPassWithoutAdmin: true,
       supportDecision: null,
+    });
+  });
+
+  test('platform operations record no support denial in observe', async () => {
+    setSupportAccessModeForTest('observe');
+    const { organization, admin } = await orgAndAdmin();
+
+    await requireLiveOrganizationForPlatformAdmin(readCtx(admin), organization.id, ['owner']);
+
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      reason: 'organization_access',
+      supportDecision: null,
+    });
+  });
+
+  test('the fetch helper records the observe support decision', async () => {
+    setSupportAccessModeForTest('observe');
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(
+        { ...readCtx(admin), trpcPath: 'codeIndexing.search' },
+        organization.id
+      )
+    ).resolves.toMatchObject({ id: organization.id });
+
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      reason: 'organization_fetch',
+      supportDecision: 'support_grant',
     });
   });
 

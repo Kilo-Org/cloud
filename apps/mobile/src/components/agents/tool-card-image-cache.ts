@@ -1,43 +1,44 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
+
+import { createPartSubscriptions } from './part-subscriptions';
 
 const CACHE_DIR_NAME = 'tool-card-images';
 
 /** part ids currently writing or already written this process lifetime */
 const inFlightOrDone = new Set<string>();
+/** part ids whose write is in flight; the card shows a loading surface instead
+ *  of reporting the attachment unavailable. */
+const pendingPartIds = new Set<string>();
 
 /** Reactive map of partId → file:// URI, updated only after a successful write. */
 const urisByPartId = new Map<string, string>();
-const listeners = new Set<() => void>();
-/** Bumped on every URI map mutation so useSyncExternalStore sees a new snapshot. */
-let urisVersion = 0;
+/** Per-part snapshot counter, so a subscriber re-renders on every state change
+ *  of its own part (a landed URI, or a pending write turning into a failure)
+ *  and is never woken by another part. */
+const versionByPartId = new Map<string, number>();
+const subscriptions = createPartSubscriptions();
+/** Bumped by every reset; a write that started before a reset never publishes
+ *  its URI into the next account's map. */
+let cacheGeneration = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
 
-function emitChange(): void {
-  urisVersion += 1;
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function getVersionSnapshot(): number {
-  return urisVersion;
+/** Wake the subscribers of one part whose state changed. */
+function emitChange(partId: string): void {
+  versionByPartId.set(partId, (versionByPartId.get(partId) ?? 0) + 1);
+  subscriptions.notify(partId);
 }
 
 function ensureCacheDirectory(): Directory {
   if (!cacheDirectory) {
-    cacheDirectory = new Directory(Paths.cache, CACHE_DIR_NAME);
-    cacheDirectory.create({ idempotent: true, intermediates: true });
+    const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
+    directory.create({ idempotent: true, intermediates: true });
+    // Assign only after create() returns: a directory whose creation threw must
+    // not be memoized, or every later attachment would inherit the failure.
+    cacheDirectory = directory;
   }
   return cacheDirectory;
 }
@@ -101,16 +102,19 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
   return safe.replace(new RegExp(`-${pattern}(?!.*-${pattern})`), '.');
 }
 
-function recordUri(partId: string, uri: string): void {
-  urisByPartId.set(partId, uri);
-  emitChange();
-}
-
 /**
  * Fire-and-forget sink for completed tool-part attachments.
  * Never throws. First attachment wins for a multi-attachment part (no tool
  * emits multi-attachment parts today; documented, not handled specially beyond
  * the part-id Set which also covers that case).
+ *
+ * The part id is marked synchronously so a live-stream pass and a history-replay
+ * pass cannot double-write it, and the card renders a loading surface while the
+ * body is written. The directory create and the exists check are synchronous
+ * native calls on the caller's turn; the base64 decode and the disk write are
+ * not — `await file.write(...)` hands those to the native file-system thread, so
+ * an arbitrarily large attachment no longer holds the JS thread that publishes
+ * the stream. The URI is recorded when the write resolves.
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
@@ -121,34 +125,41 @@ export function cacheToolAttachment(
   partId: string,
   { mime, dataUrl, filename }: Readonly<{ mime: string; dataUrl: string; filename?: string }>
 ): void {
-  try {
-    if (inFlightOrDone.has(partId)) {
-      return;
-    }
-    // Mark synchronously so a live-stream pass and a history-replay pass
-    // cannot double-write the same part.
-    inFlightOrDone.add(partId);
-
-    const payload = stripDataUrlBase64Prefix(dataUrl, mime);
-    if (payload === undefined || payload.length === 0) {
-      inFlightOrDone.delete(partId);
-      return;
-    }
-
-    const directory = ensureCacheDirectory();
-    const cacheFilename = cacheFilenameForAttachment(partId, mime, filename);
-    const file = new File(directory, cacheFilename);
-
-    if (file.exists) {
-      recordUri(partId, file.uri);
-      return;
-    }
-
-    file.writeSync(payload, { encoding: 'base64' });
-    recordUri(partId, file.uri);
-  } catch {
-    inFlightOrDone.delete(partId);
+  if (inFlightOrDone.has(partId)) {
+    return;
   }
+  // Mark synchronously so a live-stream pass and a history-replay pass cannot
+  // double-write the same part.
+  inFlightOrDone.add(partId);
+
+  const payload = stripDataUrlBase64Prefix(dataUrl, mime);
+  if (payload === undefined || payload.length === 0) {
+    inFlightOrDone.delete(partId);
+    return;
+  }
+
+  const generation = cacheGeneration;
+  pendingPartIds.add(partId);
+  emitChange(partId);
+  void (async () => {
+    try {
+      const directory = ensureCacheDirectory();
+      const file = new File(directory, cacheFilenameForAttachment(partId, mime, filename));
+      if (!file.exists) {
+        await file.write(payload, { encoding: 'base64' });
+      }
+      pendingPartIds.delete(partId);
+      if (generation === cacheGeneration) {
+        urisByPartId.set(partId, file.uri);
+      }
+      emitChange(partId);
+    } catch {
+      // A failed create or write clears the mark so the next pass retries.
+      pendingPartIds.delete(partId);
+      inFlightOrDone.delete(partId);
+      emitChange(partId);
+    }
+  })();
 }
 
 /**
@@ -166,20 +177,33 @@ export function getToolCardImageUri(partId: string): string | undefined {
   return urisByPartId.get(partId);
 }
 
+/** True while the part's body is being written and no URI is recorded yet. */
+export function isToolCardImagePending(partId: string): boolean {
+  return pendingPartIds.has(partId);
+}
+
 /**
  * Reactive lookup of a cached tool-card image URI.
  * Returns `undefined` until a successful write (or a pre-existing file) is
- * recorded for `partId`.
+ * recorded for `partId`. Each hook subscribes to its own part, so a change to
+ * one attachment's state re-renders only the cards mounted for that part.
  */
 export function useToolCardImageUri(partId: string): string | undefined {
-  useSyncExternalStore(subscribe, getVersionSnapshot, getVersionSnapshot);
+  const subscribe = useCallback(
+    (listener: () => void) => subscriptions.subscribe(partId, listener),
+    [partId]
+  );
+  const getSnapshot = useCallback(() => versionByPartId.get(partId) ?? 0, [partId]);
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return urisByPartId.get(partId);
 }
 
 /**
  * Delete the on-disk cache directory (if present) and reset the in-memory
  * maps for sign-out or account switch. Best-effort: a delete failure never
- * throws and never blocks the teardown.
+ * throws. The modern file-system API only deletes synchronously, so this runs
+ * on the teardown's own turn; a write still in flight when it runs sees the
+ * bumped generation and records nothing.
  */
 export function clearToolCardImageCache(): void {
   try {
@@ -190,16 +214,22 @@ export function clearToolCardImageCache(): void {
   } catch {
     // Best-effort cache hygiene; ignore delete failures.
   }
+  cacheGeneration += 1;
   inFlightOrDone.clear();
+  pendingPartIds.clear();
   urisByPartId.clear();
+  versionByPartId.clear();
   cacheDirectory = undefined;
-  emitChange();
+  subscriptions.notifyAll();
 }
 
 /** Test-only: clear in-memory state between cases. */
 export function __resetToolCardImageCacheForTests(): void {
+  cacheGeneration += 1;
   inFlightOrDone.clear();
+  pendingPartIds.clear();
   urisByPartId.clear();
+  versionByPartId.clear();
   cacheDirectory = undefined;
-  emitChange();
+  subscriptions.notifyAll();
 }

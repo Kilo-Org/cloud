@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Pressable } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -18,7 +18,7 @@ type SegmentedControlProps<T extends string> = {
 
 /**
  * Horizontal segmented pill. Owns the selection haptic — callers must NOT
- * fire their own `Haptics.selectionAsync()` on press. The haptic only fires
+ * fire their own `selectionHaptic()` on press. The haptic only fires
  * on an actual change of selection, not when the current value is re-tapped.
  */
 export function SegmentedControl<T extends string>({
@@ -39,7 +39,7 @@ export function SegmentedControl<T extends string>({
               if (selected) {
                 return;
               }
-              void Haptics.selectionAsync();
+              selectionHaptic();
               onChange(option.value);
             }}
             className={cn(

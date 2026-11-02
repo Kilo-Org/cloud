@@ -1,5 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,7 +22,7 @@ export async function handleMessageDetailsCopy(
     if (!copied) {
       return false;
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     return true;
   } catch {
     return false;

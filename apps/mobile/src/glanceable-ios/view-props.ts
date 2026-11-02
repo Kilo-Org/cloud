@@ -12,7 +12,7 @@ import {
   type HomeWidgetPresentation,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 import {
   type GlanceableCountKind,

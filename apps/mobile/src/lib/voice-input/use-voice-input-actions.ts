@@ -5,6 +5,7 @@ import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { impactHaptic } from '@/lib/haptics';
 
 import {
   type VoiceInputControllerSnapshot,
@@ -58,16 +59,8 @@ type VoiceInputActionsConfig = {
   getUserId: () => string | undefined;
 };
 
-async function fireHaptic(style: Haptics.ImpactFeedbackStyle): Promise<void> {
-  try {
-    await Haptics.impactAsync(style);
-  } catch {
-    // Haptic feedback is best-effort; never surface failures to the user.
-  }
-}
-
 function announceVoiceInputListening(): void {
-  void fireHaptic(Haptics.ImpactFeedbackStyle.Light);
+  impactHaptic(Haptics.ImpactFeedbackStyle.Light);
   AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.listening'));
 }
 
@@ -215,7 +208,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
 
     if (view.isActive && snapshot.status === 'listening') {
-      void fireHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
       await controller.stop(owner);
       return;
     }

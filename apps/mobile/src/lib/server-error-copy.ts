@@ -6,6 +6,8 @@
 // sentences, matched whole; anything unrecognized falls back to the localized
 // generic line, and a raw server sentence never reaches a screen.
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+
 import { i18n } from '@/i18n';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -88,6 +90,32 @@ function copyKeyFor(message: string): string | undefined {
     case ORGANIZATION_INVITE_MISSING_MESSAGE: {
       return 'queryError.notFoundDescription';
     }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found: {
+      return 'queryError.notFoundDescription';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled: {
+      // `assertEnabled` gates save, reject and approve alike, so this line must
+      // not describe one action's outcome.
+      return 'codeReviewer.reviewMemory.offAction';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_in_progress: {
+      return 'codeReviewer.reviewMemory.changeRequestInProgress';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_actionable: {
+      return 'codeReviewer.reviewMemory.changeRequestNotActionable';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.no_github_integration: {
+      return 'codeReviewer.reviewMemory.changeRequestNoGitHubAccess';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions: {
+      return 'codeReviewer.reviewMemory.changeRequestMissingPermissions';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_failed: {
+      return 'codeReviewer.reviewMemory.changeRequestFailed';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict: {
+      return 'codeReviewer.reviewMemory.proposalConflict';
+    }
     default: {
       return undefined;
     }
@@ -95,12 +123,22 @@ function copyKeyFor(message: string): string | undefined {
 }
 
 /**
+ * The catalog key for a server sentence the app explains, or `null` when it has
+ * none. Surfaces that persist a failure (or re-translate it after a language
+ * change) keep the key; everything that renders once reads
+ * `knownServerErrorMessage`.
+ */
+export function knownServerErrorCopyKey(error: unknown): string | null {
+  const message = readTrpcErrorField(error, 'message');
+  return message == null ? null : (copyKeyFor(message) ?? null);
+}
+
+/**
  * The localized copy for a server rejection the app knows how to explain, or
  * `null` when it carries no explanation of its own.
  */
 export function knownServerErrorMessage(error: unknown): string | null {
-  const message = readTrpcErrorField(error, 'message');
-  const key = message == null ? undefined : copyKeyFor(message);
+  const key = knownServerErrorCopyKey(error);
   return key == null ? null : i18n.t(key);
 }
 

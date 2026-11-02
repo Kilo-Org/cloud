@@ -223,6 +223,23 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
+  it('keeps the drag off a sheet that asks before closing', async () => {
+    // A drag has already taken the native sheet down when the question is asked,
+    // so a refused request could only answer Keep editing into an empty window.
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ dismissible: true, onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // The dismissal paths that ask first stay reachable, and the caller still
+    // decides the answer.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    expect(booleanHandler(sheetNode.props.onRequestDismiss)()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
   it('closes when the sheet dismisses', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();

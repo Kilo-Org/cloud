@@ -4,6 +4,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { type ProposalDraft } from '@/lib/review-memory-proposals';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Review memory only exists for GitHub, so the owner input pins the platform
@@ -37,7 +38,7 @@ export function useSetReviewMemoryEnabled(scope: string) {
       });
     },
     onError: error => {
-      announcingToast.error(error.message);
+      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
     },
   });
 }
@@ -46,8 +47,8 @@ export function useReviewMemoryProposalActions(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ownerInput = reviewMemoryOwnerInput(scope);
-  const onError = (error: { message: string }) => {
-    announcingToast.error(error.message);
+  const onError = (error: unknown) => {
+    announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
   };
   const onSettled = async () => {
     await Promise.all([

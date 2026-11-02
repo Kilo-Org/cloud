@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { isSameDolthubOrg, rigHandleFormatError } from '@kilocode/wl-sdk';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { resolveWasteland } from './resolve-wasteland';
@@ -13,6 +14,7 @@ import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
+import { bindCredentialToken } from '../util/credential-binding.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
@@ -387,8 +389,36 @@ export const wastelandRouter = router({
         token = await decryptToken(credential.encrypted_token, cryptoKey);
       }
 
+      // The credential row is one unit: the token this flow acts with and
+      // the org it acts for are written together. When the row already
+      // names the same org its ciphertext stays; otherwise this flow's
+      // token is recorded for that org, which needs the encryption key.
+      // Resolved here so a call that cannot write a coherent row stops
+      // before the bootstrap creates anything.
+      const binding = await bindCredentialToken(ctx.env, {
+        existing: credential,
+        org: dolthubOrg,
+        token,
+      });
+      if (binding.status === 'key-unavailable') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
+      }
+
       const config = await doStub.getConfig();
       const handle = input.rigHandle ?? credential.rig_handle ?? dolthubOrg;
+      // A handle the caller picked becomes the credential's identity right
+      // after the bootstrap, so it has to be well formed. The derived
+      // fallbacks are a DoltHub username/org and an already stored handle,
+      // which are used as they are.
+      if (input.rigHandle !== undefined) {
+        const handleError = rigHandleFormatError(input.rigHandle);
+        if (handleError !== null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: handleError });
+        }
+      }
       const displayName = input.rigDisplayName ?? config?.name ?? handle;
       const ownerEmail = input.rigEmail ?? `${handle}@kilo.local`;
 
@@ -412,6 +442,23 @@ export const wastelandRouter = router({
       }
 
       await doStub.updateConfig({ dolthub_upstream: input.upstream });
+
+      // The bootstrap wrote to `result.upstreamOwner`'s repository, so
+      // that is the org DoltHub proved for this token. The credential's
+      // rig handle is the caller's identity, and its org has to be that
+      // same proven org; when it is not, this call records no new handle
+      // or proof — the credential keeps what it already held for that
+      // same org — and a flow that establishes this org (the join)
+      // records them later.
+      const orgProven = isSameDolthubOrg(result.upstreamOwner, dolthubOrg);
+      await doStub.storeCredential({
+        userId: ctx.userId,
+        encryptedToken: binding.encryptedToken,
+        dolthubOrg: binding.dolthubOrg,
+        rigHandle: orgProven ? handle : undefined,
+        provenOrg: orgProven ? result.upstreamOwner : undefined,
+        isUpstreamAdmin: credential.is_upstream_admin,
+      });
 
       // Sync the new upstream onto the central registry so the
       // `<owner>/<repo>` lookup contract returns this wasteland.
@@ -763,6 +810,12 @@ export const wastelandRouter = router({
       return config;
     }),
 
+  // Stores the DoltHub token and org for this wasteland. `rigHandle` is
+  // accepted only so older clients keep working — it is deliberately not
+  // written: the handle is the caller's identity inside the wasteland, so
+  // only a flow that proved ownership (joinWasteland, or createUpstream
+  // for an upstream the caller just created) sets it. Re-storing
+  // credentials keeps a stored handle for the org it was recorded for.
   storeCredential: procedure
     .input(
       z.object({
@@ -792,7 +845,6 @@ export const wastelandRouter = router({
         userId: ctx.userId,
         encryptedToken,
         dolthubOrg: input.dolthubOrg,
-        rigHandle: input.rigHandle,
         isUpstreamAdmin: input.isUpstreamAdmin,
       });
 

@@ -64,6 +64,7 @@ import {
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeCloudAgentRootSessionsCursor,
+  encodeCloudAgentWorkspacesCursor,
   encodeKiloSdkMessagesCursor,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
@@ -76,6 +77,7 @@ import {
   messageIdSchema,
   partIdSchema,
   validateCloudAgentRootSessionsCursor,
+  validateCloudAgentWorkspacesCursor,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, lt, or, sql, SQL } from 'drizzle-orm';
@@ -2165,43 +2167,69 @@ describe('Kilo SDK message cursor codec', () => {
   });
 });
 
-describe('Cloud Agent root sessions cursor codec', () => {
-  const updatedAt = '2026-05-28 09:13:37.651263+00';
-  const cursor = { version: 1, updatedAt, sessionId: sdkSessionInfoFixture.id } as const;
+/**
+ * Every opaque cursor family must accept exactly the canonical unpadded
+ * base64url form of its own payload, so the shared codec is exercised the same
+ * way for each family.
+ */
+function describeOpaqueCursorWireRules<TPayload extends { updatedAt: string }>(params: {
+  title: string;
+  encode(cursor: TPayload): string;
+  decode(cursor: string): TPayload;
+  validate(cursor: string): boolean;
+  payload: TPayload;
+}): void {
+  describe(params.title, () => {
+    it('round-trips a canonical cursor', () => {
+      const encoded = params.encode(params.payload);
 
-  it('round-trips a canonical cursor', () => {
-    const encoded = encodeCloudAgentRootSessionsCursor({
-      updatedAt,
-      sessionId: cursor.sessionId,
+      expect(params.decode(encoded)).toEqual({ version: 1, ...params.payload });
+      expect(params.validate(encoded)).toBe(true);
     });
 
-    expect(decodeCloudAgentRootSessionsCursor(encoded)).toEqual(cursor);
-    expect(validateCloudAgentRootSessionsCursor(encoded)).toBe(true);
+    it('rejects values outside the base64url charset', () => {
+      expect(params.validate('abc+def')).toBe(false);
+      expect(params.validate('abc/def')).toBe(false);
+    });
+
+    it('rejects a non-canonical encoding of an otherwise valid payload', () => {
+      const spaced = JSON.stringify({ version: 1, ...params.payload }).replace(',', ', ');
+      const nonCanonical = btoa(spaced).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+
+      expect(params.validate(nonCanonical)).toBe(false);
+      expect(() => params.decode(nonCanonical)).toThrow(/cursor/);
+    });
+
+    it('rejects bytes that are not valid UTF-8', () => {
+      const invalidUtf8 = btoa(String.fromCharCode(0xff, 0xfe))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+
+      expect(params.validate(invalidUtf8)).toBe(false);
+    });
   });
+}
 
-  it('rejects values outside the base64url charset', () => {
-    expect(validateCloudAgentRootSessionsCursor('abc+def')).toBe(false);
-    expect(validateCloudAgentRootSessionsCursor('abc/def')).toBe(false);
-  });
+const cursorUpdatedAt = '2026-05-28 09:13:37.651263+00';
 
-  it('rejects a non-canonical encoding of an otherwise valid payload', () => {
-    const spaced = `{"version":1, "updatedAt":${JSON.stringify(updatedAt)},"sessionId":${JSON.stringify(
-      cursor.sessionId
-    )}}`;
-    const nonCanonical = btoa(spaced).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+describeOpaqueCursorWireRules<{ updatedAt: string; sessionId: string }>({
+  title: 'Cloud Agent root sessions cursor codec',
+  encode: encodeCloudAgentRootSessionsCursor,
+  decode: decodeCloudAgentRootSessionsCursor,
+  validate: validateCloudAgentRootSessionsCursor,
+  payload: { updatedAt: cursorUpdatedAt, sessionId: sdkSessionInfoFixture.id },
+});
 
-    expect(validateCloudAgentRootSessionsCursor(nonCanonical)).toBe(false);
-    expect(() => decodeCloudAgentRootSessionsCursor(nonCanonical)).toThrow(/cursor/);
-  });
-
-  it('rejects bytes that are not valid UTF-8', () => {
-    const invalidUtf8 = btoa(String.fromCharCode(0xff, 0xfe))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-
-    expect(validateCloudAgentRootSessionsCursor(invalidUtf8)).toBe(false);
-  });
+describeOpaqueCursorWireRules<{ updatedAt: string; workspaceId: string }>({
+  title: 'Cloud Agent workspaces cursor codec',
+  encode: encodeCloudAgentWorkspacesCursor,
+  decode: decodeCloudAgentWorkspacesCursor,
+  validate: validateCloudAgentWorkspacesCursor,
+  payload: {
+    updatedAt: cursorUpdatedAt,
+    workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
+  },
 });
 
 describe('SessionIngestRPC.resolveCloudAgentRootSessionForKiloSession', () => {

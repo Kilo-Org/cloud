@@ -8,9 +8,9 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -18,17 +18,25 @@ import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
+import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import {
+  DashboardSections,
+  DashboardSectionsSkeleton,
+} from '@/components/security-agent/dashboard-sections';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentDashboardStats,
@@ -36,7 +44,13 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
-import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
+import {
+  isSecuritySyncRetryable,
+  securitySyncPreconditionFor,
+  securitySyncReconcileCopy,
+} from '@/lib/security-agent-ledger';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import {
   securityDismissFailureCopy,
   useSecurityDismissFailures,
@@ -44,10 +58,15 @@ import {
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+
+// The input one sync attempt carries: the repository filter it was started
+// under, and the operation key a reconcile row replays.
+type SyncIntent = { repoFullName?: string; operationKey?: string };
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -55,24 +74,49 @@ const METRIC_TONE_CLASS = {
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
-export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+/**
+ * The metric tile's frame, shared with its placeholder so the loading state
+ * cannot drift from the rendered card.
+ */
+const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
+
+// One placeholder per tile: the metrics fill four of them with or without SLA
+// deadlines. Each bar is the loaded line's own box at the app's default text
+// size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
+// — so the tile's height comes out the same and the loaded cards replace the
+// placeholders without moving anything below them. The detail bar is the one
+// line the loaded tile may not carry, so it is drawn only for the scope shape
+// that carries it.
+const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
+const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
+const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
+const STAT_DETAIL_LINE_CLASS = 'h-[15px] rounded';
+
+export function buildLocalizedMetrics(
+  data: DashboardStats,
+  slaEnabled: boolean,
+  neverSynced = false
+) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
   // The tile value counts every severity, so the detail line names every
   // severity: medium and low share one bucket, which disappears while empty.
-  // Mirrors severityBreakdownDetail in @kilocode/app-shared.
+  // Mirrors severityBreakdownDetail in @kilocode/app-shared. Each bucket is a
+  // counted phrase of its own, because one `count` cannot agree three numbers.
   const breakdownDetail = (counts: DashboardStats['severity']) => {
-    const parts = { critical: number(counts.critical), high: number(counts.high) };
+    const critical = severityCountPhrase('breakdownCritical', counts.critical);
+    const high = severityCountPhrase('breakdownHigh', counts.high);
     const mediumLow = counts.medium + counts.low;
     return mediumLow > 0
       ? i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetailWithMediumLow', {
-          ...parts,
-          mediumLow: number(mediumLow),
+          critical,
+          high,
+          mediumLow: severityCountPhrase('breakdownMediumLow', mediumLow),
         })
-      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
+      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', { critical, high });
   };
 
-  return metrics.map(metric => {
+  const localized = metrics.map(metric => {
     switch (metric.id) {
       case 'openFindings': {
         return Object.assign(metric, {
@@ -109,10 +153,11 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           : null;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
-          value:
-            compliance === null
-              ? i18n.t('securityAgent.dashboard.notMeasured')
-              : formatPercent(compliance, i18n.language),
+          // An unmeasured value is a dash in the numeric slot, not a word: the
+          // tile's value style is the large mono count, so "Not measured" read
+          // as a heavy placeholder that outweighed the real counts beside it,
+          // and the detail line below already explains why there is none.
+          value: compliance === null ? UNMEASURED_VALUE : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
                 within: number(data.sla.overall.withinSla),
@@ -158,12 +203,30 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
     }
   });
+
+  // Before the first sync nothing has been measured, so every tile read a zero
+  // count and, under it, a line that described the zeros as a clean report
+  // ("All open findings tracked", "No findings have an SLA deadline yet").
+  // The filter row above already states that nothing has synced, so a dash in
+  // the numeric slot carries the measurement's absence and the tile keeps no
+  // detail line to repeat the status.
+  if (!neverSynced) {
+    return localized;
+  }
+  return localized.map(metric =>
+    Object.assign(metric, {
+      value: UNMEASURED_VALUE,
+      detail: '',
+      tone: 'neutral' as const,
+    })
+  );
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -174,7 +237,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
   const lastSync = useSecurityAgentLastSyncTime(scope, repoFullName);
   const repositories = useSecurityAgentRepositories(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const canManage = capability.canManage;
+  // The entry renders this dashboard without waiting for the role read when the
+  // config is already cached, so a failed read must say so here: otherwise a
+  // manager sees the audit action silently missing and reads it as lost access.
+  const capabilityRecovery = useRetrySecurityAgentSettings(scope);
   const triggerSync = useTriggerSecuritySync(scope);
   const dismissFailures = useSecurityDismissFailures(scope);
   const { refresh: refreshDismissFailures } = dismissFailures;
@@ -185,14 +253,65 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // another scope must not show a card or POST this scope.
   const reconcileRows = needsReconcile.filter(row => row.scope === scope);
 
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+
+  // A precondition rejection describes server state this screen cannot change:
+  // no repository in the sync scope, or a GitHub connection that is inactive or
+  // missing the vulnerability-alerts permission. The fix is applied in the
+  // repositories settings or on the GitHub App page, so the first return to
+  // this screen is when the controls must work again. Both readings go through
+  // refs so the focus callback and the handoff's return callback keep a stable
+  // identity — a callback that changed whenever a failure arrived would re-run
+  // the focus effect and clear the failure it had just shown.
+  const triggerSyncRef = useRef(triggerSync);
+  triggerSyncRef.current = triggerSync;
+  const lastSyncAttemptRef = useRef(lastSyncAttempt);
+  lastSyncAttemptRef.current = lastSyncAttempt;
+
+  const clearSyncPreconditionFailure = useCallback(() => {
+    const failure = triggerSyncRef.current.error ?? lastSyncAttemptRef.current?.error;
+    if (securitySyncPreconditionFor(failure) === null) {
+      return;
+    }
+    triggerSyncRef.current.reset();
+    setLastSyncAttempt(null);
+  }, []);
+
+  // The GitHub preconditions' fix lives on the GitHub App page; this is the
+  // app-wide handoff that mints the install state and waits for the return. A
+  // handoff that never opened a page clears nothing: the copy still explains
+  // what blocks the sync, and the handoff already reported its own failure.
+  const handleHandoffReturn = useCallback(
+    (opened: boolean) => {
+      if (opened) {
+        clearSyncPreconditionFailure();
+      }
+    },
+    [clearSyncPreconditionFailure]
+  );
+  const manageAccess = useManageRepositoryAccess(scope, 'github', {
+    onReturn: handleHandoffReturn,
+  });
+
   // The dashboard stays mounted while the dismiss sheet is open, so re-read
   // the failed dismiss drafts on focus: a fresh failure must show a card and
-  // an accepted dismissal must drop it.
+  // an accepted dismissal must drop it. The same focus is the return from the
+  // settings screen a precondition copy sends the reader to.
   useFocusEffect(
     useCallback(() => {
       refreshDismissFailures();
       refreshOutbox();
-    }, [refreshDismissFailures, refreshOutbox])
+      clearSyncPreconditionFailure();
+    }, [refreshDismissFailures, refreshOutbox, clearSyncPreconditionFailure])
   );
 
   // A failed repositories fetch disables the filter controls until a refetch
@@ -203,8 +322,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
+  // The stored absence of a sync, the same read that paints "Not yet synced"
+  // under the filter: nothing has been measured yet, so the tiles and the
+  // priority row must not read their empty result as a clean report. A read
+  // that is still loading or failed is not this state.
+  const neverSynced = lastSync.data?.lastSyncTime === null;
   const data = dashboardStats.data;
-  const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   const now = useRelativeTimeNow();
@@ -246,8 +370,61 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
-  const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
+  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncPrecondition = securitySyncPreconditionFor(syncFailure);
+  const syncBlocked = syncFailure !== null && !isSecuritySyncRetryable(syncFailure);
   const syncDisabled = triggerSync.isPending || syncBlocked;
+  const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // A precondition's fix is applied outside this screen, so the row offers that
+  // action instead of a Retry that would fail the same way: the in-app
+  // repository picker when nothing is in the sync scope, the GitHub App page
+  // when the connection itself is what blocks the sync.
+  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  if (syncPrecondition === 'noRepositories') {
+    syncAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (syncPrecondition !== null) {
+    syncAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess?.pending === true,
+      handlePress: () => {
+        manageAccess?.handlePress();
+      },
+    };
+  } else if (syncRetryable) {
+    // The retry sits beside the sentence it retries and reports its own
+    // progress: a failed sync can settle in a blink, so the header icon's flash
+    // alone read as "nothing happened". It replays the intent that failed, not
+    // the filter the reader may have switched to since.
+    syncAction = {
+      label: t('common.retry'),
+      pending: triggerSync.isPending,
+      handlePress: () => {
+        startSync(lastSyncAttempt?.intent ?? { repoFullName });
+      },
+    };
+  }
+
+  // One submit path for every control that starts a sync — the header button,
+  // the empty-state action, the retry beside the failure copy, and a
+  // reconcile-row retry — so their handlers cannot drift apart.
+  const startSync = (intent: SyncIntent) => {
+    setLastSyncAttempt({ error: triggerSync.error, intent });
+    triggerSync.mutate(intent, {
+      onSuccess: () => {
+        setLastSyncAttempt(null);
+        toast.success(t('securityAgent.dashboard.syncQueued'));
+      },
+      onSettled: () => {
+        refreshOutbox();
+      },
+    });
+  };
 
   const openRepoFilter = () => {
     if (repoFilterUnavailable) {
@@ -272,17 +449,22 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
-        title={t('common.securityAgent')}
-        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
-        // overflow when the viewer can manage the agent. Declaring exactly the
-        // buttons this viewer renders drops the actions onto their own row
-        // before the one-line CJK title loses its readable minimum.
-        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
+        // The scope name is the one thing that tells two organizations apart,
+        // so it wraps to a second line rather than ellipsizing its tail.
+        titleNumberOfLines={2}
+        // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
+        // findings and settings, plus the audit overflow when the viewer can
+        // manage the agent. Declaring 44 dp boxes understated the cluster, so
+        // the stacking decision believed the heading kept 48 dp more than it
+        // has. The widths the controls actually render are what it reserves.
+        headerRightWidth={canManage ? 3 * 48 + 2 * 7 : 2 * 48 + 7}
         headerRight={
           <View className="flex-row items-center gap-2">
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'findings'));
+                pushOnce(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityLabel={t('common.findings')}
             >
@@ -290,7 +472,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             </IconButton>
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings'));
+                pushOnce(getSecurityAgentPath(scope, 'settings'));
               }}
               accessibilityLabel={t('securityAgent.dashboard.settings')}
             >
@@ -306,11 +488,27 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        {capability.status === 'error' ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+            isRetrying={capabilityRecovery.isRetrying}
+            onRetry={() => void capabilityRecovery.retry()}
+          />
+        ) : null}
         <View className="flex-row items-center justify-between gap-3">
+          {/* The row's height comes from the 48 dp sync button beside the
+              filter, so the filter's own node carried only its two text lines
+              (~32 dp) and a tap on the row's padding missed it. The shared row
+              frame lifts the filter to the whole row; `justify-center` keeps
+              the lines where they already sat. */}
           <Pressable
             onPress={openRepoFilter}
             disabled={repoFilterUnavailable}
-            className={cn('flex-1 active:opacity-70', repoFilterUnavailable && 'opacity-50')}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center active:opacity-70',
+              repoFilterUnavailable && 'opacity-50'
+            )}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
             accessibilityState={{ disabled: repoFilterUnavailable }}
@@ -324,17 +522,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </Pressable>
           <IconButton
             onPress={() => {
-              triggerSync.mutate(
-                { repoFullName },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName });
             }}
             disabled={syncDisabled}
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
@@ -364,8 +552,35 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
-        {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
+        {syncFailure ? (
+          <View className="flex-row items-center gap-3">
+            {/* While a retry runs this sentence is the failure being retried,
+                not a fresh one, so it steps back from error red — to the warn
+                tone this screen already gives its other degraded state — while
+                the control reports the attempt. */}
+            <Text
+              className={cn(
+                'flex-1 text-xs',
+                triggerSync.isPending ? 'text-warn' : 'text-destructive'
+              )}
+            >
+              {syncFailure.message}
+            </Text>
+            {syncAction ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={syncAction.pending}
+                // A busy non-primary control dims itself, spinner included,
+                // which left the control the reader just pressed fainter than
+                // the header icon spinning beside it.
+                className={cn(syncAction.pending && 'opacity-100')}
+                onPress={syncAction.handlePress}
+              >
+                <Text>{syncAction.label}</Text>
+              </Button>
+            ) : null}
+          </View>
         ) : null}
 
         {dismissFailures.failures.map(failure => (
@@ -374,7 +589,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
-              router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
+              pushOnce(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
             }}
             onDiscard={() => {
               dismissFailures.clear(failure.findingId);
@@ -389,17 +604,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             retryable
             onRetry={() => {
               const input = row.input as { repoFullName?: string };
-              triggerSync.mutate(
-                { repoFullName: input.repoFullName, operationKey: row.operationKey },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName: input.repoFullName, operationKey: row.operationKey });
             }}
             onDiscard={() => {
               void removeOutboxRow(row.fingerprint);
@@ -409,29 +614,69 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
             without fetching, and it must show this skeleton instead of an empty
-            metrics row. */}
-        {dashboardStats.isPending ? (
-          <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
-            <Skeleton className="h-24 w-[47%] rounded-lg" />
+            metrics row. The sync-status read joins it because `neverSynced`
+            decides whether a tile carries a detail line: a tile that rendered
+            the measured shape first would shrink by a line the moment the read
+            resolved, which moves the whole dashboard. The section cards join it
+            for the same reason — they render below the tiles only once both
+            reads settle — so their placeholders keep the page's height until
+            then instead of letting the cards push it down. The placeholder
+            takes that shape as soon as the read has answered it: a scope that
+            has never synced replaces these tiles with two-line ones and its
+            Act-first card with a single line, so laying out the synced shape
+            over it would move everything below by a line whenever the stats
+            read outlasts the sync-status read. While the read is still pending
+            the detail line stays, because that is the shape three of the four
+            tiles carry in a scope that has synced and the one a synced scope's
+            first paint must not lose. */}
+        {dashboardStats.isPending || lastSync.isPending ? (
+          <View className="gap-4">
+            <View className="flex-row flex-wrap gap-3">
+              {STAT_TILE_PLACEHOLDERS.map(placeholder => (
+                <View key={placeholder} className={STAT_TILE_CLASS}>
+                  {/* The loaded card's own line boxes: label, value, detail. */}
+                  <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
+                  <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
+                  {neverSynced ? null : (
+                    <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />
+                  )}
+                </View>
+              ))}
+            </View>
+            {neverSynced && slaEnabled ? (
+              // The Manage repositories link renders whenever SLA tracking is
+              // on and nothing carries a deadline. Before the first sync that
+              // is certain, so the placeholder holds the link's own inline
+              // box and the sections below keep their place when the link
+              // arrives. Once the tiles are measured the link needs a
+              // measured total, which the placeholder cannot read, so a scope
+              // that has synced keeps it out of the loading state.
+              <View className="flex-row items-center gap-4">
+                <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
+              </View>
+            ) : null}
+            <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
-              <View key={metric.label} className="w-[47%] gap-1 rounded-lg bg-secondary p-3">
+              <View key={metric.label} className={STAT_TILE_CLASS}>
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>
                 <Text
-                  className={cn('font-mono text-xl font-semibold', METRIC_TONE_CLASS[metric.tone])}
+                  className={cn(
+                    'text-xl font-semibold tabular-nums',
+                    METRIC_TONE_CLASS[metric.tone]
+                  )}
                 >
                   {metric.value}
                 </Text>
-                <Text variant="muted" className="text-[11px]">
-                  {metric.detail}
-                </Text>
+                {metric.detail ? (
+                  <Text variant="muted" className="text-[11px]">
+                    {metric.detail}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -439,46 +684,24 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
+            {/* The refresh control in the filter row above is this screen's one
+                sync affordance; a second "Sync findings" link here repeated it
+                inside the empty state that points at the repositories instead.
+                The link takes the layout-neutral inline box: a 48 dp frame
+                around this `text-xs` line centred the text with 17 dp of its
+                own space above and below, so the link floated roughly twice as
+                far from its neighbours as the sections sit from each other. The
+                28 dp box is the audit's own minimum, the `-my-[7px]` cancels
+                the box's overflow so the line sits one section gap away, and
+                `hitSlop` carries the 44 dp touch region. */}
             <Pressable
               onPress={() => {
-                triggerSync.mutate(
-                  { repoFullName },
-                  {
-                    onSuccess: () => {
-                      toast.success(t('securityAgent.dashboard.syncQueued'));
-                    },
-                    onSettled: () => {
-                      refreshOutbox();
-                    },
-                  }
-                );
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
-              disabled={syncDisabled}
-              accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
-              accessibilityState={{
-                disabled: syncDisabled,
-                busy: triggerSync.isPending,
-              }}
-              className={cn(
-                'min-h-11 flex-row items-center gap-1.5 active:opacity-70',
-                syncBlocked && 'opacity-50'
-              )}
-            >
-              {triggerSync.isPending && (
-                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
-              )}
-              <Text className="text-xs font-medium text-primary">
-                {t('securityAgent.dashboard.syncFindings')}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
+              hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className="min-h-11 justify-center active:opacity-70"
+              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
             >
               <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}
@@ -497,12 +720,16 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {data ? (
+        {/* The Act first card's body depends on `neverSynced` too, so it waits
+            for the sync-status read rather than swapping one shape for the
+            other once the read resolves. */}
+        {data && !lastSync.isPending ? (
           <DashboardSections
             scope={scope}
             data={data}
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
+            neverSynced={neverSynced}
           />
         ) : null}
       </TabScreenScrollView>

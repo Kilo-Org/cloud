@@ -59,3 +59,7 @@ export function normalizeAgentMode(mode: string): string {
 
 /** Built-in mode slugs recognized by the CLI. */
 export const BUILTIN_AGENT_MODES = new Set<string>(AgentModes);
+
+export function isRepositoryAgentOrigin(createdOnPlatform: string | undefined): boolean {
+  return createdOnPlatform === 'webhook' || createdOnPlatform === 'scheduled';
+}

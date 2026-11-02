@@ -63,7 +63,7 @@ Custom router definitions live in PostgreSQL, table `auto_routing_custom_routers
 | `owned_by_user_id` / `owned_by_organization_id` | Exactly one is set. |
 | `slug`, `name` | Unique slug per owner; display name. |
 | `base_router` | `efficient` or `frontier`. Selects the dataset, thresholds, and switch settings. |
-| `mode` | `cost_per_accuracy` or `best_accuracy`. The only owner knob. |
+| `mode` | `cost_per_accuracy`, `best_accuracy`, or `cheapest`. The only owner knob. `cheapest` picks the lowest estimated request cost among candidates that meet the base router's accuracy threshold; when none does, it picks the most accurate candidate. |
 | `entries` | JSON array of 1–20 pool entries. |
 | `default_entry_key` | Key of the pool entry used on a null decision. |
 | `created_by_user_id`, `created_at`, `updated_at` | Audit fields. |
@@ -102,12 +102,15 @@ profile. The CLI may `suggestMeasuredAs`, but the owner must confirm the suggest
 it becomes an explicit `measuredAs`; model-name similarity never creates an implicit link.
 
 Saving a new or changed link requires an existing ready platform measurement for the selected
-base router. The web service validates the merged definition inside the owner's advisory lock
-using the platform measurements list. Unchanged links with the same entry key are exempt when
-the base router is unchanged; changing the base router revalidates every link. Linked gateway
-entries do not enter platform benchmark admission. Once saved, a link serves the newest ready
-measurement, including stale measurements and measurements whose model has since disappeared
-from the gateway catalog.
+base router, and the web service fetches the platform measurements list before it takes the
+owner's advisory lock, so a queued save never holds a pooled connection across that request.
+Unchanged links with the same entry key are exempt; changing the base router revalidates every
+link. An update that loses the race to a concurrent save re-validates the merged definition under
+the lock. A client-entry registration instead refuses with a retryable `invalid_request` when the
+base router changed concurrently, because its link was checked for the difficulty read before the
+lock. Linked gateway entries do not enter platform benchmark admission. Once saved, a link serves
+the newest ready measurement, including stale measurements and measurements whose model has since
+disappeared from the gateway catalog.
 
 Variants match by exact same name; the default variant matches only `null`. There is no
 cross-variant fallback. Unmatched variants remain client-measured rather than inheriting a

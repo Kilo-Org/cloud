@@ -1,5 +1,10 @@
 import { type QueryErrorVariant } from '@/components/query-error';
-import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import {
+  isPermissionDeniedError,
+  isTerminalTrpcCode,
+  readTrpcErrorField,
+  trpcErrorVariant,
+} from '@/lib/trpc-error';
 
 /** How the Overview presents a failed profile read. */
 export type ProfileOverviewErrorView = {
@@ -42,7 +47,7 @@ export function selectProfileOverviewErrorView(
     return { variant: 'not-found', showRetry: false, staleRow: false };
   }
   return {
-    variant: connectivity === 'offline' ? 'offline' : 'server',
+    variant: connectivity === 'offline' ? 'offline' : trpcErrorVariant(error),
     showRetry: true,
     staleRow: false,
   };

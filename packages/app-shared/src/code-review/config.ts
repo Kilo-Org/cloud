@@ -1,5 +1,15 @@
 import type { GateThreshold, ReviewStyle } from './enums';
 
+/**
+ * Bound on the optional one-off instructions of a manual review. The web route
+ * validates the start request against it
+ * (`ManualCodeReviewJobInputSchema.instructions`), and both clients cap their
+ * own field at the same number, so a draft the form accepts is a draft the
+ * route accepts. One constant instead of three copies: an over-limit note used
+ * to reach the route and come back as its generic "can't be reviewed" answer.
+ */
+export const MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH = 4_000;
+
 // Wire shape of a per-repository model override. Mirrors the tRPC input/output
 // contract (camelCase); the persisted snake_case shape lives in
 // RepositoryModelOverrideSchema in @kilocode/db/schema-types.

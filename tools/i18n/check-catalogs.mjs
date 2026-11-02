@@ -16,6 +16,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
+
 const ROOT = new URL('../../', import.meta.url).pathname;
 const LANGUAGES_FILE = join(ROOT, 'apps/mobile/src/i18n/languages.ts');
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src')];
@@ -112,19 +114,47 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{displaycount}} critical',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
+  [
+    '{{displaycount}} high',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
 ]);
 
 /**
  * Counted forms that say their number as a word instead of the visible count
  * placeholder, as `base key:plural category:locale`. Arabic names one day and
- * two days with their own word forms, so those two messages read as words and
- * carry no numeral. Every other form of a counted family must keep its
- * language's exact placeholder set, so a count deleted from a form that should
- * show it still fails. Add an entry only after reading the rendered message.
+ * two days with their own word forms, and the singular and dual of any counted
+ * noun inflect for the number, so those messages read as words and carry no
+ * numeral. Every other form of a counted family must keep its language's exact
+ * placeholder set, so a count deleted from a form that should show it still
+ * fails. Add an entry only after reading the rendered message.
  */
 const WORDED_COUNTS = new Set([
   'securityAgent.dashboard.daysOverdue:one:ar',
   'securityAgent.dashboard.daysOverdue:two:ar',
+  'securityAgent.deadline.overdue:one:ar',
+  'securityAgent.deadline.overdue:two:ar',
+  'securityAgent.deadline.dueInDays:one:ar',
+  'securityAgent.deadline.dueInDays:two:ar',
+  'securityAgent.automation.queued:one:ar',
+  'securityAgent.automation.queued:two:ar',
+  'securityAgent.settingsOverview.repositoriesCount:one:ar',
+  'securityAgent.settingsOverview.repositoriesCount:two:ar',
+  'agentChat.partRenderer.updatedFileCount:one:ar',
+  'agentChat.partRenderer.updatedFileCount:two:ar',
+  'agentChat.olderMessages.omitted:two:ar',
+  'agentChat.contextUsage.stepsCount:one:ar',
+  'agentChat.contextUsage.stepsCount:two:ar',
+  'agentChat.contextUsage.modelsCount:two:ar',
+  'prReview.discussion.comment:two:ar',
+  'prReview.hunkRows.fileLoadedCount:two:ar',
+  'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
+  'organization.kiloPass.paidSeat:one:ar',
+  'organization.kiloPass.paidSeat:two:ar',
 ]);
 
 /**
@@ -172,6 +202,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
+  // The skills.sh source label. It names the published site the skill is
+  // installed from, so every catalog keeps the site's own spelling.
+  'profiles.skillSourceSkillsSh',
   // The MCP count label. `MCP` is the protocol's own acronym, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',
@@ -196,6 +229,21 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // from localized placeholders, with no translatable words.
   'agentBriefing.atLeast',
   'agentBriefing.window',
+]);
+
+/**
+ * Counted bucket phrases that two dashboard lines render. The repository row
+ * and the deadline breakdown name the same bucket in their own wording (pt-BR
+ * says "críticas" on the row and "críticos" in the breakdown), so those keys
+ * carry the same English string on purpose and a catalog may translate the two
+ * apart. Every other pair of keys holding one English string still has to
+ * agree.
+ */
+const PER_LINE_BUCKET_PHRASES = new Set([
+  'securityAgent.dashboard.repoSummaryCritical',
+  'securityAgent.dashboardMetrics.breakdownCritical',
+  'securityAgent.dashboard.repoSummaryHigh',
+  'securityAgent.dashboardMetrics.breakdownHigh',
 ]);
 
 /** The supported tags, read from the one source of truth. */
@@ -299,6 +347,29 @@ function checkAgentEditorCopy(values, english, label) {
   checkVerbatimLabels(values, english, label);
 }
 
+/**
+ * The pull-request term keeps its capital: the acronym is `PR` in any
+ * position, and a hyphenating language writes it `Pull-Request`. A translation
+ * batch lowercased the first letter of both, so 42 catalogs read "pR" or
+ * "pull-Request" wherever the term reaches a sentence. `common.pullRequest`
+ * supplies `{{requestNoun}}` in the manual-review start failures, so the
+ * damage surfaces inside an otherwise translated sentence.
+ */
+const MISCASED_PULL_REQUEST_TERM =
+  /(?<![A-Za-zÀ-ÿ])pR(?![A-Za-zÀ-ÿ])|(?<![A-Za-zÀ-ÿ])pull-Request(?![A-Za-zÀ-ÿ])/;
+
+/** Reject the miscased pull-request term, in English and in every locale. */
+function checkPullRequestTerm(values, label) {
+  for (const [key, value] of values) {
+    const miscased = MISCASED_PULL_REQUEST_TERM.exec(value);
+    if (miscased) {
+      fail(
+        `${label}: "${key}" writes the pull-request term "${miscased[0]}"; write "PR" or "Pull-Request"`
+      );
+    }
+  }
+}
+
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
 function placeholders(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)]
@@ -395,20 +466,6 @@ function holdsLabel(values, run) {
   return false;
 }
 
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
 /**
  * Two sets:
  * - `called`: keys passed to t() or i18n.t() as a plain string. Each must exist.
@@ -420,7 +477,7 @@ function scanSource() {
   const called = new Set();
   const referenced = new Set();
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir)) {
+    for (const file of sourceFiles(dir, isTestArtifact)) {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(/\b(?:i18n\.)?t\(\s*'([^']+)'/g)) {
         called.add(match[1]);
@@ -519,6 +576,15 @@ function pluralBaseKey(key) {
 }
 
 /**
+ * The placeholders a counted family uses for the number it counts: the
+ * interpolated figure (`displayCount`, `itemCount`), i18next's own `count`,
+ * which selects the plural category and can also be read into the message, and
+ * the one family that names its figure itself (`steps`). Only a reviewed worded
+ * form may drop one of them.
+ */
+const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps']);
+
+/**
  * The visible-count placeholders an English family declares, e.g.
  * `displayCount`. A translated form must carry each one unless a reviewed
  * worded form spells the number out instead.
@@ -530,7 +596,7 @@ function familyVisibleCounts(english, base) {
       continue;
     }
     for (const name of placeholders(value).split(',').filter(Boolean)) {
-      if (name === 'displayCount' || name === 'itemCount') {
+      if (COUNT_PLACEHOLDERS.has(name)) {
         names.add(name);
       }
     }
@@ -700,6 +766,7 @@ for (const catalog of CATALOGS) {
   }
 
   checkAgentEditorCopy(english, english, `${catalog.name}/en`);
+  checkPullRequestTerm(english, `${catalog.name}/en`);
 
   const localeValues = new Map();
 
@@ -711,6 +778,7 @@ for (const catalog of CATALOGS) {
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
     localeValues.set(tag, translated);
     checkAgentEditorCopy(translated, english, label);
+    checkPullRequestTerm(translated, label);
     const ownValues = new Set(translated.values());
 
     // A locale-driven plural family: the English base interpolates {{count}}
@@ -831,14 +899,14 @@ for (const catalog of CATALOGS) {
       const wordedForm = Boolean(
         parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
       );
-      const droppedVisibleCount = expectedSet
+      const droppedCount = expectedSet
         .filter(name => !actualSet.includes(name))
-        .every(name => name === 'displayCount' || name === 'itemCount');
+        .every(name => COUNT_PLACEHOLDERS.has(name));
       const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
       if (
         actual !== expected &&
         !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
-        !(wordedForm && droppedVisibleCount && !addedPlaceholder)
+        !(wordedForm && droppedCount && !addedPlaceholder)
       ) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
@@ -918,11 +986,27 @@ for (const catalog of CATALOGS) {
     // One wording per English string.
     const exceptions = new Set(WORDING_EXCEPTIONS[tag] ?? []);
     for (const [source, keys] of sharedWordings) {
-      if (exceptions.has(source)) {
+      if (
+        exceptions.has(source) ||
+        keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
+      ) {
         continue;
       }
       const variants = new Map();
-      for (const key of keys) {
+      // A plural family's own categories carry this language's forms for the
+      // counts it distinguishes, so they differ by design. One member of each
+      // family speaks for it here: its flat base key when the group has one,
+      // otherwise its first category.
+      const representative = new Map();
+      for (const key of [...keys].sort(
+        (a, b) => Number(pluralParts(a) !== null) - Number(pluralParts(b) !== null)
+      )) {
+        const base = pluralBaseKey(key);
+        if (!representative.has(base)) {
+          representative.set(base, key);
+        }
+      }
+      for (const key of representative.values()) {
         const value = translated.get(key);
         if (value === undefined) {
           continue;

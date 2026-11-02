@@ -11,7 +11,9 @@ const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
-const mockIsMergeCommit = jest.fn();
+const mockResolveMergeHeadContent = jest.fn();
+const mockFindReviewCoveringHeads = jest.fn();
+const mockGetCheckRunConclusion = jest.fn();
 const mockIsCouncilEntitledForOwner = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -33,6 +35,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
   findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
+  findReviewCoveringHeads: (...args: unknown[]) => mockFindReviewCoveringHeads(...args),
   updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
     mockUpdateReviewHeadShaAndCheckRun(...args),
   updateCheckRunId: (...args: unknown[]) => mockUpdateCheckRunId(...args),
@@ -51,7 +54,8 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   addReactionToPR: (...args: unknown[]) => mockAddReactionToPR(...args),
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
-  isMergeCommit: (...args: unknown[]) => mockIsMergeCommit(...args),
+  getCheckRunConclusion: (...args: unknown[]) => mockGetCheckRunConclusion(...args),
+  resolveMergeHeadContent: (...args: unknown[]) => mockResolveMergeHeadContent(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
@@ -59,10 +63,7 @@ import {
   getGitHubPullRequestCheckoutRef,
   resolvePullRequestCheckoutRef,
 } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
-import {
-  handlePullRequest,
-  shouldSkipSynchronizeForMergeCommit,
-} from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-handler';
+import { handlePullRequest } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-handler';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 
@@ -121,7 +122,9 @@ beforeEach(() => {
   });
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
-  mockIsMergeCommit.mockResolvedValue(false);
+  mockResolveMergeHeadContent.mockResolvedValue({ kind: 'not_merge' });
+  mockFindReviewCoveringHeads.mockResolvedValue(null);
+  mockGetCheckRunConclusion.mockResolvedValue(undefined);
   mockIsCouncilEntitledForOwner.mockResolvedValue(false);
 });
 
@@ -192,67 +195,6 @@ describe('resolvePullRequestCheckoutRef', () => {
       isForkPr: true,
       headRepoFullName: null,
     });
-  });
-});
-
-describe('shouldSkipSynchronizeForMergeCommit', () => {
-  const baseArgs = {
-    installationId: 'inst-1',
-    headOwner: 'acme',
-    headRepoName: 'widgets',
-    headSha: 'deadbeef',
-    appType: 'standard' as const,
-  };
-
-  it('returns false for non-synchronize actions without calling the check', async () => {
-    for (const action of ['opened', 'reopened', 'ready_for_review']) {
-      let called = false;
-      const result = await shouldSkipSynchronizeForMergeCommit({
-        ...baseArgs,
-        action,
-        isMergeCommitFn: async () => {
-          called = true;
-          return true;
-        },
-      });
-
-      expect(result).toBe(false);
-      expect(called).toBe(false);
-    }
-  });
-
-  it('returns true when synchronize head is a merge commit', async () => {
-    const result = await shouldSkipSynchronizeForMergeCommit({
-      ...baseArgs,
-      action: 'synchronize',
-      isMergeCommitFn: async () => true,
-    });
-
-    expect(result).toBe(true);
-  });
-
-  it('returns false when synchronize head is not a merge commit', async () => {
-    const result = await shouldSkipSynchronizeForMergeCommit({
-      ...baseArgs,
-      action: 'synchronize',
-      isMergeCommitFn: async () => false,
-    });
-
-    expect(result).toBe(false);
-  });
-
-  it('passes the expected arguments to the check function', async () => {
-    const calls: Array<[string, string, string, string, string]> = [];
-    await shouldSkipSynchronizeForMergeCommit({
-      ...baseArgs,
-      action: 'synchronize',
-      isMergeCommitFn: async (installationId, owner, repo, sha, appType) => {
-        calls.push([installationId, owner, repo, sha, appType]);
-        return false;
-      },
-    });
-
-    expect(calls).toEqual([['inst-1', 'acme', 'widgets', 'deadbeef', 'standard']]);
   });
 });
 
@@ -504,17 +446,16 @@ describe('handlePullRequest', () => {
     it('routes a bot PR with a merge-commit head through skip, not merge-commit migration', async () => {
       mockGetBotUserId.mockResolvedValue('bot-user-1');
       mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
-      // A non-bot PR here would hit the merge-commit path and return 'Skipped merge commit'.
-      mockIsMergeCommit.mockResolvedValue(true);
 
       const payload = pullRequestPayload();
       payload.pull_request.user.type = 'Bot';
       const response = await handlePullRequest(payload, platformIntegration());
 
-      // The bot-skip decision defers the merge-commit path, so the PR is skipped as a bot PR (not re-pointed to a
+      // The bot-skip decision never reads the merge chain, so the PR is skipped as a bot PR (not re-pointed to a
       // new SHA with a fresh check run by migrateInFlightReviewsToMergeCommitHead).
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
+      expect(mockResolveMergeHeadContent).not.toHaveBeenCalled();
       expect(mockCreateCodeReview).not.toHaveBeenCalled();
     });
 
@@ -655,21 +596,186 @@ describe('handlePullRequest', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
   });
 
-  it('skips supersession cancel on merge-commit synchronize events', async () => {
+  it('skips supersession cancel on merge-commit synchronize events while a review is in flight', async () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
       config: {},
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
-    mockIsMergeCommit.mockResolvedValue(true);
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'running',
+    });
 
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Skipped merge commit' });
+    expect(mockFindReviewCoveringHeads).toHaveBeenCalledWith(expect.anything(), [
+      'merge-sha',
+      'content-sha',
+    ]);
+    // The running review is repointed at the head instead of superseded.
+    expect(mockUpdateReviewHeadShaAndCheckRun).toHaveBeenCalledWith('review-1', 'abc123', 98765);
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCancelReview).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('carries a finished review verdict onto the merge-commit head', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'completed',
+    });
+    mockGetCheckRunConclusion.mockResolvedValue('success');
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(mockGetCheckRunConclusion).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      12345,
+      'standard'
+    );
+    expect(mockCreateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      'abc123',
+      expect.objectContaining({ conclusion: 'success' }),
+      'standard'
+    );
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('leaves the merge-commit head without a run when the finished verdict cannot be read', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'completed',
+    });
+    mockGetCheckRunConclusion.mockResolvedValue(undefined);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckRun).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('passes the base sha and head to the merge resolver', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+
+    await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(mockResolveMergeHeadContent).toHaveBeenCalledWith({
+      appType: 'standard',
+      baseSha: 'def456',
+      headSha: 'abc123',
+      installationId: '98765',
+      owner: 'acme',
+      repo: 'widgets',
+    });
+  });
+
+  it('does not look for merge content on a non-synchronize event', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+
+    await handlePullRequest(pullRequestPayload({ action: 'opened' }), platformIntegration());
+
+    expect(mockResolveMergeHeadContent).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).toHaveBeenCalled();
+  });
+
+  it('reviews a merge-commit head whose content no review covers', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue(null);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(202);
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({ headSha: 'abc123', triggerSource: 'webhook' })
+    );
+  });
+
+  it('reviews a merge-commit head that takes content from outside the base branch', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({ kind: 'unreviewed_content' });
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(202);
+    expect(mockFindReviewCoveringHeads).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).toHaveBeenCalled();
+  });
+
+  it('reviews the head when the review history cannot be read', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(202);
+    expect(mockCreateCodeReview).toHaveBeenCalled();
   });
 
   it('passes the integration GitHub app type when cancelling an orphaned merge-commit check run', async () => {
@@ -679,8 +785,17 @@ describe('handlePullRequest', () => {
       config: {},
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'running',
+    });
     mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('database write failed'));
-    mockIsMergeCommit.mockResolvedValue(true);
 
     const response = await handlePullRequest(
       pullRequestPayload(),

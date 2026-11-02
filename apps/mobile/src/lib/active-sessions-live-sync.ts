@@ -1,3 +1,6 @@
+/* eslint-disable max-lines -- one owner: the socket-write and fetch serialization,
+   its pending-reason bookkeeping, and the attachment/scope fences are a single
+   state machine; splitting it would scatter the ordering guarantees it keeps */
 /** Serialized socket writes and accepted server refreshes for one tray scope. */
 import {
   hashKey,
@@ -15,11 +18,27 @@ import {
 } from './active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from './auth/auth-epoch';
 import { isSignOutActive } from './auth/sign-out-state';
-import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from './query-client';
+import { isTerminalTrpcCode, readTrpcErrorField } from './trpc-error';
+import {
+  captureActiveSessionsQueryRefresh,
+  fenceActiveSessionsQuery,
+  hasActiveSessionsServerOutcome,
+} from './query-client';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
+/**
+ * How many of a scope's attempts its own socket writes may cancel while it has
+ * no server outcome. Past this a write waits for the attempt instead, so a
+ * response slower than the heartbeat period still settles.
+ */
+const MAX_UNACCEPTED_CANCELS = 2;
 type LiveSyncReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect' | 'manual';
-type RefreshReason = LiveSyncReason | 'foreground';
+/**
+ * `reconcile` is not a refresh trigger of its own: it records that this scope
+ * still has no server outcome, so the attempt a socket write's cancel would
+ * otherwise kill must be replaced.
+ */
+type RefreshReason = LiveSyncReason | 'reconcile' | 'foreground';
 type WriteUpdater = (current: CachedActiveSession[]) => CachedActiveSession[];
 export type LiveSyncConnection = Pick<
   UserWebConnection,
@@ -49,6 +68,21 @@ export class ActiveSessionsLiveSync {
   private isFetchInFlight = false;
   private inFlightFetchCanceled = false;
   private lastEnrichmentAttemptAt: number | null = null;
+  /**
+   * Consecutive attempts this scope's socket writes canceled while it still had
+   * no server outcome. Past the budget a write waits for the in-flight attempt
+   * instead of canceling it, so a list slower than the heartbeat period can
+   * still settle instead of being restarted forever.
+   */
+  private unacceptedCancelCount = 0;
+  /**
+   * The scope's last attempt failed with a code a retry cannot fix. Such a
+   * failure is an outcome even though its query can leave the cache (a
+   * permission denial drops an unobserved query, and its metadata with it), so
+   * the reason must not come back and replace a fetch that can only fail the
+   * same way again.
+   */
+  private terminalFailureSeen = false;
   private lastConnectedState: boolean;
   private attachmentEpoch = 0;
   private authEpoch = currentAuthEpoch();
@@ -71,6 +105,9 @@ export class ActiveSessionsLiveSync {
     }
     this.attachmentEpoch += 1;
     this.authEpoch = currentAuthEpoch();
+    // A terminal failure belongs to the attempt that reported it; a fresh
+    // attachment starts learning its scope again.
+    this.terminalFailureSeen = false;
     const { connection } = this.options;
     // Re-attachment while connected must not look like a rising edge.
     this.lastConnectedState = connection.isConnected();
@@ -192,31 +229,65 @@ export class ActiveSessionsLiveSync {
     }
     const attachmentEpoch = this.attachmentEpoch;
     const { queryClient, queryKey } = this.options;
-    // Serialized cancel+setQueryData; never awaits network.
+    // Serialized cancel+setQueryData; never awaits network unless this write
+    // yields to an attempt it may no longer cancel (see the budget below).
     this.writeQueue = (async () => {
       await this.writeQueue;
       if (!this.isCurrentAttachment(attachmentEpoch)) {
         return;
       }
-      if (this.isFetchInFlight) {
-        this.inFlightFetchCanceled = true;
+      const settled = hasActiveSessionsServerOutcome(queryClient, queryKey);
+      // The scope never reached a server outcome and this write already spent
+      // its share of cancels: let the in-flight attempt land, then apply this
+      // write on top of what the server published.
+      const yieldToFetch =
+        this.isFetchInFlight && !settled && this.unacceptedCancelCount >= MAX_UNACCEPTED_CANCELS;
+      if (yieldToFetch) {
+        await this.getFetchCompletion();
+      } else {
+        if (this.isFetchInFlight) {
+          this.inFlightFetchCanceled = true;
+          this.unacceptedCancelCount += settled ? 0 : 1;
+        }
+        await queryClient.cancelQueries({ queryKey, exact: true });
       }
-      await queryClient.cancelQueries({ queryKey, exact: true });
       if (!this.isCurrentAttachment(attachmentEpoch)) {
         return;
       }
       queryClient.setQueryData<CachedActiveSessionsData>(queryKey, current => ({
         sessions: updater(current?.sessions ?? []),
       }));
-      this.maybeScheduleEnrichmentRefresh();
+      this.maybeScheduleFollowUpRefresh();
     })();
   }
 
-  private maybeScheduleEnrichmentRefresh(): void {
+  private maybeScheduleFollowUpRefresh(): void {
     this.updateEnrichmentReason();
-    if (this.pendingReasons.has('enrichment') && !this.inFlightReasons?.has('enrichment')) {
-      this.kickFetch();
+    this.updateReconcileReason();
+    for (const reason of ['enrichment', 'reconcile'] as const) {
+      if (this.pendingReasons.has(reason) && !this.inFlightReasons?.has(reason)) {
+        this.kickFetch();
+        return;
+      }
     }
+  }
+
+  /**
+   * A socket write is a manual cache write, so it never counts as a server
+   * result. Without this reason a scope whose first load a write canceled would
+   * paint its loading placeholder until the user pulls. A terminal failure is an
+   * outcome too, and its own Retry owns that recovery.
+   */
+  private updateReconcileReason(): void {
+    if (
+      this.terminalFailureSeen ||
+      hasActiveSessionsServerOutcome(this.options.queryClient, this.options.queryKey)
+    ) {
+      this.pendingReasons.delete('reconcile');
+      this.unacceptedCancelCount = 0;
+      return;
+    }
+    this.pendingReasons.add('reconcile');
   }
 
   private updateEnrichmentReason(): void {
@@ -296,8 +367,12 @@ export class ActiveSessionsLiveSync {
         await fetchPromise;
         success = !this.readInFlightFetchCanceled() && refresh.hasAcceptedResult();
       }
-    } catch {
-      // Cancellation and network failure keep reasons pending for Retry.
+    } catch (error) {
+      // Cancellation and network failure keep reasons pending for Retry. A code
+      // a retry cannot fix is recorded: its query may leave the cache (a
+      // permission denial drops an unobserved query) and with it the metadata
+      // this owner reads as the outcome.
+      this.terminalFailureSeen = isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
     } finally {
       this.isFetchInFlight = false;
     }
@@ -310,11 +385,16 @@ export class ActiveSessionsLiveSync {
       this.lastEnrichmentAttemptAt = this.now();
     }
     if (success) {
+      this.terminalFailureSeen = false;
       for (const reason of inFlightReasons) {
         this.pendingReasons.delete(reason);
       }
       this.updateEnrichmentReason();
     }
+    // An attempt a socket write canceled left the scope without a server
+    // outcome, so it is replaced even when no other reason is pending;
+    // otherwise the section paints its loading placeholder until the user pulls.
+    this.updateReconcileReason();
     const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
     const wasCanceled = this.readInFlightFetchCanceled();
     this.inFlightReasons = null;

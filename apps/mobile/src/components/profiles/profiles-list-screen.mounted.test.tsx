@@ -71,9 +71,12 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getNewProfilePath: (stack: 'app' | 'profileTab') =>
     stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',
-  getProfileOverviewPath: (profileId: string, organizationId?: string, stack?: string) =>
-    `${stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
-      organizationId ? `?org=${organizationId}` : ''
+  getProfileOverviewPath: (
+    profileId: string,
+    options: { organizationId?: string; stack?: string } = {}
+  ) =>
+    `${options.stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
+      options.organizationId ? `?org=${options.organizationId}` : ''
     }`,
 }));
 

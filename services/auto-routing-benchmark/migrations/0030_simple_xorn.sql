@@ -1,0 +1,1 @@
+ALTER TABLE `scheduler_chunks` ADD `throttle_deferrals` integer DEFAULT 0 NOT NULL;

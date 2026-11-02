@@ -35,6 +35,28 @@ export function workerRefusalStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * The worker statuses that prove it refused this send before admitting it.
+ *
+ * `services/cloud-agent-next/src/trpc-error.ts` maps the worker's answers to a
+ * status. 408 TIMEOUT and 499 CLIENT_CLOSED_REQUEST are in that map but say
+ * nothing about admission, and neither does any server-side status, so they are
+ * absent here along with every status the map does not name.
+ *
+ * The residual error is deliberately one-sided: a refusal left out of this set
+ * leaves a 'linked' row the reaper never claims, while releasing the rows of a
+ * turn the worker did admit lets the reaper delete objects that turn still
+ * references.
+ */
+const REFUSAL_STATUSES: ReadonlySet<number> = new Set([
+  400, 401, 402, 403, 404, 405, 409, 412, 413, 415, 422, 429,
+]);
+
+/** Whether this send failed with a worker answer that proves no turn exists. */
+export function refusedBeforeAdmission(status: number | undefined): boolean {
+  return status !== undefined && REFUSAL_STATUSES.has(status);
+}
+
 export type RefusedSend = {
   attachments: DispatchAttachments | undefined;
   error: unknown;
@@ -54,11 +76,11 @@ type ReleaseDependencies = {
 /**
  * Give back the attachment rows of a send the worker refused.
  *
- * A refusal is a 4xx answer to this send: the worker refuses before it admits,
- * and an admitted send answers with a queued result, so a refused turn never
- * existed. A transport failure, a timeout or a server-side status proves
- * nothing, so those keep the rows linked; the same holds for a send that linked
- * no rows here, which is the retry of an attachment an earlier dispatch holds.
+ * A refusal is an answer that proves the worker refused this send before it
+ * admitted the turn, so an accepted turn never existed. A transport failure, a
+ * timeout, a request the caller closed, or a server-side status proves nothing,
+ * so those keep the rows linked; the same holds for a send that linked no rows
+ * here, which is the retry of an attachment an earlier dispatch holds.
  *
  * The send's own error is what the caller reports; this helper never throws.
  */
@@ -67,8 +89,7 @@ export async function releaseRefusedSend(
   { release = releaseUnadmittedUploads }: ReleaseDependencies = {}
 ): Promise<void> {
   const { attachments, error, kiloUserId, linkedObjectKeys } = input;
-  const status = workerRefusalStatus(error);
-  if (status === undefined || status < 400 || status >= 500) return;
+  if (!refusedBeforeAdmission(workerRefusalStatus(error))) return;
   if (!attachments || linkedObjectKeys.length === 0) return;
 
   try {

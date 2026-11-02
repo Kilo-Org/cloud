@@ -36,6 +36,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_user_limits,
   organization_user_usage,
@@ -158,7 +159,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
@@ -356,6 +357,36 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
       )
     ),
   });
+}
+
+/**
+ * Resolves the account a delivered sign-in code belongs to.
+ *
+ * The code is delivered to one mailbox, so this match keeps a `+` suffix and
+ * Gmail dots and only ignores case. An alias of another account's address is a
+ * different address here and resolves to no account, unlike
+ * `findUserByNormalizedEmail`, which is for duplicate detection.
+ *
+ * The exact spelling is served by the unique index on `google_user_email`.
+ * A case-insensitive match runs only when no exact row exists, for legacy rows
+ * stored with other casing; those resolve to the oldest account so the answer is
+ * stable.
+ */
+export async function findUserBySignInCodeEmail(email: string): Promise<User | undefined> {
+  const deliveredEmail = getDeliveredEmailAddress(email);
+
+  const exact = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, deliveredEmail),
+  });
+  if (exact) return exact;
+
+  const [caseVariant] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(sql`lower(${kilocode_users.google_user_email})`, deliveredEmail))
+    .orderBy(kilocode_users.created_at, kilocode_users.id)
+    .limit(1);
+  return caseVariant;
 }
 
 async function recordSignupImpactTracking(args: {
@@ -995,6 +1026,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - personal byoc_connections rows (organization-owned
  *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
+ * - organization_guardrails (org-owned policy retained; created_by_kilo_user_id nulled)
+ * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
@@ -1763,6 +1796,11 @@ export async function anonymizeCloudUserData(
     .update(organization_group_policy_settings)
     .set({ updated_by_kilo_user_id: null })
     .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
+  // Guardrails are org-owned policy, so they stay; only the creator reference is cleared.
+  await tx
+    .update(organization_guardrails)
+    .set({ created_by_kilo_user_id: null })
+    .where(eq(organization_guardrails.created_by_kilo_user_id, userId));
 
   // Security audit logs: keep org-owned entries, strip actor PII
   // (user-owned entries are cascade-deleted via owned_by_user_id FK)

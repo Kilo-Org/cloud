@@ -112,6 +112,20 @@ export async function listSkillsForProfile(
   return skills.map(toResponse);
 }
 
+/**
+ * A profile's skills for a caller who holds the profile, ownership checked.
+ * The profile editor's Skills screen renders these and nothing else the
+ * profile carries.
+ */
+export async function getProfileSkills(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileSkillResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listSkillsForProfile(db, profileId);
+}
+
 export async function createCustomSkill(
   db: WorkerDb,
   profileId: string,

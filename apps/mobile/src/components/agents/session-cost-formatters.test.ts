@@ -126,6 +126,19 @@ describe('formatSpokenCost (a11y)', () => {
   it('speaks a plural-dollar + singular-cent amount', () => {
     expect(formatSpokenCost(2_010_000)).toBe('2 dollars 1 cent');
   });
+
+  // Estonian names the unit differently at one and at two or more, so the
+  // spoken phrase has to follow the same category boundary as the visible one.
+  it('speaks the Estonian dollar in the singular at one', async () => {
+    await i18n.changeLanguage('et');
+    try {
+      expect(formatSpokenCost(1_000_000)).toBe('1 dollar');
+      expect(formatSpokenCost(5_000_000)).toBe('5 dollarit');
+      expect(formatSpokenCost(1_100_000)).toBe('1 dollar 10 senti');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
 });
 
 describe('selectSessionCostInputs', () => {

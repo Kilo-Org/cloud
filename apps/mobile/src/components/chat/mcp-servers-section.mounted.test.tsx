@@ -19,6 +19,7 @@ import { act, TestRenderer } from '@/test/renderer';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Switch: 'Switch',
   View: 'View',
 }));

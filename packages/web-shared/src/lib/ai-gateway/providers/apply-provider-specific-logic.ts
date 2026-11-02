@@ -18,8 +18,8 @@ import {
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -388,7 +388,7 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (!usesUserGatewayKey && (provider.id === 'openrouter' || provider.id === 'vercel')) {
+  if (!usesUserGatewayKey && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     // A user's own BYOK credential is never ignored.
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
@@ -414,7 +414,7 @@ export async function applyProviderSpecificLogic(
     addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
-  if (provider.id === 'vercel') {
+  if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
     await applyVercelSettings(

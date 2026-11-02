@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
@@ -7,7 +7,7 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
@@ -17,6 +17,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -124,6 +125,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
+  // One formatted amount for the painted value and its spoken label: a label
+  // that stops being passed keeps its old native value, so the shown amount
+  // would otherwise still be announced as the hidden one.
+  const balanceText = formatMoney(balanceDollars, i18n.language);
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.
@@ -205,7 +210,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             accessibilityState={{ busy: isSaving, disabled: isSaving }}
             disabled={isSaving}
             onPress={retry}
-            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+            className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
           >
             <Text className="text-sm text-primary">{t('common.retry')}</Text>
             {isSaving && <ActivityIndicator size="small" color={colors.mutedForeground} />}
@@ -261,35 +266,34 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               <ScrollView horizontal className="min-w-0">
                 <Text
                   className="text-2xl font-bold tabular-nums"
-                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
                 >
-                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                  {hideBalance ? HIDDEN_BALANCE : balanceText}
                 </Text>
               </ScrollView>
+              {/* One line, swapped without an entrance fade: the caption holds
+                  the second row of this block, so a fade that paints it late
+                  leaves the reserved row empty under the amount. */}
               {creditsFailed && (
                 <Text className="text-xs text-muted-foreground">
                   {t('credits.expiryUnavailable')}
                 </Text>
               )}
               {!creditsFailed && creditsPending && (
-                <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
-                </Animated.View>
+                <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
               )}
               {!creditsFailed && !creditsPending && (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                  <CreditExpiryNote
-                    creditBlocks={creditData.creditBlocks}
-                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
-                    emptyMessage={t('credits.noExpiringCredits')}
-                  />
-                </Animated.View>
+                <CreditExpiryNote
+                  creditBlocks={creditData.creditBlocks}
+                  hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                  emptyMessage={t('credits.noExpiringCredits')}
+                />
               )}
             </View>
             <Pressable
               className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 setHideBalance(!hideBalance);
               }}
               accessibilityRole="button"

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
   getProvider,
@@ -10,6 +11,7 @@ import {
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
 import {
   getByokCredentials,
   getCatalogModeByokCredentials,
@@ -96,6 +98,9 @@ function catalogModel(
     provider: {
       id,
       models_dev_id: id,
+      ...(id === 'zai-coding'
+        ? { openrouter_inference_provider_id: 'z-ai' as const }
+        : { provider_listing: syntheticDefinition.provider_listing }),
       ...apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
         supportedChatApis,
@@ -170,7 +175,7 @@ type RouteSignature =
 function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
   if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
   const { provider, userByok } = result;
-  if (provider.id === 'direct-byok') {
+  if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
       ? { route: 'direct-byok', providerId }
@@ -179,7 +184,7 @@ function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteS
   if (!userByok) {
     if (provider === VERCEL_AI_GATEWAY) return { route: 'kilo', gateway: 'vercel' };
     if (provider === OPENROUTER) return { route: 'kilo', gateway: 'openrouter' };
-    throw new Error(`unexpected Kilo provider ${provider.id}`);
+    throw new Error(`unexpected Kilo provider ${provider.type}`);
   }
   if (provider === VERCEL_AI_GATEWAY) {
     return { route: 'vercel-byok', providerIds: userByok.map(byok => byok.providerId) };
@@ -454,5 +459,100 @@ describe('previewByokRouting', () => {
       { route: 'direct-byok', outcome: 'unreached' },
       { route: 'kilo', outcome: 'unreached' },
     ]);
+  });
+});
+
+describe('getProvider with an organization provider allow-list', () => {
+  async function routeForOrganizationKeys(
+    providerIds: UserByokProviderId[],
+    allowedProviders: ReadonlySet<string> | undefined
+  ) {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization(`Allow ${crypto.randomUUID()}`, user.id, 0);
+    await db.insert(byok_api_keys).values(
+      providerIds.map(providerId => ({
+        organization_id: organization.id,
+        provider_id: providerId,
+        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      }))
+    );
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+    const routed = await getProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: organization.id,
+      getAllowedProviders: async () => allowedProviders,
+    });
+    return routeOf(routed, 'chat_completions');
+  }
+
+  test('uses a provider key the allow-list admits', async () => {
+    await expect(
+      routeForOrganizationKeys(['moonshotai'], new Set(['anthropic', 'moonshotai']))
+    ).resolves.toEqual({ route: 'vercel-byok', providerIds: ['moonshotai'] });
+  });
+
+  test('uses provider keys when the policy does not restrict providers', async () => {
+    await expect(routeForOrganizationKeys(['moonshotai'], undefined)).resolves.toEqual({
+      route: 'vercel-byok',
+      providerIds: ['moonshotai'],
+    });
+  });
+
+  test('skips a provider key outside the allow-list for Kilo route', async () => {
+    await expect(routeForOrganizationKeys(['moonshotai'], new Set(['anthropic']))).resolves.toEqual(
+      { route: 'kilo', gateway: 'openrouter' }
+    );
+  });
+
+  test('skips a provider key outside the allow-list for a gateway key', async () => {
+    await expect(
+      routeForOrganizationKeys(['moonshotai', 'openrouter'], new Set(['anthropic']))
+    ).resolves.toEqual({ route: 'gateway-byok', providerId: 'openrouter' });
+  });
+
+  test('fails closed when the allowed key cannot be decrypted, even if a disallowed key can', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization(`Allow ${crypto.randomUUID()}`, user.id, 0);
+    const wrongKey = randomBytes(32).toString('base64');
+    await db.insert(byok_api_keys).values([
+      {
+        organization_id: organization.id,
+        provider_id: 'moonshotai',
+        encrypted_api_key: encryptApiKey('moonshotai-secret', wrongKey),
+        created_by: user.id,
+      },
+      {
+        organization_id: organization.id,
+        provider_id: 'anthropic',
+        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      },
+    ]);
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'anthropic']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    await expect(
+      getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: organization.id,
+        getAllowedProviders: async () => new Set(['moonshotai']),
+      })
+    ).rejects.toThrow();
+  });
+
+  test('skips every provider key when no allowed provider serves the model', async () => {
+    await expect(routeForOrganizationKeys(['moonshotai'], new Set())).resolves.toEqual({
+      route: 'kilo',
+      gateway: 'openrouter',
+    });
   });
 });

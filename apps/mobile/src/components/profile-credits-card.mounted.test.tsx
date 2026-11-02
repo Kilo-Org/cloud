@@ -231,6 +231,11 @@ async function mountCard(
       ui.renderer.root
         .findAll(() => true)
         .flatMap(node => node.children.filter(child => typeof child === 'string')),
+    labels: () =>
+      ui.renderer.root
+        .findAll(() => true)
+        .map(node => node.props.accessibilityLabel)
+        .filter(label => typeof label === 'string'),
   };
 }
 
@@ -792,13 +797,17 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
-  it('toggles the balance between the amount and *****', async () => {
+  it('toggles the balance between the amount and ***** with a spoken label per state', async () => {
     currentUser.userId = 'user-A';
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
 
-    const { renderer, texts, unmount } = await mountCard(queryClient);
+    const { renderer, texts, labels, unmount } = await mountCard(queryClient);
     await waitFor(() => texts().includes('$10.00'));
+    // The amount is spoken as itself: pass the amount, not nothing, because a
+    // label React Native stops receiving keeps its previous value on Android.
+    expect(labels()).toEqual(expect.arrayContaining(['$10.00']));
+    expect(labels()).not.toContain('Balance hidden');
 
     const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
     expect(hide.props.accessibilityRole).toBe('button');
@@ -808,6 +817,8 @@ describe('CreditsCard balance state', () => {
 
     expect(texts()).toContain('*****');
     expect(texts()).not.toContain('$10.00');
+    expect(labels()).toEqual(expect.arrayContaining(['Balance hidden']));
+    expect(labels()).not.toContain('$10.00');
     const show = renderer.root.findByProps({ accessibilityLabel: 'Show balance' });
     expect(show.findAllByType('Eye' as ElementType)).toHaveLength(1);
 
@@ -816,6 +827,8 @@ describe('CreditsCard balance state', () => {
     });
     expect(texts()).toContain('$10.00');
     expect(texts()).not.toContain('*****');
+    expect(labels()).toEqual(expect.arrayContaining(['$10.00']));
+    expect(labels()).not.toContain('Balance hidden');
 
     unmount();
   });

@@ -9,13 +9,14 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { QueryError } from '@/components/query-error';
+import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
@@ -25,6 +26,7 @@ import {
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
@@ -199,13 +201,14 @@ export function OrganizationCreditActivityScreen() {
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state. Any other error stays the retryable neutral state.
-  let errorVariant: 'neutral' | 'server' | 'not-found' | 'permission' = 'neutral';
-  if (errorCode === 'NOT_FOUND') {
-    errorVariant = 'not-found';
-  } else if (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
-    errorVariant = 'permission';
-  }
+  // permission state, and a request that ran out its deadline keeps the
+  // retryable slow-response state. Any other error stays the retryable neutral
+  // state.
+  const classified = trpcErrorVariant(query.error);
+  const errorVariant: QueryErrorVariant =
+    classified === 'not-found' || classified === 'permission' || classified === 'timeout'
+      ? classified
+      : 'neutral';
 
   // A later-page failure must keep the already-loaded rows and offer an inline
   // retry instead of replacing the list. Read `isFetchNextPageError`, not
@@ -269,6 +272,7 @@ export function OrganizationCreditActivityScreen() {
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
               accessibilityLabel={t('common.retry')}

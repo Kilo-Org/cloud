@@ -1,30 +1,25 @@
-import {
-  glanceableStatusKind,
-  type GlanceableStatusKind,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 import {
   isDefaultSessionTitle,
+  SESSION_LIVE_COMMAND_LIMIT,
+  SESSION_LIVE_PLAN_STEP_LIMIT,
+  SESSION_LIVE_TARGET_LIMIT,
   sessionLiveCut,
   sessionDisplayLine,
   sessionLiveText,
+  type SessionLiveChanges,
+  type SessionLiveFailureKind,
+  type SessionLivePlan,
+  type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts';
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
 import {
   SESSION_CARD_QUIET_AFTER_MS,
-  SESSION_LIVE_COMMAND_LIMIT,
-  SESSION_LIVE_PLAN_STEP_LIMIT,
-  SESSION_LIVE_TARGET_LIMIT,
-  type SessionLiveChanges,
-  type SessionLiveFailureKind,
+  type SessionCardStatusKind,
   type SessionLiveOutcomeKind,
-  type SessionLivePlan,
-  type SessionLiveStep,
 } from './session-live-content';
-
-/** The card's status kinds: the shared vocabulary plus a turn that failed. */
-export type SessionCardStatusKind = GlanceableStatusKind | 'failed';
 
 /**
  * The session card title (spec "Content" rule 2): trimmed and capped like a
@@ -68,9 +63,15 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-function isoOrNull(value: string | null | undefined): string | null {
+/** Epoch milliseconds of one backend time, or null when it is missing or does not parse. */
+function parseTimestampMs(value: string | null | undefined): number | null {
   const at = value == null ? Number.NaN : Date.parse(value);
-  return Number.isFinite(at) ? new Date(at).toISOString() : null;
+  return Number.isFinite(at) ? at : null;
+}
+
+function isoOrNull(value: string | null | undefined): string | null {
+  const at = parseTimestampMs(value);
+  return at === null ? null : new Date(at).toISOString();
 }
 
 /** The larger of the stored and the new cost, so a local update never lowers it. */
@@ -169,8 +170,8 @@ export function sessionCardStaleAtSeconds(
   defaultStaleAtSeconds: number
 ): number {
   if (content.statusKind !== 'running') return defaultStaleAtSeconds;
-  const at = content.lastActivityAt == null ? Number.NaN : Date.parse(content.lastActivityAt);
-  if (!Number.isFinite(at)) return defaultStaleAtSeconds;
+  const at = parseTimestampMs(content.lastActivityAt);
+  if (at === null) return defaultStaleAtSeconds;
   return Math.min(
     defaultStaleAtSeconds,
     Math.floor(at / 1000) + SESSION_CARD_QUIET_AFTER_MS / 1000
@@ -194,8 +195,8 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
  * a newer change first, and a bounded term so no tie-break can leave its band.
  */
 function recencyTerm(changedAt: string | null): number {
-  const at = changedAt === null ? Number.NaN : Date.parse(changedAt);
-  if (!Number.isFinite(at)) return 0;
+  const at = parseTimestampMs(changedAt);
+  if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
   return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));
 }

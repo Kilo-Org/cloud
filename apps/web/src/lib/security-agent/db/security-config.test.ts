@@ -3,6 +3,9 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs, security_agent_commands, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { SECURITY_CONFIG_CONFLICT_CODE } from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import type { TRPCError } from '@trpc/server';
 
 const mockEnqueueBacklogFindings = jest.fn<(params: { tx?: unknown }) => Promise<number>>();
 const mockResetOwnerAutoAnalysisEnabledAt =
@@ -17,9 +20,11 @@ jest.mock('./security-analysis', () => ({
 import type * as securityConfigModule from './security-config';
 
 let saveSecurityAgentConfigWithRevision: typeof securityConfigModule.saveSecurityAgentConfigWithRevision;
+let setSecurityAgentEnabled: typeof securityConfigModule.setSecurityAgentEnabled;
 
 beforeAll(async () => {
-  ({ saveSecurityAgentConfigWithRevision } = await import('./security-config'));
+  ({ saveSecurityAgentConfigWithRevision, setSecurityAgentEnabled } =
+    await import('./security-config'));
 });
 
 let user: User;
@@ -41,6 +46,27 @@ async function readRevision(): Promise<number | null> {
     .from(agent_configs)
     .where(eq(agent_configs.owned_by_user_id, user.id));
   return row?.config_revision ?? null;
+}
+
+async function readEnabled(): Promise<boolean | null> {
+  const [row] = await db
+    .select({ is_enabled: agent_configs.is_enabled })
+    .from(agent_configs)
+    .where(eq(agent_configs.owned_by_user_id, user.id));
+  return row?.is_enabled ?? null;
+}
+
+async function insertStoredConfig(params: { isEnabled: boolean }) {
+  await db.insert(agent_configs).values({
+    owned_by_organization_id: null,
+    owned_by_user_id: user.id,
+    agent_type: 'security_scan',
+    platform: 'github',
+    config: {},
+    is_enabled: params.isEnabled,
+    created_by: user.id,
+    config_revision: 1,
+  });
 }
 
 describe('saveSecurityAgentConfigWithRevision', () => {
@@ -89,15 +115,19 @@ describe('saveSecurityAgentConfigWithRevision', () => {
       expectedRevision: 1,
     });
 
-    // A second writer still holds revision 1, so its save must lose.
-    await expect(
-      saveSecurityAgentConfigWithRevision({
-        owner: owner(),
-        config: { auto_analysis_enabled: true },
-        createdBy: user.id,
-        expectedRevision: 1,
-      })
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    // A second writer still holds revision 1, so its save must lose, and the
+    // refusal carries the stable code a device maps onto its own copy.
+    const error = await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { auto_analysis_enabled: true },
+      createdBy: user.id,
+      expectedRevision: 1,
+    }).catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({ code: 'CONFLICT' });
+    const cause = (error as TRPCError).cause;
+    expect(cause).toBeInstanceOf(UpstreamApiError);
+    expect((cause as UpstreamApiError).upstreamCode).toBe(SECURITY_CONFIG_CONFLICT_CODE);
 
     expect(await readRevision()).toBe(2);
   });
@@ -192,5 +222,100 @@ describe('saveSecurityAgentConfigWithRevision', () => {
       .where(eq(security_agent_commands.owned_by_user_id, user.id));
     expect(commands).toHaveLength(1);
     expect(commands[0]?.command_type).toBe('apply_auto_remediation');
+  });
+});
+
+describe('saveSecurityAgentConfigWithRevision enable state', () => {
+  it('creates a first save disabled', async () => {
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { sla_notification_min_severity: 'critical' },
+      createdBy: user.id,
+      expectedRevision: null,
+    });
+
+    expect(await readEnabled()).toBe(false);
+  });
+
+  it('leaves a disabled config disabled while storing the saved settings', async () => {
+    await insertStoredConfig({ isEnabled: false });
+
+    const outcome = await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { sla_notification_min_severity: 'critical' },
+      createdBy: user.id,
+      expectedRevision: 1,
+    });
+
+    expect(outcome.newRevision).toBe(2);
+    expect(await readEnabled()).toBe(false);
+    const [row] = await db
+      .select({ config: agent_configs.config })
+      .from(agent_configs)
+      .where(eq(agent_configs.owned_by_user_id, user.id));
+    expect(row?.config).toMatchObject({ sla_notification_min_severity: 'critical' });
+  });
+
+  it('leaves an enabled config enabled', async () => {
+    await insertStoredConfig({ isEnabled: true });
+
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { sla_notification_min_severity: 'critical' },
+      createdBy: user.id,
+      expectedRevision: 1,
+    });
+
+    expect(await readEnabled()).toBe(true);
+  });
+
+  it('enables a disabled config when the caller asks for it', async () => {
+    await insertStoredConfig({ isEnabled: false });
+
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      createdBy: user.id,
+      expectedRevision: 1,
+    });
+
+    expect(await readEnabled()).toBe(true);
+  });
+
+  it('creates an enabled first save when the caller asks for it', async () => {
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      createdBy: user.id,
+      expectedRevision: null,
+    });
+
+    expect(await readEnabled()).toBe(true);
+  });
+
+  it('disables through setSecurityAgentEnabled without moving the revision', async () => {
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      createdBy: user.id,
+      expectedRevision: null,
+    });
+
+    await setSecurityAgentEnabled(owner(), false);
+
+    expect(await readEnabled()).toBe(false);
+    expect(await readRevision()).toBe(1);
+
+    await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { sla_notification_min_severity: 'critical' },
+      createdBy: user.id,
+      expectedRevision: 1,
+    });
+
+    expect(await readEnabled()).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
+  agent_environment_profile_agents,
   agent_environment_profile_repo_bindings,
   cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
@@ -16,6 +17,7 @@ import {
   bindProfileToRepo,
   MASKED_SECRET_VALUE,
   MAX_PROFILE_KILO_COMMANDS,
+  MAX_PROFILE_VARS,
 } from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -419,6 +421,104 @@ describe('Agent Profiles Router', () => {
       });
     });
 
+    describe('section reads', () => {
+      test('vars returns the masked list for the profile alone', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Vars Profile' });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'PLAIN',
+          value: 'visible',
+          isSecret: false,
+        });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'SECRET',
+          value: 'hidden',
+          isSecret: true,
+        });
+        await caller.agentProfiles.setCommands({ profileId, commands: ['npm ci'] });
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars.map(variable => variable.key)).toEqual(['PLAIN', 'SECRET']);
+        expect(vars.find(variable => variable.key === 'PLAIN')?.value).toBe('visible');
+        expect(vars.find(variable => variable.key === 'SECRET')?.value).toBe('***');
+      });
+
+      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
+        '%s keeps answering when another collection holds a row the whole-profile read refuses',
+        async procedure => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const { id: profileId } = await caller.agentProfiles.create({ name: 'Mixed Profile' });
+          await caller.agentProfiles.setVar({
+            profileId,
+            key: 'API_BASE',
+            value: 'http://localhost:3000',
+            isSecret: false,
+          });
+          // An agent config the response contract rejects (a variant is
+          // model-specific). It is not part of any other collection's read.
+          await db.insert(agent_environment_profile_agents).values({
+            profile_id: profileId,
+            slug: 'legacy',
+            name: 'Legacy',
+            config: { variant: 'fast' },
+          });
+
+          await expect(caller.agentProfiles.get({ profileId })).rejects.toThrow();
+
+          const result = await caller.agentProfiles[procedure]({ profileId });
+          expect(Array.isArray(result)).toBe(true);
+        }
+      );
+
+      test('vars lists six variables including secrets', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Full Profile' });
+        const keys = ['ALPHA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA'];
+        for (const [index, key] of keys.entries()) {
+          await caller.agentProfiles.setVar({
+            profileId,
+            key,
+            value: `value-${String(index)}`,
+            isSecret: index % 2 === 1,
+          });
+        }
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars).toHaveLength(keys.length);
+        expect(
+          vars.map(variable => ({
+            key: variable.key,
+            value: variable.value,
+            isSecret: variable.isSecret,
+          }))
+        ).toEqual([
+          { key: 'ALPHA', value: 'value-0', isSecret: false },
+          { key: 'BETA', value: '***', isSecret: true },
+          { key: 'DELTA', value: '***', isSecret: true },
+          { key: 'EPSILON', value: 'value-4', isSecret: false },
+          { key: 'GAMMA', value: 'value-2', isSecret: false },
+          { key: 'ZETA', value: '***', isSecret: true },
+        ]);
+      });
+
+      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
+        '%s refuses another user profile',
+        async procedure => {
+          const callerA = await createCallerForUser(ownerUser.id);
+          const callerB = await createCallerForUser(otherUser.id);
+          const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private' });
+
+          await expect(callerB.agentProfiles[procedure]({ profileId })).rejects.toThrow(
+            'Profile not found'
+          );
+        }
+      );
+    });
+
     describe('update', () => {
       test('should update profile name and description', async () => {
         const caller = await createCallerForUser(ownerUser.id);
@@ -628,6 +728,90 @@ describe('Agent Profiles Router', () => {
         expect(result.vars[0].value).toBe('***');
         expect(result.vars[0].isSecret).toBe(true);
       });
+
+      test('should apply the key rules to a new key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Key Contract Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'api key',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Invalid environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should apply the reserved-name rule to a new key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Reserved Key Test',
+        });
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'KILO_PROFILE',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow('Reserved environment variable key');
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(0);
+      });
+
+      test('should hold a profile at the variable cap', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Var Cap Test',
+        });
+
+        await db.insert(agent_environment_profile_vars).values(
+          Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+            profile_id: profileId,
+            key: `VAR_${String(index)}`,
+            value: 'value',
+            is_secret: false,
+          }))
+        );
+
+        await expect(
+          caller.agentProfiles.setVar({
+            profileId,
+            key: 'OVER_CAP',
+            value: 'value',
+            isSecret: false,
+          })
+        ).rejects.toThrow(`Profiles are limited to ${String(MAX_PROFILE_VARS)} variables`);
+
+        const stored = await db
+          .select({ key: agent_environment_profile_vars.key })
+          .from(agent_environment_profile_vars)
+          .where(eq(agent_environment_profile_vars.profile_id, profileId));
+        expect(stored).toHaveLength(MAX_PROFILE_VARS);
+        expect(stored.some(row => row.key === 'OVER_CAP')).toBe(false);
+
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'VAR_0',
+          value: 'rotated',
+          isSecret: false,
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.vars).toHaveLength(MAX_PROFILE_VARS);
+        expect(result.vars.find(variable => variable.key === 'VAR_0')?.value).toBe('rotated');
+      });
     });
 
     describe('deleteVar', () => {
@@ -824,6 +1008,154 @@ describe('Agent Profiles Router', () => {
 
         const result = await caller.agentProfiles.get({ profileId });
         expect(result.kiloCommands.map(command => command.id)).toEqual([second.id, first.id]);
+      });
+    });
+
+    describe('kiloCommandNameConflicts', () => {
+      test('refuses a second command under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Command Dup Test' });
+
+        await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+
+        await expect(
+          caller.agentProfiles.createKiloCommand({
+            profileId,
+            name: 'release-notes',
+            template: 'Draft the notes again',
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'A command with this name already exists in this profile',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => command.name)).toEqual(['release-notes']);
+      });
+
+      test('refuses a rename onto a name another command owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Command Rename Test',
+        });
+
+        const { id: commandId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'release-notes',
+          template: 'Draft the notes',
+        });
+        const { id: otherId } = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'deploy',
+          template: 'Ship it',
+        });
+
+        await expect(
+          caller.agentProfiles.updateKiloCommand({
+            profileId,
+            commandId,
+            name: 'deploy',
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a command under its own name stays allowed.
+        await caller.agentProfiles.updateKiloCommand({
+          profileId,
+          commandId,
+          name: 'release-notes',
+          template: 'Draft the notes for the next release',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => [command.id, command.name])).toEqual([
+          [otherId, 'deploy'],
+          [commandId, 'release-notes'],
+        ]);
+        expect(result.kiloCommands.find(command => command.id === commandId)?.template).toBe(
+          'Draft the notes for the next release'
+        );
+      });
+    });
+
+    describe('mcpServers', () => {
+      test('refuses a second server under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Duplicate Test' });
+
+        const server = {
+          name: 'docs',
+          type: 'remote',
+          enabled: true,
+          config: { url: 'https://docs.example.com/mcp' },
+        } as const;
+
+        await caller.agentProfiles.createMcp({ profileId, server });
+
+        await expect(caller.agentProfiles.createMcp({ profileId, server })).rejects.toMatchObject({
+          code: 'CONFLICT',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => item.name)).toEqual(['docs']);
+      });
+
+      test('refuses a rename onto a name another server owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Rename Test' });
+
+        const { id: mcpServerId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/mcp' },
+          },
+        });
+        const { id: otherId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'search',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://search.example.com/mcp' },
+          },
+        });
+
+        await expect(
+          caller.agentProfiles.updateMcp({
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'search',
+              type: 'remote',
+              enabled: true,
+              config: { url: 'https://docs.example.com/mcp' },
+            },
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a server under its own name stays allowed.
+        await caller.agentProfiles.updateMcp({
+          profileId,
+          mcpServerId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/v2' },
+          },
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => [item.id, item.name])).toEqual([
+          [mcpServerId, 'docs'],
+          [otherId, 'search'],
+        ]);
       });
     });
   });

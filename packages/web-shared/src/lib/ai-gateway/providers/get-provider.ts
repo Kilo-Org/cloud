@@ -10,6 +10,7 @@ import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -52,6 +53,7 @@ import {
   getDirectByokCatalogModelId,
   getDirectByokModel,
   getDirectByokModelChatApis,
+  getDirectByokPolicyProviderId,
   supportsCatalogMode,
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -95,9 +97,10 @@ export type GetProviderProviderResult = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
-  /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
-   *  require explicit admin opt-in. */
+  /** Skip paid-auth and organization policy checks. Used by bespoke direct-byok
+   *  ids and non-public custom_llm2 because both already require explicit admin
+   *  opt-in. A request that is neither free nor user funded still needs a
+   *  balance. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -137,7 +140,7 @@ async function directByokProviderResult(
   return {
     kind: 'provider',
     provider: {
-      id: 'direct-byok',
+      type: 'direct-byok',
       ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
@@ -147,8 +150,8 @@ async function directByokProviderResult(
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
-    // Organization model policies cover catalog ids. A bespoke id is only served by a key outside
-    // catalog mode, which stays exempt as before.
+    // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
+    // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
   };
 }
@@ -172,7 +175,8 @@ async function resolveDirectByokProvider(
   user: User | AnonymousUserContext,
   requestedModel: string,
   request: GatewayRequest,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>
 ): Promise<
   GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokCatalogCandidates | null
 > {
@@ -199,7 +203,14 @@ async function resolveDirectByokProvider(
   }
 
   if (isAnonymousContext(user)) return null;
-  const catalogModels = await findDirectByokCatalogModels(requestedModel);
+  // Keys for providers the organization policy does not admit are never loaded, so a later route
+  // that honors the policy takes the request, and an undecryptable allowed key still fails closed.
+  const catalogModels: DirectByokCatalogModel[] = [];
+  for (const catalogModel of await findDirectByokCatalogModels(requestedModel)) {
+    if (await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(catalogModel.provider))) {
+      catalogModels.push(catalogModel);
+    }
+  }
   if (catalogModels.length === 0) return null;
   const credentials = await getCatalogModeByokCredentials(
     readDb,
@@ -256,8 +267,11 @@ async function isEligibleForCustomLlm(
   user: User | AnonymousUserContext,
   organizationId: string | undefined
 ) {
+  // An anonymous caller has no balance to bill.
+  if (isAnonymousContext(user))
+    return isPublicCustomLlm(customLlm.definition) && !customLlm.definition.pricing;
   if (isPublicCustomLlm(customLlm.definition)) return true;
-  if (isAnonymousContext(user) || !organizationId) return false;
+  if (!organizationId) return false;
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
@@ -318,26 +332,26 @@ async function resolveCustomLlmProvider(
   }
 
   const { definition } = customLlm;
+  const isPublic = isPublicCustomLlm(definition);
   const provider = buildDirectProvider(
-    'custom',
+    isPublic ? 'custom-public' : 'custom',
     getCustomLlmApiKinds(definition),
     definition,
     await resolveCustomLlmAuth(credentials)
   );
-  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
-    isFree: true,
+    isFree: definition.pricing === undefined,
     bypassAccessCheck: !isPublic,
   };
 }
 
 /**
- * A public custom LLM serves anyone for free on Kilo's credential, so like other
- * free models it drops paid server features before the definition's own
- * `extra_body` applies. Private custom LLMs keep them.
+ * A public custom LLM serves anyone on Kilo's credential, so like free models it
+ * drops paid server features before the definition's own `extra_body` applies,
+ * even when it sets pricing. Private custom LLMs keep them.
  */
 function withoutPaidServerFeatures(provider: Provider): Provider {
   return {
@@ -374,10 +388,20 @@ async function getGatewayRoutedByokKeys(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined,
-  options: { includeGatewayKeys: boolean }
+  options: {
+    includeGatewayKeys: boolean;
+    getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
+  }
 ): Promise<BYOKResult[]> {
   if (isAnonymousContext(user)) return [];
-  const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  const allProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  if (allProviders.length === 0) return [];
+  // Keys for providers outside the organization allow-list are never loaded, so a later route that
+  // honors the allow-list takes the request, and an undecryptable allowed key still fails closed.
+  const allowedProviders = await options.getAllowedProviders();
+  const candidateProviders = allProviders.filter(providerId =>
+    isVercelUserByokProviderAllowed(providerId, allowedProviders)
+  );
   if (candidateProviders.length === 0) return [];
   return (
     (organizationId
@@ -385,6 +409,9 @@ async function getGatewayRoutedByokKeys(
       : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? []
   );
 }
+
+const noProviderAllowList = async () => undefined;
+const everyDirectByokProviderAllowed = async () => true;
 
 type GatewayKeyDecision = 'serves' | 'model-unavailable' | 'provider-settings';
 
@@ -485,6 +512,14 @@ export type GetProviderInput = {
   /** The request carries a spend ceiling. Only a provider that can cap the
    * price of the route it serves may take it. */
   boundedSpending?: boolean;
+  /** The OpenRouter provider slugs the organization policy allows for the model, or undefined
+   * when it does not restrict providers. Provider keys sent through Vercel must honor it (see
+   * `isVercelUserByokProviderAllowed`). */
+  getAllowedProviders?: () => Promise<ReadonlySet<string> | undefined>;
+  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key of
+   * the provider it names (see `getDirectByokPolicyProviderId` and
+   * `isModelAllowedForProviderKey`). Keys it rejects are skipped. */
+  isDirectByokProviderAllowed?: (policyProviderId: string) => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
 };
@@ -507,6 +542,8 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     kiloIgnoredProviders = [],
     boundedSpending = false,
     countryCode = null,
+    getAllowedProviders = noProviderAllowList,
+    isDirectByokProviderAllowed = everyDirectByokProviderAllowed,
   } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
@@ -527,7 +564,13 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return await resolveCustomLlmProvider(customLlm, user, organizationId, countryCode);
   }
 
-  const directByok = await resolveDirectByokProvider(user, requestedModel, request, organizationId);
+  const directByok = await resolveDirectByokProvider(
+    user,
+    requestedModel,
+    request,
+    organizationId,
+    isDirectByokProviderAllowed
+  );
   if (directByok && directByok.kind !== 'direct-byok-catalog-candidates') {
     return directByok;
   }
@@ -565,6 +608,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     directCandidates,
     await getGatewayRoutedByokKeys(user, requestedModel, organizationId, {
       includeGatewayKeys: true,
+      getAllowedProviders,
     })
   );
   for (const route of routes) {
@@ -780,12 +824,14 @@ export async function previewByokRouting({
 export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  allowedProviders?: ReadonlySet<string>
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
   const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const inference = await getGatewayRoutedByokKeys(user, requestedModel, organizationId, {
     includeGatewayKeys: false,
+    getAllowedProviders: async () => allowedProviders,
   });
   if (inference.length > 0) {
     return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };

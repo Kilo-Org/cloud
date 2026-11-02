@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
+import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications/schemas';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, spend_alert_deliveries } from '@kilocode/db/schema';

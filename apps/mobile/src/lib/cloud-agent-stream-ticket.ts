@@ -33,6 +33,26 @@ export class StreamTicketHttpError extends Error {
   }
 }
 
+/** Per-request knobs; `signal` lets a bounded caller cancel the POST. */
+export type FetchStreamTicketOptions = { signal?: AbortSignal };
+
+/**
+ * The `error` field of a refused response, when its body happens to be the
+ * documented object.
+ *
+ * The status is what a caller classifies on, so the body never decides whether
+ * the status reaches it: a proxy's HTML page, an empty body, or any other
+ * non-object JSON only costs the specific message, never the status.
+ */
+async function readRefusalMessage(response: Response): Promise<string | undefined> {
+  try {
+    const parsed = StreamTicketResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * POST the cloud-agent stream ticket. The single source of truth for the
  * route, headers, body, and response contract, shared by the session manager
@@ -40,7 +60,8 @@ export class StreamTicketHttpError extends Error {
  */
 export async function fetchCloudAgentStreamTicket(
   sessionId: string,
-  organizationId?: string
+  organizationId?: string,
+  options?: FetchStreamTicketOptions
 ): Promise<{ ticket: string; expiresAt: number }> {
   const token = await getAuthTokenForRequest();
   const body = {
@@ -54,11 +75,15 @@ export async function fetchCloudAgentStreamTicket(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    ...(options?.signal ? { signal: options.signal } : {}),
   });
-  const data = StreamTicketResponseSchema.parse(await response.json());
   if (!response.ok) {
-    throw new StreamTicketHttpError(response.status, data.error ?? 'Failed to get stream ticket');
+    throw new StreamTicketHttpError(
+      response.status,
+      (await readRefusalMessage(response)) ?? 'Failed to get stream ticket'
+    );
   }
+  const data = StreamTicketResponseSchema.parse(await response.json());
   if (!data.ticket) {
     throw new Error('Missing ticket in stream-ticket response');
   }

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   launchConnectGateBrowser,
   openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
 } from './connect-gate-platform';
 
 const mocks = vi.hoisted(() => ({
@@ -307,21 +308,24 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
   });
 
-  it('ignores a launch failure that lands after the foreground ended the wait', async () => {
+  it('reports a launch failure that lands after the foreground ended the wait', async () => {
     const pending = pendingLaunch();
     const handlers = returnHandlers();
 
     const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
     emitAppState('active');
     await launch;
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
 
-    // Settled union: a late rejection of the losing branch must not surface as
-    // a browser error or an unhandled rejection.
+    // A failure that lands after the foreground edge settled the wait still
+    // means no browser ever opened, so the user has to hear about it instead of
+    // watching an inert control.
     pending.reject(new Error('late launch failure'));
-    await Promise.resolve();
 
     expect(handlers.onReturn).toHaveBeenCalledOnce();
-    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
+    });
   });
 
   it('needs a real return, not an active delivery while the app never left', async () => {
@@ -421,5 +425,73 @@ describe('openAuthorizationAndWaitForReturn', () => {
     await expect(openAuthorizationAndWaitForReturn('https://example.com/connect')).rejects.toBe(
       error
     );
+  });
+});
+
+describe('reportLateLaunchFailure', () => {
+  /** A launch that stays pending until the test settles it. */
+  function openPending() {
+    const pending = Promise.withResolvers<{ type: string }>();
+    mocks.openAuthSessionAsync.mockReturnValue(pending.promise);
+    mocks.openBrowserAsync.mockReturnValue(pending.promise);
+    mocks.appState.currentState = 'active';
+    return pending;
+  }
+
+  function settleThroughForeground() {
+    emitAppState('background');
+    emitAppState('active');
+  }
+
+  it('reports a launch that failed after the foreground edge settled the wait', async () => {
+    const pending = openPending();
+    const onFailure = vi.fn<() => void>();
+
+    const waitPromise = openAuthorizationAndWaitForReturn('https://example.com/connect');
+    settleThroughForeground();
+    const wait = await waitPromise;
+    expect(wait.settledByLaunch).toBe(false);
+
+    reportLateLaunchFailure(wait, { onFailure });
+    expect(onFailure).not.toHaveBeenCalled();
+
+    pending.reject(new Error('no browser'));
+    await vi.waitFor(() => {
+      expect(onFailure).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('stays silent when the browser reported its own outcome', async () => {
+    const pending = openPending();
+    const onFailure = vi.fn<() => void>();
+
+    const waitPromise = openAuthorizationAndWaitForReturn('https://example.com/connect');
+    pending.resolve({ type: 'dismiss' });
+    const wait = await waitPromise;
+    expect(wait.settledByLaunch).toBe(true);
+
+    reportLateLaunchFailure(wait, { onFailure });
+    await flushMicrotasks();
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing after the caller aborted', async () => {
+    const pending = openPending();
+    const controller = new AbortController();
+    const onFailure = vi.fn<() => void>();
+
+    const waitPromise = openAuthorizationAndWaitForReturn(
+      'https://example.com/connect',
+      controller.signal
+    );
+    settleThroughForeground();
+    const wait = await waitPromise;
+
+    reportLateLaunchFailure(wait, { signal: controller.signal, onFailure });
+    controller.abort();
+    pending.reject(new Error('no browser'));
+    await flushMicrotasks();
+
+    expect(onFailure).not.toHaveBeenCalled();
   });
 });

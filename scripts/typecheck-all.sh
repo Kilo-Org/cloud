@@ -106,7 +106,7 @@ fi
 
 # 1. Build trpc (skip if --changes-only and source unchanged)
 if $changes_only; then
-  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
+  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/tsconfig.build.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
   if [ -n "$trpc_changed" ]; then
     echo "[typecheck] trpc source changed, rebuilding"
     pnpm --filter @kilocode/trpc run build

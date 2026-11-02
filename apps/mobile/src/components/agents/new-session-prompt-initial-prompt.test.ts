@@ -51,6 +51,9 @@ vi.mock('react', async () => {
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
+    // Without a renderer a previous value cannot be cached, so every call
+    // recomputes — the same result, just uncached.
+    useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
@@ -183,11 +186,15 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
   },
 }));
 
-vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: () => {
-    // no-op hook
+const sharePrefillControl = vi.hoisted(() => ({
+  current: null as null | {
+    failed: boolean;
+    retry: () => void;
+    dismiss: () => void;
   },
 }));
+
+vi.mock('@/lib/share-prefill', () => ({ useSharePrefill: () => sharePrefillControl.current }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
   useVoiceInput: () => ({
@@ -318,11 +325,48 @@ function defaultProps() {
 
 describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
     textHeightOptions.current = null;
+  });
+
+  it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const failedControl = {
+      failed: true,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    sharePrefillControl.current = failedControl;
+
+    const { SharePrefillFailure } = await import('./share-prefill-failure');
+
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const failed = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    const row = findElementByType(failed, SharePrefillFailure);
+    if (!row) {
+      throw new Error('prefill failure row did not render');
+    }
+    (row.onRetry as () => void)();
+    (row.onDismiss as () => void)();
+    expect(failedControl.retry).toHaveBeenCalledTimes(1);
+    expect(failedControl.dismiss).toHaveBeenCalledTimes(1);
+
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const delivered = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    expect(findElementByType(delivered, SharePrefillFailure)).toBeNull();
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -404,6 +448,27 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(textInputProps!.defaultValue).toBeUndefined();
+  });
+
+  it.each([
+    ['an entry that must still pick a repository', false],
+    ['an entry that is already configured', true],
+  ])('takes focus on arrival for %s only when the host allows it', async (_case, allow) => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt({
+      ...defaultProps(),
+      autoFocusOnMount: allow,
+    }) as Node;
+
+    const textInputProps = findElementByType(element, 'TextInput');
+    expect(textInputProps).not.toBeNull();
+    // The keyboard the input raises on arrival is what shrinks the form frame,
+    // so this prop is the whole behaviour: false leaves the configuration on
+    // screen and the input focuses on a tap instead.
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(textInputProps!.autoFocus).toBe(allow);
   });
 
   it('pastes clipboard text at the reported caret, not at the draft end', async () => {

@@ -15,24 +15,28 @@
 //
 // Conversation comments are returned on the first page only (backend
 // contract: later pages carry `conversation: []`). We retain the first
-// page's conversation in a module-level store keyed by the PR identity so
-// it survives both the retention trim (which drops the oldest page once
-// `maxPages` is exceeded) and the tab's unmount/remount cycle
+// page's conversation in the module-level store in
+// `conversation-retention.ts`, keyed by the signed-in tenant and the PR
+// identity, so it survives both the retention trim (which drops the oldest
+// page once `maxPages` is exceeded) and the tab's unmount/remount cycle
 // (`PrReviewScreen` unmounts `PrReviewDiscussionTab` on every tab change,
 // which a component ref cannot survive).
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
+import {
+  conversationRetentionKey,
+  retainConversationAcrossMounts,
+} from '@/lib/pr-review/discussion/conversation-retention';
 import {
   buildPrThreadsQueryOptions,
   normalizePrThreadsPages,
 } from '@/lib/pr-review/provider-pr-queries';
 import {
   githubPrRef,
-  providerPrRefKey,
   type ProviderPrScope,
   useProviderPrScope,
 } from '@/lib/pr-review/provider-pr-ref';
@@ -55,61 +59,6 @@ export function buildPrReviewDiscussionThreadsQueryOptions(
   return withInfiniteRetention(buildPrThreadsQueryOptions(trpc, scope));
 }
 
-/**
- * Fallback used once the retention trim has evicted page one.
- *
- * The backend returns conversation comments on the first page only; later
- * pages carry `conversation: []`. Once `maxPages` trims the oldest page,
- * `pages[0]` is no longer the first page, so reading `pages[0].conversation`
- * would erase the comments. Prefer the current first page's conversation when
- * it is non-empty; otherwise fall back to the retained value. While page one
- * IS loaded the caller uses its value directly (see
- * `retainConversationAcrossMounts`), including when it is empty.
- */
-export function retainConversation<C>(
-  pages: readonly { conversation: readonly C[] }[] | undefined,
-  retained: readonly C[]
-): readonly C[] {
-  const first = pages?.[0]?.conversation;
-  return first && first.length > 0 ? first : retained;
-}
-
-// Module-level retention store. Keyed by the provider ref so the retained
-// first-page conversation survives the tab's unmount/remount cycle (which a
-// component ref cannot) and so two same-named repositories on different
-// providers never share one entry.
-const conversationRetention = new Map<string, readonly ConversationComment[]>();
-
-// Shared empty reference so an empty first page keeps a stable identity across
-// renders instead of a fresh `[]` literal on every call.
-const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
-
-/**
- * Read and update the retained first-page conversation for one PR.
- *
- * `firstPageLoaded` tells the two cases apart. When the live first page is
- * loaded (`pages[0]` is page one), it is the source of truth — including when
- * it is empty, so deleting the last conversation comment empties the
- * discussion and a later eviction still reads that empty truth. Only once the
- * retention trim has evicted page one (later pages carry `conversation: []` by
- * backend contract) does the retained copy become the source, so the comments
- * survive the trim and the tab's unmount/remount cycle.
- */
-export function retainConversationAcrossMounts(
-  key: string,
-  pages: readonly { conversation: readonly ConversationComment[] }[] | undefined,
-  firstPageLoaded: boolean
-): readonly ConversationComment[] {
-  const retained = conversationRetention.get(key) ?? EMPTY_CONVERSATION;
-  const conversation = firstPageLoaded
-    ? (pages?.[0]?.conversation ?? EMPTY_CONVERSATION)
-    : retainConversation(pages, retained);
-  if (conversation !== retained) {
-    conversationRetention.set(key, conversation);
-  }
-  return conversation;
-}
-
 export function usePrReviewDiscussionThreads(args: {
   owner: string;
   repo: string;
@@ -118,6 +67,11 @@ export function usePrReviewDiscussionThreads(args: {
   const { owner, repo, number } = args;
   const trpc = useTRPC();
   const scope = useProviderPrScope({ owner, repo, number });
+  // The tenant the discussion read runs under. `getMe` is already cached for
+  // every signed-in surface (both PR route layouts read it), so this adds no
+  // request; it is read here because the retention store is process-wide and
+  // its key must name the account, not only the PR.
+  const { userId } = useCurrentUserId();
   const query = useInfiniteQuery(
     buildPrReviewDiscussionThreadsQueryOptions(trpc, { owner, repo, number, scope })
   );
@@ -154,8 +108,13 @@ export function usePrReviewDiscussionThreads(args: {
   // (including an empty one, so a deleted last comment empties the
   // discussion); once it is evicted, the module-level store keeps the last
   // first-page value across both the trim and the tab's unmount/remount cycle.
+  // The key carries the signed-in account and organization as well as the ref,
+  // so a remount can only ever be served the conversation its own tenant read;
+  // while the account is still unknown the store is neither read nor written.
   const conversation = retainConversationAcrossMounts(
-    providerPrRefKey(scope.ref),
+    userId === undefined
+      ? null
+      : conversationRetentionKey({ userId, organizationId: scope.organizationId, ref: scope.ref }),
     pages,
     firstPageLoaded
   );

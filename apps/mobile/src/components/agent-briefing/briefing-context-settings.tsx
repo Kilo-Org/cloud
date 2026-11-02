@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
@@ -262,6 +263,7 @@ export function BriefingContextSettings({
         <Button
           variant="ghost"
           size="sm"
+          className={STATE_ACTION_CLASS}
           onPress={() => {
             void estimate.refetch();
           }}

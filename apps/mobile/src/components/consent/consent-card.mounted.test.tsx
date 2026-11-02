@@ -3,7 +3,12 @@ import { createElement } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LEGAL_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 import { i18n } from '@/i18n';
 
@@ -74,6 +79,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -211,19 +217,40 @@ describe('ConsentCard', () => {
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
     expect(t).not.toContain('Data sharing preferences');
-    expect(t).not.toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Optional');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+  });
+
+  it('names the brand with the header mark instead of repeating it as text', () => {
+    const renderer = mountCard('onboarding');
+    expect(texts(renderer.root)).not.toContain(i18n.t('consent.kilo'));
+    const marks = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('consent.kilo')
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
   it('renders review wording in review mode', () => {
     const renderer = mountCard('review');
     const t = texts(renderer.root);
     expect(t).toContain('Data sharing preferences');
-    expect(t).toContain('Optional — you can change this any time in Settings');
+    // The optional section header is the headword alone: the toggle card's own
+    // description already says the choice can be changed in Settings.
+    expect(t).toContain('Optional');
+    expect(t).not.toContain('Optional — you can change this any time in Settings');
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
+
+    // One filled action per footer: the safe way out keeps the fill, and the
+    // destructive one is outlined so it cannot compete with it.
+    const back = findButton(renderer.root, 'Back');
+    const revoke = findButton(renderer.root, 'Revoke consent');
+    expect(back.props.variant ?? 'default').toBe('default');
+    expect(revoke.props.variant).toBe('outline-destructive');
   });
 
   it('defaults the optional switch to on', () => {
@@ -494,6 +521,13 @@ describe('ConsentCard', () => {
   });
 
   it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    // The cap is bounded by the two-line guarantee, not by taste: on the
+    // smallest supported width the card leaves 318dp for the sentence, and
+    // its longer segment (the pt-BR lead-in, `text-sm`) measures 209.52dp at
+    // scale 1, so a cap above 318 / 209.52 = 1.52 would wrap that segment and
+    // push the pinned footer's second action off the sheet. Headroom is why
+    // the shipped value is lower than the bound.
+    expect(CONSENT_DISCLOSURE_MAX_FONT_SCALE * 209.52).toBeLessThanOrEqual(318);
     for (const mode of ['onboarding', 'review'] as const) {
       const root = mountCard(mode).root;
       // The sentence has no line cap: uncapped it grows to several lines at
@@ -530,10 +564,17 @@ describe('ConsentCard', () => {
       if (!link) {
         throw new Error('privacy link not found');
       }
-      // A real 48dp box: the control-size audit reads the node's own rect, so
-      // the 14dp text line alone was reported as too small to tap.
-      expect(String((link.props as { className?: string }).className)).toContain(
-        LEGAL_LINK_BOX_CLASS
+      // A real 28dp box plus the vertical slop: the control-size audit reads
+      // the node's own rect, so the 14dp text line alone was reported as too
+      // small to tap, and the slop carries the 44pt region.
+      // Test renderer props are untyped; name the two reads once.
+      const props = link.props as {
+        className?: string;
+        hitSlop?: { top?: number; bottom?: number };
+      };
+      expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+      expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_DP
       );
       return link;
     });

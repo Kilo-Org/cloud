@@ -25,6 +25,10 @@ type LinearIntegrationDetailsProps = {
 const linearConnectionErrorMessages: Record<string, string> = {
   workspace_already_connected:
     'This Linear workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+  permission_required:
+    'Only organization owners, admins, and billing managers can connect or change the organization Linear integration.',
+  organization_access_required:
+    'You no longer have access to this organization. Ask an organization owner or admin for access.',
 };
 
 function getLinearConnectionErrorMessage(error: string): string {

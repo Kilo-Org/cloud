@@ -48,7 +48,7 @@ describe('getEmbeddingProvider', () => {
       'google/text-embedding-004',
     ]) {
       const result = await getEmbeddingProvider(model, user, undefined);
-      expect(result.provider.id).toBe('openrouter');
+      expect(result.provider.type).toBe('openrouter');
       expect(result.provider).toBe(OPENROUTER);
       expect(result.userByok).toBeNull();
     }
@@ -63,7 +63,7 @@ describe('getEmbeddingProvider', () => {
 
     const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
 
-    expect(result.provider.id).toBe('vercel');
+    expect(result.provider.type).toBe('vercel');
     expect(result.provider).toBe(VERCEL_AI_GATEWAY);
     expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
@@ -78,7 +78,7 @@ describe('getEmbeddingProvider', () => {
 
     const result = await getEmbeddingProvider('mistralai/mistral-embed-2312', user, 'org-123');
 
-    expect(result.provider.id).toBe('vercel');
+    expect(result.provider.type).toBe('vercel');
     expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforOrganization).toHaveBeenCalledWith(readDb, 'org-123', ['mistral']);
   });
@@ -87,7 +87,7 @@ describe('getEmbeddingProvider', () => {
     const anonUser = createAnonymousContext('127.0.0.1');
     const result = await getEmbeddingProvider('openai/text-embedding-3-small', anonUser, undefined);
 
-    expect(result.provider.id).toBe('openrouter');
+    expect(result.provider.type).toBe('openrouter');
     expect(result.userByok).toBeNull();
     expect(mockedGetModelInferenceUserByokProviders).not.toHaveBeenCalled();
   });
@@ -122,7 +122,7 @@ describe('getEmbeddingProvider', () => {
 
     const result = await getEmbeddingProvider('mistralai/codestral-embed-2505', user, undefined);
 
-    expect(result.provider.id).toBe('openrouter');
+    expect(result.provider.type).toBe('openrouter');
     expect(result.userByok).toBeNull();
   });
 });
@@ -130,6 +130,38 @@ describe('getEmbeddingProvider', () => {
 describe('getTranscriptionProvider', () => {
   it('routes transcription requests to OpenRouter', async () => {
     const result = await getTranscriptionProvider();
+
+    expect(result.provider).toBe(OPENROUTER);
+    expect(result.userByok).toBeNull();
+  });
+});
+
+describe('getEmbeddingProvider with an organization provider allow-list', () => {
+  beforeEach(() => {
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { decryptedAPIKey: 'sk-org', providerId: 'openai' },
+    ]);
+  });
+
+  it('uses a key the allow-list admits', async () => {
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      createTestUser(),
+      'org-123',
+      new Set(['openai'])
+    );
+
+    expect(result.provider).toBe(VERCEL_AI_GATEWAY);
+  });
+
+  it('routes to OpenRouter instead of a key outside the allow-list', async () => {
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      createTestUser(),
+      'org-123',
+      new Set(['azure'])
+    );
 
     expect(result.provider).toBe(OPENROUTER);
     expect(result.userByok).toBeNull();

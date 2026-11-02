@@ -101,7 +101,8 @@ export function createPublicSnowflakeReport<Usage>(options: PublicSnowflakeRepor
   const getCachedReport = createCachedFetch<Usage | null>(
     () => fetchReport(options),
     IN_MEMORY_CACHE_TTL_MS,
-    null
+    null,
+    { name: `publicSnowflakeReport[${options.source}]` }
   );
 
   return async function GET(): Promise<NextResponse> {

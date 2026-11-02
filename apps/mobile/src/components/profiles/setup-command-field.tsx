@@ -1,0 +1,124 @@
+import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
+
+import {
+  COMMAND_COUNTER_VISIBLE_REMAINING,
+  MAX_SETUP_COMMAND_LENGTH,
+} from '@/components/profiles/profile-commands-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { SelectableText } from '@/components/ui/selectable-text';
+import { Text } from '@/components/ui/text';
+
+type SetupCommandFieldProps = Readonly<{
+  /** The command the caller holds; seeds the field and sizes the hint. */
+  command: string;
+  /** The field's label, which is also its accessible name. */
+  label: string;
+  /** Controls that belong to this command's own row, at the end of its label line. */
+  trailing?: ReactNode;
+  /** The viewer cannot manage this row: render the command as read-only text. */
+  readOnly?: boolean;
+  /** The row is busy, not unmanageable: the field stays a field, dimmed. */
+  disabled?: boolean;
+  accessibilityHint?: string;
+  onChangeText: (next: string) => void;
+  onEndEditing?: () => void;
+  onSubmitEditing?: () => void;
+}>;
+
+/**
+ * One setup-command row. A manager gets the text field with the server's
+ * per-command bound made visible: the native input clips a longer value (a
+ * paste) at `MAX_SETUP_COMMAND_LENGTH` before the change reaches JS, so the
+ * field cannot tell a cut from a command that legitimately reaches the bound,
+ * and it does not claim one — an ordinary row says nothing, a command within
+ * `COMMAND_COUNTER_VISIBLE_REMAINING` of the bound counts the room left, and a
+ * command at the bound states what the bound is. The two states never render
+ * together: at the bound the count is zero, which the sentence already says.
+ *
+ * A viewer without manage rights reads the command instead of editing it. A
+ * setup command is written to be run and a single line of it is rarely the
+ * whole command, so the value renders through `SelectableText`, the app's
+ * read-only text surface: it wraps at full length, grows to its content, and
+ * carries the same label and accessible name the field has. It keeps the
+ * field's box so the row reads the same in both roles, without the muted
+ * disabled treatment a dead input had.
+ */
+export function SetupCommandField({
+  command,
+  label,
+  trailing,
+  readOnly = false,
+  disabled = false,
+  accessibilityHint,
+  onChangeText,
+  onEndEditing,
+  onSubmitEditing,
+}: Readonly<SetupCommandFieldProps>) {
+  const { t } = useTranslation();
+
+  if (readOnly) {
+    return (
+      <View className="gap-1.5">
+        <FormFieldLabel label={label} labelAccessory={trailing} />
+        <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+          <SelectableText
+            accessibilityLabel={label}
+            accessibilityHint={accessibilityHint}
+            className="text-sm leading-[1.25rem] text-foreground"
+          >
+            {command}
+          </SelectableText>
+        </View>
+      </View>
+    );
+  }
+
+  const remaining = MAX_SETUP_COMMAND_LENGTH - command.length;
+  // One line at a time: the room left while there is room, the bound once there
+  // is none. At zero the count would only restate the sentence below it.
+  const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
+  const showsBound = !disabled && remaining <= 0;
+
+  return (
+    <View className="gap-1.5">
+      <FormField
+        label={label}
+        labelAccessory={trailing}
+        defaultValue={command}
+        placeholder={t('profiles.commandPlaceholder')}
+        className="min-h-[44px] leading-[normal]"
+        maxLength={MAX_SETUP_COMMAND_LENGTH}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        accessibilityHint={accessibilityHint}
+        disabled={disabled}
+        onEndEditing={onEndEditing}
+        onSubmitEditing={onSubmitEditing}
+        onChangeText={onChangeText}
+      />
+      {showsCounter ? (
+        <View className="flex-row justify-end">
+          {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+          <Text
+            className="text-xs font-normal text-muted-foreground"
+            accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
+          >
+            {remaining}
+          </Text>
+        </View>
+      ) : null}
+      {showsBound ? (
+        <AccessibleStatus
+          message={t('profiles.commandAtLimit', { max: MAX_SETUP_COMMAND_LENGTH })}
+          tone="status"
+          className="text-xs"
+        />
+      ) : null}
+    </View>
+  );
+}

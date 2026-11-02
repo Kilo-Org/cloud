@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import {
+  cloudAgentAuthorityProcedureKind,
+  cloudAgentAuthorityProcedures,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -232,8 +234,14 @@ const cloudAgentAuthorityMiddleware = t.middleware(
   async ({ ctx, path, type, getRawInput, next }) => {
     if (ctx.cloudAgentAuthority === undefined) return next();
     try {
-      if (type !== 'mutation' || ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
+      if (ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
         throw new Error('Invalid scoped caller');
+      }
+      if (!cloudAgentAuthorityProcedures(ctx.cloudAgentAuthority).includes(path)) {
+        throw new Error('Cloud Agent authority does not permit this procedure');
+      }
+      if (cloudAgentAuthorityProcedureKind(path) !== type) {
+        throw new Error('Cloud Agent authority procedure kind mismatch');
       }
       validateCloudAgentAuthorityRequest(ctx.cloudAgentAuthority, path, await getRawInput());
     } catch {

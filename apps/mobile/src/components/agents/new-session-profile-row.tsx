@@ -12,6 +12,7 @@ import {
   profileCountItems,
 } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type RenderProfileRowArgs = {
   isProfileLoading: boolean;
@@ -113,6 +114,7 @@ export function renderProfileRowBody({
         <Button
           variant="link"
           size="sm"
+          className={STATE_ACTION_CLASS}
           onPress={onRetryProfile}
           accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
         >

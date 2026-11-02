@@ -131,26 +131,55 @@ const savedWorktreeChangesSnapshotSchema = z
 
 export type WorktreeChangesSnapshot = z.infer<typeof savedWorktreeChangesSnapshotSchema>;
 
+const worktreeTextEncoder = new TextEncoder();
+
 export function finalizeWorktreeChangesSnapshot(
   candidate: unknown
 ): WorktreeChangesSnapshot | null {
   const parsed = savedWorktreeChangesSnapshotSchema.safeParse(candidate);
   if (!parsed.success) return null;
 
-  for (let length = parsed.data.files.length; length >= 0; length--) {
-    const snapshot = {
-      ...parsed.data,
-      files: parsed.data.files.slice(0, length),
-      truncated: parsed.data.truncated || length !== parsed.data.files.length,
-    };
-    if (
-      new TextEncoder().encode(JSON.stringify(snapshot)).byteLength <= MAX_WORKTREE_CHANGES_BYTES
-    ) {
-      return snapshot;
+  const { files } = parsed.data;
+  const asSnapshot = (length: number, truncated: boolean): WorktreeChangesSnapshot => ({
+    ...parsed.data,
+    files: files.slice(0, length),
+    truncated,
+  });
+  const sizeOf = (value: unknown) => worktreeTextEncoder.encode(JSON.stringify(value)).byteLength;
+
+  const complete = asSnapshot(files.length, parsed.data.truncated);
+  if (sizeOf(complete) <= MAX_WORKTREE_CHANGES_BYTES) return complete;
+  if (files.length === 0) return null;
+
+  // Every shorter prefix reports `truncated: true`, and an array element serializes exactly
+  // like the standalone value, so one measurement of the file-less snapshot plus one per file
+  // sizes any prefix: the fixed part, the summed element bytes, and one comma per separator.
+  // The measurement already carries the four bytes of `truncated: true`, and `false` costs one
+  // byte more, which only the complete snapshot above can use.
+  const filelessBytes = sizeOf(asSnapshot(0, true));
+  const cumulativeBytes = [0];
+  let cumulative = 0;
+  for (const file of files) {
+    cumulative += sizeOf(file);
+    cumulativeBytes.push(cumulative);
+  }
+  const truncatedBytes = (length: number): number =>
+    filelessBytes + cumulativeBytes[length] + Math.max(length - 1, 0);
+
+  if (truncatedBytes(0) > MAX_WORKTREE_CHANGES_BYTES) return null;
+
+  let fitting = 0;
+  let exceeding = files.length - 1;
+  while (fitting < exceeding) {
+    const middle = Math.ceil((fitting + exceeding) / 2);
+    if (truncatedBytes(middle) <= MAX_WORKTREE_CHANGES_BYTES) {
+      fitting = middle;
+    } else {
+      exceeding = middle - 1;
     }
   }
 
-  return null;
+  return asSnapshot(fitting, true);
 }
 
 export const worktreeChangesSnapshotSchema = z.unknown().transform((value, context) => {

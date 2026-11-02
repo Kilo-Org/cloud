@@ -187,6 +187,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
     // can never block the personal Security Agent.
     return {
       role: undefined,
+      error: undefined,
       isLoading: false,
       isError: false,
       isFetching: false,
@@ -198,6 +199,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
   }
   return {
     role: query.data?.find(org => org.organizationId === scope)?.role,
+    error: query.error,
     isLoading: query.isLoading,
     isError: query.isError,
     isFetching: query.isFetching,
@@ -214,7 +216,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
 type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
 
 export function useSecurityAgentCapability(scope: string) {
-  const { role, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
+  const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
 
@@ -236,6 +238,8 @@ export function useSecurityAgentCapability(scope: string) {
   return {
     canManage,
     status,
+    /** The unread role list's own error, so a load-failure surface can name its cause. */
+    error,
     isLoading,
     isError,
     isFetching,

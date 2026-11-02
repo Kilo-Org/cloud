@@ -30,7 +30,10 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.routerPush }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -195,5 +198,28 @@ describe('FindingRow quick action link routing', () => {
     expect(mocks.routerPush).not.toHaveBeenCalled();
     expect(mocks.openBrowser).not.toHaveBeenCalled();
     expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('FindingRow open navigation', () => {
+  beforeEach(() => {
+    mocks.routerPush.mockReset();
+  });
+
+  it('opens the finding once on a fast double tap on the row', () => {
+    const tree = renderRow('available');
+    const row = tree.root.find(
+      node => String(node.type) === 'Pressable' && node.props.accessibilityRole === 'button'
+    );
+
+    act(() => {
+      (row.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
+    });
+
+    expect(mocks.routerPush).toHaveBeenCalledTimes(1);
+    expect(mocks.routerPush).toHaveBeenCalledWith(
+      '/(app)/security-agent/personal/findings/finding-1'
+    );
   });
 });

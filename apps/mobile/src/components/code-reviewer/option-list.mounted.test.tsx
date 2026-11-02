@@ -1,7 +1,12 @@
 // Failed-save contract: a rejected `onSelect` keeps the screen mounted (no
 // router.back), clears the row's busy state, and renders an inline localized
-// error with a Retry action that resubmits the failed option. Retry success
-// pops the screen; a selection while an error shows clears the error.
+// explanation of the refusal — the app's copy for a server sentence it
+// recognizes (`common.organizationTrialEnded` for the organization trial gate),
+// the generic save line otherwise. Retry is offered only when sending the same
+// request again can succeed, resubmits the failed option, shows that option
+// busy with every option disabled while it runs, and leaves the explanation up
+// until the new outcome replaces it. Retry success pops the screen; a
+// selection while an error shows clears the error.
 // Save-completion contract: the pop runs only while this screen is still the
 // focused route, so a Back pressed during the save pops exactly once.
 
@@ -12,6 +17,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { OptionList } from './option-list';
 
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -30,10 +36,19 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/button', () => ({
-  Button: (props: { accessibilityLabel?: string; onPress?: () => void; children?: ReactNode }) =>
+  Button: (props: {
+    accessibilityLabel?: string;
+    loading?: boolean;
+    onPress?: () => void;
+    children?: ReactNode;
+  }) =>
     createElement(
       'View',
-      { accessibilityLabel: props.accessibilityLabel, onPress: props.onPress },
+      {
+        accessibilityLabel: props.accessibilityLabel,
+        loading: props.loading,
+        onPress: props.onPress,
+      },
       props.children
     ),
 }));
@@ -64,6 +79,12 @@ const focus = vi.hoisted(() => ({ focused: true }));
 const OPTIONS = ['off', 'all'] as const;
 
 type SelectFn = (value: 'off' | 'all') => Promise<unknown>;
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function makeServerError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code, message } });
+}
+
 // The OptionList prop type widens the value to `string` in its own generic bound;
 // the mock keeps the literal union, so the element cast narrows it back.
 
@@ -117,6 +138,25 @@ function texts(root: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+type RetryProps = { accessibilityLabel?: string; loading?: boolean; onPress: () => void };
+
+function retryButtons(root: TestRenderer.ReactTestRenderer): RetryProps[] {
+  return root.root
+    .findAll(
+      node =>
+        String(node.type) === 'View' && node.props.accessibilityLabel === i18n.t('common.retry')
+    )
+    .map(node => node.props as RetryProps);
+}
+
+function retry(root: TestRenderer.ReactTestRenderer): RetryProps {
+  const found = retryButtons(root)[0];
+  if (!found) {
+    throw new Error('retry button not found');
+  }
+  return found;
+}
+
 /** The OptionList press handler returns void; the state updates settle over a few microtask turns. */
 async function press(pressable: () => void): Promise<void> {
   await act(async () => {
@@ -159,20 +199,61 @@ describe('OptionList failed save', () => {
 
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
 
-    const retry = renderer.root.findAllByProps({
-      accessibilityLabel: i18n.t('common.retry'),
-    })[0];
-    if (!retry) {
-      throw new Error('retry button not found');
-    }
     await act(async () => {
-      (retry.props.onPress as () => void)();
+      retry(renderer).onPress();
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(onSelect).toHaveBeenLastCalledWith('all');
     expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains a known server refusal and drops the retry that cannot succeed', async () => {
+    const renderer = await mountAsync(() =>
+      Promise.reject(makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE))
+    );
+    await press(() => {
+      row(renderer, 'All').onPress();
+    });
+
+    expect(texts(renderer)).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(texts(renderer)).not.toContain(i18n.t('codeReviewer.configSaveFailed'));
+    expect(retryButtons(renderer)).toHaveLength(0);
+  });
+
+  it('shows the retry in progress on the retried option and keeps the explanation up', async () => {
+    const gate = Promise.withResolvers<unknown>();
+    const onSelect = vi
+      .fn<SelectFn>()
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockReturnValueOnce(gate.promise);
+    const renderer = await mountAsync(onSelect);
+    await press(() => {
+      row(renderer, 'All').onPress();
+    });
+    expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
+
+    await press(() => {
+      retry(renderer).onPress();
+    });
+
+    expect(row(renderer, 'All').busy).toBe(true);
+    expect(rows(renderer).every(props => props.disabled)).toBe(true);
+    expect(retry(renderer).loading).toBe(true);
+    expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
+
+    await act(async () => {
+      gate.reject(new Error('still failing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(retry(renderer).loading).toBe(false);
+    expect(row(renderer, 'All').busy).toBe(false);
+    expect(rows(renderer).every(props => props.disabled)).toBe(false);
+    expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
   });
 
   it('clears the inline error while the next save is in flight', async () => {

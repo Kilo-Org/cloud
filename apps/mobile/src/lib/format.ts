@@ -13,6 +13,12 @@ import {
  * app language drives the output. FormatJS fills the constructors Hermes omits.
  */
 
+/**
+ * What an unmeasured count prints. A dash keeps a numeric slot's shape without
+ * claiming a number the screen has not read, which a zero would.
+ */
+export const UNMEASURED_VALUE = '—';
+
 export function formatUsd(
   amount: number,
   locale: string,

@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/models';
 import type * as AutoModelModule from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type * as GoogleModule from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import type * as QwenModule from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import type * as StepFunModule from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
@@ -26,7 +26,7 @@ describe('client-safe model imports', () => {
         '@kilocode/web-shared/lib/ai-gateway/auto-model'
       );
       const anthropic = jest.requireActual<typeof AnthropicModule>(
-        '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants'
+        '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model'
       );
       const google = jest.requireActual<typeof GoogleModule>(
         '@kilocode/web-shared/lib/ai-gateway/providers/google'

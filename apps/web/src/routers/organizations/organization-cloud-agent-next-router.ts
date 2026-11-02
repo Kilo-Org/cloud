@@ -48,10 +48,14 @@ import {
   baseSendMessageNextSchema,
   baseGetMessageResultNextSchema,
   baseGetMessageResultNextOutputSchema,
+  baseListChildSessionsNextSchema,
+  baseListChildSessionsNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseGetEgressAuditNextSchema,
+  baseGetEgressAuditNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -205,6 +209,14 @@ const ReleasePendingUploadsInput = cloudAgentReleasePendingUploadsSchema.extend(
 });
 
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const GetEgressAuditInput = baseGetEgressAuditNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ListChildSessionsInput = baseListChildSessionsNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -420,13 +432,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         };
       }
 
+      let linkedObjectKeys: string[] = [];
       try {
         // New-session flows call prepareSession without a follow-up
         // sendMessage, so the attachment rows must be linked before prepare
         // can accept the session; otherwise the reaper deletes new-session
         // objects.
-        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+        linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
 
+      try {
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
@@ -437,6 +454,15 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
       } catch (error) {
+        // Both dispatch paths route a worker's answer through the same helper,
+        // which acts only on a definite refusal and only for the rows this
+        // dispatch linked.
+        await releaseRefusedSend({
+          attachments,
+          error,
+          kiloUserId: ctx.user.id,
+          linkedObjectKeys,
+        });
         rethrowCloudAgentError(error);
       }
     }),
@@ -487,6 +513,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowCloudAgentError(error);
       }
+    }),
+
+  /**
+   * List the sessions directly created by the current organization-scoped
+   * parent. The authority is pinned to this organization by the Worker.
+   */
+  listChildSessions: organizationMemberProcedure
+    .input(ListChildSessionsInput)
+    .output(baseListChildSessionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      if (ctx.cloudAgentAuthority === undefined) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Cloud Agent authority required',
+        });
+      }
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return await createCloudAgentNextClient(authToken).listChildSessions(input);
     }),
 
   /**
@@ -542,7 +590,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
 
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab). organizationId is
-      // consumed by the membership middleware; it is not forwarded.
+      // consumed by the membership middleware; it is forwarded to the Worker
+      // only for delegated authority so scoped raw validation can pin it.
+      const workerOrganizationId =
+        ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
       const attachments = input.attachments;
       let linkedObjectKeys: string[] = [];
       try {
@@ -560,6 +611,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
+          ...(workerOrganizationId === undefined ? {} : { organizationId: workerOrganizationId }),
           messageId: input.messageId,
           attachments,
         });
@@ -577,22 +629,40 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Read one message's lifecycle result.
+   *
+   * `expectedWorktreeId` is required for ordinary user calls and optional only
+   * for delegated Cloud Agent authority, where the Worker re-checks direct-child
+   * lineage. `organizationId` is forwarded only for delegated authority so the
+   * Worker's scoped raw-input validation can pin it; ordinary calls keep the
+   * existing payload shape.
+   */
   getMessageResult: organizationMemberProcedure
     .input(baseGetMessageResultNextSchema.extend({ organizationId: z.uuid() }))
     .output(baseGetMessageResultNextOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
+      if (ctx.cloudAgentAuthority === undefined && input.expectedWorktreeId === undefined) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'expectedWorktreeId is required',
+        });
+      }
       await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
         expectedWorktreeId: input.expectedWorktreeId,
       });
+      const workerOrganizationId =
+        ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
       const client = createCloudAgentNextClient(
         await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
       );
       return await client.getMessageResult({
         cloudAgentSessionId: input.cloudAgentSessionId,
         messageId: input.messageId,
+        ...(workerOrganizationId === undefined ? {} : { organizationId: workerOrganizationId }),
       });
     }),
 
@@ -839,8 +909,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
+      const workerOrganizationId =
+        ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
 
-      return await client.interruptSession(input.sessionId);
+      return await client.interruptSession(input.sessionId, workerOrganizationId);
     }),
 
   /**
@@ -976,8 +1048,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
+      const workerOrganizationId =
+        ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
 
-      return await client.getSession(input.cloudAgentSessionId);
+      return await client.getSession(input.cloudAgentSessionId, workerOrganizationId);
+    }),
+
+  getEgressAudit: organizationMemberProcedure
+    .input(GetEgressAuditInput)
+    .output(baseGetEgressAuditNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      return await createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      ).getEgressAudit({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        cursor: input.cursor,
+        limit: input.limit,
+      });
     }),
 
   getSandboxStatus: baseProcedure

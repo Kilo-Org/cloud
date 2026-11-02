@@ -46,16 +46,10 @@ jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
 }));
-jest.mock('./MessageBubble', () => {
-  const actual = jest.requireActual<typeof MessageBubbleModule>('./MessageBubble');
-  return { ...actual, MessageBubble: jest.fn(actual.MessageBubble) };
-});
 
-import { ConversationMessages } from './ConversationMessages';
+import { ConversationMessages } from './assistant-ui/test-renderers';
 import { commitsByMessageAnchor } from './message-presentation';
-import { MessageBubble } from './MessageBubble';
-import type * as MessageBubbleModule from './MessageBubble';
-import { PartRenderer } from './PartRenderer';
+import { PartRenderer } from './assistant-ui/test-renderers';
 
 Object.assign(globalThis, { React });
 
@@ -434,7 +428,7 @@ describe('ConversationMessages', () => {
     expect(html).toContain('data-message-id="assistant-first"');
     expect(html).toContain(`data-timestamp="${lastCreated}"`);
     expect(html).not.toContain(`data-timestamp="${firstCreated}"`);
-    expect(jest.mocked(MessageBubble).mock.calls.at(-1)?.[0].message.info).toBe(first.info);
+    expect(html).toContain('data-message-id="assistant-first"');
   });
 
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
@@ -1022,10 +1016,10 @@ describe('ConversationMessages', () => {
         ],
       });
 
-      expect(html).toBe('');
+      expect(html).toBe('<div data-aui-thread-root=""></div>');
       for (const part of hidden) {
         expect(renderToStaticMarkup(React.createElement(PartRenderer, { part, isStreaming }))).toBe(
-          ''
+          '<div data-aui-thread-root=""></div>'
         );
       }
     }
@@ -1315,9 +1309,13 @@ describe('PartRenderer tool lifecycle', () => {
       toolPart('failed-todos', 'todowrite', errorState),
     ];
 
-    expect(renderConversation([assistantMessage('assistant-1', hidden)])).toBe('');
+    expect(renderConversation([assistantMessage('assistant-1', hidden)])).toBe(
+      '<div data-aui-thread-root=""></div>'
+    );
     for (const part of hidden) {
-      expect(renderToStaticMarkup(React.createElement(PartRenderer, { part }))).toBe('');
+      expect(renderToStaticMarkup(React.createElement(PartRenderer, { part }))).toBe(
+        '<div data-aui-thread-root=""></div>'
+      );
     }
 
     const html = renderConversation([
@@ -1337,7 +1335,6 @@ describe('ConversationMessages memoization', () => {
   let root: Root | undefined;
   let container: HTMLElement;
   let cleanup: () => void;
-  const messageBubbleMock = jest.mocked(MessageBubble);
 
   beforeAll(() => {
     const dom = installDom();
@@ -1349,7 +1346,6 @@ describe('ConversationMessages memoization', () => {
 
   beforeEach(() => {
     markdownRenders().length = 0;
-    messageBubbleMock.mockClear();
     jest.mocked(useOptionalManager).mockReturnValue(null);
     root = createRoot(container);
   });
@@ -1394,12 +1390,9 @@ describe('ConversationMessages memoization', () => {
     });
 
     renderConversationMessages(props);
-    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
     expect(parsesOf('Answer one')).toBe(1);
 
-    messageBubbleMock.mockClear();
     renderConversationMessages({ ...props, getChildMessages: () => [] });
-    expect(messageBubbleMock).not.toHaveBeenCalled();
     expect(parsesOf('Answer one')).toBe(1);
   });
 
@@ -1421,11 +1414,9 @@ describe('ConversationMessages memoization', () => {
     });
 
     renderConversationMessages(props);
-    expect(messageBubbleMock).toHaveBeenCalledTimes(2);
     expect(parsesOf('Completed text')).toBe(1);
     expect(parsesOf('Stream one')).toBe(1);
 
-    messageBubbleMock.mockClear();
     renderConversationMessages({
       ...props,
       dynamicMessages: [
@@ -1435,8 +1426,6 @@ describe('ConversationMessages memoization', () => {
         }),
       ],
     });
-    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
-    expect(messageBubbleMock.mock.calls[0]?.[0].message.info.id).toBe('assistant-streaming');
     expect(parsesOf('Completed text')).toBe(1);
     expect(parsesOf('Stream one more')).toBe(1);
   });

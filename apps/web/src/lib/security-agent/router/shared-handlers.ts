@@ -11,7 +11,10 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { type PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  shouldSyncProviderRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   saveSecurityAgentConfigWithRevision,
@@ -81,6 +84,11 @@ import {
   buildSecurityFindingAuditHumanActor,
   REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
 } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  SECURITY_SYNC_PRECONDITION_CODES,
+  type SecuritySyncPreconditionCode,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
@@ -576,7 +584,8 @@ async function executeSecurityCommandSubmit(args: {
  * re-submit (the Worker owns the sync state, so reconciliation is a re-enqueue
  * under the same key); `duplicate_settled` replays the canonical result;
  * in-flight admissions conflict. Cross-intent key reuse is rejected before any
- * outcome is honored.
+ * outcome is honored, as is a row admitted in another organization scope
+ * (`organization_mismatch`).
  */
 async function runSecurityLedgerSubmit(args: {
   ctx: TRPCContext;
@@ -602,6 +611,12 @@ async function runSecurityLedgerSubmit(args: {
     // While an `admitted` row holds this lease, same-key retries conflict.
     leaseSeconds: 120,
   });
+
+  // A row stored in another organization scope belongs to a different
+  // operation, so it is refused before any outcome is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
@@ -745,6 +760,23 @@ async function getRemediationTimeline(findingId: string): Promise<RemediationTim
     action: row.action,
     occurredAt: new Date(row.occurredAt).toISOString(),
   }));
+}
+
+/**
+ * A Security Agent precondition rejection: a manual sync, or enabling the agent
+ * with no repository in scope. The English message stays the web surface's
+ * copy; `upstreamCode` is the stable marker the mobile ledger maps onto
+ * translated catalog copy, so the device never parses server prose.
+ */
+function securityAgentPreconditionError(
+  precondition: SecuritySyncPreconditionCode,
+  message: string
+): TRPCError {
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message,
+    cause: new UpstreamApiError(precondition),
+  });
 }
 
 export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps<TExtra>) {
@@ -1029,7 +1061,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one
-        // transaction. A stale revision or an enqueue failure rolls back.
+        // transaction. A stale revision or an enqueue failure rolls back. The
+        // save carries no enable flag, so a settings save leaves the stored
+        // enabled state exactly as it is.
         const saveOutcome = await saveSecurityAgentConfigWithRevision({
           owner,
           config: {
@@ -1187,10 +1221,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         if (input.isEnabled) {
           if (!integration || !hasSecurityReviewPermissions(integration)) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'GitHub App does not have vulnerability_alerts permission',
-            });
+            // Same stable code as the manual-sync refusal below, so a device maps
+            // it onto catalog copy instead of showing this English sentence.
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+              'GitHub App does not have vulnerability_alerts permission'
+            );
           }
         }
 
@@ -1228,13 +1264,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             [...new Set(repositoriesToSync)].sort().join('\n');
 
         // Refuse enabling with an empty effective repo set: no repository would
-        // be synced or analyzed, so an enabled state would be misleading.
+        // be synced or analyzed, so an enabled state would be misleading. The
+        // sync path's no-repositories code marks it, so a device tells the user
+        // to pick repositories instead of showing this English sentence.
         if (input.isEnabled) {
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Select at least one repository before enabling Security Agent.',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'Select at least one repository before enabling Security Agent.'
+            );
           }
         }
 
@@ -1253,12 +1291,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         let initialSyncAdmissionFailed = false;
 
         if (input.isEnabled) {
+          // The enable flag is written in the same CAS transaction as the
+          // selection above it: enabling is this guarded transition, never a
+          // settings save.
           const { newRevision } = await saveSecurityAgentConfigWithRevision({
             owner,
             config: {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
             },
+            isEnabled: true,
             createdBy: ctx.user.id,
             expectedRevision: existingConfig?.configRevision ?? null,
           });
@@ -1337,12 +1379,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       const snapshot = readRepositorySnapshot(owner, integration);
       let repos = snapshot.repositories;
-      // A dropped entry is a snapshot this router cannot fully read, so refetch
-      // and rewrite it the same way as one it read as empty: otherwise the
-      // dropped repositories stay invisible in every repository picker.
+      // A snapshot this router cannot fully read is rebuilt from the provider, so
+      // the dropped repositories do not stay invisible in every repository
+      // picker. Otherwise the shared snapshot policy decides: a synchronized
+      // snapshot answers the list as-is, including an empty one, and only a
+      // snapshot that was never synchronized is read from the provider.
+      const cachedRepositories = integration.repositories ? snapshot.repositories : null;
       if (
         integration.platform_installation_id &&
-        (repos.length === 0 || snapshot.unreadableCount > 0)
+        (snapshot.unreadableCount > 0 ||
+          shouldSyncProviderRepositories({
+            forceRefresh: false,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at ?? null,
+          }))
       ) {
         const readableCount = repos.length;
         try {
@@ -1553,25 +1603,27 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration not found or inactive',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub integration not found or inactive'
+          );
         }
 
         if (!hasSecurityReviewPermissions(integration)) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub App does not have vulnerability_alerts permission',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+            'GitHub App does not have vulnerability_alerts permission'
+          );
         }
 
         const installationId = integration.platform_installation_id;
         if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
+          // Same reader-visible state as an inactive integration: the Kilo
+          // GitHub App is not usable for this owner until it is reconnected.
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub installation ID not found'
+          );
         }
 
         const allRepos = readRepositorySnapshot(owner, integration).repositories;
@@ -1606,10 +1658,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                   .filter((name): name is string => !!name);
 
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'No repositories configured for security reviews',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'No repositories configured for security reviews'
+            );
           }
           syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }

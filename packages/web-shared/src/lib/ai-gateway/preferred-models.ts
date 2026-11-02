@@ -19,7 +19,8 @@ export async function readPreferredModels(): Promise<string[]> {
 export const getPreferredModels: () => Promise<ReadonlyArray<string>> = createCachedFetch(
   readPreferredModels,
   60_000,
-  []
+  [],
+  { name: 'preferredModels' }
 );
 
 /**

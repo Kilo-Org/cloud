@@ -101,7 +101,7 @@ function SlaDayRow({
         disabled && 'opacity-50'
       )}
     >
-      <View className="flex-1 pr-3">
+      <View className="min-w-0 flex-1 pe-3">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
           {description}
@@ -208,7 +208,22 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     slaMediumDays: daysValid.medium ? slaDays.medium : (baseline?.slaMediumDays ?? slaDays.medium),
     slaLowDays: daysValid.low ? slaDays.low : (baseline?.slaLowDays ?? slaDays.low),
   };
-  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  // `patch` is the save payload, so it carries the saved value in place of an
+  // invalid day. The back guard must read the draft the user can see instead:
+  // an invalid-only edit would compare equal to the baseline and read as
+  // clean, and Back would discard it with no confirmation. While the toggle is
+  // off the rows are unmounted, so a hidden invalid day stays out of the
+  // comparison.
+  const draft = slaEnabled
+    ? {
+        ...patch,
+        slaCriticalDays: slaDays.critical,
+        slaHighDays: slaDays.high,
+        slaMediumDays: slaDays.medium,
+        slaLowDays: slaDays.low,
+      }
+    : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
@@ -219,7 +234,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   if (config.isError && !config.data) {
@@ -238,6 +258,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (!config.data.isEnabled && !dirty) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
     return <>{dialog}</>;
+  }
+  // The draft hydrates from the config in an effect; painting the body first
+  // would show the default toggle and then push the day rows down when they
+  // appear.
+  if (baseline === null) {
+    return <SlaSettingsSkeleton />;
   }
 
   return (
@@ -277,7 +303,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           onValueChange={setSlaEnabled}
         />
 
-        {baseline !== null && slaEnabled && (
+        {slaEnabled && (
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('securityAgent.sla.deadlinesHeading')}

@@ -65,11 +65,11 @@ export {
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 
@@ -87,6 +87,7 @@ export {
   mcpRemoteServerInputSchema,
   mcpServerFullInputSchema,
   listMcpServersForProfile,
+  getProfileMcpServers,
   createMcpServer,
   updateMcpServer,
   deleteMcpServer,
@@ -113,6 +114,7 @@ export {
   skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
+  getProfileSkills,
   createCustomSkill,
   createSkillsShSkill,
   updateSkill,
@@ -160,6 +162,7 @@ export {
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
+  getProfileKiloCommands,
   createKiloCommand,
   updateKiloCommand,
   deleteKiloCommand,

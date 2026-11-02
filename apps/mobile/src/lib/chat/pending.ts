@@ -51,7 +51,7 @@ const askedSchema = z.object({
 });
 const keptSchema = z.array(
   z.object({
-    id: z.number().int().positive(),
+    id: z.string(),
     text: z.string(),
     model: z.string(),
     effort: z.enum(EFFORTS).nullable().default(null),
@@ -61,6 +61,19 @@ const keptSchema = z.array(
     outcome: z.enum(['failed', 'stopped']).default('failed'),
   })
 );
+
+let keptCounter = 0;
+
+/**
+ * An identifier for a kept question, which names its bubble and is what its
+ * Retry finds it by. It is taken from the clock and a counter rather than from
+ * the list, so a question the written list does not hold yet cannot take one
+ * another question already has.
+ */
+export function newKeptId(): string {
+  keptCounter += 1;
+  return `${Date.now().toString(36)}-${keptCounter.toString(36)}`;
+}
 
 /** A question with no answer, the target and effort it was asked of, and its images. */
 export type Asked = Question & ChatTarget;
@@ -108,13 +121,17 @@ export function sameQuestion(one: Question & ChatTarget, other: Question & ChatT
 }
 
 /**
- * The identifier a question written next takes. It comes from the written list,
- * which may hold a question nothing in memory knows about — a retry waiting in
- * the queue — so the one chosen cannot land on that copy.
+ * The list without the newest copy of `question`. Only the newest one goes: an
+ * interrupted retry leaves its copy behind the slot's record of the same
+ * attempt, and an earlier attempt that happened to ask the same thing is a
+ * question of its own.
  */
-export async function nextKeptId(sessionId: string): Promise<number> {
-  const kept = await keptIn(sessionId);
-  return Math.max(0, ...kept.map(one => one.id)) + 1;
+export function withoutKeptCopy(
+  kept: readonly Displaced[],
+  question: Question & ChatTarget
+): readonly Displaced[] {
+  const last = kept.findLastIndex(one => sameQuestion(one, question));
+  return last === -1 ? kept : kept.filter((_, index) => index !== last);
 }
 
 /**
@@ -131,12 +148,13 @@ export async function addKept(sessionId: string, question: Displaced): Promise<v
 }
 
 /**
- * Drops the written copy of one question and no other, which is what a question
- * that reached the slot leaves behind.
+ * Drops the written copy of one question, which is what a question that reached
+ * the slot leaves behind. Only its newest copy goes, for the reason
+ * {@link withoutKeptCopy} gives.
  */
 export async function dropKept(sessionId: string, question: Question & ChatTarget): Promise<void> {
   const kept = await keptIn(sessionId);
-  const next = kept.filter(one => !sameQuestion(one, question));
+  const next = withoutKeptCopy(kept, question);
   if (next.length !== kept.length) {
     await writeKept(sessionId, next);
   }

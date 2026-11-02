@@ -47,10 +47,11 @@ import {
   keptIn,
   migrateAsked,
   moveQuestions,
-  nextKeptId,
+  newKeptId,
   rememberAsked,
   rememberFirstQuestion,
   sameQuestion,
+  withoutKeptCopy,
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -501,9 +502,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
-      /* A kept question that repeats the slot's is one attempt: see
-         `sameQuestion`. */
-      displaced: asked === null ? kept : kept.filter(one => !sameQuestion(one, asked)),
+      /* A kept question that repeats the slot's is the copy an interrupted
+         retry left: the newest one goes, and an earlier attempt that asked the
+         same thing stays. */
+      displaced: asked === null ? kept : withoutKeptCopy(kept, asked),
       status: 'idle',
       failed: null,
       failureKey: null,
@@ -535,9 +537,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
-      /* A kept question that repeats the slot's is one attempt: see
-         `sameQuestion`. */
-      displaced: asked === null ? kept : kept.filter(one => !sameQuestion(one, asked)),
+      /* A kept question that repeats the slot's is the copy an interrupted
+         retry left: the newest one goes, and an earlier attempt that asked the
+         same thing stays. */
+      displaced: asked === null ? kept : withoutKeptCopy(kept, asked),
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
@@ -568,23 +571,18 @@ async function keepAsked(sessionId: string): Promise<void> {
     return;
   }
   /* The bubble goes on screen first, so a refused write cannot take it away
-     from the reader, and the identifier comes from the written list so it
-     cannot land on a question only storage knows about. */
-  const next = {
+     from the reader. The identifier is made here rather than read from the
+     list: a question the list does not hold yet cannot take one another
+     question already has. */
+  const stored: Displaced = {
+    id: newKeptId(),
     text: held.asked,
     images: held.askedImages,
     model: held.askedModel ?? held.model,
     effort: held.askedEffort,
     afterTurns: held.turns.length,
-    outcome: held.failureKey === null ? ('stopped' as const) : ('failed' as const),
+    outcome: held.failureKey === null ? 'stopped' : 'failed',
   };
-  /* The list is read for the identifier, so it cannot land on a question only
-     storage knows about; a list that cannot be read is answered from memory and
-     a later write carries the entry. */
-  const id = await nextKeptId(sessionId).catch(
-    () => Math.max(0, ...held.displaced.map(one => one.id)) + 1
-  );
-  const stored: Displaced = { id, ...next };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],
     asked: null,
@@ -595,8 +593,8 @@ async function keepAsked(sessionId: string): Promise<void> {
   try {
     await addKept(sessionId, stored);
   } catch {
-    /* The bubble is on screen with its Retry; the next write of the list
-       carries it, and until then it lives for this session only. */
+    /* The bubble is on screen with its Retry and its words are in this chat for
+       the session; a restart is what a refused write costs. */
   }
 }
 
@@ -661,7 +659,7 @@ export async function say(
        an empty one still writes, because what is being dropped may be only in
        storage. */
     const keptNow = snapshotOf(current).displaced;
-    const keptNext = keptNow.filter(one => !sameQuestion(one, { text, images, model, effort }));
+    const keptNext = withoutKeptCopy(keptNow, { text, images, model, effort });
     if (keptNext.length !== keptNow.length) {
       change(current, { displaced: keptNext });
     }

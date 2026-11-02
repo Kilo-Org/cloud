@@ -165,7 +165,7 @@ describe('asMessages', () => {
   });
 
   it('draws a kept question among the turns it was said between, and one past the end last', () => {
-    const question = (id: number, afterTurns: number) => ({
+    const question = (id: string, afterTurns: number) => ({
       id,
       text: `question ${id}`,
       images: [],
@@ -184,15 +184,15 @@ describe('asMessages', () => {
       asked: null,
       askedImages: [],
       // The second was displaced after more turns than the store now holds.
-      displaced: [question(1, 0), question(2, 7)],
+      displaced: [question('a', 0), question('b', 7)],
       waiting: [],
     });
 
     expect(messages.map(message => message.info.id)).toEqual([
-      displacedMessageId('s1', 1),
+      displacedMessageId('s1', 'a'),
       't1',
       't2',
-      displacedMessageId('s1', 2),
+      displacedMessageId('s1', 'b'),
     ]);
   });
 

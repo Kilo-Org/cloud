@@ -24,7 +24,7 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
   displaced: [] as {
-    id: number;
+    id: string;
     text: string;
     images: { media: string; data: string }[];
     model: string;
@@ -123,7 +123,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
-  displacedMessageId: (sessionId: string, id: number) => `${sessionId}:displaced:${id}`,
+  displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -789,7 +789,7 @@ describe('message actions', () => {
     state.failureKey = CREDITS_FAILURE_KEY;
     state.displaced = [
       {
-        id: 1,
+        id: 'k1',
         text: 'the long question that failed',
         images: [],
         model: 'kilo/one',
@@ -801,11 +801,11 @@ describe('message actions', () => {
     // In the order the registry draws them: the failure, then the question that
     // took its place.
     state.messages = [
-      { info: { id: 's1:displaced:1', role: 'user' } },
+      { info: { id: 's1:displaced:k1', role: 'user' } },
       { info: { id: 's1:asked', role: 'user' } },
     ];
     const tree = await mount();
-    const kept = bubbleFor(tree, 's1:displaced:1');
+    const kept = bubbleFor(tree, 's1:displaced:k1');
 
     // It keeps the footer and the recovery it had in the slot.
     expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
@@ -827,7 +827,7 @@ describe('message actions', () => {
     state.status = 'idle';
     state.displaced = [
       {
-        id: 1,
+        id: 'k1',
         text: 'stopped question',
         images: [],
         model: 'kilo/one',
@@ -836,10 +836,10 @@ describe('message actions', () => {
         outcome: 'stopped',
       },
     ];
-    state.messages = [{ info: { id: 's1:displaced:1', role: 'user' } }];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
     const tree = await mount();
 
-    expect(bubbleFor(tree, 's1:displaced:1').deliveryState).toMatchObject({
+    expect(bubbleFor(tree, 's1:displaced:k1').deliveryState).toMatchObject({
       reason: 'interrupted',
     });
   });

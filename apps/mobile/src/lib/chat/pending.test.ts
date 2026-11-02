@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addKept,
   keptIn,
-  nextKeptId,
+  newKeptId,
   rememberAsked,
   rememberFirstQuestion,
   titledByAsked,
+  withoutKeptCopy,
 } from './pending';
 import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
@@ -72,7 +73,7 @@ describe('titledByAsked', () => {
   it('names the chat for the first question a later send kept, not the one that replaced it', async () => {
     await rememberFirstQuestion('kept', 'the question it was opened for');
     await addKept('kept', {
-      id: 1,
+      id: 'k1',
       text: 'the question it was opened for',
       images: [],
       model: 'kilo/one',
@@ -96,7 +97,7 @@ describe('titledByAsked', () => {
     await rememberFirstQuestion('retried', 'the question it was opened for');
     // The first question was asked again, so the only kept question is the later one.
     await addKept('retried', {
-      id: 1,
+      id: 'k1',
       text: 'the question asked after it',
       images: [],
       model: 'kilo/one',
@@ -116,24 +117,10 @@ describe('titledByAsked', () => {
     ]);
   });
 
-  it('gives a written question an identifier the list does not hold', async () => {
-    const first = {
-      id: await nextKeptId('ids'),
-      text: 'first',
-      images: [],
-      model: 'kilo/one',
-      effort: null,
-      afterTurns: 0,
-      outcome: 'failed' as const,
-    };
-    await addKept('ids', first);
-    const second = { ...first, id: await nextKeptId('ids'), text: 'second' };
-    await addKept('ids', second);
-
-    expect([first.id, second.id]).toEqual([1, 2]);
-    // Both are written, in the order they were asked.
-    const written = await keptIn('ids');
-    expect(written.map(one => one.text)).toEqual(['first', 'second']);
+  it('names each question with an identifier no other question has', () => {
+    // An identifier is made, not read from the list, which may not hold a queued
+    // retry's copy yet: taking the next free number would land on that copy.
+    expect(newKeptId()).not.toBe(newKeptId());
   });
 
   it('writes two questions that say the same words as two attempts', async () => {
@@ -145,11 +132,28 @@ describe('titledByAsked', () => {
       afterTurns: 0,
       outcome: 'failed' as const,
     };
-    await addKept('twice', { id: 1, ...words });
-    await addKept('twice', { id: 2, ...words });
+    await addKept('twice', { id: 'a', ...words });
+    await addKept('twice', { id: 'b', ...words });
 
     const written = await keptIn('twice');
-    expect(written.map(one => one.id)).toEqual([1, 2]);
+    expect(written.map(one => one.id)).toEqual(['a', 'b']);
+  });
+
+  it('drops only the newest copy of the slot question, keeping an earlier identical attempt', () => {
+    const words = {
+      text: 'the same words',
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    const kept = [
+      { id: 'a', ...words },
+      { id: 'b', ...words },
+    ];
+
+    expect(withoutKeptCopy(kept, words).map(one => one.id)).toEqual(['a']);
   });
 
   it('leaves a chat with no question untitled', async () => {

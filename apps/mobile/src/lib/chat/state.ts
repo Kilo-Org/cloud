@@ -33,7 +33,7 @@ export type ChatTarget = { readonly model: string; readonly effort: Effort | nul
 export type Displaced = Question &
   ChatTarget & {
     /** Names its bubble, so its Retry finds it after another failure moved the list. */
-    readonly id: number;
+    readonly id: string;
     /**
      * How many stored turns came before it. The store appends a turn per
      * answered question, so this places the bubble among the turns that were

@@ -144,7 +144,7 @@ export const askedMessageId = (sessionId: string): string => `${sessionId}:asked
  * The identifier of a question a later send kept, which is what its bubble is
  * drawn under and what its Retry finds it by.
  */
-export const displacedMessageId = (sessionId: string, id: number): string =>
+export const displacedMessageId = (sessionId: string, id: string): string =>
   `${sessionId}:displaced:${id}`;
 
 /** A question that is not in the store yet, as the bubble a person sees. */

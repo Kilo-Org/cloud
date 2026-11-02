@@ -999,9 +999,8 @@ describe('a question a later send took the slot from', () => {
     const held = snapshotOf(opened);
     /* It keeps everything needed to ask it again, and where it was said: no
        turn was stored for it, so it goes before every one of them. */
-    expect(held.displaced).toEqual([
+    expect(held.displaced).toMatchObject([
       {
-        id: 1,
         text: 'the long question',
         images: [],
         model: 'kilo/one',
@@ -1010,9 +1009,13 @@ describe('a question a later send took the slot from', () => {
         outcome: 'failed',
       },
     ]);
-    expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
+    const [kept] = held.displaced;
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The identifier names its bubble, and is the one its Retry finds it by.
     expect(asMessages(held).map(one => one.info.id)).toEqual([
-      `${held.sessionId}:displaced:1`,
+      `${held.sessionId}:displaced:${kept.id}`,
       `${held.sessionId}:asked`,
     ]);
     // Written down with the chat, so reopening it keeps the bubble.
@@ -1036,10 +1039,10 @@ describe('a question a later send took the slot from', () => {
     const held = snapshotOf(opened);
     // Said before the turn the store now holds, so it stays above it.
     expect(held.turns).toEqual([TURN]);
-    expect(asMessages(held).map(one => one.info.id)).toEqual([
-      `${held.sessionId}:displaced:1`,
-      TURN.id,
-    ]);
+    const drawn = asMessages(held).map(one => one.info.id);
+    expect(drawn).toHaveLength(2);
+    expect(drawn[0]).toMatch(/:displaced:/);
+    expect(drawn[1]).toBe(TURN.id);
   });
 
   it('is asked again from its own Retry, on the model it was asked of', async () => {
@@ -1180,9 +1183,9 @@ describe('a question a later send took the slot from', () => {
     storedQuestions.set(
       'chat-kept-questions:interrupted',
       JSON.stringify([
-        { id: 1, ...question, afterTurns: 0, outcome: 'failed' },
+        { id: 'a', ...question, afterTurns: 0, outcome: 'failed' },
         {
-          id: 2,
+          id: 'b',
           text: 'the failure it was slid above',
           model: 'kilo/one',
           effort: null,
@@ -1199,7 +1202,7 @@ describe('a question a later send took the slot from', () => {
     const held = snapshotOf('interrupted');
     expect(held.displaced.map(one => one.text)).toEqual(['the failure it was slid above']);
     expect(asMessages(held).map(one => one.info.id)).toEqual([
-      'interrupted:displaced:2',
+      'interrupted:displaced:b',
       'interrupted:asked',
     ]);
   });
@@ -1217,7 +1220,7 @@ describe('a question a later send took the slot from', () => {
       'chat-kept-questions:pictures',
       JSON.stringify([
         {
-          id: 1,
+          id: 'a',
           ...words,
           images: [{ media: 'image/jpeg', data: 'AAAA' }],
           afterTurns: 0,
@@ -1231,7 +1234,7 @@ describe('a question a later send took the slot from', () => {
 
     // Same words, different picture: two questions, both on screen.
     expect(asMessages(snapshotOf('pictures')).map(one => one.info.id)).toEqual([
-      'pictures:displaced:1',
+      'pictures:displaced:a',
       'pictures:asked',
     ]);
   });

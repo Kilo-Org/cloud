@@ -115,7 +115,8 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('filename: session.title');
     // The file item's filename is the session-resolved safe name, never the
     // raw manifest name (see the filename resolution test below).
-    expect(extensionSource).toContain('filename: name,');
+    expect(extensionSource).toContain('filename: entry.filename,');
+    expect(extensionSource).not.toContain('filename: file.name');
     expect(extensionSource).toContain('contentType: UTType(mimeType: file.mime) ?? .data');
   });
 
@@ -133,11 +134,21 @@ describe('artifacts File Provider extension contract', () => {
       'static func unique(_ name: String, taken: inout Set<String>) -> String'
     );
     expect(extensionSource).toContain('static let maxBytes = 200');
-    // Enumeration resolves every entry through the sanitizer, in the
-    // manifest's own order, so the first duplicate keeps its name and a later
-    // one takes a counter suffix.
-    expect(itemsBody).toContain('ArtifactFileName.sanitize(');
-    expect(itemsBody).toContain('ArtifactFileName.unique(');
+    // One owner resolves every entry through the sanitizer, in the manifest's
+    // own order, so the first duplicate keeps its name and a later one takes a
+    // counter suffix; enumeration and a single-item lookup both consume it
+    // instead of each running the scan.
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.sanitize(');
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.unique(');
+    expect(extensionSource.match(/ArtifactFileName\.unique\(/gu)).toHaveLength(1);
+    // One definition of the extension rule too: `unique` and `bound` both ask
+    // `splitExtension`, so the dot guard exists in one place.
+    expect(extensionSource.match(/lastIndex\(of: "\."\)/gu)).toHaveLength(1);
+    expect(itemsBody).toContain('resolvedFilenames(in: sessionId)');
+    expect(resolvedFilenameBody).toContain('resolvedFilenames(in: sessionId)');
+    // An entry the session does not list has no place in that order, so the
+    // single-item lookup keeps the sanitize fallback.
+    expect(resolvedFilenameBody).toContain('?? ArtifactFileName.sanitize(');
     // The stage path holds the invariant at the boundary: the component it
     // appends to the per-fetch UUID directory is sanitized again as a
     // last-resort fallback, so an unsafe name can never reach the path API.
@@ -151,7 +162,9 @@ describe('artifacts File Provider extension contract', () => {
     // is `Data`, a String-typed property is never read by the system, and the
     // protocol requirement is non-optional, so folders carry the zero version.
     expect(extensionSource).toContain('let contentModificationDate: Date?');
-    expect(extensionSource).toContain('let version: NSFileProviderItemVersion');
+    expect(extensionSource).toContain('let itemVersion: NSFileProviderItemVersion');
+    expect(extensionSource).not.toContain('var itemVersion');
+    expect(extensionSource).not.toContain('let version: NSFileProviderItemVersion');
     expect(extensionSource).toContain(
       'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {'
     );
@@ -467,6 +480,12 @@ const fileBody = swiftFunctionBody(
 const itemsBody = swiftFunctionBody(
   'func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {'
 );
+const resolvedFilenamesBody = swiftFunctionBody(
+  'func resolvedFilenames(\n    in sessionId: String\n  ) -> [(file: ArtifactManifest.File, filename: String)] {'
+);
+const resolvedFilenameBody = swiftFunctionBody(
+  'func resolvedFilename(for file: ArtifactManifest.File, sessionId: String) -> String {'
+);
 const fetchContentsBody = swiftFunctionBody(
   'func fetchContents(\n    for itemIdentifier: NSFileProviderItemIdentifier,\n    version requestedVersion: NSFileProviderItemVersion?,'
 );
@@ -638,13 +657,14 @@ describe('artifacts File Provider manifest memoization', () => {
   it('resolves every lookup through the memoized manifest', () => {
     // No lookup reads or decodes on its own; they all funnel through
     // `manifest()`, so one enumeration decodes once.
-    for (const body of [sessionBody, fileBody, itemsBody]) {
+    for (const body of [sessionBody, fileBody, resolvedFilenamesBody, itemsBody]) {
       expect(body).not.toContain('Data(contentsOf:');
       expect(body).not.toContain('JSONDecoder()');
     }
     expect(sessionBody).toContain('manifest()?.sessions.first');
     expect(fileBody).toContain('session(id: sessionId)?.files.first');
+    expect(resolvedFilenamesBody).toContain('session(id: sessionId)?.files ?? []');
     expect(itemsBody).toContain('manifest()?.sessions ?? []');
-    expect(itemsBody).toContain('guard let session = session(id: sessionId) else');
+    expect(itemsBody).toContain('resolvedFilenames(in: sessionId)');
   });
 });

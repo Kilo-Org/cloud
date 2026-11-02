@@ -385,17 +385,17 @@ describe('ChildSessionDrawer header', () => {
   let root: Root | undefined;
   let container: HTMLElement;
   let cleanup: () => void;
+  const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
   const drawerSource = atom<StoredMessage[]>([]);
   const drawerStore = createStore();
   const manager = {
     atoms: {
       isStreaming: atom(false),
       activeQuestion: atom(null),
-      childMessages: atom(
-        get =>
-          (_sessionId: string): StoredMessage[] =>
-            get(drawerSource)
-      ),
+      childMessages: atom(get => {
+        const messages = get(drawerSource);
+        return (_sessionId: string): StoredMessage[] => readDrawerMessages(messages);
+      }),
       childSessionHydrationState: atom(() => (_sessionId: string): ChildSessionHydrationState => ({
         status: 'ready',
         cursor: null,
@@ -444,6 +444,17 @@ describe('ChildSessionDrawer header', () => {
       );
     });
   }
+
+  it('reuses the child snapshot on unrelated drawer updates', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Child snapshot' });
+    readDrawerMessages.mockClear();
+    act(() => drawerStore.set(manager.atoms.isStreaming, true));
+    expect(readDrawerMessages).not.toHaveBeenCalled();
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(readDrawerMessages).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll('[data-message-id="child-1"]')).toHaveLength(1);
+  });
 
   it('shows the routed model next to the agent', () => {
     renderDrawer({

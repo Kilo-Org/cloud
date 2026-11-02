@@ -19,6 +19,7 @@ import type { CloudMessagePresentation } from './presentation-types';
 import { CloudChatRuntimeProvider } from './CloudChatRuntimeProvider';
 
 type CloudThreadProps = {
+  active?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   onOpenPreparationDetails?: (attemptId: string) => void;
@@ -103,14 +104,17 @@ function CloudThreadBody({
   );
 }
 
-export function CloudThread(props: CloudThreadProps) {
-  const manager = useOptionalManager();
-  return manager ? (
-    <CloudThreadWithLiveFacts {...props} manager={manager} />
-  ) : (
-    <CloudThreadBody {...props} />
-  );
-}
+export const CloudThread = React.memo(
+  function CloudThread(props: CloudThreadProps) {
+    const manager = useOptionalManager();
+    return manager ? (
+      <CloudThreadWithLiveFacts {...props} manager={manager} />
+    ) : (
+      <CloudThreadBody {...props} />
+    );
+  },
+  (previous, next) => previous.active === false && next.active === false
+);
 function CloudThreadWithLiveFacts({
   manager,
   ...props

@@ -18,6 +18,7 @@ import {
 const convertMessage = (message: ThreadMessageLike): ThreadMessageLike => message;
 
 type CloudChatRuntimeProviderProps = {
+  active?: boolean;
   projection: CloudProjectionInput;
   state: CloudThreadState;
   onNew: (message: AppendMessage) => Promise<void>;
@@ -26,6 +27,7 @@ type CloudChatRuntimeProviderProps = {
 };
 
 export function CloudChatRuntimeProvider({
+  active = true,
   projection,
   state,
   onNew,
@@ -44,16 +46,19 @@ export function CloudChatRuntimeProvider({
   } = projection;
   const projectedMessages = useMemo(
     () =>
-      project({
-        messages,
-        messageGroups,
-        isStreaming,
-        pendingMessages,
-        sendingMessageIds,
-        preparationByMessageId,
-        commitsAfterMessage,
-      }).map(row => row.message),
+      active
+        ? project({
+            messages,
+            messageGroups,
+            isStreaming,
+            pendingMessages,
+            sendingMessageIds,
+            preparationByMessageId,
+            commitsAfterMessage,
+          }).map(row => row.message)
+        : null,
     [
+      active,
       project,
       messages,
       messageGroups,
@@ -64,10 +69,15 @@ export function CloudChatRuntimeProvider({
       commitsAfterMessage,
     ]
   );
+  // Keep mounted transcript rows stable while other workspace tabs are active.
+  const [lastVisibleMessages, setLastVisibleMessages] = useState(projectedMessages ?? []);
+  if (projectedMessages !== null && projectedMessages !== lastVisibleMessages) {
+    setLastVisibleMessages(projectedMessages);
+  }
   const { canCancel, ...gates } = cloudRuntimeGates(state);
   const runtime = useExternalStoreRuntime({
     ...gates,
-    messages: projectedMessages,
+    messages: projectedMessages ?? lastVisibleMessages,
     convertMessage,
     onNew,
     ...(canCancel && onCancel ? { onCancel } : {}),

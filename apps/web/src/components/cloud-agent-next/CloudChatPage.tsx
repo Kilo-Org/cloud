@@ -1485,6 +1485,7 @@ export default function CloudChatPage({
             </SetPageTitle>
             {showChatInterface ? (
               <CloudChatRuntimeProvider
+                active={chatTabActive}
                 projection={{
                   messages: shownMessages,
                   isStreaming,
@@ -1655,6 +1656,7 @@ export default function CloudChatPage({
                                 ) : transcriptPhase === 'failed' ? null : (
                                   <PreviewLinksContext.Provider value={preview.links}>
                                     <CloudThread
+                                      active={chatTabActive}
                                       getChildMessages={getChildMessages}
                                       onOpenChildSession={handleOpenTopLevelChildSession}
                                       onOpenPreparationDetails={handleOpenPreparationDetails}

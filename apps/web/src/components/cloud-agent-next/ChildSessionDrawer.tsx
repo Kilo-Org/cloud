@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { useAtomValue } from 'jotai';
 import { AlertCircle, ArrowDown, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,11 @@ export function ChildSessionDrawer({
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const selectedEntry = stack[stack.length - 1];
   const selectedSessionId = selectedEntry?.sessionId;
-  const messages = selectedSessionId ? getChildMessages(selectedSessionId) : [];
+  const messages = useMemo(
+    () => (selectedSessionId ? getChildMessages(selectedSessionId) : []),
+    [getChildMessages, selectedSessionId]
+  );
+  const messageGroups = useMemo(() => messages.map(message => [message]), [messages]);
   const hydrationState = selectedSessionId
     ? getChildSessionHydrationState(selectedSessionId)
     : IDLE_HYDRATION_STATE;
@@ -377,7 +381,7 @@ export function ChildSessionDrawer({
                   <CloudReadOnlyThread
                     messages={messages}
                     isStreaming={messages.some(isMessageStreaming)}
-                    messageGroups={messages.map(message => [message])}
+                    messageGroups={messageGroups}
                     getChildMessages={getChildMessages}
                     onOpenChildSession={onOpenChildSession}
                     presentationMode="live"

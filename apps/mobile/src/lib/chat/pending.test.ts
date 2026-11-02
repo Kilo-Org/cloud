@@ -139,6 +139,34 @@ describe('titledByAsked', () => {
     expect(written.map(one => one.id)).toEqual(['a', 'b']);
   });
 
+  it('reads an entry written with a numbered identifier as the name it is', async () => {
+    stored.set(
+      'chat-kept-questions:numbered',
+      JSON.stringify([
+        {
+          id: 4,
+          text: 'a numbered entry',
+          model: 'kilo/one',
+          effort: null,
+          images: [],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    const written = await keptIn('numbered');
+    expect(written.map(one => one.id)).toEqual(['4']);
+  });
+
+  it('answers an empty list for a record it cannot read, so the chat still opens', async () => {
+    stored.set('chat-kept-questions:broken', JSON.stringify([{ nope: true }]));
+
+    expect(await keptIn('broken')).toEqual([]);
+    stored.set('chat-kept-questions:garbled', 'not json');
+    expect(await keptIn('garbled')).toEqual([]);
+  });
+
   it('drops only the newest copy of the slot question, keeping an earlier identical attempt', () => {
     const words = {
       text: 'the same words',

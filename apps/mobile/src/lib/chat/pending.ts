@@ -51,7 +51,9 @@ const askedSchema = z.object({
 });
 const keptSchema = z.array(
   z.object({
-    id: z.string(),
+    /* An identifier made by this version; an entry written while it was still a
+       number of the list keeps its number as its name. */
+    id: z.union([z.string(), z.number()]).transform(String),
     text: z.string(),
     model: z.string(),
     effort: z.enum(EFFORTS).nullable().default(null),
@@ -100,7 +102,18 @@ async function writeKept(sessionId: string, kept: readonly Displaced[]): Promise
 
 export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
   const kept = await getItem(KEPT_SCOPE, sessionId);
-  return kept === null ? [] : keptSchema.parse(JSON.parse(kept));
+  if (kept === null) {
+    return [];
+  }
+  /* A record this version cannot read is one it cannot draw either. A chat that
+     will not open is the worse of the two, so the list is answered empty and the
+     next write replaces it. */
+  try {
+    const parsed = keptSchema.safeParse(JSON.parse(kept));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

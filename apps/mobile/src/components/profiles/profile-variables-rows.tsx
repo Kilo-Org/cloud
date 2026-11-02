@@ -22,10 +22,10 @@ import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
-/** Content-shaped rows in the same slot and height as a loaded variable row. */
+/** Content-shaped rows in the same slot, height and gap as loaded variable rows. */
 export function VariablesSkeleton() {
   return (
-    <View className="gap-2">
+    <View className="gap-3">
       {[0, 1, 2].map(index => (
         <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
       ))}
@@ -46,6 +46,9 @@ function variableInputErrorMessage(t: (key: string) => string, error: VariableIn
   }
   if (error === 'value-required') {
     return t('profiles.valueRequired');
+  }
+  if (error === 'reserved') {
+    return t('profiles.keyReserved');
   }
   return error === 'duplicate' ? t('profiles.keyDuplicate') : t('profiles.keyTooLong');
 }
@@ -243,7 +246,10 @@ export function VariableEditForm({
   const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   // An edit's key is stored, so only an add can collide with the profile's keys.
   const validate = (key: string, value: string): VariableInputError | null =>
-    validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
+    validateVariableInput({ key, value }, isNew ? existingKeys : [], {
+      requireValue,
+      newKey: isNew,
+    });
 
   const submit = async () => {
     const key = keyRef.current;

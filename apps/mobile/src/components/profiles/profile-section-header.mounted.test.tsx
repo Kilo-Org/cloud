@@ -5,9 +5,7 @@ import { ProfileSectionHeader } from '@/components/profiles/profile-section-head
 import { act, TestRenderer } from '@/test/renderer';
 
 const h = vi.hoisted(() => ({
-  overview: {
-    data: undefined as { name: string } | undefined,
-  },
+  overview: { data: undefined as { name: string } | undefined, isPending: true },
   back: vi.fn(),
   canGoBack: vi.fn(() => true),
 }));
@@ -32,6 +30,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000' }),
@@ -61,15 +60,22 @@ function headerLines(renderer: TestRenderer.ReactTestRenderer): string[] {
     .map(node => String(node.props.children));
 }
 
+/** The subtitle slot's placeholder bars. */
+function placeholders(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Skeleton'
+  );
+}
+
 describe('ProfileSectionHeader mounted', () => {
   beforeEach(() => {
-    h.overview.data = undefined;
+    h.overview = { data: undefined, isPending: true };
     h.back.mockReset();
     h.canGoBack.mockReturnValue(true);
   });
 
   it('names the profile under the section title once the profile is read', () => {
-    h.overview.data = { name: 'Shared Agency Review Profile' };
+    h.overview = { data: { name: 'Shared Agency Review Profile' }, isPending: false };
     const renderer = renderHeader({
       profileId: 'profile-1',
       organizationId: 'org-1',
@@ -77,15 +83,26 @@ describe('ProfileSectionHeader mounted', () => {
     });
 
     expect(headerLines(renderer)).toEqual(['Profile agents', 'Shared Agency Review Profile']);
+    expect(placeholders(renderer)).toHaveLength(0);
     renderer.unmount();
   });
 
-  it('holds the subtitle line while the profile read is unsettled', () => {
+  it('holds the subtitle line with a placeholder while the profile read is unsettled', () => {
     const renderer = renderHeader({ profileId: 'profile-1', title: 'Skills' });
 
     // The reserved line is the same style as the name that replaces it, so the
-    // header keeps its height instead of growing when the name arrives.
+    // header keeps its height instead of growing when the name arrives; while
+    // the read is in flight it holds a placeholder instead of an empty slot.
     expect(headerLines(renderer)).toEqual(['Skills', '\u00A0']);
+    expect(placeholders(renderer)).toHaveLength(1);
+
+    act(() => {
+      h.overview = { data: undefined, isPending: false };
+      renderer.update(
+        createElement(ProfileSectionHeader, { profileId: 'profile-1', title: 'Skills' })
+      );
+    });
+    expect(placeholders(renderer)).toHaveLength(0);
     renderer.unmount();
   });
 

@@ -211,7 +211,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         contentContainerClassName="px-6 gap-6 pt-4"
       >
         {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
+          <Text className="text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}

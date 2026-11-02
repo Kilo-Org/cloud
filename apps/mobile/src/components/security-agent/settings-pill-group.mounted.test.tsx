@@ -30,13 +30,13 @@ const OPTIONS = [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderGroup() {
+function renderGroup({ disabled = false }: { disabled?: boolean } = {}) {
   act(() => {
     const element = createElement(PillGroup, {
       label: 'Minimum severity',
       options: OPTIONS,
       value: 'high',
-      disabled: false,
+      disabled,
       onChange: () => undefined,
     });
     if (renderer) {
@@ -70,5 +70,36 @@ describe('PillGroup touch target', () => {
       expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(row.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('PillGroup read-only treatment', () => {
+  // Regression: a disabled group painted its rows at half opacity, which put
+  // the unselected labels at 1.95:1 in light and 2.15:1 in dark on the row's
+  // own surface, so every option below the selected one read as disabled copy
+  // rather than as options the screen shows.
+  it('keeps every option label at its secondary text colour', () => {
+    act(() => {
+      renderer?.unmount();
+      renderer = undefined;
+    });
+    const root = renderGroup({ disabled: true });
+    const rows = root.findAll(node => Object.is(node.type, 'Pressable'));
+    for (const row of rows) {
+      expect(String(row.props.className)).not.toContain('opacity-50');
+    }
+
+    const labels = root
+      .findAll(node => Object.is(node.type, 'Text'))
+      .filter(label => String(label.props.className).includes('flex-1'));
+    const unselected = labels.filter(label => label.props.children !== OPTIONS[1].label);
+    expect(unselected).toHaveLength(OPTIONS.length - 1);
+    for (const label of unselected) {
+      expect(String(label.props.className).split(' ')).toEqual(
+        expect.arrayContaining(['text-muted-foreground', 'dark:text-ink2'])
+      );
+    }
+    const selected = labels.find(label => label.props.children === OPTIONS[1].label);
+    expect(String(selected?.props.className)).toContain('text-foreground');
   });
 });

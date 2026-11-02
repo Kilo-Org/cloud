@@ -14,6 +14,14 @@ import { cn } from '@/lib/utils';
  * screen's severity pickers. Renders a vertical row list (like the dismiss
  * reason and finding-filter pickers) so long labels stay fully readable
  * instead of being squeezed into a horizontal pill row.
+ *
+ * A read-only owner still reads every option: the row keeps the secondary text
+ * colour (`ink2` in dark, where `mutedForeground` sits at 4.5:1 on the row) and
+ * the selection stays marked by the check and the heavier foreground label. A
+ * second, dimmer treatment on the rows made unselected options 2:1 on the dark
+ * row and 1.95:1 in light, so selectable copy read as disabled content; the
+ * screen's own read-only state (`disabled` on the group and the callers' own
+ * treatment) carries that cue once, above the list.
  */
 export function PillGroup<T extends string>({
   label,
@@ -46,8 +54,7 @@ export function PillGroup<T extends string>({
                 // because `hitSlop` does not move the rect an audit reads.
                 ROW_TARGET_CLASS,
                 'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft',
-                disabled && 'opacity-50'
+                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
                 selectionHaptic();
@@ -58,7 +65,7 @@ export function PillGroup<T extends string>({
               <Text
                 className={cn(
                   'flex-1 text-sm',
-                  active ? 'font-medium text-foreground' : 'text-muted-foreground'
+                  active ? 'font-medium text-foreground' : 'text-muted-foreground dark:text-ink2'
                 )}
               >
                 {option.label}

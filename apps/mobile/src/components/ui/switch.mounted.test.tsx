@@ -179,18 +179,21 @@ describe('Switch', () => {
     expect(props.thumbColor).toBe(lightColors.mutedForeground);
   });
 
-  it('keeps the disabled pair off the brand accent in dark mode', () => {
+  it('keeps the disabled pair readable and off the brand accent in dark mode', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
+    // The muted pair measured 2.2:1 on the row and 1.07:1 for the on grip in
+    // dark, so a disabled control nearly vanished beside an enabled one.
     expect(on.trackColor).toEqual({
-      false: darkColors.mutedSoft,
-      true: darkColors.primaryDisabled,
+      false: darkColors.mutedForeground,
+      true: darkColors.mutedForeground,
     });
-    expect(on.thumbColor).toBe(darkColors.primaryForeground);
+    expect(on.thumbColor).toBe(darkColors.foreground);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(off.thumbColor).toBe(darkColors.mutedForeground);
+    expect(off.thumbColor).toBe(darkColors.foreground);
+    expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
     expect(on.trackColor?.true).not.toBe(darkColors.primary);
   });
 

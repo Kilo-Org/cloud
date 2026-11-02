@@ -470,11 +470,12 @@ describe('getProvider with an organization provider allow-list', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization(`Allow ${crypto.randomUUID()}`, user.id, 0);
     await db.insert(byok_api_keys).values(
-      providerIds.map(providerId => ({
+      providerIds.map((providerId, index) => ({
         organization_id: organization.id,
         provider_id: providerId,
         encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
         created_by: user.id,
+        created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
       }))
     );
     jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
@@ -547,6 +548,17 @@ describe('getProvider with an organization provider allow-list', () => {
         getAllowedProviders: async () => new Set(['moonshotai']),
       })
     ).rejects.toThrow();
+  });
+
+  test('uses the next key in order when the allow-list rejects the first one', async () => {
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'anthropic']);
+
+    await expect(routeForOrganizationKeys(['moonshotai', 'anthropic'], undefined)).resolves.toEqual(
+      { route: 'vercel-byok', providerIds: ['moonshotai'] }
+    );
+    await expect(
+      routeForOrganizationKeys(['moonshotai', 'anthropic'], new Set(['anthropic']))
+    ).resolves.toEqual({ route: 'vercel-byok', providerIds: ['anthropic'] });
   });
 
   test('skips every provider key when no allowed provider serves the model', async () => {

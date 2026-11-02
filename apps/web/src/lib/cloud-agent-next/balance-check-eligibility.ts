@@ -8,6 +8,11 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { getOpenAiChatGptByokModelIds } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import type { User } from '@kilocode/db/schema';
 
@@ -23,8 +28,9 @@ export type BalanceCheckModelEligibility = {
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
  * - the model is not Kilo-exclusive AND the user has a BYOK provider
- *   configured that can serve it, so the session is billed against the
- *   user's own key rather than their balance.
+ *   configured that can serve it, or a "Sign in with ChatGPT" connection
+ *   that serves it, so the session is billed against the user's own key or
+ *   plan rather than their balance.
  *
  * Kilo-exclusive models are always excluded from the BYOK bypass: they are
  * Kilo-funded and platform billed, so even when `getModelUserByokProviders`
@@ -43,6 +49,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   user: Pick<User, 'id'>;
   modelId: string;
   organizationId?: string;
+  includeSharedServicesConnection?: boolean;
 }): Promise<BalanceCheckModelEligibility> {
   // Naming a custom LLM the user cannot call skips this check too, but the
   // gateway refuses every request for it, so the session cannot run inference.
@@ -58,7 +65,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
   if (enabledProviderIds.length === 0) {
-    return { isFree: false, hasUserByokAvailable: false };
+    return { isFree: false, hasUserByokAvailable: await hasOpenAiChatGptByokForModel(params) };
   }
 
   const enabled = new Set(enabledProviderIds);
@@ -87,5 +94,32 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     enabledProviderIds: enabled,
     allowedProviders,
   });
-  return { isFree: false, hasUserByokAvailable };
+  return {
+    isFree: false,
+    hasUserByokAvailable: hasUserByokAvailable || (await hasOpenAiChatGptByokForModel(params)),
+  };
+}
+
+/**
+ * Whether a "Sign in with ChatGPT" connection serves the model, so the ChatGPT
+ * plan pays instead of the Kilo balance. Service runs also consider the
+ * organization's shared-services connection, which routing tries first.
+ */
+async function hasOpenAiChatGptByokForModel(params: {
+  user: Pick<User, 'id'>;
+  modelId: string;
+  organizationId?: string;
+  includeSharedServicesConnection?: boolean;
+}): Promise<boolean> {
+  const owners: OpenAiChatGptOwner[] = [];
+  if (params.includeSharedServicesConnection && params.organizationId) {
+    owners.push(openAiChatGptSharedServicesOwner(params.organizationId));
+  }
+  owners.push({ kiloUserId: params.user.id, organizationId: params.organizationId ?? null });
+
+  for (const owner of owners) {
+    const servedModelIds = await getOpenAiChatGptByokModelIds(owner, [params.modelId]);
+    if (servedModelIds?.has(params.modelId)) return true;
+  }
+  return false;
 }

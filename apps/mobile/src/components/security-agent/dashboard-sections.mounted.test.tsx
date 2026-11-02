@@ -179,9 +179,8 @@ describe('DashboardSections priority card', () => {
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
-    // Nothing is waiting, so the row is a statement: a press state would
-    // promise a findings list that has nothing in it.
-    expect(card.findAllByType('Pressable')).toHaveLength(0);
+    // The all-clear row opens the findings list; the next test pins its floor.
+    expect(card.findAllByType('Pressable')).toHaveLength(1);
   });
 
   // Regression: the all-clear row was sized by its one text line plus `py-3`,

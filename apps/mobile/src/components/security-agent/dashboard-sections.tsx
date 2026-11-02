@@ -127,9 +127,10 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   }
 
   if (!finding) {
-    // Nothing is waiting, so the row is a statement, not a destination: a
-    // trailing arrow and a press state promised a findings list with nothing
-    // to act on.
+    // The all-clear row still opens the findings list: a scope can hold findings
+    // that are fixed, ignored or waiting on analysis, and the list is where a
+    // reader checks that. Its whole row is the target, so the card it opens
+    // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Pressable

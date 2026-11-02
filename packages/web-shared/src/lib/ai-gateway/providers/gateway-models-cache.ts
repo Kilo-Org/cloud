@@ -135,7 +135,7 @@ export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<Readon
 );
 
 // Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
-const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
+export const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'anthropic/claude-haiku-4-5',
   'anthropic/claude-sonnet-4-5',
   'anthropic/claude-sonnet-4-6',

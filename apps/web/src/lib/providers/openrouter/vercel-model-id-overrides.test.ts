@@ -1,7 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT } from '@kilocode/db/schema-types';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { ModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
-import { buildVercelModelIdOverrides } from './vercel-model-id-overrides';
+import {
+  buildVercelModelIdOverrides,
+  LEGACY_OPENROUTER_MODEL_ID_OVERRIDES,
+} from './vercel-model-id-overrides';
 
 type CatalogModel = { id: string; canonical_model_id?: string };
 
@@ -27,10 +31,20 @@ function build(
   });
 }
 
+function buildGenerated(
+  modelsDevCatalog: ModelsDevCatalog,
+  openrouterModelIds: string[],
+  vercelModelIds: string[]
+) {
+  return build(modelsDevCatalog, openrouterModelIds, vercelModelIds).filter(
+    override => !(override.openrouter_model_id in LEGACY_OPENROUTER_MODEL_ID_OVERRIDES)
+  );
+}
+
 describe('buildVercelModelIdOverrides', () => {
   it('matches OpenRouter and Vercel models that share a canonical ID', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [{ id: 'vendor/old-name', canonical_model_id: 'vendor/new-name' }],
           vercel: [{ id: 'vendor/new-name', canonical_model_id: 'vendor/new-name' }],
@@ -43,7 +57,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('picks the shortest model ID on both sides when several share a canonical ID', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [
             { id: 'vendor/a-much-longer-name', canonical_model_id: 'vendor/model' },
@@ -62,7 +76,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('skips free variants', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [
             { id: 'vendor/model:free', canonical_model_id: 'vendor/model' },
@@ -81,7 +95,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('skips identical IDs', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [{ id: 'vendor/model', canonical_model_id: 'vendor/model' }],
           vercel: [{ id: 'vendor/model', canonical_model_id: 'vendor/model' }],
@@ -94,7 +108,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('skips IDs already handled by the prefix rewrite', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [
             { id: 'qwen/qwen3-32b', canonical_model_id: 'qwen/qwen3-32b' },
@@ -113,7 +127,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('only matches models present in the gateway model lists', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [{ id: 'vendor/model', canonical_model_id: 'vendor/model' }],
           vercel: [{ id: 'other/model', canonical_model_id: 'vendor/model' }],
@@ -126,7 +140,7 @@ describe('buildVercelModelIdOverrides', () => {
 
   it('ignores models without a canonical ID', () => {
     expect(
-      build(
+      buildGenerated(
         catalog({
           openrouter: [{ id: 'vendor/model' }],
           vercel: [{ id: 'other/model' }],
@@ -137,7 +151,34 @@ describe('buildVercelModelIdOverrides', () => {
     ).toEqual([]);
   });
 
-  it('sorts overrides and truncates to the configured maximum', () => {
+  it('includes hardcoded overrides for every legacy OpenRouter alias', () => {
+    const overrides = build(catalog({ openrouter: [], vercel: [] }), [], []);
+
+    expect(overrides).toHaveLength(Object.keys(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES).length);
+    for (const alias of legacyOpenRouterAliases) {
+      expect(overrides).toContainEqual({
+        openrouter_model_id: alias,
+        vercel_model_id: LEGACY_OPENROUTER_MODEL_ID_OVERRIDES[alias],
+      });
+    }
+  });
+
+  it('allows several legacy aliases to share a Vercel model ID', () => {
+    expect(build(catalog({ openrouter: [], vercel: [] }), [], [])).toEqual(
+      expect.arrayContaining([
+        {
+          openrouter_model_id: 'anthropic/claude-sonnet-4-5',
+          vercel_model_id: 'anthropic/claude-sonnet-4.5',
+        },
+        {
+          openrouter_model_id: 'claude-sonnet-4.5',
+          vercel_model_id: 'anthropic/claude-sonnet-4.5',
+        },
+      ])
+    );
+  });
+
+  it('sorts overrides and truncates generated entries to the configured maximum', () => {
     const count = VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT + 1;
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     const openrouter = Array.from({ length: count }, (_, index) => ({
@@ -156,9 +197,11 @@ describe('buildVercelModelIdOverrides', () => {
     );
 
     expect(overrides).toHaveLength(VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT);
-    expect(overrides[0]).toEqual({
-      openrouter_model_id: 'vendor/openrouter-0',
-      vercel_model_id: 'vendor/vercel-0',
-    });
+    expect(new Set(overrides.map(override => override.openrouter_model_id)).size).toBe(
+      overrides.length
+    );
+    expect(overrides.map(override => override.openrouter_model_id)).toEqual(
+      [...overrides.map(override => override.openrouter_model_id)].sort()
+    );
   });
 });

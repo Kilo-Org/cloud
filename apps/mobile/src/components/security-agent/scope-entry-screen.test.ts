@@ -348,7 +348,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
       const setup = host(root, 'SecurityAgentSetup')[0];
 
       expect(setup?.props.readOnlyNotice).toBe(
-        'Only organization owners and admins can connect GitHub.'
+        'Ask an organization owner or admin to connect GitHub.'
       );
       expect(setup?.props.url).toBeUndefined();
     }

@@ -1,4 +1,4 @@
-import { ShieldCheck } from '@/components/ui/icons';
+import { Info, ShieldCheck } from '@/components/ui/icons';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -21,10 +21,10 @@ type SecurityAgentSetupProps<T> = {
   /**
    * Why the reader cannot start this connection themselves, once the server has
    * refused it for their organization role. When set, the action is withheld:
-   * the body shows this sentence in the button's own box and never resolves a
-   * URL, so the screen cannot offer a press whose destination refuses the
-   * reader. A caller the server admits never sets it, so no device-side role
-   * read can deny a press.
+   * the body shows this sentence in an info callout in the button's own slot
+   * and never resolves a URL, so the screen cannot offer a press whose
+   * destination refuses the reader. A caller the server admits never sets it,
+   * so no device-side role read can deny a press.
    */
   readOnlyNotice?: string;
   /**
@@ -102,12 +102,16 @@ export function SecurityAgentSetup<T>({
         {readOnlyNotice ? (
           // The notice takes the action's place rather than sitting beside it:
           // this reader has no press to make, and the sentence is the only
-          // thing left to say. It keeps the button's own box — `mt-3`, the
-          // full-width `min-h-[44px]` at the same padding (`Button`'s default
-          // size) — so a role that resolves after mount changes what the block
-          // says without re-centring it under the reader's eyes.
-          <View className="mt-3 w-full min-h-[44px] items-center justify-center px-4 py-2">
-            <Text className="text-center text-xs text-muted-foreground">{readOnlyNotice}</Text>
+          // thing left to say. It keeps the button's own slot — `mt-3`, full
+          // width, the same padding as the description — so a refusal that
+          // arrives after mount changes what the block says without
+          // re-centring it under the reader's eyes. It is drawn as an info
+          // callout at the description's own size and colour: as a bare line in
+          // the button's gap it read as a footnote, the faintest text on the
+          // screen, leaving the state looking unfinished.
+          <View className="mt-3 w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
+            <Info size={16} color={colors.mutedForeground} />
+            <Text className="flex-1 text-sm text-muted-foreground">{readOnlyNotice}</Text>
           </View>
         ) : (
           <Button

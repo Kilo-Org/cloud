@@ -2064,7 +2064,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instal·la l'aplicació de GitHub de Kilo per sincronitzar automàticament les alertes de Dependabot i gestionar les incidències de seguretat de tots els teus repositoris.",
-      "connectOwnerOnly": "Només els propietaris i els administradors de l'organització poden connectar {{platform}}.",
+      "connectOwnerOnly": "Demana a un propietari o administrador de l'organització que connecti {{platform}}.",
       "connectTitle": "Connecta GitHub per començar",
       "couldNotLoad": "No s'ha pogut carregar l'agent de seguretat.",
       "installApp": "Instal·la l'aplicació de GitHub",

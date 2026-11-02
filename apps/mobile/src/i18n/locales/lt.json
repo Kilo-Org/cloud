@@ -2097,7 +2097,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Įdiek Kilo GitHub programėlę, kad automatiškai sinchronizuotum Dependabot įspėjimus ir tvarkytum saugos radinius visose savo saugyklose.",
-      "connectOwnerOnly": "Tik organizacijos savininkai ir administratoriai gali prijungti {{platform}}.",
+      "connectOwnerOnly": "Paprašyk organizacijos savininko ar administratoriaus prijungti {{platform}}.",
       "connectTitle": "Prijunk GitHub ir pradėk",
       "couldNotLoad": "Nepavyko įkelti saugos agento.",
       "installApp": "Įdiegti GitHub programėlę",

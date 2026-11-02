@@ -2031,7 +2031,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ogohlantirishlarini avtomatik sinxronlash va repozitoriyalaringizdagi xavfsizlik muammolarini boshqarish uchun Kilo GitHub ilovasini o'rnating.",
-      "connectOwnerOnly": "Faqat tashkilot egalar va administratorlar {{platform}}ni ulashi mumkin.",
+      "connectOwnerOnly": "Tashkilot egasi yoki administratoridan {{platform}}ni ulashini so'rang.",
       "connectTitle": "Boshlash uchun GitHubni ulang",
       "couldNotLoad": "Xavfsizlik agentini yuklab bo'lmadi.",
       "installApp": "GitHub ilovasini o'rnatish",

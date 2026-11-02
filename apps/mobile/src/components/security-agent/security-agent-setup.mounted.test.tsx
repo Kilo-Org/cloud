@@ -15,7 +15,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck' }));
+vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck', Info: 'Info' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -166,9 +166,7 @@ it('drops the failed-press line when a refusal takes the action’s place', asyn
       title: 'Connect GitHub',
       description: 'Authorize the GitHub App.',
       buttonLabel: 'Connect',
-      readOnlyNotice: refused
-        ? 'Only organization owners and admins can connect GitHub.'
-        : undefined,
+      readOnlyNotice: refused ? 'Ask an organization owner or admin to connect GitHub.' : undefined,
       resolveUrl: () => {
         setRefused(true);
         return Promise.resolve(undefined);
@@ -184,7 +182,9 @@ it('drops the failed-press line when a refusal takes the action’s place', asyn
   });
   expect(body.findAllByType(Button)).toHaveLength(0);
   expect(body.findAllByType('Text' as ElementType).map(node => node.props.children)).toContain(
-    'Only organization owners and admins can connect GitHub.'
+    'Ask an organization owner or admin to connect GitHub.'
   );
+  // The notice is an info callout, not a bare line: the cue travels with it.
+  expect(body.findAllByType('Info' as ElementType)).toHaveLength(1);
   expect(body.findByType('AccessibleStatus' as ElementType).props.message).toBeNull();
 });

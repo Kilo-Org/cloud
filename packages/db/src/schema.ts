@@ -238,6 +238,16 @@ export const StripeServiceFeeOutcome = {
 export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
 
+export const ServiceFeeRollbackRefundStatus = {
+  Pending: 'pending',
+  Succeeded: 'succeeded',
+  Skipped: 'skipped',
+  Failed: 'failed',
+} as const;
+
+export type ServiceFeeRollbackRefundStatus =
+  (typeof ServiceFeeRollbackRefundStatus)[keyof typeof ServiceFeeRollbackRefundStatus];
+
 // ADR 0005 custom router values. Declared here rather than imported from
 // @kilocode/auto-routing-contracts: consumers that typecheck this package's
 // source would otherwise pull in the contracts source, which needs a newer
@@ -11590,6 +11600,67 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+// One claim per assessment for the admin-initiated refund of service fees
+// charged before collection was disabled. The row is claimed before Stripe is
+// called so that concurrent or repeated runs cannot refund the same fee twice.
+export const service_fee_rollback_refunds = pgTable(
+  'service_fee_rollback_refunds',
+  {
+    assessment_key: text().primaryKey().notNull(),
+    status: text().notNull().$type<ServiceFeeRollbackRefundStatus>(),
+    attempt: integer().default(1).notNull(),
+    // Definite Stripe refund rejections only; failures before Stripe is asked
+    // to refund do not count toward the retry cap.
+    rejected_attempts: integer().default(0).notNull(),
+    amount_minor: integer().default(0).notNull(),
+    currency: text().notNull(),
+    stripe_charge_id: text(),
+    stripe_refund_id: text(),
+    reason: text(),
+    requested_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.assessment_key],
+      foreignColumns: [stripe_service_fee_assessments.assessment_key],
+      name: 'FK_svc_fee_rollback_refunds_assessment',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.requested_by_kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_svc_fee_rollback_refunds_requested_by',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    uniqueIndex('UQ_service_fee_rollback_refunds_stripe_refund_id')
+      .on(table.stripe_refund_id)
+      .where(isNotNull(table.stripe_refund_id)),
+    index('IDX_service_fee_rollback_refunds_status').on(table.status),
+    enumCheck(
+      'service_fee_rollback_refunds_status_check',
+      table.status,
+      ServiceFeeRollbackRefundStatus
+    ),
+    check(
+      'service_fee_rollback_refunds_amounts_check',
+      sql`${table.amount_minor} >= 0 AND ${table.attempt} >= 1 AND ${table.rejected_attempts} >= 0`
+    ),
+    check(
+      'service_fee_rollback_refunds_succeeded_check',
+      sql`${table.status} <> 'succeeded' OR ${table.stripe_refund_id} IS NOT NULL`
+    ),
+  ]
+);
+
+export type ServiceFeeRollbackRefund = typeof service_fee_rollback_refunds.$inferSelect;
 
 export const agent_briefing_preferences = pgTable(
   'agent_briefing_preferences',

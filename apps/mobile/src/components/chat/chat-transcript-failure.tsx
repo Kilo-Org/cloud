@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { StateSurface } from '@/components/centered-state-surface';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -39,15 +40,12 @@ export function ChatTranscriptFailure({
   const unavailable = failureKey === CHAT_UNAVAILABLE_KEY;
 
   return (
-    // Centred in the area the state occupies. The shared measured centring
-    // centres against the whole window, which a chat's transcript area is not:
-    // it sits between the header and the composer, so a measured state lands
-    // half that difference away from where it first drew and jumps when the
-    // measurement arrives.
-    <View className="flex-1 justify-center">
+    // Measured against the transcript area this state occupies. The shared
+    // measured centring against the whole window lands half the difference
+    // between the two away from where the state first drew, so it jumped when
+    // the measurement arrived; scoped to the area, both agree.
+    <StateSurface className="flex-1">
       <QueryError
-        placement="static"
-        className="w-full"
         // The chat is gone in the first case and failed in the second, so the
         // title says which of the two the person is looking at.
         variant={unavailable ? 'not-found' : 'neutral'}
@@ -68,6 +66,6 @@ export function ChatTranscriptFailure({
           </View>
         }
       />
-    </View>
+    </StateSurface>
   );
 }

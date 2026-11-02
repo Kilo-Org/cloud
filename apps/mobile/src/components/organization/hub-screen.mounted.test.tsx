@@ -373,6 +373,8 @@ describe('Organization hub billing card while its data loads', () => {
     const hub = await renderHub();
     expect(bellRow(hub.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
     expect(bellRow(hub.renderer)?.props.subtitlePlaceholder).toBeUndefined();
+    // A settled row's name is the text it shows, so no name is passed.
+    expect(bellRow(hub.renderer)?.props.accessibilityLabel).toBeUndefined();
     expect(kiloPassQuery.enabled.at(-1)).toBe(true);
     hub.unmount();
 
@@ -383,6 +385,11 @@ describe('Organization hub billing card while its data loads', () => {
     // Loading copy is not a subtitle; the row reserves its settled line instead.
     expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
     expect(bellRow(loading.renderer)?.props.subtitlePlaceholder).toBeTruthy();
+    // The placeholder has no text, so the row's name carries the loading state;
+    // a reader hears the title and the cue instead of the bare title.
+    expect(bellRow(loading.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.loading')}`
+    );
     loading.unmount();
 
     // A list payload persisted before the parent link existed is unknown, not a

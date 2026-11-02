@@ -136,6 +136,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     );
   }
   const lowBalanceLoading = orgWithMembers.data == null && !lowBalanceUnavailable;
+  // While it loads, the row's subtitle is a Skeleton with no text, so the name
+  // derived from the row would be its title alone. The name carries the
+  // loading state instead of `accessibilityState.busy`, which Android renders
+  // as the node's whole content description and drops the title with it.
+  const lowBalanceAccessibilityLabel = lowBalanceLoading
+    ? `${t('organization.lowBalanceAlert.title')}. ${t('common.loading')}`
+    : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -248,6 +255,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 subtitlePlaceholder={
                   lowBalanceLoading ? <Skeleton className="mt-0.5 h-4 w-12 rounded" /> : undefined
                 }
+                accessibilityLabel={lowBalanceAccessibilityLabel}
                 trailing={
                   lowBalanceUnavailable ? (
                     <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>

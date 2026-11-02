@@ -17,6 +17,88 @@ import {
 import migrations from '../../drizzle/migrations';
 import type { AttributionsTrackRequestBody } from '../schemas';
 
+/**
+ * The logical target a request asks about. Rows store these labels, so every read
+ * and delete names the target it answers for.
+ */
+export type AttributionTarget = {
+  organization_id: string;
+  project_id: string;
+  file_path: string;
+};
+
+/** Totals over a set of stored attributions. */
+export type AttributionSummary = {
+  total_attributions: number;
+  total_lines_added: number;
+  total_lines_removed: number;
+  by_status: Record<string, number>;
+  by_branch: Record<string, number>;
+};
+
+/** One stored attribution with its line records, as the debug listing serves it. */
+export type AttributionDebugRow = AttributionsMetadataSelect & {
+  lines_added: LinesAddedSelect[];
+  lines_removed: LinesRemovedSelect[];
+};
+
+type SummaryCounts = {
+  attributions: number;
+  linesAdded: number;
+  linesRemoved: number;
+  byStatus: Map<string, number>;
+  byBranch: Map<string, number>;
+};
+
+function emptyCounts(): SummaryCounts {
+  return {
+    attributions: 0,
+    linesAdded: 0,
+    linesRemoved: 0,
+    byStatus: new Map(),
+    byBranch: new Map(),
+  };
+}
+
+function countRow(
+  counts: SummaryCounts,
+  metadata: AttributionsMetadataSelect,
+  linesAddedCount: number,
+  linesRemovedCount: number
+): void {
+  counts.attributions += 1;
+  counts.linesAdded += linesAddedCount;
+  counts.linesRemoved += linesRemovedCount;
+  counts.byStatus.set(metadata.status, (counts.byStatus.get(metadata.status) ?? 0) + 1);
+  counts.byBranch.set(metadata.branch, (counts.byBranch.get(metadata.branch) ?? 0) + 1);
+}
+
+function summarize(counts: SummaryCounts): AttributionSummary {
+  return {
+    total_attributions: counts.attributions,
+    total_lines_added: counts.linesAdded,
+    total_lines_removed: counts.linesRemoved,
+    by_status: Object.fromEntries(counts.byStatus),
+    by_branch: Object.fromEntries(counts.byBranch),
+  };
+}
+
+/** True when a stored row carries exactly this target's labels. */
+function matchesTarget(
+  row: {
+    organization_id: string | null;
+    project_id: string;
+    file_path: string;
+  },
+  target: AttributionTarget
+): boolean {
+  return (
+    row.organization_id === target.organization_id &&
+    row.project_id === target.project_id &&
+    row.file_path === target.file_path
+  );
+}
+
 export class AttributionTrackerDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
 
@@ -35,11 +117,18 @@ export class AttributionTrackerDO extends DurableObject<Env> {
     this.db.delete(attributionsMetadata).run();
   }
 
-  deleteAttribution(id: number): boolean {
+  deleteAttribution(target: AttributionTarget, id: number): boolean {
     const existing = this.db
       .select({ id: attributionsMetadata.id })
       .from(attributionsMetadata)
-      .where(eq(attributionsMetadata.id, id))
+      .where(
+        and(
+          eq(attributionsMetadata.id, id),
+          eq(attributionsMetadata.organization_id, target.organization_id),
+          eq(attributionsMetadata.project_id, target.project_id),
+          eq(attributionsMetadata.file_path, target.file_path)
+        )
+      )
       .all();
 
     if (existing.length === 0) {
@@ -104,7 +193,7 @@ export class AttributionTrackerDO extends DurableObject<Env> {
   /**
    * @deprecated Use getAttributionEvents() for flexible retention calculation
    */
-  getLinesAddedByHash(branch?: string): Record<string, number[]> {
+  getLinesAddedByHash(target: AttributionTarget, branch?: string): Record<string, number[]> {
     const branchPattern = branch ?? '*';
 
     const rows = this.db
@@ -120,6 +209,9 @@ export class AttributionTrackerDO extends DurableObject<Env> {
       .where(
         and(
           eq(attributionsMetadata.status, 'accepted'),
+          eq(attributionsMetadata.organization_id, target.organization_id),
+          eq(attributionsMetadata.project_id, target.project_id),
+          eq(attributionsMetadata.file_path, target.file_path),
           sql`${attributionsMetadata.branch} GLOB ${branchPattern}`
         )
       )
@@ -140,6 +232,7 @@ export class AttributionTrackerDO extends DurableObject<Env> {
   }
 
   getAttributionEvents(
+    target: AttributionTarget,
     branch?: string
   ): Array<{ id: number; taskId: string | null; lineHashes: string[] }> {
     const branchPattern = branch ?? '*';
@@ -153,6 +246,9 @@ export class AttributionTrackerDO extends DurableObject<Env> {
       .where(
         and(
           eq(attributionsMetadata.status, 'accepted'),
+          eq(attributionsMetadata.organization_id, target.organization_id),
+          eq(attributionsMetadata.project_id, target.project_id),
+          eq(attributionsMetadata.file_path, target.file_path),
           sql`${attributionsMetadata.branch} GLOB ${branchPattern}`
         )
       )
@@ -179,20 +275,16 @@ export class AttributionTrackerDO extends DurableObject<Env> {
     return result;
   }
 
-  getDebugData(): {
-    attributions: Array<
-      AttributionsMetadataSelect & {
-        lines_added: LinesAddedSelect[];
-        lines_removed: LinesRemovedSelect[];
-      }
-    >;
-    summary: {
-      total_attributions: number;
-      total_lines_added: number;
-      total_lines_removed: number;
-      by_status: Record<string, number>;
-      by_branch: Record<string, number>;
-    };
+  /**
+   * The listed attributions belong to `target`, and so does `summary`, so the
+   * admin panel's totals describe the rows it shows. `instance_summary` keeps the
+   * totals of the whole object, which another target sharing this instance
+   * contributes to.
+   */
+  getDebugData(target: AttributionTarget): {
+    attributions: AttributionDebugRow[];
+    summary: AttributionSummary;
+    instance_summary: AttributionSummary;
   } {
     const metadataRows = this.db
       .select()
@@ -200,30 +292,17 @@ export class AttributionTrackerDO extends DurableObject<Env> {
       .orderBy(desc(attributionsMetadata.created_at))
       .all();
 
-    const attributions: Array<
-      AttributionsMetadataSelect & {
-        lines_added: LinesAddedSelect[];
-        lines_removed: LinesRemovedSelect[];
-      }
-    > = [];
-
-    let totalLinesAdded = 0;
-    let totalLinesRemoved = 0;
-    const statusCounts = new Map<string, number>();
-    const branchCounts = new Map<string, number>();
+    const attributions: AttributionDebugRow[] = [];
+    const targetCounts = emptyCounts();
+    const instanceCounts = emptyCounts();
 
     for (const metadata of metadataRows) {
-      statusCounts.set(metadata.status, (statusCounts.get(metadata.status) ?? 0) + 1);
-      branchCounts.set(metadata.branch, (branchCounts.get(metadata.branch) ?? 0) + 1);
-
       const linesAddedRows = this.db
         .select()
         .from(linesAdded)
         .where(eq(linesAdded.attributions_metadata_id, metadata.id))
         .orderBy(linesAdded.line_number)
         .all();
-
-      totalLinesAdded += linesAddedRows.length;
 
       const linesRemovedRows = this.db
         .select()
@@ -232,7 +311,13 @@ export class AttributionTrackerDO extends DurableObject<Env> {
         .orderBy(linesRemoved.line_number)
         .all();
 
-      totalLinesRemoved += linesRemovedRows.length;
+      countRow(instanceCounts, metadata, linesAddedRows.length, linesRemovedRows.length);
+
+      if (!matchesTarget(metadata, target)) {
+        continue;
+      }
+
+      countRow(targetCounts, metadata, linesAddedRows.length, linesRemovedRows.length);
 
       attributions.push({
         ...metadata,
@@ -243,26 +328,25 @@ export class AttributionTrackerDO extends DurableObject<Env> {
 
     return {
       attributions,
-      summary: {
-        total_attributions: metadataRows.length,
-        total_lines_added: totalLinesAdded,
-        total_lines_removed: totalLinesRemoved,
-        by_status: Object.fromEntries(statusCounts),
-        by_branch: Object.fromEntries(branchCounts),
-      },
+      summary: summarize(targetCounts),
+      instance_summary: summarize(instanceCounts),
     };
   }
 }
 
+/**
+ * The instance name for a target. It joins the labels, so two different targets
+ * can land on one instance; every operation therefore carries its own target and
+ * acts only on the rows that match it.
+ */
+export function attributionTrackerKey(target: AttributionTarget): string {
+  return `${target.organization_id}/${target.project_id}/${target.file_path}`;
+}
+
 export function getAttributionTrackerDO(
   env: Env,
-  params: {
-    organization_id: string;
-    project_id: string;
-    file_path: string;
-  }
+  target: AttributionTarget
 ): DurableObjectStub<AttributionTrackerDO> {
-  const doKey = `${params.organization_id}/${params.project_id}/${params.file_path}`;
-  const id = env.ATTRIBUTION_TRACKER.idFromName(doKey);
+  const id = env.ATTRIBUTION_TRACKER.idFromName(attributionTrackerKey(target));
   return env.ATTRIBUTION_TRACKER.get(id);
 }

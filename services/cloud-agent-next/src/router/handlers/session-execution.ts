@@ -12,7 +12,7 @@
  *
  * New callers should prefer the unified `start` / `send` endpoints.
  */
-import { protectedProcedure } from '../auth.js';
+import { protectedProcedure, cloudAgentManagedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import {
   InitiateFromPreparedSessionInput,
@@ -88,7 +88,7 @@ export function createSessionExecutionV2Handlers() {
         });
       }),
 
-    sendMessageV2: protectedProcedure
+    sendMessageV2: cloudAgentManagedProcedure
       .input(SendMessageV2Input)
       .output(LegacyExecutionResponse)
       .mutation(async ({ input, ctx }) => {

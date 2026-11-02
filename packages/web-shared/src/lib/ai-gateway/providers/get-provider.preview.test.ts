@@ -11,6 +11,7 @@ import {
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
 import {
   getByokCredentials,
   getCatalogModeByokCredentials,
@@ -97,6 +98,9 @@ function catalogModel(
     provider: {
       id,
       models_dev_id: id,
+      ...(id === 'zai-coding'
+        ? { openrouter_inference_provider_id: 'z-ai' as const }
+        : { provider_listing: syntheticDefinition.provider_listing }),
       ...apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
         supportedChatApis,
@@ -171,7 +175,7 @@ type RouteSignature =
 function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
   if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
   const { provider, userByok } = result;
-  if (provider.id === 'direct-byok') {
+  if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
       ? { route: 'direct-byok', providerId }
@@ -180,7 +184,7 @@ function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteS
   if (!userByok) {
     if (provider === VERCEL_AI_GATEWAY) return { route: 'kilo', gateway: 'vercel' };
     if (provider === OPENROUTER) return { route: 'kilo', gateway: 'openrouter' };
-    throw new Error(`unexpected Kilo provider ${provider.id}`);
+    throw new Error(`unexpected Kilo provider ${provider.type}`);
   }
   if (provider === VERCEL_AI_GATEWAY) {
     return { route: 'vercel-byok', providerIds: userByok.map(byok => byok.providerId) };

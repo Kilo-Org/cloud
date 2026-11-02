@@ -60,6 +60,7 @@ const freeUsageContext = {
   requested_model: 'upstream-model',
   provider: 'openrouter',
   is_free: true,
+  custom_llm_pricing: null,
   user_byok: false,
   custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
   api_kind: 'chat_completions',
@@ -412,6 +413,7 @@ describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request
       kind: request.kind,
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: {
         user: null,
         organization_id: null,
@@ -2103,6 +2105,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
               requested_model: model,
               provider,
               is_free: isFree,
+              custom_llm_pricing: null,
               user_byok: userByok,
               custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
               api_kind: shape.kind,
@@ -2161,6 +2164,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             requested_model: 'openai/gpt-5',
             provider,
             is_free: false,
+            custom_llm_pricing: null,
             user_byok: false,
             api_kind: shape.kind,
             custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
@@ -2182,6 +2186,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           requested_model: 'openai/gpt-5',
           provider: 'openai-chatgpt',
           is_free: false,
+          custom_llm_pricing: null,
           user_byok: false,
           custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
           api_kind: shape.kind,
@@ -2212,6 +2217,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             requested_model: 'openai/gpt-5',
             provider: 'vercel',
             is_free: false,
+            custom_llm_pricing: null,
             user_byok: false,
             custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
             api_kind: shape.kind,
@@ -2248,6 +2254,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             requested_model: 'openai/gpt-5',
             provider: 'vercel',
             is_free: false,
+            custom_llm_pricing: null,
             user_byok: userByok,
             custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
             api_kind: shape.kind,
@@ -2276,8 +2283,12 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
 
     test.each([
       ['requested/alias', 'requested/alias'],
+      ['typesafe/jev-1.13', 'typesafe/jev-1.13'],
+      ['nvidia/nemotron-3-super-120b-a12b', 'nvidia/nemotron-3-super-120b-a12b'],
       ['~auto', 'upstream-model'],
       ['openrouter/auto', 'upstream-model'],
+      ['typesafe/jev-router', 'upstream-model'],
+      ['nvidia/switchyard', 'upstream-model'],
     ])('handles requested model %s', async (requestedModel, expectedModel) => {
       const { payload } = await rewriteUsageFixture(
         shape,
@@ -2318,6 +2329,7 @@ test.each(['openrouter', 'vercel'] as const)(
         requested_model: 'google/gemini-3.8-flash',
         provider,
         is_free: false,
+        custom_llm_pricing: null,
         user_byok: false,
         custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
         api_kind: 'messages',
@@ -2358,6 +2370,7 @@ test.each(['provider_metadata', 'providerMetadata'])(
         requested_model: 'requested-model',
         provider: 'vercel',
         is_free: false,
+        custom_llm_pricing: null,
         user_byok: false,
         custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
         api_kind: 'messages',
@@ -2433,6 +2446,7 @@ describe.each(usageShapes.filter(shape => shape.kind !== 'chat_completions'))(
             requested_model: 'requested-model',
             provider: 'vercel',
             is_free: false,
+            custom_llm_pricing: null,
             user_byok: false,
             custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
             api_kind: shape.kind,
@@ -2609,6 +2623,7 @@ describe('rewriteModelResponse', () => {
         kind: shape.kind,
         isFree,
         userByok,
+        customLlmPricing: null,
         logging: makeLogging({
           request: {
             kind: shape.kind,
@@ -2640,6 +2655,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
       responseTransforms: null,
     });
@@ -2669,6 +2685,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
       responseTransforms: null,
     });
@@ -2693,6 +2710,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: true,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });
@@ -2712,6 +2730,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: true,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });
@@ -2734,6 +2753,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });
@@ -2753,6 +2773,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
       responseTransforms: null,
     });
@@ -2769,6 +2790,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: false,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });
@@ -2787,6 +2809,7 @@ describe('rewriteModelResponse', () => {
         kind: 'chat_completions',
         isFree: false,
         userByok: false,
+        customLlmPricing: null,
         logging: makeLogging({
           user: { id: 'test-user', google_user_email: email } as RequestLoggingParams['user'],
         }),
@@ -2806,6 +2829,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: true,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });
@@ -2823,6 +2847,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       isFree: true,
       userByok: false,
+      customLlmPricing: null,
       logging: makeLogging(),
       responseTransforms: null,
     });

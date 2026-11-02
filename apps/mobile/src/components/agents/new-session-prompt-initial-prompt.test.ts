@@ -93,6 +93,10 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
+  // The composer's top fade resizes on the UI thread; there is none here, so
+  // the style factory runs once and the shared value is a plain box.
+  useAnimatedStyle: (factory: () => object) => factory(),
+  useSharedValue: <T>(value: T) => ({ value }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -124,25 +128,6 @@ vi.mock('@/components/ui/accessible-status', () => ({
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
   ChatToolbar: 'ChatToolbar',
-}));
-
-/** Captures the options the prompt hands the height-measuring hook. */
-const textHeightOptions = vi.hoisted(() => ({
-  current: null as Record<string, unknown> | null,
-}));
-
-vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: (options: Record<string, unknown>) => {
-    textHeightOptions.current = options;
-    return {
-      height: 48,
-      maxHeight: 160,
-      measureElement: null,
-      reset: vi.fn(),
-      setNativeContentHeight: vi.fn(),
-      setText: vi.fn(),
-    };
-  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
@@ -186,11 +171,15 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
   },
 }));
 
-vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: () => {
-    // no-op hook
+const sharePrefillControl = vi.hoisted(() => ({
+  current: null as null | {
+    failed: boolean;
+    retry: () => void;
+    dismiss: () => void;
   },
 }));
+
+vi.mock('@/lib/share-prefill', () => ({ useSharePrefill: () => sharePrefillControl.current }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
   useVoiceInput: () => ({
@@ -321,11 +310,47 @@ function defaultProps() {
 
 describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
-    textHeightOptions.current = null;
+  });
+
+  it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const failedControl = {
+      failed: true,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    sharePrefillControl.current = failedControl;
+
+    const { SharePrefillFailure } = await import('./share-prefill-failure');
+
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const failed = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    const row = findElementByType(failed, SharePrefillFailure);
+    if (!row) {
+      throw new Error('prefill failure row did not render');
+    }
+    (row.onRetry as () => void)();
+    (row.onDismiss as () => void)();
+    expect(failedControl.retry).toHaveBeenCalledTimes(1);
+    expect(failedControl.dismiss).toHaveBeenCalledTimes(1);
+
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const delivered = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    expect(findElementByType(delivered, SharePrefillFailure)).toBeNull();
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -572,16 +597,18 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(errorIndex).toBeLessThan(inputIndex);
   });
 
-  it('keeps the three-line floor at a large font scale', async () => {
+  it('gives the input the three-line floor at a large font scale', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
     // Before the host reports a frame, the floor is the preferred three lines
     // at the scaled line height: 24 * 2 * 3 + 16 = 160.
     dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt(defaultProps());
+    const element = NewSessionPrompt(defaultProps()) as Node;
+    const input = findElementByType(element, 'TextInput');
 
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
-    expect(textHeightOptions.current?.minHeight).not.toBe(64);
+    expect(input?.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ height: 160 })])
+    );
   });
 });

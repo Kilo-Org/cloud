@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
 export const PARENT_SESSION_CALLBACK_URL = 'session:parent';
@@ -80,11 +81,88 @@ const scopedPrepareSessionSchema = z
   })
   .strict();
 
+const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+const scopedChildOperations = {
+  prepareSession: { kind: 'mutation', schema: scopedPrepareSessionSchema },
+  listChildSessions: {
+    kind: 'query',
+    schema: z
+      .object({ limit: z.number().int().min(1).max(50).default(20), cursor: z.uuid().optional() })
+      .strict(),
+  },
+  getSession: {
+    kind: 'query',
+    schema: z.object({ cloudAgentSessionId: childSessionIdSchema }).strict(),
+  },
+  getMessageResult: {
+    kind: 'query',
+    schema: z
+      .object({
+        cloudAgentSessionId: childSessionIdSchema,
+        messageId: childMessageIdSchema,
+        expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+      })
+      .strict(),
+  },
+  interruptSession: {
+    kind: 'mutation',
+    schema: z.object({ sessionId: childSessionIdSchema }).strict(),
+  },
+  sendMessage: {
+    kind: 'mutation',
+    schema: z
+      .object({
+        cloudAgentSessionId: childSessionIdSchema,
+        messageId: childMessageIdSchema,
+        payload: z
+          .object({
+            type: z.literal('prompt'),
+            prompt: z
+              .string()
+              .min(1)
+              .max(100_000)
+              .refine(prompt => prompt.trim().length > 0),
+            mode: scopedPrepareSessionSchema.shape.mode,
+            model: scopedPrepareSessionSchema.shape.model,
+            variant: scopedPrepareSessionSchema.shape.variant,
+          })
+          .strict(),
+        autoCommit: z.boolean().optional(),
+        expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+      })
+      .strict(),
+  },
+} as const;
+
+function childOperation(procedure: string) {
+  const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
+  const name = match?.[1];
+  if (!name || !Object.hasOwn(scopedChildOperations, name)) {
+    throw new Error('Cloud Agent authority does not permit this procedure');
+  }
+  return scopedChildOperations[name as keyof typeof scopedChildOperations];
+}
+
+export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
+  const prefix =
+    authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+  return Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`);
+}
+
+export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
+  return childOperation(procedure).kind;
+}
+
 export function cloudAgentAuthorityInputSchema(
-  authority: CloudAgentAuthority
+  authority: CloudAgentAuthority,
+  procedure = cloudAgentAuthorityProcedure(authority)
 ): Record<string, unknown> {
+  if (!cloudAgentAuthorityProcedures(authority).includes(procedure)) {
+    throw new Error('Cloud Agent launch exceeds its authority');
+  }
   return z.toJSONSchema(
-    scopedPrepareSessionSchema.extend({
+    childOperation(procedure).schema.extend({
       organizationId:
         authority.organizationId === null
           ? z.never().optional()
@@ -104,14 +182,16 @@ export function validateCloudAgentAuthorityRequest(
   procedure: string,
   input: unknown,
   nowSeconds = Math.floor(Date.now() / 1000)
-): z.infer<typeof scopedPrepareSessionSchema> {
+) {
   const scope = CloudAgentAuthoritySchema.parse(authority);
-  const parsedProcedure = CloudAgentSpawnProcedureSchema.parse(procedure);
-  if (scope.expiresAt <= nowSeconds || cloudAgentAuthorityProcedure(scope) !== parsedProcedure) {
+  if (scope.expiresAt <= nowSeconds || !cloudAgentAuthorityProcedures(scope).includes(procedure)) {
     throw new Error('Cloud Agent authority does not permit this procedure');
   }
-  const request = scopedPrepareSessionSchema.parse(input);
-  const organizationProcedure = parsedProcedure === 'organizations.cloudAgentNext.prepareSession';
+  const operation = childOperation(procedure);
+  const request = operation.schema
+    .extend({ organizationId: z.string().min(1).optional() })
+    .parse(input);
+  const organizationProcedure = procedure.startsWith('organizations.');
   if (
     organizationProcedure !== (scope.organizationId !== null) ||
     (request.organizationId ?? null) !== scope.organizationId
@@ -129,5 +209,6 @@ export function isCloudAgentAuthorityHttpPathAllowed(
   if (pathname === '/api/user') return true;
   if (!pathname?.startsWith('/api/trpc/')) return false;
   const paths = pathname.slice('/api/trpc/'.length).split(',');
-  return paths.length > 0 && paths.every(path => cloudAgentAuthorityProcedure(authority) === path);
+  const allowed = cloudAgentAuthorityProcedures(authority);
+  return paths.length > 0 && paths.every(path => allowed.includes(path));
 }

@@ -18,7 +18,7 @@ vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function mountRow(item: LanguagePickerItem): TestRenderer.ReactTestRenderer {
+function mountRow(item: LanguagePickerItem, disabled = false): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -27,7 +27,7 @@ function mountRow(item: LanguagePickerItem): TestRenderer.ReactTestRenderer {
         first: item.kind === 'section',
         showDivider: false,
         selected: false,
-        disabled: false,
+        disabled,
         deviceEndonym: 'English',
         isRtl: false,
         onSelect: vi.fn<(preference: string) => void>(),
@@ -84,5 +84,27 @@ describe('LanguagePickerRow section titles', () => {
     }
 
     renderer.unmount();
+  });
+
+  it('dims the language name, not the English subtitle, while the sheet is busy', () => {
+    const item = {
+      kind: 'language',
+      key: 'es',
+      row: { tag: 'es', endonym: 'Español', englishName: 'Spanish' },
+    } as const;
+    const row = (disabled: boolean) => {
+      const renderer = mountRow(item, disabled);
+      const [name, subtitle] = mountedTexts(renderer).map(text => String(text.props.className));
+      renderer.unmount();
+      return { name, subtitle };
+    };
+
+    // The row supplies its own content, so the label carries the unavailable
+    // cue; the subtitle keeps the muted token itself, never an inherited
+    // opacity that would drag it under 4.5:1.
+    expect(row(true).name).toContain('text-muted-foreground');
+    expect(row(true).subtitle).toContain('text-muted-foreground');
+    expect(row(true).subtitle).not.toContain('opacity');
+    expect(row(false).name).not.toContain('text-muted-foreground');
   });
 });

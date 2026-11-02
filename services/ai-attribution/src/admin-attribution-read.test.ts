@@ -25,6 +25,7 @@ import { AttributionTrackerDO } from './dos/AttributionTracker.do';
 import type { AttributionsMetadataSelect } from './db/sqlite-schema';
 
 const ADMIN_SECRET = 'test-admin-secret';
+const TARGET = { organization_id: 'org-1', project_id: 'project-1', file_path: 'src/index.ts' };
 
 type QueryResults = unknown[];
 
@@ -79,7 +80,7 @@ describe('AttributionTrackerDO reads', () => {
       ],
     ]);
 
-    const linesAdded = tracker.getLinesAddedByHash();
+    const linesAdded = tracker.getLinesAddedByHash(TARGET);
 
     expect(Object.keys(linesAdded)).toEqual([
       'constructor',
@@ -106,7 +107,7 @@ describe('AttributionTrackerDO reads', () => {
     const lineRows = [{ line_hash: 'constructor', line_number: 1 }];
     const tracker = trackerWith([rows, lineRows, [], [], [], [], []]);
 
-    const { summary } = tracker.getDebugData();
+    const { summary } = tracker.getDebugData(TARGET);
 
     expect(summary.total_attributions).toBe(3);
     expect(Object.keys(summary.by_branch)).toEqual(['constructor', '__proto__', 'main']);

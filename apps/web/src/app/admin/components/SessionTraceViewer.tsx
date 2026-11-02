@@ -11,7 +11,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MessageBubble as V1MessageBubble } from '@/components/cloud-agent/MessageBubble';
 import { MessageErrorBoundary as V1MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
 import { convertToCloudMessages } from '@/components/cloud-agent/store/db-session-atoms';
-import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
+import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
+import { CloudMessage as V2Message } from '@/components/cloud-agent-next/assistant-ui/CloudMessage';
+import { useCloudMessagePresentation } from '@/components/cloud-agent-next/assistant-ui/cloud-presentation-context';
 import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
 import {
   formatSessionCost,
@@ -76,6 +78,25 @@ function getV2MessageModelLabel(message: StoredMessage): string | null {
   }
 
   return formatModelLabel(message.info.providerID, message.info.modelID);
+}
+
+function V2TraceMessage() {
+  const presentation = useCloudMessagePresentation();
+  const message = presentation.sources[0];
+  const model = message?.info.role === 'user' ? getV2MessageModelLabel(message) : null;
+  return (
+    <V2MessageErrorBoundary>
+      <div className="mb-2 space-y-1 last:mb-0">
+        {model && (
+          <div className="text-muted-foreground flex items-center gap-2 px-3 text-xs">
+            <span className="font-medium">Model:</span>
+            <code className="bg-muted rounded px-1 py-0.5 font-mono">{model}</code>
+          </div>
+        )}
+        <V2Message />
+      </div>
+    </V2MessageErrorBoundary>
+  );
 }
 
 function convertToMessage(cloudMessage: CloudMessage): Message & {
@@ -230,6 +251,8 @@ export function SessionTraceViewer() {
     // guaranteed by the session-ingest worker that originally created the data.
     return messagesQuery.data.messages as unknown as StoredMessage[];
   }, [messagesQuery.data]);
+
+  const v2MessageGroups = useMemo(() => v2Messages.map(message => [message]), [v2Messages]);
 
   const messageCount = isV2 ? v2Messages.length : v1Messages.length;
 
@@ -493,26 +516,11 @@ export function SessionTraceViewer() {
                 <p className="text-muted-foreground">No messages in this session</p>
               ) : isV2 ? (
                 <div className="space-y-2">
-                  {v2Messages.map((msg, index) => {
-                    const userMessageModel =
-                      msg.info.role === 'user' ? getV2MessageModelLabel(msg) : null;
-
-                    return (
-                      <V2MessageErrorBoundary key={`${msg.info.id}-${index}`}>
-                        <div className="space-y-1">
-                          {userMessageModel && (
-                            <div className="text-muted-foreground flex items-center gap-2 px-3 text-xs">
-                              <span className="font-medium">Model:</span>
-                              <code className="bg-muted rounded px-1 py-0.5 font-mono">
-                                {userMessageModel}
-                              </code>
-                            </div>
-                          )}
-                          <V2MessageBubble message={msg} isStreaming={false} />
-                        </div>
-                      </V2MessageErrorBoundary>
-                    );
-                  })}
+                  <CloudReadOnlyThread
+                    messages={v2Messages}
+                    messageGroups={v2MessageGroups}
+                    messageComponent={V2TraceMessage}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">

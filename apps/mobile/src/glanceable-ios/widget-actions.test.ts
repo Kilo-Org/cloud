@@ -138,6 +138,7 @@ vi.mock('@/lib/glanceable/widget-actions', () => ({
 }));
 vi.mock('@/lib/glanceable/persist', () => ({
   getLastGlanceableSnapshot: () => mocks.lastSnapshot,
+  getGlanceableSnapshotForSignedInScope: () => mocks.lastSnapshot,
   _resetGlanceablePersistForTests: () => {
     mocks.lastSnapshot = null;
   },

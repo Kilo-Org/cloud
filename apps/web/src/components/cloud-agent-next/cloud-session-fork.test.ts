@@ -125,6 +125,30 @@ describe('deriveCloudSessionForkFields', () => {
     });
   });
 
+  it('preserves runtime agent visibility when continuing in a new session', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Reviewer', mode: 'subagent' },
+          { slug: 'hidden', name: 'Hidden', hidden: true },
+          { slug: 'disabled', name: 'Disabled', disable: true },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      fields: {
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Reviewer', config: { mode: 'subagent' } },
+          { slug: 'hidden', name: 'Hidden', config: { hidden: true } },
+          { slug: 'disabled', name: 'Disabled', config: { disable: true } },
+        ],
+      },
+    });
+  });
+
   it('forwards runtime agents so custom agent modes remain forkable', () => {
     const result = deriveCloudSessionForkFields({
       session: CLOUD_SESSION,

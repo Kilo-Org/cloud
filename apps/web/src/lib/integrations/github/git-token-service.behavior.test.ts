@@ -189,4 +189,66 @@ describe('InstallationLookupService database authorization', () => {
       service().findActiveAssociationById(orgOwned.id, { userId: member.id })
     ).resolves.toEqual({ success: false });
   });
+
+  it('authorizes a healthy organization association that carries no stored role', async () => {
+    const member = await insertTestUser();
+    const organization = await createTestOrganization('Roleless token org', member.id, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: '880101',
+        account_login: 'acme',
+        lifecycle_state: 'active',
+        repository_access: 'selected',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+        permissions: { contents: 'read' },
+      })
+      .returning();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '880101',
+        platform_account_login: 'acme',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        integration_status: 'active',
+        permissions: { contents: 'read' },
+        repository_access: 'selected',
+        repositories: [{ id: 1, name: 'repo', full_name: 'acme/repo', private: true }],
+      })
+      .returning();
+
+    await expect(
+      service().assertActiveAssociationForInstallation('880101', 'standard', integration.id)
+    ).resolves.toBeUndefined();
+    await expect(
+      service().findInstallationId({
+        githubRepo: 'acme/repo',
+        userId: member.id,
+        orgId: organization.id,
+      })
+    ).resolves.toMatchObject({ success: true, installationId: '880101' });
+  });
+
+  it('keeps a personal association without a stored role unauthorized', async () => {
+    const user = await insertTestUser();
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: user.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '880102',
+      platform_account_login: 'personal',
+      github_app_type: 'standard',
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+
+    await expect(
+      service().assertActiveAssociationForInstallation('880102', 'standard')
+    ).rejects.toBeInstanceOf(GitHubInstallationAccessDeniedError);
+  });
 });

@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -30,10 +31,8 @@ export function PillGroup<T extends string>({
 }>) {
   const colors = useThemeColors();
   return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
       <RadioGroup label={label} className="overflow-hidden rounded-lg bg-secondary">
         {options.map((option, index) => {
           const active = value === option.value;
@@ -42,7 +41,11 @@ export function PillGroup<T extends string>({
               key={option.value}
               disabled={disabled}
               className={cn(
-                'min-h-11 flex-row items-center justify-between px-4 py-3 active:opacity-70',
+                // A row sized by its one label line sat at 38.5 dp under the
+                // design target; the floor has to be the row's own class,
+                // because `hitSlop` does not move the rect an audit reads.
+                ROW_TARGET_CLASS,
+                'flex-row items-center justify-between px-4 py-3 active:opacity-70',
                 index < options.length - 1 && 'border-b-[0.5px] border-hair-soft',
                 disabled && 'opacity-50'
               )}

@@ -51,6 +51,7 @@ import {
   getDirectByokCatalogModelId,
   getDirectByokModel,
   getDirectByokModelChatApis,
+  getDirectByokPolicyProviderId,
   supportsCatalogMode,
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -94,9 +95,10 @@ export type GetProviderProviderResult = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
-  /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
-   *  require explicit admin opt-in. */
+  /** Skip paid-auth and organization policy checks. Used by bespoke direct-byok
+   *  ids and non-public custom_llm2 because both already require explicit admin
+   *  opt-in. A request that is neither free nor user funded still needs a
+   *  balance. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -136,7 +138,7 @@ async function directByokProviderResult(
   return {
     kind: 'provider',
     provider: {
-      id: 'direct-byok',
+      type: 'direct-byok',
       ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
@@ -146,8 +148,8 @@ async function directByokProviderResult(
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
-    // Organization model policies cover catalog ids. A bespoke id is only served by a key outside
-    // catalog mode, which stays exempt as before.
+    // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
+    // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
   };
 }
@@ -171,7 +173,8 @@ async function resolveDirectByokProvider(
   user: User | AnonymousUserContext,
   requestedModel: string,
   request: GatewayRequest,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>
 ): Promise<
   GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokUnsupportedApiKind | null
 > {
@@ -198,7 +201,14 @@ async function resolveDirectByokProvider(
   }
 
   if (isAnonymousContext(user)) return null;
-  const catalogModels = await findDirectByokCatalogModels(requestedModel);
+  // Keys for providers the organization policy does not admit are never loaded, so a later route
+  // that honors the policy takes the request, and an undecryptable allowed key still fails closed.
+  const catalogModels: DirectByokCatalogModel[] = [];
+  for (const catalogModel of await findDirectByokCatalogModels(requestedModel)) {
+    if (await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(catalogModel.provider))) {
+      catalogModels.push(catalogModel);
+    }
+  }
   if (catalogModels.length === 0) return null;
   const credentials = await getCatalogModeByokCredentials(
     readDb,
@@ -264,8 +274,11 @@ async function isEligibleForCustomLlm(
   user: User | AnonymousUserContext,
   organizationId: string | undefined
 ) {
+  // An anonymous caller has no balance to bill.
+  if (isAnonymousContext(user))
+    return isPublicCustomLlm(customLlm.definition) && !customLlm.definition.pricing;
   if (isPublicCustomLlm(customLlm.definition)) return true;
-  if (isAnonymousContext(user) || !organizationId) return false;
+  if (!organizationId) return false;
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
@@ -326,26 +339,26 @@ async function resolveCustomLlmProvider(
   }
 
   const { definition } = customLlm;
+  const isPublic = isPublicCustomLlm(definition);
   const provider = buildDirectProvider(
-    'custom',
+    isPublic ? 'custom-public' : 'custom',
     getCustomLlmApiKinds(definition),
     definition,
     await resolveCustomLlmAuth(credentials)
   );
-  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
-    isFree: true,
+    isFree: definition.pricing === undefined,
     bypassAccessCheck: !isPublic,
   };
 }
 
 /**
- * A public custom LLM serves anyone for free on Kilo's credential, so like other
- * free models it drops paid server features before the definition's own
- * `extra_body` applies. Private custom LLMs keep them.
+ * A public custom LLM serves anyone on Kilo's credential, so like free models it
+ * drops paid server features before the definition's own `extra_body` applies,
+ * even when it sets pricing. Private custom LLMs keep them.
  */
 function withoutPaidServerFeatures(provider: Provider): Provider {
   return {
@@ -429,6 +442,7 @@ async function getGatewayRoutedByok(
 }
 
 const noProviderAllowList = async () => undefined;
+const everyDirectByokProviderAllowed = async () => true;
 
 /**
  * Prefers the Vercel AI Gateway key when Vercel can serve the model under the
@@ -490,6 +504,10 @@ export type GetProviderInput = {
    * when it does not restrict providers. Provider keys sent through Vercel must honor it (see
    * `isVercelUserByokProviderAllowed`). */
   getAllowedProviders?: () => Promise<ReadonlySet<string> | undefined>;
+  /** Whether the organization policy admits the model served by a catalog-mode direct BYOK key of
+   * the provider it names (see `getDirectByokPolicyProviderId` and
+   * `isModelAllowedForProviderKey`). Keys it rejects are skipped. */
+  isDirectByokProviderAllowed?: (policyProviderId: string) => Promise<boolean>;
   /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
    * They apply to routes Kilo pays for, never to a user's own gateway key. */
   kiloIgnoredProviders?: string[];
@@ -516,6 +534,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     botId,
     getRoutingProviderConfig,
     getAllowedProviders = noProviderAllowList,
+    isDirectByokProviderAllowed = everyDirectByokProviderAllowed,
     kiloIgnoredProviders = [],
     boundedSpending = false,
     countryCode = null,
@@ -543,7 +562,8 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     user,
     requestedModel,
     request,
-    organizationId
+    organizationId,
+    isDirectByokProviderAllowed
   );
   let directByokUnsupportedApiKind: DirectByokUnsupportedApiKind | null = null;
   if (directByokProvider?.kind === 'direct-byok-unsupported-api-kind') {

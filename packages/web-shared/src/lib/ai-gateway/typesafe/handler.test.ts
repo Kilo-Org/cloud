@@ -95,7 +95,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter', () => ({
   OPENROUTER: {
-    id: 'openrouter',
+    type: 'openrouter',
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: 'test-platform-openrouter-key',
   },
@@ -960,7 +960,7 @@ describe('handleSystemOneRequest', () => {
     await runAfter();
     expect(fetchGeneration).toHaveBeenCalledWith(
       upstreamBody.id,
-      expect.objectContaining({ id: 'openrouter' })
+      expect.objectContaining({ type: 'openrouter' })
     );
     expect(mapToUsageStats).toHaveBeenCalledWith(expect.anything(), '', user.id, 'openrouter');
     expect(emitGatewayApiMetrics).toHaveBeenCalledWith(

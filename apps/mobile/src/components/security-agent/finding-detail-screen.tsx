@@ -30,6 +30,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
@@ -153,16 +154,30 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // One header for the loading, load-failure and not-found states. It draws no
-  // eyebrow line of its own: a finding that does not exist never gains a
-  // repository, so reserving that line would leave the title sitting half a
-  // line below the back chevron above a gap no label ever fills. Without it the
-  // title shares the back control's row, centred on the chevron, in every one
-  // of those states.
+  // The not-found and load-failure states share a header without an eyebrow
+  // line. Neither ever gains a repository, so the title belongs on the back
+  // control's row, centred on the chevron, rather than half a line below it
+  // above a gap no label ever fills.
   const pendingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
+  // Loading does gain the repository: the loaded header draws it on an eyebrow
+  // line above the title. The row centres the heading column against the back
+  // control, so that line moves the title down by half its height — 7.6 dp
+  // measured on the Android emulator — in the frame the payload lands. Reserving
+  // the line here puts the title where the payload will leave it, so it holds
+  // still from the first paint instead of being pushed down later.
+  const loadingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      reserveEyebrow
       showBackButton
       onBack={handleBack}
     />
@@ -197,7 +212,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {pendingHeader}
+        {loadingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -277,7 +292,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             <Pressable
               key={key}
               className={cn(
-                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
+                // The strip is a segmented row: each tab carries the shared
+                // row floor on its own node so a tap anywhere in the tab's
+                // height lands, not just the label line.
+                ROW_TARGET_CLASS,
+                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
                 selected ? 'bg-selection' : 'bg-secondary'
               )}
               onPress={() => {

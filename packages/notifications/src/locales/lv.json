@@ -9,6 +9,7 @@
       "lowBalance": "Tava bilancei nepieciešama uzmanība",
       "spendAlert": "Taviem izdevumiem nepieciešama uzmanība",
       "securityFinding": "Drošības atradumam nepieciešama uzmanība",
+      "securityUpdate": "Drošības pārbaudei ir atjauninājums",
       "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Drošības atradumam nepieciešama uzmanība"
+      "body": "Drošības pārbaudei ir atjauninājums"
     }
   },
   "instanceLifecycle": {

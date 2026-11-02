@@ -126,9 +126,15 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-Scope each PR form header with a native safe-area provider outside the scroll view.
-Apply its top inset with `SafeAreaView`, not the app root inset.
-Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 
@@ -146,7 +152,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
 - Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.

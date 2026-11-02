@@ -154,6 +154,16 @@ describe('<ToggleRow>', () => {
     expect(haptics.selectionAsync).not.toHaveBeenCalled();
   });
 
+  it('mutes the title while the row is unavailable and only then', () => {
+    const disabled = renderRow({ disabled: true, value: true });
+    const [disabledTitle] = disabled.root.findAllByType('Text' as ElementType);
+    expect(String(disabledTitle?.props.className)).toContain('text-muted-foreground');
+
+    const enabled = renderRow({ disabled: false, value: true });
+    const [enabledTitle] = enabled.root.findAllByType('Text' as ElementType);
+    expect(String(enabledTitle?.props.className)).not.toContain('text-muted-foreground');
+  });
+
   it('flips the value when the selection tick rejects', async () => {
     const onValueChange = vi.fn<(next: boolean) => void>();
     haptics.selectionAsync.mockRejectedValue(new Error('no haptic engine'));

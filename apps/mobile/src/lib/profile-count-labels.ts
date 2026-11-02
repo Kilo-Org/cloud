@@ -56,6 +56,25 @@ export function profileCountItems(counts: ProfileCountCounts): ProfileCountItem[
   return items.filter(item => item.count > 0);
 }
 
+/**
+ * The counts of a profile the user is about to save, which carries only the
+ * variables and the setup commands on screen. Both are counted messages, so
+ * the summary agrees with each number instead of naming a fixed plural.
+ */
+export function draftProfileCountItems(
+  envVarCount: number,
+  setupCommandCount: number
+): ProfileCountItem[] {
+  return profileCountItems({
+    varCount: envVarCount,
+    mcpServerCount: 0,
+    skillCount: 0,
+    kiloCommandCount: 0,
+    commandCount: setupCommandCount,
+    agentCount: 0,
+  });
+}
+
 /** Localize each count in order, e.g. `['3 vars', '1 MCP']`. */
 export function formatProfileCountItems(
   t: TFunction,

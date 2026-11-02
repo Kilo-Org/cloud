@@ -5,11 +5,12 @@
 // settings page that widens installation access, and a resync that ignores the
 // snapshot. A non-empty list is exactly where the old screen offered neither.
 
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { act } from '@/test/renderer';
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
 import ReposRoute from './repos';
 import {
   renderWithProviders,
@@ -61,6 +62,7 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
   AppState: {
     addEventListener: (event: string, handler: AppStateHandler) => {
       if (event === 'change') {
@@ -117,11 +119,56 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: ReactNode; refreshControl?: ReactNode }) =>
-    createElement('ScrollView', { refreshControl: props.refreshControl }, props.children),
+vi.mock('@/components/ui/icons', () => ({
+  FolderGit2: 'FolderGit2',
+  Search: 'Search',
+  SearchX: 'SearchX',
+  X: 'X',
 }));
+vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
+vi.mock('@/components/tab-screen', () => ({
+  TAB_SCREEN_TRAILING_GAP: 16,
+  useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
+}));
+// The screen draws its rows through the app's list, so the stub keeps the
+// header, the rows and the empty slot reachable from the mounted tree while the
+// list's own props stay inspectable.
+vi.mock('@shopify/flash-list', async () => {
+  // `vi.mock` factories run before the file's imports bind.
+  const {
+    createElement: create,
+    forwardRef,
+    isValidElement,
+    useImperativeHandle,
+  } = await import('react');
+  const slot = (value: unknown) => (isValidElement(value) ? value : null);
+  return {
+    FlashList: forwardRef(function FlashListStub(
+      props: {
+        data?: unknown[];
+        renderItem: (info: { item: never; index: number }) => ReactNode;
+        ListHeaderComponent?: unknown;
+        ListEmptyComponent?: unknown;
+        ListFooterComponent?: unknown;
+      },
+      ref: Ref<unknown>
+    ) {
+      // The screen resets its offset when the query changes.
+      useImperativeHandle(ref, () => ({ scrollToOffset: () => undefined }), []);
+      const data = props.data ?? [];
+      return create(
+        'FlashList',
+        props,
+        slot(props.ListHeaderComponent),
+        data.map((item, index) =>
+          create('ReviewRow', { key: index }, props.renderItem({ item: item as never, index }))
+        ),
+        data.length === 0 ? slot(props.ListEmptyComponent) : null,
+        slot(props.ListFooterComponent)
+      );
+    }),
+  };
+});
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/integration-urls', () => ({
   getBitbucketIntegrationUrl: () => 'https://example.test/bitbucket',
@@ -213,8 +260,8 @@ function button(renderer: Mounted['renderer'], label: string) {
 }
 
 function pullControl(renderer: Mounted['renderer']) {
-  const [scrollView] = renderer.root.findAll(node => String(node.type) === 'ScrollView');
-  const control = scrollView?.props.refreshControl as PullControl | undefined;
+  const [list] = renderer.root.findAll(node => String(node.type) === 'FlashList');
+  const control = list?.props.refreshControl as PullControl | undefined;
   if (!control) {
     throw new Error('the repository list rendered no pull control');
   }
@@ -455,6 +502,24 @@ describe('repository picker config read states', () => {
     );
 
     expect(state.queryErrorProps).toHaveLength(0);
+    unmount();
+  });
+
+  it('paints the repository rows with no entering animation above them', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'RepoToggleRow').length === 2
+    );
+
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`,
+    // so a row mounted under one stays invisible whenever that entrance is
+    // cancelled or overwritten, under a painted header with no explanation.
+    const row = renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')[0];
+    if (!row) {
+      throw new Error('the repository rows were not rendered');
+    }
+    expect(enteringAncestors(row)).toEqual([]);
     unmount();
   });
 });

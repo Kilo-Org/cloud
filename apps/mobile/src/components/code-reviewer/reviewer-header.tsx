@@ -16,6 +16,7 @@ import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 export function ReviewerHeader({
   title,
   titleNumberOfLines,
+  reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
   backFallback = CODE_REVIEWER_HOME_PATH,
@@ -26,11 +27,17 @@ export function ReviewerHeader({
   /** Raise the title's line cap for prose that may wrap; the default is one. */
   titleNumberOfLines?: number;
   /**
-   * The mono line above the title. This header carries every screen's own
-   * shape, so each one passes what its header already showed: the list and
-   * provider screens pass `t('common.codeReviewer')`, while the scope list
-   * (whose title is the product name) and the edit routes keep the title-only
-   * header they had.
+   * Reserve the title's line cap so a name that arrives with a query, or wraps
+   * to its second line, cannot move the body below the header.
+   */
+  reserveTitleSpace?: boolean;
+  /**
+   * The mono line above the title: the header's category label. Screens that
+   * title themselves with a scope (the platform list, the review list) still
+   * pass what their own header names — the product for the platform list, the
+   * list's own name for the review list — while the provider screens pass
+   * `t('common.codeReviewer')`. The scope list (whose title is the product
+   * name) and the edit routes keep the title-only header they had.
    */
   eyebrow?: string;
   /**
@@ -49,6 +56,7 @@ export function ReviewerHeader({
     <ScreenHeader
       title={title}
       titleNumberOfLines={titleNumberOfLines}
+      reserveTitleSpace={reserveTitleSpace}
       eyebrow={eyebrow}
       reserveEyebrow={reserveEyebrow}
       backFallback={backFallback}

@@ -9,6 +9,7 @@
       "lowBalance": "Mae angen sylw ar eich balans",
       "spendAlert": "Mae angen sylw ar eich gwariant",
       "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch",
+      "securityUpdate": "Mae gan wiriad diogelwch ddiweddariad",
       "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Mae angen sylw ar ganfyddiad diogelwch"
+      "body": "Mae gan wiriad diogelwch ddiweddariad"
     }
   },
   "instanceLifecycle": {

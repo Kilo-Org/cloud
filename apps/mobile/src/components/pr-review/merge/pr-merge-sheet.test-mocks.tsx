@@ -40,6 +40,9 @@ const state = vi.hoisted(() => ({
 export { state };
 
 vi.mock('react-native', () => ({
+  // The commit fields render the shared Input, whose alignment helper reads
+  // `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
@@ -105,6 +108,7 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
   radioItemA11y: ({

@@ -1,5 +1,5 @@
 {
-  "id": "b8b1418e-4330-4051-b3ab-74ef9309a679",
+  "id": "db10bcc9-5736-4ad7-ae56-7eac8bc3c911",
   "prevId": "642ebf95-d55f-46a7-9a27-0ee59915e968",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -12274,6 +12224,200 @@
           "value": "\"enkrypt_sync_state\".\"baseline_matched_count\" >= 0"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.enkrypt_usage": {
+      "name": "enkrypt_usage",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "api_kind_id": {
+          "name": "api_kind_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision_id": {
+          "name": "decision_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enkrypt_credits_cost": {
+          "name": "enkrypt_credits_cost",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "charged_microdollars": {
+          "name": "charged_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_latency_ms": {
+          "name": "added_latency_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_enkrypt_usage_organization_created_at": {
+          "name": "IDX_enkrypt_usage_organization_created_at",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_enkrypt_usage_user_created_at": {
+          "name": "IDX_enkrypt_usage_user_created_at",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "enkrypt_usage_api_kind_id_api_kind_api_kind_id_fk": {
+          "name": "enkrypt_usage_api_kind_id_api_kind_api_kind_id_fk",
+          "tableFrom": "enkrypt_usage",
+          "tableTo": "api_kind",
+          "columnsFrom": [
+            "api_kind_id"
+          ],
+          "columnsTo": [
+            "api_kind_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "enkrypt_usage_decision_id_enkrypt_usage_decision_decision_id_fk": {
+          "name": "enkrypt_usage_decision_id_enkrypt_usage_decision_decision_id_fk",
+          "tableFrom": "enkrypt_usage",
+          "tableTo": "enkrypt_usage_decision",
+          "columnsFrom": [
+            "decision_id"
+          ],
+          "columnsTo": [
+            "decision_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "enkrypt_usage_id_created_at_pk": {
+          "name": "enkrypt_usage_id_created_at_pk",
+          "columns": [
+            "id",
+            "created_at"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.enkrypt_usage_decision": {
+      "name": "enkrypt_usage_decision",
+      "schema": "",
+      "columns": {
+        "decision_id": {
+          "name": "decision_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "decision": {
+          "name": "decision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_enkrypt_usage_decision": {
+          "name": "UQ_enkrypt_usage_decision",
+          "columns": [
+            {
+              "expression": "decision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.enrichment_data": {

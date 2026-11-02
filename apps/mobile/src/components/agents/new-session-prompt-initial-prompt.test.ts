@@ -93,6 +93,10 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
+  // The composer's top fade resizes on the UI thread; there is none here, so
+  // the style factory runs once and the shared value is a plain box.
+  useAnimatedStyle: (factory: () => object) => factory(),
+  useSharedValue: <T>(value: T) => ({ value }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

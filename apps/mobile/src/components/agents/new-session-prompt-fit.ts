@@ -16,6 +16,41 @@
  * on every frame change without shifting layout on load, refresh, or retry.
  */
 
+export type ResolveComposerTopFadeHeightInput = {
+  /** How far the field's text has scrolled above its text box, in points. */
+  scrollOffset: number;
+  /** One text line's height, in points. */
+  lineHeight: number;
+};
+
+/**
+ * Height of the top fade over the composer input, in points.
+ *
+ * A scrolled multiline field cuts its topmost line at the text box's top edge.
+ * With line boxes `L` tall and the field scrolled by `y` into one of them, the
+ * fragment left at the top is the bottom `L - y` of that line, and the next
+ * whole line begins exactly `L - y` below the top edge. The fade has to cover
+ * the fragment and must not reach the whole line under it, so it is the
+ * smaller of the two: `min(y, L - y)`.
+ *
+ * That band is never taller than half a line, so a readable line is never
+ * dimmed — the failure of both a fixed one-line fade (it washes the first line
+ * of any overflowing draft) and a fade sized to the offset alone (past the
+ * halfway point it swallows the whole next line). It is 0 at the top of the
+ * field, where nothing is cut.
+ */
+export function resolveComposerTopFadeHeight({
+  scrollOffset,
+  lineHeight,
+}: ResolveComposerTopFadeHeightInput): number {
+  'worklet';
+  if (!Number.isFinite(scrollOffset) || !Number.isFinite(lineHeight) || lineHeight <= 0) {
+    return 0;
+  }
+  const intoLine = scrollOffset % lineHeight;
+  return Math.max(0, Math.min(intoLine, lineHeight - intoLine));
+}
+
 export type ResolveNewSessionPromptMinHeightInput = {
   /** Height of the scrollable form frame the prompt sits in, in points. */
   frameHeight: number;

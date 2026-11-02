@@ -2,6 +2,7 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import {
   AccessibilityInfo,
   type LayoutChangeEvent,
@@ -39,7 +40,10 @@ import {
   resolveNewSessionPromptControlState,
   resolvePromptCounterRemaining,
 } from '@/components/agents/new-session-prompt-state';
-import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
+import {
+  resolveComposerTopFadeHeight,
+  resolveNewSessionPromptMinHeight,
+} from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -81,15 +85,17 @@ const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
-// LinearGradient is not NativeWind-mapped; the physical style object follows
-// the skeleton.tsx overlay pattern. It starts at the text box, where a scrolled
-// field clips its topmost line.
+// LinearGradient is not NativeWind-mapped; the physical style objects follow
+// the skeleton.tsx overlay pattern. The band starts at the text box, where a
+// scrolled field clips its topmost line, and its height comes from the scroll
+// offset on the UI thread.
 const PROMPT_TOP_FADE_STYLE = {
   position: 'absolute',
   left: 0,
   right: 0,
   top: PROMPT_INPUT_VERTICAL_INSET,
 } as const;
+const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -214,18 +220,26 @@ export function NewSessionPrompt({
   // grew to its text and only scrolled once the cap stopped it.
   const [contentHeight, setContentHeight] = useState(0);
   const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
-  // How far the draft has scrolled above the text box's top edge, which is
-  // exactly how much of its topmost line the field clips. The fade covers that
-  // band and nothing more, so it never dims a line the reader can see whole: a
-  // draft that fits, or a field still at its top, has offset 0 and no fade, and
-  // a field scrolled by two of the line's 24 dp fades two.
-  const [promptScrolledBy, setPromptScrolledBy] = useState(0);
-  const promptTopFadeHeight = Math.min(promptScrolledBy, promptLineHeight);
-  const promptTopFade = promptTopFadeHeight > PROMPT_SCROLLED_THRESHOLD;
+  // The fade band over the clipped top line, driven from the field's scroll
+  // offset. It lives in a shared value, not React state: a drag reports a frame
+  // per few pixels, and this card's toolbar, attachment strip and controls are
+  // not memoized, so committing each offset would re-render all of them at
+  // frame rate just to resize an overlay. Only the crossing that mounts the
+  // gradient is state.
+  const promptScrollOffset = useSharedValue(0);
+  const [promptFaded, setPromptFaded] = useState(false);
+  const promptTopFadeStyle = useAnimatedStyle(() => ({
+    height: resolveComposerTopFadeHeight({
+      scrollOffset: promptScrollOffset.value,
+      lineHeight: promptLineHeight,
+    }),
+  }));
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = Math.max(0, event.nativeEvent.contentOffset.y);
-    setPromptScrolledBy(current => (Math.abs(current - next) <= 0.5 ? current : next));
+    promptScrollOffset.value = next;
+    const faded = next > PROMPT_SCROLLED_THRESHOLD;
+    setPromptFaded(current => (current === faded ? current : faded));
   }
 
   const promptInputStyle = {
@@ -497,7 +511,8 @@ export function NewSessionPrompt({
               if (!shouldEnableComposerInputScroll(next, promptHeight)) {
                 // The draft fits again: the field is back at its top, where the
                 // first line is whole.
-                setPromptScrolledBy(0);
+                promptScrollOffset.value = 0;
+                setPromptFaded(false);
               }
             }}
             onScroll={handlePromptScroll}
@@ -517,16 +532,21 @@ export function NewSessionPrompt({
             // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
             disableFullscreenUI
           />
-          {promptTopFade ? (
-            <LinearGradient
+          {promptFaded ? (
+            <Animated.View
+              className="absolute left-0 right-0"
               pointerEvents="none"
-              // The card's own color, so the slice fades into the surface
-              // behind it instead of drawing a bar of its own.
-              colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={[PROMPT_TOP_FADE_STYLE, { height: promptTopFadeHeight }]}
-            />
+              style={[PROMPT_TOP_FADE_STYLE, promptTopFadeStyle]}
+            >
+              <LinearGradient
+                // The card's own color, so the slice fades into the surface
+                // behind it instead of drawing a bar of its own.
+                colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={PROMPT_TOP_FADE_FILL}
+              />
+            </Animated.View>
           ) : null}
         </View>
         {showsCounter ? (

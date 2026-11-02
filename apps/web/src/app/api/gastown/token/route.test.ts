@@ -78,7 +78,7 @@ describe('POST /api/gastown/token', () => {
     );
   });
 
-  it('does not record a legacy elevation when a capability body is sent', async () => {
+  it('records the legacy elevation even when a capability body is sent', async () => {
     jest.mocked(requireWorkerAdminActor).mockResolvedValue({
       actor: { assurance: { userId: 'user-1' } },
       sessionBinding: { apiTokenPepper: 'pepper-1', webSessionPepper: null },
@@ -90,7 +90,7 @@ describe('POST /api/gastown/token', () => {
       actions: ['trpc:gastown.getTown'],
     });
     await POST(request({ adminCapability: { target: { kind: 'town', id: 'town-1' } } }));
-    expect(recordKiloAdminElevationForRequest).not.toHaveBeenCalledWith(
+    expect(recordKiloAdminElevationForRequest).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'service_token_mint' })
     );
   });
@@ -148,6 +148,21 @@ describe('POST /api/gastown/token', () => {
     expect(recordKiloAdminElevationForRequest).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'service_token_mint' })
     );
+  });
+
+  it('refuses a guard result for a different user', async () => {
+    jest.mocked(requireWorkerAdminActor).mockResolvedValue({
+      actor: { assurance: { userId: 'user-2' } },
+      sessionBinding: { apiTokenPepper: 'pepper-1', webSessionPepper: null },
+    } as never);
+    const response = await POST(
+      request({ adminCapability: { target: { kind: 'town', id: 'town-1' } } })
+    );
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Worker admin capabilities require the same authenticated user',
+    });
+    expect(issueWorkerAdminCapability).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed capability request', async () => {

@@ -1,5 +1,7 @@
 'use client';
 
+import { findWorkerAdminAction } from '@kilocode/worker-utils/worker-admin-actions';
+
 export type BrowserCapabilityAudience = 'gastown-admin' | 'wasteland-admin';
 
 type OperationLike = { path: string; input: unknown };
@@ -80,66 +82,86 @@ export async function browserCapabilityHeader(params: {
   const prefix = params.audience === 'gastown-admin' ? 'gastown' : 'wasteland';
   const actions = params.operations
     .map(operation => `trpc:${operation.path}`)
-    .filter(action => action.startsWith(`trpc:${prefix}.`));
+    .filter(action => {
+      if (!action.startsWith(`trpc:${prefix}.`)) return false;
+      return findWorkerAdminAction(params.audience, action)?.targetKind === target.kind;
+    });
   if (actions.length === 0) return null;
 
   const key = targetKey(params.audience, target);
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now() && actions.every(a => cached.actions.has(a))) {
-    return cached.capability;
-  }
-  const retryAt = negativeCache.get(key);
-  if (retryAt !== undefined && retryAt > Date.now()) return null;
 
-  const requested = new Set(actions);
-  if (cached && cached.expiresAt > Date.now()) {
-    for (const action of cached.actions) requested.add(action);
-  }
-  const requestActions = [...requested].sort();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cached = cache.get(key);
+    if (cached && cached.expiresAt <= Date.now()) cache.delete(key);
+    if (cached && actions.every(action => cached.actions.has(action))) {
+      return cached.capability;
+    }
 
-  let pending = inflight.get(key);
-  if (!pending) {
-    pending = (async () => {
-      try {
-        const response = await fetch(params.tokenEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminCapability: { target, actions: requestActions } }),
-        });
-        if (!response.ok) return null;
-        const body: unknown = await response.json().catch(() => null);
-        const parsed =
-          typeof body === 'object' && body !== null
-            ? (body as { capability?: unknown; capabilityExpiresAt?: unknown })
-            : {};
-        if (
-          typeof parsed.capability !== 'string' ||
-          typeof parsed.capabilityExpiresAt !== 'string'
-        ) {
+    const retryAt = negativeCache.get(key);
+    if (retryAt !== undefined) {
+      if (retryAt > Date.now()) return null;
+      negativeCache.delete(key);
+    }
+
+    const requested = new Set(actions);
+    if (cached) {
+      for (const action of cached.actions) requested.add(action);
+    }
+    const requestActions = [...requested].sort();
+
+    let pending = inflight.get(key);
+    if (!pending) {
+      pending = (async () => {
+        try {
+          const response = await fetch(params.tokenEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminCapability: { target, actions: requestActions } }),
+          });
+          if (!response.ok) return null;
+          const body: unknown = await response.json().catch(() => null);
+          const parsed =
+            typeof body === 'object' && body !== null
+              ? (body as { capability?: unknown; capabilityExpiresAt?: unknown })
+              : {};
+          if (
+            typeof parsed.capability !== 'string' ||
+            typeof parsed.capabilityExpiresAt !== 'string'
+          ) {
+            return null;
+          }
+          const expiresAt = new Date(parsed.capabilityExpiresAt).getTime();
+          if (!Number.isFinite(expiresAt)) return null;
+          return {
+            capability: parsed.capability,
+            expiresAt,
+            actions: new Set(requestActions),
+          };
+        } catch {
           return null;
         }
-        const expiresAt = new Date(parsed.capabilityExpiresAt).getTime();
-        if (!Number.isFinite(expiresAt)) return null;
-        return {
-          capability: parsed.capability,
-          expiresAt,
-          actions: new Set(requestActions),
-        };
-      } catch {
-        return null;
-      }
-    })().finally(() => {
-      inflight.delete(key);
-    });
-    inflight.set(key, pending);
+      })().finally(() => {
+        inflight.delete(key);
+      });
+      inflight.set(key, pending);
+    }
+
+    const entry = await pending;
+    if (!entry) {
+      negativeCache.set(key, Date.now() + NEGATIVE_CACHE_MS);
+      return null;
+    }
+
+    if (!actions.every(action => entry.actions.has(action))) {
+      if (inflight.get(key) === pending) inflight.delete(key);
+      cache.delete(key);
+      continue;
+    }
+
+    const expiresAt = entry.expiresAt - 30_000;
+    if (expiresAt > Date.now()) cache.set(key, { ...entry, expiresAt });
+    return entry.capability;
   }
 
-  const entry = await pending;
-  if (!entry) {
-    negativeCache.set(key, Date.now() + NEGATIVE_CACHE_MS);
-    return null;
-  }
-  const expiresAt = entry.expiresAt - 30_000;
-  if (expiresAt > Date.now()) cache.set(key, { ...entry, expiresAt });
-  return entry.capability;
+  return null;
 }

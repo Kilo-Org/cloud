@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
 
-  if (legacyIssuance && user.is_admin && capabilityRequest === null) {
+  if (legacyIssuance && user.is_admin) {
     await recordKiloAdminElevationForRequest({
       user,
       tokenSource,

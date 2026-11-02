@@ -75,6 +75,83 @@ describe('browserCapabilityHeader', () => {
     });
   });
 
+  it('drops unlisted actions instead of poisoning the target cache', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          capability: 'cap-1',
+          capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+        { status: 200 }
+      )
+    );
+    await expect(
+      browserCapabilityHeader(
+        params([
+          { path: 'gastown.getTown', input: { townId: 'town-6' } },
+          { path: 'gastown.sendMessage', input: { townId: 'town-6', message: 'x' } },
+        ])
+      )
+    ).resolves.toBe('cap-1');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string).adminCapability.actions).toEqual([
+      'trpc:gastown.getTown',
+    ]);
+  });
+
+  it('requests nothing when every action is unlisted', async () => {
+    await expect(
+      browserCapabilityHeader(
+        params([{ path: 'gastown.sendMessage', input: { townId: 'town-7', message: 'x' } }])
+      )
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('widens when an in-flight result does not cover a concurrent caller', async () => {
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>(resolve => {
+      resolveFirst = resolve;
+    });
+    fetchMock
+      .mockImplementationOnce(() => firstResponse)
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            capability: 'cap-2',
+            capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }),
+          { status: 200 }
+        )
+      );
+
+    const narrow = browserCapabilityHeader(
+      params([{ path: 'gastown.getTown', input: { townId: 'town-8' } }])
+    );
+    const wide = browserCapabilityHeader(
+      params([
+        { path: 'gastown.getTown', input: { townId: 'town-8' } },
+        { path: 'gastown.getRig', input: { townId: 'town-8', rigId: 'rig-1' } },
+      ])
+    );
+    resolveFirst(
+      new Response(
+        JSON.stringify({
+          capability: 'cap-1',
+          capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+        { status: 200 }
+      )
+    );
+
+    await expect(narrow).resolves.toBe('cap-1');
+    await expect(wide).resolves.toBe('cap-2');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string).adminCapability.actions).toEqual([
+      'trpc:gastown.getRig',
+      'trpc:gastown.getTown',
+    ]);
+  });
+
   it('does not attach a capability across mixed targets', async () => {
     await expect(
       browserCapabilityHeader(

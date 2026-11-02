@@ -61,7 +61,7 @@ describe('POST /api/wasteland/token', () => {
     );
   });
 
-  it('does not record a legacy elevation for a capability request', async () => {
+  it('records the legacy elevation for a capability request', async () => {
     jest.mocked(requireWorkerAdminActor).mockResolvedValue({
       actor: { assurance: { userId: 'user-1' } },
       sessionBinding: { apiTokenPepper: 'pepper-1', webSessionPepper: null },
@@ -73,7 +73,7 @@ describe('POST /api/wasteland/token', () => {
       actions: ['trpc:wasteland.getWasteland'],
     });
     await POST(request({ adminCapability: { target: { kind: 'wasteland', id: 'w-1' } } }));
-    expect(recordKiloAdminElevationForRequest).not.toHaveBeenCalledWith(
+    expect(recordKiloAdminElevationForRequest).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'service_token_mint' })
     );
   });

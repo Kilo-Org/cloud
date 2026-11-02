@@ -390,7 +390,7 @@
       "expandLinesOfContext_other": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
       "expandMoreLines_one": "{{displayCount}} نوره کرښه ښکاره کړئ ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوي",
+      "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوی",
       "loadedOfTotalFiles_other": "له {{total}} فایلونو څخه {{loaded}} بار شوي"
     },
     "sideBySide": {
@@ -708,7 +708,12 @@
       "pendingComment_other": "په تمه تبصرې",
       "submitCountOfTotal": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
-      "partialPostedMessage": "{{displayFreshCount}} تبصرې خپرې شوې. {{displayStaleCount}} تبصرې یوه پخواني کمېټ ته اشاره کوي او ستاسو په کتار کې پاتې شوې.",
+      "partialPostedFresh": "{{displayFreshCount}} تبصرې خپرې شوې. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} تبصره خپره شوه. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} تبصرې خپرې شوې. ",
+      "partialPostedStale": "{{displayStaleCount}} تبصرې یوه پخواني کمېټ ته اشاره کوي او ستاسو په کتار کې پاتې شوې.",
+      "partialPostedStale_one": "{{displayStaleCount}} تبصره یوه پخواني کمېټ ته اشاره کوي او ستاسو په کتار کې پاتې شوه.",
+      "partialPostedStale_other": "{{displayStaleCount}} تبصرې یوه پخواني کمېټ ته اشاره کوي او ستاسو په کتار کې پاتې شوې.",
       "blockedRequestChanges": "د بدلونونو د غوښتلو لپاره لنډیز یا لږ تر لږه یوه تبصره ورزیاته کړئ.",
       "blockedComment": "د تبصرې په توګه د بیاکتنې د خپرولو لپاره لنډیز یا لږ تر لږه یوه تبصره ورزیاته کړئ."
     },
@@ -1750,6 +1755,8 @@
       "exploitabilityReasoning": "د ناوړه ګټې اخیستنې د امکان دلیلونه",
       "suggestedFix": "وړاندیز شوی حل",
       "whereFound": "د موندلو ځایونه ({{displayCount}})",
+      "whereFound_one": "د موندلو ځای ({{displayCount}})",
+      "whereFound_other": "د موندلو ځایونه ({{displayCount}})",
       "fullReport": "بشپړ جوړ شوی راپور",
       "yes": "هو",
       "no": "نه",
@@ -1828,6 +1835,8 @@
       "breakdownMediumLow_other": "{{displayCount}} منځني او ټیټ",
       "dueThisWeek": "مهلت یې دا اوونۍ پای ته رسېږي",
       "dueThisWeekDetail": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
+      "dueThisWeekDetail_one": "له دې څخه {{exploitable}} موندنې کې د ناوړه ګټې اخیستنې امکان تایید شوی",
+      "dueThisWeekDetail_other": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
       "noDeadline": "وروستۍ نېټه نشته",
       "reviewSlaAssignment": "د SLA ټاکنه بیا وګورئ",
       "allOpenFindingsTracked": "ټولې پرانیستې موندنې څارل کېږي"

@@ -72,7 +72,7 @@ import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-pro
 import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
-import { adminEnkryptGuardrailChargesRouter } from '@/routers/admin/enkrypt-guardrail-charges-router';
+import { adminEnkryptUsageRouter } from '@/routers/admin/enkrypt-usage-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
@@ -2780,7 +2780,7 @@ export const adminRouter = createTRPCRouter({
   customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
-  enkryptGuardrailCharges: adminEnkryptGuardrailChargesRouter,
+  enkryptUsage: adminEnkryptUsageRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
   disputes: adminStripeDisputesRouter,

@@ -28,7 +28,7 @@ export type EnkryptGuardrailCall = {
   creditsCost: number | null;
 };
 
-export type EnkryptGuardrailCharge = EnkryptGuardrailCall & {
+export type EnkryptUsageRecord = EnkryptGuardrailCall & {
   /** The request's wait for the verdict, on its final call only; see the ledger column. */
   addedLatencyMs: number | null;
 };
@@ -40,68 +40,68 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
 
 /**
  * Writes the ledger row and debits the organization in one transaction, apart from inference
- * usage accounting. The debit is an atomic increment, so concurrent charges cannot lose updates,
+ * usage accounting. The debit is an atomic increment, so concurrent debits cannot lose updates,
  * and the ledger row's id is the consumption source id that makes a Kilo Pass debit idempotent.
  * Runs on the primary, so gateway callers must defer it with `after()`.
  */
-export async function recordEnkryptGuardrailCharge(charge: EnkryptGuardrailCharge): Promise<void> {
+export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
   const id = randomUUID();
   const occurredAt = new Date().toISOString();
-  const chargedMicrodollars = enkryptCreditsToMicrodollars(charge.creditsCost);
+  const chargedMicrodollars = enkryptCreditsToMicrodollars(usageRecord.creditsCost);
 
   const organizationUsage = await db.transaction(async tx => {
     let [apiKind] = await tx
       .select({ id: api_kind.api_kind_id })
       .from(api_kind)
-      .where(eq(api_kind.api_kind, charge.apiKind));
+      .where(eq(api_kind.api_kind, usageRecord.apiKind));
     if (!apiKind) {
       [apiKind] = await tx
         .insert(api_kind)
-        .values({ api_kind: charge.apiKind })
+        .values({ api_kind: usageRecord.apiKind })
         .onConflictDoNothing({ target: api_kind.api_kind })
         .returning({ id: api_kind.api_kind_id });
       if (!apiKind) {
         [apiKind] = await tx
           .select({ id: api_kind.api_kind_id })
           .from(api_kind)
-          .where(eq(api_kind.api_kind, charge.apiKind));
+          .where(eq(api_kind.api_kind, usageRecord.apiKind));
       }
     }
     let [decision] = await tx
       .select({ id: enkrypt_usage_decision.decision_id })
       .from(enkrypt_usage_decision)
-      .where(eq(enkrypt_usage_decision.decision, charge.decision));
+      .where(eq(enkrypt_usage_decision.decision, usageRecord.decision));
     if (!decision) {
       [decision] = await tx
         .insert(enkrypt_usage_decision)
-        .values({ decision: charge.decision })
+        .values({ decision: usageRecord.decision })
         .onConflictDoNothing({ target: enkrypt_usage_decision.decision })
         .returning({ id: enkrypt_usage_decision.decision_id });
       if (!decision) {
         [decision] = await tx
           .select({ id: enkrypt_usage_decision.decision_id })
           .from(enkrypt_usage_decision)
-          .where(eq(enkrypt_usage_decision.decision, charge.decision));
+          .where(eq(enkrypt_usage_decision.decision, usageRecord.decision));
       }
     }
     if (!apiKind || !decision) throw new Error('Enkrypt usage lookup resolution failed');
 
     await tx.insert(enkrypt_usage).values({
       id,
-      organization_id: charge.organizationId,
-      kilo_user_id: charge.kiloUserId,
-      session_id: charge.sessionId,
+      organization_id: usageRecord.organizationId,
+      kilo_user_id: usageRecord.kiloUserId,
+      session_id: usageRecord.sessionId,
       api_kind_id: apiKind.id,
       decision_id: decision.id,
-      enkrypt_credits_cost: charge.creditsCost,
+      enkrypt_credits_cost: usageRecord.creditsCost,
       charged_microdollars: chargedMicrodollars,
-      added_latency_ms: charge.addedLatencyMs,
+      added_latency_ms: usageRecord.addedLatencyMs,
       created_at: occurredAt,
     });
     if (chargedMicrodollars === 0) return null;
     const consumption = await recordOrganizationConsumption(tx, {
-      organizationId: charge.organizationId,
-      kiloUserId: charge.kiloUserId,
+      organizationId: usageRecord.organizationId,
+      kiloUserId: usageRecord.kiloUserId,
       amountMicrodollars: chargedMicrodollars,
       occurredAt,
       source: 'enkrypt-guardrail',
@@ -111,7 +111,7 @@ export async function recordEnkryptGuardrailCharge(charge: EnkryptGuardrailCharg
   });
 
   if (organizationUsage) {
-    scheduleOrganizationLowBalanceAlert(charge.organizationId, organizationUsage);
+    scheduleOrganizationLowBalanceAlert(usageRecord.organizationId, organizationUsage);
     scheduleOrganizationUsageAutoTopUp(organizationUsage);
   }
 }

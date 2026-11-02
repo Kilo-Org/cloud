@@ -10,19 +10,19 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
-const ENKRYPT_CHARGES_WINDOW_DAYS = 30;
+const ENKRYPT_USAGE_WINDOW_DAYS = 30;
 
 const ListInputSchema = z.object({
   organizationId: z.string().uuid().optional(),
   limit: z.number().int().min(1).max(1000).default(200),
 });
 
-export const adminEnkryptGuardrailChargesRouter = createTRPCRouter({
+export const adminEnkryptUsageRouter = createTRPCRouter({
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
     const where = and(
       gte(
         enkrypt_usage.created_at,
-        sql`now() - make_interval(days => ${ENKRYPT_CHARGES_WINDOW_DAYS})`
+        sql`now() - make_interval(days => ${ENKRYPT_USAGE_WINDOW_DAYS})`
       ),
       input.organizationId ? eq(enkrypt_usage.organization_id, input.organizationId) : undefined
     );

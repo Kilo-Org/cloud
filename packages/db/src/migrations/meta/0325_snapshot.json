@@ -1,5 +1,5 @@
 {
-  "id": "14162dee-0f8f-4438-8f54-f37572db2a31",
+  "id": "23004a70-bfcb-4146-a63c-ffdffbbf5fbf",
   "prevId": "704d1452-61a4-44cb-914a-07bd75ae0e34",
   "version": "7",
   "dialect": "postgresql",
@@ -22419,6 +22419,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "null"
+        },
         "personal_account_disabled": {
           "name": "personal_account_disabled",
           "type": "boolean",
@@ -22492,6 +22499,22 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kilocode_users_external_id": {
+          "name": "IDX_kilocode_users_external_id",
+          "columns": [
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kilocode_users\".\"external_id\" IS NOT NULL",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -26622,30 +26645,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "directory_id": {
-          "name": "directory_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "directory_group_id": {
-          "name": "directory_group_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "directory_idp_id": {
-          "name": "directory_idp_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "external_org_id": {
-          "name": "external_org_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -26708,70 +26707,6 @@
           "isUnique": true,
           "where": "(\"organizations\".\"settings\"->>'is_sales_demo')::boolean = true AND \"organizations\".\"deleted_at\" IS NULL",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_organizations_directory_group_id": {
-          "name": "UQ_organizations_directory_group_id",
-          "columns": [
-            {
-              "expression": "directory_group_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"organizations\".\"directory_group_id\" IS NOT NULL AND \"organizations\".\"deleted_at\" IS NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_organizations_external_org_id": {
-          "name": "UQ_organizations_external_org_id",
-          "columns": [
-            {
-              "expression": "external_org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"organizations\".\"external_org_id\" IS NOT NULL AND \"organizations\".\"deleted_at\" IS NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_directory_idp_id": {
-          "name": "IDX_organizations_directory_idp_id",
-          "columns": [
-            {
-              "expression": "directory_idp_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"directory_idp_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_directory_id": {
-          "name": "IDX_organizations_directory_id",
-          "columns": [
-            {
-              "expression": "directory_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"directory_id\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         }

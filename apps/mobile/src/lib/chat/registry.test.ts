@@ -1511,8 +1511,11 @@ describe('a question a later send took the slot from', () => {
         parts: [{ id: 'p3', kind: 'text', body: 'noon' }],
       },
     ];
+    /* The slot names a kept record the list no longer holds, which is what a
+       refused `forgetAsked` after the list was written away leaves, and what an
+       entry `keptIn` could not read leaves too. The newest question turn then
+       has to win over the tool-results turn for the fold to happen at all. */
     storedQuestions.set('chat-asked-target:tooled', JSON.stringify({ ...words, from: 'a' }));
-    storedQuestions.set('chat-kept-questions:tooled', JSON.stringify([{ id: 'a', ...words }]));
 
     await enterChat(place, 'tooled');
     await settled();

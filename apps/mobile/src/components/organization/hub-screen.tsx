@@ -228,7 +228,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
-                subtitleLoading={lowBalanceLoading}
+                subtitlePlaceholder={
+                  lowBalanceLoading ? <Skeleton className="mt-0.5 h-4 w-12 rounded" /> : undefined
+                }
                 trailing={
                   lowBalanceUnavailable ? (
                     <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>

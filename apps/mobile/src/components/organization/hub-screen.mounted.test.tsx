@@ -364,7 +364,7 @@ describe('Organization hub billing card while its data loads', () => {
   it('keeps every row from the first frame and reserves the subtitle line', async () => {
     const settled = await renderHub();
     expect(bellRow(settled.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
-    expect(bellRow(settled.renderer)?.props.subtitleLoading).toBe(false);
+    expect(bellRow(settled.renderer)?.props.subtitlePlaceholder).toBeUndefined();
     settled.unmount();
 
     membersQuery.data = undefined;
@@ -378,7 +378,7 @@ describe('Organization hub billing card while its data loads', () => {
     ).not.toEqual([]);
     // Loading copy is not a subtitle; the row reserves its settled line instead.
     expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
-    expect(bellRow(loading.renderer)?.props.subtitleLoading).toBe(true);
+    expect(bellRow(loading.renderer)?.props.subtitlePlaceholder).toBeTruthy();
     loading.unmount();
   });
 });

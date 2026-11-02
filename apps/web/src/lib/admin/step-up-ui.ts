@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { ADMIN_STEP_UP_ENROLLMENT_FLAG } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { getAdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
@@ -18,11 +19,12 @@ export async function isAdminStepUpUiVisible(user: {
   return adminStepUpUiRule({
     isAdmin: user.is_admin,
     mode: getAdminStepUpMode(),
-    enrollmentEnabled: () => isReleaseToggleEnabled(ADMIN_STEP_UP_ENROLLMENT_FLAG, user.id),
+    // Off mode is the only path that reads PostHog here. `cache` dedupes the
+    // call within one server render so the layout and page share one lookup.
+    enrollmentEnabled: () => readEnrollmentToggle(user.id),
   });
 }
 
-/** Dependency-injected rule so the mode/toggle matrix is unit-testable. */
 export async function adminStepUpUiRule(params: {
   isAdmin: boolean;
   mode: 'off' | 'observe' | 'enforce';
@@ -32,3 +34,7 @@ export async function adminStepUpUiRule(params: {
   if (params.mode !== 'off') return true;
   return params.enrollmentEnabled();
 }
+
+const readEnrollmentToggle = cache((userId: string) =>
+  isReleaseToggleEnabled(ADMIN_STEP_UP_ENROLLMENT_FLAG, userId)
+);

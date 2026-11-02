@@ -5,6 +5,11 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
+});
+
 const mockGetServerSession = jest.fn();
 const mockRedirect = jest.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -1449,6 +1454,44 @@ describe('credential exchange bearer authentication guard', () => {
       { legacy: 'deny' }
     );
     expect(blocked.authFailedResponse?.status).toBe(403);
+  });
+});
+
+describe('observe-mode step-up observation (REST)', () => {
+  const originalMode = process.env.ADMIN_STEP_UP_MODE;
+
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_MODE = originalMode;
+    jest.restoreAllMocks();
+  });
+
+  test('a failing step-up measurement does not deny an admin request', async () => {
+    process.env.ADMIN_STEP_UP_MODE = 'observe';
+    const admin = await insertTestUser({
+      google_user_email: `observe-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'observe-session-pepper',
+    });
+    const { evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    };
+    const failure = evaluateStepUp.mockRejectedValueOnce(
+      new Error('relation "session_step_up_proofs" does not exist')
+    );
+
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/safety-identifiers' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'observe-session-pepper',
+      webSessionId: 'observe-web-session',
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(failure).toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
   });
 });
 

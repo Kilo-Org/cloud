@@ -1,3 +1,8 @@
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
+});
+
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { kilocode_users, passkey_credentials, session_step_up_proofs } from '@kilocode/db/schema';
@@ -301,6 +306,19 @@ describe('requirePrivilegedActor', () => {
         { ...contextFor(user), webSessionPepper: 'stale-pepper' }
       )
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Reauthentication required' });
+  });
+
+  it('does not deny an admin procedure when the step-up measurement fails', async () => {
+    const { user } = await setup();
+    const { evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    };
+    evaluateStepUp.mockRejectedValueOnce(
+      new Error('relation "session_step_up_proofs" does not exist')
+    );
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(caller.admin.getPermissions()).resolves.toBeDefined();
   });
 
   it('lets an observed admin procedure complete without a proof', async () => {

@@ -92,6 +92,7 @@ export function StepUpDialog({
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reauthRequired, setReauthRequired] = useState(false);
   const errorRef = useRef<HTMLParagraphElement | null>(null);
   const statusQuery = useQuery({
     ...trpc.stepUp.getStatus.queryOptions(),
@@ -109,6 +110,7 @@ export function StepUpDialog({
     if (isRunning) return;
     setIsRunning(true);
     setError(null);
+    setReauthRequired(false);
 
     try {
       const result = await runStepUpCeremony({
@@ -129,6 +131,14 @@ export function StepUpDialog({
     } catch (caught) {
       if (caught instanceof PasskeyRegistrationError && caught.failure === 'cancelled') {
         setError('Passkey creation was cancelled. No passkey was added.');
+      } else if (
+        caught instanceof PasskeyRegistrationError &&
+        caught.failure === 'reauth_required'
+      ) {
+        setReauthRequired(true);
+        setError(
+          'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
+        );
       } else {
         setError('Passkey verification did not complete. Try again.');
       }
@@ -180,7 +190,7 @@ export function StepUpDialog({
         ) : null}
 
         <DialogFooter>
-          {needsSignIn ? (
+          {needsSignIn || reauthRequired ? (
             <StepUpSignInAgainButton size="default" />
           ) : (
             <Button onClick={() => void runCeremony()} disabled={isRunning}>

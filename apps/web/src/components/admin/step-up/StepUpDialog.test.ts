@@ -18,7 +18,13 @@ jest.mock('@simplewebauthn/browser', () => ({
   startAuthentication: jest.fn(),
 }));
 jest.mock('@/components/profile/PasskeysCard', () => ({
-  PasskeyRegistrationError: class PasskeyRegistrationError extends Error {},
+  PasskeyRegistrationError: class PasskeyRegistrationError extends Error {
+    failure: string;
+    constructor(failure: string) {
+      super(failure);
+      this.failure = failure;
+    }
+  },
   registerNewPasskey: jest.fn(),
 }));
 jest.mock('./StepUpSignInAgainButton', () => ({
@@ -149,7 +155,9 @@ describe('StepUpDialog', () => {
       ok: true,
       json: async () => ({ challengeId: 'c', options: {} }),
     });
-    mockStartAuthentication.mockRejectedValue(new Error('NotAllowedError'));
+    mockStartAuthentication.mockRejectedValue(
+      Object.assign(new Error('dismissed'), { name: 'NotAllowedError' })
+    );
     mount();
     const focusSpy = jest.spyOn(
       (mounted!.container.ownerDocument.defaultView as any).HTMLElement.prototype,
@@ -165,6 +173,28 @@ describe('StepUpDialog', () => {
     expect(alert?.getAttribute('tabindex')).toBe('-1');
     expect(focusSpy).toHaveBeenCalled();
     expect(focusSpy.mock.instances).toContain(alert);
+    expect(onVerified).not.toHaveBeenCalled();
+  });
+
+  it('offers sign-in again when in-dialog enrollment needs reauthentication', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'NOT_ENROLLED' }),
+    });
+    const passkeysCard = jest.requireMock('@/components/profile/PasskeysCard') as {
+      PasskeyRegistrationError: new (failure: string) => Error;
+      registerNewPasskey: jest.Mock;
+    };
+    (
+      passkeysCard.registerNewPasskey as jest.Mock<(...args: unknown[]) => Promise<never>>
+    ).mockRejectedValueOnce(new passkeysCard.PasskeyRegistrationError('reauth_required'));
+    mount();
+
+    act(() => button('Verify with passkey')?.click());
+    await flush();
+
+    expect(button('Sign out and sign in again')).toBeDefined();
+    expect(mounted!.container.textContent).toContain('Sign in again before adding a passkey');
     expect(onVerified).not.toHaveBeenCalled();
   });
 

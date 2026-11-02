@@ -31,8 +31,15 @@ export async function runStepUpCeremony(deps: StepUpCeremonyDeps): Promise<StepU
   let assertion: unknown;
   try {
     assertion = await deps.startAuthentication(options.options);
-  } catch {
-    return { ok: false, code: 'CANCELLED' };
+  } catch (error) {
+    // @simplewebauthn/browser throws NotAllowedError when the user dismisses
+    // the sheet and AbortError on a timeout. Anything else is a real browser
+    // or authenticator failure and must not read as a deliberate cancel.
+    const name = error instanceof Error ? error.name : '';
+    if (name === 'NotAllowedError' || name === 'AbortError') {
+      return { ok: false, code: 'CANCELLED' };
+    }
+    return { ok: false, code: 'VERIFICATION_FAILED' };
   }
 
   return (await deps.submitAssertion(options.challengeId, assertion))

@@ -81,11 +81,21 @@ export const stepUpRouter = createTRPCRouter({
       return { revoked: 0 };
     }
 
-    const revoked = await revokeCurrentSessionStepUpProofs(
-      ctx.user.id,
-      ctx.webSessionId,
-      'user_lock'
-    );
-    return { revoked };
+    try {
+      const revoked = await revokeCurrentSessionStepUpProofs(
+        ctx.user.id,
+        ctx.webSessionId,
+        'user_lock'
+      );
+      return { revoked };
+    } catch (error) {
+      // Drizzle errors embed statement parameters such as the session hash.
+      // Report only the error shape and give the client a generic refusal.
+      reportStepUpFailure('admin_step_up_revoke_current', error);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Could not lock this session. Try again.',
+      });
+    }
   }),
 });

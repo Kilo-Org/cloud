@@ -45,11 +45,17 @@ export function StepUpSignInAgainButton({
   async function handleClick() {
     if (isPending) return;
     setIsPending(true);
-    await performStepUpReauth({
-      pathname,
-      revoke: () => fetch('/api/auth/revoke-web-session', { method: 'POST' }),
-      signOut,
-    });
+    try {
+      await performStepUpReauth({
+        pathname,
+        revoke: () => fetch('/api/auth/revoke-web-session', { method: 'POST' }),
+        signOut,
+      });
+    } catch {
+      // Sign-out itself failed; leave the user on this page with a working
+      // button rather than a permanently disabled one.
+      setIsPending(false);
+    }
   }
 
   return (

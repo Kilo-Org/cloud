@@ -57,8 +57,7 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
 
   const withStepUp = useCallback(
     async <T,>(operation: () => Promise<T>): Promise<T> => {
-      const result = await runWithStepUp(operation, requestStepUp, stepUpRequirementFromError);
-      return result;
+      return runWithStepUp(operation, requestStepUp, stepUpRequirementFromError);
     },
     [requestStepUp]
   );

@@ -51,7 +51,7 @@ describe('runStepUpCeremony', () => {
     const result = await runStepUpCeremony({
       requestOptions,
       startAuthentication: async () => {
-        throw new Error('NotAllowedError');
+        throw Object.assign(new Error('user dismissed'), { name: 'NotAllowedError' });
       },
       submitAssertion,
       enroll: async () => {},
@@ -60,6 +60,19 @@ describe('runStepUpCeremony', () => {
     expect(result).toEqual({ ok: false, code: 'CANCELLED' });
     expect(requestOptions).toHaveBeenCalledTimes(1);
     expect(submitAssertion).not.toHaveBeenCalled();
+  });
+
+  it('reports a non-cancellation browser error as a verification failure', async () => {
+    const result = await runStepUpCeremony({
+      requestOptions: async () => ({ ok: true, challengeId: 'c1', options }),
+      startAuthentication: async () => {
+        throw Object.assign(new Error('authenticator unavailable'), { name: 'InvalidStateError' });
+      },
+      submitAssertion: async () => true,
+      enroll: async () => {},
+    });
+
+    expect(result).toEqual({ ok: false, code: 'VERIFICATION_FAILED' });
   });
 
   it('surfaces a refusal code without retrying', async () => {

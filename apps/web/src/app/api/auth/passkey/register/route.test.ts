@@ -285,7 +285,6 @@ describe('POST /api/auth/passkey/register', () => {
     mockEvaluateStepUp.mockResolvedValue({
       state: {
         status: 'fresh',
-        proofId: 'proof-1',
         method: 'webauthn_uv',
         verifiedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 60_000).toISOString(),

@@ -101,7 +101,8 @@ export function StepUpDialog({
   const needsSignIn =
     current.code === 'SESSION_UNBOUND' ||
     current.code === 'BEARER_NOT_ALLOWED' ||
-    current.code === 'REAUTH_REQUIRED';
+    current.code === 'REAUTH_REQUIRED' ||
+    statusQuery.data?.sessionBound === false;
 
   async function runCeremony() {
     if (isRunning) return;

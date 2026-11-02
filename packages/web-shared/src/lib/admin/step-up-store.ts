@@ -133,7 +133,6 @@ export async function evaluateStepUp(
     return {
       state: {
         status: 'fresh',
-        proofId: liveProof.id,
         method: 'webauthn_uv',
         verifiedAt: new Date(liveProof.verified_at).toISOString(),
         expiresAt: new Date(liveProof.expires_at).toISOString(),

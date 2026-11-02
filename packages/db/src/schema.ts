@@ -5506,7 +5506,10 @@ export const session_step_up_proofs = pgTable(
     ),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
-    check('check_session_step_up_proofs_purpose', sql`${table.purpose} IN ('session', 'operation')`),
+    check(
+      'check_session_step_up_proofs_purpose',
+      sql`${table.purpose} IN ('session', 'operation')`
+    ),
     check(
       'check_session_step_up_proofs_action_binding',
       sql`(${table.purpose} = 'operation') = (${table.action_binding_hash} IS NOT NULL)`

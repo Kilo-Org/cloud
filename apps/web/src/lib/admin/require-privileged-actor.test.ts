@@ -260,7 +260,6 @@ describe('requirePrivilegedActor', () => {
         ...contextFor(user),
         adminStepUpState: {
           status: 'fresh',
-          proofId: 'proof-from-middleware',
           method: 'webauthn_uv',
           verifiedAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 60_000).toISOString(),

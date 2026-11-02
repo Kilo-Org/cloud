@@ -48,7 +48,6 @@ export type AdminStepUpState =
   | { status: 'expired'; verifiedAt: string }
   | {
       status: 'fresh';
-      proofId: string;
       method: 'webauthn_uv';
       verifiedAt: string;
       expiresAt: string;

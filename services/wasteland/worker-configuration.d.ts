@@ -17,6 +17,8 @@ declare namespace Cloudflare {
 		WASTELAND_DEBUG_OPERATORS: "";
 		KILO_API_URL: "http://192.168.65.254:3000";
 		KILO_INTERNAL_API_URL: "http://localhost:3000";
+		LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 		WASTELAND_API_URL: "http://192.168.65.254:8787";
 		WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
@@ -33,6 +35,8 @@ declare namespace Cloudflare {
 		WASTELAND_DEBUG_OPERATORS: string;
 		KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
 		KILO_INTERNAL_API_URL: "http://localhost:3000" | "https://api.kilo.ai";
+		LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 		WASTELAND_API_URL: "http://192.168.65.254:8787" | "https://wasteland.kiloapps.io";
 		WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
@@ -46,5 +50,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "WASTELAND_DEBUG_ROUTES" | "WASTELAND_DEBUG_OPERATORS" | "KILO_API_URL" | "KILO_INTERNAL_API_URL" | "WASTELAND_API_URL">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "WASTELAND_DEBUG_ROUTES" | "WASTELAND_DEBUG_OPERATORS" | "KILO_API_URL" | "KILO_INTERNAL_API_URL" | "LEGACY_ADMIN_CLAIM_MODE" | "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS" | "WASTELAND_API_URL">> {}
 }

@@ -77,6 +77,8 @@
     // the host and needs `localhost`.
     "KILO_INTERNAL_API_URL": "https://api.kilo.ai",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
+    "LEGACY_ADMIN_CLAIM_MODE": "honor",
+    "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS": "",
   },
 
   "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
@@ -121,6 +123,8 @@
         // localhost:3000 directly — no Docker bridge needed.
         "KILO_INTERNAL_API_URL": "http://localhost:3000",
         "WASTELAND_API_URL": "http://192.168.65.254:8787",
+        "LEGACY_ADMIN_CLAIM_MODE": "honor",
+        "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS": "",
       },
       "durable_objects": {
         "bindings": [

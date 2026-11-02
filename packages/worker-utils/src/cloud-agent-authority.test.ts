@@ -4,6 +4,8 @@ import {
   CloudAgentAuthoritySchema,
   cloudAgentAuthorityInputSchema,
   cloudAgentAuthorityProcedure,
+  cloudAgentAuthorityProcedures,
+  cloudAgentAuthorityProcedureKind,
   isCloudAgentAuthorityHttpPathAllowed,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
@@ -197,7 +199,7 @@ describe('Cloud Agent authority contract', () => {
     '/api/gastown/token',
     '/api/wasteland/token',
     '/api/profile',
-    '/api/trpc/cloudAgentNext.sendMessage',
+    '/api/trpc/cloudAgentNext.deleteSession',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
     '/api/trpc/',
     '/api/user/',
@@ -211,6 +213,117 @@ describe('Cloud Agent authority contract', () => {
     ).toBe(true);
     vi.setSystemTime(new Date(scope.expiresAt * 1000));
     expect(isCloudAgentAuthorityHttpPathAllowed(scope, '/api/user')).toBe(false);
+  });
+
+  const childSessionId = 'workspace_33333333-3333-4333-8333-333333333333';
+  const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+  const managementRequests = [
+    ['listChildSessions', 'query', { limit: 5 }],
+    ['getSession', 'query', { cloudAgentSessionId: childSessionId }],
+    ['getMessageResult', 'query', { cloudAgentSessionId: childSessionId, messageId }],
+    ['interruptSession', 'mutation', { sessionId: childSessionId }],
+    [
+      'sendMessage',
+      'mutation',
+      {
+        cloudAgentSessionId: childSessionId,
+        messageId,
+        payload: {
+          type: 'prompt',
+          prompt: 'Continue the child task',
+          mode: 'code',
+          model: 'provider/model',
+        },
+      },
+    ],
+  ] as const;
+
+  it.each(managementRequests)('permits only the pinned scope for %s', (name, kind, input) => {
+    const procedure = `cloudAgentNext.${name}`;
+    expect(cloudAgentAuthorityProcedures(scope)).toContain(procedure);
+    expect(cloudAgentAuthorityProcedureKind(procedure)).toBe(kind);
+    expect(validateCloudAgentAuthorityRequest(scope, procedure, input)).toEqual(input);
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(true);
+    const orgScope = { ...scope, organizationId };
+    const orgProcedure = `organizations.${procedure}`;
+    expect(
+      validateCloudAgentAuthorityRequest(orgScope, orgProcedure, { ...input, organizationId })
+    ).toMatchObject(input);
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, orgProcedure, { ...input, organizationId })
+    ).toThrow();
+    expect(() => validateCloudAgentAuthorityRequest(orgScope, procedure, input)).toThrow();
+    expect(() => validateCloudAgentAuthorityRequest(orgScope, orgProcedure, input)).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest(orgScope, orgProcedure, {
+        ...input,
+        organizationId: 'other-org',
+      })
+    ).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, {
+        ...input,
+        parentCloudAgentSessionId: scope.parentSessionId,
+      })
+    ).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, input, scope.expiresAt)
+    ).toThrow();
+    expect(cloudAgentAuthorityInputSchema(scope, procedure)).toHaveProperty(
+      'additionalProperties',
+      false
+    );
+  });
+
+  it('rejects follow-up configuration, commands, whitespace prompts, and malformed identities', () => {
+    const request = {
+      cloudAgentSessionId: childSessionId,
+      messageId,
+      payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'provider/model' },
+    };
+    for (const payload of [
+      { ...request.payload, prompt: '   ' },
+      { ...request.payload, mcpServers: {} },
+      { type: 'command', command: 'run', arguments: '' },
+    ]) {
+      expect(() =>
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.sendMessage', {
+          ...request,
+          payload,
+        })
+      ).toThrow();
+    }
+    for (const extra of [
+      { cloudAgentSessionId: 'ses_not_a_cloud_session' },
+      { messageId: 'invalid-message-id' },
+      { attachments: {} },
+      { callbackTarget: { url: 'session:parent' } },
+      { envVars: { TOKEN: 'not-allowed' } },
+    ]) {
+      expect(() =>
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.sendMessage', {
+          ...request,
+          ...extra,
+        })
+      ).toThrow();
+    }
+  });
+
+  it('rejects unknown procedure kinds and mixed-scope batches', () => {
+    expect(() => cloudAgentAuthorityProcedureKind('cloudAgentNext.deleteSession')).toThrow();
+    expect(() => cloudAgentAuthorityProcedureKind('user.getMe')).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        scope,
+        '/api/trpc/cloudAgentNext.getSession,cloudAgentNext.getMessageResult'
+      )
+    ).toBe(true);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        scope,
+        '/api/trpc/cloudAgentNext.getSession,organizations.cloudAgentNext.getSession'
+      )
+    ).toBe(false);
   });
 });
 

@@ -12,7 +12,8 @@ export type PrivilegedGuardTier =
   | 'superadmin'
   | 'credit_manager'
   | 'session_viewer'
-  | 'api_request_log_exporter';
+  | 'api_request_log_exporter'
+  | 'support_access_requester';
 
 type GuardTagged = { [PRIVILEGED_GUARD_TIER]?: PrivilegedGuardTier };
 
@@ -118,6 +119,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   salesDemo: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
   securityAdvisorContent: support,
   sessionTraces: { read: 'support_read', write: 'support_write', target: 'user' },
+  supportAccess: support,
   syncProviders: platform,
   userDataExports: { read: 'support_read', write: 'support_write', target: 'user' },
   userDeletionQueue: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
@@ -660,7 +662,14 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/admin/admin-permissions.ts',
     actionClass: 'platform_read',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 4,
+  },
+  {
+    id: 'internal.admin.supportAccessService',
+    file: 'apps/web/src/lib/admin/support-access-service.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    occurrences: 1,
   },
   {
     id: 'internal.admin.creditManagement',

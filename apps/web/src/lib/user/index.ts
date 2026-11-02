@@ -1215,7 +1215,7 @@ export async function anonymizeCloudUserData(
     await tx.insert(support_access_grant_events).values(
       revokedGrants.map(grant => ({
         grant_id: grant.id,
-        event_type: 'revoked',
+        event_type: 'revoked' as const,
         organization_id: grant.organizationId,
         action_class: grant.actionClass,
         metadata: { cause: 'actor_soft_deleted' },

@@ -44,6 +44,7 @@ const mockUser: User = {
   can_view_sessions: false,
   can_manage_credits: false,
   can_export_api_request_logs: false,
+  can_request_support_org_access: false,
   total_microdollars_acquired: 0,
   next_credit_expiration_at: null,
   has_validation_stytch: null,

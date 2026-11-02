@@ -88,6 +88,7 @@ import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminSupportAccessRouter } from '@/routers/admin/admin-support-access-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
@@ -2828,4 +2829,5 @@ export const adminRouter = createTRPCRouter({
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,
+  supportAccess: adminSupportAccessRouter,
 });

@@ -53,7 +53,7 @@ export async function revokeOpenSupportGrants(
     await tx.insert(support_access_grant_events).values(
       revoked.map(grant => ({
         grant_id: grant.id,
-        event_type: 'revoked',
+        event_type: 'revoked' as const,
         performed_by_kilo_user_id: params.performedByKiloUserId ?? null,
         organization_id: grant.organizationId,
         action_class: grant.actionClass,

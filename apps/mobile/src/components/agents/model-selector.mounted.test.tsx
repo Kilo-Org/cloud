@@ -441,7 +441,9 @@ describe('ModelSelector pill touch target', () => {
     const option = cliCatalogOption();
     const renderer = renderSelector({ value: option.id, options: [option] });
 
-    const pill = renderer.root.findAll(node => node.type === 'Pressable')[0];
+    const pill = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    )[0];
     if (pill === undefined) {
       throw new Error('model pill not found');
     }

@@ -70,6 +70,7 @@ const mockUser: User = {
   account_deletion_requested_at: null,
   normalized_email: null,
   email_domain: null,
+  external_id: null,
   personal_account_disabled: false,
 };
 

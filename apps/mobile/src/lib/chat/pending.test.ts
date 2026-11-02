@@ -159,12 +159,28 @@ describe('titledByAsked', () => {
     expect(written.map(one => one.id)).toEqual(['4']);
   });
 
-  it('answers an empty list for a record it cannot read, so the chat still opens', async () => {
-    stored.set('chat-kept-questions:broken', JSON.stringify([{ nope: true }]));
-
-    expect(await keptIn('broken')).toEqual([]);
+  it('answers the readable entries when one of them cannot be read', async () => {
+    const entry = (id: string, text: string) => ({
+      id,
+      text,
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed',
+    });
+    stored.set(
+      'chat-kept-questions:partial',
+      JSON.stringify([entry('a', 'the readable one'), { nope: true }, entry('b', 'the other one')])
+    );
     stored.set('chat-kept-questions:garbled', 'not json');
+    stored.set('chat-kept-questions:shapeless', JSON.stringify({ nope: true }));
+
+    const written = await keptIn('partial');
+    expect(written.map(one => one.text)).toEqual(['the readable one', 'the other one']);
+    // A record nothing can read is answered empty rather than thrown out of the open.
     expect(await keptIn('garbled')).toEqual([]);
+    expect(await keptIn('shapeless')).toEqual([]);
   });
 
   it('drops only the newest copy of the slot question, keeping an earlier identical attempt', () => {

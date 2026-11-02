@@ -49,20 +49,20 @@ const askedSchema = z.object({
   // A question remembered before images existed carries none.
   images: imagesSchema,
 });
-const keptSchema = z.array(
-  z.object({
-    /* An identifier made by this version; an entry written while it was still a
-       number of the list keeps its number as its name. */
-    id: z.union([z.string(), z.number()]).transform(String),
-    text: z.string(),
-    model: z.string(),
-    effort: z.enum(EFFORTS).nullable().default(null),
-    images: imagesSchema,
-    afterTurns: z.number().int().nonnegative(),
-    // A question kept before the outcome was recorded failed its answer.
-    outcome: z.enum(['failed', 'stopped']).default('failed'),
-  })
-);
+const keptEntrySchema = z.object({
+  /* An identifier made by this version; an entry written while it was still a
+     number of the list keeps its number as its name. */
+  id: z.union([z.string(), z.number()]).transform(String),
+  text: z.string(),
+  model: z.string(),
+  effort: z.enum(EFFORTS).nullable().default(null),
+  images: imagesSchema,
+  afterTurns: z.number().int().nonnegative(),
+  // A question kept before the outcome was recorded failed its answer.
+  outcome: z.enum(['failed', 'stopped']).default('failed'),
+});
+/** The stored list, before any entry is read: one broken entry is dropped alone. */
+const keptRecordsSchema = z.array(z.unknown());
 
 let keptCounter = 0;
 
@@ -105,12 +105,16 @@ export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
   if (kept === null) {
     return [];
   }
-  /* A record this version cannot read is one it cannot draw either. A chat that
-     will not open is the worse of the two, so the list is answered empty and the
-     next write replaces it. */
+  /* One entry this version cannot read must not take the others: the readable
+     ones are answered, and the next write replaces the list with what it drew.
+     A record nothing can read is the same answer, because a chat that opens
+     without one bubble beats a chat that does not open. */
   try {
-    const parsed = keptSchema.safeParse(JSON.parse(kept));
-    return parsed.success ? parsed.data : [];
+    const written = keptRecordsSchema.parse(JSON.parse(kept));
+    return written.flatMap(entry => {
+      const parsed = keptEntrySchema.safeParse(entry);
+      return parsed.success ? [parsed.data] : [];
+    });
   } catch {
     return [];
   }

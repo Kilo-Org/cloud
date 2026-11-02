@@ -309,11 +309,11 @@ export function checkSafeArea(tree: LayoutTree): Finding[] {
   const { safeArea, window } = tree.env;
   for (const node of tree.nodes) {
     if (!node.isText && !node.isTextInput && !node.pressable) continue;
-    // A node inside a natively presented dialog or sheet is measured against
-    // that surface's origin, which the platform placed inside the window: its
-    // frame says nothing about the window's insets, and the surface's own
-    // presenter owns them.
-    if (insidePresentedSurface(node)) continue;
+    // A node inside a partial native dialog or sheet is measured against that
+    // surface's origin, which the platform placed inside the window: its frame
+    // says nothing about the window's insets, and the surface's presenter owns
+    // them. A surface filling the window's content area keeps its check.
+    if (insidePresentedSurface(node, tree.env)) continue;
     if (ancestors(node).some(ancestor => ancestor.scroll.y)) continue;
     const rect = node.visibleRect;
     const top = safeArea.top > 0 ? Math.min(bottom(rect), safeArea.top) - Math.max(rect[1], 0) : 0;

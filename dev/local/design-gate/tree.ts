@@ -127,21 +127,33 @@ export const tags = {
 const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\))$/i;
 
 /**
- * Owners whose content a native dialog or sheet hosts. The platform positions
- * that surface inside the window, so the frames React Native reports for the
- * content start at the surface's own origin, not at the window's — which is why
- * a rule that compares a frame against the window's insets must skip them.
+ * Owners whose content a native dialog or sheet hosts.
+ *
+ * The platform positions that surface inside the window, and the frames React
+ * Native reports for its content start at the surface's own origin — so for a
+ * surface that covers only part of the window (a bottom sheet), a frame near the
+ * surface's top says nothing about the window's top inset. A surface that fills
+ * the window's content area starts where the window's content starts, and its
+ * frames do describe the insets, so it must stay checked.
  */
 const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
-
-/** True when a native dialog or sheet hosts the node's content. */
-export function insidePresentedSurface(node: LayoutNode): boolean {
-  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
-}
 
 /** True when one of a probe node's owners is a presented surface. */
 export function hasPresentedOwner(probe: ProbeNode): boolean {
   return (probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true);
+}
+
+/**
+ * True when a partial native dialog or sheet hosts the node's content, so the
+ * frame is measured from that surface's origin rather than the window's.
+ */
+export function insidePresentedSurface(node: LayoutNode, env: ProbeEnv): boolean {
+  const surface = [node, ...ancestors(node)].find(candidate => hasPresentedOwner(candidate.probe));
+  if (!surface) {
+    return false;
+  }
+  const contentHeight = env.window.height - env.safeArea.top - env.safeArea.bottom;
+  return surface.rect[3] < contentHeight - 1;
 }
 
 function visibleContainer(style: ProbeNode['style']): boolean {

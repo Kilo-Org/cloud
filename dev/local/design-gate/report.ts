@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { writeJson, type CellRun, type Exec, type RunOutcome } from './capture';
 import type { Finding, Rect } from './findings';
-import { hasPresentedOwner, parseDump } from './tree';
+import { insidePresentedSurface, normalize, parseDump } from './tree';
 
 export type RunMeta = {
   platform: string;
@@ -201,10 +201,11 @@ export function skippedRules(cells: readonly CellRun[], out: string) {
   );
 }
 
-/** True when the snapshot holds content a native dialog or sheet hosts. */
+/** True when the snapshot holds a partial native dialog or sheet. */
 function hasPresentedSurface(dump: string): boolean {
   try {
-    return parseDump(fs.readFileSync(dump, 'utf8')).nodes.some(hasPresentedOwner);
+    const tree = normalize(parseDump(fs.readFileSync(dump, 'utf8')));
+    return tree.nodes.some(node => insidePresentedSurface(node, tree.env));
   } catch {
     return false;
   }

@@ -254,14 +254,17 @@ test('safe-area: text under the top and bottom insets, tolerance', () => {
   assert.deepEqual(run('safe-area', [{ parent: 0, tag: 'View', rect: [0, 0, 400, 100] }], env), []);
 });
 
-test('safe-area: a natively presented surface is measured from its own origin', () => {
-  const env = { safeArea: { top: 24, right: 0, bottom: 30, left: 0 } };
+test('safe-area: a partial presented surface is measured from its own origin', () => {
+  const env = {
+    safeArea: { top: 24, right: 0, bottom: 30, left: 0 },
+    window: { width: 400, height: 800 },
+  };
   // A bottom sheet's content host starts partway down the window and the
   // platform positions it; inside that surface every frame starts at the
   // surface's origin, so the window's top inset never describes it.
   const presented: ProbeNode[] = [
-    { parent: 0, tag: 'RNHostView', rect: [0, 600, 400, 200], owners: ['RNHostView'] },
-    { parent: 1, tag: 'View', rect: [0, 600, 400, 200], owners: ['View', 'PresentedContent'] },
+    { parent: 0, tag: 'RNHostView', rect: [0, 600, 400, 170], owners: ['RNHostView'] },
+    { parent: 1, tag: 'View', rect: [0, 600, 400, 170], owners: ['View', 'PresentedContent'] },
     { parent: 2, tag: 'Paragraph', rect: [0, 0, 400, 20], text: 'Select account' },
   ];
   assert.deepEqual(run('safe-area', presented, env), []);
@@ -275,6 +278,22 @@ test('safe-area: a natively presented surface is measured from its own origin', 
     )[0]?.measured,
     20
   );
+});
+
+test('safe-area: a presented surface that fills the window keeps the check', () => {
+  const env = {
+    safeArea: { top: 24, right: 0, bottom: 30, left: 0 },
+    window: { width: 400, height: 800 },
+  };
+  // A full-window sheet starts where the window's content starts, so its frames
+  // do describe the insets — skipping them would hide real violations on the
+  // surfaces that fill the screen.
+  const presented: ProbeNode[] = [
+    { parent: 0, tag: 'RNHostView', rect: [0, 0, 400, 746], owners: ['RNHostView'] },
+    { parent: 1, tag: 'View', rect: [0, 0, 400, 746], owners: ['View', 'PresentedContent'] },
+    { parent: 2, tag: 'Paragraph', rect: [0, 10, 400, 20], text: 'Title' },
+  ];
+  assert.equal(run('safe-area', presented, env)[0]?.measured, 14);
 });
 
 test('touch-target: allows 0.5 dp of pixel-snapping rounding', () => {

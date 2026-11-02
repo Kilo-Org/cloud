@@ -292,7 +292,7 @@ test('skippedRules lists the safe-area gap a presented surface leaves', () => {
         },
         nodes: [
           { parent: -1, tag: 'RootView', rect: [0, 0, 400, 800] },
-          { parent: 0, tag: 'View', rect: [0, 600, 400, 200], ...(owners ? { owners } : {}) },
+          { parent: 0, tag: 'View', rect: [0, 600, 400, 170], ...(owners ? { owners } : {}) },
         ],
       })
     );

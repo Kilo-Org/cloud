@@ -140,8 +140,7 @@ describe('useAppLifecycle mounted', () => {
     expect(textChildren(second)).toEqual(['true']);
 
     // The probe mounted while the app was already backgrounded, so `active` is
-    // not a background -> active edge for it. That matches today's per-hook
-    // `useState(true)`, which a backgrounded mount also started from.
+    // not a background -> active edge for it.
     act(() => {
       appState.emit('active');
     });

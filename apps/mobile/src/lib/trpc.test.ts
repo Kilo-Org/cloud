@@ -576,7 +576,7 @@ describe('latency wiring', () => {
   // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
   // and the server's fetch adapter rejects that empty body with 400. The
   // shared fetch sends `{}` so an unbatched no-input query reaches its
-  // procedure, matching the batched `{"0":{"json":null}}` shape.
+  // procedure.
   it('sends an empty JSON object body when a POST has none', async () => {
     const { httpFetch } = await loadLatencyLinks();
     mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));

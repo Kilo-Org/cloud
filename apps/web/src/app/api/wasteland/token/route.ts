@@ -7,7 +7,10 @@ import {
   recordKiloAdminElevationForRequest,
   serviceTarget,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { isWorkerAdminLegacyClaimIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
+import {
+  isWorkerAdminCapabilityIssuanceEnabled,
+  isWorkerAdminLegacyClaimIssuanceEnabled,
+} from '@kilocode/web-shared/lib/config.server';
 import { WASTELAND_ADMIN_AUDIENCE } from '@kilocode/worker-utils/worker-admin-capability';
 import {
   AdminCapabilityRequestSchema,
@@ -34,15 +37,18 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const rawBody: unknown = await request.json().catch(() => null);
-  const capabilityRequest =
-    rawBody === null ? null : AdminCapabilityRequestSchema.safeParse(rawBody);
+  const hasCapabilityRequest =
+    typeof rawBody === 'object' && rawBody !== null && 'adminCapability' in rawBody;
+  const capabilityRequest = hasCapabilityRequest
+    ? AdminCapabilityRequestSchema.safeParse(rawBody)
+    : null;
   if (capabilityRequest !== null && !capabilityRequest.success) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
 
-  if (legacyIssuance && user.is_admin) {
+  if (legacyIssuance && user.is_admin && capabilityRequest === null) {
     await recordKiloAdminElevationForRequest({
       user,
       tokenSource,
@@ -65,13 +71,17 @@ export async function POST(request: Request) {
   if (capabilityRequest !== null) {
     const { target, actions } = capabilityRequest.data.adminCapability;
     try {
-      await requireWorkerAdminActor(request, request.headers, {
+      const actor = await requireWorkerAdminActor(request, request.headers, {
         actionClass: 'worker_admin',
         target: { kind: 'service', id: 'wasteland' },
         inventoryId: 'rest.wastelandToken',
       });
       const issued = await issueWorkerAdminCapability({
-        user,
+        user: {
+          ...user,
+          id: actor.actor.assurance.userId,
+          api_token_pepper: actor.sessionBinding.apiTokenPepper,
+        },
         audience: WASTELAND_ADMIN_AUDIENCE,
         target,
         actions,
@@ -80,6 +90,8 @@ export async function POST(request: Request) {
       return NextResponse.json({
         token,
         expiresAt,
+        admin: user.is_admin === true,
+        capabilityIssuance: true,
         capability: issued.capability,
         capabilityExpiresAt: issued.capabilityExpiresAt,
       });
@@ -100,5 +112,10 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ token, expiresAt });
+  return NextResponse.json({
+    token,
+    expiresAt,
+    admin: user.is_admin === true,
+    capabilityIssuance: isWorkerAdminCapabilityIssuanceEnabled(),
+  });
 }

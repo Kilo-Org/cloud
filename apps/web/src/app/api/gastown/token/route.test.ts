@@ -99,7 +99,10 @@ describe('POST /api/gastown/token', () => {
   });
 
   it('returns the capability once the guard passes', async () => {
-    jest.mocked(requireWorkerAdminActor).mockResolvedValue({} as never);
+    jest.mocked(requireWorkerAdminActor).mockResolvedValue({
+      actor: { assurance: { userId: 'user-1' } },
+      sessionBinding: { apiTokenPepper: 'pepper-1', webSessionPepper: null },
+    } as never);
     jest.mocked(issueWorkerAdminCapability).mockResolvedValue({
       capability: 'capability-token',
       capabilityExpiresAt: '2026-01-01T00:05:00.000Z',
@@ -114,6 +117,13 @@ describe('POST /api/gastown/token', () => {
       capability: 'capability-token',
       capabilityExpiresAt: '2026-01-01T00:05:00.000Z',
     });
+  });
+
+  it('ignores an unrelated JSON body like it did before capabilities', async () => {
+    const response = await POST(request({}));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ token: 'identity-token' });
+    expect(requireWorkerAdminActor).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed capability request', async () => {

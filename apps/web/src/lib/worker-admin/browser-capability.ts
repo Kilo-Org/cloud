@@ -6,30 +6,19 @@ type OperationLike = { path: string; input: unknown };
 
 type Target = { kind: 'town' | 'wasteland'; id: string };
 
+export type BrowserWorkerIdentity = {
+  token: string;
+  admin: boolean;
+  capabilityIssuance: boolean;
+};
+
 type CapabilityEntry = { capability: string; expiresAt: number };
 
-const cache = new Map<string, CapabilityEntry>();
-const inflight = new Map<string, Promise<CapabilityEntry | null>>();
+const NEGATIVE_CACHE_MS = 60_000;
 
-function decodeTokenClaims(token: string): Record<string, unknown> | null {
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-  try {
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const json = decodeURIComponent(
-      Array.from(atob(padded), char => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`).join(
-        ''
-      )
-    );
-    const parsed: unknown = JSON.parse(json);
-    return typeof parsed === 'object' && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
+const cache = new Map<string, CapabilityEntry>();
+const negativeCache = new Map<string, number>();
+const inflight = new Map<string, Promise<CapabilityEntry | null>>();
 
 function targetForOperation(
   audience: BrowserCapabilityAudience,
@@ -61,35 +50,44 @@ function cacheKey(target: Target, actions: string[]): string {
   return `${target.kind}:${target.id}:${actions.slice().sort().join(',')}`;
 }
 
+export function resetBrowserCapabilityCache(): void {
+  cache.clear();
+  negativeCache.clear();
+  inflight.clear();
+}
+
 /**
  * Return the `X-Kilo-Worker-Capability` value for a browser tRPC batch, or
- * null when the caller is not an admin, the batch spans targets, or capability
- * issuance is unavailable. Falling back to null keeps today's legacy-claim
- * behavior while issuance is dark.
+ * null when the caller is not an admin, capability issuance is disabled, the
+ * batch spans targets, or issuance failed recently.
+ *
+ * At the default flags this is a no-op: capability issuance is advertised as
+ * disabled by the token endpoint, so no extra request is made and admin
+ * behavior is exactly the legacy path.
  */
 export async function browserCapabilityHeader(params: {
   audience: BrowserCapabilityAudience;
   operations: readonly OperationLike[];
-  getIdentityToken: () => Promise<string>;
+  getIdentity: () => Promise<BrowserWorkerIdentity>;
   tokenEndpoint: '/api/gastown/token' | '/api/wasteland/token';
 }): Promise<string | null> {
-  const identityToken = await params.getIdentityToken();
-  const claims = decodeTokenClaims(identityToken);
-  if (claims?.isAdmin !== true) return null;
+  const identity = await params.getIdentity();
+  if (!identity.admin || !identity.capabilityIssuance) return null;
 
   const target = commonTarget(params.audience, params.operations);
   if (!target) return null;
 
+  const prefix = params.audience === 'gastown-admin' ? 'gastown' : 'wasteland';
   const actions = params.operations
     .map(operation => `trpc:${operation.path}`)
-    .filter(action =>
-      action.startsWith(`trpc:${params.audience === 'gastown-admin' ? 'gastown' : 'wasteland'}.`)
-    );
+    .filter(action => action.startsWith(`trpc:${prefix}.`));
   if (actions.length === 0) return null;
 
   const key = cacheKey(target, actions);
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.capability;
+  const retryAt = negativeCache.get(key);
+  if (retryAt !== undefined && retryAt > Date.now()) return null;
 
   let pending = inflight.get(key);
   if (!pending) {
@@ -118,7 +116,10 @@ export async function browserCapabilityHeader(params: {
   }
 
   const entry = await pending;
-  if (!entry) return null;
+  if (!entry) {
+    negativeCache.set(key, Date.now() + NEGATIVE_CACHE_MS);
+    return null;
+  }
   const expiresAt = entry.expiresAt - 30_000;
   if (expiresAt > Date.now()) cache.set(key, { ...entry, expiresAt });
   return entry.capability;

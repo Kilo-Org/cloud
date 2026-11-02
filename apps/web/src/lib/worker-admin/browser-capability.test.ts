@@ -1,15 +1,17 @@
-import { browserCapabilityHeader } from './browser-capability';
+import {
+  browserCapabilityHeader,
+  resetBrowserCapabilityCache,
+  type BrowserWorkerIdentity,
+} from './browser-capability';
 
-function tokenWithClaims(claims: Record<string, unknown>): string {
-  const payload = btoa(JSON.stringify(claims))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-  return `header.${payload}.signature`;
-}
+const adminIdentity: BrowserWorkerIdentity = {
+  token: 'identity-token',
+  admin: true,
+  capabilityIssuance: true,
+};
 
-const adminToken = tokenWithClaims({ isAdmin: true, kiloUserId: 'user-1' });
-const userToken = tokenWithClaims({ isAdmin: false, kiloUserId: 'user-1' });
+const nonAdminIdentity: BrowserWorkerIdentity = { ...adminIdentity, admin: false };
+const legacyIdentity: BrowserWorkerIdentity = { ...adminIdentity, capabilityIssuance: false };
 
 describe('browserCapabilityHeader', () => {
   const fetchMock = jest.fn();
@@ -17,21 +19,34 @@ describe('browserCapabilityHeader', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
+    resetBrowserCapabilityCache();
   });
 
-  function params(operations: Array<{ path: string; input: unknown }>, token = adminToken) {
+  function params(
+    operations: Array<{ path: string; input: unknown }>,
+    identity: BrowserWorkerIdentity = adminIdentity
+  ) {
     return {
       audience: 'gastown-admin' as const,
       operations,
-      getIdentityToken: async () => token,
+      getIdentity: async () => identity,
       tokenEndpoint: '/api/gastown/token' as const,
     };
   }
 
-  it('returns null for non-admin identities without calling the issuer', async () => {
+  it('does nothing for non-admin identities', async () => {
     await expect(
       browserCapabilityHeader(
-        params([{ path: 'gastown.getTown', input: { townId: 'town-1' } }], userToken)
+        params([{ path: 'gastown.getTown', input: { townId: 'town-1' } }], nonAdminIdentity)
+      )
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does nothing at the default flags, so no extra request is made', async () => {
+    await expect(
+      browserCapabilityHeader(
+        params([{ path: 'gastown.getTown', input: { townId: 'town-1' } }], legacyIdentity)
       )
     ).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -72,10 +87,11 @@ describe('browserCapabilityHeader', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to null when issuance is unavailable', async () => {
+  it('negative-caches issuance failures so polling does not retry each time', async () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 403 }));
-    await expect(
-      browserCapabilityHeader(params([{ path: 'gastown.getTown', input: { townId: 'town-3' } }]))
-    ).resolves.toBeNull();
+    const request = params([{ path: 'gastown.getTown', input: { townId: 'town-3' } }]);
+    await expect(browserCapabilityHeader(request)).resolves.toBeNull();
+    await expect(browserCapabilityHeader(request)).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

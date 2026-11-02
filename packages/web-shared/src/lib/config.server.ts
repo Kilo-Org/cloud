@@ -132,9 +132,6 @@ export function isWorkerAdminLegacyClaimIssuanceEnabled(): boolean {
 export function isWorkerAdminCapabilityIssuanceEnabled(): boolean {
   return getEnvVariable('WORKER_ADMIN_CAPABILITY_ISSUANCE') === 'on';
 }
-export const WORKER_ADMIN_CAPABILITY_PRIVATE_JWK = getEnvVariable(
-  'WORKER_ADMIN_CAPABILITY_PRIVATE_JWK'
-);
 const resourceTokenFamilyFlags = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
   gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',

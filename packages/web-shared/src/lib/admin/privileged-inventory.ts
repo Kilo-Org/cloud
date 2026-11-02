@@ -648,7 +648,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/api/gastown/token/route.ts',
     actionClass: 'worker_admin',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.app.glanceableAgentsSnapshot',
@@ -662,7 +662,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/api/wasteland/token/route.ts',
     actionClass: 'worker_admin',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.abuse.blockBlacklistedDomains',

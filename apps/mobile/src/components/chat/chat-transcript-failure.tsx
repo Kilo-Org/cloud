@@ -60,7 +60,10 @@ export function ChatTranscriptFailure({
                 <Text>{t('common.retry')}</Text>
               </Button>
             ) : null}
-            <Button variant="ghost" className={STATE_ACTION_CLASS} onPress={onBack}>
+            {/* Back is the only way out of the terminal state, so it carries a
+                control shape like the shared error states' action instead of
+                reading as a caption under the description. */}
+            <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onBack}>
               <Text>{t('common.back')}</Text>
             </Button>
           </View>

@@ -325,6 +325,113 @@ describe('Cloud Agent authority contract', () => {
       )
     ).toBe(false);
   });
+
+  it('allows only the models.list discovery query for personal and organization authority', () => {
+    expect(cloudAgentAuthorityProcedures(scope)).toEqual([
+      'cloudAgentNext.prepareSession',
+      'cloudAgentNext.listChildSessions',
+      'cloudAgentNext.getSession',
+      'cloudAgentNext.getMessageResult',
+      'cloudAgentNext.interruptSession',
+      'cloudAgentNext.sendMessage',
+      'models.list',
+    ]);
+    expect(cloudAgentAuthorityProcedures({ ...scope, organizationId })).toEqual([
+      'organizations.cloudAgentNext.prepareSession',
+      'organizations.cloudAgentNext.listChildSessions',
+      'organizations.cloudAgentNext.getSession',
+      'organizations.cloudAgentNext.getMessageResult',
+      'organizations.cloudAgentNext.interruptSession',
+      'organizations.cloudAgentNext.sendMessage',
+      'models.list',
+    ]);
+    expect(cloudAgentAuthorityProcedureKind('models.list')).toBe('query');
+  });
+
+  it.each([
+    ['personal', scope],
+    ['organization', { ...scope, organizationId }],
+  ] as const)('accepts strict models.list discovery for %s authority', (_label, authority) => {
+    expect(validateCloudAgentAuthorityRequest(authority, 'models.list', undefined)).toBeUndefined();
+    expect(validateCloudAgentAuthorityRequest(authority, 'models.list', {})).toEqual({});
+    expect(cloudAgentAuthorityInputSchema(authority, 'models.list')).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+    });
+    expect(cloudAgentAuthorityInputSchema(authority, 'models.list')).not.toHaveProperty(
+      'properties.organizationId'
+    );
+    expect(isCloudAgentAuthorityHttpPathAllowed(authority, '/api/trpc/models.list')).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['array', []],
+    ['extra field', { extra: true }],
+    ['organizationId', { organizationId }],
+    ['limit', { limit: 1 }],
+  ] as const)('rejects widened models.list input: %s', (_label, input) => {
+    expect(() => validateCloudAgentAuthorityRequest(scope, 'models.list', input)).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest({ ...scope, organizationId }, 'models.list', input)
+    ).toThrow();
+  });
+
+  it.each([
+    'models.preferred',
+    'models.customPricing',
+    'models.get',
+    'organizations.models.list',
+    'organizations.cloudAgentNext.models.list',
+  ])('does not permit adjacent models path %s', procedure => {
+    expect(cloudAgentAuthorityProcedures(scope)).not.toContain(procedure);
+    expect(() => cloudAgentAuthorityProcedureKind(procedure)).toThrow();
+    expect(() => cloudAgentAuthorityInputSchema(scope, procedure)).toThrow();
+    expect(() => validateCloudAgentAuthorityRequest(scope, procedure, {})).toThrow();
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(false);
+  });
+
+  it('expires models.list discovery with the authority', () => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'models.list', {}, scope.expiresAt)
+    ).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, expiresAt: now - 1 },
+        '/api/trpc/models.list'
+      )
+    ).toBe(false);
+  });
+
+  it('rejects HTTP batches mixing models.list with a forbidden or cross-scope path', () => {
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,models.preferred')
+    ).toBe(false);
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,user.getMe')).toBe(
+      false
+    );
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        scope,
+        '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
+      )
+    ).toBe(false);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, organizationId },
+        '/api/trpc/models.list,cloudAgentNext.getSession'
+      )
+    ).toBe(false);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,cloudAgentNext.getSession')
+    ).toBe(true);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, organizationId },
+        '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
+      )
+    ).toBe(true);
+  });
 });
 
 describe('scoped JWT policy', () => {

@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and the top-level areas of services/kilo-mcp/catalog.json. Generated from that catalog — read the catalog for current detail.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety, and the top-level catalog areas.
 ---
 
 <!--
@@ -13,12 +13,14 @@ Then regenerate:
 
 # Kilo MCP
 
-The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
-`kilo_call`.
+General account connections expose the Kilo API through two tools, `kilo_search`
+and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedicated
+child-session tools described below. Use the tool names published by your client;
+it may prefix them with the MCP server name.
 
 The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
 
-## How to use it
+## General API connections
 
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
 2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
@@ -35,6 +37,24 @@ code. A row whose top segment is `debug` carries `debug: true`.
 The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
 it, and the catalog wins when the two disagree — read the catalog, not this
 file, for current detail.
+
+## Parent-scoped child sessions
+
+These connections publish `search_models`, `spawn_session`, `list_child_sessions`,
+`get_session`, `get_message_result`, `send_message`, and `interrupt_session`.
+They do not expose API `search` or `call`.
+
+1. Launch a child only when the user explicitly asks for a new Cloud Agent session. Use local tools for work in the current worktree; a child has its own sandbox and independent worktree.
+2. Call `search_models` with the requested model name or partial identifier. Copy the returned `id` exactly into `model`; select only a returned `variant` and pass it separately. Do not guess IDs or silently substitute another model. An `alias_target` identifies a floating alias's target; catalog discovery does not guarantee organization policy approval.
+3. Call `spawn_session` with the repository, complete task prompt, mode, exact model ID, and a fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. The child starts immediately in a registered workspace with multi-chat support. Organization and `createdOnPlatform` are inherited from trusted parent state, not chosen by the caller.
+4. Set `callbackTarget: { "url": "session:parent" }` to receive completion, failure, or interruption as a new parent message. Omit it for no notification. Prefer callbacks over polling; never hold a tool open waiting for a callback.
+5. Use `list_child_sessions` to rediscover IDs, `get_session` for a bounded status check, and `get_message_result` for an initial or follow-up message's durable outcome. Creation and message admission are not completion. Use `send_message` or `interrupt_session` only for authorized follow-ups or Stop.
+6. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
+
+Authority and callbacks belong to the workspace's canonical parent, the original
+root chat, even when a sibling chat invokes the tool. Only its direct children
+are manageable; unrelated sessions and the parent itself are not. Children cannot
+spawn grandchildren.
 
 ## Reporting feedback and bugs
 

@@ -83,6 +83,10 @@ const scopedPrepareSessionSchema = z
 
 const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+// Discovery is scope-neutral; auth context pins any signed organization, and the
+// shared input stays empty so it cannot carry one.
+const MODELS_LIST_PROCEDURE = 'models.list';
+const modelsListInputSchema = z.object({}).strict();
 const scopedChildOperations = {
   prepareSession: { kind: 'mutation', schema: scopedPrepareSessionSchema },
   listChildSessions: {
@@ -144,13 +148,21 @@ function childOperation(procedure: string) {
   return scopedChildOperations[name as keyof typeof scopedChildOperations];
 }
 
+function isModelsListProcedure(procedure: string): boolean {
+  return procedure === MODELS_LIST_PROCEDURE;
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
-  return Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`);
+  return [
+    ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
+    MODELS_LIST_PROCEDURE,
+  ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
+  if (isModelsListProcedure(procedure)) return 'query';
   return childOperation(procedure).kind;
 }
 
@@ -161,13 +173,17 @@ export function cloudAgentAuthorityInputSchema(
   if (!cloudAgentAuthorityProcedures(authority).includes(procedure)) {
     throw new Error('Cloud Agent launch exceeds its authority');
   }
+  if (isModelsListProcedure(procedure)) {
+    return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
+  }
   return z.toJSONSchema(
     childOperation(procedure).schema.extend({
       organizationId:
         authority.organizationId === null
           ? z.never().optional()
           : z.literal(authority.organizationId),
-    })
+    }),
+    { io: 'input' }
   );
 }
 
@@ -186,6 +202,9 @@ export function validateCloudAgentAuthorityRequest(
   const scope = CloudAgentAuthoritySchema.parse(authority);
   if (scope.expiresAt <= nowSeconds || !cloudAgentAuthorityProcedures(scope).includes(procedure)) {
     throw new Error('Cloud Agent authority does not permit this procedure');
+  }
+  if (isModelsListProcedure(procedure)) {
+    return modelsListInputSchema.optional().parse(input);
   }
   const operation = childOperation(procedure);
   const request = operation.schema

@@ -12,7 +12,7 @@ const {
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
   assertOrganizationMembershipMock,
-  parentRuntimeTokenMock,
+  parentSpawnContextMock,
   balanceMock,
 } = vi.hoisted(() => ({
   db: { mockedDb: true },
@@ -21,7 +21,7 @@ const {
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
   assertOrganizationMembershipMock: vi.fn(),
-  parentRuntimeTokenMock: vi.fn(),
+  parentSpawnContextMock: vi.fn(),
   balanceMock: vi.fn(),
 }));
 
@@ -51,7 +51,7 @@ vi.mock('./organization-membership.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnContext: parentSpawnContextMock }),
 }));
 vi.mock('../../balance-validation.js', () => ({ validateBalanceOnly: balanceMock }));
 
@@ -103,7 +103,10 @@ describe('session creation preflight', () => {
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
-    parentRuntimeTokenMock.mockResolvedValue('trusted-parent-model-token');
+    parentSpawnContextMock.mockResolvedValue({
+      token: 'trusted-parent-model-token',
+      createdOnPlatform: 'cloud-agent-web',
+    });
     balanceMock.mockResolvedValue({ success: true });
   });
 
@@ -126,12 +129,13 @@ describe('session creation preflight', () => {
       cloudAgentAuthority: authority,
     };
     const resolved = await preflightSessionCreation(creation, scopedContext, 'prepareSession');
-    expect(parentRuntimeTokenMock).toHaveBeenCalledWith(authority);
+    expect(parentSpawnContextMock).toHaveBeenCalledWith(authority);
     expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env);
     expect(assertRepositoryAccessMock).toHaveBeenCalled();
-    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(mergeProfileConfigurationMock).toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
     expect(resolved.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+    expect(resolved.options?.createdOnPlatform).toBe('cloud-agent-web');
     balanceMock.mockClear();
     const freeContext = {
       ...scopedContext,
@@ -156,11 +160,77 @@ describe('session creation preflight', () => {
       'prepareSession'
     );
     expect(balanceMock).toHaveBeenCalledOnce();
-    parentRuntimeTokenMock.mockRejectedValueOnce(new Error('parent revoked'));
+    parentSpawnContextMock.mockRejectedValueOnce(new Error('parent revoked'));
     assertRepositoryAccessMock.mockClear();
     await expect(
       preflightSessionCreation(creation, scopedContext, 'prepareSession')
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(assertRepositoryAccessMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['cloud-agent-web', 'agent-manager', 'desktop'])(
+    'inherits the validated parent origin %s instead of caller provenance',
+    async createdOnPlatform => {
+      parentSpawnContextMock.mockResolvedValue({
+        token: 'trusted-parent-model-token',
+        createdOnPlatform,
+      });
+      const authority = {
+        version: 1 as const,
+        ownerId: context.userId,
+        parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+        organizationId: null,
+        authorizationId: '12345678-1234-4234-8234-123456789abc',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      };
+      const creation = request({
+        parentCloudAgentSessionId: authority.parentSessionId,
+        options: { createdOnPlatform: 'cloud-agent', clientProvenance: 'browser' },
+      });
+
+      const resolved = await preflightSessionCreation(
+        creation,
+        {
+          ...context,
+          authToken: jwt.sign({ aud: 'cloud-agent-next' }, 'fixture'),
+          cloudAgentAuthority: authority,
+        },
+        'prepareSession'
+      );
+
+      expect(resolved.options?.createdOnPlatform).toBe(createdOnPlatform);
+      expect(balanceMock).toHaveBeenCalledWith(
+        'trusted-parent-model-token',
+        undefined,
+        context.env
+      );
+    }
+  );
+
+  it('rejects a non-interactive parent origin before billing or profile resolution', async () => {
+    parentSpawnContextMock.mockResolvedValue({
+      token: 'trusted-parent-model-token',
+      createdOnPlatform: 'slack',
+    });
+    const authority = {
+      version: 1 as const,
+      ownerId: context.userId,
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+
+    await expect(
+      preflightSessionCreation(
+        request({ parentCloudAgentSessionId: authority.parentSessionId }),
+        { ...context, cloudAgentAuthority: authority },
+        'prepareSession'
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(balanceMock).not.toHaveBeenCalled();
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
     expect(assertRepositoryAccessMock).not.toHaveBeenCalled();
   });
 

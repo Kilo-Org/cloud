@@ -203,7 +203,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
       }
       if (ctx.cloudAgentAuthority) {
         request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
-        request.options = { ...request.options, createdOnPlatform: 'cloud-agent' };
+        if (request.options?.operationKey === undefined) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'operation_key_required' });
+        }
       }
       const requestWithProfile = await preflightSessionCreation(
         request,
@@ -231,7 +233,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         botId: ctx.botId,
         cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
-      const billingOrigin = { billingOrigin: input.createdOnPlatform };
+      const billingOrigin = { billingOrigin: requestWithProfile.options?.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an
       // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
       // key is ignored and the legacy split-flow behavior is preserved.

@@ -48,11 +48,14 @@ const {
   registerNewSessionMock,
   startNewSessionMock,
   createSessionWithLedgerMock,
-  parentRuntimeTokenMock,
+  parentSpawnContextMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
-  parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
+  parentSpawnContextMock: vi.fn().mockResolvedValue({
+    token: 'trusted-parent-model-token',
+    createdOnPlatform: 'cloud-agent-web',
+  }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -117,7 +120,7 @@ vi.mock('../../session/session-registration.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnContext: parentSpawnContextMock }),
 }));
 vi.mock('../../balance-validation.js', () => ({
   validateBalanceOnly: vi.fn(async () => ({ success: true })),
@@ -239,7 +242,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
-  it('derives child lineage from authority', async () => {
+  it('derives child lineage from authority and requires a ledger operation key', async () => {
     const context = createContext();
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     const authority = {
@@ -259,14 +262,47 @@ describe('prepareSession operation-ledger admission gate', () => {
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
       autoInitiate: true,
-      createdOnPlatform: 'cloud-agent-web',
+      operationKey: OPERATION_KEY,
+      createdOnPlatform: 'cloud-agent',
     });
-    const [request, registration] = startNewSessionMock.mock.calls[0];
+    const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
     expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
     expect(request).not.toHaveProperty('allowSubagentSessions');
-    expect(request.options.createdOnPlatform).toBe('cloud-agent');
+    expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
     expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
     expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+    expect(options.operationKey).toBe(OPERATION_KEY);
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a scoped child launch without a ledger operation key', async () => {
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const caller = router.createCaller(context);
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'operation_key_required' });
+
+    expect(parentSpawnContextMock).not.toHaveBeenCalled();
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
 
   it('permits normal parent preparation inputs without requiring auto-initiation or GitHub', async () => {

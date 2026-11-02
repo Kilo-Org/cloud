@@ -645,6 +645,21 @@ export function isTrustedWorktreeCreateOrigin(
   );
 }
 
+/**
+ * A scoped Cloud Agent launch is authenticated by the parent authority in the
+ * request context, not by caller-selected provenance or origin.
+ */
+export function isAuthenticatedChildWorktreeCreate(
+  input: Pick<SessionRegistrationInput, 'parentCloudAgentSessionId' | 'options'>,
+  ctx: Pick<SessionRegistrationContext, 'cloudAgentAuthority'>
+): boolean {
+  return (
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId
+  );
+}
+
 export function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
@@ -664,10 +679,11 @@ export function isEligibleFirstWorktreeSession(
     );
   }
   return (
-    isTrustedWorktreeCreateOrigin(
+    (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
-    ) &&
+    ) ||
+      isAuthenticatedChildWorktreeCreate(input, ctx)) &&
     input.initialTurn !== undefined &&
     input.clone === undefined
   );
@@ -2037,7 +2053,19 @@ async function assertCreateIntentUnchanged(
   if (typeof stored !== 'string' || stored.length === 0) {
     return;
   }
-  if ((await sessionCreateIntentFingerprint(input)) !== stored) {
+  const current = await sessionCreateIntentFingerprint(input);
+  if (current === stored) return;
+  // Deployed scoped children recorded the origin the old prepare handler forced.
+  const scopedChild =
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId;
+  const legacy = scopedChild
+    ? await sessionCreateIntentFingerprint({
+        ...input,
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+      })
+    : undefined;
+  if (legacy !== stored) {
     throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
   }
 }

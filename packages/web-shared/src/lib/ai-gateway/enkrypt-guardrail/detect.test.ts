@@ -115,10 +115,10 @@ describe('scanRequest', () => {
       deps(async () => detectResponse({ summary: {} }, { credits: header }))
     );
 
-    expect(result.charges).toEqual([expect.objectContaining({ creditsCost })]);
+    expect(result.usageRecords).toEqual([expect.objectContaining({ creditsCost })]);
   });
 
-  it('allows a clean request and charges the reported credits', async () => {
+  it('allows a clean request and records the reported credits', async () => {
     const result = await scanRequest(
       makeScan(),
       deps(async () =>
@@ -131,7 +131,7 @@ describe('scanRequest', () => {
 
     expect(result).toEqual({
       verdict: { action: 'allow' },
-      charges: [
+      usageRecords: [
         {
           organizationId: '00000000-0000-4000-8000-000000000002',
           kiloUserId: 'oauth/google:123',
@@ -163,7 +163,7 @@ describe('scanRequest', () => {
       message:
         "Your organization's Enkrypt AI guardrail blocked this request (detected: injection_attack). Potential prompt injection detected.",
     });
-    expect(result.charges).toEqual([
+    expect(result.usageRecords).toEqual([
       expect.objectContaining({ decision: 'blocked', creditsCost: 2 }),
     ]);
   });
@@ -197,7 +197,7 @@ describe('scanRequest', () => {
       message:
         "Your organization's Enkrypt AI guardrail blocked this request (detected: keyword_detector). The request was flagged by your organization policy. Review it and retry.",
     });
-    expect(result.charges).toEqual([expect.objectContaining({ decision: 'blocked' })]);
+    expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'blocked' })]);
   });
 
   it.each([
@@ -211,7 +211,7 @@ describe('scanRequest', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.charges).toEqual([expect.objectContaining({ decision: 'allowed' })]);
+    expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'allowed' })]);
   });
 
   describe('when Enkrypt reports a detector error with HTTP 200', () => {
@@ -267,7 +267,7 @@ describe('scanRequest', () => {
 
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
         expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
-        expect(result.charges).toEqual([
+        expect(result.usageRecords).toEqual([
           expect.objectContaining({ decision: 'error', creditsCost: 4 }),
         ]);
         expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
@@ -303,7 +303,10 @@ describe('scanRequest', () => {
       dependencies
     );
 
-    expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
+    expect(result).toEqual({
+      verdict: { action: 'unavailable', reason: 'failed' },
+      usageRecords: [],
+    });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
@@ -319,7 +322,7 @@ describe('scanRequest', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.charges).toEqual([expect.objectContaining({ decision: 'allowed' })]);
+    expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'allowed' })]);
   });
 
   it('makes no call for an empty request', async () => {
@@ -327,7 +330,7 @@ describe('scanRequest', () => {
 
     const result = await scanRequest(makeScan({ text: '' }), dependencies);
 
-    expect(result).toEqual({ verdict: { action: 'allow' }, charges: [] });
+    expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [] });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
@@ -344,7 +347,7 @@ describe('scanRequest', () => {
           action: 'block',
           message: expect.stringContaining('cannot scan more than 500,000 characters'),
         },
-        charges: [],
+        usageRecords: [],
       });
       expect(result.verdict).toMatchObject({
         message: expect.stringContaining('Compact or prune earlier conversation history'),
@@ -356,7 +359,7 @@ describe('scanRequest', () => {
     });
   });
 
-  it('retries one transient failure and charges both calls', async () => {
+  it('retries one transient failure and records usage for both calls', async () => {
     const responses = [
       detectResponse({ summary: {} }, { status: 502 }),
       detectResponse({ summary: { injection_attack: 0 } }, { credits: '2' }),
@@ -367,7 +370,7 @@ describe('scanRequest', () => {
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(2);
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.charges).toEqual([
+    expect(result.usageRecords).toEqual([
       expect.objectContaining({ decision: 'error', creditsCost: null }),
       expect.objectContaining({ decision: 'allowed', creditsCost: 2 }),
     ]);
@@ -397,7 +400,7 @@ describe('scanRequest', () => {
   });
 
   describe('client cancellation', () => {
-    it('makes no call and records no charge if the client already disconnected', async () => {
+    it('makes no call and records no usage if the client already disconnected', async () => {
       const controller = new AbortController();
       controller.abort();
       const dependencies = deps(async () => detectResponse({ summary: {} }), {
@@ -406,7 +409,10 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
+      expect(result).toEqual({
+        verdict: { action: 'unavailable', reason: 'failed' },
+        usageRecords: [],
+      });
       expect(dependencies.fetch).not.toHaveBeenCalled();
       expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
       expect(console.debug).toHaveBeenCalledWith(
@@ -440,7 +446,7 @@ describe('scanRequest', () => {
         expect(dependencies.fetch).toHaveBeenCalledTimes(1);
         expect(fetchCalls(dependencies)[0][1].signal?.aborted).toBe(true);
         expect(fetchCalls(dependencies)[0][1].signal?.reason).toBe(controller.signal.reason);
-        expect(result.charges).toEqual([]);
+        expect(result.usageRecords).toEqual([]);
         expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
         expect(console.debug).toHaveBeenCalledWith(
           '[enkrypt-guardrail] decision',
@@ -473,7 +479,7 @@ describe('scanRequest', () => {
 
       expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-      expect(result.charges).toEqual([
+      expect(result.usageRecords).toEqual([
         expect.objectContaining({ decision: 'error', creditsCost: 3 }),
       ]);
       expect(console.debug).toHaveBeenCalledWith(
@@ -512,7 +518,7 @@ describe('scanRequest', () => {
       const result = await scanRequest(makeScan(), deps(failure));
 
       expect(result.verdict).toEqual({ action: 'unavailable', reason });
-      expect(result.charges.every(charge => charge.decision === 'error')).toBe(true);
+      expect(result.usageRecords.every(usageRecord => usageRecord.decision === 'error')).toBe(true);
     });
 
     it('rejects the request when Enkrypt does not answer within the timeout', async () => {
@@ -526,7 +532,7 @@ describe('scanRequest', () => {
 
       expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-      expect(result.charges).toEqual([expect.objectContaining({ decision: 'error' })]);
+      expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
       expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
         '[enkrypt-guardrail] decision',
         expect.objectContaining({ error: 'timeout' })
@@ -540,7 +546,10 @@ describe('scanRequest', () => {
 
       const result = await scanRequest(makeScan(), dependencies);
 
-      expect(result).toEqual({ verdict: { action: 'unavailable', reason: 'failed' }, charges: [] });
+      expect(result).toEqual({
+        verdict: { action: 'unavailable', reason: 'failed' },
+        usageRecords: [],
+      });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
   });

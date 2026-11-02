@@ -115,8 +115,8 @@ describe('selectScopeEntryView', () => {
 });
 
 /** A tRPC client rejection, as `readTrpcErrorField` reads it. */
-function serverError(code: string): Error {
-  return Object.assign(new Error('boom'), { data: { code, message: 'boom' } });
+function serverError(code: string, data: Record<string, unknown> = {}): Error {
+  return Object.assign(new Error('boom'), { data: { code, message: 'boom', ...data } });
 }
 
 const CONNECTION_DESCRIPTION = 'organization.boundary.loadErrorMessage';
@@ -135,6 +135,15 @@ function failureFor(patch: Partial<SelectScopeEntryLoadFailureInput>): ScopeEntr
 describe('isInstallStateRefusal', () => {
   it('reads the server’s role answer', () => {
     expect(isInstallStateRefusal(serverError('UNAUTHORIZED'))).toBe(true);
+  });
+
+  it('keeps a session auth failure retryable, not a role answer', () => {
+    // `createTRPCContext` answers UNAUTHORIZED with `data.authRequired` when the
+    // session is invalid or missing. The app signs out on it; it is not the
+    // organization-role decision, and a personal scope has no owner to ask.
+    expect(isInstallStateRefusal(serverError('UNAUTHORIZED', { authRequired: true }))).toBe(
+      false
+    );
   });
 
   it('keeps every other failure retryable', () => {

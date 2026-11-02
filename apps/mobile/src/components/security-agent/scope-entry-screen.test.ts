@@ -395,6 +395,24 @@ describe('ScopeEntryScreen GitHub install capability', () => {
     expect(setup?.props.buttonLabel).toBe('Install GitHub App');
   });
 
+  it.each(['personal', 'org_123'])(
+    'keeps the retryable press when the %s mint answers a session auth failure',
+    async scope => {
+      // A session that expired answers UNAUTHORIZED with `data.authRequired`.
+      // The app signs out on it; retiring the press for the role notice would
+      // claim an organization role decided it, which a personal scope lacks.
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+      sessionAuthRequired = true;
+
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBeUndefined();
+      expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    }
+  );
+
   it("keeps the install press while an enabled agent's role list is unread", async () => {
     // An enabled agent with no connection reaches the connect view before the
     // shared membership list lands. Withholding the press on that unresolved

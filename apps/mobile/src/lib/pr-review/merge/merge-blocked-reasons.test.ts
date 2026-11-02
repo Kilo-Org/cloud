@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 import {
   defaultMergeMethodFor,
@@ -6,6 +8,7 @@ import {
   getMergeabilityStatus,
   getMergeBlockedReasons,
   type MergeBlockedReasonsArgs,
+  prMergeMethodName,
 } from './merge-blocked-reasons';
 
 function repo(overrides: Partial<MergeBlockedReasonsArgs> = {}): MergeBlockedReasonsArgs {
@@ -274,5 +277,28 @@ describe('defaultMergeMethodFor', () => {
         viewerCanAdmin: true,
       })
     ).toBe('merge');
+  });
+});
+
+describe('prMergeMethodName', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('names the method from the active catalog, never the wire code', async () => {
+    await i18n.changeLanguage('ps');
+    expect(prMergeMethodName('squash')).toBe('د کمېټونو یو کول');
+    expect(prMergeMethodName('merge')).toBe('یوځای کول');
+    expect(prMergeMethodName('rebase')).toBe('بیا بنسټول');
+  });
+
+  it('accepts the upper-case method codes the GraphQL API returns', async () => {
+    await i18n.changeLanguage('en');
+    expect(prMergeMethodName('SQUASH')).toBe('Squash');
+    expect(prMergeMethodName('Merge')).toBe('Merge');
+  });
+
+  it('keeps a value this build does not know as the provider sent it', () => {
+    expect(prMergeMethodName('FastForward')).toBe('fastforward');
   });
 });

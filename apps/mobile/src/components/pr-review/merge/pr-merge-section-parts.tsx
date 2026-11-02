@@ -13,6 +13,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
 import {
   type MergeBlockedReason,
+  prMergeMethodName,
   type PrOverviewDto,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
@@ -174,7 +175,7 @@ export function AutoMergeEnabledBanner({
           {t('prReview.merge.autoMergeOn')}
         </Text>
         <Text className="text-xs text-accent-soft-foreground">
-          {t('prReview.merge.autoMergeDescription', { method: method.toLowerCase() })}
+          {t('prReview.merge.autoMergeDescription', { method: prMergeMethodName(method) })}
         </Text>
       </View>
       <Button

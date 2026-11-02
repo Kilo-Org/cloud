@@ -25,6 +25,7 @@ export type PrReviewOverviewFixtureSurface =
   | 'overview'
   | 'overview-no-checks'
   | 'overview-multi-group'
+  | 'overview-auto-merge'
   | 'merge-request-missing'
   | 'merge-request-error';
 
@@ -32,17 +33,24 @@ export type PrReviewOverviewFixtureSurface =
  * What each overview surface reads. The GitHub surfaces differ only in the
  * shape of the checks answer — one run, no runs, and one run per status group —
  * because the Review button and the merge section below that card must keep one
- * position after the first settled frame in all three.
+ * position after the first settled frame in all three. `overview-auto-merge`
+ * keeps the single-run checks and turns auto-merge on, which is the only shape
+ * that draws the merge section's auto-merge banner.
  */
 const SURFACE_READS = {
-  overview: { scope: 'github', checks: 'one-run' },
-  'overview-no-checks': { scope: 'github', checks: 'no-runs' },
-  'overview-multi-group': { scope: 'github', checks: 'multi-group' },
-  'merge-request-missing': { scope: 'gitlab', checks: 'one-run' },
-  'merge-request-error': { scope: 'gitlab', checks: 'one-run' },
+  overview: { scope: 'github', checks: 'one-run', autoMerge: false },
+  'overview-no-checks': { scope: 'github', checks: 'no-runs', autoMerge: false },
+  'overview-multi-group': { scope: 'github', checks: 'multi-group', autoMerge: false },
+  'overview-auto-merge': { scope: 'github', checks: 'one-run', autoMerge: true },
+  'merge-request-missing': { scope: 'gitlab', checks: 'one-run', autoMerge: false },
+  'merge-request-error': { scope: 'gitlab', checks: 'one-run', autoMerge: false },
 } as const satisfies Record<
   PrReviewOverviewFixtureSurface,
-  { readonly scope: 'github' | 'gitlab'; readonly checks: 'one-run' | 'no-runs' | 'multi-group' }
+  {
+    readonly scope: 'github' | 'gitlab';
+    readonly checks: 'one-run' | 'no-runs' | 'multi-group';
+    readonly autoMerge: boolean;
+  }
 >;
 
 const headSha = '0123456789abcdef0123456789abcdef01234567';
@@ -94,6 +102,16 @@ export const reviewOverviewFixture = {
     viewerCanAdmin: true,
     viewerLogin: 'ada',
   },
+} satisfies RouterOutputs['githubPrReview']['getPullRequest'];
+
+/**
+ * The same pull request with auto-merge queued. The merge section draws the
+ * auto-merge banner from `autoMerge` and nothing else, so this is the only
+ * fixture shape that shows the copy which names the queued method.
+ */
+const autoMergeOverviewFixture = {
+  ...reviewOverviewFixture,
+  autoMerge: { method: 'squash' },
 } satisfies RouterOutputs['githubPrReview']['getPullRequest'];
 
 const reviewChecksFixture = {
@@ -191,7 +209,9 @@ function createFixtureClient(surface: PrReviewOverviewFixtureSurface) {
             throw new Error('Review overview fixture does not allow writes');
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
-            return fixtureResponse(reviewOverviewFixture);
+            return fixtureResponse(
+              SURFACE_READS[surface].autoMerge ? autoMergeOverviewFixture : reviewOverviewFixture
+            );
           }
           if (url.includes('/githubPrReview.listChecks')) {
             return fixtureResponse(CHECKS_BY_SHAPE[SURFACE_READS[surface].checks]);

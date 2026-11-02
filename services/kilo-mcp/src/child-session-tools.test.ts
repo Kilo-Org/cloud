@@ -85,6 +85,8 @@ describe('dedicated child session tools', () => {
       'get_message_result',
       'send_message',
       'interrupt_session',
+      'list_folders',
+      'assign_workspace_to_folder',
     ]);
     const { cloudAgentAuthority: omitted, ...generalAuth } = auth;
     expect(omitted).toEqual(authority);
@@ -255,6 +257,91 @@ describe('dedicated child session tools', () => {
     expect(tools.find(tool => tool.name === 'interrupt_session')?.annotations.destructiveHint).toBe(
       true
     );
+  });
+});
+
+describe('scoped workspace folder tools', () => {
+  const worktreeId = 'worktree_66666666-6666-4666-8666-666666666666';
+  const folderId = '77777777-7777-4777-8777-777777777777';
+
+  it.each([null, organizationId])('pins folder listing to the signed scope %s', async org => {
+    const connection = {
+      ...auth,
+      ...(org ? { organizationId: org } : {}),
+      cloudAgentAuthority: { ...authority, organizationId: org },
+    };
+    await run('list_folders', {}, connection);
+    const request = new Request(...fetchImpl.mock.calls[0]!);
+    expect(request.method).toBe('GET');
+    expect(new URL(request.url).pathname).toBe('/api/trpc/workspaceFolders.list');
+    expect(JSON.parse(new URL(request.url).searchParams.get('input')!)).toEqual({
+      organizationId: org,
+    });
+  });
+
+  it.each([null, organizationId])(
+    'forwards the direct child and worktree tuple for scope %s',
+    async org => {
+      const connection = {
+        ...auth,
+        ...(org ? { organizationId: org } : {}),
+        cloudAgentAuthority: { ...authority, organizationId: org },
+      };
+      const input = { cloudAgentSessionId: childId, worktreeId, folderId };
+      await run('assign_workspace_to_folder', input, connection);
+      const request = new Request(...fetchImpl.mock.calls[0]!);
+      expect(request.method).toBe('POST');
+      expect(new URL(request.url).pathname).toBe('/api/trpc/workspaceFolders.moveWorktree');
+      expect(await request.json()).toEqual({ ...input, organizationId: org });
+    }
+  );
+
+  it('can remove only the identified child workspace folder assignment', async () => {
+    await run('assign_workspace_to_folder', {
+      cloudAgentSessionId: childId,
+      worktreeId,
+      folderId: null,
+    });
+    expect(await new Request(...fetchImpl.mock.calls[0]!).json()).toEqual({
+      cloudAgentSessionId: childId,
+      worktreeId,
+      folderId: null,
+      organizationId: null,
+    });
+  });
+
+  it.each([
+    { worktreeId, folderId },
+    { cloudAgentSessionId: childId, folderId },
+    { cloudAgentSessionId: childId, worktreeId },
+    { cloudAgentSessionId: childId, worktreeId, folderId: 'not-a-folder' },
+    { cloudAgentSessionId: childId, worktreeId: 'not-a-worktree', folderId },
+    { cloudAgentSessionId: childId, worktreeId, folderId, organizationId },
+  ])('rejects missing identifiers, guessed identifiers, and scope overrides: %j', async input => {
+    await expect(run('assign_workspace_to_folder', input)).rejects.toThrow('schema');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not let folder listing take caller-selected account scope', async () => {
+    await expect(run('list_folders', { organizationId })).rejects.toThrow('schema');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('preserves ambiguous mutation errors without silently retrying folder assignment', async () => {
+    fetchImpl.mockRejectedValueOnce(new Error('network unavailable'));
+    await expect(
+      run('assign_workspace_to_folder', { cloudAgentSessionId: childId, worktreeId, folderId })
+    ).rejects.toMatchObject({ data: { ambiguous: true } });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('marks folder listing read-only and explains the whole-workspace scope of assignment', () => {
+    const tools = childSessionTools(authority);
+    expect(tools.find(tool => tool.name === 'list_folders')?.annotations.readOnlyHint).toBe(true);
+    const assignment = tools.find(tool => tool.name === 'assign_workspace_to_folder');
+    expect(assignment?.annotations.readOnlyHint).toBe(false);
+    expect(assignment?.description).toContain('all sibling chats');
+    expect(assignment?.description).toContain('Cannot move the parent workspace');
   });
 });
 

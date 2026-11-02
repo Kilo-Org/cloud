@@ -41,7 +41,8 @@ file, for current detail.
 ## Parent-scoped child sessions
 
 These connections publish `search_models`, `spawn_session`, `list_child_sessions`,
-`get_session`, `get_message_result`, `send_message`, and `interrupt_session`.
+`get_session`, `get_message_result`, `send_message`, `interrupt_session`,
+`list_folders`, and `assign_workspace_to_folder`.
 They do not expose API `search` or `call`.
 
 1. Launch a child only when the user explicitly asks for a new Cloud Agent session. Use local tools for work in the current worktree; a child has its own sandbox and independent worktree.
@@ -49,7 +50,8 @@ They do not expose API `search` or `call`.
 3. Call `spawn_session` with the repository, complete task prompt, mode, exact model ID, and a fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. The child starts immediately in a registered workspace with multi-chat support. Organization and `createdOnPlatform` are inherited from trusted parent state, not chosen by the caller.
 4. Set `callbackTarget: { "url": "session:parent" }` to receive completion, failure, or interruption as a new parent message. Omit it for no notification. Prefer callbacks over polling; never hold a tool open waiting for a callback.
 5. Use `list_child_sessions` to rediscover IDs, `get_session` for a bounded status check, and `get_message_result` for an initial or follow-up message's durable outcome. Creation and message admission are not completion. Use `send_message` or `interrupt_session` only for authorized follow-ups or Stop.
-6. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
+6. To organize a child workspace, call `list_folders` to find an existing folder's exact ID, then `assign_workspace_to_folder` with that `folderId` and the child's `cloudAgentSessionId` and `worktreeId` from `list_child_sessions` or `get_session`. This files the whole worktree, including sibling chats. Set `folderId: null` to unfile it. Only workspaces created by this parent are movable; these tools cannot create, edit, delete, or reorder folders. Folder listing returns metadata, not other workspaces' membership.
+7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
 
 Authority and callbacks belong to the workspace's canonical parent, the original
 root chat, even when a sibling chat invokes the tool. Only its direct children

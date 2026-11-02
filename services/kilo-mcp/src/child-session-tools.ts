@@ -48,6 +48,18 @@ const childOperations = [
     description:
       'Request Stop for a direct child Cloud Agent session when the user authorizes interruption. Pass its cloudAgentSessionId in sessionId. This interrupts work; it does not delete the session or guarantee physical sandbox cleanup. Check durable outcomes if confirmation is needed. Never target the parent, unrelated sessions, or siblings in the parent workspace.',
   },
+  {
+    name: 'list_folders',
+    procedure: 'workspaceFolders.list',
+    description:
+      "List existing workspace folders belonging to this user in the parent's fixed personal or organization scope. Returns folder id, name, and color; worktreeIds is intentionally empty and does not describe folder membership. Use the returned folder id with assign_workspace_to_folder to organize a workspace this parent created. Does not list unrelated workspaces or grant permission to create, rename, delete, or reorder folders. A revoked parent or unavailable authorization fails rather than appearing as an empty folder list.",
+  },
+  {
+    name: 'assign_workspace_to_folder',
+    procedure: 'workspaceFolders.moveWorktree',
+    description:
+      'Assign a workspace created by this canonical parent to an existing folder in the same user and organization scope, or pass folderId:null to remove its folder assignment. Use list_folders for the exact folder id and list_child_sessions or get_session for the child cloudAgentSessionId and worktreeId. Both child and worktree IDs are required and verified against live parent authorization, direct-child lineage, and stored workspace ownership. The folder applies to the entire worktree, including all sibling chats, without changing chat activity or runtime state. Cannot move the parent workspace or other workspaces owned by the same user. After a transport failure, reconcile before retrying.',
+  },
 ] as const;
 
 const searchModelsArgs = z
@@ -78,7 +90,7 @@ export const CHILD_SESSION_TOOL_NAMES = [
 ];
 
 export const CHILD_SESSION_INSTRUCTIONS =
-  'This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace\'s canonical parent session, the original root chat, not to the sibling chat that invoked this tool. Launch a child only when the user explicitly asks to spin up a new Cloud Agent session. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree. First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval. Call spawn_session with a complete task brief and a fresh UUID operationKey. Organization and createdOnPlatform come from trusted parent state, not caller input. Include callbackTarget: { url: "session:parent" } to receive the result as a new message in the canonical parent; omit for no notification. Prefer callbacks over polling. Do not poll or wait in a tool for a callback; keep any status check bounded. Use list_child_sessions to recover IDs, get_session for status, get_message_result for a specific message outcome, send_message for authorized follow-ups, and interrupt_session for authorized Stop. You may list, inspect, check status, stop, send a follow-up to, or spawn only direct child Cloud Agent sessions of this parent and must not access unrelated sessions. An accepted launch or follow-up is not completed work. After an ambiguous mutation failure, reconcile state before retrying and retain the original operationKey/messageId. Spawned children cannot spawn further children; do not launch a child from a child session, and do not ask a child to launch one.';
+  'This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace\'s canonical parent session, the original root chat, not to the sibling chat that invoked this tool. Launch a child only when the user explicitly asks to spin up a new Cloud Agent session. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree. First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval. Call spawn_session with a complete task brief and a fresh UUID operationKey. Organization and createdOnPlatform come from trusted parent state, not caller input. Include callbackTarget: { url: "session:parent" } to receive the result as a new message in the canonical parent; omit for no notification. Prefer callbacks over polling. Do not poll or wait in a tool for a callback; keep any status check bounded. Use list_child_sessions to recover IDs, get_session for status, get_message_result for a specific message outcome, send_message for authorized follow-ups, and interrupt_session for authorized Stop. Use list_folders to discover existing folder IDs in the fixed parent scope, then assign_workspace_to_folder with the direct child\'s cloudAgentSessionId and worktreeId to file its entire workspace; folderId:null removes the assignment. Folder tools cannot organize unrelated workspaces or create, edit, delete, or reorder folders. You may list, inspect, check status, stop, send a follow-up to, or spawn only direct child Cloud Agent sessions of this parent and must not access unrelated sessions. An accepted launch or follow-up is not completed work. After an ambiguous mutation failure, reconcile state before retrying and retain the original operationKey/messageId. Spawned children cannot spawn further children; do not launch a child from a child session, and do not ask a child to launch one.';
 
 const fieldDescriptions: Record<string, string> = {
   githubRepo: 'GitHub repository in owner/repository form. The child checks it out independently.',
@@ -102,6 +114,10 @@ const fieldDescriptions: Record<string, string> = {
     'Canonical message ID matching msg_[12 lowercase hex][14 alphanumeric]. For a new follow-up generate a fresh ID; reuse it only for that same submission. For a result use initialMessageId or the submitted follow-up ID.',
   expectedWorktreeId:
     'Optional worktree_* ID from list_child_sessions to verify the child workspace binding.',
+  worktreeId:
+    "The child workspace's worktree_* ID from list_child_sessions or get_session. It must match the supplied direct child cloudAgentSessionId.",
+  folderId:
+    "Existing folder UUID returned by list_folders in this parent's fixed account scope, or null to remove the child workspace's folder assignment.",
   cursor: 'nextCursor returned by the previous list_child_sessions page.',
   limit: 'Maximum children per page, from 1 to 50; defaults to 20.',
   payload:
@@ -125,7 +141,10 @@ export function childSessionTools(authority: CloudAgentAuthority) {
       },
     },
     ...childOperations.map(tool => {
-      const schema = cloudAgentAuthorityInputSchema(authority, `${prefix}.${tool.procedure}`);
+      const path = tool.procedure.startsWith('workspaceFolders.')
+        ? tool.procedure
+        : `${prefix}.${tool.procedure}`;
+      const schema = cloudAgentAuthorityInputSchema(authority, path);
       const properties = { ...(schema.properties as Record<string, Record<string, unknown>>) };
       delete properties.organizationId;
       delete properties.autoInitiate;
@@ -139,9 +158,12 @@ export function childSessionTools(authority: CloudAgentAuthority) {
         ? schema.required.filter(key => key !== 'organizationId' && key !== 'autoInitiate')
         : [];
       if (tool.procedure === 'prepareSession') required.push('operationKey');
-      const readOnly = ['listChildSessions', 'getSession', 'getMessageResult'].includes(
-        tool.procedure
-      );
+      const readOnly = [
+        'listChildSessions',
+        'getSession',
+        'getMessageResult',
+        'workspaceFolders.list',
+      ].includes(tool.procedure);
       return {
         name: tool.name,
         description: tool.description,
@@ -222,7 +244,8 @@ export async function runChildSessionTool(options: {
   if (!operation || !tool) throw new JsonRpcFailure(-32602, 'Unknown child session tool.');
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
-  const path = `${prefix}.${operation.procedure}`;
+  const folderOperation = operation.procedure.startsWith('workspaceFolders.');
+  const path = folderOperation ? operation.procedure : `${prefix}.${operation.procedure}`;
   const row = catalog[path];
   if (!row)
     throw new JsonRpcFailure(-32000, 'Child session operation is unavailable in the Kilo catalog.');
@@ -233,7 +256,9 @@ export async function runChildSessionTool(options: {
     input: {
       ...args,
       ...(operation.procedure === 'prepareSession' ? { autoInitiate: true } : {}),
-      ...(authority.organizationId === null ? {} : { organizationId: authority.organizationId }),
+      ...(authority.organizationId === null && !folderOperation
+        ? {}
+        : { organizationId: authority.organizationId }),
     },
   });
 }

@@ -139,7 +139,24 @@ const scopedChildOperations = {
   },
 } as const;
 
-function childOperation(procedure: string) {
+const scopedFolderOperations = {
+  'workspaceFolders.list': { kind: 'query', schema: z.object({}).strict() },
+  'workspaceFolders.moveWorktree': {
+    kind: 'mutation',
+    schema: z
+      .object({
+        cloudAgentSessionId: childSessionIdSchema,
+        worktreeId: cloudAgentWorktreeIdSchema,
+        folderId: z.uuid().nullable(),
+      })
+      .strict(),
+  },
+} as const;
+
+function scopedOperation(procedure: string) {
+  if (Object.hasOwn(scopedFolderOperations, procedure)) {
+    return scopedFolderOperations[procedure as keyof typeof scopedFolderOperations];
+  }
   const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
   const name = match?.[1];
   if (!name || !Object.hasOwn(scopedChildOperations, name)) {
@@ -158,12 +175,13 @@ export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): s
   return [
     ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
+    ...Object.keys(scopedFolderOperations),
   ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
   if (isModelsListProcedure(procedure)) return 'query';
-  return childOperation(procedure).kind;
+  return scopedOperation(procedure).kind;
 }
 
 export function cloudAgentAuthorityInputSchema(
@@ -177,9 +195,10 @@ export function cloudAgentAuthorityInputSchema(
     return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
   }
   return z.toJSONSchema(
-    childOperation(procedure).schema.extend({
-      organizationId:
-        authority.organizationId === null
+    scopedOperation(procedure).schema.extend({
+      organizationId: procedure.startsWith('workspaceFolders.')
+        ? z.literal(authority.organizationId)
+        : authority.organizationId === null
           ? z.never().optional()
           : z.literal(authority.organizationId),
     }),
@@ -206,13 +225,18 @@ export function validateCloudAgentAuthorityRequest(
   if (isModelsListProcedure(procedure)) {
     return modelsListInputSchema.optional().parse(input);
   }
-  const operation = childOperation(procedure);
+  const operation = scopedOperation(procedure);
+  const folderProcedure = procedure.startsWith('workspaceFolders.');
   const request = operation.schema
-    .extend({ organizationId: z.string().min(1).optional() })
+    .extend({
+      organizationId: folderProcedure
+        ? z.literal(scope.organizationId)
+        : z.string().min(1).optional(),
+    })
     .parse(input);
   const organizationProcedure = procedure.startsWith('organizations.');
   if (
-    organizationProcedure !== (scope.organizationId !== null) ||
+    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
     (request.organizationId ?? null) !== scope.organizationId
   ) {
     throw new Error('Cloud Agent launch exceeds its authority');

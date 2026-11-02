@@ -36462,6 +36462,10 @@
               "type": "null"
             }
           ]
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -36475,9 +36479,10 @@
       "moveworktree",
       "organizationid",
       "worktreeid",
-      "folderid"
+      "folderid",
+      "cloudagentsessionid"
     ],
-    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid organizationId worktreeId folderId"
+    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid cloudagentsessionid organizationId worktreeId folderId cloudAgentSessionId"
   },
   "workspaceFolders.reorder": {
     "path": "workspaceFolders.reorder",

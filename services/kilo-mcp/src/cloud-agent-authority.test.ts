@@ -691,6 +691,8 @@ describe('Cloud Agent MCP authority', () => {
         'get_message_result',
         'send_message',
         'interrupt_session',
+        'list_folders',
+        'assign_workspace_to_folder',
       ]);
       for (const tool of body.result.tools) {
         expect(tool.inputSchema).not.toHaveProperty('properties.parentCloudAgentSessionId');

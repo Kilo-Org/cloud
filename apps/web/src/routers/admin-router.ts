@@ -2457,7 +2457,7 @@ export const adminRouter = createTRPCRouter({
   }),
 
   apiRequestLog: createTRPCRouter({
-    getSummary: adminProcedure.query(async () => {
+    getSummary: sessionViewerProcedure.query(async () => {
       const [summary] = await db
         .select({
           recordCount: count(),

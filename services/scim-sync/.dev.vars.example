@@ -1,7 +1,0 @@
-# Shared secrets (required for local dev — secrets store not available in wrangler dev)
-# @from WORKOS_API_KEY
-WORKOS_API_KEY=
-
-# Worker environment
-ENVIRONMENT=development
-WORKOS_API_BASE_URL=https://api.workos.com

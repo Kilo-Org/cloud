@@ -6,13 +6,11 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   // Capped at the newest date the pinned miniflare/workerd binary supports, so
-  // `wrangler dev` and the vitest-pool-workers suite run the same runtime as
-  // production. Raise it with the wrangler/miniflare catalog bump.
+  // `wrangler dev` runs the same runtime as production. Raise it with the
+  // wrangler/miniflare catalog bump.
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  // Lets drizzle's generated migration files be imported as strings.
-  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "dev": {
     "port": 8819,
     "local_protocol": "http",
@@ -22,39 +20,23 @@
     "enabled": true,
   },
   "logpush": true,
-  // The Durable Object reschedules its own alarm after every poll. The cron is
-  // only a watchdog: it re-arms the alarm if the chain ever dies (DO eviction
-  // with exhausted alarm retries), so a stalled poller self-heals within 5
-  // minutes instead of waiting for a deploy.
-  "triggers": {
-    "crons": ["*/5 * * * *"],
-  },
   "vars": {
     "ENVIRONMENT": "production",
-    "WORKOS_API_BASE_URL": "https://api.workos.com",
   },
   "durable_objects": {
     "bindings": [
       {
-        "name": "WORKOS_EVENT_SYNC_DO",
-        "class_name": "WorkOSEventSyncDO",
+        "name": "SCIM_SYNC_DO",
+        "class_name": "ScimSyncDO",
       },
     ],
   },
+  // SQLite-backed from the start: switching a deployed class's storage backend
+  // later is not supported, and this class will need storage.
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["WorkOSEventSyncDO"],
-    },
-  ],
-  // PRODUCTION Secrets Store (shared Kilo secrets store).
-  // WORKOS_API_KEY_PROD / WORKOS_API_KEY_DEV must exist in the store before
-  // this worker deploys, or `wrangler deploy` fails on the missing secret.
-  "secrets_store_secrets": [
-    {
-      "binding": "WORKOS_API_KEY",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "WORKOS_API_KEY_PROD",
+      "new_sqlite_classes": ["ScimSyncDO"],
     },
   ],
   // ============================================
@@ -65,28 +47,17 @@
     "dev": {
       "name": "cloudflare-scim-sync-dev",
       "workers_dev": true,
-      "triggers": {
-        "crons": ["*/5 * * * *"],
-      },
       "vars": {
         "ENVIRONMENT": "development",
-        "WORKOS_API_BASE_URL": "https://api.workos.com",
       },
       "durable_objects": {
         "bindings": [
           {
-            "name": "WORKOS_EVENT_SYNC_DO",
-            "class_name": "WorkOSEventSyncDO",
+            "name": "SCIM_SYNC_DO",
+            "class_name": "ScimSyncDO",
           },
         ],
       },
-      "secrets_store_secrets": [
-        {
-          "binding": "WORKOS_API_KEY",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "WORKOS_API_KEY_DEV",
-        },
-      ],
     },
   },
 }

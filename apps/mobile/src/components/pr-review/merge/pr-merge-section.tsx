@@ -34,7 +34,6 @@ import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
-  BlockedPanelPending,
   ClosedChip,
   MergeabilityCheckingRow,
   MergeabilityTimedOutRow,
@@ -95,7 +94,7 @@ export function PrMergeSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const status = getMergeabilityStatus(overview);
-  const { reasons, isChecksPending } = useMergeBlockedReasons(overview, {
+  const { reasons } = useMergeBlockedReasons(overview, {
     owner,
     repo,
     number: overview.number,
@@ -225,31 +224,27 @@ export function PrMergeSection({
 
   // Blocked.
   if (status === 'blocked') {
-    // The panel's checks row is read from `listChecks`; until that answers the
-    // panel keeps its own shape and the actions below it stay where they are,
-    // so it never paints a cause the read replaces, never appends a row after
-    // the first paint, and never moves what is below it.
+    // The panel's rows come from the read the Checks card above it renders, so
+    // they are final at the panel's first frame: it never paints a cause the
+    // answer replaces, never appends a row after the first paint, and never
+    // moves what is below it.
     return (
       <View className="gap-3">
-        {isChecksPending ? (
-          <BlockedPanelPending />
-        ) : (
-          <BlockedPanel
-            reasons={reasons}
-            allowUpdateBranch={overview.repo.allowUpdateBranch}
-            isUpdatePending={updateBranch.isPending}
-            onUpdateBranch={() => {
-              ignoreRejection(
-                updateBranch.mutateAsync({
-                  owner,
-                  repo,
-                  number: overview.number,
-                  expectedHeadSha: overview.headSha,
-                })
-              );
-            }}
-          />
-        )}
+        <BlockedPanel
+          reasons={reasons}
+          allowUpdateBranch={overview.repo.allowUpdateBranch}
+          isUpdatePending={updateBranch.isPending}
+          onUpdateBranch={() => {
+            ignoreRejection(
+              updateBranch.mutateAsync({
+                owner,
+                repo,
+                number: overview.number,
+                expectedHeadSha: overview.headSha,
+              })
+            );
+          }}
+        />
         {overview.repo.allowAutoMerge ? (
           <Button
             variant="outline"

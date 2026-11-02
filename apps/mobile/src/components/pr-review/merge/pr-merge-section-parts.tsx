@@ -153,36 +153,6 @@ export function BlockedPanel({
   );
 }
 
-/**
- * The panel's place before the checks read answers. It is the panel's own
- * chrome — label, card, one row's geometry — so the panel that arrives is the
- * same box filled in, not a different section swapped for it. The row is a
- * title-only reason row (the reviews and checks rows both are), which is what
- * a blocked review settles to.
- */
-export function BlockedPanelPending() {
-  const { t } = useTranslation();
-  return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.merge.blockedTitle')} />
-      <View
-        className="overflow-hidden rounded-lg bg-secondary"
-        accessibilityRole="progressbar"
-        accessibilityLabel={t('common.loading')}
-      >
-        <View className="flex-row items-start gap-3 px-4 py-3">
-          {/* Plain bars, not the shimmering skeleton: this panel is imported by
-              the provider section's pure test, whose Node runtime cannot load
-              the animation library the shared Skeleton pulls in. `bg-muted-soft`
-              is the one gray that contrasts with this card in both themes. */}
-          <View className="h-4 w-4 rounded bg-muted-soft" />
-          <View className="h-5 w-1/2 rounded bg-muted-soft" />
-        </View>
-      </View>
-    </View>
-  );
-}
-
 export function AutoMergeEnabledBanner({
   method,
   onDisable,

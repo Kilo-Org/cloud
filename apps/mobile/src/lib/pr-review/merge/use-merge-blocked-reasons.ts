@@ -1,8 +1,8 @@
-// The blocked panel's rows, wired to the reads that decide them. Kept out of
+// The blocked panel's rows, wired to the read that decides them. Kept out of
 // the section so the panel and the Checks card above it read `listChecks`
 // through the same query: one answer, two surfaces, no contradiction.
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import {
@@ -14,26 +14,27 @@ import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 
 export type MergeBlockedReasonsModel = {
   reasons: MergeBlockedReason[];
-  /**
-   * True while the checks read has not answered. The rows are not final yet,
-   * so the section holds the panel instead of painting a cause it will
-   * replace, and appending a row only after the read never moves the screen.
-   */
-  isChecksPending: boolean;
 };
 
 /**
  * Why the merge section holds the PR back. `failedCheckCount` is the `failure`
- * rollup of the read the Checks card renders, and is `null` until that read
- * answers, so the panel never claims a checks cause the card cannot show.
+ * rollup of the read the Checks card renders, so the panel names failing checks
+ * only when that card counts them.
+ *
+ * The overview paints its body only once this read has answered, and a head
+ * change keeps the previous answer on screen the way the card does, so the
+ * panel's rows are final at its first frame: it never paints a placeholder the
+ * answer then replaces, and never adds a row to a painted panel.
  */
 export function useMergeBlockedReasons(
   overview: PrOverviewDto,
   triple: { owner: string; repo: string; number: number }
 ): MergeBlockedReasonsModel {
   const queries = useProviderPrQueries(triple);
-  const checks = useQuery(queries.checksOptions(overview.headSha, true));
-  const isChecksPending = checks.isLoading;
+  const checks = useQuery({
+    ...queries.checksOptions(overview.headSha, true),
+    placeholderData: keepPreviousData,
+  });
   const failedCheckCount = checks.data ? checks.data.rollup.failure : null;
   const reasons = useMemo(
     () =>
@@ -44,10 +45,9 @@ export function useMergeBlockedReasons(
         mergeableState: overview.mergeableState,
         reviewDecision: overview.reviewDecision,
         failedCheckCount,
-        isChecksReadPending: isChecksPending,
         allowUpdateBranch: overview.repo.allowUpdateBranch,
       }),
-    [overview, failedCheckCount, isChecksPending]
+    [overview, failedCheckCount]
   );
-  return { reasons, isChecksPending };
+  return { reasons };
 }

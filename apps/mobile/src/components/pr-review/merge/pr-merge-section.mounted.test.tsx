@@ -42,11 +42,9 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useDisableAutoMergeMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 // The poll suite owns the timer, not the reasons: the panel's rows come from
-// their own selector tests and the end-to-end run. The model is mutable so a
-// test can put the checks read back in flight.
+// their own selector tests and the end-to-end run.
 const reasonsModel = vi.hoisted(() => ({
   reasons: [] as MergeBlockedReason[],
-  isChecksPending: false,
 }));
 vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
   useMergeBlockedReasons: () => reasonsModel,
@@ -54,7 +52,6 @@ vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
 vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   AutoMergeEnabledBanner: 'AutoMergeEnabledBanner',
   BlockedPanel: 'BlockedPanel',
-  BlockedPanelPending: 'BlockedPanelPending',
   MergeabilityCheckingRow: 'MergeabilityCheckingRow',
   MergeabilityTimedOutRow: 'MergeabilityTimedOutRow',
   ClosedChip: 'ClosedChip',
@@ -210,15 +207,16 @@ describe('PrMergeSection mergeability poll', () => {
     expect(onRefetch).toHaveBeenCalledOnce();
   });
 
-  it('holds the blocked panel until the checks read answers', () => {
+  it('paints the blocked panel rows on its first frame', () => {
     const onRefetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const blocked = overview({
       mergeable: false,
       mergeableState: 'blocked',
       reviewDecision: 'APPROVED',
     });
-    reasonsModel.isChecksPending = true;
-    reasonsModel.reasons = [];
+    reasonsModel.reasons = [
+      { id: 'failing-checks', iconKind: 'failing-checks', severity: 'destructive', title: 'x' },
+    ];
     act(() => {
       renderer = TestRenderer.create(sectionElement(blocked, onRefetch));
     });
@@ -226,20 +224,9 @@ describe('PrMergeSection mergeability poll', () => {
     if (!mounted) {
       throw new Error('the merge section did not mount');
     }
-    // Nothing is claimed while the read is unanswered; the panel keeps its
-    // own place with one row's geometry.
-    expect(countOf(mounted, 'BlockedPanelPending')).toBe(1);
-    expect(countOf(mounted, 'BlockedPanel')).toBe(0);
-
-    reasonsModel.isChecksPending = false;
-    reasonsModel.reasons = [
-      { id: 'failing-checks', iconKind: 'failing-checks', severity: 'destructive', title: 'x' },
-    ];
-    act(() => {
-      mounted.update(sectionElement(blocked, onRefetch));
-    });
-    expect(countOf(mounted, 'BlockedPanelPending')).toBe(0);
-    expect(countOf(mounted, 'BlockedPanel')).toBe(1);
+    const panels = mounted.root.findAll(node => String(node.type) === 'BlockedPanel');
+    expect(panels).toHaveLength(1);
+    expect(panels[0]?.props.reasons).toEqual(reasonsModel.reasons);
     reasonsModel.reasons = [];
   });
 

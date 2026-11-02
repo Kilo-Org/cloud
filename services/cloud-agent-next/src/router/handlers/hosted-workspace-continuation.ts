@@ -61,7 +61,7 @@ import { repositoryInputToSessionRepository } from './session-start.js';
 /** Parent ledger identity. */
 const CONTINUATION_DOMAIN = 'session';
 const CONTINUATION_INTENT = 'continue_hosted_workspace';
-const CONTINUATION_LEASE_SECONDS = 120;
+const CONTINUATION_STEP_LEASE_SECONDS = 120;
 
 const ContinuationAgentInput = z
   .object({
@@ -105,16 +105,22 @@ export const ContinueHostedWorkspaceInput = ContinueHostedWorkspaceRequestSchema
         message: 'activeSourceKiloSessionId must be one of the sessions',
       });
     }
-    // The request is not persisted as raw JSON, but a plaintext generic git
-    // token must never reach any durable store or the derived create intent, so
-    // reject it before any write. The other repository variants (including a
-    // token-less generic git) are unchanged.
-    if (value.repository.type === 'git' && value.repository.token !== undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['repository', 'token'],
-        message: 'repository.token is not accepted',
-      });
+    if (value.repository.type === 'git') {
+      if (value.repository.token !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['repository', 'token'],
+          message: 'repository.token is not accepted',
+        });
+      }
+      const url = URL.parse(value.repository.url);
+      if (url && (url.username !== '' || url.password !== '')) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['repository', 'url'],
+          message: 'repository.url must not contain credentials',
+        });
+      }
     }
   }
 );
@@ -360,7 +366,7 @@ async function resolveContinuationPlan(args: {
     clone: { cloneFromKiloSessionId: firstSession.sourceKiloSessionId },
     // Copy the agent: preflight applies the continuation mode fallback, and the
     // batch digest and per-source fallback are derived from the caller's request.
-    agent: { ...firstSession.agent },
+    agent: { ...firstSession.agent, variant: firstSession.agent.variant || undefined },
     repository: repositoryInputToSessionRepository(args.input.repository),
     ownershipTitle: args.sources[0]?.title,
     options: {
@@ -386,7 +392,7 @@ async function resolveContinuationPlan(args: {
       agent: {
         mode: mode.mode,
         model: session.agent.model,
-        ...(session.agent.variant !== undefined ? { variant: session.agent.variant } : {}),
+        ...(session.agent.variant ? { variant: session.agent.variant } : {}),
       },
       modeFallback: mode.modeFallback,
     };
@@ -414,6 +420,9 @@ function buildChildRequest(
     repository: repositoryInputToSessionRepository(input.repository),
     ...(plan.request.profile ? { profile: plan.request.profile } : {}),
     ...(plan.request.environment ? { environment: plan.request.environment } : {}),
+    ...(plan.request.environmentSandboxAllocation
+      ? { environmentSandboxAllocation: plan.request.environmentSandboxAllocation }
+      : {}),
     ownershipTitle: source.title,
     options: {
       kilocodeOrganizationId: plan.request.options?.kilocodeOrganizationId,
@@ -452,7 +461,7 @@ function shapeOutput(args: {
       agent: {
         mode: destination.modeFallback ? 'code' : requested.agent.mode,
         model: requested.agent.model,
-        ...(requested.agent.variant !== undefined ? { variant: requested.agent.variant } : {}),
+        ...(requested.agent.variant ? { variant: requested.agent.variant } : {}),
       },
       modeFallback: destination.modeFallback,
     });
@@ -767,10 +776,13 @@ const continueHostedWorkspaceHandler = protectedProcedure
       intent: CONTINUATION_INTENT,
       operationKey: input.operationKey,
       taxonomy: 'safe-retry',
-      leaseSeconds: CONTINUATION_LEASE_SECONDS,
+      leaseSeconds: CONTINUATION_STEP_LEASE_SECONDS * input.sessions.length,
       initialCanonicalResult: { [continuationDigestKey]: digest },
     });
 
+    if (admission.admission === 'organization_mismatch') {
+      throw continuationError('operation_key_reuse_mismatch', false);
+    }
     if (admission.admission === 'duplicate_settled') {
       return replayCompletedParent({ db, ctx, input, row: admission.row });
     }

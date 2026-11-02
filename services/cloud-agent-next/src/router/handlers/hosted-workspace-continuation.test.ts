@@ -117,6 +117,19 @@ describe('continueHostedWorkspace input schema', () => {
       }).success
     ).toBe(true);
   });
+
+  it.each([
+    'https://user:secret@example.com/repo.git',
+    'https://user@example.com/repo.git',
+    'https://:secret@example.com/repo.git',
+  ])('rejects generic git URL userinfo: %s', url => {
+    expect(
+      ContinueHostedWorkspaceInput.safeParse({
+        ...validInput,
+        repository: { type: 'git', url },
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('continuation request digest', () => {

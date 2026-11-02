@@ -305,6 +305,79 @@ describe('continueHostedWorkspace balance before admission', () => {
 });
 
 describe('continueHostedWorkspace fresh success', () => {
+  it('normalizes empty variants before preflight, creation, and completed replay', async () => {
+    const input = {
+      ...INPUT,
+      sessions: SESSIONS.map(source => ({ ...source, agent: { ...source.agent, variant: '' } })),
+    };
+    const result = await caller().continueHostedWorkspace(input);
+    expect(mocks.preflightSessionCreation.mock.calls[0]?.[0].agent.variant).toBeUndefined();
+    expect(mocks.createSessionWithLedger.mock.calls[0]?.[0].agent).not.toHaveProperty('variant');
+    expect(mocks.createContinuedWorkspaceSibling.mock.calls[0]?.[0].agent).not.toHaveProperty(
+      'variant'
+    );
+    expect(result.sessions).toEqual(EXPECTED_SESSIONS);
+
+    mocks.getOperation.mockResolvedValue({
+      ...(await completedRow()),
+      canonical_result: {
+        continuationDigest: await continuationRequestDigest(
+          ContinueHostedWorkspaceInput.parse(input),
+          ORG_ID
+        ),
+        workspaceId: result.workspaceId,
+        destinations: DESTINATIONS,
+      },
+    });
+    const replay = await caller().continueHostedWorkspace(input);
+    expect(replay.sessions).toEqual(result.sessions);
+    expect(replay.replayed).toBe(true);
+  });
+
+  it('preserves a nonempty variant in root and sibling creation', async () => {
+    const input = {
+      ...INPUT,
+      sessions: SESSIONS.map(source => ({
+        ...source,
+        agent: { ...source.agent, variant: 'high' },
+      })),
+    };
+    const result = await caller().continueHostedWorkspace(input);
+    expect(mocks.createSessionWithLedger.mock.calls[0]?.[0].agent.variant).toBe('high');
+    expect(mocks.createContinuedWorkspaceSibling.mock.calls[0]?.[0].agent.variant).toBe('high');
+    expect(result.sessions.map(source => source.agent.variant)).toEqual(['high', 'high']);
+  });
+
+  it('passes the preflight environment allocation to root creation', async () => {
+    mocks.preflightSessionCreation.mockImplementation(async request => ({
+      ...request,
+      environmentSandboxAllocation: 'cloudflare-containers-standard-4',
+    }));
+    await caller().continueHostedWorkspace(INPUT);
+    expect(mocks.createSessionWithLedger.mock.calls[0]?.[0].environmentSandboxAllocation).toBe(
+      'cloudflare-containers-standard-4'
+    );
+  });
+
+  it.each([1, 10])('budgets the parent lease for %i sequential creates', async count => {
+    const sessions = Array.from({ length: count }, (_, index) => ({
+      sourceKiloSessionId: `ses_${String(index).padStart(26, 'a')}`,
+      agent: { mode: 'code', model: 'a/b' },
+    }));
+    mocks.getPgDb.mockReturnValue(
+      makeDb(sessions.map(source => sourceRow(source.sourceKiloSessionId)))
+    );
+    await caller().continueHostedWorkspace({
+      ...INPUT,
+      sessions,
+      activeSourceKiloSessionId: sessions[0]!.sourceKiloSessionId,
+    });
+    expect(mocks.admitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ leaseSeconds: 120 * count })
+    );
+  });
+
   it('creates the clone-only root and siblings and reports no replay', async () => {
     const result = await caller().continueHostedWorkspace(INPUT);
     expect(result).toMatchObject({
@@ -517,6 +590,16 @@ describe('continueHostedWorkspace retry and replay', () => {
 });
 
 describe('continueHostedWorkspace concurrent loser', () => {
+  it('rejects an organization mismatch at admission without creating sessions', async () => {
+    mocks.admitOperation.mockResolvedValue({ admission: 'organization_mismatch' });
+    await expect(caller().continueHostedWorkspace(INPUT)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(mocks.createSessionWithLedger).not.toHaveBeenCalled();
+    expect(mocks.createContinuedWorkspaceSibling).not.toHaveBeenCalled();
+  });
+
   it('returns creation_in_progress when the winner B matches', async () => {
     const digest = await continuationRequestDigest(
       ContinueHostedWorkspaceInput.parse(INPUT),

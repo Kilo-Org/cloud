@@ -7,6 +7,26 @@ on:
   pull_request:
     branches:
       - '**'
+    # The e2e suite renders apps/web, and the stories import apps/web/src and
+    # packages/web-shared (apps/storybook/tsconfig.json). Push to main stays
+    # unfiltered, so the full suite still runs for every merged change.
+    paths:
+      - '.github/workflows/chromatic.yml'
+      - 'apps/web/.env'
+      - 'apps/web/.env.test'
+      - 'apps/web/src/**'
+      - 'apps/web/public/**'
+      - 'apps/web/tests/**'
+      - 'apps/web/playwright.config.ts'
+      - 'apps/web/next.config.mjs'
+      - 'apps/web/postcss.config.mjs'
+      - 'apps/web/mdx-components.tsx'
+      - 'apps/web/tsconfig.json'
+      - 'apps/web/package.json'
+      - 'apps/storybook/**'
+      - 'apps/storybook/.storybook/**'
+      - 'packages/web-shared/**'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 permissions:
@@ -67,8 +87,26 @@ jobs:
         env:
           DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}
 
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
+
+      # No --with-deps: the runner image already ships the Chromium system
+      # libraries, and the apt-get behind --with-deps can hang until the job
+      # timeout when the fleet's apt egress degrades. The same reasoning is in
+      # ci.yml and extension-ci.yml.
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: pnpm --filter web exec playwright install chromium
 
       - name: Run Playwright tests
         run: pnpm test:e2e
@@ -105,11 +143,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Storybook dependencies
-        run: |
-          cd apps/storybook
-          pnpm install --frozen-lockfile
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:

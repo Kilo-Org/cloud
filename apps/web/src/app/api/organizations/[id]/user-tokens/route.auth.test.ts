@@ -139,7 +139,7 @@ for (const enabled of [false, true]) {
   describe(`legacy organization issuance with resource flags ${enabled}`, () => {
     beforeEach(() => setIssuance(enabled));
 
-    test.each(['cookie', 'empty-header-cookie', 'legacy-1h', 'legacy-5y'] as const)(
+    test.each(['cookie', 'legacy-1h', 'legacy-5y'] as const)(
       'preserves %s for absent, empty, malformed and empty-object bodies',
       async auth => {
         const headers = auth.startsWith('legacy')
@@ -151,7 +151,6 @@ for (const enabled of [false, true]) {
               )
             )
           : new Headers({ cookie: 'next-auth.session-token=test-session' });
-        if (auth === 'empty-header-cookie') headers.set('authorization', '');
         for (const body of [undefined, '', '{', '{}']) {
           const response = await request(headers, body);
           expect(response.status).toBe(200);
@@ -180,6 +179,18 @@ for (const enabled of [false, true]) {
         );
       }
     );
+
+    test('rejects an empty Authorization header even with a valid session cookie', async () => {
+      const headers = new Headers({ cookie: 'next-auth.session-token=test-session' });
+      headers.set('authorization', '');
+
+      for (const body of [undefined, '', '{', '{}']) {
+        const response = await request(headers, body);
+        expect(response.status).toBe(401);
+      }
+
+      expect(await auditLogs()).toHaveLength(0);
+    });
 
     test.each([900, 3600, 7200])(
       'preserves legacy human tokens with deviceAuthRequestCode and %s-second lifetime',

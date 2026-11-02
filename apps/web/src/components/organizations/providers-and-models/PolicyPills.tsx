@@ -4,7 +4,7 @@ const PILL_BASE =
   'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none';
 
 export const BYOK_ONLY_DESCRIPTION =
-  'Only serves requests through your organization’s own API key for this provider, when the key uses Kilo catalog model IDs.';
+  'Only serves requests through your organization’s own API key for this provider, when the key uses Kilo catalog model IDs. Its training and prompt retention badges are a best-effort summary of the provider’s published policies. Your organization’s own terms with the provider govern these requests.';
 
 export function PolicyPill({ value, variant }: { value: boolean; variant: PolicyPillVariant }) {
   if (!value) {

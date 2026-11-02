@@ -31,6 +31,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { captureException } from '@sentry/nextjs';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { advancePasskeyCounter, getWebRelyingParty } from '@/lib/auth/passkey';
 
@@ -360,25 +361,32 @@ export async function verifyStepUp(params: {
     })
   );
 
-  await recordAdminAction(
-    {
-      user: {
-        id: admin.id,
-        google_user_email: admin.google_user_email,
-        google_user_name: admin.google_user_name,
-        is_super_admin: admin.is_super_admin,
+  // The proof is already durable. An audit write failure is reported, but
+  // must not turn a successful verification into an error the client retries
+  // against an already-consumed challenge.
+  try {
+    await recordAdminAction(
+      {
+        user: {
+          id: admin.id,
+          google_user_email: admin.google_user_email,
+          google_user_name: admin.google_user_name,
+          is_super_admin: admin.is_super_admin,
+        },
+        authViaToken: false,
+        credential: 'session',
+        trpcPath: '/api/auth/step-up',
       },
-      authViaToken: false,
-      credential: 'session',
-      trpcPath: '/api/auth/step-up',
-    },
-    {
-      action: 'admin.step_up.verified',
-      target: { type: 'user', id: params.userId },
-      message: 'Verified MFA for a privileged session',
-      metadata: { purpose: policy.purpose },
-    }
-  );
+      {
+        action: 'admin.step_up.verified',
+        target: { type: 'user', id: params.userId },
+        message: 'Verified MFA for a privileged session',
+        metadata: { purpose: policy.purpose },
+      }
+    );
+  } catch (error) {
+    captureException(error, { tags: { source: 'admin_step_up_audit' } });
+  }
 
   return proof;
 }

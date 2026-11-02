@@ -17,6 +17,7 @@ import {
   STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS,
 } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { captureException } from '@sentry/nextjs';
 
 /**
  * Vercel Firewall rate-limit rule applied to `{ action: 'options' }`, keyed
@@ -136,25 +137,31 @@ export async function POST(request: NextRequest) {
     );
 
     if (user.is_admin) {
-      await recordAdminAction(
-        {
-          user: {
-            id: user.id,
-            google_user_email: user.google_user_email,
-            google_user_name: user.google_user_name,
-            is_super_admin: user.is_super_admin,
+      try {
+        await recordAdminAction(
+          {
+            user: {
+              id: user.id,
+              google_user_email: user.google_user_email,
+              google_user_name: user.google_user_name,
+              is_super_admin: user.is_super_admin,
+            },
+            authViaToken: false,
+            credential: 'session',
+            headersList: request.headers,
+            trpcPath: '/api/auth/passkey/register',
           },
-          authViaToken: false,
-          credential: 'session',
-          headersList: request.headers,
-          trpcPath: '/api/auth/passkey/register',
-        },
-        {
-          action: 'admin.passkey.enrolled',
-          target: { type: 'user', id: user.id },
-          message: 'Enrolled a passkey for a platform admin',
-        }
-      );
+          {
+            action: 'admin.passkey.enrolled',
+            target: { type: 'user', id: user.id },
+            message: 'Enrolled a passkey for a platform admin',
+          }
+        );
+      } catch (error) {
+        // The credential is already registered; report the audit gap without
+        // telling the user their enrollment failed.
+        captureException(error, { tags: { source: 'admin_passkey_enrollment_audit' } });
+      }
     }
 
     return NextResponse.json({ credentialId: credential.credential_id });

@@ -305,12 +305,12 @@ export function McpFormSheet({
 
         <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
           <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
-            {t('common.enabled')}
+            {t('profiles.mcp.enableServer')}
           </Text>
           <Switch
             value={enabled}
             disabled={isSaving}
-            accessibilityLabel={t('common.enabled')}
+            accessibilityLabel={t('profiles.mcp.enableServer')}
             onValueChange={setEnabled}
           />
         </View>

@@ -3911,6 +3911,7 @@
       "environment": "បរិស្ថាន (JSON)",
       "headers": "ក្បាលសំណើ (JSON)",
       "timeout": "ការអស់ពេល",
+      "enableServer": "បើកម៉ាស៊ីនមេ",
       "secretCount_one": "{{count}} សម្ងាត់",
       "secretCount_other": "{{count}} សម្ងាត់",
       "namePlaceholder": "my-server",

@@ -3911,6 +3911,7 @@
       "environment": "ตัวแปรสภาพแวดล้อม (JSON)",
       "headers": "ส่วนหัว (JSON)",
       "timeout": "การหมดเวลา",
+      "enableServer": "เปิดใช้งานเซิร์ฟเวอร์",
       "secretCount_one": "{{count}} ความลับ",
       "secretCount_other": "{{count}} ความลับ",
       "namePlaceholder": "my-server",

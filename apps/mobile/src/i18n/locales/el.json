@@ -3911,6 +3911,7 @@
       "environment": "Περιβάλλον (JSON)",
       "headers": "Κεφαλίδες (JSON)",
       "timeout": "Χρονικό όριο λήξης",
+      "enableServer": "Ενεργοποίηση διακομιστή",
       "secretCount_one": "{{count}} μυστικό",
       "secretCount_other": "{{count}} μυστικά",
       "namePlaceholder": "my-server",

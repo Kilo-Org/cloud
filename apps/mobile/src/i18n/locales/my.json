@@ -3911,6 +3911,7 @@
       "environment": "ပတ်ဝန်းကျင် (JSON)",
       "headers": "ခေါင်းစီးများ (JSON)",
       "timeout": "အချိန်ကုန်ဆုံးမှု",
+      "enableServer": "ဆာဗာကို ဖွင့်ပါ",
       "secretCount_one": "{{count}} လျှို့ဝှက်ချက်",
       "secretCount_other": "{{count}} လျှို့ဝှက်ချက်",
       "namePlaceholder": "my-server",

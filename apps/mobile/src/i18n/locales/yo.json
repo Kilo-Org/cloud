@@ -3911,6 +3911,7 @@
       "environment": "Ayika iṣẹ́ (JSON)",
       "headers": "Awọn akọle (JSON)",
       "timeout": "Akoko ipari",
+      "enableServer": "Mú olupin ṣiṣẹ́",
       "secretCount_one": "{{count}} aṣiri",
       "secretCount_other": "{{count}} aṣiri",
       "namePlaceholder": "my-server",

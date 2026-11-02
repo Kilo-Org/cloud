@@ -3911,6 +3911,7 @@
       "environment": "Орчин (JSON)",
       "headers": "Толгой хэсэг (JSON)",
       "timeout": "Хугацаа",
+      "enableServer": "Серверийг идэвхжүүлэх",
       "secretCount_one": "{{count}} нууц",
       "secretCount_other": "{{count}} нууц",
       "namePlaceholder": "my-server",

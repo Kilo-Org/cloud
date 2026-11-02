@@ -3911,6 +3911,7 @@
       "environment": "Umhverfi (JSON)",
       "headers": "Hausar (JSON)",
       "timeout": "Tímamörk",
+      "enableServer": "Virkja netþjón",
       "secretCount_one": "{{count}} leyndarmál",
       "secretCount_other": "{{count}} leyndarmál",
       "namePlaceholder": "my-server",

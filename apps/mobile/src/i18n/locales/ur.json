@@ -3911,6 +3911,7 @@
       "environment": "ماحول (JSON)",
       "headers": "ہیڈرز (JSON)",
       "timeout": "ٹائم آؤٹ",
+      "enableServer": "سرور فعال کریں",
       "secretCount_one": "{{count}} خفیہ",
       "secretCount_other": "{{count}} خفیہ",
       "namePlaceholder": "my-server",

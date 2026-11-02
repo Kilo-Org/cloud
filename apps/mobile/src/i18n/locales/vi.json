@@ -3911,6 +3911,7 @@
       "environment": "Môi trường (JSON)",
       "headers": "Tiêu đề (JSON)",
       "timeout": "Thời gian chờ",
+      "enableServer": "Bật máy chủ",
       "secretCount_one": "{{count}} bí mật",
       "secretCount_other": "{{count}} bí mật",
       "namePlaceholder": "my-server",

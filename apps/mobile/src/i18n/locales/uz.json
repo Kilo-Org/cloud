@@ -3911,6 +3911,7 @@
       "environment": "Muhit (JSON)",
       "headers": "Sarlavhalar (JSON)",
       "timeout": "Kutish vaqti",
+      "enableServer": "Serverni yoqing",
       "secretCount_one": "{{count}} sir",
       "secretCount_other": "{{count}} sir",
       "namePlaceholder": "my-server",

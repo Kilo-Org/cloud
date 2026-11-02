@@ -3967,6 +3967,7 @@
       "environment": "Vide (JSON)",
       "headers": "Galvenes (JSON)",
       "timeout": "Taimauts",
+      "enableServer": "Iespējot serveri",
       "secretCount_zero": "{{count}} noslēpumu",
       "secretCount_one": "{{count}} noslēpums",
       "secretCount_other": "{{count}} noslēpumi",

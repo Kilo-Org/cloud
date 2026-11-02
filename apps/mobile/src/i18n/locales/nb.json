@@ -3911,6 +3911,7 @@
       "environment": "Miljø (JSON)",
       "headers": "Overskrifter (JSON)",
       "timeout": "Tidsavbrudd",
+      "enableServer": "Aktiver server",
       "secretCount_one": "{{count}} hemmelighet",
       "secretCount_other": "{{count}} hemmeligheter",
       "namePlaceholder": "my-server",

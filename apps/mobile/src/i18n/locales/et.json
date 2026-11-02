@@ -3911,6 +3911,7 @@
       "environment": "Keskkond (JSON)",
       "headers": "Päised (JSON)",
       "timeout": "Aegumine",
+      "enableServer": "Lülita server sisse",
       "secretCount_one": "{{count}} saladus",
       "secretCount_other": "{{count}} saladust",
       "namePlaceholder": "my-server",

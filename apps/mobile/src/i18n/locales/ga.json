@@ -4079,6 +4079,7 @@
       "environment": "Timpeallacht (JSON)",
       "headers": "Ceanntásca (JSON)",
       "timeout": "Teorainn Ama",
+      "enableServer": "Cumasaigh freastalaí",
       "secretCount_one": "{{count}} rún",
       "secretCount_two": "{{count}} rún",
       "secretCount_few": "{{count}} rún",

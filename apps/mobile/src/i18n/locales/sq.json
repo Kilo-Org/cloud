@@ -3911,6 +3911,7 @@
       "environment": "Mjedisi (JSON)",
       "headers": "Titujt (JSON)",
       "timeout": "Kohëzgjatja",
+      "enableServer": "Aktivizo serverin",
       "secretCount_one": "{{count}} sekret",
       "secretCount_other": "{{count}} sekrete",
       "namePlaceholder": "my-server",

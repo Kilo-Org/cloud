@@ -3917,6 +3917,7 @@
       "environment": "Tontolon'ny rindrambaiko (JSON)",
       "headers": "Lohateny (JSON)",
       "timeout": "Fe-potoana",
+      "enableServer": "Alefaso ny mpizara",
       "secretCount_one": "{{count}} tsiambaratelo",
       "secretCount_other": "{{count}} tsiambaratelo",
       "namePlaceholder": "my-server",

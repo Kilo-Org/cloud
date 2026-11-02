@@ -3917,6 +3917,7 @@
       "environment": "পরিবেশ (JSON)",
       "headers": "হেডার (JSON)",
       "timeout": "টাইমআউট",
+      "enableServer": "সার্ভার চালু করুন",
       "secretCount_one": "{{count}} গোপন মান",
       "secretCount_other": "{{count}} গোপন মান",
       "namePlaceholder": "my-server",

@@ -3911,6 +3911,7 @@
       "environment": "ପରିବେଶ (JSON)",
       "headers": "ହେଡର୍ସ (JSON)",
       "timeout": "ଟାଇମ୍‌ଆଉଟ୍",
+      "enableServer": "ସର୍ଭର ଚାଲୁ କରନ୍ତୁ",
       "secretCount_one": "{{count}} ଗୁପ୍ତ",
       "secretCount_other": "{{count}} ଗୁପ୍ତ",
       "namePlaceholder": "my-server",

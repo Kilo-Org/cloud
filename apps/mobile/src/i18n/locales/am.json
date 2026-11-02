@@ -3917,6 +3917,7 @@
       "environment": "የአካባቢ ተለዋዋጮች (JSON)",
       "headers": "ራስጌዎች (JSON)",
       "timeout": "የጊዜ ገደብ",
+      "enableServer": "አገልጋይን አንቃ",
       "secretCount_one": "{{count}} ሚስጥር",
       "secretCount_other": "{{count}} ሚስጥሮች",
       "namePlaceholder": "my-server",

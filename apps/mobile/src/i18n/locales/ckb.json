@@ -3911,6 +3911,7 @@
       "environment": "ژینگە (JSON)",
       "headers": "سەردێڕەکان (JSON)",
       "timeout": "کات بەسەرچوون",
+      "enableServer": "سێرڤەر چالاک بکە",
       "secretCount_one": "{{count}} نهێنی",
       "secretCount_other": "{{count}} نهێنی",
       "namePlaceholder": "my-server",

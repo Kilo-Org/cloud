@@ -4023,6 +4023,7 @@
       "environment": "Середовище (JSON)",
       "headers": "Заголовки (JSON)",
       "timeout": "Час очікування",
+      "enableServer": "Увімкнути сервер",
       "secretCount_one": "{{count}} секрет",
       "secretCount_few": "{{count}} секрети",
       "secretCount_many": "{{count}} секретів",

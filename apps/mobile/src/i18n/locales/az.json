@@ -3911,6 +3911,7 @@
       "environment": "Mühit (JSON)",
       "headers": "Başlıqlar (JSON)",
       "timeout": "Taymout",
+      "enableServer": "Serveri aktivləşdir",
       "secretCount_one": "{{count}} gizli",
       "secretCount_other": "{{count}} gizli",
       "namePlaceholder": "my-server",

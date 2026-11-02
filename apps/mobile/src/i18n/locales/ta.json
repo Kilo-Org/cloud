@@ -3911,6 +3911,7 @@
       "environment": "சூழல் (JSON)",
       "headers": "தலைப்புகள் (JSON)",
       "timeout": "காலவரம்பு",
+      "enableServer": "சர்வரை இயக்கவும்",
       "secretCount_one": "{{count}} இரகசியம்",
       "secretCount_other": "{{count}} இரகசியங்கள்",
       "namePlaceholder": "my-server",

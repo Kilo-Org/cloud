@@ -3911,6 +3911,7 @@
       "environment": "د چاپېریال متغیرات (JSON)",
       "headers": "سرلیکونه (JSON)",
       "timeout": "د وخت پای",
+      "enableServer": "سرور فعال کړئ",
       "secretCount_one": "{{count}} پټ",
       "secretCount_other": "{{count}} پټونه",
       "namePlaceholder": "my-server",

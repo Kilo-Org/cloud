@@ -4023,6 +4023,7 @@
       "environment": "Środowisko (JSON)",
       "headers": "Nagłówki (JSON)",
       "timeout": "Limit czasu",
+      "enableServer": "Włącz serwer",
       "secretCount_one": "{{count}} sekret",
       "secretCount_few": "{{count}} sekrety",
       "secretCount_many": "{{count}} sekretów",

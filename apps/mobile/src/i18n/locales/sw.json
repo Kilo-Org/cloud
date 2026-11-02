@@ -3911,6 +3911,7 @@
       "environment": "Mazingira (JSON)",
       "headers": "Vijajuu (JSON)",
       "timeout": "Muda wa kusubiri",
+      "enableServer": "Washa seva",
       "secretCount_one": "{{count}} siri",
       "secretCount_other": "{{count}} siri",
       "namePlaceholder": "my-server",

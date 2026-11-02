@@ -3973,6 +3973,7 @@
       "environment": "Environnement (JSON)",
       "headers": "En-têtes (JSON)",
       "timeout": "Délai d'attente",
+      "enableServer": "Activer le serveur",
       "secretCount_one": "{{count}} secret",
       "secretCount_many": "{{count}} secrets",
       "secretCount_other": "{{count}} secrets",

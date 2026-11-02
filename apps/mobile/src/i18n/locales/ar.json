@@ -4135,6 +4135,7 @@
       "environment": "البيئة (JSON)",
       "headers": "الرؤوس (JSON)",
       "timeout": "المهلة",
+      "enableServer": "تفعيل الخادم",
       "secretCount_zero": "{{count}} أسرار",
       "secretCount_one": "{{count}} سر",
       "secretCount_two": "{{count}} سرّان",

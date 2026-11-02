@@ -3911,6 +3911,7 @@
       "environment": "Орта (JSON)",
       "headers": "Тақырыптар (JSON)",
       "timeout": "Күту уақыты",
+      "enableServer": "Серверді қосыңыз",
       "secretCount_one": "{{count}} құпия",
       "secretCount_other": "{{count}} құпия",
       "namePlaceholder": "my-server",

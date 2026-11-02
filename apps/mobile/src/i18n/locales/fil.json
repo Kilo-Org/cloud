@@ -3917,6 +3917,7 @@
       "environment": "Kapaligiran (JSON)",
       "headers": "Mga Header (JSON)",
       "timeout": "Oras ng paghihintay",
+      "enableServer": "I-enable ang server",
       "secretCount_one": "{{count}} lihim",
       "secretCount_other": "{{count}} lihim",
       "namePlaceholder": "my-server",

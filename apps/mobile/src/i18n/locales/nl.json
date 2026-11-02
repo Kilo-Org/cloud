@@ -3911,6 +3911,7 @@
       "environment": "Omgeving (JSON)",
       "headers": "Kopteksten (JSON)",
       "timeout": "Time-out",
+      "enableServer": "Server inschakelen",
       "secretCount_one": "{{count}} geheim",
       "secretCount_other": "{{count}} geheimen",
       "namePlaceholder": "my-server",

@@ -3911,6 +3911,7 @@
       "environment": "Среда (JSON)",
       "headers": "Заглавки (JSON)",
       "timeout": "Време за изчакване",
+      "enableServer": "Включете сървъра",
       "secretCount_one": "{{count}} тайна",
       "secretCount_other": "{{count}} тайни",
       "namePlaceholder": "my-server",

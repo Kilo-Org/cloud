@@ -3911,6 +3911,7 @@
       "environment": "ຕົວແປສະພາບແວດລ້ອມ (JSON)",
       "headers": "ສ່ວນຫົວ (JSON)",
       "timeout": "ໄລຍະເວລາໝົດກຳນົດ",
+      "enableServer": "ເປີດໃຊ້ເຊີບເວີ",
       "secretCount_one": "{{count}} ຄວາມລັບ",
       "secretCount_other": "{{count}} ຄວາມລັບ",
       "namePlaceholder": "my-server",

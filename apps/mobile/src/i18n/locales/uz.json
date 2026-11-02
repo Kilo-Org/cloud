@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ogohlantirishlarini avtomatik sinxronlash va repozitoriyalaringizdagi xavfsizlik muammolarini boshqarish uchun Kilo GitHub ilovasini o'rnating.",
+      "connectOwnerOnly": "Tashkilot egasi yoki administratoridan {{platform}}ni ulashini so'rang.",
       "connectTitle": "Boshlash uchun GitHubni ulang",
       "couldNotLoad": "Xavfsizlik agentini yuklab bo'lmadi.",
       "installApp": "GitHub ilovasini o'rnatish",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "O'rnatishni yakunlab bo'lmaydi",
       "notAdminMessage": "Bu hisobni faqat GitHub administratori ulay oladi. Tashkilot administratoridan Kiloni o'rnatishni so'rang.",
       "alreadyClaimedMessage": "Bu o'rnatilgan GitHub ilovasi allaqachon boshqa Kilo hisobiga ulangan. Avval o'sha hisobdagi ulanishni uzing.",
+      "installationUnavailableMessage": "Ushbu GitHub App o'rnatilishi to'xtatib qo'yilgan yoki endi mavjud emas. Uni GitHub'da tiklang yoki qayta o'rnating, so'ngra qaytadan boshlang.",
+      "multipleInstallationsMessage": "Ushbu Kilo tashkiloti hozirda faqat bitta GitHub tashkilotini ulay oladi.",
       "didNotCompleteTitle": "O'rnatish yakunlanmadi",
       "didNotCompleteMessage": "GitHub ilovasini o'rnatish yakunlanmadi. Ilovadan qayta urinib ko'ring."
     },

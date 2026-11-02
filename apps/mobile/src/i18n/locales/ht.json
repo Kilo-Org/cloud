@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Enstale aplikasyon GitHub Kilo a pou senkronize alèt Dependabot yo otomatikman epi jere konsta sekirite nan tout depo ou yo.",
+      "connectOwnerOnly": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou konekte {{platform}}.",
       "connectTitle": "Konekte GitHub pou kòmanse",
       "couldNotLoad": "Nou pa t ka chaje Ajan sekirite a.",
       "installApp": "Enstale aplikasyon GitHub la",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Pa ka fini enstalasyon an",
       "notAdminMessage": "Se sèlman yon administratè GitHub kont sa a ki ka konekte li. Mande yon administratè òganizasyon an pou enstale Kilo.",
       "alreadyClaimedMessage": "Enstalasyon GitHub sa a deja konekte ak yon lòt kont Kilo. Dekonekte li nan kont sa a anvan.",
+      "installationUnavailableMessage": "Enstalasyon GitHub App sa a sispann oswa li pa disponib ankò. Retabli oswa reenstale li nan GitHub, epi rekòmanse.",
+      "multipleInstallationsMessage": "Oganizasyon Kilo sa a ka konekte sèlman yon sèl oganizasyon GitHub pou kounye a.",
       "didNotCompleteTitle": "Enstalasyon an pa fini",
       "didNotCompleteMessage": "Enstalasyon aplikasyon GitHub la pa fini. Eseye ankò nan aplikasyon an."
     },

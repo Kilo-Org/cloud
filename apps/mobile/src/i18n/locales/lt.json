@@ -2102,6 +2102,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Įdiek Kilo GitHub programėlę, kad automatiškai sinchronizuotum Dependabot įspėjimus ir tvarkytum saugos radinius visose savo saugyklose.",
+      "connectOwnerOnly": "Paprašyk organizacijos savininko ar administratoriaus prijungti {{platform}}.",
       "connectTitle": "Prijunk GitHub ir pradėk",
       "couldNotLoad": "Nepavyko įkelti saugos agento.",
       "installApp": "Įdiegti GitHub programėlę",
@@ -2298,6 +2299,8 @@
       "cannotCompleteTitle": "Nepavyksta užbaigti diegimo",
       "notAdminMessage": "Tik tos GitHub paskyros administratorius gali ją prijungti. Paprašyk organizacijos administratoriaus įdiegti Kilo.",
       "alreadyClaimedMessage": "Ši įdiegta GitHub programėlė jau susieta su kita Kilo paskyra. Pirmiausia atjunk ją toje paskyroje.",
+      "installationUnavailableMessage": "Šis GitHub App diegimas sustabdytas arba nebepasiekiamas. Atkurk jį arba įdiek iš naujo GitHub, tada pradėk iš naujo.",
+      "multipleInstallationsMessage": "Ši Kilo organizacija šiuo metu gali prijungti tik vieną GitHub organizaciją.",
       "didNotCompleteTitle": "Diegimas neužbaigtas",
       "didNotCompleteMessage": "GitHub programėlės diegimas neužbaigtas. Bandyk dar kartą programėlėje."
     },

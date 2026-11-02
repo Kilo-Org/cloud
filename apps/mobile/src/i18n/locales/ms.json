@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Pasang apl GitHub Kilo untuk menyegerakkan amaran Dependabot secara automatik dan mengurus penemuan keselamatan dalam semua repositori anda.",
+      "connectOwnerOnly": "Minta pemilik atau pentadbir organisasi menyambungkan {{platform}}.",
       "connectTitle": "Sambungkan GitHub untuk bermula",
       "couldNotLoad": "Tidak dapat memuatkan Ejen Keselamatan.",
       "installApp": "Pasang apl GitHub",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Tidak dapat menyelesaikan pemasangan",
       "notAdminMessage": "Hanya pentadbir GitHub bagi akaun itu boleh menyambungkannya. Minta pentadbir organisasi memasang Kilo.",
       "alreadyClaimedMessage": "Pemasangan GitHub itu sudah disambungkan ke akaun Kilo lain. Putuskan sambungannya di sana dahulu.",
+      "installationUnavailableMessage": "Pemasangan GitHub App ini digantung atau tidak lagi tersedia. Pulihkan atau pasang semula di GitHub, kemudian mulakan semula.",
+      "multipleInstallationsMessage": "Organisasi Kilo ini pada masa ini hanya boleh menyambungkan satu organisasi GitHub.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan apl GitHub tidak selesai. Cuba lagi daripada apl."
     },

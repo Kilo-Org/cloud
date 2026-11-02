@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installeer die Kilo GitHub-app om Dependabot-waarskuwings outomaties te sinkroniseer en sekuriteitsbevindings in jou bewaarplekke te bestuur.",
+      "connectOwnerOnly": "Vra 'n organisasie-eienaar of administrateur om {{platform}} te koppel.",
       "connectTitle": "Koppel GitHub om te begin",
       "couldNotLoad": "Die Sekuriteitsagent kon nie gelaai word nie.",
       "installApp": "Installeer die GitHub-app",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Kan installasie nie voltooi nie",
       "notAdminMessage": "Slegs 'n GitHub-administrateur van daardie rekening kan dit koppel. Vra 'n administrateur van die organisasie om Kilo te installeer.",
       "alreadyClaimedMessage": "Daardie GitHub-installasie is reeds aan 'n ander Kilo-rekening gekoppel. Ontkoppel dit eers daar.",
+      "installationUnavailableMessage": "Hierdie GitHub App-installasie is opgeskort of nie meer beskikbaar nie. Herstel of herinstalleer dit in GitHub en begin dan weer.",
+      "multipleInstallationsMessage": "Hierdie Kilo-organisasie kan tans slegs een GitHub-organisasie koppel.",
       "didNotCompleteTitle": "Installasie is nie voltooi nie",
       "didNotCompleteMessage": "Die GitHub-toepinstallasie is nie voltooi nie. Probeer weer vanuit die toep."
     },

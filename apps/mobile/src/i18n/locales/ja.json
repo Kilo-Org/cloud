@@ -1459,6 +1459,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub Appをインストールすると、Dependabotアラートを自動で同期し、各リポジトリのセキュリティの検出結果をまとめて管理できます。",
+      "connectOwnerOnly": "組織のオーナーまたは管理者に{{platform}}の接続を依頼してください。",
       "connectTitle": "GitHubを接続して始める",
       "couldNotLoad": "セキュリティエージェントを読み込めませんでした。",
       "installApp": "GitHub Appをインストール",
@@ -1690,6 +1691,8 @@
       "cannotCompleteTitle": "インストールを完了できません",
       "notAdminMessage": "接続できるのは、そのGitHubアカウントの管理者だけです。組織の管理者にKiloのインストールを依頼してください。",
       "alreadyClaimedMessage": "インストール済みのGitHub Appは、すでに別のKiloアカウントに接続されています。先にそのアカウントで接続を解除してください。",
+      "installationUnavailableMessage": "このGitHub Appのインストールは停止されているか、利用できなくなっています。GitHubで復元または再インストールしてから、もう一度やり直してください。",
+      "multipleInstallationsMessage": "このKilo組織は、現在接続できるGitHub組織が一つのみです。",
       "didNotCompleteTitle": "インストールが完了しませんでした",
       "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"
     },

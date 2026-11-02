@@ -2135,6 +2135,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installa l-app ta' Kilo fuq GitHub biex tissinkronizza awtomatikament l-allerti ta' Dependabot u timmaniġġja s-sejbiet tas-sigurtà fir-repożitorji tiegħek.",
+      "connectOwnerOnly": "Staqsi lis-sid jew l-amministratur tal-organizzazzjoni biex jikkonnettja {{platform}}.",
       "connectTitle": "Ikkonnettja GitHub biex tibda",
       "couldNotLoad": "Ma setax jitgħabba l-aġent tas-sigurtà.",
       "installApp": "Installa l-app ta' GitHub",
@@ -2335,6 +2336,8 @@
       "cannotCompleteTitle": "Ma tistax titlesta l-installazzjoni",
       "notAdminMessage": "Amministratur ta' GitHub biss jista' jikkonnettja dak il-kont. Itlob lil amministratur tal-organizzazzjoni biex jinstalla Kilo.",
       "alreadyClaimedMessage": "Dik l-installazzjoni ta' GitHub diġà hija konnessa ma' kont ieħor ta' Kilo. Skonnettjaha hemm l-ewwel.",
+      "installationUnavailableMessage": "Din l-installazzjoni tal-GitHub App hija sospiża jew m'għadhiex disponibbli. Irrestawraha jew installaha mill-ġdid fi GitHub, imbagħad erġa' ibda.",
+      "multipleInstallationsMessage": "Din l-organizzazzjoni ta' Kilo bħalissa tista' tikkonnettja organizzazzjoni waħda biss ta' GitHub.",
       "didNotCompleteTitle": "L-installazzjoni ma tlestietx",
       "didNotCompleteMessage": "L-installazzjoni tal-app ta' GitHub ma tlestietx. Erġa' pprova mill-app."
     },

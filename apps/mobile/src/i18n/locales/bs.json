@@ -2069,6 +2069,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instaliraj Kilo GitHub aplikaciju za automatsku sinhronizaciju upozorenja iz Dependabota i upravljanje sigurnosnim nalazima u svojim repozitorijima.",
+      "connectOwnerOnly": "Zamolite vlasnika organizacije ili administratora da poveže {{platform}}.",
       "connectTitle": "Poveži GitHub za početak",
       "couldNotLoad": "Nije moguće učitati sigurnosnog agenta.",
       "installApp": "Instaliraj GitHub aplikaciju",
@@ -2261,6 +2262,8 @@
       "cannotCompleteTitle": "Instalacija se ne može dovršiti",
       "notAdminMessage": "Samo administrator tog računa na GitHubu može ga povezati. Zamoli administratora organizacije da instalira Kilo.",
       "alreadyClaimedMessage": "Ta instalacija aplikacije za GitHub već je povezana s drugim Kilo računom. Prvo je tamo odspoji.",
+      "installationUnavailableMessage": "Ova instalacija GitHub App je suspendovana ili više nije dostupna. Obnovi je ili ponovo instaliraj na GitHubu, pa počni ponovo.",
+      "multipleInstallationsMessage": "Ova Kilo organizacija trenutno može povezati samo jednu GitHub organizaciju.",
       "didNotCompleteTitle": "Instalacija nije dovršena",
       "didNotCompleteMessage": "Instalacija aplikacije za GitHub nije dovršena. Pokušaj ponovo iz aplikacije."
     },

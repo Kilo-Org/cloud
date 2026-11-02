@@ -2042,6 +2042,7 @@
     },
     "scopeEntry": {
       "connectDescription": "برای همگام‌سازی خودکار هشدارهای Dependabot و مدیریت یافته‌های امنیتی در مخازن خود، برنامه Kilo را در GitHub نصب کنید.",
+      "connectOwnerOnly": "از مالک یا مدیر سازمان بخواهید {{platform}} را متصل کند.",
       "connectTitle": "برای شروع GitHub را وصل کنید",
       "couldNotLoad": "بارگذاری عامل امنیتی ممکن نشد.",
       "installApp": "نصب برنامه GitHub",
@@ -2230,6 +2231,8 @@
       "cannotCompleteTitle": "تکمیل نصب ممکن نیست",
       "notAdminMessage": "فقط مدیر آن حساب در GitHub می‌تواند آن را متصل کند. از مدیر سازمان بخواهید Kilo را نصب کند.",
       "alreadyClaimedMessage": "این برنامهٔ نصب‌شده در GitHub از قبل به حساب Kilo دیگری متصل است. ابتدا اتصال آن را از همان حساب قطع کنید.",
+      "installationUnavailableMessage": "این نصب GitHub App تعلیق شده یا دیگر در دسترس نیست. آن را در GitHub بازیابی یا دوباره نصب کنید، سپس دوباره شروع کنید.",
+      "multipleInstallationsMessage": "سازمان Kilo شما در حال حاضر فقط می‌تواند به یک سازمان GitHub متصل شود.",
       "didNotCompleteTitle": "نصب تکمیل نشد",
       "didNotCompleteMessage": "نصب برنامهٔ GitHub کامل نشد. از داخل برنامه دوباره تلاش کنید."
     },

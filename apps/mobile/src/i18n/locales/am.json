@@ -2042,6 +2042,7 @@
     },
     "scopeEntry": {
       "connectDescription": "የDependabot ማስጠንቀቂያዎችን በራስ-ሰር ለማመሳሰል እና በማከማቻዎችዎ ያሉትን የደህንነት ግኝቶች ለማስተዳደር የKilo የGitHub መተግበሪያን ይጫኑ።",
+      "connectOwnerOnly": "አንድ የድርጅት ባለቤት ወይም አስተዳዳሪ {{platform}}ን እንዲያገናኝ ይጠይቁ።",
       "connectTitle": "ለመጀመር GitHubን ያገናኙ",
       "couldNotLoad": "የደህንነት ወኪሉን መጫን አልተቻለም።",
       "installApp": "የGitHub መተግበሪያን ይጫኑ",
@@ -2230,6 +2231,8 @@
       "cannotCompleteTitle": "መጫኑን ማጠናቀቅ አይቻልም",
       "notAdminMessage": "የዚያ መለያ የGitHub አስተዳዳሪ ብቻ መለያውን ማገናኘት ይችላል። Kiloን እንዲጭን የድርጅቱን አስተዳዳሪ ጠይቅ።",
       "alreadyClaimedMessage": "ያ የGitHub መተግበሪያ ጭነት አስቀድሞ ከሌላ የKilo መለያ ጋር ተገናኝቷል። በመጀመሪያ ከዚያ መለያ ግንኙነቱን አቋርጥ።",
+      "installationUnavailableMessage": "ይህ የGitHub መተግበሪያ ጭነት ታግዷል ወይም ከእንግዲህ አይገኝም። በGitHub ውስጥ መልሰው አስተካክለው ወይም እንደገና ጫነው፣ ከዚያ እንደገና ጀምር።",
+      "multipleInstallationsMessage": "ይህ የKilo ድርጅት በአሁኑ ጊዜ አንድ ብቻ የGitHub ድርጅት ማገናኘት ይችላል።",
       "didNotCompleteTitle": "መጫኑ አልተጠናቀቀም",
       "didNotCompleteMessage": "የGitHub መተግበሪያው ጭነት አልተጠናቀቀም። ከመተግበሪያው እንደገና ሞክር።"
     },

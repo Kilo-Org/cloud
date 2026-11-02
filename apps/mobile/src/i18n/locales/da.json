@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installér Kilos GitHub-app for automatisk at synkronisere Dependabot-advarsler og administrere sikkerhedsfund på tværs af dine kodelagre.",
+      "connectOwnerOnly": "Bed en organisationsejer eller administrator om at oprette forbindelse til {{platform}}.",
       "connectTitle": "Tilslut GitHub for at komme i gang",
       "couldNotLoad": "Sikkerhedsagenten kunne ikke indlæses.",
       "installApp": "Installér GitHub-appen",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Kan ikke fuldføre installation",
       "notAdminMessage": "Kun en GitHub-administrator for denne konto kan tilslutte den. Bed en administrator i organisationen om at installere Kilo.",
       "alreadyClaimedMessage": "Denne GitHub-installation er allerede tilsluttet en anden Kilo-konto. Afbryd først forbindelsen der.",
+      "installationUnavailableMessage": "Installationen af denne GitHub App er suspenderet eller ikke længere tilgængelig. Gendan eller geninstaller den i GitHub, og start derefter igen.",
+      "multipleInstallationsMessage": "Denne Kilo-organisation kan i øjeblikket kun tilsluttes én GitHub-organisation.",
       "didNotCompleteTitle": "Installationen blev ikke fuldført",
       "didNotCompleteMessage": "Installationen af GitHub-appen blev ikke fuldført. Prøv igen fra appen."
     },

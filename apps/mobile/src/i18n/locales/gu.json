@@ -2042,6 +2042,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ની ચેતવણીઓ આપમેળે સિંક કરવા અને તમારી રિપોઝિટરીઓનાં સુરક્ષા તારણોનું સંચાલન કરવા Kilo GitHub ઍપ ઇન્સ્ટોલ કરો.",
+      "connectOwnerOnly": "સંસ્થાના કોઈ માલિક અથવા એડમિનને {{platform}} જોડવા માટે કહો.",
       "connectTitle": "શરૂ કરવા GitHub કનેક્ટ કરો",
       "couldNotLoad": "સુરક્ષા એજન્ટ લોડ કરી શકાયો નહીં.",
       "installApp": "GitHub ઍપ ઇન્સ્ટોલ કરો",
@@ -2230,6 +2231,8 @@
       "cannotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ કરી શકાતું નથી",
       "notAdminMessage": "માત્ર તે એકાઉન્ટનો GitHub એડમિન જ તેને કનેક્ટ કરી શકે છે. Kilo ઇન્સ્ટોલ કરવા સંસ્થાના એડમિનને કહો.",
       "alreadyClaimedMessage": "તે GitHub ઇન્સ્ટોલેશન પહેલેથી જ બીજા Kilo એકાઉન્ટ સાથે કનેક્ટ થયેલું છે. પહેલાં ત્યાંથી તેને ડિસ્કનેક્ટ કરો.",
+      "installationUnavailableMessage": "આ GitHub App ઇન્સ્ટોલેશન સસ્પેન્ડ થયેલું છે અથવા હવે ઉપલબ્ધ નથી. GitHub માં તેને પુનઃસ્થાપિત કરો અથવા ફરી ઇન્સ્ટોલ કરો, પછી ફરી શરૂ કરો.",
+      "multipleInstallationsMessage": "આ Kilo ઓર્ગેનાઇઝેશન હાલમાં માત્ર એક GitHub ઓર્ગેનાઇઝેશન સાથે જ કનેક્ટ થઈ શકે છે.",
       "didNotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ થયું નથી",
       "didNotCompleteMessage": "GitHub એપનું ઇન્સ્ટોલેશન પૂરું થયું નથી. એપમાંથી ફરી પ્રયત્ન કરો."
     },

@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Asenna Kilon GitHub-sovellus, niin voit synkronoida Dependabot-hälytykset automaattisesti ja hallinnoida koodivarastojesi tietoturvahavaintoja.",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään {{platform}}.",
       "connectTitle": "Aloita yhdistämällä GitHub",
       "couldNotLoad": "Tietoturva-agenttia ei voitu ladata",
       "installApp": "Asenna GitHub-sovellus",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Asennusta ei voi suorittaa loppuun",
       "notAdminMessage": "Vain kyseisen GitHub-tilin ylläpitäjä voi yhdistää sen. Pyydä organisaation ylläpitäjää asentamaan Kilo.",
       "alreadyClaimedMessage": "Kyseinen GitHub-asennus on jo yhdistetty toiseen Kilo-tiliin. Katkaise yhteys sieltä ensin.",
+      "installationUnavailableMessage": "Tämä GitHub App -asennus on keskeytetty tai ei ole enää saatavilla. Palauta asennus tai asenna se uudelleen GitHubissa ja aloita sitten uudelleen.",
+      "multipleInstallationsMessage": "Tämä Kilo-organisaatio voi tällä hetkellä yhdistää vain yhden GitHub-organisaation.",
       "didNotCompleteTitle": "Asennus ei valmistunut",
       "didNotCompleteMessage": "GitHub-sovelluksen asennus jäi kesken. Yritä uudelleen sovelluksesta."
     },

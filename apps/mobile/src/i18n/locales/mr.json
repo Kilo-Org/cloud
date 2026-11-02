@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot सूचना आपोआप सिंक करण्यासाठी आणि तुमच्या रिपॉझिटरींमधील सुरक्षा निष्कर्ष व्यवस्थापित करण्यासाठी Kilo GitHub ॲप इन्स्टॉल करा.",
+      "connectOwnerOnly": "संस्थेच्या मालकाला किंवा प्रशासकाला {{platform}} जोडण्यास सांगा.",
       "connectTitle": "सुरुवात करण्यासाठी GitHub जोडा",
       "couldNotLoad": "सुरक्षा एजंट लोड करता आला नाही.",
       "installApp": "GitHub ॲप इन्स्टॉल करा",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "इन्स्टॉलेशन पूर्ण करता येत नाही",
       "notAdminMessage": "फक्त त्या खात्याचा GitHub प्रशासकच ते कनेक्ट करू शकतो. संस्थेच्या प्रशासकाला Kilo इन्स्टॉल करण्यास सांगा.",
       "alreadyClaimedMessage": "ते GitHub इन्स्टॉलेशन आधीच दुसऱ्या Kilo खात्याशी कनेक्ट आहे. आधी त्या खात्यातून ते डिस्कनेक्ट करा.",
+      "installationUnavailableMessage": "हे GitHub App इन्स्टॉलेशन निलंबित आहे किंवा आता उपलब्ध नाही. ते GitHub मध्ये पुनर्संचयित करा किंवा पुन्हा इन्स्टॉल करा, त्यानंतर पुन्हा सुरू करा.",
+      "multipleInstallationsMessage": "ही Kilo संस्था सध्या फक्त एका GitHub संस्थेशी कनेक्ट होऊ शकते.",
       "didNotCompleteTitle": "इन्स्टॉलेशन पूर्ण झाले नाही",
       "didNotCompleteMessage": "GitHub अॅपचे इन्स्टॉलेशन पूर्ण झाले नाही. अॅपमधून पुन्हा प्रयत्न करा."
     },

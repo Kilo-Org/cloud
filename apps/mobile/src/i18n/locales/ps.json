@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "د Kilo د GitHub اپ نصب کړئ، څو د Dependabot خبرتیاوې په اتوماتیک ډول هممهاله او په خپلو ټولو ذخیرو کې امنیتي موندنې مدیریت کړئ.",
+      "connectOwnerOnly": "له یو د سازمان مالک یا مدیر څخه وغواړئ چې {{platform}} ونښلوي.",
       "connectTitle": "د پیل لپاره GitHub ونښلوئ",
       "couldNotLoad": "امنیتي اجنټ بار نه شو.",
       "installApp": "د GitHub اپ نصب کړئ",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "نصب نه شي بشپړېدای",
       "notAdminMessage": "یوازې د هغه حساب د GitHub مدیر یې نښلولی شي. د سازمان له یوه مدیر څخه وغواړئ چې Kilo نصب کړي.",
       "alreadyClaimedMessage": "د GitHub دا نصب لا دمخه له بل Kilo حساب سره نښلول شوی دی. لومړی هلته یې اړیکه پرې کړئ.",
+      "installationUnavailableMessage": "د GitHub App دا نصب ځنډول شوی یا نور شتون نلري. په GitHub کې یې بحال یا بیا نصب کړئ، بیا بیا پیل کړئ.",
+      "multipleInstallationsMessage": "د Kilo دا سازمان اوس مهال یوازې له یوه GitHub سازمان سره نښلېدای شي.",
       "didNotCompleteTitle": "نصب بشپړ نه شو",
       "didNotCompleteMessage": "د GitHub اپلیکیشن نصب بشپړ نه شو. له اپلیکیشن څخه بیا هڅه وکړئ."
     },

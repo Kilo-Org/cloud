@@ -2102,6 +2102,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Nainstalujte aplikaci Kilo na GitHubu. Umožní vám automaticky synchronizovat upozornění Dependabot a spravovat bezpečnostní nálezy ve vašich repozitářích.",
+      "connectOwnerOnly": "Požádejte vlastníka organizace nebo správce, aby připojil {{platform}}.",
       "connectTitle": "Začněte připojením GitHubu",
       "couldNotLoad": "Bezpečnostního agenta se nepodařilo načíst.",
       "installApp": "Nainstalovat aplikaci GitHub",
@@ -2298,6 +2299,8 @@
       "cannotCompleteTitle": "Instalaci nelze dokončit",
       "notAdminMessage": "Tento účet může připojit jen jeho správce na GitHubu. Požádej správce organizace, aby nainstaloval Kilo.",
       "alreadyClaimedMessage": "Tato instalace aplikace pro GitHub je už připojená k jinému účtu Kilo. Nejprve ji tam odpoj.",
+      "installationUnavailableMessage": "Tato instalace aplikace pro GitHub je pozastavená nebo už není dostupná. Obnov ji nebo znovu nainstaluj v GitHubu a pak začni znovu.",
+      "multipleInstallationsMessage": "Tato organizace Kilo může mít teď připojenou jen jednu organizaci na GitHubu.",
       "didNotCompleteTitle": "Instalace nebyla dokončena",
       "didNotCompleteMessage": "Instalace aplikace pro GitHub se nedokončila. Zkus to znovu v aplikaci."
     },

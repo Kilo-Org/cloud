@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Settu upp GitHub-forrit Kilo til að samstilla Dependabot-viðvaranir sjálfkrafa og stjórna öryggisfrávikum í geymslunum þínum.",
+      "connectOwnerOnly": "Biddu eiganda fyrirtækisins eða stjórnanda um að tengja {{platform}}.",
       "connectTitle": "Tengdu GitHub til að byrja",
       "couldNotLoad": "Ekki tókst að hlaða öryggiserindrekanum.",
       "installApp": "Setja upp GitHub-forrit",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Ekki er hægt að ljúka uppsetningu",
       "notAdminMessage": "Aðeins stjórnandi viðkomandi GitHub-reiknings getur tengt hann. Biddu stjórnanda fyrirtækisins um að setja upp Kilo.",
       "alreadyClaimedMessage": "Þessi GitHub-uppsetning er þegar tengd öðrum Kilo-reikningi. Aftengdu hana þar fyrst.",
+      "installationUnavailableMessage": "Þessi GitHub App-uppsetning er í biðstöðu eða ekki lengur tiltæk. Endurheimtu hana eða settu hana upp aftur á GitHub og byrjaðu svo aftur.",
+      "multipleInstallationsMessage": "Þessi Kilo-stofnun getur sem stendur aðeins tengt eina GitHub-stofnun.",
       "didNotCompleteTitle": "Uppsetningu var ekki lokið",
       "didNotCompleteMessage": "Ekki var lokið við uppsetningu GitHub-forritsins. Reyndu aftur í appinu."
     },

@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "ติดตั้ง Kilo GitHub App เพื่อซิงค์การแจ้งเตือน Dependabot โดยอัตโนมัติและจัดการข้อค้นพบด้านความปลอดภัยในคลังโค้ดของคุณ",
+      "connectOwnerOnly": "ขอให้เจ้าขององค์กรหรือผู้ดูแลระบบเชื่อมต่อ {{platform}}",
       "connectTitle": "เชื่อมต่อ GitHub เพื่อเริ่มต้น",
       "couldNotLoad": "ไม่สามารถโหลดเอเจนต์ความปลอดภัยได้",
       "installApp": "ติดตั้ง GitHub App",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "ไม่สามารถติดตั้งให้เสร็จสมบูรณ์ได้",
       "notAdminMessage": "มีเพียงผู้ดูแลบัญชี GitHub นั้นเท่านั้นที่เชื่อมต่อได้ ขอให้ผู้ดูแลองค์กรติดตั้ง Kilo",
       "alreadyClaimedMessage": "การติดตั้ง GitHub นั้นเชื่อมต่อกับบัญชี Kilo อื่นแล้ว ตัดการเชื่อมต่อที่นั่นก่อน",
+      "installationUnavailableMessage": "การติดตั้ง GitHub App นี้ถูกระงับหรือไม่พร้อมใช้งานอีกต่อไป กู้คืนหรือติดตั้งใหม่ใน GitHub จากนั้นเริ่มอีกครั้ง",
+      "multipleInstallationsMessage": "องค์กร Kilo นี้สามารถเชื่อมต่อองค์กร GitHub ได้เพียงหนึ่งองค์กรในขณะนี้",
       "didNotCompleteTitle": "การติดตั้งยังไม่เสร็จสมบูรณ์",
       "didNotCompleteMessage": "การติดตั้ง GitHub App ยังไม่เสร็จสมบูรณ์ ลองอีกครั้งจากแอป"
     },

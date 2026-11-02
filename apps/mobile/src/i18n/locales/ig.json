@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Wụnye ngwa Kilo maka GitHub iji mekọrịta data ọkwa Dependabot na-akpaghị aka ma jikwaa ihe achọpụtara na nchebe n'ebe nchekwa gị niile.",
+      "connectOwnerOnly": "Jụọ onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ jikọọ {{platform}}.",
       "connectTitle": "Jikọọ GitHub iji bido",
       "couldNotLoad": "Enweghị ike ibudata onye enyemaka nchebe.",
       "installApp": "Wụnye ngwa GitHub",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Enweghị ike imecha ntinye",
       "notAdminMessage": "Naanị onye nchịkwa GitHub nke akaụntụ ahụ nwere ike ijikọ ya. Rịọ onye nchịkwa òtù ka ọ tinye Kilo.",
       "alreadyClaimedMessage": "Ejikọlarị ntinye GitHub ahụ na akaụntụ Kilo ọzọ. Buru ụzọ kwụsị njikọ ya n'ebe ahụ.",
+      "installationUnavailableMessage": "Akwụsịtụrụ ntinye GitHub App a ma ọ bụ na ọ dịghịzi. Weghachite ma ọ bụ tinyeghachi ya na GitHub, wee malite ọzọ.",
+      "multipleInstallationsMessage": "Òtù Kilo a nwere ike ijikọ naanị otu nzukọ GitHub ugbu a.",
       "didNotCompleteTitle": "Ntinye agwụchaghị",
       "didNotCompleteMessage": "Emechaghị ntinye ngwa GitHub. Nwaa ọzọ site na ngwa a."
     },

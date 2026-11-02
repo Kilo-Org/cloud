@@ -2042,6 +2042,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ඇඟවීම් ස්වයංක්‍රීයව සමමුහුර්ත කිරීමට සහ ඔබේ ගබඩාවල ආරක්ෂක සොයාගැනීම් කළමනාකරණය කිරීමට Kilo GitHub යෙදුම ස්ථාපනය කරන්න.",
+      "connectOwnerOnly": "සංවිධාන හිමිකරුවෙකුගෙන් හෝ පරිපාලකවරයෙකුගෙන් {{platform}} සම්බන්ධ කරන ලෙස ඉල්ලන්න.",
       "connectTitle": "ආරම්භ කිරීමට GitHub සම්බන්ධ කරන්න",
       "couldNotLoad": "ආරක්ෂක නියෝජිතයා පූරණය කළ නොහැකි විය.",
       "installApp": "GitHub යෙදුම ස්ථාපනය කරන්න",
@@ -2230,6 +2231,8 @@
       "cannotCompleteTitle": "ස්ථාපනය සම්පූර්ණ කළ නොහැක",
       "notAdminMessage": "එම ගිණුම සම්බන්ධ කළ හැක්කේ එහි GitHub පරිපාලකයෙකුට පමණි. Kilo ස්ථාපනය කරන ලෙස සංවිධානයේ පරිපාලකයෙකුගෙන් ඉල්ලන්න.",
       "alreadyClaimedMessage": "එම GitHub ස්ථාපනය දැනටමත් වෙනත් Kilo ගිණුමකට සම්බන්ධ කර ඇත. පළමුව එය එතැනින් විසන්ධි කරන්න.",
+      "installationUnavailableMessage": "මෙම GitHub App ස්ථාපනය අත්හිටුවා ඇත හෝ තවදුරටත් ලබා ගත නොහැක. GitHub තුළ එය ප්‍රතිස්ථාපනය කරන්න හෝ නැවත ස්ථාපනය කරන්න, පසුව නැවත ආරම්භ කරන්න.",
+      "multipleInstallationsMessage": "මෙම Kilo සංවිධානයට දැනට එක් GitHub සංවිධානයක් පමණක් සම්බන්ධ කළ හැක.",
       "didNotCompleteTitle": "ස්ථාපනය සම්පූර්ණ නොවීය",
       "didNotCompleteMessage": "GitHub යෙදුම ස්ථාපනය කිරීම සම්පූර්ණ නොවීය. යෙදුමෙන් නැවත උත්සාහ කරන්න."
     },

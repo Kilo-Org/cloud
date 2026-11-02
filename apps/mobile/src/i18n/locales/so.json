@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Rakib abka Kilo ee GitHub si aad si otomaatig ah u isku waafajiso digniinaha Dependabot una maamusho natiijooyinka amniga ee kaydadkaaga oo dhan.",
+      "connectOwnerOnly": "Waydii milkiilaha ururka ama maamulaha inuu ku xidho {{platform}}.",
       "connectTitle": "Ku xidh GitHub si aad u bilowdo",
       "couldNotLoad": "Wakiilka amniga lama soo dejin karin.",
       "installApp": "Rakib abka GitHub",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Rakibidda lama dhammayn karo",
       "notAdminMessage": "Keliya maamulaha GitHub ee akoonkaas ayaa xiriirin kara. Ka codso maamulaha ururka inuu rakibo Kilo.",
       "alreadyClaimedMessage": "Rakibiddaas GitHub waxay mar hore ku xiran tahay akoon kale oo Kilo ah. Marka hore halkaas ka gooy xiriirka.",
+      "installationUnavailableMessage": "Rakibidda GitHub App waa la hakiyay ama mar dambe lama heli karo. Ku soo celi ama dib ugu rakib GitHub, ka dibna mar kale bilow.",
+      "multipleInstallationsMessage": "Ururkan Kilo hadda wuxuu kaliya ku xiri karaa hal urur oo GitHub ah.",
       "didNotCompleteTitle": "Rakibiddu ma dhammaystirmin",
       "didNotCompleteMessage": "Rakibidda barnaamijka GitHub ma dhammaystirmin. Mar kale ka isku day abka."
     },

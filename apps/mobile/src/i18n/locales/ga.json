@@ -2135,6 +2135,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Suiteáil aip GitHub Kilo chun foláirimh Dependabot a shioncronú go huathoibríoch agus torthaí slándála a bhainistiú ar fud do stórtha.",
+      "connectOwnerOnly": "Iarr ar úinéir nó riarthóir eagraíochta {{platform}} a cheangal.",
       "connectTitle": "Ceangail GitHub chun tosú",
       "couldNotLoad": "Níorbh fhéidir an Gníomhaire slándála a lódáil.",
       "installApp": "Suiteáil an aip GitHub",
@@ -2335,6 +2336,8 @@
       "cannotCompleteTitle": "Ní féidir an tsuiteáil a chríochnú",
       "notAdminMessage": "Ní féidir ach le riarthóir GitHub den chuntas sin é a nascadh. Iarr ar riarthóir eagraíochta Kilo a shuiteáil.",
       "alreadyClaimedMessage": "Tá an tsuiteáil GitHub sin nasctha cheana le cuntas Kilo eile. Dícheangail í ansin ar dtús.",
+      "installationUnavailableMessage": "Tá an tsuiteáil GitHub App seo ar fionraí nó níl sí ar fáil a thuilleadh. Athchóirigh nó athshuiteáil í i GitHub, ansin tosaigh arís.",
+      "multipleInstallationsMessage": "Ní féidir leis an eagraíocht Kilo seo ach eagraíocht GitHub amháin a nascadh faoi láthair.",
       "didNotCompleteTitle": "Níor críochnaíodh an tsuiteáil",
       "didNotCompleteMessage": "Níor críochnaíodh suiteáil na haipe GitHub. Bain triail as arís ón aip."
     },

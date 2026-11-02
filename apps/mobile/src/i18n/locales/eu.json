@@ -2036,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalatu Kiloren GitHub aplikazioa Dependabot-en abisuak automatikoki sinkronizatzeko eta zure biltegietako segurtasun-aurkikuntzak kudeatzeko.",
+      "connectOwnerOnly": "Eskatu erakundeko jabe bati edo administratzaile bati {{platform}} konekta dezan.",
       "connectTitle": "Konektatu GitHub hasteko",
       "couldNotLoad": "Ezin izan da segurtasun-agentea kargatu.",
       "installApp": "Instalatu GitHub aplikazioa",
@@ -2224,6 +2225,8 @@
       "cannotCompleteTitle": "Ezin da instalazioa osatu",
       "notAdminMessage": "Kontu hori haren GitHub administratzaile batek soilik konekta dezake. Eskatu erakundeko administratzaile bati Kilo instalatzeko.",
       "alreadyClaimedMessage": "GitHub instalazio hori jada beste Kilo kontu batekin konektatuta dago. Deskonektatu lehenengo han.",
+      "installationUnavailableMessage": "GitHub App instalazio hau etenda dago edo jada ez dago erabilgarri. Berrezarri edo instalatu berriro GitHub-en, eta gero hasi berriro.",
+      "multipleInstallationsMessage": "Kilo erakunde honek une honetan soilik GitHub erakunde bat konekta dezake.",
       "didNotCompleteTitle": "Instalazioa ez da osatu",
       "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },

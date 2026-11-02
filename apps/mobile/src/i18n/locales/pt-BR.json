@@ -1445,6 +1445,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instale o app do Kilo no GitHub para sincronizar automaticamente alertas do Dependabot e gerenciar ocorrências de segurança nos seus repositórios.",
+      "connectOwnerOnly": "Peça a um proprietário ou administrador da organização para conectar o {{platform}}.",
       "connectTitle": "Conecte o GitHub para começar",
       "couldNotLoad": "Não foi possível carregar o agente de segurança.",
       "installApp": "Instalar app do GitHub",
@@ -1681,6 +1682,8 @@
       "cannotCompleteTitle": "Não foi possível concluir a instalação",
       "notAdminMessage": "Somente um administrador do GitHub dessa conta pode conectá-la. Peça a um administrador da organização para instalar o Kilo.",
       "alreadyClaimedMessage": "Essa instalação do GitHub já está conectada a outra conta do Kilo. Desconecte-a lá primeiro.",
+      "installationUnavailableMessage": "Esta instalação do GitHub App está suspensa ou não está mais disponível. Restaure-a ou reinstale-a no GitHub e comece novamente.",
+      "multipleInstallationsMessage": "No momento, esta organização do Kilo pode conectar apenas uma organização do GitHub.",
       "didNotCompleteTitle": "A instalação não foi concluída",
       "didNotCompleteMessage": "A instalação do aplicativo para GitHub não foi concluída. Tente novamente pelo app."
     },

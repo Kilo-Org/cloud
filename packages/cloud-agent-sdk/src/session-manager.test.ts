@@ -8807,7 +8807,11 @@ describe('createSessionManager', () => {
         model: { providerID: 'retired', id: 'retired-model' },
       });
       retired.onError?.('Connection to agent lost');
-      retired.onMessageFailed?.('msg-retired', { status: 'failed', reason: 'exhausted' });
+      retired.onMessageFailed?.('msg-retired', {
+        status: 'failed',
+        error: 'retired failure',
+        reason: 'exhausted',
+      });
       retired.onChildSessionError?.('child-retired', 'Retired child failed');
       retired.onQuestionAsked?.('req-retired', [
         { question: 'Retired question?', header: 'q', options: [] },

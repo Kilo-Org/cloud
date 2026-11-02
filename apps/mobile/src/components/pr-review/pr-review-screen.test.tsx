@@ -902,6 +902,94 @@ describe('PrReviewScreen fixed header and disabled actions', () => {
     }
   });
 
+  it('keeps the Overview tab reachable when a terminal read fails from another tab', () => {
+    // The reader had Files or Discussion open when a refetch turned terminal:
+    // the body still holds the cached request, so the tabs that read from it
+    // stay shut, and the Overview entry — the surface with the failure and its
+    // recovery — is the way back.
+    for (const tab of ['files', 'discussion'] as const) {
+      prQueryResult = {
+        data: {
+          title: 'Bump the dep',
+          state: 'open',
+          mergeable: true,
+          headSha: 'head-1',
+          counts: { changedFiles: 2 },
+        },
+        isLoading: false,
+        isError: true,
+        error: { data: { code: 'NOT_FOUND' } },
+        isFetching: false,
+      };
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+      const selector = findElement({
+        node: element,
+        type: 'PrReviewTabSelector',
+        prop: 'activeTab',
+        value: tab,
+      });
+      expect(selector?.props).toEqual(
+        expect.objectContaining({ disabledTabs: ['files', 'discussion'] })
+      );
+      // The cached request still reaches the tab body under the reader.
+      const filesBody = findElement({
+        node: element,
+        type: 'PrReviewFilesTab',
+        prop: 'headSha',
+        value: 'head-1',
+      });
+      const discussionBody = findElement({
+        node: element,
+        type: 'PrReviewDiscussionTab',
+        prop: 'owner',
+        value: 'octocat',
+      });
+      expect(tab === 'files' ? filesBody : discussionBody).not.toBeNull();
+    }
+  });
+
+  it('keeps the Overview tab reachable after the initial load fails', () => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'NOT_FOUND' } },
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const selector = findElement({
+      node: element,
+      type: 'PrReviewTabSelector',
+      prop: 'activeTab',
+      value: 'overview',
+    });
+    expect(selector?.props).toEqual(
+      expect.objectContaining({ disabledTabs: ['files', 'discussion'] })
+    );
+  });
+
+  it('keeps every tab reachable while a retryable read keeps the loaded request', () => {
+    prQueryResult = {
+      data: { title: 'Bump the dep', state: 'open', mergeable: true, headSha: 'head-1' },
+      isLoading: false,
+      isError: true,
+      error: { data: { code: 'BAD_GATEWAY' } },
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const selector = findElement({
+      node: element,
+      type: 'PrReviewTabSelector',
+      prop: 'activeTab',
+      value: 'overview',
+    });
+    expect(selector?.props).toEqual(expect.objectContaining({ disabledTabs: [] }));
+  });
+
   it('disables Review and Merge at the Bitbucket organization boundary', () => {
     vi.mocked(React.useContext).mockReturnValue({
       ref: { platform: 'bitbucket', workspace: 'team', repoSlug: 'repo', prId: 7 },

@@ -39,6 +39,8 @@ import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
+const TABS_WITHOUT_A_REQUEST: readonly PrReviewTabId[] = ['files', 'discussion'];
+const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -244,6 +246,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     errorState?.kind === 'retryable' || errorState?.kind === 'service-unavailable';
   const loadFailed = errorState !== null && (pr.data === undefined || !keepsCachedData);
   const requestLoaded = !loadFailed && pr.data !== undefined;
+  // Files and Discussion read from the request, so a failed load leaves them
+  // with nothing to show. Overview owns that failure: it renders the
+  // unavailable state and its recovery, and it stays selectable, so a reader
+  // whose selected tab was Files keeps a way back to it.
+  const tabSelectorDisabledTabs = loadFailed ? TABS_WITHOUT_A_REQUEST : NO_DISABLED_TABS;
   // The review-submit sheet is a route sibling on every provider (s6), so
   // the affordance is offered wherever its scope can actually be queried:
   // a Bitbucket PR without a selected organization waits at the boundary
@@ -369,7 +376,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             activeTab={tab}
             onChange={setTab}
             discussionCount={pr.data?.commentCount}
-            disabled={loadFailed}
+            disabledTabs={tabSelectorDisabledTabs}
           />
         </View>
       ) : null}

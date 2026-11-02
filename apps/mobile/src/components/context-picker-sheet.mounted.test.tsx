@@ -8,20 +8,26 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ContextPickerSheet } from '@/components/context-picker-sheet';
+import { scrollTo } from '@/test/scroll-view-mock';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const theme = vi.hoisted(() => ({ colors: { primary: '#FFDD00', foreground: '#F2F0EB' } }));
 const onSelect = vi.hoisted(() => vi.fn());
 const onClose = vi.hoisted(() => vi.fn());
 
-vi.mock('react-native', () => ({
-  Modal: 'Modal',
-  Platform: { OS: 'ios' },
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  View: 'View',
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
-}));
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so the
+  // shared host-element mock is pulled in here too.
+  const { MockScrollView } = await import('@/test/scroll-view-mock');
+  return {
+    Modal: 'Modal',
+    Platform: { OS: 'ios' },
+    Pressable: 'Pressable',
+    ScrollView: MockScrollView,
+    View: 'View',
+    useWindowDimensions: () => ({ width: 400, height: 800 }),
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 24 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
@@ -108,6 +114,7 @@ beforeEach(() => {
   }
   onSelect.mockReset();
   onClose.mockReset();
+  scrollTo.mockClear();
 });
 
 /** The account list: the one scrollable region inside the sheet. */
@@ -164,6 +171,8 @@ describe('ContextPickerSheet', () => {
 
     expect(rows(renderer).map(row => row.selected)).toEqual([false, false]);
     expect(rows(renderer).map(row => row.check)).toEqual([false, false]);
+    // Nothing is checked, so nothing scrolls: the list opens at its first row.
+    expect(renderer.root.findAll(node => node.props.onLayout !== undefined)).toHaveLength(0);
   });
 
   it('paints the check with the active palette', async () => {
@@ -172,6 +181,34 @@ describe('ContextPickerSheet', () => {
     const check = renderer.root.findAll(node => node.type === Check);
     expect(check).toHaveLength(1);
     expect(check[0]?.props.color).toBe(theme.colors.primary);
+  });
+
+  it('brings the checked row into view, and never scrolls the list again', async () => {
+    const renderer = await mount();
+
+    // A list capped at half the window hides the checked row below the fold
+    // when the account is far down it, and no visible row would mark the
+    // selection: the row the check belongs to is the one that reveals itself.
+    const [revealing, ...others] = renderer.root
+      .findAll(accountRow)
+      .filter(node => node.props.onLayout !== undefined);
+    expect(others).toHaveLength(0);
+    if (revealing === undefined) {
+      throw new Error('the checked account row must reveal itself');
+    }
+    expect(selectedState(revealing)).toBe(true);
+    const layOut = revealing.props.onLayout as (event: unknown) => void;
+
+    act(() => {
+      layOut({ nativeEvent: { layout: { y: 48 } } });
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ y: 48, animated: false });
+
+    // A later layout pass must not yank the list the user has scrolled.
+    act(() => {
+      layOut({ nativeEvent: { layout: { y: 0 } } });
+    });
+    expect(scrollTo).toHaveBeenCalledTimes(1);
   });
 
   it('reports the pressed row by index and dismisses through the sheet', async () => {

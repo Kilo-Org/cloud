@@ -1,5 +1,12 @@
 import { Check } from '@/components/ui/icons';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useRef } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  type ScrollViewInstance,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
@@ -80,6 +87,14 @@ function ContextPickerSheetBody({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const cancelLabel = options[cancelButtonIndex] ?? '';
+  const listRef = useRef<ScrollViewInstance>(null);
+  // The list caps at half the window, so a long membership list starts at the
+  // top and the checked row can begin below the fold: the sheet would open with
+  // no visible mark on the account the user is on, and the first row is the
+  // only one left to read as the selection. Scroll the check into view once,
+  // when its row is laid out; a later layout (resize, rotation) must not yank
+  // a list the user has scrolled.
+  const revealed = useRef(false);
   // Divider between rows only: the rule that closes the list belongs to the
   // action area below, not to the last row.
   let lastRowIndex = -1;
@@ -102,6 +117,7 @@ function ContextPickerSheetBody({
           {title}
         </Text>
         <ScrollView
+          ref={listRef}
           nestedScrollEnabled
           style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}
           showsVerticalScrollIndicator={false}
@@ -121,6 +137,20 @@ function ContextPickerSheetBody({
                 onPress={() => {
                   onSelect(index);
                 }}
+                onLayout={
+                  index === currentIndex
+                    ? event => {
+                        if (revealed.current) {
+                          return;
+                        }
+                        revealed.current = true;
+                        listRef.current?.scrollTo({
+                          y: event.nativeEvent.layout.y,
+                          animated: false,
+                        });
+                      }
+                    : undefined
+                }
                 accessible
                 accessibilityRole="button"
                 accessibilityLabel={label}

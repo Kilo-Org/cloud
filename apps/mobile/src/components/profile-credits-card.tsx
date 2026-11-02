@@ -44,10 +44,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Stack the balance unless the expiry note keeps its two lines beside the
   // amount, the visibility toggle and the purchase action. Measured on the
-  // standard matrix's compact cell (Android, 2026-11-02): the note needs 226 dp
-  // of column for two lines and the one-row siblings take 158 dp of the card,
-  // so it holds from 370 scaled card dp. Below that the note takes a row of its
-  // own at the card's full width.
+  // standard matrix (Android, 2026-11-02): the note takes two lines from a
+  // 215 dp column and three lines below that, and the one-row siblings take
+  // 157 dp of the card, so the one-row layout holds from about 372 scaled card
+  // dp. The threshold stacks below 370 of them and uses the card's width rather
+  // than the display's; below it the note takes a row of its own at full width.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it

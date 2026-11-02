@@ -71,6 +71,22 @@ export function selectScopeEntryView({
   return 'dashboard';
 }
 
+/**
+ * Whether the install state was refused for this caller's organization role.
+ *
+ * `githubApps.mintInstallState` authorizes through `resolveAuthorizedOwner(...,
+ * ORGANIZATION_MANAGE_ROLES)` (`apps/web/src/lib/integrations/resolve-owner.ts`)
+ * before it writes anything, and `ensureOrganizationAccess` answers
+ * `UNAUTHORIZED` for a role below that. That answer is the server's own role
+ * decision, so the entry reads it instead of inferring the role on the device: a
+ * local membership read cannot see the server's Kilo-admin elevation or a
+ * parent-organization role, and withholding the press on it would deny callers
+ * the server admits. Any other failure is a retryable error, not a role answer.
+ */
+export function isInstallStateRefusal(error: unknown): boolean {
+  return readTrpcErrorField(error, 'code') === 'UNAUTHORIZED';
+}
+
 /** The cause-named description the failure screen shows, or null for the variant's own copy. */
 type ScopeEntryLoadFailureDescriptionKey =
   | 'organization.boundary.loadErrorMessage'

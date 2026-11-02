@@ -77,9 +77,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const ownerUserId = await lookupUserId(ownerEmail);
   const memberUserId = await lookupUserId(memberEmail);
 
-  // Idempotent rerun: the two organizations are the only rows this topic owns,
-  // and their integrations and memberships cascade with them.
-  await db.delete(organizations).where(inArray(organizations.name, ORGANIZATION_NAMES));
+  // Idempotent rerun: the two organizations are the only rows this topic owns.
+  // `platform_integrations` cascades from `organizations`
+  // (`owned_by_organization_id`, onDelete cascade), but
+  // `organization_memberships.organization_id` carries no foreign key
+  // (`packages/db/src/schema.ts`), so its rows are deleted explicitly.
+  const previousIds = (
+    await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(inArray(organizations.name, ORGANIZATION_NAMES))
+  ).map(row => row.id);
+  if (previousIds.length > 0) {
+    await db
+      .delete(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, previousIds));
+    await db.delete(organizations).where(inArray(organizations.id, previousIds));
+  }
 
   const pendingOrganizationId = randomUUID();
   const suspendedOrganizationId = randomUUID();

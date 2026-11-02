@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isInstallStateRefusal,
   type ScopeEntryLoadFailure,
   type ScopeEntryView,
   selectScopeEntryLoadFailure,
@@ -130,6 +131,21 @@ function failureFor(patch: Partial<SelectScopeEntryLoadFailureInput>): ScopeEntr
     ...patch,
   });
 }
+
+describe('isInstallStateRefusal', () => {
+  it('reads the server’s role answer', () => {
+    expect(isInstallStateRefusal(serverError('UNAUTHORIZED'))).toBe(true);
+  });
+
+  it('keeps every other failure retryable', () => {
+    // FORBIDDEN is the single-installation guard, not a missing role, and a
+    // transport rejection never reached the server at all.
+    expect(isInstallStateRefusal(serverError('FORBIDDEN'))).toBe(false);
+    expect(isInstallStateRefusal(serverError('INTERNAL_SERVER_ERROR'))).toBe(false);
+    expect(isInstallStateRefusal(new TypeError('Network request failed'))).toBe(false);
+    expect(isInstallStateRefusal(undefined)).toBe(false);
+  });
+});
 
 describe('selectScopeEntryLoadFailure', () => {
   it('names the connection when the failed read never reached the server', () => {

@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import {
+  isInstallStateRefusal,
   selectScopeEntryLoadFailure,
   selectScopeEntryView,
 } from '@/components/security-agent/scope-entry-render';
@@ -124,6 +125,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
   const mintUrlRef = useRef<string | null>(null);
+  // Starting a GitHub installation for an organization is an organization-manage
+  // role's action, and the server is the only authority on that role:
+  // `githubApps.mintInstallState` resolves the caller through
+  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
+  // parent-organization role — neither is visible in the device's membership
+  // read. So the press is offered until the server answers, and its
+  // `UNAUTHORIZED` answer retires the press for the role notice.
+  const [installRefused, setInstallRefused] = useState(false);
 
   // A failed mint must not replace the setup screen with an error-only page:
   // the setup state (with the audit-report action) stays usable and the press
@@ -138,6 +147,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         setMintUrl(null);
         mintUrlRef.current = null;
         setIsMinting(true);
+        setInstallRefused(false);
       }
       try {
         const { token } = await trpcClient.githubApps.mintInstallState.mutate({
@@ -148,9 +158,15 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         mintUrlRef.current = url;
         if (!cancelledRef.current) {
           setMintUrl(url);
+          setInstallRefused(false);
         }
         return true;
-      } catch {
+      } catch (error) {
+        // A refused role is the answer this screen acts on; a transport or
+        // server failure leaves the press in place to retry.
+        if (!cancelledRef.current && isInstallStateRefusal(error)) {
+          setInstallRefused(true);
+        }
         return false;
       } finally {
         if (isInitial && !cancelledRef.current) {
@@ -163,23 +179,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
-  // Starting a GitHub installation for an organization is an organization-manage
-  // role's action: `githubApps.mintInstallState` refuses a billing manager with
-  // `UNAUTHORIZED`, so a screen that offered the press to every `canManage`
-  // reader would end in `setupFailed` with nothing the reader could do. Only a
-  // resolved role may withhold it: an enabled agent reaches this view while the
-  // role list is still loading, and hiding the press then would dead-end the
-  // owner who can take it.
-  const roleResolved = capability.status === 'allowed' || capability.status === 'denied';
-  const canInstallGitHub = !roleResolved || capability.canManageGitHub;
-
   // Mint only when the entry view actually needs a fresh GitHub install URL:
   // connect-github always, reauthorize only when the server offered no
   // reauthorize URL. Dashboard and disabled-settings mounts must not mint —
   // the token is a bearer credential and churning it on every visit is
   // wasteful.
-  const shouldMint =
-    (view === 'connect-github' && canInstallGitHub) || (view === 'reauthorize' && !reauthUrl);
+  const shouldMint = view === 'connect-github' || (view === 'reauthorize' && !reauthUrl);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -302,11 +307,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
               // The Code Reviewer's connect gate shows the same role rule, but
               // its sentence also restates that the provider is unconnected,
               // which this heading already says; the narrower notice leaves one
-              // message on the screen.
+              // message on the screen. It is a personal scope's mint that takes
+              // no organization role, so only the server's refusal sets it.
               readOnlyNotice={
-                canInstallGitHub
-                  ? undefined
-                  : t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
+                installRefused
+                  ? t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
+                  : undefined
               }
               url={connectUrl ?? undefined}
               resolveUrl={async () => {

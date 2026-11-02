@@ -19,11 +19,12 @@ type SecurityAgentSetupProps<T> = {
   description: string;
   buttonLabel: string;
   /**
-   * Why the reader cannot start this connection themselves, from a resolved
-   * role. When set, the action is withheld: the body shows this sentence where
-   * the button would be and never resolves a URL, so the screen cannot offer a
-   * press whose destination refuses the reader. An unresolved capability
-   * passes nothing, keeping the button while the role is still unknown.
+   * Why the reader cannot start this connection themselves, once the server has
+   * refused it for their organization role. When set, the action is withheld:
+   * the body shows this sentence in the button's own box and never resolves a
+   * URL, so the screen cannot offer a press whose destination refuses the
+   * reader. A caller the server admits never sets it, so no device-side role
+   * read can deny a press.
    */
   readOnlyNotice?: string;
   /**
@@ -101,9 +102,13 @@ export function SecurityAgentSetup<T>({
         {readOnlyNotice ? (
           // The notice takes the action's place rather than sitting beside it:
           // this reader has no press to make, and the sentence is the only
-          // thing left to say. It keeps the button's `mt-3` so the block reads
-          // the same in both states.
-          <Text className="mt-3 text-center text-xs text-muted-foreground">{readOnlyNotice}</Text>
+          // thing left to say. It keeps the button's own box — `mt-3`, the
+          // full-width `min-h-[44px]` at the same padding (`Button`'s default
+          // size) — so a role that resolves after mount changes what the block
+          // says without re-centring it under the reader's eyes.
+          <View className="mt-3 w-full min-h-[44px] items-center justify-center px-4 py-2">
+            <Text className="text-center text-xs text-muted-foreground">{readOnlyNotice}</Text>
+          </View>
         ) : (
           <Button
             className="mt-3 w-full flex-row gap-2"
@@ -118,7 +123,13 @@ export function SecurityAgentSetup<T>({
             <Text>{buttonLabel}</Text>
           </Button>
         )}
-        <AccessibleStatus message={failure} className="text-center text-sm" />
+        {/* A notice leaves nothing to retry, so the press that produced this
+            line is no longer the screen's state: drop it rather than leave an
+            error beneath an action-less body. */}
+        <AccessibleStatus
+          message={readOnlyNotice ? null : failure}
+          className="text-center text-sm"
+        />
       </View>
     </CenteredState>
   );

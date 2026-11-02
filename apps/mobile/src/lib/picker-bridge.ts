@@ -172,10 +172,7 @@ export function resolveModelPickerSelection(
 }
 
 export function commitModelPickerSelection(
-  bridge: Pick<
-    ModelPickerBridge,
-    'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'
-  >,
+  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
   value: string,
   variant: string
 ): boolean {

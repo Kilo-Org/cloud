@@ -635,7 +635,13 @@ describe('ModelPickerContent thinking effort availability', () => {
   // The commit itself runs on the sheet's focus-effect cleanup, which this
   // harness mocks out (see `expo-router`); the close is what the route owns.
   function mountWith(acceptsVariant: boolean) {
-    slotState.bridge = { ...makeBridge(), options: [effortOption], currentValue: effortOption.id, currentVariant: 'low', acceptsVariant };
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [effortOption],
+      currentValue: effortOption.id,
+      currentVariant: 'low',
+      acceptsVariant,
+    };
   }
 
   function modelRow(renderer: TestRenderer.ReactTestRenderer) {

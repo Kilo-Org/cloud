@@ -3408,6 +3408,7 @@ describe('User', () => {
         can_view_sessions: true,
         can_manage_credits: true,
         can_export_api_request_logs: true,
+        can_request_support_org_access: true,
       });
 
       await softDeleteUser(user.id);
@@ -3449,6 +3450,7 @@ describe('User', () => {
       expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
       expect(softDeleted!.can_export_api_request_logs).toBe(false);
+      expect(softDeleted!.can_request_support_org_access).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });

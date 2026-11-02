@@ -135,6 +135,8 @@ import {
   agent_briefing_context_preferences,
   agent_briefing_preferences,
   cli_sessions_v2,
+  support_access_grants,
+  support_access_grant_events,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -1185,10 +1187,41 @@ export async function anonymizeCloudUserData(
       can_view_sessions: false,
       can_manage_credits: false,
       can_export_api_request_logs: false,
+      can_request_support_org_access: false,
       customer_source: null,
       signup_ip: null,
     })
     .where(eq(kilocode_users.id, userId));
+
+  const revokedGrants = await tx
+    .update(support_access_grants)
+    .set({
+      status: 'revoked',
+      revoked_at: sql`now()`,
+      revoke_reason: 'actor account soft-deleted',
+    })
+    .where(
+      and(
+        eq(support_access_grants.actor_kilo_user_id, userId),
+        inArray(support_access_grants.status, ['pending', 'active'])
+      )
+    )
+    .returning({
+      id: support_access_grants.id,
+      organizationId: support_access_grants.organization_id,
+      actionClass: support_access_grants.action_class,
+    });
+  if (revokedGrants.length > 0) {
+    await tx.insert(support_access_grant_events).values(
+      revokedGrants.map(grant => ({
+        grant_id: grant.id,
+        event_type: 'revoked',
+        organization_id: grant.organizationId,
+        action_class: grant.actionClass,
+        metadata: { cause: 'actor_soft_deleted' },
+      }))
+    );
+  }
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));

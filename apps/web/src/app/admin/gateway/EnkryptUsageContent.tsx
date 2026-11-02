@@ -41,12 +41,12 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function EnkryptGuardrailChargesContent() {
+export function EnkryptUsageContent() {
   const trpc = useTRPC();
   const [organizationInput, setOrganizationInput] = useState('');
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const { data, isLoading, isFetching, error, refetch } = useQuery(
-    trpc.admin.enkryptGuardrailCharges.list.queryOptions({ organizationId, limit: 200 })
+    trpc.admin.enkryptUsage.list.queryOptions({ organizationId, limit: 200 })
   );
 
   const trimmedInput = organizationInput.trim();
@@ -64,7 +64,7 @@ export function EnkryptGuardrailChargesContent() {
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="type-title">Enkrypt Guardrail Charges</h1>
+          <h1 className="type-title">Enkrypt Usage</h1>
           <p className="text-muted-foreground mt-1 type-body">
             Rows in <code>enkrypt_usage</code>: one per Enkrypt guardrail detect call billed to an
             organization. Covers the last 30 days: the table shows the latest 200 rows and the
@@ -112,7 +112,9 @@ export function EnkryptGuardrailChargesContent() {
         )}
       </form>
 
-      {error && <p className="text-destructive type-body">{error.message}</p>}
+      {error && (
+        <p className="text-destructive type-body">Unable to load usage records: {error.message}</p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <Stat label="Calls" value={summary ? summary.total_calls.toLocaleString() : '—'} />
@@ -148,7 +150,7 @@ export function EnkryptGuardrailChargesContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Latest charges</CardTitle>
+          <CardTitle>Latest usage records</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -169,14 +171,14 @@ export function EnkryptGuardrailChargesContent() {
               {isLoading && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-muted-foreground">
-                    Loading charges…
+                    Loading usage records…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && data?.rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-muted-foreground">
-                    No guardrail charges yet.
+                    No usage records yet.
                   </TableCell>
                 </TableRow>
               )}

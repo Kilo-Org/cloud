@@ -530,6 +530,14 @@ export const kilocode_users = pgTable(
     normalized_email: text(),
     email_domain: text(),
 
+    /**
+     * The user's id in an external identity provider. Prep for SCIM over
+     * WorkOS event sync: directory events arrive for users who have never
+     * signed in, so no `user_auth_provider` row exists to resolve them
+     * against. Null for everyone except directory-provisioned users.
+     */
+    external_id: text().default(sql`null`),
+
     personal_account_disabled: boolean().default(false).notNull(),
   },
   table => [
@@ -541,6 +549,10 @@ export const kilocode_users = pgTable(
       .concurrently(),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
+    index('IDX_kilocode_users_external_id')
+      .on(table.external_id)
+      .where(sql`${table.external_id} IS NOT NULL`)
+      .concurrently(),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     check(
@@ -3331,6 +3343,14 @@ export const organizations = pgTable(
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
+    // WorkOS Directory Sync bindings. `directory_group_id` is the primary binding;
+    // `directory_idp_id` is the identity-provider group ID, which survives a directory
+    // disconnect/reconnect that mints a new `directory_group_id`.
+    directory_id: text(),
+    directory_group_id: text(),
+    directory_idp_id: text(),
+    // Identifier for this organization in the customer's own system.
+    external_org_id: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
@@ -3349,6 +3369,28 @@ export const organizations = pgTable(
       .where(
         sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
       ),
+    // Directory Sync lookups resolve an organization from a webhook payload, so each
+    // binding column is probed by value. The predicates keep these indexes to the few
+    // directory-synced rows; `deleted_at IS NULL` lets a soft-deleted organization
+    // release its binding for reuse.
+    uniqueIndex('UQ_organizations_directory_group_id')
+      .on(table.directory_group_id)
+      .where(sql`${table.directory_group_id} IS NOT NULL AND ${table.deleted_at} IS NULL`)
+      .concurrently(),
+    uniqueIndex('UQ_organizations_external_org_id')
+      .on(table.external_org_id)
+      .where(sql`${table.external_org_id} IS NOT NULL AND ${table.deleted_at} IS NULL`)
+      .concurrently(),
+    // Not unique: a disconnect/reconnect can leave two rows briefly sharing an IdP
+    // group while the new `directory_group_id` is adopted.
+    index('IDX_organizations_directory_idp_id')
+      .on(table.directory_idp_id)
+      .where(sql`${table.directory_idp_id} IS NOT NULL`)
+      .concurrently(),
+    index('IDX_organizations_directory_id')
+      .on(table.directory_id)
+      .where(sql`${table.directory_id} IS NOT NULL`)
+      .concurrently(),
   ]
 );
 

@@ -179,6 +179,7 @@ describe('DashboardSections priority card', () => {
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
+    // The all-clear row opens the findings list; the next test pins its floor.
     expect(card.findAllByType('Pressable')).toHaveLength(1);
   });
 
@@ -242,7 +243,12 @@ describe('DashboardSections stat rows', () => {
     // here is a measured coverage count: a number, never the unmeasured dash.
     expect(rows.map(row => row.props.value)).not.toContain('—');
     expect(rows.map(row => row.props.value)).toContain('0');
-    expect(rows.map(row => row.props.dotTone)).toContain('good');
+    // Synced, so the counts are real numbers rather than dashes — and with
+    // nothing counted in any of them the dots stay neutral, because a zero is
+    // a satisfied row rather than a severity.
+    expect(
+      rows.every(row => row.props.dotTone === 'muted' || row.props.dotTone === undefined)
+    ).toBe(true);
   });
 });
 

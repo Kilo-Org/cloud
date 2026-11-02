@@ -54,6 +54,7 @@ vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
 vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   AutoMergeEnabledBanner: 'AutoMergeEnabledBanner',
   BlockedPanel: 'BlockedPanel',
+  BlockedPanelPending: 'BlockedPanelPending',
   MergeabilityCheckingRow: 'MergeabilityCheckingRow',
   MergeabilityTimedOutRow: 'MergeabilityTimedOutRow',
   ClosedChip: 'ClosedChip',
@@ -225,8 +226,9 @@ describe('PrMergeSection mergeability poll', () => {
     if (!mounted) {
       throw new Error('the merge section did not mount');
     }
-    // Nothing is claimed while the read is unanswered.
-    expect(countOf(mounted, 'MergeabilityCheckingRow')).toBe(1);
+    // Nothing is claimed while the read is unanswered; the panel keeps its
+    // own place with one row's geometry.
+    expect(countOf(mounted, 'BlockedPanelPending')).toBe(1);
     expect(countOf(mounted, 'BlockedPanel')).toBe(0);
 
     reasonsModel.isChecksPending = false;
@@ -236,7 +238,7 @@ describe('PrMergeSection mergeability poll', () => {
     act(() => {
       mounted.update(sectionElement(blocked, onRefetch));
     });
-    expect(countOf(mounted, 'MergeabilityCheckingRow')).toBe(0);
+    expect(countOf(mounted, 'BlockedPanelPending')).toBe(0);
     expect(countOf(mounted, 'BlockedPanel')).toBe(1);
     reasonsModel.reasons = [];
   });

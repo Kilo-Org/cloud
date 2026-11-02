@@ -34,6 +34,7 @@ import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
+  BlockedPanelPending,
   ClosedChip,
   MergeabilityCheckingRow,
   MergeabilityTimedOutRow,
@@ -225,10 +226,11 @@ export function PrMergeSection({
   // Blocked.
   if (status === 'blocked') {
     // The panel's checks row is read from `listChecks`; until that answers the
-    // section holds the panel, so it never paints a cause the read replaces
-    // and never appends a row after the first paint.
+    // section holds the panel's place in its own shape, so it never paints a
+    // cause the read replaces, never appends a row after the first paint, and
+    // the panel that arrives does not move what is below it.
     if (isChecksPending) {
-      return <MergeabilityCheckingRow />;
+      return <BlockedPanelPending />;
     }
     return (
       <View className="gap-3">

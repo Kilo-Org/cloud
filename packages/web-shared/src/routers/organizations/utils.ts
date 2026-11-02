@@ -202,11 +202,6 @@ export type OrganizationAccessContext = Pick<
 
 export type ResolveOrganizationAccessOptions = {
   roles?: OrganizationRole[];
-  /**
-   * Replaces the `is_admin: false` fake contexts: membership (direct or
-   * inherited) is the only accepted authority.
-   */
-  member?: 'only';
   /** Exact REST route pattern or inventory key. Defaults to the tRPC path. */
   supportKey?: string | null;
   supportActionId?: string | null;
@@ -267,16 +262,9 @@ function supportAccessReasonFor(params: {
 }
 
 function deniedAccessError(params: {
-  memberOnly: boolean;
   decision: SupportDecision | null;
   grantStatus: 'expired' | 'revoked' | null;
 }): TRPCError {
-  if (params.memberOnly) {
-    return new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You do not have access to this organization',
-    });
-  }
   return new TRPCError({
     code: 'FORBIDDEN',
     message: 'Explicit support access is required for this organization',
@@ -316,7 +304,7 @@ export async function resolveOrganizationAccess(
   const mode: SupportAccessMode = getSupportAccessMode();
   const isAdmin = ctx.user.is_admin;
   const role = effectiveMembershipRole(rows, options.roles);
-  if (role && (options.member === 'only' || !(isAdmin && mode !== 'enforce'))) {
+  if (role && !(isAdmin && mode !== 'enforce')) {
     return { kind: 'member', role };
   }
 
@@ -330,14 +318,6 @@ export async function resolveOrganizationAccess(
         rows.length > 0
           ? 'You do not have the required organizational role to access this feature'
           : 'You do not have access to this organization',
-    });
-  }
-
-  if (options.member === 'only') {
-    throw deniedAccessError({
-      memberOnly: true,
-      decision: 'deny_actor_permission',
-      grantStatus: null,
     });
   }
 
@@ -362,12 +342,12 @@ export async function resolveOrganizationAccess(
       target: organizationTarget(organizationId),
       membershipRole: effectiveMembershipRole(rows),
       wouldPassWithoutAdmin: role !== null,
-      supportDecision: role !== null ? 'member' : 'deny_actor_permission',
+      supportDecision: mode === 'off' ? null : role !== null ? 'member' : 'deny_actor_permission',
     });
     return {
       kind: 'legacy_admin',
       role: 'owner',
-      wouldBe: role !== null ? 'member' : 'deny_actor_permission',
+      wouldBe: mode === 'off' ? null : role !== null ? 'member' : 'deny_actor_permission',
     };
   }
 
@@ -430,7 +410,6 @@ export async function resolveOrganizationAccess(
       inventoryId: null,
     });
     throw deniedAccessError({
-      memberOnly: false,
       decision: evaluation.decision,
       grantStatus,
     });
@@ -501,6 +480,29 @@ export async function requireLiveOrganization(organizationId: Organization['id']
   if (!(await isLiveOrganization(organizationId))) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
+}
+
+/**
+ * Platform operation on a live organization. Records the same membership
+ * observation as the parent membership-based path, so off-mode telemetry keeps
+ * its fields.
+ */
+export async function requireLiveOrganizationForPlatformAdmin(
+  ctx: TRPCContext,
+  organizationId: Organization['id'],
+  roles?: OrganizationRole[]
+): Promise<void> {
+  await requireLiveOrganization(organizationId);
+  const observation = await observeMembershipRole(
+    () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+    roles
+  );
+  await recordKiloAdminElevation(ctx, {
+    reason: 'organization_access',
+    target: organizationTarget(organizationId),
+    ...observation,
+    supportDecision: getSupportAccessMode() === 'off' ? null : 'deny_not_allowlisted',
+  });
 }
 
 /**
@@ -668,6 +670,31 @@ export async function ensureOrganizationAccessAndFetchOrg(
   organizationId: Organization['id'],
   roles?: OrganizationRole[]
 ): Promise<Organization> {
+  if (ctx.user.is_admin && getSupportAccessMode() !== 'enforce') {
+    const organizationResult = settle(
+      db
+        .select()
+        .from(organizations)
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+      roles
+    );
+    await recordKiloAdminElevation(ctx, {
+      reason: 'organization_fetch',
+      target: organizationTarget(organizationId),
+      ...observation,
+    });
+    const rowsResult = await organizationResult;
+    if (!rowsResult.ok) throw rowsResult.error;
+    const [organization] = rowsResult.value;
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    return organization;
+  }
+
   const rows = await loadEffectiveMembershipRowsWithOrganization(ctx.user.id, organizationId);
   const role = effectiveMembershipRole(rows, roles);
   if (role) {
@@ -675,27 +702,28 @@ export async function ensureOrganizationAccessAndFetchOrg(
     if (organization) return organization;
   }
 
-  if (!(await isLiveOrganization(organizationId))) {
-    if (ctx.user.is_admin) {
-      await recordKiloAdminElevation(ctx, {
-        reason: 'organization_fetch',
-        target: organizationTarget(organizationId),
-        membershipRole: null,
-        wouldPassWithoutAdmin: null,
-        supportDecision: null,
-      });
+  if (ctx.user.is_admin) {
+    await resolveOrganizationAccess(ctx, organizationId, {
+      roles,
+      auditReason: 'organization_fetch',
+    });
+    const organization = await getOrganizationById(organizationId);
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
     }
+    return organization;
+  }
+
+  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
-  await resolveOrganizationAccess(ctx, organizationId, {
-    roles,
-    auditReason: 'organization_fetch',
+  throw new TRPCError({
+    code: 'UNAUTHORIZED',
+    message:
+      rows.length > 0
+        ? 'You do not have the required organizational role to access this feature'
+        : 'You do not have access to this organization',
   });
-  const organization = await getOrganizationById(organizationId);
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  return organization;
 }
 
 // Custom procedure that ensures user has access to the organization (any role)

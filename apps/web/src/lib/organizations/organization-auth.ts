@@ -13,6 +13,7 @@ import {
   loadEffectiveMembershipRowsWithOrganization,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   findSupportAllowEntry,
   supportStandInRole,
@@ -62,11 +63,6 @@ export async function getAuthorizedOrgContext(
     supportKey?: string | null;
     /** Required for a REST write; REST reads default to `support_read`. */
     requiredActionClass?: SupportActionClass;
-    /**
-     * Credential issuers and other never-list surfaces pass this so a support
-     * grant cannot substitute for membership.
-     */
-    memberOnly?: boolean;
   } = {}
 ): Promise<DataOrNextError<AuthorizedOrgData>> {
   const { getUserFromAuthOverride, surface, requestMethod } = options;
@@ -99,7 +95,7 @@ export async function getAuthorizedOrgContext(
     if (!user.is_admin) throw membershipError;
   }
   const memberRole = effectiveMembershipRole(memberRows, roles);
-  if (memberRole) {
+  if (memberRole && (!user.is_admin || getSupportAccessMode() === 'enforce')) {
     const organization = memberRows.find(row => row.role === memberRole)?.organization;
     if (organization) {
       return successResult({
@@ -127,7 +123,6 @@ export async function getAuthorizedOrgContext(
       organizationId,
       {
         roles,
-        member: options.memberOnly ? 'only' : undefined,
         surface: (surface ?? 'rest') as SupportSurface,
         supportKey: options.supportKey ?? null,
         requiredActionClass: options.requiredActionClass,

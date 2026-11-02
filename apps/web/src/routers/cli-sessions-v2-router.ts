@@ -925,7 +925,7 @@ async function addOrganizationCondition(
       await recordKiloAdminElevation(ctx, {
         reason: 'cli_session_cross_org_query',
         target: UNSCOPED_TARGET,
-        supportDecision: 'deny_not_allowlisted',
+        supportDecision: getSupportAccessMode() === 'off' ? null : 'deny_not_allowlisted',
       });
     } else {
       whereConditions.push(

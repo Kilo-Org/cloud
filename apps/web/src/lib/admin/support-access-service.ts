@@ -234,12 +234,12 @@ export async function requestSupportGrant(params: {
   try {
     return await db.transaction(async tx => {
       await lockGrantScope(tx, params.actorKiloUserId, params.organizationId);
+      const actors = await lockActors(tx, [params.actorKiloUserId]);
+      const actor = assertRequesterPermission(actors.get(params.actorKiloUserId));
       await expireStaleGrants(tx, {
         actorKiloUserId: params.actorKiloUserId,
         organizationId: params.organizationId,
       });
-      const actors = await lockActors(tx, [params.actorKiloUserId]);
-      const actor = assertRequesterPermission(actors.get(params.actorKiloUserId));
       await assertLiveOrganization(tx, params.organizationId);
 
       const now = new Date();
@@ -304,6 +304,7 @@ export async function approveSupportGrant(params: {
     // Advisory lock before any row lock: request() takes advisory first, and a
     // reverse order here would deadlock.
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
+    const actors = await lockActors(tx, [unlocked.actor_kilo_user_id, params.approverKiloUserId]);
     await expireStaleGrants(tx, {
       actorKiloUserId: unlocked.actor_kilo_user_id,
       organizationId: unlocked.organization_id,
@@ -320,7 +321,6 @@ export async function approveSupportGrant(params: {
     if (pending.action_class !== 'support_write') {
       throw badRequest('Only write grants require approval');
     }
-    const actors = await lockActors(tx, [pending.actor_kilo_user_id, params.approverKiloUserId]);
     assertRequesterPermission(actors.get(pending.actor_kilo_user_id));
     const approver = actors.get(params.approverKiloUserId);
     if (
@@ -415,6 +415,7 @@ export async function cancelSupportGrant(params: {
       throw forbidden('Only the requester can cancel a support access request');
     }
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
+    await lockActors(tx, [params.actorKiloUserId]);
     const [grant] = await tx
       .update(support_access_grants)
       .set({
@@ -446,13 +447,13 @@ export async function revokeSupportGrant(params: {
       .limit(1);
     if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
+    const actors = await lockActors(tx, [params.actorKiloUserId]);
     const [existing] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    const actors = await lockActors(tx, [params.actorKiloUserId]);
     const actor = actors.get(params.actorKiloUserId);
     if (!actor || actor.blocked_reason !== null) {
       throw forbidden('Support access revocation permission required');
@@ -499,12 +500,12 @@ export async function emergencyIssueSupportGrant(params: {
   try {
     return await db.transaction(async tx => {
       await lockGrantScope(tx, params.superadminKiloUserId, params.organizationId);
+      const actors = await lockActors(tx, [params.superadminKiloUserId]);
+      const actor = actors.get(params.superadminKiloUserId);
       await expireStaleGrants(tx, {
         actorKiloUserId: params.superadminKiloUserId,
         organizationId: params.organizationId,
       });
-      const actors = await lockActors(tx, [params.superadminKiloUserId]);
-      const actor = actors.get(params.superadminKiloUserId);
       if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
         throw forbidden('Superadmin access required');
       }
@@ -557,13 +558,13 @@ export async function reviewSupportGrant(params: {
       throw badRequest('A grant cannot be reviewed by its requester');
     }
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
+    const actors = await lockActors(tx, [params.reviewerKiloUserId]);
     const [existing] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    const actors = await lockActors(tx, [params.reviewerKiloUserId]);
     const reviewer = actors.get(params.reviewerKiloUserId);
     if (!reviewer || reviewer.blocked_reason !== null || !userIsSuperadmin(reviewer)) {
       throw forbidden('Superadmin access required');

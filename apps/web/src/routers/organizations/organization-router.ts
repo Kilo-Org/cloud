@@ -39,7 +39,7 @@ import {
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
-  requireLiveOrganization,
+  requireLiveOrganizationForPlatformAdmin,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
   organizationBillingProcedure,
@@ -511,7 +511,7 @@ export const organizationsRouter = createTRPCRouter({
     }),
 
   updateSeatsRequired: adminProcedure.input(OrganizationSeatsUpdateSchema).mutation(async opts => {
-    await requireLiveOrganization(opts.input.organizationId);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     await db
       .update(organizations)
       .set({ require_seats: opts.input.seatsRequired })
@@ -603,7 +603,7 @@ export const organizationsRouter = createTRPCRouter({
 
   // this is an admin only route used to show seat purchases in a debug UI for KILO admins
   seatPurchases: adminProcedure.input(OrganizationIdInputSchema).query(async opts => {
-    await requireLiveOrganization(opts.input.organizationId);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     const seatPurchases = await db
       .select()
       .from(organization_seats_purchases)

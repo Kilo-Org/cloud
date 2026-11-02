@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import {
   ensureOrganizationAccess,
+  ensureMemberOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
-  resolveOrganizationAccess,
 } from './utils';
 import {
   setAdminAccessSinkForTest,
@@ -562,9 +562,9 @@ describe('mode-aware support organization access', () => {
 
     for (const mode of ['off', 'observe', 'enforce'] as const) {
       setSupportAccessModeForTest(mode);
-      await expect(
-        resolveOrganizationAccess(readCtx(admin), organization.id, { member: 'only' })
-      ).resolves.toMatchObject({ kind: 'member', role: 'owner' });
+      await expect(ensureMemberOrganizationAccess({ id: admin.id }, organization.id)).resolves.toBe(
+        'owner'
+      );
     }
   });
 
@@ -671,7 +671,7 @@ describe('mode-aware support organization access', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  test('enforce never admits a grant for a real member-only surface', async () => {
+  test('member-only never admits a support grant', async () => {
     setSupportAccessModeForTest('enforce');
     const { organization, admin } = await orgAndAdmin();
     await insertGrant({
@@ -681,8 +681,27 @@ describe('mode-aware support organization access', () => {
     });
 
     await expect(
-      resolveOrganizationAccess(readCtx(admin), organization.id, { member: 'only' })
+      ensureMemberOrganizationAccess({ id: admin.id }, organization.id)
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  test('off mode records no support decision for an admin who is a real member', async () => {
+    setSupportAccessModeForTest('off');
+    const { organization, admin } = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'owner',
+      invited_by: 'test',
+    });
+
+    await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe('owner');
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      membershipRole: 'owner',
+      wouldPassWithoutAdmin: true,
+      supportDecision: null,
+    });
   });
 
   test('a real member keeps access in every mode', async () => {

@@ -224,7 +224,12 @@ describe('shared tap-target geometry', () => {
     // lift the touch region clear of 44pt — 8pt per side lands on 43.81pt.
     expect(CHIP_FRAME_DP).toBeLessThan(TOUCH_TARGET_DP);
     expect(CHIP_HIT_SLOP).toEqual({ top: CHIP_HIT_SLOP_DP, bottom: CHIP_HIT_SLOP_DP });
-    expect(tapTargetReachDp(CHIP_FRAME_DP, CHIP_HIT_SLOP_DP)).toBeGreaterThan(TOUCH_TARGET_DP);
+    // Past the half point the control-size audit allows for pixel rounding, so
+    // the reach still clears the target when Android truncates each fractional
+    // inset to a whole pixel.
+    expect(tapTargetReachDp(CHIP_FRAME_DP, CHIP_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP + 0.5
+    );
     // Vertical only: the chip is wider than the target on its own, and a
     // horizontal reach would land on the chip beside it and the paste button.
     expect(CHIP_HIT_SLOP).not.toHaveProperty('left');

@@ -75,6 +75,7 @@ import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging
 import { adminEnkryptUsageRouter } from '@/routers/admin/enkrypt-usage-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
+import { adminServiceFeeRollbackRouter } from '@/routers/admin/service-fee-rollback-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
@@ -2783,6 +2784,7 @@ export const adminRouter = createTRPCRouter({
   enkryptUsage: adminEnkryptUsageRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  serviceFeeRollback: adminServiceFeeRollbackRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
   actionAuditLogs: adminActionAuditLogsRouter,

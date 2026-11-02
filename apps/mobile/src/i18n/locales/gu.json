@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ટૂલ સારાંશનું ભાષાંતર કરો",
     "toolSummaryTranslationSubtitle": "દરેક ટૂલ સારાંશને તમારી ઍપની ભાષામાં ભાષાંતર કરવા મોડેલ પર મોકલો. ભાષાંતર નિષ્ફળ થાય તો મૂળ દર્શાવવામાં આવે છે.",
     "toolSummaryTranslationModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(common.model) પર ટૅપ કરો.",
+    "translateSummaries": "સારાંશનું ભાષાંતર કરો",
     "autoExpandThinkingInactiveSubtitle": "વિચારપ્રક્રિયાની વિગતો છુપાવેલી હોય ત્યારે કોઈ અસર થશે નહીં."
   },
   "prReview": {

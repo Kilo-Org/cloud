@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
     "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies.",
+    "translateSummaries": "Vertaal opsommings",
     "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie."
   },
   "prReview": {

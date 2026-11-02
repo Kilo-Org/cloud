@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tulkot rīku kopsavilkumus",
     "toolSummaryTranslationSubtitle": "Sūti katru rīka kopsavilkumu modelim, lai to iztulkotu tavas lietotnes valodā. Ja tulkošana neizdodas, tiek rādīts oriģināls.",
     "toolSummaryTranslationModelUnavailableNotice": "Šis modelis vairs netiek piedāvāts. Pieskaries $t(common.model), lai izvēlētos citu.",
+    "translateSummaries": "Tulkot kopsavilkumus",
     "autoExpandThinkingInactiveSubtitle": "Nav efekta, kad domāšanas informācija ir slēpta."
   },
   "prReview": {

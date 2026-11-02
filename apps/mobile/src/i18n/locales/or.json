@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ଟୁଲ୍ ସାରାଂଶ ଅନୁବାଦ କରନ୍ତୁ",
     "toolSummaryTranslationSubtitle": "ପ୍ରତ୍ୟେକ ଟୁଲ୍ ସାରାଂଶକୁ ଆପଣଙ୍କ ଆପର ଭାଷାରେ ଅନୁବାଦ କରିବା ପାଇଁ ଏକ ମଡେଲକୁ ପଠାନ୍ତୁ। ଅନୁବାଦ ବିଫଳ ହେଲେ ମୂଳ ଦେଖାଯାଏ।",
     "toolSummaryTranslationModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(common.model) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
+    "translateSummaries": "ସାରାଂଶ ଅନୁବାଦ କରନ୍ତୁ",
     "autoExpandThinkingInactiveSubtitle": "ଚିନ୍ତନର ବିବରଣୀ ଲୁଚାଯାଇ ଥିବା ସମୟରେ କୌଣସି ପ୍ରଭାବ ନାହିଁ।"
   },
   "prReview": {

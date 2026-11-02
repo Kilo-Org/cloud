@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Prevedi sažetke alata",
     "toolSummaryTranslationSubtitle": "Pošalji svaki sažetak alata modelu da ga prevede na jezik tvoje aplikacije. Ako prijevod ne uspije, prikazuje se original.",
     "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da odabereš drugi.",
+    "translateSummaries": "Prevedi sažetke",
     "autoExpandThinkingInactiveSubtitle": "Nema efekta dok su detalji razmišljanja sakriveni."
   },
   "prReview": {

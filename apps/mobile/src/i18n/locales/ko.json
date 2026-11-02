@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "도구 요약 번역",
     "toolSummaryTranslationSubtitle": "각 도구 요약을 모델로 보내 앱 언어로 번역합니다. 번역에 실패하면 원본이 표시됩니다.",
     "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요.",
+    "translateSummaries": "요약 번역",
     "autoExpandThinkingInactiveSubtitle": "추론 내용이 숨겨진 동안에는 효과가 없습니다."
   },
   "notifications": {

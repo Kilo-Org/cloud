@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "টুলের সারসংক্ষেপ অনুবাদ করুন",
     "toolSummaryTranslationSubtitle": "প্রতিটি টুলের সারসংক্ষেপ আপনার অ্যাপের ভাষায় অনুবাদ করতে একটি মডেলে পাঠান। অনুবাদ ব্যর্থ হলে মূলটি দেখানো হয়।",
     "toolSummaryTranslationModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(common.model) স্পর্শ করুন।",
+    "translateSummaries": "সারসংক্ষেপ অনুবাদ করুন",
     "autoExpandThinkingInactiveSubtitle": "চিন্তাভাবনার বিস্তারিত লুকানো থাকলে এর কোনো প্রভাব থাকবে না।"
   },
   "prReview": {

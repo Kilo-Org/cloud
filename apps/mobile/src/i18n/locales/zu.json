@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
     "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
     "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye.",
+    "translateSummaries": "Humusha izifinyezo",
     "autoExpandThinkingInactiveSubtitle": "Ayinampembelele uma imininingwane yokucabanga efihliwe."
   },
   "prReview": {

@@ -191,6 +191,7 @@ export function ProvidersTab({
                                 <img
                                   src={row.providerIconUrl}
                                   alt=""
+                                  referrerPolicy="no-referrer"
                                   className="h-5 w-5 object-contain"
                                 />
                               ) : null}

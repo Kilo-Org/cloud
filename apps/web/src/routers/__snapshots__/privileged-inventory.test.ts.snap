@@ -444,6 +444,8 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "organizations.sso.updateSsoDomain mutation [admin] -> trpc.organizations.sso",
   "organizations.updatePlan mutation [admin] -> trpc.organizations.updatePlan",
   "organizations.updateSeatsRequired mutation [admin] -> trpc.organizations.updateSeatsRequired",
+  "stepUp.getStatus query [admin] -> trpc.stepUp.getStatus",
+  "stepUp.revokeCurrent mutation [admin] -> trpc.stepUp.revokeCurrent",
   "test.adminHello query [admin] -> trpc.test.adminHello",
 ]
 `;

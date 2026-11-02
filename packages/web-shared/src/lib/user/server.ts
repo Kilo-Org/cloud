@@ -270,6 +270,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
   return resolveUserFromSession({ adminOnly: false }, db);
 }
 
+/**
+ * Session-only read for MFA step-up. It refuses any bearer credential and
+ * reads the primary so a proof minted a moment ago is usable immediately. The
+ * caller still enforces the route's Origin check before trusting the session.
+ */
+export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession({ adminOnly: true }, db);
+}
+
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {

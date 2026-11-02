@@ -248,7 +248,7 @@ describe('sessionAuthOptions', () => {
       expires: new Date(Date.now() + 60_000).toISOString(),
     } as never;
 
-    const serverSession = await sessionAuthOptions.callbacks.session({ session, token });
+    const serverSession = await sessionAuthOptions.callbacks.session({ session, token } as never);
     expect(serverSession.webSessionId).toBe('per-session-id');
 
     const browserSession = await authOptions.callbacks!.session!({ session, token } as never);

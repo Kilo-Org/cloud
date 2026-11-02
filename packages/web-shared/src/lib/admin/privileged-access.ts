@@ -36,7 +36,23 @@ export type PlatformAdminPermissions = {
   canExportApiRequestLogs: boolean;
 };
 
-export type AdminStepUpState = { status: 'absent' };
+export type AdminStepUpState =
+  /** Measurement did not run (for example, step-up mode is off). */
+  | { status: 'absent' }
+  /** The session predates the per-session claim and cannot be bound to a proof. */
+  | { status: 'session_unbound' }
+  /** The actor has no passkey enrolled, so no step-up proof can be minted. */
+  | { status: 'not_enrolled' }
+  /** The actor is enrolled but has no live proof for this session and action. */
+  | { status: 'required' }
+  | { status: 'expired'; verifiedAt: string }
+  | {
+      status: 'fresh';
+      proofId: string;
+      method: 'webauthn_uv';
+      verifiedAt: string;
+      expiresAt: string;
+    };
 
 export type SupportGrantSlot = {
   grantId: string;
@@ -127,11 +143,12 @@ export function createAdminAssurance(params: {
   userId: string;
   permissions: PlatformAdminPermissions;
   supportGrant?: SupportGrantSlot | null;
+  stepUp?: AdminStepUpState;
 }): AdminAssurance {
   return {
     userId: params.userId,
     permissions: params.permissions,
-    stepUp: ADMIN_STEP_UP_ABSENT,
+    stepUp: params.stepUp ?? ADMIN_STEP_UP_ABSENT,
     supportGrant: params.supportGrant ?? null,
   };
 }

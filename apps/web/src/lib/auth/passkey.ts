@@ -24,7 +24,7 @@ import {
 
 import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.
@@ -85,6 +85,16 @@ function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
     expectedOrigins.push(fingerprintToAndroidOrigin(ANDROID_DEBUG_CERT_FINGERPRINT));
   }
   return { rpId: url.hostname, expectedOrigins };
+}
+
+/**
+ * The web-only relying party used by privileged MFA step-up. The native app
+ * must never complete a step-up: accepting an `android:apk-key-hash` origin
+ * there would let a mobile client borrow a browser session's proof.
+ */
+export function getWebRelyingParty(): { rpId: string; expectedOrigin: string } {
+  const url = new URL(NEXTAUTH_URL);
+  return { rpId: url.hostname, expectedOrigin: url.origin };
 }
 
 const rpName = 'Kilo Code';
@@ -357,6 +367,30 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
 }
 
 /**
+ * Advance a credential's signature counter as a compare-and-set against the
+ * value that was just verified. A concurrent assertion read the same counter
+ * and reaches this write with a stale expectation, so it updates no row.
+ */
+export async function advancePasskeyCounter(
+  credential: Pick<PasskeyCredential, 'id' | 'sign_count'>,
+  newCounter: number,
+  fromDb: typeof db | DrizzleTransaction = db
+): Promise<boolean> {
+  const advanced = await fromDb
+    .update(passkey_credentials)
+    .set({ sign_count: newCounter, last_used_at: sql`NOW()` })
+    .where(
+      and(
+        eq(passkey_credentials.id, credential.id),
+        eq(passkey_credentials.sign_count, credential.sign_count)
+      )
+    )
+    .returning({ id: passkey_credentials.id });
+
+  return advanced.length === 1;
+}
+
+/**
  * Verify a passkey assertion against the challenge stored on the row and mint
  * a one-time sign-in ticket for the credential's owner.
  *
@@ -433,18 +467,7 @@ export async function verifyAuthentication(
   // verified. A concurrent assertion for the same credential read the same
   // counter and reaches this write with a stale expectation, so it updates no
   // row: only the assertion that won the row is allowed to mint a ticket.
-  const advanced = await db
-    .update(passkey_credentials)
-    .set({ sign_count: newCounter, last_used_at: sql`NOW()` })
-    .where(
-      and(
-        eq(passkey_credentials.id, credential.id),
-        eq(passkey_credentials.sign_count, credential.sign_count)
-      )
-    )
-    .returning({ id: passkey_credentials.id });
-
-  if (advanced.length !== 1) {
+  if (!(await advancePasskeyCounter(credential, newCounter))) {
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
 

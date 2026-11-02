@@ -488,3 +488,37 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
+
+/**
+ * Session-bound MFA step-up mode.
+ *
+ * Security posture must not flip on a PostHog outage, so this is an
+ * environment variable rather than a release toggle. `enforce` is parsed but
+ * clamped to `observe` while `ADMIN_STEP_UP_ENFORCEMENT_AVAILABLE` is false;
+ * PR2 ships observe only. Tests force enforcement through the seam below,
+ * which config cannot reach.
+ */
+export type AdminStepUpMode = 'off' | 'observe' | 'enforce';
+
+export const ADMIN_STEP_UP_ENFORCEMENT_AVAILABLE = false;
+
+let enforcementAvailableForTest: boolean | null = null;
+
+export function isAdminStepUpEnforcementAvailable(): boolean {
+  return enforcementAvailableForTest ?? ADMIN_STEP_UP_ENFORCEMENT_AVAILABLE;
+}
+
+export function getAdminStepUpMode(): AdminStepUpMode {
+  const raw = getEnvVariable('ADMIN_STEP_UP_MODE').trim().toLowerCase();
+  if (raw === 'enforce') {
+    return isAdminStepUpEnforcementAvailable() ? 'enforce' : 'observe';
+  }
+  return raw === 'observe' ? 'observe' : 'off';
+}
+
+/** Test-only seam; pass `null` to restore the production clamp. */
+export const __adminStepUpTest__ = {
+  setEnforcementAvailable(value: boolean | null): void {
+    enforcementAvailableForTest = value;
+  },
+};

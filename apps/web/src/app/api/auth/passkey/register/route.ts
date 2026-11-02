@@ -9,7 +9,14 @@ import {
 } from '@/lib/auth/passkey';
 import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { registrationResponseSchema } from '@/lib/auth/passkey-response';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  ADMIN_STEP_UP_ENROLLMENT_FLAG,
+  STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS,
+} from '@kilocode/web-shared/lib/admin/step-up-policy';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 
 /**
  * Vercel Firewall rate-limit rule applied to `{ action: 'options' }`, keyed
@@ -44,8 +51,46 @@ const requestSchema = z.discriminatedUnion('action', [
   }),
 ]);
 
+/**
+ * Admins may only enroll another sign-in factor when this browser session is
+ * fresh: a live step-up proof is sufficient, and a first passkey (which cannot
+ * have a proof yet) requires a primary sign-in from the last ten minutes.
+ * Gated by the enrollment release toggle so the rollout can be staged.
+ */
+async function refuseStaleAdminEnrollment(params: {
+  user: { id: string; is_admin: boolean };
+  webSessionId?: string;
+  authenticatedAt?: number;
+}): Promise<NextResponse | null> {
+  if (!params.user.is_admin) return null;
+  if (!(await isReleaseToggleEnabled(ADMIN_STEP_UP_ENROLLMENT_FLAG, params.user.id))) {
+    return null;
+  }
+
+  if (
+    typeof params.authenticatedAt === 'number' &&
+    Date.now() - params.authenticatedAt * 1000 <= STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS
+  ) {
+    return null;
+  }
+
+  if (params.webSessionId) {
+    const evaluation = await evaluateStepUp({
+      userId: params.user.id,
+      webSessionId: params.webSessionId,
+      actionClass: 'platform_read',
+    });
+    if (evaluation.state.status === 'fresh') return null;
+  }
+
+  return NextResponse.json({ error: 'REAUTH_REQUIRED' }, { status: 401 });
+}
+
 export async function POST(request: NextRequest) {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  // Enrollment and management are session-only: a bearer token must not be
+  // able to add a sign-in factor to the account.
+  const { user, authFailedResponse, webSessionId, authenticatedAt } =
+    await getUserFromSessionForCredentialIssuance();
   if (authFailedResponse) {
     return authFailedResponse;
   }
@@ -77,11 +122,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ challengeId, options });
     }
 
+    const reauth = await refuseStaleAdminEnrollment({
+      user,
+      webSessionId,
+      authenticatedAt,
+    });
+    if (reauth) return reauth;
+
     const credential = await verifyRegistration(
       user.id,
       parsed.data.challengeId,
       parsed.data.response
     );
+
+    if (user.is_admin) {
+      await recordAdminAction(
+        {
+          user: {
+            id: user.id,
+            google_user_email: user.google_user_email,
+            google_user_name: user.google_user_name,
+            is_super_admin: user.is_super_admin,
+          },
+          authViaToken: false,
+          credential: 'session',
+          headersList: request.headers,
+          trpcPath: '/api/auth/passkey/register',
+        },
+        {
+          action: 'admin.passkey.enrolled',
+          target: { type: 'user', id: user.id },
+          message: 'Enrolled a passkey for a platform admin',
+        }
+      );
+    }
+
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {

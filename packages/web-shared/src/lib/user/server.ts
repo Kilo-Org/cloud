@@ -182,6 +182,7 @@ type GetAuthResponse =
       cloudAgentAuthority?: undefined;
       webSessionId?: undefined;
       webSessionPepper?: undefined;
+      authenticatedAt?: undefined;
     }
   | {
       user: User;
@@ -198,6 +199,8 @@ type GetAuthResponse =
       webSessionId?: string;
       /** Server-only pepper the session was minted with, for primary re-reads. */
       webSessionPepper?: string | null;
+      /** Unix seconds when the browser session signed in. */
+      authenticatedAt?: number;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -489,7 +492,11 @@ async function resolveUserFromSession(
     undefined,
     undefined,
     undefined,
-    { id: session.webSessionId, pepper: session.webSessionPepper }
+    {
+      id: session.webSessionId,
+      pepper: session.webSessionPepper,
+      authenticatedAt: session.authenticatedAt,
+    }
   );
 }
 
@@ -550,7 +557,7 @@ async function validateUserAuthorization(
   botId?: string,
   tokenSource?: string,
   deviceSessionId?: string,
-  webSession?: { id?: string; pepper?: string | null }
+  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number }
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
@@ -604,6 +611,7 @@ async function validateUserAuthorization(
     deviceSessionId,
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
+    authenticatedAt: webSession?.authenticatedAt,
   };
 }
 

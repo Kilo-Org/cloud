@@ -17,3 +17,22 @@ export async function createCallerForUser(userId: string, opts?: { deviceSession
     headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
   });
 }
+
+/** Test-only caller that represents a browser session, not a bearer token. */
+export async function createSessionCallerForUser(
+  userId: string,
+  opts?: { webSessionId?: string; webSessionPepper?: string | null }
+) {
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new Error(`Test user not found: ${userId}`);
+  }
+  return createCaller({
+    user,
+    credential: 'session',
+    authViaToken: false,
+    webSessionId: opts?.webSessionId ?? 'test-web-session',
+    webSessionPepper: opts?.webSessionPepper ?? user.web_session_pepper,
+    headersList: new Headers(),
+  });
+}

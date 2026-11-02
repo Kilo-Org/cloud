@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -2706,7 +2706,7 @@ describe('user router - passkeys', () => {
 
   it('lists the caller passkeys without the public key or the credential id', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2732,7 +2732,7 @@ describe('user router - passkeys', () => {
   it('lists only the caller passkeys', async () => {
     await insertPasskey(owner.id, 'Owner passkey');
     await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2741,7 +2741,7 @@ describe('user router - passkeys', () => {
 
   it('renames an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
 
@@ -2755,7 +2755,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to rename another user passkey', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
       { code: 'NOT_FOUND' }
@@ -2770,7 +2770,7 @@ describe('user router - passkeys', () => {
 
   it('deletes an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.deletePasskey({ id: row.id });
 
@@ -2784,7 +2784,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to delete another user passkey and leaves it in place', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -2798,7 +2798,7 @@ describe('user router - passkeys', () => {
   });
 
   it('refuses an unknown passkey id', async () => {
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(
       caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
@@ -2807,7 +2807,7 @@ describe('user router - passkeys', () => {
 
   it('refuses an empty passkey name', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
 
@@ -2816,5 +2816,32 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored?.name).toBe('Work laptop');
+  });
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Bearer rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('refuses %s through a bearer token', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const bearerCaller = await createCallerForUser(owner.id);
+
+    await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Browser session required',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
   });
 });

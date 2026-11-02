@@ -115,7 +115,8 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('filename: session.title');
     // The file item's filename is the session-resolved safe name, never the
     // raw manifest name (see the filename resolution test below).
-    expect(extensionSource).toContain('filename: name,');
+    expect(itemsBody).toContain('filename: entry.name,');
+    expect(itemsBody).not.toContain('file.name');
     expect(extensionSource).toContain('contentType: UTType(mimeType: file.mime) ?? .data');
   });
 
@@ -133,11 +134,20 @@ describe('artifacts File Provider extension contract', () => {
       'static func unique(_ name: String, taken: inout Set<String>) -> String'
     );
     expect(extensionSource).toContain('static let maxBytes = 200');
-    // Enumeration resolves every entry through the sanitizer, in the
-    // manifest's own order, so the first duplicate keeps its name and a later
-    // one takes a counter suffix.
-    expect(itemsBody).toContain('ArtifactFileName.sanitize(');
-    expect(itemsBody).toContain('ArtifactFileName.unique(');
+    // One ordered resolution owns sanitize + deduplicate, so enumeration and
+    // the single-item lookup that stages a file cannot drift: the first
+    // duplicate keeps its name, a later one takes a counter suffix, and both
+    // callers read the same result.
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.sanitize(');
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.unique(');
+    expect(itemsBody).not.toContain('ArtifactFileName.unique(');
+    expect(itemsBody).toContain('resolvedFilenames(in: session)');
+    expect(resolvedFilenameBody).toContain('resolvedFilenames(in: session)');
+    // An entry the session does not list still resolves to its own sanitized
+    // name instead of failing.
+    expect(resolvedFilenameBody).toContain(
+      'ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime)'
+    );
     // The stage path holds the invariant at the boundary: the component it
     // appends to the per-fetch UUID directory is sanitized again as a
     // last-resort fallback, so an unsafe name can never reach the path API.
@@ -151,7 +161,12 @@ describe('artifacts File Provider extension contract', () => {
     // is `Data`, a String-typed property is never read by the system, and the
     // protocol requirement is non-optional, so folders carry the zero version.
     expect(extensionSource).toContain('let contentModificationDate: Date?');
-    expect(extensionSource).toContain('let version: NSFileProviderItemVersion');
+    // One stored property under the protocol's own name: a stored `let`
+    // satisfies the get-only requirement, so no alias can fall out of step
+    // with the value the initializer took.
+    expect(extensionSource).toContain('let itemVersion: NSFileProviderItemVersion');
+    expect(extensionSource).not.toContain('var itemVersion: NSFileProviderItemVersion {');
+    expect(extensionSource).not.toContain('let version: NSFileProviderItemVersion');
     expect(extensionSource).toContain(
       'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {'
     );
@@ -466,6 +481,12 @@ const fileBody = swiftFunctionBody(
 );
 const itemsBody = swiftFunctionBody(
   'func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {'
+);
+const resolvedFilenamesBody = swiftFunctionBody(
+  'func resolvedFilenames(in session: ArtifactManifest.Session)'
+);
+const resolvedFilenameBody = swiftFunctionBody(
+  'private func resolvedFilename(file: ArtifactManifest.File, sessionId: String) -> String {'
 );
 const fetchContentsBody = swiftFunctionBody(
   'func fetchContents(\n    for itemIdentifier: NSFileProviderItemIdentifier,\n    version requestedVersion: NSFileProviderItemVersion?,'

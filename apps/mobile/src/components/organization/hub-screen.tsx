@@ -379,6 +379,13 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       </View>
       <View className="flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
+        {/* `h-4` is the `text-xs` line box (1 rem; native rem is 14), so the row
+            keeps its height and this title its place while the status loads; a
+            shorter bar drops the text block below the 30dp icon tile and the
+            whole row with it. The bar is `bg-muted-soft` because the theme's
+            `bg-muted` equals the `bg-secondary` card it sits on, which drew no
+            bar at all. The subtitle keeps the theme's own `line-height` rather
+            than a fixed one, so it still grows with the system text scale. */}
         {state.loading ? (
           <Skeleton className="mt-0.5 h-4 w-28 rounded bg-muted-soft" />
         ) : (

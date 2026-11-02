@@ -218,7 +218,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
           ...(headSha
             ? [
                 queryClient.invalidateQueries({
-                  queryKey: queries.checksOptions(headSha).queryKey,
+                  queryKey: queries.checksOptions(headSha, true).queryKey,
                 }),
               ]
             : []),

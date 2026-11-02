@@ -76,6 +76,22 @@ export function PrReviewOverview({
 
   const pr = useQuery(queries.overviewOptions());
 
+  // The checks card below the description grows downward from whatever frame
+  // it first paints: a head with no runs renders one copy line, a head with
+  // runs renders a count header plus one row per status group. The Review
+  // button and PrMergeSection sit below it, so a card that painted a
+  // placeholder first and its body later pushed them down by the difference
+  // (30.9 dp on dev/pr-review-copy-fixture/overview, design gate at b3b389e1),
+  // and a placeholder that reserved the tallest shape pulled them ~100 dp
+  // upward whenever the head had no checks (`pr-review-acme-widgets-1`).
+  // No single placeholder height holds in all three states, so the body
+  // paints only once this read has settled: the card's first frame is its
+  // final one and the two actions never move. The read is enabled by the
+  // overview's own answer (it needs the head SHA), and a failed read settles
+  // here too, so the error arm and the empty/terminal states paint at once.
+  const headSha = pr.data?.headSha;
+  const checks = useQuery(queries.checksOptions(headSha ?? '', headSha !== undefined));
+
   const handleOpenReviewSubmit = useCallback(() => {
     const href: Href = {
       pathname: REVIEW_SUBMIT_PATH,
@@ -223,7 +239,7 @@ export function PrReviewOverview({
   }
 
   const data = pr.data;
-  if (!data) {
+  if (!data || checks.isLoading) {
     return (
       <DetailScreenScrollView
         className="flex-1"
@@ -282,7 +298,7 @@ export function PrReviewOverview({
         )}
       </View>
 
-      <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
+      <PrReviewChecksSection owner={owner} repo={repo} number={number} checks={checks} />
 
       {isGitHub ? (
         // The ScreenHeader already carries the primary Submit-review CTA

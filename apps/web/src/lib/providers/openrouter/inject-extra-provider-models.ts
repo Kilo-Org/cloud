@@ -276,7 +276,7 @@ export function injectVercelOnlyModels({
 
   for (const vercelOnlyModel of vercelOnlyModels) {
     const { id, storedModel, catalog } = vercelOnlyModel;
-    const isFree = isFreeVercelStoredModel(id, storedModel);
+    const isFree = isFreeVercelStoredModel(storedModel);
     const model: OpenRouterModel = {
       slug: id,
       name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),

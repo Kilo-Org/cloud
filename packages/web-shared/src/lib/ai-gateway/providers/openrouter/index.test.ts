@@ -45,6 +45,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+  isValidOpenRouterModelId: jest.fn(() => Promise.resolve(true)),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models', () => ({

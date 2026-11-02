@@ -276,6 +276,10 @@ const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
+
+beforeEach(() => {
+  jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
+});
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);

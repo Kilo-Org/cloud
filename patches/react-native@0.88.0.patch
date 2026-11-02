@@ -1,8 +1,7 @@
 diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
-index a803387b98bfb68e0c9bbb783e25bc649566e6a3..399f12b67f54d8ba5b82cee21c55f8e6990e7f5b 100644
 --- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 +++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
-@@ -93,10 +93,13 @@ static UIColor *defaultPlaceholderColor(void)
+@@ -93,10 +93,13 @@
      [accessibilityLabel appendString:superAccessibilityLabel];
    }
  
@@ -20,7 +19,7 @@ index a803387b98bfb68e0c9bbb783e25bc649566e6a3..399f12b67f54d8ba5b82cee21c55f8e6
      [accessibilityLabel appendString:self.placeholder];
    }
  
-@@ -133,7 +136,29 @@ static UIColor *defaultPlaceholderColor(void)
+@@ -133,7 +136,29 @@
      return;
    }
  
@@ -51,10 +50,9 @@ index a803387b98bfb68e0c9bbb783e25bc649566e6a3..399f12b67f54d8ba5b82cee21c55f8e6
    [self _updatePlaceholder];
  }
 diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
-index cc081964b1f3810bc525ae1c2dd55ce3a6afe7e8..e9f0cccb852b59188f6c4098a2e64350e30b45e4 100644
 --- a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
 +++ b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
-@@ -121,26 +121,28 @@ static NSString *const kRCTLegacyInteropChildIndexKey = @"index";
+@@ -121,26 +121,28 @@
  
    // Step 3: check if the module has been registered
    // TODO(T174674274): Implement lazy loading of legacy view managers in the new architecture.
@@ -64,33 +62,35 @@ index cc081964b1f3810bc525ae1c2dd55ce3a6afe7e8..e9f0cccb852b59188f6c4098a2e64350
 -  if (supportedLegacyViewComponents[componentName] != NULL) {
 -    return YES;
 -  }
-+  @synchronized(supportedLegacyViewComponents) {
-+    NSArray<Class> *registeredModules = RCTGetModuleClasses();
-+    if (supportedLegacyViewComponents[componentName] != NULL) {
-+      return YES;
-+    }
- 
+-
 -  for (Class moduleClass in registeredModules) {
 -    id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
 -    NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
 -        ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
 -        : [bridgeModule moduleName];
+-
+-    if (supportedLegacyViewComponents[moduleName] == NULL) {
+-      supportedLegacyViewComponents[moduleName] = moduleClass;
+-    }
+-
+-    if ([moduleName isEqualToString:componentName] ||
+-        [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
++  @synchronized(supportedLegacyViewComponents) {
++    NSArray<Class> *registeredModules = RCTGetModuleClasses();
++    if (supportedLegacyViewComponents[componentName] != NULL) {
+       return YES;
++    }
++
 +    for (Class moduleClass in registeredModules) {
 +      id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
 +      NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
 +          ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
 +          : [bridgeModule moduleName];
- 
--    if (supportedLegacyViewComponents[moduleName] == NULL) {
--      supportedLegacyViewComponents[moduleName] = moduleClass;
--    }
++
 +      if (supportedLegacyViewComponents[moduleName] == NULL) {
 +        supportedLegacyViewComponents[moduleName] = moduleClass;
 +      }
- 
--    if ([moduleName isEqualToString:componentName] ||
--        [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
--      return YES;
++
 +      if ([moduleName isEqualToString:componentName] ||
 +          [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
 +        return YES;
@@ -99,10 +99,9 @@ index cc081964b1f3810bc525ae1c2dd55ce3a6afe7e8..e9f0cccb852b59188f6c4098a2e64350
    }
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2a61705fc 100644
 --- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-@@ -50,6 +50,7 @@ using namespace facebook::react;
+@@ -50,6 +50,7 @@
  @interface RCTComponentViewFactory ()
  - (void)_registerComponentIfPossible:(const std::string &)name;
  - (BOOL)_wasComponentRegistered:(const std::string &)name;
@@ -110,7 +109,7 @@ index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2
  @end
  
  // Allow JS runtime to register native components as needed. For static view configs.
-@@ -117,12 +118,14 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -117,12 +118,14 @@
  
  - (BOOL)_wasComponentRegistered:(const std::string &)name
  {
@@ -125,7 +124,7 @@ index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2
    if (_registrationStatusMap.find(name) != _registrationStatusMap.end()) {
      return;
    }
-@@ -130,7 +133,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -130,7 +133,7 @@
    // Fallback 1: Call provider function for component view class.
    Class<RCTComponentViewProtocol> klass = RCTComponentViewClassWithName(name.c_str());
    if (klass != nullptr) {
@@ -134,7 +133,7 @@ index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2
      return;
    }
  
-@@ -141,7 +144,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -141,7 +144,7 @@
      NSString *objcName = [NSString stringWithCString:name.c_str() encoding:NSUTF8StringEncoding];
      klass = self.thirdPartyFabricComponentsProvider.thirdPartyFabricComponents[objcName];
      if (klass != nullptr) {
@@ -143,19 +142,20 @@ index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2
        return;
      }
    }
-@@ -189,7 +192,11 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -189,7 +192,11 @@
  {
    RCTAssert(componentViewClass, @"RCTComponentViewFactory: Provided `componentViewClass` is `nil`.");
    std::unique_lock lock(_mutex);
+-
 +  [self _registerComponentViewClassLocked:componentViewClass];
 +}
- 
++
 +- (void)_registerComponentViewClassLocked:(Class<RCTComponentViewProtocol>)componentViewClass
 +{
    auto provider = [componentViewClass componentDescriptorProvider];
    _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
    _providerRegistry.add(provider);
-@@ -213,6 +220,17 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -213,6 +220,17 @@
        @"ComponentView with componentHandle `%lli` (`%s`) not found.",
        componentHandle,
        (char *)componentHandle);
@@ -174,7 +174,6 @@ index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2
    Class viewClass = componentViewClassDescriptor.viewClass;
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
-index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39368b41da 100644
 --- a/React/Fabric/Mounting/RCTComponentViewRegistry.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
 @@ -10,6 +10,7 @@
@@ -185,7 +184,7 @@ index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39
  
  #import <React/RCTImageComponentView.h>
  #import <React/RCTParagraphComponentView.h>
-@@ -74,6 +75,16 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
+@@ -74,6 +75,16 @@
    RCTAssertMainQueue();
    auto iterator = _registry.find(tag);
    RCTAssert(iterator != _registry.end(), @"RCTComponentViewRegistry: Attempt to query unregistered component.");
@@ -202,7 +201,7 @@ index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39
    return iterator->second;
  }
  
-@@ -107,7 +118,8 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
+@@ -107,7 +118,8 @@
    RCTAssertMainQueue();
    auto &recycledViews = _recyclePool[componentHandle];
  
@@ -213,10 +212,9 @@ index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39
      return;
    }
 diff --git a/React/Fabric/Mounting/RCTMountingManager.mm b/React/Fabric/Mounting/RCTMountingManager.mm
-index 68662f06d59bd4b1827510da747931fb223452b1..a37baa2983c34e88c86fcb45aca40c5fd84f7a87 100644
 --- a/React/Fabric/Mounting/RCTMountingManager.mm
 +++ b/React/Fabric/Mounting/RCTMountingManager.mm
-@@ -78,6 +78,12 @@ static void RCTPerformMountInstructions(
+@@ -78,6 +78,12 @@
  
          UIView<RCTComponentViewProtocol> *newChildComponentView = newChildViewDescriptor.view;
  
@@ -229,7 +227,7 @@ index 68662f06d59bd4b1827510da747931fb223452b1..a37baa2983c34e88c86fcb45aca40c5f
          RCTAssert(newChildShadowView.props, @"`newChildShadowView.props` must not be null.");
  
          [newChildComponentView updateProps:newChildShadowView.props oldProps:nullptr];
-@@ -95,6 +101,18 @@ static void RCTPerformMountInstructions(
+@@ -95,6 +101,18 @@
          auto &oldChildShadowView = mutation.oldChildShadowView;
          auto &oldChildViewDescriptor = [registry componentViewDescriptorWithTag:oldChildShadowView.tag];
          auto &parentViewDescriptor = [registry componentViewDescriptorWithTag:mutation.parentTag];
@@ -249,10 +247,9 @@ index 68662f06d59bd4b1827510da747931fb223452b1..a37baa2983c34e88c86fcb45aca40c5f
          break;
        }
 diff --git a/types_generated/Libraries/Components/TextInput/TextInput.d.ts b/types_generated/Libraries/Components/TextInput/TextInput.d.ts
-index cff52891ae4143fa22c1a115ced11a760630208a..d4a94291da20d2ec837c8307f3f687b1cafe09a6 100644
 --- a/types_generated/Libraries/Components/TextInput/TextInput.d.ts
 +++ b/types_generated/Libraries/Components/TextInput/TextInput.d.ts
-@@ -158,5 +158,5 @@ export type TextInputComponentStatics = Readonly<{
+@@ -158,5 +158,5 @@
   * @see https://reactnative.dev/docs/textinput
   */
  declare const $$TextInput: TextInputType;

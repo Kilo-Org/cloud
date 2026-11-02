@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Traduzir resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envia cada resumo de ferramenta a um modelo para o traduzir para a língua da sua aplicação. O original é mostrado se a tradução falhar.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo já não é oferecido. Toque em $t(common.model) para escolher outro.",
+    "translateSummaries": "Traduzir resumos",
     "autoExpandThinkingInactiveSubtitle": "Não tem efeito enquanto os detalhes do raciocínio estiverem ocultos."
   },
   "prReview": {
@@ -697,6 +698,9 @@
       "reconnectTitle": "Voltar a ligar o GitHub",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada.",
       "gitlabDescription": "Rever merge requests no telemóvel",
+      "gitlabInstanceMismatchTitle": "A ligação ao GitLab é de outra instância",
+      "gitlabInstanceMismatchDescription": "A tua ligação ao GitLab é para {{connected}}, mas este merge request está em {{requested}}. Liga o GitLab nessa instância para o rever.",
+      "checkActiveConnection": "A ligação está ativa, mas este item ainda não pode ser carregado.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
       "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
@@ -840,7 +844,7 @@
       "shareMergeRequest": "Partilhar merge request",
       "viewOnProvider": "Ver em {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponível",
-      "unavailableDescription": "Pode ter sido eliminado, ou não tens acesso a ele.",
+      "unavailableDescription": "Pode ter sido eliminado ou podes não ter acesso.",
       "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
       "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
       "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
@@ -2071,6 +2075,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instala a aplicação do Kilo no GitHub para sincronizar automaticamente os alertas do Dependabot e gerir as ocorrências de segurança nos teus repositórios.",
+      "connectOwnerOnly": "Pede a um proprietário ou administrador da organização para ligar o {{platform}}.",
       "connectTitle": "Ligar o GitHub para começar",
       "couldNotLoad": "Não foi possível carregar o agente de segurança.",
       "installApp": "Instalar aplicação do GitHub",
@@ -2263,6 +2268,8 @@
       "cannotCompleteTitle": "Não é possível concluir a instalação",
       "notAdminMessage": "Só um administrador dessa conta no GitHub a pode ligar. Pede a um administrador da organização para instalar o Kilo.",
       "alreadyClaimedMessage": "Essa instalação do GitHub já está ligada a outra conta Kilo. Desliga-a primeiro nessa conta.",
+      "installationUnavailableMessage": "Esta instalação da GitHub App está suspensa ou já não está disponível. Restaura-a ou reinstala-a no GitHub e começa de novo.",
+      "multipleInstallationsMessage": "Neste momento, esta organização Kilo só pode ter uma única organização do GitHub ligada.",
       "didNotCompleteTitle": "A instalação não foi concluída",
       "didNotCompleteMessage": "A instalação da aplicação para o GitHub não foi concluída. Tenta novamente na aplicação."
     },
@@ -2419,7 +2426,6 @@
       "defaultProfileResolvesTo": "Corresponde a {{name}}",
       "defaultProfileResolvesToAccessibility": "Perfil predefinido: {{name}}",
       "manageProfiles": "Gerir perfis",
-      "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
       "advancedConfig": "Configuração avançada",
       "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",

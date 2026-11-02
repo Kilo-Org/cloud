@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Vosita xulosalarini tarjima qilish",
     "toolSummaryTranslationSubtitle": "Har bir vosita xulosasini ilova tilingizga tarjima qilish uchun modelga yuboring. Tarjima muvaffaqiyatsiz bo'lsa, asl nusxa ko'rsatiladi.",
     "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging.",
+    "translateSummaries": "Xulosalarni tarjima qilish",
     "autoExpandThinkingInactiveSubtitle": "Fikrlash tafsilotlari yashirilganda hech qanday ta'sir ko'rsatmaydi."
   },
   "prReview": {
@@ -682,6 +683,9 @@
       "reconnectTitle": "GitHubga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
+      "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
+      "gitlabInstanceMismatchDescription": "GitLab ulanishingiz {{connected}} uchun, lekin bu merge so‘rovi {{requested}}da. Uni koʻrib chiqish uchun oʻsha instansiyadagi GitLabga ulaning.",
+      "checkActiveConnection": "Ulanish faol, lekin bu elementni hali ham yuklab boʻlmaydi.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
@@ -2032,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ogohlantirishlarini avtomatik sinxronlash va repozitoriyalaringizdagi xavfsizlik muammolarini boshqarish uchun Kilo GitHub ilovasini o'rnating.",
+      "connectOwnerOnly": "Tashkilot egasi yoki administratoridan {{platform}}ni ulashini so'rang.",
       "connectTitle": "Boshlash uchun GitHubni ulang",
       "couldNotLoad": "Xavfsizlik agentini yuklab bo'lmadi.",
       "installApp": "GitHub ilovasini o'rnatish",
@@ -2220,6 +2225,8 @@
       "cannotCompleteTitle": "O'rnatishni yakunlab bo'lmaydi",
       "notAdminMessage": "Bu hisobni faqat GitHub administratori ulay oladi. Tashkilot administratoridan Kiloni o'rnatishni so'rang.",
       "alreadyClaimedMessage": "Bu o'rnatilgan GitHub ilovasi allaqachon boshqa Kilo hisobiga ulangan. Avval o'sha hisobdagi ulanishni uzing.",
+      "installationUnavailableMessage": "Ushbu GitHub App o'rnatilishi to'xtatib qo'yilgan yoki endi mavjud emas. Uni GitHub'da tiklang yoki qayta o'rnating, so'ngra qaytadan boshlang.",
+      "multipleInstallationsMessage": "Ushbu Kilo tashkiloti hozirda faqat bitta GitHub tashkilotini ulay oladi.",
       "didNotCompleteTitle": "O'rnatish yakunlanmadi",
       "didNotCompleteMessage": "GitHub ilovasini o'rnatish yakunlanmadi. Ilovadan qayta urinib ko'ring."
     },
@@ -2376,7 +2383,6 @@
       "defaultProfileResolvesTo": "Hozir {{name}} profili",
       "defaultProfileResolvesToAccessibility": "Standart profil: {{name}}",
       "manageProfiles": "Profillarni boshqarish",
-      "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
       "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",

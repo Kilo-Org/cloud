@@ -73,6 +73,13 @@
   --ring-track: rgba(20, 15, 10, 0.05);
   --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
+  /* Low-emphasis accent control. `--accent-soft` is the full-strength accent
+   * surface that user bubbles and selected pills fill with; a soft accent
+   * *button* must recede behind a filled primary instead of repeating it, so it
+   * paints the accent at 16% over whatever surface holds it and takes the
+   * accent itself as ink. */
+  --accent-soft-tint: #4f5a1029;
+  --accent-soft-tint-foreground: #4f5a10;
   --good: #24784a;
   --good-foreground: #ffffff;
   --good-tile-bg: #24784a1a;
@@ -207,6 +214,12 @@
     --ring-track: rgba(255, 255, 255, 0.2);
     --accent-soft: #ffdd00;
     --accent-soft-foreground: #1a1a10;
+    /* Dark counterpart of the soft accent control. The dark theme's primary
+     * already fills with #ffdd00, so a solid accent-soft button would be
+     * indistinguishable from it; the 16% tint keeps the accent's hue while the
+     * control stays clearly secondary, and the accent inks the label. */
+    --accent-soft-tint: #ffdd0029;
+    --accent-soft-tint-foreground: #ffdd00;
     --good: #5fcb8e;
     --good-foreground: #0e0e10;
     --good-tile-bg: #5fcb8e1a;
@@ -300,6 +313,8 @@
   --color-ring-track: var(--ring-track);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-accent-soft-tint: var(--accent-soft-tint);
+  --color-accent-soft-tint-foreground: var(--accent-soft-tint-foreground);
   --color-good: var(--good);
   --color-good-foreground: var(--good-foreground);
   --color-good-tile-bg: var(--good-tile-bg);

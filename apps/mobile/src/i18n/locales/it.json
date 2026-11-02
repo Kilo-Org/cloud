@@ -1439,6 +1439,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installa l'app GitHub di Kilo per sincronizzare automaticamente gli avvisi di Dependabot e gestire le segnalazioni di sicurezza nei tuoi repository.",
+      "connectOwnerOnly": "Chiedi a un proprietario o amministratore dell'organizzazione di connettere {{platform}}.",
       "connectTitle": "Connetti GitHub per iniziare",
       "couldNotLoad": "Impossibile caricare l'Agente di sicurezza.",
       "installApp": "Installa l'app GitHub",
@@ -1675,6 +1676,8 @@
       "cannotCompleteTitle": "Impossibile completare l'installazione",
       "notAdminMessage": "Solo un amministratore GitHub di quell'account può connetterlo. Chiedi a un amministratore dell'organizzazione di installare Kilo.",
       "alreadyClaimedMessage": "Questa installazione dell'app per GitHub è già connessa a un altro account Kilo. Prima disconnettila da quell'account.",
+      "installationUnavailableMessage": "Questa installazione di GitHub App è sospesa o non più disponibile. Ripristinala o reinstallala in GitHub, poi ricomincia.",
+      "multipleInstallationsMessage": "Questa organizzazione Kilo può attualmente connettere una sola organizzazione GitHub.",
       "didNotCompleteTitle": "Installazione non completata",
       "didNotCompleteMessage": "L'installazione dell'app per GitHub non è stata completata. Riprova dall'app."
     },
@@ -1831,7 +1834,6 @@
       "defaultProfileResolvesTo": "Corrisponde a {{name}}",
       "defaultProfileResolvesToAccessibility": "Profilo predefinito: {{name}}",
       "manageProfiles": "Gestisci i profili",
-      "noProfiles": "Nessun profilo ancora. Creane uno per aggiungere variabili di ambiente, server MCP e competenze.",
       "advancedConfig": "Configurazione avanzata",
       "advancedConfigDescription": "Si applica a questa sessione. Salvarlo come profilo lo conserva per la prossima volta.",
       "saveAsProfile": "Salva come profilo",
@@ -2438,6 +2440,7 @@
     "toolSummaryTranslation": "Traduci i riepiloghi degli strumenti",
     "toolSummaryTranslationSubtitle": "Invia ogni riepilogo di strumento a un modello per tradurlo nella lingua della tua app. Se la traduzione non riesce, viene mostrato l'originale.",
     "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro.",
+    "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
   "addCredits": {
@@ -2746,6 +2749,9 @@
       "reconnectTitle": "Riconnetti GitHub",
       "reconnectDescription": "L'autorizzazione a connetterti a GitHub è stata revocata.",
       "gitlabDescription": "Esamina le merge request dal telefono",
+      "gitlabInstanceMismatchTitle": "La connessione GitLab è per un'altra istanza",
+      "gitlabInstanceMismatchDescription": "La tua connessione GitLab è per {{connected}}, ma questa merge request è su {{requested}}. Connetti GitLab su quell'istanza per revisionarla.",
+      "checkActiveConnection": "La connessione è attiva, ma non è ancora possibile caricare questo elemento.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "gitlabReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
@@ -3227,7 +3233,7 @@
       "shareMergeRequest": "Condividi il merge request",
       "viewOnProvider": "Visualizza su {{provider}}",
       "mergeRequestUnavailable": "Merge request non disponibile",
-      "unavailableDescription": "Potrebbe essere stato eliminato, oppure non hai accesso.",
+      "unavailableDescription": "Potrebbe essere stato eliminato, oppure potresti non avere accesso.",
       "accessDeniedMergeRequest": "Non hai il permesso di visualizzare questo merge request.",
       "couldNotLoadMergeRequest": "Impossibile caricare il merge request.",
       "discussionAccessDenied": "Non hai il permesso di visualizzare la discussione di questo merge request.",

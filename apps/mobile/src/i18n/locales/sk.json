@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Preložiť súhrny nástrojov",
     "toolSummaryTranslationSubtitle": "Pošli každý súhrn nástroja modelu, aby ho preložil do jazyka tvojej aplikácie. Ak preklad zlyhá, zobrazí sa originál.",
     "toolSummaryTranslationModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(common.model) vyberte iný.",
+    "translateSummaries": "Preložiť súhrny",
     "autoExpandThinkingInactiveSubtitle": "Nemá žiadny účinok, keď sú podrobnosti uvažovania skryté."
   },
   "prReview": {
@@ -712,6 +713,9 @@
       "reconnectTitle": "Opätovné pripojenie k službe GitHub",
       "reconnectDescription": "Prístup k tvojmu účtu GitHub bol odvolaný.",
       "gitlabDescription": "Kontrolovať merge requesty v mobile",
+      "gitlabInstanceMismatchTitle": "Pripojenie ku GitLabu je pre inú inštanciu",
+      "gitlabInstanceMismatchDescription": "Tvoje pripojenie ku GitLabu je pre {{connected}}, ale tento merge request je na {{requested}}. Pripoj GitLab na tej inštancii, aby si ho mohol skontrolovať.",
+      "checkActiveConnection": "Pripojenie je aktívne, ale táto položka sa stále nedá načítať.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
@@ -859,7 +863,7 @@
       "shareMergeRequest": "Zdieľať merge request",
       "viewOnProvider": "Zobraziť v {{provider}}",
       "mergeRequestUnavailable": "Merge request nie je dostupný",
-      "unavailableDescription": "Bol možná odstránený, alebo k nemu nemáš prístup.",
+      "unavailableDescription": "Možno bol odstránený, alebo k nemu nemáš prístup.",
       "accessDeniedMergeRequest": "Nemáš oprávnenie zobraziť tento merge request.",
       "couldNotLoadMergeRequest": "Merge request sa nepodarilo načítať.",
       "discussionAccessDenied": "Nemáš oprávnenie zobraziť diskusiu k tomuto merge request.",
@@ -2098,6 +2102,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Nainštalujte aplikáciu Kilo na platforme GitHub na automatickú synchronizáciu upozornení zo služby Dependabot a správu bezpečnostných nálezov vo vašich repozitároch.",
+      "connectOwnerOnly": "Požiadajte vlastníka organizácie alebo správcu, aby pripojil {{platform}}.",
       "connectTitle": "Pripojte GitHub a začnite",
       "couldNotLoad": "Bezpečnostného agenta sa nepodarilo načítať.",
       "installApp": "Nainštalovať aplikáciu GitHub",
@@ -2294,6 +2299,8 @@
       "cannotCompleteTitle": "Inštaláciu nemožno dokončiť",
       "notAdminMessage": "Účet môže pripojiť len jeho správca na GitHub. Požiadaj správcu organizácie, aby nainštaloval Kilo.",
       "alreadyClaimedMessage": "Táto inštalácia aplikácie pre GitHub je už pripojená k inému účtu Kilo. Najprv ju tam odpoj.",
+      "installationUnavailableMessage": "Táto inštalácia aplikácie pre GitHub je pozastavená alebo už nie je dostupná. Obnov ju alebo znova nainštaluj v GitHube a potom začni odznova.",
+      "multipleInstallationsMessage": "Táto organizácia Kilo môže mať momentálne pripojenú len jednu organizáciu GitHub.",
       "didNotCompleteTitle": "Inštalácia sa nedokončila",
       "didNotCompleteMessage": "Inštalácia aplikácie pre GitHub sa nedokončila. Skús to znova z aplikácie."
     },
@@ -2450,7 +2457,6 @@
       "defaultProfileResolvesTo": "Aktuálne {{name}}",
       "defaultProfileResolvesToAccessibility": "Predvolený profil: {{name}}",
       "manageProfiles": "Spravovať profily",
-      "noProfiles": "Zatiaľ žiadne profily. Vytvorte jeden a pridajte premenné prostredia, servery MCP a zručnosti.",
       "advancedConfig": "Pokročilá konfigurácia",
       "advancedConfigDescription": "Platí pre toto sedenie. Uložením ako profil zostane aj nabudúce.",
       "saveAsProfile": "Uložiť ako profil",

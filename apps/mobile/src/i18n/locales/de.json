@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
     "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
     "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen.",
+    "translateSummaries": "Zusammenfassungen übersetzen",
     "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind."
   },
   "notifications": {
@@ -1458,6 +1459,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installiere die Kilo-GitHub-App, um Dependabot-Warnungen automatisch zu synchronisieren und Sicherheitsbefunde in deinen Repositories zu verwalten.",
+      "connectOwnerOnly": "Bitten Sie einen Organisationsinhaber oder Admin, {{platform}} zu verbinden.",
       "connectTitle": "GitHub verbinden, um loszulegen",
       "couldNotLoad": "Der Sicherheitsagent konnte nicht geladen werden.",
       "installApp": "GitHub-App installieren",
@@ -1689,6 +1691,8 @@
       "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
       "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Administrator deiner Organisation, Kilo zu installieren.",
       "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
+      "installationUnavailableMessage": "Diese GitHub App-Installation ist ausgesetzt oder nicht mehr verfügbar. Stelle sie in GitHub wieder her oder installiere sie dort erneut, und starte dann erneut.",
+      "multipleInstallationsMessage": "Diese Kilo-Organisation kann derzeit nur eine einzige GitHub-Organisation verbinden.",
       "didNotCompleteTitle": "Installation wurde nicht abgeschlossen",
       "didNotCompleteMessage": "Die Installation der GitHub-App wurde nicht abgeschlossen. Versuche es erneut in der App."
     },
@@ -1845,7 +1849,6 @@
       "defaultProfileResolvesTo": "Entspricht {{name}}",
       "defaultProfileResolvesToAccessibility": "Standardprofil: {{name}}",
       "manageProfiles": "Profile verwalten",
-      "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
       "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
@@ -2712,6 +2715,9 @@
       "reconnectTitle": "GitHub erneut verbinden",
       "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
       "gitlabDescription": "Merge-Requests mobil prüfen",
+      "gitlabInstanceMismatchTitle": "GitLab-Verbindung gehört zu einer anderen Instanz",
+      "gitlabInstanceMismatchDescription": "Deine GitLab-Verbindung gilt für {{connected}}, aber dieser Merge-Request liegt auf {{requested}}. Verbinde GitLab auf dieser Instanz, um ihn zu prüfen.",
+      "checkActiveConnection": "Die Verbindung ist aktiv, aber dieses Element kann weiterhin nicht geladen werden.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
@@ -3178,7 +3184,7 @@
       "shareMergeRequest": "Merge-Request teilen",
       "viewOnProvider": "Auf {{provider}} ansehen",
       "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
-      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff darauf.",
+      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff.",
       "accessDeniedMergeRequest": "Du hast keine Berechtigung, diesen Merge-Request anzusehen.",
       "couldNotLoadMergeRequest": "Der Merge-Request konnte nicht geladen werden.",
       "discussionAccessDenied": "Du hast keine Berechtigung, die Diskussion zu diesem Merge-Request anzusehen.",

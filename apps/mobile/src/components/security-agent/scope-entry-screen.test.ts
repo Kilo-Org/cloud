@@ -330,6 +330,119 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen GitHub install capability', () => {
+  // `githubApps.mintInstallState` is the authority on who may start an
+  // organization installation: it resolves the caller through
+  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
+  // parent-organization role. The entry therefore offers the press and lets the
+  // server refuse it, so a device-side membership read cannot deny a caller the
+  // server admits.
+  it.each(['member', 'billing_manager'])(
+    'shows the read-only notice once the mint refuses a %s',
+    async role => {
+      roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+
+      const root = await mount('org_123');
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBe(
+        'Ask an organization owner or admin to connect GitHub.'
+      );
+      expect(setup?.props.url).toBeUndefined();
+    }
+  );
+
+  it('keeps the press when the membership read cannot name a role for the organization', async () => {
+    // An organization reached through the server's parent-organization role has
+    // no direct row here; its mint still succeeds, so the unresolved device-side
+    // role must not withhold the press.
+    roles = [{ organizationId: 'parent_123', organizationName: 'Parent', role: 'member' }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+  });
+
+  it.each(['owner', 'admin'])('keeps the install press for an %s', async role => {
+    roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the retryable press when the mint fails for any other reason', async () => {
+    // Only a refused role retires the action; a transport or server failure
+    // leaves the press, which re-mints before opening.
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+    failingProcedures = new Set(['mintInstallState']);
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+  });
+
+  it.each(['personal', 'org_123'])(
+    'keeps the retryable press when the %s mint answers a session auth failure',
+    async scope => {
+      // A session that expired answers UNAUTHORIZED with `data.authRequired`.
+      // The app signs out on it; retiring the press for the role notice would
+      // claim an organization role decided it, which a personal scope lacks.
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+      sessionAuthRequired = true;
+
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBeUndefined();
+      expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    }
+  );
+
+  it("keeps the install press while an enabled agent's role list is unread", async () => {
+    // An enabled agent with no connection reaches the connect view before the
+    // shared membership list lands. Withholding the press on that unresolved
+    // role would hide the only action from the owner who can take it.
+    configData.isEnabled = true;
+    roles = [];
+    heldProcedures = new Set(['list']);
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    releaseHeld?.();
+  });
+
+  it('never withholds the personal install press', async () => {
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('personal');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+});
+
 describe('ScopeEntryScreen names the scope it acts on', () => {
   // An admin in several organizations reauthorizes one organization's GitHub
   // app: the header has to say whose agent the button acts on, the way the Code

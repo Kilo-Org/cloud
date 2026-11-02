@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "תרגם סיכומי כלים",
     "toolSummaryTranslationSubtitle": "שלח כל סיכום כלי למודל כדי לתרגם אותו לשפת האפליקציה שלך. המקור יוצג אם התרגום ייכשל.",
     "toolSummaryTranslationModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(common.model) כדי לבחור אחר.",
+    "translateSummaries": "תרגם סיכומים",
     "autoExpandThinkingInactiveSubtitle": "אין לו השפעה כאשר פרטי החשיבה מוסתרים."
   },
   "notifications": {
@@ -1471,6 +1472,7 @@
     },
     "scopeEntry": {
       "connectDescription": "התקן את אפליקציית Kilo ב-GitHub כדי לסנכרן אוטומטית התראות Dependabot ולנהל ממצאי אבטחה בכל המאגרים שלך.",
+      "connectOwnerOnly": "בקש מבעל הארגון או מנהל לחבר את {{platform}}.",
       "connectTitle": "חיבור GitHub לתחילת העבודה",
       "couldNotLoad": "לא ניתן לטעון את סוכן האבטחה.",
       "installApp": "התקנת אפליקציית GitHub",
@@ -1707,6 +1709,8 @@
       "cannotCompleteTitle": "לא ניתן להשלים את ההתקנה",
       "notAdminMessage": "רק מנהל GitHub של החשבון הזה יכול לחבר אותו. בקש ממנהל הארגון להתקין את Kilo.",
       "alreadyClaimedMessage": "התקנת GitHub הזו כבר מחוברת לחשבון Kilo אחר. נתק אותה שם קודם.",
+      "installationUnavailableMessage": "התקנת GitHub App הזו מושהית או אינה זמינה יותר. שחזר או התקן אותה מחדש ב-GitHub, ואז התחל שוב.",
+      "multipleInstallationsMessage": "ארגון Kilo זה יכול כרגע לחבר ארגון GitHub אחד בלבד.",
       "didNotCompleteTitle": "ההתקנה לא הושלמה",
       "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."
     },
@@ -1863,7 +1867,6 @@
       "defaultProfileResolvesTo": "מוגדר ל-{{name}}",
       "defaultProfileResolvesToAccessibility": "פרופיל ברירת מחדל: {{name}}",
       "manageProfiles": "נהל פרופילים",
-      "noProfiles": "עדיין אין פרופילים. צור אחד כדי להוסיף משתני סביבה, שרתי MCP ומיומנויות.",
       "advancedConfig": "תצורה מתקדמת",
       "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
       "saveAsProfile": "שמור כפרופיל",
@@ -2746,6 +2749,9 @@
       "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל.",
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
+      "gitlabInstanceMismatchTitle": "חיבור GitLab מיועד למופע אחר",
+      "gitlabInstanceMismatchDescription": "חיבור GitLab שלך מיועד ל-{{connected}}, אבל בקשת המיזוג הזו נמצאת ב-{{requested}}. התחברו ל-GitLab במופע זה כדי לסקור אותה.",
+      "checkActiveConnection": "החיבור פעיל, אבל עדיין לא ניתן לטעון את הפריט הזה.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
@@ -3227,7 +3233,7 @@
       "shareMergeRequest": "שיתוף בקשת המיזוג",
       "viewOnProvider": "הצגה ב-{{provider}}",
       "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
-      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
+      "unavailableDescription": "ייתכן שנמחק, או שאין לך גישה אליו.",
       "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
       "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
       "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",

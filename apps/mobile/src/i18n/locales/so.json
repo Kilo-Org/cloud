@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Turjun koobabka qalabka",
     "toolSummaryTranslationSubtitle": "Dir koob kasta oo qalab ah moodel si uu ugu turjumo luqadda abkaaga. Waxaa la muujiyaa asalka haddii turjumaadda ay fashilanto.",
     "toolSummaryTranslationModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(common.model) si aad u dooratid mid kale.",
+    "translateSummaries": "Turjun koobabka",
     "autoExpandThinkingInactiveSubtitle": "Wax saameyn ah kuma lahan marka faahfaahinta fikirka la qariyay."
   },
   "prReview": {
@@ -682,6 +683,9 @@
       "reconnectTitle": "Dib u xir GitHub",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday.",
       "gitlabDescription": "Taleefanka ku eeg merge request-yada",
+      "gitlabInstanceMismatchTitle": "Xiriirka GitLab waa server kale",
+      "gitlabInstanceMismatchDescription": "Xiriirkaaga GitLab waa {{connected}}, laakiin merge request-kani wuxuu ku yaal {{requested}}. Ku xir GitLab server-kaas si aad u eegto.",
+      "checkActiveConnection": "Xiriirku waa firfircoon, laakiin weli shaygan lama soo rari karo.",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
       "gitlabReconnectAdminOnlyDescription": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay dib ugu xidhaan.",
@@ -821,7 +825,7 @@
       "shareMergeRequest": "La wadaag merge request-ka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
       "mergeRequestUnavailable": "Merge request-ka lama heli karo",
-      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama inadan helin ogolaansho.",
+      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama in aanad helin ogolaansho.",
       "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
       "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
       "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
@@ -2032,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Rakib abka Kilo ee GitHub si aad si otomaatig ah u isku waafajiso digniinaha Dependabot una maamusho natiijooyinka amniga ee kaydadkaaga oo dhan.",
+      "connectOwnerOnly": "Waydii milkiilaha ururka ama maamulaha inuu ku xidho {{platform}}.",
       "connectTitle": "Ku xidh GitHub si aad u bilowdo",
       "couldNotLoad": "Wakiilka amniga lama soo dejin karin.",
       "installApp": "Rakib abka GitHub",
@@ -2220,6 +2225,8 @@
       "cannotCompleteTitle": "Rakibidda lama dhammayn karo",
       "notAdminMessage": "Keliya maamulaha GitHub ee akoonkaas ayaa xiriirin kara. Ka codso maamulaha ururka inuu rakibo Kilo.",
       "alreadyClaimedMessage": "Rakibiddaas GitHub waxay mar hore ku xiran tahay akoon kale oo Kilo ah. Marka hore halkaas ka gooy xiriirka.",
+      "installationUnavailableMessage": "Rakibidda GitHub App waa la hakiyay ama mar dambe lama heli karo. Ku soo celi ama dib ugu rakib GitHub, ka dibna mar kale bilow.",
+      "multipleInstallationsMessage": "Ururkan Kilo hadda wuxuu kaliya ku xiri karaa hal urur oo GitHub ah.",
       "didNotCompleteTitle": "Rakibiddu ma dhammaystirmin",
       "didNotCompleteMessage": "Rakibidda barnaamijka GitHub ma dhammaystirmin. Mar kale ka isku day abka."
     },
@@ -2376,7 +2383,6 @@
       "defaultProfileResolvesTo": "Waxay u dhigtaa {{name}}",
       "defaultProfileResolvesToAccessibility": "Muuqaalka asalka ah: {{name}}",
       "manageProfiles": "Maamul profiles",
-      "noProfiles": "Weli profiles ma jiraan Abuur mid lagu daro doorsoomayaasha deegaanka, adeegayaasha MCP, iyo xirfadaha.",
       "advancedConfig": "Habaynta Sare",
       "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",
       "saveAsProfile": "U keydi sidii Profile ahaan",

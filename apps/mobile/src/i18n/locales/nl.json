@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Hulpmiddelsamenvattingen vertalen",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelsamenvatting naar een model om die naar je app-taal te vertalen. Het origineel wordt getoond als de vertaling mislukt.",
     "toolSummaryTranslationModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(common.model) om een ander te kiezen.",
+    "translateSummaries": "Samenvattingen vertalen",
     "autoExpandThinkingInactiveSubtitle": "Heeft geen effect zolang de details van de gedachtegang verborgen zijn."
   },
   "notifications": {
@@ -1458,6 +1459,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installeer de Kilo GitHub-app om Dependabot-waarschuwingen automatisch te synchroniseren en beveiligingsbevindingen in je repositories te beheren.",
+      "connectOwnerOnly": "Vraag een organisatie-eigenaar of beheerder om {{platform}} te koppelen.",
       "connectTitle": "Koppel GitHub om te beginnen",
       "couldNotLoad": "De Beveiligingsagent kon niet worden geladen.",
       "installApp": "GitHub-app installeren",
@@ -1689,6 +1691,8 @@
       "cannotCompleteTitle": "Installatie kan niet worden voltooid",
       "notAdminMessage": "Alleen een GitHub-beheerder van dat account kan de verbinding maken. Vraag een organisatiebeheerder om Kilo te installeren.",
       "alreadyClaimedMessage": "Die GitHub-installatie is al gekoppeld aan een ander Kilo-account. Koppel de installatie daar eerst los.",
+      "installationUnavailableMessage": "Deze installatie van de GitHub App is opgeschort of niet meer beschikbaar. Herstel of herinstalleer deze in GitHub en start daarna opnieuw.",
+      "multipleInstallationsMessage": "Deze Kilo-organisatie kan op dit moment slechts één GitHub-organisatie koppelen.",
       "didNotCompleteTitle": "Installatie niet voltooid",
       "didNotCompleteMessage": "De installatie van de GitHub-app is niet voltooid. Probeer het opnieuw vanuit de app."
     },
@@ -1845,7 +1849,6 @@
       "defaultProfileResolvesTo": "Verwijst naar {{name}}",
       "defaultProfileResolvesToAccessibility": "Standaardprofiel: {{name}}",
       "manageProfiles": "Beheer profielen",
-      "noProfiles": "Nog geen profielen. Maak er een om omgevingsvariabelen, MCP-servers en vaardigheden toe te voegen.",
       "advancedConfig": "Geavanceerde configuratie",
       "advancedConfigDescription": "Geldt voor deze sessie. Opslaan als profiel bewaart het voor de volgende keer.",
       "saveAsProfile": "Opslaan als profiel",
@@ -2712,6 +2715,9 @@
       "reconnectTitle": "GitHub opnieuw verbinden",
       "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
       "gitlabDescription": "Merge requests op je mobiel beoordelen",
+      "gitlabInstanceMismatchTitle": "GitLab-verbinding is voor een andere instantie",
+      "gitlabInstanceMismatchDescription": "Je GitLab-verbinding is voor {{connected}}, maar deze merge request staat op {{requested}}. Verbind GitLab op die instantie om hem te beoordelen.",
+      "checkActiveConnection": "De verbinding is actief, maar dit item kan nog steeds niet worden geladen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
@@ -3178,7 +3184,7 @@
       "shareMergeRequest": "Merge request delen",
       "viewOnProvider": "Bekijken op {{provider}}",
       "mergeRequestUnavailable": "Merge request niet beschikbaar",
-      "unavailableDescription": "Mogelijk is deze verwijderd, of heb je geen toegang.",
+      "unavailableDescription": "Mogelijk is deze verwijderd of heb je geen toegang.",
       "accessDeniedMergeRequest": "Je hebt geen toestemming om deze merge request te bekijken.",
       "couldNotLoadMergeRequest": "De merge request kon niet worden geladen.",
       "discussionAccessDenied": "Je hebt geen toestemming om de discussie van deze merge request te bekijken.",

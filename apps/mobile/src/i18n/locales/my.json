@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ကိရိယာ အကျဉ်းချုပ်များကို ဘာသာပြန်ပါ",
     "toolSummaryTranslationSubtitle": "ကိရိယာ အကျဉ်းချုပ် တစ်ခုချင်းစီကို သင့်အက်ပ်၏ ဘာသာစကားသို့ ဘာသာပြန်ရန် မော်ဒယ်တစ်ခုသို့ ပို့ပါ။ ဘာသာပြန်မှု မအောင်မြင်ပါက မူရင်းကို ပြသပါမည်။",
     "toolSummaryTranslationModelUnavailableNotice": "ဤမော်ဒယ်ကို ပေးအပ်ခြင်း မရှိတော့ပါ။ အခြားတစ်ခု ရွေးချယ်ရန် $t(common.model) ကို နှိပ်ပါ။",
+    "translateSummaries": "အကျဉ်းချုပ်များကို ဘာသာပြန်ပါ",
     "autoExpandThinkingInactiveSubtitle": "စဉ်းစားချက်အသေးစိတ်ကို ဖျောက်ထားသည့်အခါ သက်ရောက်မှု မရှိပါ။"
   },
   "prReview": {
@@ -682,6 +683,9 @@
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
       "gitlabDescription": "မိုဘိုင်းတွင် merge request များကို သုံးသပ်ပါ",
+      "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",
+      "gitlabInstanceMismatchDescription": "သင့် GitLab ချိတ်ဆက်မှုသည် {{connected}} အတွက် ဖြစ်သော်လည်း ဤ merge request သည် {{requested}} ပေါ်တွင် ရှိပါသည်။ ၎င်းကို သုံးသပ်ရန် ထို instance ပေါ်တွင် GitLab ကို ချိတ်ဆက်ပါ။",
+      "checkActiveConnection": "ချိတ်ဆက်မှု အသက်ဝင်နေပါသည်၊ သို့သော် ဤအရာကို မဖွင့်နိုင်သေးပါ။",
       "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
       "bitbucketOrgOnlyNoOrganizationDescription": "ဤအကောင့်တွင် အဖွဲ့များ မရှိသေးပါ။ အဖွဲ့တစ်ခုကို ဖန်တီးပါ သို့မဟုတ် ပါဝင်ပါက Bitbucket PR များကို သုံးသပ်နိုင်ပါသည်။",
       "gitlabReconnectAdminOnlyDescription": "အဖွဲ့အစည်း ပိုင်ရှင်၊ စီမံခန့်ခွဲသူ သို့မဟုတ် ငွေတောင်းခံမှုမန်နေဂျာတစ်ဦးအား ၎င်းကို ပြန်လည်ချိတ်ဆက်ပေးရန် တောင်းဆိုပါ။",
@@ -2032,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot သတိပေးချက်များကို အလိုအလျောက် ထပ်တူပြုရန်နှင့် ကုဒ်သိုလှောင်ရာအားလုံးရှိ လုံခြုံရေးတွေ့ရှိချက်များကို စီမံရန် Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ။",
+      "connectOwnerOnly": "အဖွဲ့အစည်း ပိုင်ရှင် သို့မဟုတ် စီမံခန့်ခွဲသူတစ်ဦးကို {{platform}} ကို ချိတ်ဆက်ပေးရန် တောင်းဆိုပါ။",
       "connectTitle": "စတင်ရန် GitHub ကို ချိတ်ဆက်ပါ",
       "couldNotLoad": "လုံခြုံရေးအေးဂျင့်ကို ဖွင့်၍ မရပါ။",
       "installApp": "GitHub အက်ပ် ထည့်သွင်းရန်",
@@ -2220,6 +2225,8 @@
       "cannotCompleteTitle": "ထည့်သွင်းမှုကို အပြီးမသတ်နိုင်ပါ",
       "notAdminMessage": "အဲဒီအကောင့်၏ GitHub စီမံခန့်ခွဲသူကသာ ချိတ်ဆက်နိုင်ပါသည်။ Kilo ကို ထည့်သွင်းပေးရန် အဖွဲ့အစည်း၏ စီမံခန့်ခွဲသူကို တောင်းဆိုပါ။",
       "alreadyClaimedMessage": "ထို GitHub ထည့်သွင်းမှုကို အခြား Kilo အကောင့်တစ်ခုနှင့် ချိတ်ဆက်ပြီးဖြစ်သည်။ ထိုနေရာတွင် ဦးစွာ ချိတ်ဆက်မှုဖြုတ်ပါ။",
+      "installationUnavailableMessage": "ဤ GitHub App ထည့်သွင်းမှုကို ရပ်ဆိုင်းထားသည် သို့မဟုတ် မရရှိနိုင်တော့ပါ။ GitHub တွင် ၎င်းကို ပြန်လည်ရယူပါ သို့မဟုတ် ပြန်လည်ထည့်သွင်းပါ၊ ထို့နောက် ပြန်လည်စတင်ပါ။",
+      "multipleInstallationsMessage": "ဤ Kilo အဖွဲ့အစည်းသည် လက်ရှိတွင် GitHub အဖွဲ့အစည်း တစ်ခုသာ ချိတ်ဆက်နိုင်ပါသည်။",
       "didNotCompleteTitle": "ထည့်သွင်းမှု မပြီးစီးပါ",
       "didNotCompleteMessage": "GitHub အက်ပ် ထည့်သွင်းမှု မပြီးစီးခဲ့ပါ။ အက်ပ်မှ ထပ်စမ်းကြည့်ပါ။"
     },
@@ -2376,7 +2383,6 @@
       "defaultProfileResolvesTo": "လက်ရှိတွင် {{name}} ဖြစ်ပါသည်",
       "defaultProfileResolvesToAccessibility": "မူရင်းပရိုဖိုင်: {{name}}",
       "manageProfiles": "ပရိုဖိုင်များကို စီမံပါ။",
-      "noProfiles": "ပရိုဖိုင်များ မရှိသေးပါ။ ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ၊ MCP ဆာဗာများနှင့် ကျွမ်းကျင်မှုများကို ထည့်သွင်းရန် တစ်ခုဖန်တီးပါ။",
       "advancedConfig": "အဆင့်မြင့်ဖွဲ့စည်းမှု",
       "advancedConfigDescription": "ဤစက်ရှင်အတွက် သက်ဆိုင်ပါသည်။ Profile အဖြစ် သိမ်းဆည်းပါက နောက်တစ်ကြိမ်အတွက် ကျန်ရှိပါမည်။",
       "saveAsProfile": "Profile အဖြစ် သိမ်းဆည်းပါ။",

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Преведи обобщенията на инструментите",
     "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
     "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг.",
+    "translateSummaries": "Преведи обобщенията",
     "autoExpandThinkingInactiveSubtitle": "Няма ефект, докато подробностите за разсъжденията са скрити."
   },
   "prReview": {
@@ -682,6 +683,9 @@
       "reconnectTitle": "Повторно свързване с GitHub",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
+      "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
+      "gitlabInstanceMismatchDescription": "Връзката ви с GitLab е за {{connected}}, но тази merge заявка е на {{requested}}. Свържете GitLab на тази инстанция, за да я прегледате.",
+      "checkActiveConnection": "Връзката е активна, но този елемент все още не може да бъде зареден.",
       "bitbucketOrgOnlyDescription": "Превключете акаунта горе към организация, за да преглеждате нейните заявки за сливане в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Този акаунт все още няма организации. Заявките за сливане в Bitbucket могат да се преглеждат, след като създадете организация или се присъедините към такава.",
       "gitlabReconnectAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
@@ -2032,6 +2036,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Инсталирай приложението на Kilo за GitHub, за да синхронизираш автоматично сигналите от Dependabot и да управляваш проблемите със сигурността в хранилищата си.",
+      "connectOwnerOnly": "Поискай от собственик на организацията или администратор да свърже {{platform}}.",
       "connectTitle": "Свържи GitHub, за да започнеш",
       "couldNotLoad": "Не успяхме да заредим агента по сигурността.",
       "installApp": "Инсталирай приложението за GitHub",
@@ -2220,6 +2225,8 @@
       "cannotCompleteTitle": "Инсталирането не може да завърши",
       "notAdminMessage": "Само администратор на този акаунт в GitHub може да го свърже. Помоли администратор на организацията да инсталира Kilo.",
       "alreadyClaimedMessage": "Тази инсталация в GitHub вече е свързана с друг акаунт в Kilo. Първо прекъсни връзката оттам.",
+      "installationUnavailableMessage": "Тази инсталация на GitHub App е спряна или вече не е налична. Възстанови я или я преинсталирай в GitHub, след което започни отново.",
+      "multipleInstallationsMessage": "Тази организация в Kilo в момента може да свързва само една организация в GitHub.",
       "didNotCompleteTitle": "Инсталирането не е завършено",
       "didNotCompleteMessage": "Инсталирането на приложението за GitHub не завърши. Опитай отново от приложението."
     },
@@ -2376,7 +2383,6 @@
       "defaultProfileResolvesTo": "Насочва към {{name}}",
       "defaultProfileResolvesToAccessibility": "Профил по подразбиране: {{name}}",
       "manageProfiles": "Управление на профили",
-      "noProfiles": "Все още няма профили. Създайте такъв, за да добавите променливи на средата, MCP сървъри и умения.",
       "advancedConfig": "Разширена конфигурация",
       "advancedConfigDescription": "Вали за тази сесия. Запазването като профил го запазва за следващия път.",
       "saveAsProfile": "Запази като профил",

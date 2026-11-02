@@ -383,31 +383,69 @@ async function getGatewayRoutedByokCandidateProviders(
   ];
 }
 
+type GatewayRoutedByokOptions = {
+  includeGatewayKeys: boolean;
+  getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
+};
+
+/**
+ * The providers whose keys may serve the model through a gateway. Keys for providers outside the
+ * organization allow-list are never loaded, so a later route that honors the allow-list takes the
+ * request, and an undecryptable allowed key still fails closed.
+ */
+async function getAllowedGatewayRoutedByokProviders(
+  requestedModel: string,
+  options: GatewayRoutedByokOptions
+): Promise<UserByokProviderId[]> {
+  const allProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  if (allProviders.length === 0) return [];
+  const allowedProviders = await options.getAllowedProviders();
+  return allProviders.filter(providerId =>
+    isVercelUserByokProviderAllowed(providerId, allowedProviders)
+  );
+}
+
+async function decryptGatewayRoutedByokKeys(
+  userId: string,
+  organizationId: string | undefined,
+  providerIds: UserByokProviderId[]
+): Promise<BYOKResult[]> {
+  return (
+    (organizationId
+      ? await getBYOKforOrganization(readDb, organizationId, providerIds)
+      : await getBYOKforUser(readDb, userId, providerIds)) ?? []
+  );
+}
+
 /** The enabled provider keys sent through Vercel and whole-gateway keys that may serve the model. */
 async function getGatewayRoutedByokKeys(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined,
-  options: {
-    includeGatewayKeys: boolean;
-    getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
-  }
+  options: GatewayRoutedByokOptions
 ): Promise<BYOKResult[]> {
   if (isAnonymousContext(user)) return [];
-  const allProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
-  if (allProviders.length === 0) return [];
-  // Keys for providers outside the organization allow-list are never loaded, so a later route that
-  // honors the allow-list takes the request, and an undecryptable allowed key still fails closed.
-  const allowedProviders = await options.getAllowedProviders();
-  const candidateProviders = allProviders.filter(providerId =>
-    isVercelUserByokProviderAllowed(providerId, allowedProviders)
-  );
+  const candidateProviders = await getAllowedGatewayRoutedByokProviders(requestedModel, options);
   if (candidateProviders.length === 0) return [];
-  return (
-    (organizationId
-      ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
-      : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? []
-  );
+  return decryptGatewayRoutedByokKeys(user.id, organizationId, candidateProviders);
+}
+
+/**
+ * Metadata of the keys `getGatewayRoutedByokKeys` would load. Routing ranks these and decrypts only
+ * the key it picks, so a key ranked below the serving route costs no decryption and cannot fail
+ * the request.
+ */
+async function getGatewayRoutedByokKeyStates(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined,
+  options: GatewayRoutedByokOptions
+): Promise<ByokKeyState[]> {
+  if (isAnonymousContext(user)) return [];
+  const candidateProviders = await getAllowedGatewayRoutedByokProviders(requestedModel, options);
+  if (candidateProviders.length === 0) return [];
+  const keys = await getByokKeyStates(readDb, byokOwner(user.id, organizationId));
+  return keys.filter(key => key.isEnabled && candidateProviders.includes(key.providerId));
 }
 
 const noProviderAllowList = async () => undefined;
@@ -458,10 +496,10 @@ function rankByokRoutes<D extends ByokKeyState, G extends ByokKeyRef>(
 }
 
 function gatewayRoutedByokResult(
-  route: Exclude<ByokRoute<ByokKeyState, BYOKResult>, { route: 'direct-byok' }>,
+  route: Exclude<ByokRoute<ByokKeyState, ByokKeyState>, { route: 'direct-byok' }>,
+  key: BYOKResult,
   requestedModel: string
 ): GetProviderProviderResult {
-  const { key } = route;
   return {
     kind: 'provider',
     provider:
@@ -606,7 +644,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   const decideGatewayKey = createGatewayKeyDecider(requestedModel, resolveRoutingProviderConfig);
   const routes = rankByokRoutes(
     directCandidates,
-    await getGatewayRoutedByokKeys(user, requestedModel, organizationId, {
+    await getGatewayRoutedByokKeyStates(user, requestedModel, organizationId, {
       includeGatewayKeys: true,
       getAllowedProviders,
     })
@@ -620,10 +658,15 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (route.route === 'gateway-byok' && (await decideGatewayKey(route.providerId)) !== 'serves') {
       continue;
     }
-    return (
-      (catalogKeyServes ? await checkChatGpt() : null) ??
-      gatewayRoutedByokResult(route, requestedModel)
+    const chatGpt = catalogKeyServes ? await checkChatGpt() : null;
+    if (chatGpt) return chatGpt;
+    if (isAnonymousContext(user)) continue;
+    const { providerId } = route.key;
+    const key = (await decryptGatewayRoutedByokKeys(user.id, organizationId, [providerId])).find(
+      byok => byok.providerId === providerId
     );
+    if (!key) continue;
+    return gatewayRoutedByokResult(route, key, requestedModel);
   }
 
   // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over

@@ -74,6 +74,20 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getCatalogModeByokCredentials: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
+  // Key metadata mirrors whatever the test's getBYOKforUser/getBYOKforOrganization mocks return.
+  getByokKeyStates: jest.fn(async (fromDb: never, owner: { type: string; id: string }) => {
+    const byok = jest.requireMock<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok');
+    const keys =
+      owner.type === 'user'
+        ? await byok.getBYOKforUser(fromDb, owner.id, [])
+        : await byok.getBYOKforOrganization(fromDb, owner.id, []);
+    return (keys ?? []).map(({ providerId, priority }) => ({
+      providerId,
+      priority,
+      isEnabled: true,
+      serveCatalogModels: false,
+    }));
+  }),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
@@ -422,9 +436,9 @@ describe('getProvider ChatGPT connection routing order', () => {
       isFree: false,
       bypassAccessCheck: false,
     });
-    expect(jest.mocked(getBYOKforUser).mock.calls[0]?.slice(1)).toEqual([
+    expect(jest.mocked(getBYOKforUser).mock.calls.at(-1)?.slice(1)).toEqual([
       user.id,
-      ['anthropic', 'vercel-ai-gateway', 'openrouter'],
+      ['anthropic'],
     ]);
   });
 
@@ -606,9 +620,7 @@ describe('getProvider gateway BYOK routing', () => {
 
     const result = await resolve({ ...providerInput(model), organizationId: ORG_ID });
 
-    expect(getBYOKforOrganization).toHaveBeenCalledWith(expect.anything(), ORG_ID, [
-      'anthropic',
-      'vercel-ai-gateway',
+    expect(getBYOKforOrganization).toHaveBeenLastCalledWith(expect.anything(), ORG_ID, [
       'openrouter',
     ]);
     expect(getBYOKforUser).not.toHaveBeenCalled();

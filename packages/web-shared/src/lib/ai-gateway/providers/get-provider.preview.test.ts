@@ -430,6 +430,52 @@ describe('previewByokRouting', () => {
     ]);
   });
 
+  test.each([
+    { catalogPriority: 0, expected: 'serves' },
+    { catalogPriority: 2, expected: 'fails closed' },
+  ])(
+    'decrypts only the key it uses: catalog key at priority $catalogPriority $expected',
+    async ({ catalogPriority, expected }) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values([
+        {
+          kilo_user_id: user.id,
+          provider_id: 'zai-coding',
+          encrypted_api_key: encryptApiKey('zai-coding-secret', BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: true, priority: catalogPriority },
+        },
+        {
+          kilo_user_id: user.id,
+          provider_id: 'moonshotai',
+          encrypted_api_key: encryptApiKey('moonshotai-secret', randomBytes(32).toString('base64')),
+          created_by: user.id,
+          settings: { priority: 1 },
+        },
+      ]);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+      jest.mocked(decryptApiKey).mockClear();
+
+      const routed = getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+      });
+
+      if (expected === 'serves') {
+        expect(routeOf(await routed, 'chat_completions')).toEqual({
+          route: 'direct-byok',
+          providerId: 'zai-coding',
+        });
+        expect(decryptApiKey).toHaveBeenCalledTimes(1);
+      } else {
+        await expect(routed).rejects.toThrow();
+      }
+    }
+  );
+
   test('puts the ChatGPT connection ahead of a gateway key the owner ranked above a catalog key', async () => {
     const user = await insertTestUser();
     await db.insert(byok_api_keys).values(

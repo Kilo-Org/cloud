@@ -121,13 +121,15 @@ export const adminProcedure = procedure.use(async ({ ctx, path, getRawInput, nex
   const action = `trpc:${path}`;
   const target = adminTargetForInput(await getRawInput());
   const decision = await ctx.workerAdmin.decide(action, target);
-  emitWorkerAdminDecision(ctx.env, decision, {
-    action,
-    userId: ctx.userId || null,
-    wastelandId: target.kind === 'wasteland' ? target.id : null,
-    jti: decision.allowed ? decision.jti : null,
-    delivery: 'trpc',
-  });
+  if (ctx.workerAdmin.takeDecisionReport(action, target)) {
+    emitWorkerAdminDecision(ctx.env, decision, {
+      action,
+      userId: ctx.userId || null,
+      wastelandId: target.kind === 'wasteland' ? target.id : null,
+      jti: decision.allowed ? decision.jti : null,
+      delivery: 'trpc',
+    });
+  }
   if (!decision.allowed) {
     throw new TRPCError({
       code:

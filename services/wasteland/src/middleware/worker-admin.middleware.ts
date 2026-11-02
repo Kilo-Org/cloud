@@ -82,14 +82,14 @@ export function emitWorkerAdminDecision(
     route: params.action,
     userId: params.userId ?? undefined,
     wastelandId: params.wastelandId ?? undefined,
-    error: decision.allowed ? undefined : decision.reason,
+    reason: decision.reason ?? undefined,
     label: params.jti ?? undefined,
   });
   console.log(
     JSON.stringify({
       tag: 'worker-admin',
       event,
-      mode: decision.source,
+      source: decision.source,
       outcome: decision.allowed
         ? decision.wouldDeny
           ? 'observe_would_deny'

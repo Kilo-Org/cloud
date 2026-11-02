@@ -13,13 +13,20 @@ async function workerAdminAllows(ctx: TRPCContext, wastelandId: string): Promise
     kind: 'wasteland',
     id: wastelandId,
   });
-  emitWorkerAdminDecision(ctx.env, decision, {
-    action: `trpc:${ctx.procedurePath}`,
-    userId: ctx.userId || null,
-    wastelandId,
-    jti: decision.allowed ? decision.jti : null,
-    delivery: 'trpc',
-  });
+  if (
+    ctx.workerAdmin.takeDecisionReport(`trpc:${ctx.procedurePath}`, {
+      kind: 'wasteland',
+      id: wastelandId,
+    })
+  ) {
+    emitWorkerAdminDecision(ctx.env, decision, {
+      action: `trpc:${ctx.procedurePath}`,
+      userId: ctx.userId || null,
+      wastelandId,
+      jti: decision.allowed ? decision.jti : null,
+      delivery: 'trpc',
+    });
+  }
   if (!decision.allowed && decision.status === 503) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',

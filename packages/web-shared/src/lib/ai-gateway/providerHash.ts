@@ -8,9 +8,9 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 export function generateProviderSpecificHash(payload: string, provider: Provider): string {
   const salt = 'd20250815';
   const pepper =
-    provider.id === 'vercel'
+    provider.type === 'vercel'
       ? 'vercel'
-      : provider.id === 'openrouter'
+      : provider.type === 'openrouter'
         ? 'henk is a boss'
         : provider.apiUrl;
   return crypto
@@ -62,7 +62,7 @@ export function applyTrackingIds(
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
-    if (provider.id === 'openrouter' || provider.id === 'vercel') {
+    if (provider.type === 'openrouter' || provider.type === 'vercel') {
       request.body.user = userHash;
       if (taskHash) {
         request.body.session_id = taskHash;

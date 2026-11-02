@@ -304,7 +304,7 @@ function mockCustomLlm(customLlm: CustomLlm) {
 }
 
 const provider = {
-  id: 'openrouter',
+  type: 'openrouter',
   apiUrl: 'https://openrouter.ai/api/v1',
   apiUrlOverrides: {},
   disableUrlSuffix: false,
@@ -571,7 +571,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         is_free: false,
       }),
       expect.anything(),
-      expect.objectContaining({ id: provider.id, apiKey: provider.apiKey })
+      expect.objectContaining({ type: provider.type, apiKey: provider.apiKey })
     );
   });
 
@@ -1378,19 +1378,19 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       Pick<GetProviderProviderResult, 'provider' | 'userByok'>
     > = {
       'a catalog-mode direct BYOK key': {
-        provider: { ...provider, id: 'direct-byok' },
+        provider: { ...provider, type: 'direct-byok' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
       },
       'a Vercel BYOK inference provider key': {
-        provider: { ...provider, id: 'vercel' },
+        provider: { ...provider, type: 'vercel' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'moonshotai' }],
       },
       'an OpenRouter key': {
-        provider: { ...provider, id: 'openrouter' },
+        provider: { ...provider, type: 'openrouter' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'openrouter' }],
       },
       'a Vercel AI Gateway key': {
-        provider: { ...provider, id: 'vercel' },
+        provider: { ...provider, type: 'vercel' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
       },
       'no BYOK key': { provider, userByok: null },
@@ -2307,7 +2307,7 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('names the BYOK key when it cannot serve the API kind', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'direct-byok', supportedChatApis: ['responses'] },
+      provider: { ...provider, type: 'direct-byok', supportedChatApis: ['responses'] },
       userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
       isFree: false,
       bypassAccessCheck: false,
@@ -2418,7 +2418,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'direct-byok' },
+      provider: { ...provider, type: 'direct-byok' },
       userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
       isFree: false,
       bypassAccessCheck: false,
@@ -3318,7 +3318,7 @@ describe('custom routers and signed auto decisions', () => {
 });
 
 describe('custom LLM requests', () => {
-  const customProvider = { ...provider, id: 'custom' } satisfies Provider;
+  const customProvider = { ...provider, type: 'custom' } satisfies Provider;
 
   function customLlm(publicId: string, isPublic: boolean): CustomLlm {
     return {
@@ -4089,7 +4089,7 @@ describe('Enkrypt input guardrail', () => {
             kilo_user_id: 'user-123',
             organization_id: 'org-1',
             status_code: status,
-            provider: provider.id,
+            provider: provider.type,
             model: 'openai/gpt-4o',
             error: { guardrail_rejection: verdict },
           }),

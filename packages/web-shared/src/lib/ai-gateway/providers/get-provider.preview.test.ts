@@ -171,7 +171,7 @@ type RouteSignature =
 function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
   if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
   const { provider, userByok } = result;
-  if (provider.id === 'direct-byok') {
+  if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
       ? { route: 'direct-byok', providerId }
@@ -180,7 +180,7 @@ function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteS
   if (!userByok) {
     if (provider === VERCEL_AI_GATEWAY) return { route: 'kilo', gateway: 'vercel' };
     if (provider === OPENROUTER) return { route: 'kilo', gateway: 'openrouter' };
-    throw new Error(`unexpected Kilo provider ${provider.id}`);
+    throw new Error(`unexpected Kilo provider ${provider.type}`);
   }
   if (provider === VERCEL_AI_GATEWAY) {
     return { route: 'vercel-byok', providerIds: userByok.map(byok => byok.providerId) };

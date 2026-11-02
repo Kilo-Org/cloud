@@ -1,5 +1,5 @@
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { MicrodollarUsage, Organization } from '@kilocode/db';
 import type { GatewayApiKind } from '@kilocode/usage-contracts';
@@ -126,7 +126,7 @@ export type MicrodollarUsageContext = {
   kiloUserId: string;
   fraudHeaders: FraudDetectionHeaders;
   organizationId?: Organization['id'];
-  provider: ProviderId;
+  provider: ProviderType;
   requested_model: string;
   readonly is_free: boolean;
   promptInfo: PromptInfo;

@@ -126,10 +126,11 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-An imperative `Sheet` with `snapPoints` gets its content bounded to the smallest detent on Android, where the
-library otherwise sizes the content host to the window and a body that takes its slack is laid out past the
-frame. Content the sheet must keep reachable — a dismiss row, a submit row — therefore sits at the sheet's own
-edge, outside any `flex-1` list, and a list bounds its own height when it must not push that row off.
+An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
+detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
+bottom — a dismiss row, a submit row — cannot be reached. Size such a sheet to its content instead, keep
+the rows that must stay reachable at the sheet's own edge, and bound a list that could otherwise push them
+off.
 
 A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
 its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset

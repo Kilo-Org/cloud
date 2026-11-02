@@ -1,7 +1,7 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Platform, useWindowDimensions, View } from 'react-native';
+import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -13,60 +13,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * Use a route with `useFormSheetScreenOptions()` instead when the surface needs
  * a URL or its own screen — a route sheet is a real native sheet too.
  */
-
-/**
- * The band Material3 keeps above a sheet's content for its drag handle, in dp.
- * A detent sheet positions its content below that band inside the same frame,
- * so the content room of a detent is the detent less this allowance.
- */
-const NATIVE_HANDLE_ALLOWANCE_DP = 48;
-
-/** The height one detent asks for, in dp, resolved the way the library does. */
-function detentHeight(snapPoint: string | number, windowHeight: number): number {
-  // A detent is a pixel height or a percentage of the window, and both carry
-  // their value in the text form the library parses (`'50%'`, `200`).
-  const text = `${snapPoint}`;
-  const value = Number.parseFloat(text);
-  if (!Number.isFinite(value)) {
-    return windowHeight;
-  }
-  return text.trim().endsWith('%') ? (value / 100) * windowHeight : value;
-}
-
-/**
- * The height a two-detent sheet may give its content on Android, or null to
- * leave the content as it is.
- *
- * Android builds a detent sheet's content host at the height of its own window
- * rather than at the detent's height (`fitToContents` is off whenever
- * `snapPoints` are passed), so a body that takes its slack — a `flex-1` list, a
- * form's spacer — is laid out past the sheet frame and the bottom of the
- * content, usually the dismiss or submit row, cannot be reached. Bounding the
- * content to the smallest detent keeps every detent's frame holding its own
- * content, and a scroll view inside still scrolls within that room.
- *
- * A detent that already fills the window is left alone: its content host is the
- * window less the system bars, which the wrapper must not exceed.
- */
-function detentContentHeight(
-  snapPoints: (string | number)[] | undefined,
-  windowHeight: number,
-  showHandle: boolean
-): number | null {
-  // A single snap point is not a detent range: the library renders that sheet
-  // fully expanded (`skipPartiallyExpanded`), so bounding its content to the
-  // point would leave its own content short of the frame it draws.
-  if (Platform.OS !== 'android' || !snapPoints || snapPoints.length < 2) {
-    return null;
-  }
-  const smallestDetent = Math.min(
-    ...snapPoints.map(snapPoint => detentHeight(snapPoint, windowHeight))
-  );
-  if (!Number.isFinite(smallestDetent) || smallestDetent >= windowHeight) {
-    return null;
-  }
-  return Math.max(0, smallestDetent - (showHandle ? NATIVE_HANDLE_ALLOWANCE_DP : 0));
-}
 
 type SheetProps = {
   visible: boolean;
@@ -139,8 +85,6 @@ export function Sheet({
   // device locale unless it is told the app's, so a device in Portuguese
   // announced Portuguese controls inside an Arabic app.
   const { i18n } = useTranslation();
-  const { height: windowHeight } = useWindowDimensions();
-  const detentContent = detentContentHeight(snapPoints, windowHeight, showHandle);
   // Stay mounted through the dismiss animation. `index` -1 starts the animation
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
@@ -205,16 +149,6 @@ export function Sheet({
     return null;
   }
 
-  let content: ReactNode = children;
-  if (detentContent !== null) {
-    // The detent's own room bounds the content, so the body keeps its dismiss or
-    // submit row inside the sheet instead of below it.
-    content = <View style={{ height: detentContent }}>{children}</View>;
-  } else if (Platform.OS === 'android' && !snapPoints?.length) {
-    // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
-    content = <View className="w-full max-w-[640px] self-center">{children}</View>;
-  }
-
   return (
     <BottomSheet
       index={visible && !dismissalPending ? 0 : -1}
@@ -257,7 +191,12 @@ export function Sheet({
         onDismiss?.();
       }}
     >
-      {content}
+      {Platform.OS === 'android' && !snapPoints?.length ? (
+        // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
+        <View className="w-full max-w-[640px] self-center">{children}</View>
+      ) : (
+        children
+      )}
     </BottomSheet>
   );
 }

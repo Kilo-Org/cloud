@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { writeJson, type CellRun, type Exec, type RunOutcome } from './capture';
 import type { Finding, Rect } from './findings';
+import { hasPresentedOwner, parseDump } from './tree';
 
 export type RunMeta = {
   platform: string;
@@ -173,15 +174,40 @@ export function summarize(findings: readonly Finding[]): { errors: number; warni
 
 export function skippedRules(cells: readonly CellRun[]) {
   return cells.flatMap(cell =>
-    cell.screens
-      .filter(screen => screen.env.safeAreaKnown === false)
-      .map(screen => ({
-        cell: cell.id,
-        target: screen.target,
-        rule: 'safe-area',
-        reason: 'snapshot has no system-bar inset evidence',
-      }))
+    cell.screens.flatMap(screen => {
+      const entries: { cell: string; target: string; rule: string; reason: string }[] = [];
+      if (screen.env.safeAreaKnown === false) {
+        entries.push({
+          cell: cell.id,
+          target: screen.target,
+          rule: 'safe-area',
+          reason: 'snapshot has no system-bar inset evidence',
+        });
+      }
+      // A screen that shows a natively presented dialog or sheet loses its
+      // safe-area check: the probe reports those frames from the surface's own
+      // origin, so the window's insets do not describe them. The gap is listed
+      // rather than hidden, so the rule it silenced is visible in the report.
+      if (hasPresentedSurface(screen.dump)) {
+        entries.push({
+          cell: cell.id,
+          target: screen.target,
+          rule: 'safe-area',
+          reason: 'content is hosted by a native dialog or sheet, whose frames are surface-local',
+        });
+      }
+      return entries;
+    })
   );
+}
+
+/** True when the snapshot holds content a native dialog or sheet hosts. */
+function hasPresentedSurface(dump: string): boolean {
+  try {
+    return parseDump(fs.readFileSync(dump, 'utf8')).nodes.some(hasPresentedOwner);
+  } catch {
+    return false;
+  }
 }
 
 export function renderReport(

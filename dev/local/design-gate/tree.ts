@@ -136,9 +136,12 @@ const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true 
 
 /** True when a native dialog or sheet hosts the node's content. */
 export function insidePresentedSurface(node: LayoutNode): boolean {
-  return [node, ...ancestors(node)].some(candidate =>
-    (candidate.probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true)
-  );
+  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
+}
+
+/** True when one of a probe node's owners is a presented surface. */
+export function hasPresentedOwner(probe: ProbeNode): boolean {
+  return (probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true);
 }
 
 function visibleContainer(style: ProbeNode['style']): boolean {

@@ -17,7 +17,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: 'View',

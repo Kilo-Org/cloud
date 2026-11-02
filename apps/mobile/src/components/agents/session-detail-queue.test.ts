@@ -160,7 +160,6 @@ vi.mock('@/lib/trpc', () => ({
 // ── react-native / native bridges ──────────────────────────────────────────
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   KeyboardAvoidingView: 'KeyboardAvoidingView',

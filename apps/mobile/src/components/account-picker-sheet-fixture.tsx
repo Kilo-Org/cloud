@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useContextPicker } from '@/components/context-control';
 import { useTRPC } from '@/lib/trpc';
@@ -20,13 +20,19 @@ export function AccountPickerSheetFixture() {
   const trpc = useTRPC();
   const organizations = useQuery(trpc.organizations.list.queryOptions());
   const { openPicker, picker } = useContextPicker(organizations.data);
+  // The header's control refuses to open while the list is still loading, so
+  // opening on mount would measure nothing. Open once, the first time the rows
+  // exist — the state the header reaches after the list settles — and never
+  // again, so dismissing the sheet keeps it dismissed.
+  const [opened, setOpened] = useState(false);
 
-  // The header's control refuses to open while the list is still loading, so a
-  // fixture that opened it on mount would measure nothing; opening once the
-  // rows exist is the state the header reaches after the list settles.
   useEffect(() => {
+    if (opened || organizations.data === undefined) {
+      return;
+    }
+    setOpened(true);
     openPicker();
-  });
+  }, [opened, organizations.data, openPicker]);
 
   return picker;
 }

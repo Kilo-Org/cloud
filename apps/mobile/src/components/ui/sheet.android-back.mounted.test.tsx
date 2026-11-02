@@ -18,7 +18,6 @@ const platform = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({ card: '#1F1F24' }) }));
 vi.mock('react-native', () => ({
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Platform: {
     get OS() {
       return platform.os;

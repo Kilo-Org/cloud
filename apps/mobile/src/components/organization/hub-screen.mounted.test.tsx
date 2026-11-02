@@ -24,6 +24,7 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({
   role: 'owner' as string,
+  parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
 }));
@@ -54,7 +55,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     org: {
       organizationId: 'org-1',
       organizationName: 'Acme',
-      parentOrganizationId: null,
+      parentOrganizationId: boundary.parentOrganizationId,
       balance: 5_000_000,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
@@ -200,6 +201,7 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
   routerPush.mockClear();
@@ -370,15 +372,22 @@ describe('Organization hub billing card while its data loads', () => {
     membersQuery.data = undefined;
     const loading = await renderHub();
     // The Kilo Pass row used to appear only once the membership payload arrived.
-    const kiloPassTitle = i18n.t('kiloPass.title');
-    expect(
-      loading.renderer.root.findAll(node =>
-        String(node.props.accessibilityLabel).startsWith(kiloPassTitle)
-      )
-    ).not.toEqual([]);
+    expect(loading.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
     // Loading copy is not a subtitle; the row reserves its settled line instead.
     expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
     expect(bellRow(loading.renderer)?.props.subtitlePlaceholder).toBeTruthy();
     loading.unmount();
+
+    // A list payload persisted before the parent link existed is unknown, not a
+    // child, so the row is still there from the first frame.
+    boundary.parentOrganizationId = undefined;
+    const upgraded = await renderHub();
+    expect(upgraded.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    upgraded.unmount();
+
+    boundary.parentOrganizationId = 'org-parent';
+    const child = await renderHub();
+    expect(child.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    child.unmount();
   });
 });

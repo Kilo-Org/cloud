@@ -71,15 +71,25 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   }, [organizationIdOverride, org, setOrganizationId]);
 
   const orgWithMembers = useOrgWithMembers(organizationId);
+  // `organizations.list` carries the org's parent link, so the billing group
+  // knows from its first frame whether this org has a Kilo Pass row instead of
+  // adding one a request later and pushing the rows under it down. A device
+  // that persisted the list before that field existed hydrates an entry
+  // without it; that is "unknown", not "child", so the row renders in its
+  // loading state rather than appearing when the refreshed list lands.
+  const parentOrganizationId = org?.parentOrganizationId;
+  // `null` is a top-level organization and a missing field is a list payload
+  // persisted before this field existed; both keep the row. Only a child
+  // organization, which carries its parent's id, has no Kilo Pass row.
+  const isChildOrganization = (parentOrganizationId ?? null) !== null;
+  const showKiloPassRow = isMoneyRole(role) && !isChildOrganization;
   // The summary API is parent-only (`organizationParentBillingProcedure`
-  // rejects child orgs and non-billing roles), so a child org must never fire
-  // it. `organizations.list` carries the same parent link the membership
-  // payload does, and the hub only renders once that list resolved, so the
-  // billing group knows from its first frame whether this org has a Kilo Pass
-  // row instead of adding one a request later and pushing the rows under it
-  // down.
-  const showKiloPass = isMoneyRole(role) && org?.parentOrganizationId === null;
-  const kiloPassSummary = useOrgKiloPassSummary(organizationId, showKiloPass);
+  // rejects child orgs and non-billing roles), so it fires only once the link
+  // confirms a top-level organization.
+  const kiloPassSummary = useOrgKiloPassSummary(
+    organizationId,
+    isMoneyRole(role) && parentOrganizationId === null
+  );
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
@@ -94,7 +104,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   }
 
   const showMoney = isMoneyRole(role);
-  const kiloPassRowState = showKiloPass
+  const kiloPassRowState = showKiloPassRow
     ? getOrgKiloPassRowState({ data: kiloPassSummary.data, isError: kiloPassSummary.isError })
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;

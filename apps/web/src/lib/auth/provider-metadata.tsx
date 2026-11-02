@@ -52,14 +52,22 @@ const AuthProviderIds = AllAuthProviders.map(p => p.id);
 export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
-// Subset used for account linking (excludes SSO, email, passkeys, and dev-only
-// providers).
+// Subset offered for OAuth sign-in: every provider except SSO, email, passkeys
+// and the dev-only one.
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
   p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 
 export const LinkableAuthProviders = [...AllAuthProviders.filter(isLinkableAuthProvider)] as const;
 export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as const;
 export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id), 'email'] as const;
+
+// Subset `/connected-accounts` may start a link for. Account linking requires
+// the web session that started it, and a provider's callback carries that
+// session only when it is a same-site GET; Apple's callback is a cross-site
+// form POST, so Apple is offered for sign-in only.
+export const AccountLinkingProviders = [
+  ...LinkableAuthProviders.filter(p => p.id !== 'apple'),
+] as const;
 
 // All auth methods (excludes fake-login, used for sign-in hints)
 // This is the same as all providers except fake-login

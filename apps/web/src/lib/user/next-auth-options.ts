@@ -98,6 +98,7 @@ import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
+  getUserFromSession,
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
@@ -1006,6 +1007,19 @@ export const authOptions: NextAuthOptions = {
         linkingSession = await getAccountLinkingSession();
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
+
+        // Account linking requires the person who started it: the pending link
+        // names a user, and the request must carry that user's web session. A
+        // request whose session does not name the same user is refused with the
+        // ordinary linking failure. The read above consumed the cookie, so a
+        // refusal is final.
+        if (isAccountLinking && linkingSession) {
+          const linkingPrincipal = await getUserFromSession();
+          if (linkingPrincipal?.id !== linkingSession.existingUserId) {
+            warnInSentry('SECURITY: Account link refused: the session does not match the link');
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
 
         // The linking session is consumed here, so it carries the organization
         // through to the jwt callback on the profile, the same way `isNewUser`

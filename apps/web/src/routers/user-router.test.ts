@@ -122,6 +122,17 @@ describe('user router - getMe', () => {
   });
 });
 
+describe('user router - linkAuthProvider', () => {
+  it('refuses an Apple link start', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.linkAuthProvider({ provider: 'apple' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+  });
+});
+
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
     testUser = await insertTestUser({

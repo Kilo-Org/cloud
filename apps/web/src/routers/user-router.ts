@@ -684,6 +684,16 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // Account linking requires the web session that started it. Apple's
+      // callback is a cross-site form POST that carries no session cookie, so
+      // an Apple link cannot complete; refuse it here instead of letting the
+      // round trip end in a failure on /connected-accounts.
+      if (input.provider === 'apple') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Apple cannot be added as a sign-in method.',
+        });
+      }
       // An organization-scoped link records the organization on the linking
       // session so the callback can store the BYOK connection for it. Only the
       // OpenAI (ChatGPT) provider has an organization-scoped connection, so any

@@ -176,7 +176,7 @@ describe('upstream model catalog validation', () => {
     'bytedance-seed/seed-2.0',
     'openai/gpt-4o',
     '~deepseek/deepseek-pro-latest',
-    exclusiveModel.internal_id,
+    exclusiveModel.public_id,
   ]);
 
   beforeEach(() => {
@@ -246,24 +246,22 @@ describe('upstream model catalog validation', () => {
       it.each([false, true])('blocks an invalid catalog ID (BYOK: %s)', async byok => {
         const result = await attempt({
           providerId,
-          requestedModel: providerId === 'vercel' ? 'qwen/not-in-catalog' : 'qwen/qwen3-coder',
-          wireModel: 'alibaba/not-in-catalog',
+          requestedModel: 'qwen/not-in-catalog',
+          wireModel: 'openai/gpt-4o',
           kind,
           userByok: byok ? [{ providerId: byokProviderId, decryptedAPIKey: 'test-key' }] : null,
         });
 
         expect(result).toEqual({ type: 'invalid-openrouter-model' });
-        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
-          [providerId === 'vercel' ? 'qwen/not-in-catalog' : 'alibaba/not-in-catalog'],
-        ]);
+        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/not-in-catalog']]);
         expect(upstreamRequest).not.toHaveBeenCalled();
       });
 
       it.each([false, true])('sends a valid catalog ID (BYOK: %s)', async byok => {
         const result = await attempt({
           providerId,
-          requestedModel: providerId === 'vercel' ? 'qwen/qwen3-coder' : 'not-in-catalog',
-          wireModel: providerId === 'vercel' ? 'alibaba/qwen3-coder' : 'qwen/qwen3-coder',
+          requestedModel: 'qwen/qwen3-coder',
+          wireModel: 'alibaba/qwen3-coder',
           kind,
           userByok: byok ? [{ providerId: byokProviderId, decryptedAPIKey: 'test-key' }] : null,
         });
@@ -275,7 +273,7 @@ describe('upstream model catalog validation', () => {
           expect.objectContaining({
             chatApi: kind,
             body: expect.objectContaining({
-              model: providerId === 'vercel' ? 'alibaba/qwen3-coder' : 'qwen/qwen3-coder',
+              model: 'alibaba/qwen3-coder',
             }),
           })
         );
@@ -290,47 +288,38 @@ describe('upstream model catalog validation', () => {
     ['bytedance-seed/seed-2.0', 'bytedance/seed-2.0'],
     ['openai/gpt-4o', 'override/custom-deployment'],
     ['~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813'],
-    [exclusiveModel.public_id, exclusiveModel.internal_id],
   ])('validates %s before sending Vercel wire ID %s', async (requestedModel, wireModel) => {
     const result = await attempt({ requestedModel, wireModel });
 
     expect(result.type).toBe('success');
-    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
-      [requestedModel === exclusiveModel.public_id ? exclusiveModel.internal_id : requestedModel],
-    ]);
+    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([[requestedModel]]);
     expect(upstreamRequest).toHaveBeenCalledTimes(1);
     expect(upstreamRequest).toHaveBeenCalledWith(
       expect.objectContaining({ body: expect.objectContaining({ model: wireModel }) })
     );
   });
 
-  it('blocks an invalid Vercel canonical ID even when overridden to a valid catalog ID', async () => {
-    const result = await attempt({
-      requestedModel: 'qwen/not-in-catalog',
-      wireModel: 'openai/gpt-4o',
-    });
+  it.each(['openrouter', 'vercel'] as const)(
+    '%s validates a Kilo-exclusive public ID before sending its backing wire ID',
+    async providerId => {
+      const result = await attempt({
+        providerId,
+        requestedModel: exclusiveModel.public_id,
+        wireModel: exclusiveModel.internal_id,
+      });
 
-    expect(result).toEqual({ type: 'invalid-openrouter-model' });
-    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/not-in-catalog']]);
-    expect(upstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('blocks a Kilo-exclusive Vercel model when its backing ID is absent from the catalog', async () => {
-    jest
-      .mocked(isValidOpenRouterModelId)
-      .mockImplementation(async model => model === exclusiveModel.public_id);
-
-    const result = await attempt({
-      requestedModel: exclusiveModel.public_id,
-      wireModel: exclusiveModel.internal_id,
-    });
-
-    expect(result).toEqual({ type: 'invalid-openrouter-model' });
-    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
-      [exclusiveModel.internal_id],
-    ]);
-    expect(upstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(result.type).toBe('success');
+      expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([
+        [exclusiveModel.public_id],
+      ]);
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+      expect(upstreamRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ model: exclusiveModel.internal_id }),
+        })
+      );
+    }
+  );
 
   it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
     'does not validate %s models against the OpenRouter catalog',

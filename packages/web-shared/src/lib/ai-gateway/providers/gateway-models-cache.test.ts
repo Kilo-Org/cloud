@@ -23,6 +23,7 @@ import {
   getSystemOneModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { StoredModel } from '@kilocode/db';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 function storedModel(partial: Partial<StoredModel> & Pick<StoredModel, 'id'>): StoredModel {
   return {
@@ -143,6 +144,16 @@ describe('isValidOpenRouterModelId', () => {
     mockLimit.mockReset();
     mockWarnExceptInTest.mockClear();
   });
+
+  it.each(kiloExclusiveModels.map(model => model.public_id))(
+    'accepts Kilo-exclusive public id %s without consulting the database',
+    async modelId => {
+      const { isValidOpenRouterModelId } = await loadValidator();
+
+      await expect(isValidOpenRouterModelId(modelId)).resolves.toBe(true);
+      expect(mockLimit).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     'anthropic/claude-haiku-4-5',

@@ -1,5 +1,5 @@
 {
-  "id": "7090d4d5-3ee0-44ce-bedd-9e04bee81612",
+  "id": "778f272a-3a02-401e-8ef3-d58346b0e6d6",
   "prevId": "7929e453-5924-4033-98d9-c3a47fd5cb72",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -32823,6 +32773,168 @@
         "security_remediations_status_check": {
           "name": "security_remediations_status_check",
           "value": "\"security_remediations\".\"status\" IN ('queued', 'running', 'pr_opened', 'failed', 'blocked', 'no_changes_needed', 'cancelled')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.service_fee_rollback_refunds": {
+      "name": "service_fee_rollback_refunds",
+      "schema": "",
+      "columns": {
+        "assessment_key": {
+          "name": "assessment_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt": {
+          "name": "attempt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "rejected_attempts": {
+          "name": "rejected_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_refund_id": {
+          "name": "stripe_refund_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by_kilo_user_id": {
+          "name": "requested_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_service_fee_rollback_refunds_stripe_refund_id": {
+          "name": "UQ_service_fee_rollback_refunds_stripe_refund_id",
+          "columns": [
+            {
+              "expression": "stripe_refund_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"service_fee_rollback_refunds\".\"stripe_refund_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_service_fee_rollback_refunds_status": {
+          "name": "IDX_service_fee_rollback_refunds_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "FK_svc_fee_rollback_refunds_assessment": {
+          "name": "FK_svc_fee_rollback_refunds_assessment",
+          "tableFrom": "service_fee_rollback_refunds",
+          "tableTo": "stripe_service_fee_assessments",
+          "columnsFrom": [
+            "assessment_key"
+          ],
+          "columnsTo": [
+            "assessment_key"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "FK_svc_fee_rollback_refunds_requested_by": {
+          "name": "FK_svc_fee_rollback_refunds_requested_by",
+          "tableFrom": "service_fee_rollback_refunds",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "requested_by_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "service_fee_rollback_refunds_status_check": {
+          "name": "service_fee_rollback_refunds_status_check",
+          "value": "\"service_fee_rollback_refunds\".\"status\" IN ('pending', 'succeeded', 'skipped', 'failed')"
+        },
+        "service_fee_rollback_refunds_amounts_check": {
+          "name": "service_fee_rollback_refunds_amounts_check",
+          "value": "\"service_fee_rollback_refunds\".\"amount_minor\" >= 0 AND \"service_fee_rollback_refunds\".\"attempt\" >= 1 AND \"service_fee_rollback_refunds\".\"rejected_attempts\" >= 0"
+        },
+        "service_fee_rollback_refunds_succeeded_check": {
+          "name": "service_fee_rollback_refunds_succeeded_check",
+          "value": "\"service_fee_rollback_refunds\".\"status\" <> 'succeeded' OR \"service_fee_rollback_refunds\".\"stripe_refund_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false

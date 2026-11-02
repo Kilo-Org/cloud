@@ -15,7 +15,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
-import { PolicyPill } from '@/components/organizations/providers-and-models/PolicyPills';
+import {
+  ByokOnlyPriceCell,
+  ByokOnlyTag,
+  PolicyPill,
+} from '@/components/organizations/providers-and-models/PolicyPills';
 import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
 import type {
   ModelRow,
@@ -142,27 +146,37 @@ export function ModelDetailsDialog({
                             <img
                               src={offering.providerIconUrl}
                               alt=""
+                              referrerPolicy="no-referrer"
                               className="h-4 w-4 object-contain"
                             />
                           ) : null}
                         </div>
                         <span>{offering.providerDisplayName}</span>
+                        <ByokOnlyTag value={offering.byokOnly} />
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <DiscountedPrice
-                        price={offering.promptPrice}
-                        originalPrice={offering.originalPromptPrice}
-                        formatPrice={formatPriceCompact}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <DiscountedPrice
-                        price={offering.completionPrice}
-                        originalPrice={offering.originalCompletionPrice}
-                        formatPrice={formatPriceCompact}
-                      />
-                    </TableCell>
+                    {offering.byokOnly ? (
+                      <TableCell colSpan={2}>
+                        <ByokOnlyPriceCell />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <DiscountedPrice
+                            price={offering.promptPrice}
+                            originalPrice={offering.originalPromptPrice}
+                            formatPrice={formatPriceCompact}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <DiscountedPrice
+                            price={offering.completionPrice}
+                            originalPrice={offering.originalCompletionPrice}
+                            formatPrice={formatPriceCompact}
+                          />
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <PolicyPill value={offering.trains} variant="trains" />
                     </TableCell>

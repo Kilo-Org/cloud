@@ -234,7 +234,7 @@ function isDevSentinel(admission: AdmissionPayload): boolean {
  * Perform full async admission verification BEFORE user settlement.
  *
  * Must be called before createOrUpdateUser in the token route so that:
- * - Failed admission under enforce never leaves a settled user.
+ * - Failed admission never leaves a settled user.
  * - Keys are written after the user id exists (via the token route after
  *   successful settlement).
  *
@@ -253,7 +253,10 @@ export type VerifyAdmissionOk = {
   publicKey?: string;
   /** Sign count from the assertion authenticator data — set on assertion only */
   signCount?: number;
-  /** The userId that owns this key (from DB row) — set on assertion only */
+  /**
+   * The userId that owns this key (from DB row) — set when the key id is already
+   * bound to an account (attestation or assertion)
+   */
   existingKeyUserId?: string;
 };
 

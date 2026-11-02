@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   exchangeDoltHubOAuthCode,
@@ -15,6 +16,7 @@ import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
+  organizationAccessDenialErrorCode,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 
@@ -113,7 +115,10 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
     }
 
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      // The organization row stores the shared DoltHub access token, so
+      // installing or replacing it needs the role that governs integrations,
+      // not just membership.
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
@@ -135,6 +140,21 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
+
+    // An organization-role denial is an expected outcome, not an incident.
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.DOLTHUB,
+            state,
+            `error=${denialCode}`
+          ),
+          APP_URL
+        )
+      );
+    }
 
     captureException(error, {
       tags: {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 /**
  * The card's own content beyond the ingest derivation contract: the outcome
@@ -15,6 +16,14 @@ import { z } from 'zod';
  * trimmed to a single short line by the producer. Free-form assistant text
  * never appears here.
  */
+
+/**
+ * The card's status kinds: the shared glanceable vocabulary plus a turn that
+ * failed. The parser (`pushDataSchema`) and the builder (`SessionCardStatusKind`)
+ * both read this one list, so the accepted and the produced kinds cannot drift.
+ */
+export const SESSION_CARD_STATUS_KINDS = [...GLANCEABLE_STATUS_KINDS, 'failed'] as const;
+export type SessionCardStatusKind = (typeof SESSION_CARD_STATUS_KINDS)[number];
 
 /** How a finished session ended, for the outcome line. */
 export const sessionLiveOutcomeKindSchema = z.enum(['pr_opened', 'changes', 'none']);

@@ -52,6 +52,11 @@ type OverviewRow = {
  * Config-derived rows shown on a connected provider's overview screen.
  * Pulled out of platform-overview-screen.tsx purely to keep that file under
  * the repo's max-lines limit — no behavior change.
+ *
+ * Every row names its destination screen with that screen's own title key
+ * (`codeReviewer.style.title`, `codeReviewer.gate.title`, …), so the list
+ * keeps one case convention and the entry point and the header it opens
+ * cannot drift apart in wording or case.
  */
 export function buildOverviewRows({
   data,
@@ -72,13 +77,13 @@ export function buildOverviewRows({
     {
       field: 'style',
       icon: MessageSquareText,
-      title: i18n.t('codeReviewer.overview.reviewStyle'),
+      title: i18n.t('codeReviewer.style.title'),
       subtitle: i18n.t(reviewStyleLabels[data.reviewStyle]),
     },
     {
       field: 'focus-areas',
       icon: ShieldCheck,
-      title: i18n.t('codeReviewer.overview.focusAreas'),
+      title: i18n.t('codeReviewer.focusAreas.title'),
       subtitle:
         data.focusAreas.length > 0
           ? formatList(

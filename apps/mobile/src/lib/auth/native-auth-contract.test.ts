@@ -126,8 +126,6 @@ describe('parseTokenPair', () => {
   });
 });
 
-// --- parseDeviceAuthTokenResponse ---
-
 describe('parseDeviceAuthTokenResponse', () => {
   it('parses an approved response with refresh pair', () => {
     expect(
@@ -222,8 +220,6 @@ describe('buildDeviceAuthPollRequest', () => {
   });
 });
 
-// --- parseEmailCodeResponse ---
-
 describe('parseEmailCodeResponse', () => {
   it('parses success without challengeId (legacy server)', () => {
     expect(parseEmailCodeResponse({ success: true })).toEqual({
@@ -252,8 +248,6 @@ describe('parseEmailCodeResponse', () => {
     expect(parseEmailCodeResponse({ success: true, challengeId: 'not-a-uuid' })).toBeNull();
   });
 });
-
-// --- parseAuthError ---
 
 describe('parseAuthError', () => {
   it('returns the code and ssoOrganizationId for an SSO error', () => {

@@ -6,7 +6,7 @@
 // different one as the field's name. These suites pin the two strings together
 // in the languages that drifted.
 
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -31,6 +31,9 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useFocusEffect: (effect: () => void) => {
+    useEffect(effect, [effect]);
+  },
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

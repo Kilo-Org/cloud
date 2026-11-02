@@ -194,6 +194,11 @@ describe('PR Overview full-body states', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    // The loading body keeps the loaded overview's top edge: one section gap
+    // (17.5 dp) below the tab selector, with the progress band out of flow.
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('px-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
     unmount();
   });
 
@@ -223,6 +228,10 @@ describe('PR Overview full-body states', () => {
           String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
       )
     ).toHaveLength(1);
+    // Same top edge as the loaded and loading bodies.
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('px-4 pb-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
     unmount();
   });
 

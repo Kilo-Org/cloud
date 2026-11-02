@@ -16,12 +16,13 @@ import {
   type SecuritySyncPrecondition,
   securitySyncPreconditionForCode,
 } from '@kilocode/app-shared/security-agent';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 import {
   isOperationInProgress,
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
 } from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { knownServerErrorCopyKey } from '@/lib/server-error-copy';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** A settled `failed` row replayed under the same key: no recovery, fresh key. */
 export const SECURITY_OPERATION_REPLAY_FAILED_MESSAGE =
@@ -192,7 +193,10 @@ function markerKeyFor(error: Error): string | null {
       return 'securityAgent.mutations.serviceUnavailable';
     }
     default: {
-      return null;
+      // The subscription gate and the organization procedures refuse a write
+      // with their own sentence and no ledger marker: a lapsed trial is the
+      // reason the reader needs, not the generic "could not complete" line.
+      return knownServerErrorCopyKey(error);
     }
   }
 }
@@ -297,13 +301,15 @@ function configMutationCopyKeyFor(error: unknown): string | null {
 /**
  * The message a Security Agent config write shows when the server refuses it
  * (the enable toggle and the settings save). A refusal the server marked with a
- * stable code reads the catalog copy that names it; anything else reads the
+ * stable code reads the catalog copy that names it; a rejection carrying one of
+ * the organization sentences the app already explains keeps that reason (the
+ * lapsed-trial gate is the one a settings save hits). Anything else reads the
  * localized generic sentence, because the server's own English explanation
  * cannot be translated on the device. The fallback follows the retry class, as
  * the ledger mapper's does.
  */
 export function securityConfigMutationMessage(error: unknown): string {
-  const copyKey = configMutationCopyKeyFor(error);
+  const copyKey = configMutationCopyKeyFor(error) ?? knownServerErrorCopyKey(error);
   return i18n.t(copyKey ?? fallbackKeyFor(isSecuritySyncRetryable(error)));
 }
 

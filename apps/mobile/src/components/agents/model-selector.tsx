@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -40,6 +41,8 @@ type ModelSelectorProps = {
   value: string;
   variant: string;
   options: (ModelOption | SessionModelOption)[];
+  /** Whether this chip's `onSelect` stores the picked thinking effort. */
+  acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoading?: boolean;
@@ -99,16 +102,26 @@ export function openModelPicker(
     options: (ModelOption | SessionModelOption)[];
     value: string;
     variant: string;
+    /** Whether the caller stores the picked thinking effort; see `ModelPickerBridge`. */
+    acceptsVariant: boolean;
     onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
     selectionScope?: ModelPickerSelectionScopeContextValue;
   }
 ) {
-  const { options, value, variant, onSelect, selectionScope = UNFENCED_SELECTION_CONTEXT } = params;
+  const {
+    options,
+    value,
+    variant,
+    acceptsVariant,
+    onSelect,
+    selectionScope = UNFENCED_SELECTION_CONTEXT,
+  } = params;
   const routeKey = selectionScope.selectionScope.sessionId;
   modelPickerSlot.set(routeKey, {
     options: options.map(option => toSessionModelOption(option)),
     currentValue: value,
     currentVariant: variant,
+    acceptsVariant,
     selectionScope: selectionScope.selectionScope,
     isSelectionCurrent: selectionScope.isSelectionCurrent,
     onSelect: selection => {
@@ -128,6 +141,7 @@ export function ModelSelector({
   value,
   variant,
   options,
+  acceptsVariant,
   onSelect,
   disabled = false,
   isLoading = false,
@@ -198,6 +212,7 @@ export function ModelSelector({
       options: pickerOptions,
       value,
       variant,
+      acceptsVariant,
       onSelect,
       selectionScope: selectionContext,
     });
@@ -207,6 +222,9 @@ export function ModelSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
+      // The chip's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
@@ -250,6 +268,7 @@ export function ModelPickerOptionRow({
   option,
   selected,
   selectedVariant,
+  acceptsVariant,
   isFavorite,
   showProvider,
   onSelectModel,
@@ -259,6 +278,12 @@ export function ModelPickerOptionRow({
   option: SessionModelOption;
   selected: boolean;
   selectedVariant: string;
+  /**
+   * Whether the picker's caller keeps a picked effort. When it does not, the
+   * row renders no effort chips: a chip here would close the sheet and drop the
+   * choice, because the caller stores only the model id.
+   */
+  acceptsVariant: boolean;
   isFavorite: boolean;
   /**
    * Whether the row shows its provider line. The list turns it off inside a
@@ -406,7 +431,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
       </View>
-      {selected && option.variants.length > 1 ? (
+      {acceptsVariant && selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('agentChat.modelSelector.thinkingEffort')}

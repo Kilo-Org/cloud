@@ -6,7 +6,7 @@
 // only after the draft already carries the config's values, so the first body
 // frame is the settled one.
 
-import { type ComponentType, createElement, type ReactNode } from 'react';
+import { type ComponentType, createElement, type ReactNode, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,6 +68,9 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
   useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useFocusEffect: (effect: () => void) => {
+    useEffect(effect, [effect]);
+  },
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

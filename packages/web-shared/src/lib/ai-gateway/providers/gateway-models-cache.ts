@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
@@ -133,30 +134,6 @@ export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<Readon
   new Set<string>(),
   { name: 'openRouterSystemOneModelIds' }
 );
-
-// Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
-const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
-  'anthropic/claude-haiku-4-5',
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-sonnet-4-6',
-  'anthropic/claude-sonnet-5-20260630',
-  'claude-sonnet-4.5',
-  'claude-sonnet-5',
-  'deepseek-v4-flash',
-  'deepseek-v4-flash-0731',
-  'deepseek-v4-pro',
-  'gemini-2.5-flash-lite',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gpt-5.4',
-  'gpt-5.4-mini',
-  'gpt-5.5',
-  'gpt-5.6-luna',
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'minimax-m3',
-  'minimax/minimax-m2.5-20260211',
-]);
 
 // The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
 // empty snapshot reports an outage once per window instead of once per validated model id.

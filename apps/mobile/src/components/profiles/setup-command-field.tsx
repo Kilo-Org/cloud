@@ -8,6 +8,8 @@ import {
 } from '@/components/profiles/profile-commands-model';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 
 type SetupCommandFieldProps = Readonly<{
@@ -17,6 +19,9 @@ type SetupCommandFieldProps = Readonly<{
   label: string;
   /** Controls that belong to this command's own row, at the end of its label line. */
   trailing?: ReactNode;
+  /** The viewer cannot manage this row: render the command as read-only text. */
+  readOnly?: boolean;
+  /** The row is busy, not unmanageable: the field stays a field, dimmed. */
   disabled?: boolean;
   accessibilityHint?: string;
   onChangeText: (next: string) => void;
@@ -25,19 +30,28 @@ type SetupCommandFieldProps = Readonly<{
 }>;
 
 /**
- * One setup-command text field with the server's per-command bound made
- * visible. The native input clips a longer value (a paste) at
- * `MAX_SETUP_COMMAND_LENGTH` before the change reaches JS, so the field cannot
- * tell a cut from a command that legitimately reaches the bound, and it does
- * not claim one: an ordinary row says nothing, a command within
+ * One setup-command row. A manager gets the text field with the server's
+ * per-command bound made visible: the native input clips a longer value (a
+ * paste) at `MAX_SETUP_COMMAND_LENGTH` before the change reaches JS, so the
+ * field cannot tell a cut from a command that legitimately reaches the bound,
+ * and it does not claim one — an ordinary row says nothing, a command within
  * `COMMAND_COUNTER_VISIBLE_REMAINING` of the bound counts the room left, and a
  * command at the bound states what the bound is. The two states never render
  * together: at the bound the count is zero, which the sentence already says.
+ *
+ * A viewer without manage rights reads the command instead of editing it. A
+ * setup command is written to be run and a single line of it is rarely the
+ * whole command, so the value renders through `SelectableText`, the app's
+ * read-only text surface: it wraps at full length, grows to its content, and
+ * carries the same label and accessible name the field has. It keeps the
+ * field's box so the row reads the same in both roles, without the muted
+ * disabled treatment a dead input had.
  */
 export function SetupCommandField({
   command,
   label,
   trailing,
+  readOnly = false,
   disabled = false,
   accessibilityHint,
   onChangeText,
@@ -45,6 +59,24 @@ export function SetupCommandField({
   onSubmitEditing,
 }: Readonly<SetupCommandFieldProps>) {
   const { t } = useTranslation();
+
+  if (readOnly) {
+    return (
+      <View className="gap-1.5">
+        <FormFieldLabel label={label} labelAccessory={trailing} />
+        <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+          <SelectableText
+            accessibilityLabel={label}
+            accessibilityHint={accessibilityHint}
+            className="text-sm leading-[1.25rem] text-foreground"
+          >
+            {command}
+          </SelectableText>
+        </View>
+      </View>
+    );
+  }
+
   const remaining = MAX_SETUP_COMMAND_LENGTH - command.length;
   // One line at a time: the room left while there is room, the bound once there
   // is none. At zero the count would only restate the sentence below it.

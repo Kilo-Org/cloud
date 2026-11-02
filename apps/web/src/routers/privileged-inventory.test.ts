@@ -389,7 +389,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
           if (!excluded.has(relative)) files.add(relative);
         } else if (
           file.endsWith('.tsx') &&
-          fs.readFileSync(file, 'utf8').includes("'use server'")
+          !fs.readFileSync(file, 'utf8').includes("'use client'")
         ) {
           files.add(path.relative(REPO_ROOT, file));
         }

@@ -80,10 +80,21 @@ function ContextPickerSheetBody({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const cancelLabel = options[cancelButtonIndex] ?? '';
+  // Divider between rows only: the rule that closes the list belongs to the
+  // action area below, not to the last row.
+  let lastRowIndex = -1;
+  for (const [index] of options.entries()) {
+    if (index !== cancelButtonIndex) {
+      lastRowIndex = index;
+    }
+  }
 
   return (
     <Sheet visible onClose={onClose}>
-      <View style={{ paddingBottom: insets.bottom + 12 }}>
+      {/* The sheet's own content stops at the safe area: the dismiss row is the
+          last thing it draws, so nothing is left below it but the platform's
+          navigation bar. */}
+      <View style={{ paddingBottom: insets.bottom }}>
         <Text
           accessibilityRole="header"
           className="px-3 py-3 text-center text-sm font-semibold text-muted-foreground"
@@ -105,7 +116,7 @@ function ContextPickerSheetBody({
                 className={cn(
                   ROW_TARGET_CLASS,
                   'flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
-                  index < cancelButtonIndex && 'border-b-[0.5px] border-hair-soft'
+                  index !== lastRowIndex && 'border-b-[0.5px] border-hair-soft'
                 )}
                 onPress={() => {
                   onSelect(index);
@@ -129,19 +140,25 @@ function ContextPickerSheetBody({
             );
           })}
         </ScrollView>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={cancelLabel}
-          className={cn(
-            ROW_TARGET_CLASS,
-            'mt-1 items-center justify-center px-4 py-3 active:bg-secondary'
-          )}
-          onPress={() => {
-            onSelect(cancelButtonIndex);
-          }}
-        >
-          <Text className="text-sm font-medium text-foreground">{cancelLabel}</Text>
-        </Pressable>
+        {/* The dismiss row is an action, not the next account: a full rule
+            closes the scrolling list where the rows stop, and the row's own
+            section padding keeps it off that rule. Without the rule a row the
+            list cuts at that edge read as if the sheet continued into Cancel. */}
+        <View className="border-t border-border">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={cancelLabel}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'items-center justify-center px-4 py-3 active:bg-secondary'
+            )}
+            onPress={() => {
+              onSelect(cancelButtonIndex);
+            }}
+          >
+            <Text className="text-sm font-medium text-foreground">{cancelLabel}</Text>
+          </Pressable>
+        </View>
       </View>
     </Sheet>
   );

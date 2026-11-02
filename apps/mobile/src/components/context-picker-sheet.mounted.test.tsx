@@ -122,7 +122,7 @@ describe('ContextPickerSheet', () => {
     expect(renderer.root.findAll(accountRow)).toHaveLength(0);
   });
 
-  it('draws a divider on every account row and the check on the current one', async () => {
+  it('rules off the action row instead of the last account row', async () => {
     const renderer = await mount();
 
     expect(renderer.root.findByProps({ accessibilityRole: 'header' }).children).toContain(
@@ -130,14 +130,18 @@ describe('ContextPickerSheet', () => {
     );
     expect(rows(renderer)).toEqual([
       { label: 'Personal', selected: false, divider: true, check: false, gutter: true },
-      { label: 'Acme Corp', selected: true, divider: true, check: true, gutter: true },
+      { label: 'Acme Corp', selected: true, divider: false, check: true, gutter: true },
     ]);
-    // Cancel is the ordinary button below them: no selected state, no check.
+    // Cancel is the ordinary button below them: no selected state, no check. A
+    // full rule closes the list above it, so it reads as an action rather than
+    // the next account, and the sheet's content stops at the safe area.
     const cancel = renderer.root.find(
       node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
     );
     expect(cancel.props.accessibilityRole).toBe('button');
     expect(cancel.props.accessibilityState).toBeUndefined();
+    expect(String(cancel.parent?.props.className)).toContain('border-t');
+    expect(cancel.parent?.parent?.props.style).toEqual({ paddingBottom: 24 });
   });
 
   it('checks nothing when the stored account is not in the list', async () => {

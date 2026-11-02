@@ -1614,6 +1614,8 @@
       "set": "ठरवलेले",
       "notSet": "ठरवलेले नाही",
       "nSelected": "{{displayCount}} निवडले",
+      "nSelected_one": "{{displayCount}} निवडले",
+      "nSelected_other": "{{displayCount}} निवडले",
       "proposedReviewMdGuidance": "प्रस्तावित REVIEW.md मार्गदर्शन"
     },
     "decision": {

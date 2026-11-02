@@ -1680,6 +1680,11 @@
       "set": "Issettjat",
       "notSet": "Mhux issettjat",
       "nSelected": "{{displayCount}} magħżula",
+      "nSelected_one": "{{displayCount}} magħżula",
+      "nSelected_other": "{{displayCount}} magħżula",
+      "nSelected_few": "{{displayCount}} magħżula",
+      "nSelected_many": "{{displayCount}} magħżula",
+      "nSelected_two": "{{displayCount}} magħżula",
       "proposedReviewMdGuidance": "Linji gwida proposti għal REVIEW.md"
     },
     "decision": {

@@ -1614,6 +1614,8 @@
       "set": "Definido",
       "notSet": "Non definido",
       "nSelected": "{{displayCount}} seleccionados",
+      "nSelected_one": "{{displayCount}} seleccionados",
+      "nSelected_other": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Pautas propostas para REVIEW.md"
     },
     "decision": {

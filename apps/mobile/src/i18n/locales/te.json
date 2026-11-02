@@ -1614,6 +1614,8 @@
       "set": "సెట్ చేయబడింది",
       "notSet": "సెట్ చేయబడలేదు",
       "nSelected": "{{displayCount}} ఎంచుకున్నారు",
+      "nSelected_one": "{{displayCount}} ఎంచుకున్నారు",
+      "nSelected_other": "{{displayCount}} ఎంచుకున్నారు",
       "proposedReviewMdGuidance": "REVIEW.md కోసం ప్రతిపాదించిన మార్గదర్శకాలు"
     },
     "decision": {

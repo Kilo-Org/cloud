@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Alle Bereiche",
       "nSelected": "{{displayCount}} ausgewählt",
+      "nSelected_one": "{{displayCount}} ausgewählt",
+      "nSelected_other": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"

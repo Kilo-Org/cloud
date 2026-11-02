@@ -1614,6 +1614,8 @@
       "set": "ಹೊಂದಿಸಲಾಗಿದೆ",
       "notSet": "ಹೊಂದಿಸಲಾಗಿಲ್ಲ",
       "nSelected": "{{displayCount}} ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+      "nSelected_one": "{{displayCount}} ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+      "nSelected_other": "{{displayCount}} ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "proposedReviewMdGuidance": "ಪ್ರಸ್ತಾಪಿಸಲಾದ REVIEW.md ಮಾರ್ಗದರ್ಶನ"
     },
     "decision": {

@@ -1614,6 +1614,8 @@
       "set": "Έχει οριστεί",
       "notSet": "Δεν έχει οριστεί",
       "nSelected": "Επιλεγμένα: {{displayCount}}",
+      "nSelected_one": "Επιλεγμένα: {{displayCount}}",
+      "nSelected_other": "Επιλεγμένα: {{displayCount}}",
       "proposedReviewMdGuidance": "Προτεινόμενες οδηγίες για το REVIEW.md"
     },
     "decision": {

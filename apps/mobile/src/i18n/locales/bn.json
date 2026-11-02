@@ -1614,6 +1614,8 @@
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_one": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_other": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {

@@ -1614,6 +1614,8 @@
       "set": "Kusethiwe",
       "notSet": "Akukho okusethiwe",
       "nSelected": "Kukhethwe: {{displayCount}}",
+      "nSelected_one": "Kukhethwe: {{displayCount}}",
+      "nSelected_other": "Kukhethwe: {{displayCount}}",
       "proposedReviewMdGuidance": "Imihlahlandlela ephakanyisiwe ye-REVIEW.md"
     },
     "decision": {

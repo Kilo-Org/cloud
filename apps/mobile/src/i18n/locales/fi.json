@@ -1614,6 +1614,8 @@
       "set": "Määritetty",
       "notSet": "Ei määritetty",
       "nSelected": "Valittu: {{displayCount}}",
+      "nSelected_one": "Valittu: {{displayCount}}",
+      "nSelected_other": "Valittu: {{displayCount}}",
       "proposedReviewMdGuidance": "Ehdotetut REVIEW.md-ohjeet"
     },
     "decision": {

@@ -1090,6 +1090,10 @@
     "overview": {
       "allAreas": "Wszystkie obszary",
       "nSelected": "Wybrano: {{displayCount}}",
+      "nSelected_one": "Wybrano: {{displayCount}}",
+      "nSelected_other": "Wybrano: {{displayCount}}",
+      "nSelected_few": "Wybrano: {{displayCount}}",
+      "nSelected_many": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",
       "set": "Ustawiono",
       "notSet": "Nie ustawiono"

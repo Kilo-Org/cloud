@@ -1614,6 +1614,8 @@
       "set": "Angivet",
       "notSet": "Ej angivet",
       "nSelected": "Valda: {{displayCount}}",
+      "nSelected_one": "Valda: {{displayCount}}",
+      "nSelected_other": "Valda: {{displayCount}}",
       "proposedReviewMdGuidance": "Föreslagna riktlinjer för REVIEW.md"
     },
     "decision": {

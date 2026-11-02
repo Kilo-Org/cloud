@@ -1636,6 +1636,9 @@
       "set": "Postavljeno",
       "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
+      "nSelected_one": "{{displayCount}} odabrano",
+      "nSelected_other": "{{displayCount}} odabrano",
+      "nSelected_few": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },
     "decision": {

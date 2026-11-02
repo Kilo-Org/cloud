@@ -1614,6 +1614,8 @@
       "set": "Beállítva",
       "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
+      "nSelected_one": "{{displayCount}} kijelölve",
+      "nSelected_other": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
     "decision": {

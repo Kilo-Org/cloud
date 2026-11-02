@@ -1614,6 +1614,8 @@
       "set": "Ingestel",
       "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
+      "nSelected_one": "{{displayCount}} gekies",
+      "nSelected_other": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
     "decision": {

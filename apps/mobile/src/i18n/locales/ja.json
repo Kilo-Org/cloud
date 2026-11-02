@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "すべての領域",
       "nSelected": "{{displayCount}}件選択中",
+      "nSelected_one": "{{displayCount}}件選択中",
+      "nSelected_other": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "set": "設定済み",
       "notSet": "未設定"

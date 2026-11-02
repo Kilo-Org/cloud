@@ -1614,6 +1614,8 @@
       "set": "مقرر ہے",
       "notSet": "مقرر نہیں",
       "nSelected": "{{displayCount}} منتخب",
+      "nSelected_one": "{{displayCount}} منتخب",
+      "nSelected_other": "{{displayCount}} منتخب",
       "proposedReviewMdGuidance": "REVIEW.md کے لیے تجویز کردہ ہدایات"
     },
     "decision": {

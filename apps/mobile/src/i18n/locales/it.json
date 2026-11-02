@@ -1054,6 +1054,9 @@
     "overview": {
       "allAreas": "Tutte le aree",
       "nSelected": "Selezionati: {{displayCount}}",
+      "nSelected_one": "Selezionati: {{displayCount}}",
+      "nSelected_other": "Selezionati: {{displayCount}}",
+      "nSelected_many": "Selezionati: {{displayCount}}",
       "proposedReviewMdGuidance": "Indicazioni proposte per REVIEW.md",
       "set": "Configurato",
       "notSet": "Non configurato"

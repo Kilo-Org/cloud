@@ -1614,6 +1614,8 @@
       "set": "Stillt",
       "notSet": "Ekki stillt",
       "nSelected": "Valið: {{displayCount}}",
+      "nSelected_one": "Valið: {{displayCount}}",
+      "nSelected_other": "Valið: {{displayCount}}",
       "proposedReviewMdGuidance": "Tillögur að leiðbeiningum í REVIEW.md"
     },
     "decision": {

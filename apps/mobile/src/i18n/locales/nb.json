@@ -1614,6 +1614,8 @@
       "set": "Angitt",
       "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {

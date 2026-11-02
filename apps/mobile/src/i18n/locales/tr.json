@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Tüm alanlar",
       "nSelected": "{{displayCount}} seçili",
+      "nSelected_one": "{{displayCount}} seçili",
+      "nSelected_other": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "set": "Belirlendi",
       "notSet": "Belirlenmedi"

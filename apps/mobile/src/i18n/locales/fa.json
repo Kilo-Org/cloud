@@ -1614,6 +1614,8 @@
       "set": "تنظیم‌شده",
       "notSet": "تنظیم‌نشده",
       "nSelected": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_one": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_other": "{{displayCount}} مورد انتخاب‌شده",
       "proposedReviewMdGuidance": "دستورالعمل‌های پیشنهادی برای REVIEW.md"
     },
     "decision": {

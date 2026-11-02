@@ -1614,6 +1614,8 @@
       "set": "បានកំណត់",
       "notSet": "មិនបានកំណត់",
       "nSelected": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_one": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_other": "បានជ្រើសរើស {{displayCount}}",
       "proposedReviewMdGuidance": "ការណែនាំ REVIEW.md ដែលបានស្នើ"
     },
     "decision": {

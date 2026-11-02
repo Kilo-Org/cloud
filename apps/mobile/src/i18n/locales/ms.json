@@ -1614,6 +1614,8 @@
       "set": "Ditetapkan",
       "notSet": "Tidak ditetapkan",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },
     "decision": {

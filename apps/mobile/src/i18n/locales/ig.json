@@ -1614,6 +1614,8 @@
       "set": "E debere",
       "notSet": "E debeghị",
       "nSelected": "A họrọla {{displayCount}}",
+      "nSelected_one": "A họrọla {{displayCount}}",
+      "nSelected_other": "A họrọla {{displayCount}}",
       "proposedReviewMdGuidance": "Nduzi REVIEW.md atụrụ aro"
     },
     "decision": {

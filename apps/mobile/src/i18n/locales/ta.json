@@ -1614,6 +1614,8 @@
       "set": "அமைக்கப்பட்டது",
       "notSet": "அமைக்கப்படவில்லை",
       "nSelected": "தேர்ந்தெடுத்தவை: {{displayCount}}",
+      "nSelected_one": "தேர்ந்தெடுத்தவை: {{displayCount}}",
+      "nSelected_other": "தேர்ந்தெடுத்தவை: {{displayCount}}",
       "proposedReviewMdGuidance": "முன்மொழியப்பட்ட REVIEW.md வழிகாட்டுதல்"
     },
     "decision": {

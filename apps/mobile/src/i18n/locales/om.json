@@ -1614,6 +1614,8 @@
       "set": "Qindaa'e",
       "notSet": "Hin qindaa'e",
       "nSelected": "{{displayCount}} filatamaniiru",
+      "nSelected_one": "{{displayCount}} filatamaniiru",
+      "nSelected_other": "{{displayCount}} filatamaniiru",
       "proposedReviewMdGuidance": "Qajeelfama REVIEW.md dhihaate"
     },
     "decision": {

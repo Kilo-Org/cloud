@@ -1614,6 +1614,8 @@
       "set": "Konfigire",
       "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
+      "nSelected_one": "{{displayCount}} chwazi",
+      "nSelected_other": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
     "decision": {

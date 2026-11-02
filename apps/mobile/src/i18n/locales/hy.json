@@ -1614,6 +1614,8 @@
       "set": "Սահմանված է",
       "notSet": "Սահմանված չէ",
       "nSelected": "Ընտրված է {{displayCount}}",
+      "nSelected_one": "Ընտրված է {{displayCount}}",
+      "nSelected_other": "Ընտրված է {{displayCount}}",
       "proposedReviewMdGuidance": "Առաջարկվող հրահանգներ REVIEW.md-ի համար"
     },
     "decision": {

@@ -1614,6 +1614,8 @@
       "set": "Ezarrita",
       "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
+      "nSelected_one": "{{displayCount}} hautatuta",
+      "nSelected_other": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },
     "decision": {

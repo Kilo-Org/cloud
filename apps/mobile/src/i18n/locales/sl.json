@@ -1658,6 +1658,10 @@
       "set": "Nastavljeno",
       "notSet": "Ni nastavljeno",
       "nSelected": "Izbrano {{displayCount}}",
+      "nSelected_one": "Izbrano {{displayCount}}",
+      "nSelected_other": "Izbrano {{displayCount}}",
+      "nSelected_few": "Izbrano {{displayCount}}",
+      "nSelected_two": "Izbrano {{displayCount}}",
       "proposedReviewMdGuidance": "Predlagane smernice za REVIEW.md"
     },
     "decision": {

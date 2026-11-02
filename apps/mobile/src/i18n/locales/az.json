@@ -1614,6 +1614,8 @@
       "set": "Təyin edilib",
       "notSet": "Təyin edilməyib",
       "nSelected": "{{displayCount}} seçilib",
+      "nSelected_one": "{{displayCount}} seçilib",
+      "nSelected_other": "{{displayCount}} seçilib",
       "proposedReviewMdGuidance": "REVIEW.md üçün təklif olunan təlimatlar"
     },
     "decision": {

@@ -10,6 +10,7 @@ import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
 import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';
+import { SupportAccessBanner } from './SupportAccessBanner';
 
 export async function OrganizationByPageLayout({
   params,
@@ -62,6 +63,7 @@ export async function OrganizationByPageLayout({
         : user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
+      {access.kind === 'support' && <SupportAccessBanner access={access} />}
       {render({ role, organization, isGlobalAdmin: user.is_admin && !isSupport })}
     </OrganizationTrialWrapper>
   );

@@ -95,6 +95,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Building2 />,
   },
   {
+    title: () => 'Support access',
+    url: '/admin/support-access',
+    icon: () => <KeyRound />,
+  },
+  {
     title: () => 'Trial Organizations',
     url: '/admin/organizations/trials',
     icon: () => <Clock />,

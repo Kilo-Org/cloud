@@ -253,6 +253,7 @@ describe('sessionAuthOptions', () => {
 
     const browserSession = await authOptions.callbacks!.session!({ session, token } as never);
     expect(browserSession).not.toHaveProperty('webSessionId');
+    expect(browserSession).not.toHaveProperty('webSessionPepper');
   });
 });
 

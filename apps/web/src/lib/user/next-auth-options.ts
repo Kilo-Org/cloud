@@ -779,6 +779,8 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
   profile: parseOpenAiProfile,
 };
 
+const serverSessionCallback = sessionAuthOptions.callbacks?.session;
+
 export const authOptions: NextAuthOptions = {
   ...sessionAuthOptions,
   cookies: {
@@ -962,18 +964,27 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     ...sessionAuthOptions.callbacks,
-    // `webSessionId` is the server-side binding for MFA step-up proofs. Server
-    // reads use `sessionAuthOptions` and see it; the browser-facing
-    // `/api/auth/session` response must never expose it.
+    // `webSessionId` and `webSessionPepper` are server-side bindings for MFA
+    // step-up proofs and session revocation. Server reads use
+    // `sessionAuthOptions` and see them; the browser-facing
+    // `/api/auth/session` response must expose neither.
     async session({ session, token, user, trigger, newSession }) {
-      const result = await sessionAuthOptions.callbacks!.session!({
+      if (!serverSessionCallback) return session;
+      const result = await serverSessionCallback({
         session,
         token,
         user,
         trigger,
         newSession,
       });
-      if (result) delete (result as { webSessionId?: string }).webSessionId;
+      if (result) {
+        const browserSession = result as {
+          webSessionId?: string;
+          webSessionPepper?: string | null;
+        };
+        delete browserSession.webSessionId;
+        delete browserSession.webSessionPepper;
+      }
       return result;
     },
     // NOTE(bmc): Errors thrown from this function have their messages sent to the client.

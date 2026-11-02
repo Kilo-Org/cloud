@@ -11892,7 +11892,7 @@ export const support_access_grant_events = pgTable(
       .notNull(),
     grant_id: uuid()
       .notNull()
-      .references(() => support_access_grants.id, { onDelete: 'cascade' }),
+      .references(() => support_access_grants.id, { onDelete: 'restrict' }),
     event_type: text().$type<SupportAccessGrantEventType>().notNull(),
     performed_by_kilo_user_id: text().references(() => kilocode_users.id),
     organization_id: uuid().notNull(),

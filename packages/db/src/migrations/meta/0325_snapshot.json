@@ -1,5 +1,5 @@
 {
-  "id": "9da57609-7388-49c8-af22-3de2f02778ef",
+  "id": "88cd04d7-a606-4371-8e93-d3a575c7bdb4",
   "prevId": "704d1452-61a4-44cb-914a-07bd75ae0e34",
   "version": "7",
   "dialect": "postgresql",
@@ -36031,7 +36031,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "support_access_grant_events_performed_by_kilo_user_id_kilocode_users_id_fk": {

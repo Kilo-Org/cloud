@@ -63,7 +63,7 @@ CREATE TABLE "support_access_grants" (
 );
 --> statement-breakpoint
 ALTER TABLE "kilocode_users" ADD COLUMN "can_request_support_org_access" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "support_access_grant_events" ADD CONSTRAINT "support_access_grant_events_grant_id_support_access_grants_id_fk" FOREIGN KEY ("grant_id") REFERENCES "public"."support_access_grants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_access_grant_events" ADD CONSTRAINT "support_access_grant_events_grant_id_support_access_grants_id_fk" FOREIGN KEY ("grant_id") REFERENCES "public"."support_access_grants"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_access_grant_events" ADD CONSTRAINT "support_access_grant_events_performed_by_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("performed_by_kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_access_grants" ADD CONSTRAINT "support_access_grants_actor_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("actor_kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_access_grants" ADD CONSTRAINT "support_access_grants_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

@@ -40,17 +40,15 @@ import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
-  addKept,
   askedIn,
-  dropKept,
   forgetAsked,
   keptIn,
-  markKept,
   migrateAsked,
   moveQuestions,
   newKeptId,
   rememberAsked,
   rememberFirstQuestion,
+  replaceKept,
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -101,9 +99,17 @@ type ChatContext = ManagedRuntime.ManagedRuntime.Services<ChatRuntime>;
  */
 type Waiting = Question & ChatTarget;
 
-/** What the screen draws of the line: the questions, without the models they go to. */
+/**
+ * What the screen draws of the line: the questions, without the models they go
+ * to. A question asked again keeps the record it came from, so its bubble stays
+ * the one already in the transcript rather than a second copy at the bottom.
+ */
 const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
-  waiting.map(one => ({ text: one.text, images: one.images }));
+  waiting.map(one => ({
+    text: one.text,
+    images: one.images,
+    ...(one.from == null ? {} : { from: one.from }),
+  }));
 
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
@@ -595,7 +601,7 @@ async function keepAsked(sessionId: string): Promise<void> {
       askedFrom: null,
     });
     try {
-      await markKept(sessionId, askedFrom, outcome);
+      await replaceKept(sessionId, snapshotOf(sessionId).displaced);
     } catch {
       /* The bubble keeps the ending it had; a refused write costs a restart. */
     }
@@ -623,7 +629,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedFrom: null,
   });
   try {
-    await addKept(sessionId, stored);
+    await replaceKept(sessionId, snapshotOf(sessionId).displaced);
   } catch {
     /* The bubble is on screen with its Retry and its words are in this chat for
        the session; a restart is what a refused write costs. */
@@ -938,6 +944,37 @@ function why(cause: Cause.Cause<unknown>): string {
 }
 
 /**
+ * The kept questions left once the answer to one of them is a stored turn.
+ *
+ * The question that was answered leaves, and the ones said after it move one
+ * turn down: the answer is the newest turn, and a question said after the one it
+ * answers has to stay under it rather than reading above it.
+ */
+function withoutAnswered(
+  kept: readonly Displaced[],
+  answeredFrom: string | null
+): readonly Displaced[] {
+  if (answeredFrom === null) {
+    return kept;
+  }
+  const answeredIndex = kept.findIndex(one => one.id === answeredFrom);
+  const answered = kept[answeredIndex];
+  if (answered === undefined) {
+    return kept;
+  }
+  return kept.flatMap((one, index) => {
+    if (index === answeredIndex) {
+      return [];
+    }
+    return [
+      index > answeredIndex && one.afterTurns >= answered.afterTurns
+        ? { ...one, afterTurns: one.afterTurns + 1 }
+        : one,
+    ];
+  });
+}
+
+/**
  * What is true once an answer has ended. A failure carries a reason for the log
  * and the key of the fixed copy the screen shows.
  *
@@ -961,15 +998,17 @@ async function settle(
      is now a stored turn, so its kept bubble goes rather than standing beside
      the answer as a failure that never happened. A failed attempt keeps it, and
      that bubble is where the failure is shown. */
-  const heldFrom = snapshotOf(sessionId).askedFrom;
-  const answeredFrom = failed === null ? heldFrom : null;
+  const held = snapshotOf(sessionId);
+  const answeredFrom = failed === null ? held.askedFrom : null;
+  const kept = withoutAnswered(held.displaced, answeredFrom);
   if (failed === null) {
     await forgetAsked(sessionId);
-    if (answeredFrom !== null) {
+    if (kept !== held.displaced) {
       try {
-        await dropKept(sessionId, [answeredFrom]);
+        await replaceKept(sessionId, kept);
       } catch {
-        /* The state below still drops it, and the next write replaces the list. */
+        /* The state below still drops it, and the next write of the list carries
+           it out; a restart before then draws the bubble again. */
       }
     }
   }
@@ -978,14 +1017,11 @@ async function settle(
     turns,
     answering: [],
     status: 'idle',
-    asked: failed === null ? null : snapshotOf(sessionId).asked,
-    askedImages: failed === null ? [] : snapshotOf(sessionId).askedImages,
-    askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
-    askedFrom: failed === null ? null : snapshotOf(sessionId).askedFrom,
-    displaced:
-      answeredFrom === null
-        ? snapshotOf(sessionId).displaced
-        : snapshotOf(sessionId).displaced.filter(one => one.id !== answeredFrom),
+    asked: failed === null ? null : held.asked,
+    askedImages: failed === null ? [] : held.askedImages,
+    askedModel: failed === null ? null : held.askedModel,
+    askedFrom: failed === null ? null : held.askedFrom,
+    displaced: kept,
     failed,
     failureKey: failure?.key ?? null,
   });

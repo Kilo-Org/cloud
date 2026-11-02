@@ -265,12 +265,17 @@ export function asMessages(input: {
     });
   }
   for (const [index, question] of input.waiting.entries()) {
-    drawn.push(
-      questionMessage(
-        { id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId },
-        question
-      )
-    );
+    /* A question waiting to be asked again is already in the transcript: a
+       second bubble under it would say the same thing twice. */
+    const alreadyDrawn = question.from != null && heldKept.has(question.from);
+    if (!alreadyDrawn) {
+      drawn.push(
+        questionMessage(
+          { id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId },
+          question
+        )
+      );
+    }
   }
   return drawn;
 }

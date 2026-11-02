@@ -1145,6 +1145,63 @@ describe('a question a later send took the slot from', () => {
     expect(asked.map(one => one.text)).toEqual(['first']);
   });
 
+  it('is queued once when its Retry is pressed twice while another answer arrives', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving, so the retry waits behind it rather than asking now.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    // The second press finds the question already in the line.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(waitingWords(opened)).toEqual(['first']);
+  });
+
+  it('keeps a question said after it under its answer once it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    await retryChat(opened, first);
+    await settled();
+    // The answer to the question asked again is a turn the store holds.
+    storedHistory = [TURN];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* The answer is the newest turn, and the question said after the one it
+       answers moved one turn down rather than reading above it. */
+    expect(held.displaced.map(one => [one.text, one.afterTurns])).toEqual([['second', 1]]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      TURN.id,
+      `${held.sessionId}:displaced:${held.displaced[0]?.id ?? ''}`,
+    ]);
+    // The list is written as it is drawn, so a reopen keeps the order.
+    const written = await keptIn(held.sessionId);
+    expect(written.map(one => one.afterTurns)).toEqual([1]);
+  });
+
   it('is still named for the question that opened the chat after it is asked again', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });

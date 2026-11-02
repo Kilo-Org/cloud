@@ -7,17 +7,33 @@ import { askedMessageId, displacedMessageId } from '@/lib/chat/turns';
 
 /**
  * The bubble the slot's question is drawn as: its own, or the kept one it asks
- * again, which is drawn at the place it was said.
+ * again, which is drawn at the place it was said. A slot that names a kept
+ * question the transcript no longer holds falls back to its own bubble, which is
+ * where the transcript builder drew it.
  */
 function slotBubbleId(
-  state: Pick<ChatState, 'sessionId' | 'status' | 'asked' | 'askedFrom'>
+  state: Pick<ChatState, 'sessionId' | 'status' | 'asked' | 'askedFrom' | 'displaced'>
 ): string | undefined {
   if (state.status !== 'idle' || state.asked === null) {
     return undefined;
   }
-  return state.askedFrom === null
-    ? askedMessageId(state.sessionId)
-    : displacedMessageId(state.sessionId, state.askedFrom);
+  const from = state.askedFrom;
+  if (from === null || !state.displaced.some(one => one.id === from)) {
+    return askedMessageId(state.sessionId);
+  }
+  return displacedMessageId(state.sessionId, from);
+}
+
+/**
+ * The kept questions that are on their way to being asked: the one in the slot,
+ * and the ones waiting in the line. Their bubbles carry no recovery while they
+ * are the attempt rather than a failure under it.
+ */
+function onTheirWay(state: Pick<ChatState, 'askedFrom' | 'waiting'>): ReadonlySet<string> {
+  return new Set([
+    ...(state.askedFrom === null ? [] : [state.askedFrom]),
+    ...state.waiting.flatMap(one => (one.from == null ? [] : [one.from])),
+  ]);
 }
 
 /** What a bubble of a chat is handed: its details, and for an unanswered question, its recovery. */
@@ -46,7 +62,7 @@ type BubbleActions = {
 export function useChatMessageActions(
   state: Pick<
     ChatState,
-    'sessionId' | 'status' | 'asked' | 'askedFrom' | 'displaced' | 'failureKey'
+    'sessionId' | 'status' | 'asked' | 'askedFrom' | 'displaced' | 'waiting' | 'failureKey'
   >,
   messages: readonly StoredMessage[],
   retry: (displaced?: Displaced) => Promise<void>
@@ -93,7 +109,11 @@ export function useChatMessageActions(
     composerControlRef.current?.setText(text);
   }, []);
 
-  const asking = state.askedFrom;
+  /* Rebuilt only when the line or the slot changes: every word of an answer is
+     a publish, and a new set per render would recreate every row's actions. */
+  const askedFrom = state.askedFrom;
+  const waiting = state.waiting;
+  const asking = useMemo(() => onTheirWay({ askedFrom, waiting }), [askedFrom, waiting]);
   const actionsFor = useCallback(
     (message: StoredMessage): BubbleActions => {
       if (message.info.id === unanswered) {
@@ -109,7 +129,7 @@ export function useChatMessageActions(
       const earlier = kept.get(message.info.id);
       /* The kept question the slot is asking again carries no recovery while it
          is being asked: it is the attempt on screen, not a failure under it. */
-      if (earlier !== undefined && earlier.question.id !== asking) {
+      if (earlier !== undefined && !asking.has(earlier.question.id)) {
         return {
           onLongPressDetails: openDetails,
           deliveryState: earlier.delivery,

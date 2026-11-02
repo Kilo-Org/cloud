@@ -123,53 +123,15 @@ export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
 }
 
 /**
- * Adds a question to the written list under the identifier it carries.
+ * Writes the kept questions as the chat holds them.
  *
- * It reads first and appends, rather than rewriting a list built in memory: a
- * question can have a copy here that memory cannot see, and only this entry
- * would survive a restart. Two questions with the same words are two attempts,
- * so nothing is folded into an existing entry.
+ * The list is handed in whole rather than changed in place: the chat's state is
+ * what decides which questions are in the transcript, and writing it out means a
+ * write that was refused is repaired by the next one instead of leaving a record
+ * behind that the chat no longer draws.
  */
-export async function addKept(sessionId: string, question: Displaced): Promise<void> {
-  const kept = await keptIn(sessionId);
-  await writeKept(sessionId, [...kept, question]);
-}
-
-/**
- * Records how the latest attempt at a written question ended.
- *
- * A question asked again is still the same bubble in the transcript, so the
- * attempt that just ended is what its footer describes: the failure it first
- * showed, or the way the attempt the person started from it ended.
- */
-export async function markKept(
-  sessionId: string,
-  id: string,
-  outcome: Displaced['outcome']
-): Promise<void> {
-  const kept = await keptIn(sessionId);
-  const next = kept.map(one => (one.id === id ? { ...one, outcome } : one));
-  const changed = next.some((one, index) => one !== kept[index]);
-  if (changed) {
-    await writeKept(sessionId, next);
-  }
-}
-
-/**
- * Drops the written copies with these identifiers, which is what a question a
- * later send kept leaves behind once its answer is in the store. The
- * identifiers come from the caller because a question's words cannot tell one
- * attempt from another: this drops exactly the records it was given.
- */
-export async function dropKept(sessionId: string, ids: readonly string[]): Promise<void> {
-  if (ids.length === 0) {
-    return;
-  }
-  const kept = await keptIn(sessionId);
-  const next = kept.filter(one => !ids.includes(one.id));
-  if (next.length !== kept.length) {
-    await writeKept(sessionId, next);
-  }
+export async function replaceKept(sessionId: string, kept: readonly Displaced[]): Promise<void> {
+  await writeKept(sessionId, kept);
 }
 
 /** Remembers the words a chat is named for, which are the first ones said in it. */

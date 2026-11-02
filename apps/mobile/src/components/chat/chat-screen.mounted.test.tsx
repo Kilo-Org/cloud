@@ -877,6 +877,21 @@ describe('message actions', () => {
     expect(state.retry.mock.calls[0]).toEqual([]);
   });
 
+  it('falls back to its own bubble when the record the slot names is gone', async () => {
+    state.status = 'idle';
+    state.asked = 'a question whose kept record is no longer here';
+    state.askedFrom = 'gone';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [];
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:asked');
+
+    // The transcript drew the slot's own bubble, so the recovery is on it.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.onRetryMessage).toBeDefined();
+  });
+
   it('shows no recovery under a question asked again while it is being asked', async () => {
     state.status = 'working';
     state.asked = 'the long question that failed';

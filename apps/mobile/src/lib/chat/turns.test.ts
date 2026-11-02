@@ -83,6 +83,34 @@ describe('asMessages', () => {
     ]);
   });
 
+  it('draws a question waiting to be asked again once, on its kept bubble', () => {
+    const kept = {
+      id: 'k1',
+      text: 'the question it asks again',
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    const input = {
+      sessionId: 's1',
+      turns: [],
+      answering: [],
+      asked: 'third',
+      askedImages: [],
+      displaced: [kept],
+      waiting: [{ text: kept.text, images: [], from: 'k1' }],
+    } satisfies Parameters<typeof asMessages>[0];
+
+    // One bubble for the question, at the place it was said, and one for the
+    // question in the slot: the queued copy is the attempt on that bubble.
+    expect(asMessages(input).map(message => message.info.id)).toEqual([
+      displacedMessageId('s1', 'k1'),
+      askedMessageId('s1'),
+    ]);
+  });
+
   it('gives every message its own identifier, so a list can key on it', () => {
     const messages = asMessages({
       sessionId: 's1',

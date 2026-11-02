@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  addKept,
   keptIn,
   newKeptId,
   rememberAsked,
   rememberFirstQuestion,
+  replaceKept,
   titledByAsked,
 } from './pending';
 import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
@@ -71,15 +71,17 @@ describe('titledByAsked', () => {
 
   it('names the chat for the first question a later send kept, not the one that replaced it', async () => {
     await rememberFirstQuestion('kept', 'the question it was opened for');
-    await addKept('kept', {
-      id: 'k1',
-      text: 'the question it was opened for',
-      images: [],
-      model: 'kilo/one',
-      effort: null,
-      afterTurns: 0,
-      outcome: 'failed',
-    });
+    await replaceKept('kept', [
+      {
+        id: 'k1',
+        text: 'the question it was opened for',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ]);
     await rememberAsked('kept', {
       text: 'the question asked after it',
       model: 'kilo/one',
@@ -95,15 +97,17 @@ describe('titledByAsked', () => {
   it('keeps naming the chat for the first question after that one is asked again', async () => {
     await rememberFirstQuestion('retried', 'the question it was opened for');
     // The first question was asked again, so the only kept question is the later one.
-    await addKept('retried', {
-      id: 'k1',
-      text: 'the question asked after it',
-      images: [],
-      model: 'kilo/one',
-      effort: null,
-      afterTurns: 0,
-      outcome: 'failed',
-    });
+    await replaceKept('retried', [
+      {
+        id: 'k1',
+        text: 'the question asked after it',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ]);
     await rememberAsked('retried', {
       text: 'the question it was opened for',
       model: 'kilo/one',
@@ -122,7 +126,7 @@ describe('titledByAsked', () => {
     expect(newKeptId()).not.toBe(newKeptId());
   });
 
-  it('writes two questions that say the same words as two attempts', async () => {
+  it('writes the whole list, so two questions that say the same words stay two attempts', async () => {
     const words = {
       text: 'the same words',
       images: [],
@@ -131,11 +135,17 @@ describe('titledByAsked', () => {
       afterTurns: 0,
       outcome: 'failed' as const,
     };
-    await addKept('twice', { id: 'a', ...words });
-    await addKept('twice', { id: 'b', ...words });
+    await replaceKept('twice', [
+      { id: 'a', ...words },
+      { id: 'b', ...words },
+    ]);
 
     const written = await keptIn('twice');
     expect(written.map(one => one.id)).toEqual(['a', 'b']);
+    // A later write replaces the list rather than adding to it.
+    await replaceKept('twice', [{ id: 'b', ...words }]);
+    const replaced = await keptIn('twice');
+    expect(replaced.map(one => one.id)).toEqual(['b']);
   });
 
   it('reads an entry written with a numbered identifier as the name it is', async () => {

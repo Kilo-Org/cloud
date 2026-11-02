@@ -242,7 +242,11 @@ const harnessBuildGuards = [
     name,
     "steps.published.outputs.published != 'true'",
   ]),
-  ['explorer-ios-release.yml', 'build', undefined],
+  [
+    'explorer-ios-release.yml',
+    'build',
+    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+  ],
 ];
 
 test('every consumer job restores or builds the harness SDK through the action', () => {
@@ -259,11 +263,20 @@ test('every consumer job restores or builds the harness SDK through the action',
       `${file}:${name} runs the action after install`
     );
     assert.equal(steps[actionIndex].if, guard, `${file}:${name} keeps its guard`);
-    assert.deepEqual(
-      steps.filter(step => step.run === harnessBuild).map(step => step.name),
-      [],
-      `${file}:${name} never builds the harness SDK outside the action`
-    );
+    // explorer-ios-release checks out an arbitrary cloud_ref, which can predate
+    // the action; it is the only job allowed a plain build, behind the
+    // complementary guard.
+    const plain = steps.filter(step => step.run === harnessBuild);
+    if (file !== 'explorer-ios-release.yml') {
+      assert.deepEqual(
+        plain.map(step => step.name),
+        [],
+        `${file}:${name} never builds outside`
+      );
+    } else {
+      assert.equal(plain.length, 1);
+      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+    }
   }
 });
 

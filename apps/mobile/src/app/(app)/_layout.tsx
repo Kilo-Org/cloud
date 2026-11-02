@@ -30,6 +30,7 @@ import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -137,6 +138,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <LeaveSettleMount />
       <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />

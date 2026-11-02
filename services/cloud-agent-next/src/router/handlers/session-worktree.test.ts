@@ -635,13 +635,17 @@ describe('createWorktreeChat request validation and authorization', () => {
   it.each(['cloud-agent-web', 'agent-manager', 'desktop'])(
     'creates a sibling from an inherited %s child workspace root without granting MCP',
     async createdOnPlatform => {
-      const metadata = sourceMetadata();
+      verifyKiloTokenForPolicyMock.mockResolvedValue({
+        claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+      });
+      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
       metadata.identity.createdOnPlatform = createdOnPlatform;
       metadata.parentCloudAgentSessionId = ALTERNATE_SOURCE_WORKSPACE_ID;
       metadata.allowSubagentSessions = false;
       const { caller, input, destinationStub } = fixture({
         metadata,
-        ownershipResults: [[ownershipRow({ createdOnPlatform })]],
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[ownershipRow({ createdOnPlatform, organizationId: ORGANIZATION_ID })]],
       });
 
       await expect(caller.createWorktreeChat(input)).resolves.toEqual({

@@ -32,6 +32,10 @@ import {
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
 import {
+  profileResolutionPolicyForSessionCreateOrigin,
+  resolveEffectiveSessionConfiguration,
+} from '../router/handlers/session-creation-preflight.js';
+import {
   admitOperation,
   markReconcilePending,
   recordOperationProgress,
@@ -2055,19 +2059,23 @@ async function assertCreateIntentUnchanged(
   }
   const current = await sessionCreateIntentFingerprint(input);
   if (current === stored) return;
-  // Deployed scoped children recorded the origin the old prepare handler forced.
+  // Deployed scoped children used the forced origin's profile policy, without web defaults.
   const scopedChild =
     ctx.cloudAgentAuthority !== undefined &&
     input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId;
-  const legacy = scopedChild
-    ? await sessionCreateIntentFingerprint({
+  if (scopedChild) {
+    const legacyInput = await resolveEffectiveSessionConfiguration(
+      ctx,
+      {
         ...input,
         options: { ...input.options, createdOnPlatform: 'cloud-agent' },
-      })
-    : undefined;
-  if (legacy !== stored) {
-    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+        profile: { id: input.profile?.id, overrides: input.profile?.overrides },
+      },
+      profileResolutionPolicyForSessionCreateOrigin('cloud-agent')
+    );
+    if ((await sessionCreateIntentFingerprint(legacyInput)) === stored) return;
   }
+  throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
 }
 
 /**

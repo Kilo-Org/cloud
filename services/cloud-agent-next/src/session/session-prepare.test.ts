@@ -42,6 +42,7 @@ import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import type * as SandboxPlacementModule from '../sandbox-placement.js';
 import type * as MessageIdModule from './message-id.js';
 import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
+import { mergeProfileConfiguration } from '@kilocode/cloud-agent-profile';
 import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
@@ -207,6 +208,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importOriginal => {
   return {
     ...actual,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
+    mergeProfileConfiguration: vi.fn(),
   };
 });
 
@@ -4063,80 +4065,162 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it('replays a legacy scoped child fingerprint without converting worktree state', async () => {
-    const input = scopedChildRequest();
-    const legacyFingerprint = await sessionCreateIntentFingerprint({
-      ...input,
-      options: { ...input.options, createdOnPlatform: 'cloud-agent' },
-    });
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: makeLedgerRow({
-        status: 'completed',
-        canonical_result: {
-          cloudAgentSessionId: SANDBOX_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-          initialMessageId: INITIAL_MESSAGE_ID,
-          sandboxId: 'ses-0123456789abcdef',
-          sandboxProvider: 'cloudflare',
-          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
-          [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+  it.each([
+    {
+      name: 'no implicit configuration',
+      legacyProfile: { resolved: {} },
+      profile: { resolved: {} },
+    },
+    {
+      name: 'implicit environment and profile configuration',
+      legacyProfile: { resolved: {} },
+      profile: {
+        resolvedProfileId: 'default-profile',
+        resolved: {
+          setupCommands: ['pnpm install'],
+          mcpServers: { docs: { type: 'remote', url: 'https://mcp.example.com/docs' } },
+          runtimeInstructions: [{ name: 'repo-rules', content: 'Follow repository conventions' }],
+          kiloCommands: [{ name: 'verify', template: 'Run the tests' }],
         },
-      }),
-    });
-    const doStub = makeDoStub();
-    const ctx = modernContext(scopedChildContext(makeContext(doStub)));
-
-    await expect(runCreate(ctx, input)).resolves.toEqual({
-      cloudAgentSessionId: SANDBOX_SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-      replayed: true,
-    });
-
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-    const childCall = doStub.recordCloudAgentChildSession.mock.calls.at(-1)?.[0];
-    expect(childCall).not.toHaveProperty('worktreeId');
-  });
-
-  it('rejects a legacy scoped child fingerprint when another immutable field changed', async () => {
-    const input = scopedChildRequest();
-    const legacyFingerprint = await sessionCreateIntentFingerprint({
-      ...input,
-      options: { ...input.options, createdOnPlatform: 'cloud-agent' },
-    });
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: makeLedgerRow({
-        status: 'completed',
-        canonical_result: {
-          cloudAgentSessionId: SANDBOX_SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-          initialMessageId: INITIAL_MESSAGE_ID,
-          sandboxId: 'ses-0123456789abcdef',
-          sandboxProvider: 'cloudflare',
-          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
-          [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+      },
+    },
+    {
+      name: 'inline overrides and implicit configuration',
+      legacyProfile: {
+        overrides: { setupCommands: ['pnpm build'] },
+        resolved: { setupCommands: ['pnpm build'] },
+      },
+      profile: {
+        overrides: { setupCommands: ['pnpm build'] },
+        resolved: {
+          setupCommands: ['pnpm install', 'pnpm build'],
+          runtimeInstructions: [{ name: 'repo-rules', content: 'Follow repository conventions' }],
         },
-      }),
-    });
-    const doStub = makeDoStub();
-    const ctx = modernContext(scopedChildContext(makeContext(doStub)));
-
-    await expect(
-      runCreate(ctx, {
+      },
+    },
+    {
+      name: 'an explicit profile and implicit environment',
+      legacyProfile: {
+        id: 'explicit-profile',
+        resolved: { setupCommands: ['pnpm build'] },
+      },
+      profile: {
+        id: 'explicit-profile',
+        resolved: { setupCommands: ['pnpm install', 'pnpm build'] },
+      },
+    },
+  ] satisfies {
+    name: string;
+    legacyProfile: SessionCreateRequest['profile'];
+    profile: SessionCreateRequest['profile'];
+  }[])(
+    'replays a legacy scoped child fingerprint with $name without converting worktree state',
+    async ({ legacyProfile, profile }) => {
+      const input: SessionCreateRequest = { ...scopedChildRequest(), profile };
+      const legacyFingerprint = await sessionCreateIntentFingerprint({
         ...input,
-        initialTurn: { type: 'prompt', prompt: 'Changed prompt' },
-      })
-    ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'session_create_intent_conflict',
-    });
+        profile: legacyProfile,
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+      });
+      vi.mocked(mergeProfileConfiguration).mockResolvedValue({
+        setupCommands: ['pnpm build'],
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          canonical_result: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare',
+            [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+            [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const doStub = makeDoStub();
+      const ctx = modernContext(scopedChildContext(makeContext(doStub)));
 
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(doStub.recordCloudAgentChildSession).not.toHaveBeenCalled();
-  });
+      await expect(runCreate(ctx, input)).resolves.toEqual({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        replayed: true,
+      });
+
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      const childCall = doStub.recordCloudAgentChildSession.mock.calls.at(-1)?.[0];
+      expect(childCall).not.toHaveProperty('worktreeId');
+      if (input.profile?.id) {
+        expect(mergeProfileConfiguration).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ profileId: input.profile.id, environment: undefined })
+        );
+      } else {
+        expect(mergeProfileConfiguration).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each([
+    {
+      name: 'the prompt',
+      change: { initialTurn: { type: 'prompt', prompt: 'Changed prompt' } },
+    },
+    {
+      name: 'inline setup commands',
+      change: { profile: { overrides: { setupCommands: ['pnpm build'] } } },
+    },
+    {
+      name: 'the explicit profile id',
+      change: { profile: { id: 'different-profile' } },
+    },
+  ] satisfies { name: string; change: Partial<SessionCreateRequest> }[])(
+    'rejects a legacy scoped child fingerprint when $name changed',
+    async ({ change }) => {
+      vi.mocked(mergeProfileConfiguration).mockResolvedValue({});
+      const input = scopedChildRequest();
+      const legacyFingerprint = await sessionCreateIntentFingerprint({
+        ...input,
+        profile: { resolved: {} },
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          canonical_result: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare',
+            [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+            [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const doStub = makeDoStub();
+      const ctx = modernContext(scopedChildContext(makeContext(doStub)));
+
+      await expect(
+        runCreate(ctx, {
+          ...input,
+          ...change,
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'session_create_intent_conflict',
+      });
+
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.recordCloudAgentChildSession).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('createSessionWithLedger takeover reconciliation ladder', () => {

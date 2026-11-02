@@ -17,6 +17,7 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Sheet } from '@/components/ui/sheet';
+import { isSheetTouchHeld } from '@/lib/sheet-touch-guard';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
@@ -319,6 +320,31 @@ describe('Sheet', () => {
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(sheet(renderer)).toBeUndefined();
+  });
+
+  // Until the native sheet's own window takes touch, the app window still owns
+  // it: the hold is what keeps a tap made while the sheet opens off the screen
+  // and the tab bar behind it.
+  it('holds the app window touch while it opens and until it unmounts', async () => {
+    const { renderer, queryClient } = await mount();
+
+    expect(isSheetTouchHeld()).toBe(true);
+
+    await updateSheet(renderer, queryClient, { visible: false });
+    expect(isSheetTouchHeld()).toBe(true);
+
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+
+    expect(isSheetTouchHeld()).toBe(false);
+  });
+
+  it('takes no app window touch while it is closed', async () => {
+    await mount({ visible: false });
+
+    expect(isSheetTouchHeld()).toBe(false);
   });
 
   it('ends the sheet when the native sheet dismisses on its own (swipe, backdrop or Back)', async () => {

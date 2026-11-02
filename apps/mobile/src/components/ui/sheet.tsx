@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports
@@ -53,6 +54,16 @@ type SheetProps = {
   onRequestDismiss?: () => boolean;
   children: ReactNode;
 };
+
+/**
+ * Holds the app-wide touch gate while this sheet takes the touch over. Mounted
+ * with the native sheet, so the hold's own bound and its cleanup start and end
+ * with the sheet's presentation.
+ */
+function SheetTouchHold() {
+  useSheetTouchHold();
+  return null;
+}
 
 /**
  * Native bottom sheet, presented over the whole app. It presents a separate
@@ -150,53 +161,56 @@ export function Sheet({
   }
 
   return (
-    <BottomSheet
-      index={visible && !dismissalPending ? 0 : -1}
-      snapPoints={snapPoints}
-      // The native sheet paints the platform surface color: without this a
-      // forced in-app dark theme still shows a light sheet behind themed text.
-      backgroundStyle={{ backgroundColor: background ?? colors.card }}
-      handleComponent={showHandle ? undefined : null}
-      enablePanDownToClose
-      dismissGestures={dismissGestures}
-      onRequestDismiss={onRequestDismiss}
-      locale={i18n.language}
-      onClose={() => {
-        // A dismissal the caller already reopened past must not close the sheet
-        // again through the caller's own handler. A self-dismissal (backdrop,
-        // swipe, Android Back) has no pending request and reports while
-        // `visible` is still true, so it is still forwarded.
-        if (visible && dismissalPending) {
-          return;
-        }
-        onClose();
-      }}
-      onDismiss={() => {
-        setDismissalPending(false);
-        if (visible && dismissalPending) {
-          // Superseded: the caller reopened while this dismissal was in flight.
-          // The next render hands the library `index` 0, re-presenting the sheet
-          // the dismissal had taken down; the sheet stays mounted, so its content
-          // never unmounts.
-          return;
-        }
-        // Clear the host flag before queueing, not just with `setMounted`: on
-        // Android this report runs from the host's effect, ahead of this
-        // component's `[visible]` effect, which reads the flag to decide whether
-        // a dismissal is still outstanding. Otherwise it re-arms
-        // `dismissalPending` for a dismissal that already reported and the next
-        // reopen passes -1 and never presents.
-        mountedRef.current = false;
-        setMounted(false);
-        onDismiss?.();
-      }}
-    >
-      {Platform.OS === 'android' && !snapPoints?.length ? (
-        // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
-        <View className="w-full max-w-[640px] self-center">{children}</View>
-      ) : (
-        children
-      )}
-    </BottomSheet>
+    <>
+      <SheetTouchHold />
+      <BottomSheet
+        index={visible && !dismissalPending ? 0 : -1}
+        snapPoints={snapPoints}
+        // The native sheet paints the platform surface color: without this a
+        // forced in-app dark theme still shows a light sheet behind themed text.
+        backgroundStyle={{ backgroundColor: background ?? colors.card }}
+        handleComponent={showHandle ? undefined : null}
+        enablePanDownToClose
+        dismissGestures={dismissGestures}
+        onRequestDismiss={onRequestDismiss}
+        locale={i18n.language}
+        onClose={() => {
+          // A dismissal the caller already reopened past must not close the sheet
+          // again through the caller's own handler. A self-dismissal (backdrop,
+          // swipe, Android Back) has no pending request and reports while
+          // `visible` is still true, so it is still forwarded.
+          if (visible && dismissalPending) {
+            return;
+          }
+          onClose();
+        }}
+        onDismiss={() => {
+          setDismissalPending(false);
+          if (visible && dismissalPending) {
+            // Superseded: the caller reopened while this dismissal was in flight.
+            // The next render hands the library `index` 0, re-presenting the sheet
+            // the dismissal had taken down; the sheet stays mounted, so its content
+            // never unmounts.
+            return;
+          }
+          // Clear the host flag before queueing, not just with `setMounted`: on
+          // Android this report runs from the host's effect, ahead of this
+          // component's `[visible]` effect, which reads the flag to decide whether
+          // a dismissal is still outstanding. Otherwise it re-arms
+          // `dismissalPending` for a dismissal that already reported and the next
+          // reopen passes -1 and never presents.
+          mountedRef.current = false;
+          setMounted(false);
+          onDismiss?.();
+        }}
+      >
+        {Platform.OS === 'android' && !snapPoints?.length ? (
+          // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
+          <View className="w-full max-w-[640px] self-center">{children}</View>
+        ) : (
+          children
+        )}
+      </BottomSheet>
+    </>
   );
 }

@@ -29,19 +29,24 @@ type CardControlProps = Omit<React.ComponentProps<typeof Pressable>, 'className'
   children?: ReactNode;
 };
 
+/** A press-state variant: the one class family that turns a view into a press target. */
+const PRESS_FEEDBACK_VARIANT = /\bactive:\S+/g;
+
 /**
  * The press target every control of these two cards renders, with the layer
  * that only reserves height rendering a plain view instead. Two things make
  * that view inert: a mounted `Pressable` is a touch area even with its
  * `onPress` gone, because Pressability still hands the host view a click
- * handler; and NativeWind turns any `className` with an `active:` variant into
- * a `Pressable` of its own. So the reserved view carries only the layout
- * classes, and the press feedback belongs to the drawn layer.
+ * handler; and NativeWind turns any element whose `className` carries a press
+ * variant into a `Pressable` of its own. The reserved view therefore drops
+ * every press variant a caller passes and keeps only the layout classes, so
+ * the press feedback lives in the drawn layer alone.
  */
 export function CardControl({ className, children, ...pressProps }: CardControlProps) {
   const reserved = useReservedHomeCardLayer();
   if (reserved) {
-    return <View className={className}>{children}</View>;
+    const layout = className?.replaceAll(PRESS_FEEDBACK_VARIANT, '').replaceAll(/\s+/g, ' ').trim();
+    return <View className={layout}>{children}</View>;
   }
   return (
     <Pressable className={cn('active:opacity-70', className)} {...pressProps}>

@@ -27,7 +27,13 @@ const buttonVariants = cva(
         // outline and paints no fill of its own.
         'outline-destructive':
           'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
-        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // A filled neutral action keeps its own fill rather than the surface
+        // token: `--secondary` is also the dark card an outlined control paints
+        // (above), so a filled action in that colour reads as the same control
+        // as the outlined one beside it, as it did in the discard-draft sheet
+        // and the permission card. `--secondary-fill` equals `--secondary` in
+        // light and takes a visible step above it in dark.
+        secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
         'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',

@@ -228,7 +228,6 @@ export function PasskeysCard() {
             <span className="font-medium">Passkeys</span>
           </div>
 
-
           {passkeysQuery.isLoading ? (
             // Sized like the rows it replaces, so loading→content does not move
             // anything around the card.

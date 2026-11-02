@@ -1,6 +1,5 @@
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 
-
 export type StepUpOptions =
   | { ok: true; challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }
   | { ok: false; code?: string };

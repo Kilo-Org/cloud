@@ -1751,8 +1751,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       });
       if (
         feeRefund.assessment &&
-        feeRefund.assessment.chargedFeeMinor > 0 &&
-        (await isServiceFeeOnlyRefundedCharge({ chargeId: charge.id, stripe: client }))
+        (await isServiceFeeOnlyRefundedCharge({
+          charge,
+          chargedFeeMinor: feeRefund.assessment.chargedFeeMinor,
+          stripe: client,
+        }))
       ) {
         break;
       }

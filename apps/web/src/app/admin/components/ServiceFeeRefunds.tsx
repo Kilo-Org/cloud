@@ -108,8 +108,13 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 export function ServiceFeeRefunds() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [batchSize, setBatchSize] = useState(DEFAULT_BATCH_SIZE);
+  const [batchSizeInput, setBatchSizeInput] = useState(String(DEFAULT_BATCH_SIZE));
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const batchSize = /^\d+$/.test(batchSizeInput.trim())
+    ? Number.parseInt(batchSizeInput.trim(), 10)
+    : Number.NaN;
+  const validBatchSize =
+    Number.isInteger(batchSize) && batchSize >= 1 && batchSize <= MAX_BATCH_SIZE;
 
   const overview = useQuery(trpc.admin.serviceFeeRollback.overview.queryOptions());
   const invalidateOverview = () =>
@@ -120,13 +125,18 @@ export function ServiceFeeRefunds() {
   const executeBatch = useMutation(
     trpc.admin.serviceFeeRollback.executeBatch.mutationOptions({
       onSuccess: results => {
-        const refunded = results.filter(row => row.status === 'refunded').length;
-        const problems = results.filter(
-          row => row.status === 'failed' || row.status === 'outcome_unknown'
-        ).length;
-        toast.success(
-          `Processed ${results.length}: ${refunded} refunded, ${problems} need attention.`
-        );
+        const count = (...statuses: string[]) =>
+          results.filter(row => statuses.includes(row.status)).length;
+        const refunded = count('refunded', 'already_refunded');
+        const skipped = count('skipped');
+        const failed = count('failed');
+        const unknown = count('outcome_unknown');
+        const summary = `Processed ${results.length}: ${refunded} refunded, ${skipped} skipped, ${failed} failed, ${unknown} outcome unknown.`;
+        if (skipped + failed + unknown > 0) {
+          toast.warning(`${summary} Review them under Needs attention.`);
+        } else {
+          toast.success(summary);
+        }
       },
       onError: error => toast.error(error.message || 'Refund batch failed'),
       onSettled: invalidateOverview,
@@ -135,7 +145,17 @@ export function ServiceFeeRefunds() {
 
   const reconcile = useMutation(
     trpc.admin.serviceFeeRollback.reconcileStale.mutationOptions({
-      onSuccess: results => toast.success(`Reconciled ${results.length} pending claims.`),
+      onSuccess: results => {
+        const count = (status: string) => results.filter(row => row.status === status).length;
+        const errors = count('error');
+        const stillPending = count('pending');
+        const summary = `Reconciled ${results.length}: ${count('succeeded')} refunded, ${count('failed')} queued for retry, ${stillPending} still pending, ${errors} errors.`;
+        if (errors + stillPending > 0) {
+          toast.warning(summary);
+        } else {
+          toast.success(summary);
+        }
+      },
       onError: error => toast.error(error.message || 'Reconcile failed'),
       onSettled: invalidateOverview,
     })
@@ -162,7 +182,6 @@ export function ServiceFeeRefunds() {
     claim => claim.status !== 'succeeded' || claim.awaitingWebhook
   );
   const busy = executeBatch.isPending || reconcile.isPending;
-  const validBatchSize = batchSize >= 1 && batchSize <= MAX_BATCH_SIZE;
 
   return (
     <div className="flex flex-col gap-y-6">
@@ -205,10 +224,18 @@ export function ServiceFeeRefunds() {
                 min={1}
                 max={MAX_BATCH_SIZE}
                 className="h-9 w-28"
-                value={batchSize}
-                onChange={event => setBatchSize(Number(event.target.value))}
+                step={1}
+                inputMode="numeric"
+                aria-invalid={!validBatchSize}
+                value={batchSizeInput}
+                onChange={event => setBatchSizeInput(event.target.value)}
                 disabled={busy}
               />
+              {!validBatchSize && (
+                <p className="text-destructive text-xs">
+                  Enter a whole number from 1 to {MAX_BATCH_SIZE}.
+                </p>
+              )}
             </div>
             <Button
               variant="destructive"
@@ -217,7 +244,9 @@ export function ServiceFeeRefunds() {
             >
               {executeBatch.isPending
                 ? 'Refunding…'
-                : `Refund next ${Math.min(batchSize, data.remaining.count)}`}
+                : validBatchSize
+                  ? `Refund next ${Math.min(batchSize, data.remaining.count)}`
+                  : 'Refund next batch'}
             </Button>
             <Button
               variant="outline"
@@ -248,6 +277,44 @@ export function ServiceFeeRefunds() {
                 reason: row.reason,
               }))}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {reconcile.data && reconcile.data.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Last reconcile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assessment</TableHead>
+                    <TableHead>Refund</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reconcile.data.map(row => (
+                    <TableRow key={row.assessmentKey}>
+                      <TableCell>
+                        <StatusBadge status={row.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{row.assessmentKey}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.stripeRefundId ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {row.reason ?? ''}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -28,6 +28,21 @@ export const SERVICE_FEE_REFUND_FEE_METADATA_KEY = 'serviceFeeRefundFeeMinor';
 
 const PAGE_SIZE = 100;
 const COUNTED_REFUND_STATUSES = new Set(['succeeded', 'pending']);
+const DEAD_REFUND_STATUSES = new Set(['failed', 'canceled']);
+
+/** A refund that moved, or is moving, money: the statuses fee allocation sums. */
+export function isCountedRefund(refund: Pick<Stripe.Refund, 'status'>): boolean {
+  return COUNTED_REFUND_STATUSES.has(refund.status ?? '');
+}
+
+/**
+ * A refund that has not failed or been canceled, including ones that still
+ * need customer action. Use this wherever an unfinished refund must block a
+ * duplicate or count against a fee-only decision.
+ */
+export function isLiveRefund(refund: Pick<Stripe.Refund, 'status'>): boolean {
+  return !DEAD_REFUND_STATUSES.has(refund.status ?? '');
+}
 
 export class ServiceFeeObservationNotReadyError extends Error {
   readonly name = 'ServiceFeeObservationNotReadyError';
@@ -242,30 +257,51 @@ export function parseServiceFeeRefundAllocationMetadata(
   return { productMinor, feeMinor };
 }
 
-/**
- * True when every counted refund on the charge carries allocation metadata
- * that returns only service fee and no product. Such a refund leaves the
- * purchase intact, so it must not trigger adverse-payment handling.
- */
-export async function isServiceFeeOnlyRefundedCharge(params: {
-  chargeId: string;
-  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>;
-}): Promise<boolean> {
-  const refunds = await listAllPages(startingAfter =>
-    params.stripe.refunds.list({
-      charge: params.chargeId,
+export async function listAllChargeRefunds(
+  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>,
+  chargeId: string
+): Promise<Stripe.Refund[]> {
+  return listAllPages(startingAfter =>
+    stripe.refunds.list({
+      charge: chargeId,
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     })
   );
-  const counted = refunds.filter(refund => COUNTED_REFUND_STATUSES.has(refund.status ?? ''));
-  return (
-    counted.length > 0 &&
-    counted.every(refund => {
-      const allocation = parseServiceFeeRefundAllocationMetadata(refund.metadata);
-      return allocation !== null && allocation.productMinor === 0 && allocation.feeMinor > 0;
-    })
-  );
+}
+
+/**
+ * True when the charge's refunds returned only service fee and left the
+ * purchase intact, so they must not trigger adverse-payment handling. Every
+ * live refund must claim fee only in its metadata and its amount must equal
+ * that fee, the fee refunds together cannot exceed the charged fee, and the
+ * charge cannot be fully refunded.
+ */
+export async function isServiceFeeOnlyRefundedCharge(params: {
+  charge: Pick<Stripe.Charge, 'id' | 'amount' | 'amount_refunded'>;
+  chargedFeeMinor: number;
+  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>;
+}): Promise<boolean> {
+  if (params.chargedFeeMinor <= 0 || params.charge.amount_refunded >= params.charge.amount) {
+    return false;
+  }
+  const live = (await listAllChargeRefunds(params.stripe, params.charge.id)).filter(isLiveRefund);
+  if (live.length === 0) return false;
+
+  let feeRefundedMinor = 0;
+  for (const refund of live) {
+    const allocation = parseServiceFeeRefundAllocationMetadata(refund.metadata);
+    if (
+      !allocation ||
+      allocation.productMinor !== 0 ||
+      allocation.feeMinor <= 0 ||
+      refund.amount !== allocation.feeMinor
+    ) {
+      return false;
+    }
+    feeRefundedMinor += refund.amount;
+  }
+  return feeRefundedMinor <= params.chargedFeeMinor;
 }
 
 /**
@@ -657,7 +693,7 @@ async function listChargeRefunds(
 function sumRefundMetadataAllocations(
   refunds: readonly Stripe.Refund[]
 ): ServiceFeeRefundAllocation | null {
-  const counted = refunds.filter(refund => COUNTED_REFUND_STATUSES.has(refund.status ?? ''));
+  const counted = refunds.filter(isCountedRefund);
   if (counted.length === 0) return null;
 
   let productMinor = 0;

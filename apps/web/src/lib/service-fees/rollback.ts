@@ -15,16 +15,24 @@ import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   SERVICE_FEE_REFUND_FEE_METADATA_KEY,
   SERVICE_FEE_REFUND_PRODUCT_METADATA_KEY,
+  isCountedRefund,
+  isLiveRefund,
+  listAllChargeRefunds,
   parseServiceFeeRefundAllocationMetadata,
 } from '@/lib/service-fees/refunds';
 
 export const SERVICE_FEE_ROLLBACK_METADATA_KEY = 'serviceFeeRollback';
 export const SERVICE_FEE_ROLLBACK_MAX_BATCH_SIZE = 50;
 export const SERVICE_FEE_ROLLBACK_STALE_PENDING_MS = 10 * 60 * 1000;
+export const SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS = 3;
 
 const LIST_LIMIT = 1_000;
-const REFUND_PAGE_SIZE = 100;
-const INACTIVE_REFUND_STATUSES = new Set(['failed', 'canceled']);
+// Stripe rejections that repeat on every retry; retrying only wastes batch slots.
+const NON_RETRYABLE_STRIPE_CODES = new Set([
+  'charge_already_refunded',
+  'charge_disputed',
+  'resource_missing',
+]);
 
 type Db = typeof defaultDb;
 
@@ -93,7 +101,8 @@ const candidateColumns = {
 
 /**
  * Settled, charged fees with a positive remainder that no claim has finished
- * or is still working on. Failed claims are eligible again.
+ * or is still working on. Failed claims are eligible again until they reach
+ * the attempt cap, at which point they are skipped.
  */
 function candidateWhere() {
   return and(
@@ -121,6 +130,8 @@ export async function listServiceFeeRollbackCandidates(
     )
     .where(candidateWhere())
     .orderBy(
+      // Never-claimed fees first so retries of failed ones cannot starve them.
+      asc(sql`${service_fee_rollback_refunds.assessment_key} IS NOT NULL`),
       asc(stripe_service_fee_assessments.created_at),
       asc(stripe_service_fee_assessments.assessment_key)
     )
@@ -306,7 +317,7 @@ async function refundCandidate(params: {
       status: ServiceFeeRollbackRowStatus;
     }
   ): Promise<ServiceFeeRollbackRowResult> => {
-    await database
+    const updated = await database
       .update(service_fee_rollback_refunds)
       .set({
         status,
@@ -316,8 +327,54 @@ async function refundCandidate(params: {
         reason: row.reason,
         updated_at: sql`now()`,
       })
-      .where(eq(service_fee_rollback_refunds.assessment_key, candidate.assessmentKey));
+      .where(
+        and(
+          eq(service_fee_rollback_refunds.assessment_key, candidate.assessmentKey),
+          eq(service_fee_rollback_refunds.attempt, claim.attempt),
+          eq(service_fee_rollback_refunds.status, ServiceFeeRollbackRefundStatus.Pending)
+        )
+      )
+      .returning({ assessmentKey: service_fee_rollback_refunds.assessment_key });
+    if (updated.length === 0) {
+      // Reconcile resolved this attempt while it ran and a later attempt may
+      // own the claim now; do not overwrite it.
+      return {
+        ...base,
+        ...row,
+        status: 'claimed_elsewhere',
+        reason: `Claim changed while this attempt ran (${row.status}): ${row.reason ?? 'no detail'}`,
+      };
+    }
     return { ...base, ...row };
+  };
+
+  const fail = (error: unknown, stripeChargeId: string | null) => {
+    const reason = errorMessage(error);
+    if (isNonRetryableStripeError(error)) {
+      return finish(ServiceFeeRollbackRefundStatus.Skipped, {
+        status: 'skipped',
+        amountMinor: 0,
+        stripeChargeId,
+        stripeRefundId: null,
+        reason: `Stripe rejected the refund and retrying will not help: ${reason}`,
+      });
+    }
+    if (claim.attempt >= SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS) {
+      return finish(ServiceFeeRollbackRefundStatus.Skipped, {
+        status: 'skipped',
+        amountMinor: 0,
+        stripeChargeId,
+        stripeRefundId: null,
+        reason: `Gave up after ${claim.attempt} attempts: ${reason}`,
+      });
+    }
+    return finish(ServiceFeeRollbackRefundStatus.Failed, {
+      status: 'failed',
+      amountMinor: 0,
+      stripeChargeId,
+      stripeRefundId: null,
+      reason,
+    });
   };
 
   let plan: RefundPlan;
@@ -328,15 +385,18 @@ async function refundCandidate(params: {
       tags: { source: 'service_fee_rollback', stage: 'plan' },
       extra: { assessmentKey: candidate.assessmentKey },
     });
-    return finish(ServiceFeeRollbackRefundStatus.Failed, {
-      status: 'failed',
-      amountMinor: 0,
-      stripeChargeId: candidate.stripeChargeId,
-      stripeRefundId: null,
-      reason: errorMessage(error),
-    });
+    return fail(error, candidate.stripeChargeId);
   }
 
+  if (plan.kind === 'awaiting_completion') {
+    return finish(ServiceFeeRollbackRefundStatus.Pending, {
+      status: 'outcome_unknown',
+      amountMinor: plan.amountMinor,
+      stripeChargeId: plan.chargeId,
+      stripeRefundId: plan.refundId,
+      reason: AWAITING_COMPLETION_REASON,
+    });
+  }
   if (plan.kind === 'already_refunded') {
     return finish(ServiceFeeRollbackRefundStatus.Succeeded, {
       status: 'already_refunded',
@@ -370,6 +430,15 @@ async function refundCandidate(params: {
       },
       { idempotencyKey: serviceFeeRollbackIdempotencyKey(candidate.assessmentKey, claim.attempt) }
     );
+    if (!isCountedRefund(refund)) {
+      return finish(ServiceFeeRollbackRefundStatus.Pending, {
+        status: 'outcome_unknown',
+        amountMinor: refund.amount,
+        stripeChargeId: plan.chargeId,
+        stripeRefundId: refund.id,
+        reason: AWAITING_COMPLETION_REASON,
+      });
+    }
     return finish(ServiceFeeRollbackRefundStatus.Succeeded, {
       status: 'refunded',
       amountMinor: refund.amount,
@@ -383,13 +452,7 @@ async function refundCandidate(params: {
       extra: { assessmentKey: candidate.assessmentKey, chargeId: plan.chargeId },
     });
     if (isDefiniteStripeRejection(error)) {
-      return finish(ServiceFeeRollbackRefundStatus.Failed, {
-        status: 'failed',
-        amountMinor: 0,
-        stripeChargeId: plan.chargeId,
-        stripeRefundId: null,
-        reason: errorMessage(error),
-      });
+      return fail(error, plan.chargeId);
     }
     return finish(ServiceFeeRollbackRefundStatus.Pending, {
       status: 'outcome_unknown',
@@ -401,9 +464,13 @@ async function refundCandidate(params: {
   }
 }
 
+const AWAITING_COMPLETION_REASON =
+  'Rollback refund exists but has not completed in Stripe; reconcile once it settles';
+
 type RefundPlan =
   | { kind: 'refund'; chargeId: string; amountMinor: number }
   | { kind: 'already_refunded'; chargeId: string; refundId: string; amountMinor: number }
+  | { kind: 'awaiting_completion'; chargeId: string; refundId: string; amountMinor: number }
   | { kind: 'skip'; chargeId: string | null; reason: string };
 
 /**
@@ -448,19 +515,28 @@ async function planRefund(params: {
   if (charge.currency !== assessment.currency) {
     return { kind: 'skip', chargeId, reason: 'Charge currency does not match the fee currency' };
   }
+  if (charge.disputed) {
+    return { kind: 'skip', chargeId, reason: 'Charge is disputed; resolve the dispute first' };
+  }
 
-  const refunds = await listChargeRefunds(params.stripe, chargeId);
-  const counted = refunds.filter(isActiveRefund);
+  // Live rather than counted refunds: an unfinished refund must still block a
+  // duplicate and count against the remaining fee.
+  const live = (await listAllChargeRefunds(params.stripe, chargeId)).filter(isLiveRefund);
 
-  const ours = counted.find(
+  const ours = live.find(
     refund => refund.metadata?.[SERVICE_FEE_ROLLBACK_METADATA_KEY] === params.assessmentKey
   );
   if (ours) {
-    return { kind: 'already_refunded', chargeId, refundId: ours.id, amountMinor: ours.amount };
+    return {
+      kind: isCountedRefund(ours) ? 'already_refunded' : 'awaiting_completion',
+      chargeId,
+      refundId: ours.id,
+      amountMinor: ours.amount,
+    };
   }
 
   let stripeFeeRefundedMinor = 0;
-  for (const refund of counted) {
+  for (const refund of live) {
     const allocation = parseServiceFeeRefundAllocationMetadata(refund.metadata);
     if (!allocation) {
       return {
@@ -495,26 +571,6 @@ async function resolveChargeId(
   return latestCharge?.id ?? null;
 }
 
-async function listChargeRefunds(
-  stripe: ServiceFeeRollbackStripeClient,
-  chargeId: string
-): Promise<Stripe.Refund[]> {
-  const refunds: Stripe.Refund[] = [];
-  let startingAfter: string | undefined;
-  for (;;) {
-    const page = await stripe.refunds.list({
-      charge: chargeId,
-      limit: REFUND_PAGE_SIZE,
-      ...(startingAfter ? { starting_after: startingAfter } : {}),
-    });
-    refunds.push(...page.data);
-    if (!page.has_more) return refunds;
-    const cursor = page.data.at(-1)?.id;
-    if (!cursor) throw new Error('Stripe refund page is marked has_more without a cursor');
-    startingAfter = cursor;
-  }
-}
-
 /**
  * Resolves claims left pending after an unknown Stripe outcome. Only claims
  * untouched for the stale window are considered, so in-flight runs are left
@@ -528,7 +584,7 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
 }): Promise<
   {
     assessmentKey: string;
-    status: 'succeeded' | 'failed' | 'error';
+    status: 'succeeded' | 'failed' | 'pending' | 'error';
     stripeRefundId: string | null;
     reason: string | null;
   }[]
@@ -565,12 +621,21 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
           stripeChargeId: row.assessmentChargeId,
           stripePaymentIntentId: row.stripePaymentIntentId,
         }));
-      const refunds = chargeId ? await listChargeRefunds(params.stripe, chargeId) : [];
+      const refunds = chargeId ? await listAllChargeRefunds(params.stripe, chargeId) : [];
       const ours = refunds.find(
         refund =>
-          isActiveRefund(refund) &&
+          isLiveRefund(refund) &&
           refund.metadata?.[SERVICE_FEE_ROLLBACK_METADATA_KEY] === row.assessmentKey
       );
+      if (ours && !isCountedRefund(ours)) {
+        results.push({
+          assessmentKey: row.assessmentKey,
+          status: 'pending' as const,
+          stripeRefundId: ours.id,
+          reason: AWAITING_COMPLETION_REASON,
+        });
+        continue;
+      }
       const next = ours
         ? {
             status: ServiceFeeRollbackRefundStatus.Succeeded,
@@ -630,8 +695,12 @@ function isDefiniteStripeRejection(error: unknown): boolean {
   );
 }
 
-function isActiveRefund(refund: Stripe.Refund): boolean {
-  return !INACTIVE_REFUND_STATUSES.has(refund.status ?? '');
+function isNonRetryableStripeError(error: unknown): boolean {
+  return (
+    error instanceof Stripe.errors.StripeError &&
+    typeof error.code === 'string' &&
+    NON_RETRYABLE_STRIPE_CODES.has(error.code)
+  );
 }
 
 function errorMessage(error: unknown): string {

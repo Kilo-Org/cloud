@@ -78,6 +78,7 @@ describe('admin.serviceFeeRollback', () => {
     const create = jest.spyOn(stripeClient.refunds, 'create').mockResolvedValue({
       id: 're_router_test',
       amount: 250,
+      status: 'succeeded',
     } as unknown as Stripe.Response<Stripe.Refund>);
     const caller = await createCallerForUser(admin.id);
 

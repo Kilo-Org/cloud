@@ -23,7 +23,16 @@ import {
 type FakeCharge = { id: string; amount: number; amount_refunded: number; currency: string };
 type CreateCall = { params: Stripe.RefundCreateParams; idempotencyKey: string };
 
-function createFakeStripe(options: { createError?: () => Error; createDelayMs?: number } = {}) {
+type CreateErrorFactory = (params: Stripe.RefundCreateParams) => Error | undefined;
+
+function createFakeStripe(
+  options: {
+    createError?: CreateErrorFactory;
+    createDelayMs?: number;
+    refundStatus?: Stripe.Refund['status'];
+    beforeCreate?: () => Promise<void>;
+  } = {}
+) {
   const charges = new Map<string, FakeCharge>();
   const refunds = new Map<string, Stripe.Refund[]>();
   const paymentIntents = new Map<string, string>();
@@ -70,10 +79,13 @@ function createFakeStripe(options: { createError?: () => Error; createDelayMs?: 
         const replay = idempotent.get(idempotencyKey);
         if (replay) return replay;
         creates.push({ params, idempotencyKey });
-        if (createError) throw createError();
+        await options.beforeCreate?.();
+        const error = createError?.(params);
+        if (error) throw error;
         const refund = addRefund(params.charge ?? '', {
           amount: params.amount ?? 0,
           metadata: params.metadata as Stripe.Metadata,
+          status: options.refundStatus ?? 'succeeded',
         });
         idempotent.set(idempotencyKey, refund);
         return refund;
@@ -87,7 +99,8 @@ function createFakeStripe(options: { createError?: () => Error; createDelayMs?: 
     paymentIntents,
     creates,
     addRefund,
-    setCreateError: (factory: (() => Error) | undefined) => {
+    refunds,
+    setCreateError: (factory: CreateErrorFactory | undefined) => {
       createError = factory;
     },
   };
@@ -142,12 +155,22 @@ async function claimFor(assessmentKey: string) {
   });
 }
 
-function stripeRejection(message: string): Error {
+function stripeRejection(message: string, code?: string): Error {
   return new Stripe.errors.StripeInvalidRequestError({
     message,
     type: 'invalid_request_error',
     statusCode: 400,
+    code,
   } as ConstructorParameters<typeof Stripe.errors.StripeInvalidRequestError>[0]);
+}
+
+function runBatch(stripe: ReturnType<typeof createFakeStripe>, limit = 10) {
+  return executeServiceFeeRollbackBatch({
+    database: db,
+    stripe: stripe.client,
+    adminKiloUserId: adminId,
+    limit,
+  });
 }
 
 let adminId: string;
@@ -387,6 +410,103 @@ describe('executeServiceFeeRollbackBatch', () => {
     });
     expect(again).toEqual([]);
     expect(stripe.creates).toHaveLength(1);
+  });
+});
+
+describe('executeServiceFeeRollbackBatch retry handling', () => {
+  test('refunds never-claimed fees before retrying failed ones and gives up after the cap', async () => {
+    let failingChargeId = '';
+    const stripe = createFakeStripe({
+      createError: params =>
+        params.charge === failingChargeId ? stripeRejection('card closed') : undefined,
+    });
+    const failing = await seedChargedFee({ kiloUserId: customerId, stripe });
+    failingChargeId = failing.chargeId;
+
+    expect((await runBatch(stripe, 1))[0]).toMatchObject({
+      assessmentKey: failing.assessmentKey,
+      status: 'failed',
+    });
+
+    const fresh = await seedChargedFee({ kiloUserId: customerId, stripe });
+    expect((await runBatch(stripe, 1))[0]).toMatchObject({
+      assessmentKey: fresh.assessmentKey,
+      status: 'refunded',
+    });
+
+    expect((await runBatch(stripe, 1))[0]).toMatchObject({ status: 'failed' });
+    expect((await runBatch(stripe, 1))[0]).toMatchObject({
+      assessmentKey: failing.assessmentKey,
+      status: 'skipped',
+      reason: expect.stringContaining('Gave up after 3 attempts'),
+    });
+    expect(await runBatch(stripe, 1)).toEqual([]);
+    expect(await claimFor(failing.assessmentKey)).toMatchObject({ status: 'skipped', attempt: 3 });
+  });
+
+  test('skips immediately on a Stripe rejection that cannot succeed on retry', async () => {
+    const stripe = createFakeStripe({
+      createError: () => stripeRejection('Charge has been disputed', 'charge_disputed'),
+    });
+    const seeded = await seedChargedFee({ kiloUserId: customerId, stripe });
+
+    expect((await runBatch(stripe))[0]).toMatchObject({ status: 'skipped' });
+    expect(await claimFor(seeded.assessmentKey)).toMatchObject({ status: 'skipped', attempt: 1 });
+    expect(await runBatch(stripe)).toEqual([]);
+  });
+
+  test('does not overwrite a claim that changed while the attempt was running', async () => {
+    let assessmentKey = '';
+    const stripe = createFakeStripe({
+      beforeCreate: async () => {
+        await db
+          .update(service_fee_rollback_refunds)
+          .set({ status: 'failed', reason: 'Reconciled: no rollback refund found on the charge' })
+          .where(eq(service_fee_rollback_refunds.assessment_key, assessmentKey));
+      },
+    });
+    assessmentKey = (await seedChargedFee({ kiloUserId: customerId, stripe })).assessmentKey;
+
+    const [result] = await runBatch(stripe);
+
+    expect(result).toMatchObject({ status: 'claimed_elsewhere' });
+    expect(await claimFor(assessmentKey)).toMatchObject({
+      status: 'failed',
+      stripe_refund_id: null,
+    });
+  });
+
+  test('keeps a refund that has not completed pending until reconcile sees it settle', async () => {
+    const stripe = createFakeStripe({ refundStatus: 'requires_action' });
+    const seeded = await seedChargedFee({ kiloUserId: customerId, stripe });
+
+    const [result] = await runBatch(stripe);
+    expect(result).toMatchObject({ status: 'outcome_unknown' });
+    expect(result.stripeRefundId).not.toBeNull();
+    expect(await claimFor(seeded.assessmentKey)).toMatchObject({
+      status: 'pending',
+      stripe_refund_id: result.stripeRefundId,
+    });
+    expect(await runBatch(stripe)).toEqual([]);
+
+    const later = new Date(Date.now() + SERVICE_FEE_ROLLBACK_STALE_PENDING_MS + 60_000);
+    expect(
+      await reconcileStaleServiceFeeRollbackClaims({
+        database: db,
+        stripe: stripe.client,
+        now: later,
+      })
+    ).toEqual([expect.objectContaining({ status: 'pending' })]);
+
+    const [refund] = stripe.refunds.get(seeded.chargeId) ?? [];
+    refund.status = 'succeeded';
+    expect(
+      await reconcileStaleServiceFeeRollbackClaims({
+        database: db,
+        stripe: stripe.client,
+        now: later,
+      })
+    ).toEqual([expect.objectContaining({ status: 'succeeded', stripeRefundId: refund.id })]);
   });
 });
 

@@ -109,9 +109,13 @@ export function SecurityAgentSetup<T>({
           // callout at the description's own size and colour: as a bare line in
           // the button's gap it read as a footnote, the faintest text on the
           // screen, leaving the state looking unfinished.
-          <View className="mt-3 w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
+          <View className="mt-3 w-full min-h-[44px] flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3">
             <Info size={16} color={colors.mutedForeground} />
-            <Text className="flex-1 text-sm text-muted-foreground">{readOnlyNotice}</Text>
+            {/* The sentence takes `foreground`, not the description's muted
+                token: on the light info tile the composite surface lifts that
+                token to 4.45:1, under the 4.5 text floor the theme test holds
+                it to. The size stays the description's. */}
+            <Text className="flex-1 text-sm text-foreground">{readOnlyNotice}</Text>
           </View>
         ) : (
           <Button

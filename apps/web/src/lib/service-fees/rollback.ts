@@ -298,7 +298,10 @@ async function refundCandidate(params: {
       },
       setWhere: eq(service_fee_rollback_refunds.status, ServiceFeeRollbackRefundStatus.Failed),
     })
-    .returning({ attempt: service_fee_rollback_refunds.attempt });
+    .returning({
+      attempt: service_fee_rollback_refunds.attempt,
+      rejectedAttempts: service_fee_rollback_refunds.rejected_attempts,
+    });
 
   if (!claim) {
     return {
@@ -315,12 +318,14 @@ async function refundCandidate(params: {
     status: ServiceFeeRollbackRefundStatus,
     row: Omit<ServiceFeeRollbackRowResult, keyof typeof base> & {
       status: ServiceFeeRollbackRowStatus;
-    }
+    },
+    rejectedAttempts = claim.rejectedAttempts
   ): Promise<ServiceFeeRollbackRowResult> => {
     const updated = await database
       .update(service_fee_rollback_refunds)
       .set({
         status,
+        rejected_attempts: rejectedAttempts,
         amount_minor: row.amountMinor,
         stripe_charge_id: row.stripeChargeId,
         stripe_refund_id: row.stripeRefundId,
@@ -348,7 +353,12 @@ async function refundCandidate(params: {
     return { ...base, ...row };
   };
 
-  const fail = (error: unknown, stripeChargeId: string | null) => {
+  /**
+   * Only a definite rejection of the refund request counts toward the retry
+   * cap. Failures while planning, before Stripe is asked to refund, stay
+   * retryable so a transient outage cannot exhaust the cap.
+   */
+  const fail = (error: unknown, stripeChargeId: string | null, stage: 'plan' | 'refund') => {
     const reason = errorMessage(error);
     if (isNonRetryableStripeError(error)) {
       return finish(ServiceFeeRollbackRefundStatus.Skipped, {
@@ -356,25 +366,35 @@ async function refundCandidate(params: {
         amountMinor: 0,
         stripeChargeId,
         stripeRefundId: null,
-        reason: `Stripe rejected the refund and retrying will not help: ${reason}`,
+        reason: `Stripe rejected the request and retrying will not help: ${reason}`,
       });
     }
-    if (claim.attempt >= SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS) {
-      return finish(ServiceFeeRollbackRefundStatus.Skipped, {
-        status: 'skipped',
+    const rejectedAttempts =
+      stage === 'refund' ? claim.rejectedAttempts + 1 : claim.rejectedAttempts;
+    if (rejectedAttempts >= SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS) {
+      return finish(
+        ServiceFeeRollbackRefundStatus.Skipped,
+        {
+          status: 'skipped',
+          amountMinor: 0,
+          stripeChargeId,
+          stripeRefundId: null,
+          reason: `Gave up after Stripe rejected the refund ${rejectedAttempts} times: ${reason}`,
+        },
+        rejectedAttempts
+      );
+    }
+    return finish(
+      ServiceFeeRollbackRefundStatus.Failed,
+      {
+        status: 'failed',
         amountMinor: 0,
         stripeChargeId,
         stripeRefundId: null,
-        reason: `Gave up after ${claim.attempt} attempts: ${reason}`,
-      });
-    }
-    return finish(ServiceFeeRollbackRefundStatus.Failed, {
-      status: 'failed',
-      amountMinor: 0,
-      stripeChargeId,
-      stripeRefundId: null,
-      reason,
-    });
+        reason,
+      },
+      rejectedAttempts
+    );
   };
 
   let plan: RefundPlan;
@@ -385,7 +405,7 @@ async function refundCandidate(params: {
       tags: { source: 'service_fee_rollback', stage: 'plan' },
       extra: { assessmentKey: candidate.assessmentKey },
     });
-    return fail(error, candidate.stripeChargeId);
+    return fail(error, candidate.stripeChargeId, 'plan');
   }
 
   if (plan.kind === 'awaiting_completion') {
@@ -452,7 +472,7 @@ async function refundCandidate(params: {
       extra: { assessmentKey: candidate.assessmentKey, chargeId: plan.chargeId },
     });
     if (isDefiniteStripeRejection(error)) {
-      return fail(error, plan.chargeId);
+      return fail(error, plan.chargeId, 'refund');
     }
     return finish(ServiceFeeRollbackRefundStatus.Pending, {
       status: 'outcome_unknown',
@@ -577,18 +597,24 @@ async function resolveChargeId(
  * alone. A matching rollback refund marks the claim succeeded; otherwise it
  * becomes failed and is eligible for the next batch.
  */
+export type ServiceFeeRollbackReconcileResult = {
+  assessmentKey: string;
+  flow: StripeServiceFeeFlow;
+  kiloUserId: string | null;
+  organizationId: string | null;
+  status: 'succeeded' | 'failed' | 'pending' | 'error';
+  amountMinor: number;
+  currency: string;
+  stripeChargeId: string | null;
+  stripeRefundId: string | null;
+  reason: string | null;
+};
+
 export async function reconcileStaleServiceFeeRollbackClaims(params: {
   database: Db;
   stripe: ServiceFeeRollbackStripeClient;
   now?: Date;
-}): Promise<
-  {
-    assessmentKey: string;
-    status: 'succeeded' | 'failed' | 'pending' | 'error';
-    stripeRefundId: string | null;
-    reason: string | null;
-  }[]
-> {
+}): Promise<ServiceFeeRollbackReconcileResult[]> {
   const staleBefore = new Date(
     (params.now ?? new Date()).getTime() - SERVICE_FEE_ROLLBACK_STALE_PENDING_MS
   ).toISOString();
@@ -598,6 +624,10 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
       stripeChargeId: service_fee_rollback_refunds.stripe_charge_id,
       assessmentChargeId: stripe_service_fee_assessments.stripe_charge_id,
       stripePaymentIntentId: stripe_service_fee_assessments.stripe_payment_intent_id,
+      flow: stripe_service_fee_assessments.flow,
+      kiloUserId: stripe_service_fee_assessments.kilo_user_id,
+      organizationId: stripe_service_fee_assessments.organization_id,
+      currency: service_fee_rollback_refunds.currency,
     })
     .from(service_fee_rollback_refunds)
     .innerJoin(
@@ -612,8 +642,15 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
     )
     .limit(SERVICE_FEE_ROLLBACK_MAX_BATCH_SIZE);
 
-  const results = [];
+  const results: ServiceFeeRollbackReconcileResult[] = [];
   for (const row of stale) {
+    const base = {
+      assessmentKey: row.assessmentKey,
+      flow: row.flow,
+      kiloUserId: row.kiloUserId,
+      organizationId: row.organizationId,
+      currency: row.currency,
+    };
     try {
       const chargeId =
         row.stripeChargeId ??
@@ -629,8 +666,10 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
       );
       if (ours && !isCountedRefund(ours)) {
         results.push({
-          assessmentKey: row.assessmentKey,
-          status: 'pending' as const,
+          ...base,
+          status: 'pending',
+          amountMinor: ours.amount,
+          stripeChargeId: chargeId,
           stripeRefundId: ours.id,
           reason: AWAITING_COMPLETION_REASON,
         });
@@ -662,8 +701,10 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
         .returning({ assessmentKey: service_fee_rollback_refunds.assessment_key });
       if (updated.length === 0) continue;
       results.push({
-        assessmentKey: row.assessmentKey,
-        status: ours ? ('succeeded' as const) : ('failed' as const),
+        ...base,
+        status: ours ? 'succeeded' : 'failed',
+        amountMinor: next.amount_minor,
+        stripeChargeId: chargeId,
         stripeRefundId: ours?.id ?? null,
         reason: next.reason,
       });
@@ -673,8 +714,10 @@ export async function reconcileStaleServiceFeeRollbackClaims(params: {
         extra: { assessmentKey: row.assessmentKey },
       });
       results.push({
-        assessmentKey: row.assessmentKey,
-        status: 'error' as const,
+        ...base,
+        status: 'error',
+        amountMinor: 0,
+        stripeChargeId: row.stripeChargeId,
         stripeRefundId: null,
         reason: errorMessage(error),
       });

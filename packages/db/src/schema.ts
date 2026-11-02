@@ -11610,6 +11610,9 @@ export const service_fee_rollback_refunds = pgTable(
     assessment_key: text().primaryKey().notNull(),
     status: text().notNull().$type<ServiceFeeRollbackRefundStatus>(),
     attempt: integer().default(1).notNull(),
+    // Definite Stripe refund rejections only; failures before Stripe is asked
+    // to refund do not count toward the retry cap.
+    rejected_attempts: integer().default(0).notNull(),
     amount_minor: integer().default(0).notNull(),
     currency: text().notNull(),
     stripe_charge_id: text(),
@@ -11648,7 +11651,7 @@ export const service_fee_rollback_refunds = pgTable(
     ),
     check(
       'service_fee_rollback_refunds_amounts_check',
-      sql`${table.amount_minor} >= 0 AND ${table.attempt} >= 1`
+      sql`${table.amount_minor} >= 0 AND ${table.attempt} >= 1 AND ${table.rejected_attempts} >= 0`
     ),
     check(
       'service_fee_rollback_refunds_succeeded_check',

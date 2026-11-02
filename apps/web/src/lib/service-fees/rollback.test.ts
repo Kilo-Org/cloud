@@ -11,6 +11,7 @@ import {
   parseServiceFeeRefundAllocationMetadata,
 } from '@/lib/service-fees/refunds';
 import {
+  SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS,
   SERVICE_FEE_ROLLBACK_METADATA_KEY,
   SERVICE_FEE_ROLLBACK_STALE_PENDING_MS,
   executeServiceFeeRollbackBatch,
@@ -438,10 +439,34 @@ describe('executeServiceFeeRollbackBatch retry handling', () => {
     expect((await runBatch(stripe, 1))[0]).toMatchObject({
       assessmentKey: failing.assessmentKey,
       status: 'skipped',
-      reason: expect.stringContaining('Gave up after 3 attempts'),
+      reason: expect.stringContaining('Gave up after Stripe rejected the refund 3 times'),
     });
     expect(await runBatch(stripe, 1)).toEqual([]);
-    expect(await claimFor(failing.assessmentKey)).toMatchObject({ status: 'skipped', attempt: 3 });
+    expect(await claimFor(failing.assessmentKey)).toMatchObject({
+      status: 'skipped',
+      attempt: 3,
+      rejected_attempts: 3,
+    });
+  });
+
+  test('failures before the refund request do not use up the retry cap', async () => {
+    const stripe = createFakeStripe();
+    const seeded = await seedChargedFee({ kiloUserId: customerId, stripe });
+    const charge = stripe.charges.get(seeded.chargeId);
+    if (!charge) throw new Error('missing fake charge');
+    stripe.charges.delete(seeded.chargeId);
+
+    for (let run = 0; run < SERVICE_FEE_ROLLBACK_MAX_ATTEMPTS + 1; run++) {
+      expect((await runBatch(stripe))[0]).toMatchObject({ status: 'failed' });
+    }
+    expect(await claimFor(seeded.assessmentKey)).toMatchObject({
+      status: 'failed',
+      rejected_attempts: 0,
+    });
+    expect(stripe.creates).toHaveLength(0);
+
+    stripe.charges.set(seeded.chargeId, charge);
+    expect((await runBatch(stripe))[0]).toMatchObject({ status: 'refunded' });
   });
 
   test('skips immediately on a Stripe rejection that cannot succeed on retry', async () => {

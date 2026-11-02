@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "cloudflare-scim-sync-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  // No secrets store in tests: WORKOS_API_KEY is a plain string var here and
+  // `resolveSecret` accepts both shapes. The base URL matches the deployed
+  // value so `Env`'s generated literal type stays honest; tests stub `fetch`.
+  "vars": {
+    "ENVIRONMENT": "development",
+    "WORKOS_API_BASE_URL": "https://api.workos.com",
+    "WORKOS_API_KEY": "sk_test_scim_sync",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKOS_EVENT_SYNC_DO",
+        "class_name": "WorkOSEventSyncDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkOSEventSyncDO"],
+    },
+  ],
+}

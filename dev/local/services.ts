@@ -279,6 +279,13 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/ai-attribution',
   },
+  // Polls the WorkOS Events API; no local dependencies — it needs only a
+  // WorkOS API key and reaches the upstream API directly.
+  'cloudflare-scim-sync': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/scim-sync',
+  },
   grafana: { group: 'observability', dependsOn: [] },
   // The app POSTs its client-observed latency batches to the latency-ingest
   // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points

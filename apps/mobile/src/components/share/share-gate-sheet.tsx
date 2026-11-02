@@ -493,6 +493,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       destinations={destinations}
       onSelect={handleSelectDestination}
       onRetry={handleRetry}
+      onDismiss={dismiss}
       instances={instanceRows}
       spawningConnectionId={spawningConnectionId}
       instanceRowsDisabled={instanceRowsDisabled}

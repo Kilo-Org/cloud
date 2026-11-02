@@ -2997,7 +2997,6 @@
         "squash": "Gộp bản ghi"
       },
       "terminal": {
-        "alreadyMerged": "Đã hợp nhất",
         "closed": "PR này đã đóng",
         "closedMergeRequest": "Merge request này đã đóng"
       },
@@ -3014,7 +3013,6 @@
         "requiredReviewsTitle": "Thiếu các đánh giá bắt buộc",
         "requiredReviewsDetail": "Chưa có phê duyệt từ những người bắt buộc phải đánh giá.",
         "failingChecksTitle": "Các bước kiểm tra bắt buộc không đạt",
-        "failingChecksDetail": "Các bước kiểm tra trạng thái bắt buộc không đạt yêu cầu.",
         "unstableTitle": "Một số bước kiểm tra không đạt",
         "unstableDetail": "Các bước kiểm tra không bắt buộc không đạt yêu cầu. Kết quả này không ngăn việc hợp nhất.",
         "draftTitle": "Yêu cầu hợp nhất nháp",

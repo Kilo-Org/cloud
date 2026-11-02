@@ -456,7 +456,6 @@
         "rebase": "Presadenie"
       },
       "terminal": {
-        "alreadyMerged": "Už zlúčené",
         "closed": "Táto žiadosť o zlúčenie je uzavretá",
         "closedMergeRequest": "Tento merge request je uzavretý"
       },
@@ -473,7 +472,6 @@
         "requiredReviewsTitle": "Chýbajú povinné kontroly kódu",
         "requiredReviewsDetail": "Chýbajú schválenia od určených posudzovateľov alebo sa na ne ešte čaká.",
         "failingChecksTitle": "Zlyhávajú povinné kontroly",
-        "failingChecksDetail": "Povinné kontroly stavu zlyhávajú.",
         "unstableTitle": "Niektoré kontroly zlyhávajú",
         "unstableDetail": "Nepovinné kontroly zlyhávajú. Nezablokujú zlúčenie.",
         "draftTitle": "Koncept PR",

@@ -442,7 +442,6 @@
         "rebase": "Endurgrunnun"
       },
       "terminal": {
-        "alreadyMerged": "Þegar sameinað",
         "closed": "Þessi sameiningarbeiðni er lokuð",
         "closedMergeRequest": "Þessi merge request er lokuð"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Áskildar yfirferðir vantar",
         "requiredReviewsDetail": "Samþykki frá tilskildum yfirlesurum vantar eða er enn í bið.",
         "failingChecksTitle": "Áskildar athuganir standast ekki",
-        "failingChecksDetail": "Áskildar stöðuathuganir standast ekki.",
         "unstableTitle": "Sumar athuganir standast ekki",
         "unstableDetail": "Athuganir sem ekki eru áskildar standast ekki. Þær hindra ekki sameiningu.",
         "draftTitle": "Drög að samrunabeiðni",

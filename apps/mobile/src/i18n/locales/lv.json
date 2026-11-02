@@ -449,7 +449,6 @@
         "rebase": "Pārbāzēšana"
       },
       "terminal": {
-        "alreadyMerged": "Jau apvienots",
         "closed": "Izmaiņu pieprasījums ir slēgts",
         "closedMergeRequest": "Šis merge request ir slēgts"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Trūkst obligāto vērtējumu",
         "requiredReviewsDetail": "Vēl nav saņemti apstiprinājumi no visiem obligātajiem pārskatītājiem.",
         "failingChecksTitle": "Nesekmīgas obligātās pārbaudes",
-        "failingChecksDetail": "Obligātās statusa pārbaudes ir nesekmīgas.",
         "unstableTitle": "Dažas pārbaudes ir nesekmīgas",
         "unstableDetail": "Neobligātās pārbaudes ir nesekmīgas. Tās netraucēs apvienošanu.",
         "draftTitle": "Izmaiņu pieprasījuma melnraksts",

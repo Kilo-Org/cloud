@@ -442,7 +442,6 @@
         "rebase": "Ìyípadà ìpìlẹ̀"
       },
       "terminal": {
-        "alreadyMerged": "A ti dà á pọ̀ tẹ́lẹ̀",
         "closed": "A ti ti ìbéèrè ìṣọ̀kan yìí pa",
         "closedMergeRequest": "A ti ti ìbéèrè ìṣọ̀kan yìí pa"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Àwọn àtúnyẹ̀wò tí a nílò kò sí",
         "requiredReviewsDetail": "Àwọn olùṣàtúnyẹ̀wò tí a nílò kò tíì fọwọ́ sí i, tàbí à ń dúró de ìfọwọ́sí wọn.",
         "failingChecksTitle": "Àwọn àyẹ̀wò tí a nílò ń kùnà",
-        "failingChecksDetail": "Àwọn àyẹ̀wò ipò tí a nílò ń kùnà.",
         "unstableTitle": "Àwọn àyẹ̀wò kan ń kùnà",
         "unstableDetail": "Àwọn àyẹ̀wò tí kò pọn dandan ń kùnà. Wọn kò ní dènà ìdàpọ̀ náà.",
         "draftTitle": "Ìbéèrè àkópọ̀ tí kò tíì ṣetán",

@@ -442,7 +442,6 @@
         "rebase": "Oinarri-aldaketa"
       },
       "terminal": {
-        "alreadyMerged": "Dagoeneko bateratuta",
         "closed": "Bateratze-eskaera hau itxita dago",
         "closedMergeRequest": "Merge-eskaera hau itxita dago"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Beharrezko berrikuspenak falta dira",
         "requiredReviewsDetail": "Beharrezko berrikusleen onespenak falta dira edo jasotzeko daude.",
         "failingChecksTitle": "Beharrezko egiaztapenek huts egiten dute",
-        "failingChecksDetail": "Beharrezko egoera-egiaztapenek huts egiten dute.",
         "unstableTitle": "Egiaztapen batzuek huts egiten dute",
         "unstableDetail": "Beharrezkoak ez diren egiaztapenek huts egiten dute. Ez dute bateratzea eragotziko.",
         "draftTitle": "Bateratze-eskaeraren zirriborroa",

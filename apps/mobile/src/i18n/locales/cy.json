@@ -470,7 +470,6 @@
         "rebase": "Ailsylfaenu"
       },
       "terminal": {
-        "alreadyMerged": "Eisoes wedi'i gyfuno",
         "closed": "Mae'r cais tynnu hwn ar gau",
         "closedMergeRequest": "Mae'r cais uno hwn ar gau"
       },
@@ -487,7 +486,6 @@
         "requiredReviewsTitle": "Adolygiadau gofynnol ar goll",
         "requiredReviewsDetail": "Mae cymeradwyaeth yr adolygwyr gofynnol ar goll neu'n dal i gael ei disgwyl.",
         "failingChecksTitle": "Gwiriadau gofynnol yn methu",
-        "failingChecksDetail": "Mae gwiriadau statws gofynnol yn methu.",
         "unstableTitle": "Mae rhai gwiriadau yn methu",
         "unstableDetail": "Mae rhai gwiriadau dewisol yn methu. Ni fyddant yn atal y cyfuno.",
         "draftTitle": "Cais tynnu drafft",

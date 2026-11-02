@@ -3048,7 +3048,6 @@
         "squash": "Regroupement"
       },
       "terminal": {
-        "alreadyMerged": "Déjà fusionnée",
         "closed": "Demande de fusion fermée",
         "closedMergeRequest": "Ce merge request est fermé"
       },
@@ -3065,7 +3064,6 @@
         "requiredReviewsTitle": "Revues requises manquantes",
         "requiredReviewsDetail": "Les personnes dont la revue est requise n'ont pas encore donné leur approbation.",
         "failingChecksTitle": "Échec des vérifications requises",
-        "failingChecksDetail": "Les vérifications d'état requises échouent.",
         "unstableTitle": "Certaines vérifications échouent",
         "unstableDetail": "Certaines vérifications facultatives échouent. Elles ne bloquent pas la fusion.",
         "draftTitle": "PR en brouillon",

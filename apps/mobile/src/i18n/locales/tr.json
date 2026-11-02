@@ -2997,7 +2997,6 @@
         "squash": "Sıkıştırma"
       },
       "terminal": {
-        "alreadyMerged": "Zaten birleştirildi",
         "closed": "Bu çekme isteği kapalı",
         "closedMergeRequest": "Bu birleştirme isteği kapalı"
       },
@@ -3014,7 +3013,6 @@
         "requiredReviewsTitle": "Gerekli incelemeler eksik",
         "requiredReviewsDetail": "Gerekli incelemelerin onayları eksik veya henüz verilmedi.",
         "failingChecksTitle": "Başarısız olan gerekli kontroller",
-        "failingChecksDetail": "Gerekli durum kontrolleri başarısız.",
         "unstableTitle": "Bazı kontroller başarısız",
         "unstableDetail": "Gerekli olmayan kontroller başarısız. Bunlar birleştirmeyi engellemez.",
         "draftTitle": "Taslak çekme isteği",

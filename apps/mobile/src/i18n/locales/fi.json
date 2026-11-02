@@ -442,7 +442,6 @@
         "rebase": "Uudelleenperustus"
       },
       "terminal": {
-        "alreadyMerged": "Jo yhdistetty",
         "closed": "Muutospyyntö suljettu",
         "closedMergeRequest": "Yhdistämispyyntö suljettu"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Pakolliset katselmoinnit puuttuvat",
         "requiredReviewsDetail": "Pakollisten katselmoijien hyväksynnät puuttuvat tai niitä odotetaan vielä.",
         "failingChecksTitle": "Pakollisia tarkistuksia epäonnistui",
-        "failingChecksDetail": "Pakollisia tilatarkistuksia on epäonnistunut.",
         "unstableTitle": "Osa tarkistuksista epäonnistui",
         "unstableDetail": "Osa valinnaisista tarkistuksista on epäonnistunut. Ne eivät estä yhdistämistä.",
         "draftTitle": "Muutospyyntöluonnos",

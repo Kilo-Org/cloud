@@ -2997,7 +2997,6 @@
         "squash": "スカッシュ"
       },
       "terminal": {
-        "alreadyMerged": "マージ済み",
         "closed": "プルリクエストはクローズ済み",
         "closedMergeRequest": "マージリクエストはクローズ済み"
       },
@@ -3014,7 +3013,6 @@
         "requiredReviewsTitle": "必須レビューが未完了",
         "requiredReviewsDetail": "必須レビュアーからの承認がまだそろっていません。",
         "failingChecksTitle": "必須チェックが失敗しています",
-        "failingChecksDetail": "必須のステータスチェックが失敗しています。",
         "unstableTitle": "一部のチェックが失敗しています",
         "unstableDetail": "必須ではないチェックが失敗していますが、マージは可能です。",
         "draftTitle": "下書きのプルリクエスト",

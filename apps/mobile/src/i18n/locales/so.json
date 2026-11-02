@@ -442,7 +442,6 @@
         "rebase": "Saldhig-beddel"
       },
       "terminal": {
-        "alreadyMerged": "Hore ayaa la isugu daray",
         "closed": "Codsigan isku-darka waa xiran yahay",
         "closedMergeRequest": "Codsigan merge request waa xiran yahay"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Dib-u-eegisyadii loo baahnaa ayaa maqan",
         "requiredReviewsDetail": "Ansixinta dib-u-eegayaasha loo baahan yahay ayaa maqan ama weli la sugayaa.",
         "failingChecksTitle": "Hubinno loo baahan yahay oo fashilmaya",
-        "failingChecksDetail": "Hubinnada xaaladda ee loo baahan yahay ayaa fashilmaya.",
         "unstableTitle": "Hubinnada qaar ayaa fashilmaya",
         "unstableDetail": "Hubinnada aan khasabka ahayn ayaa fashilmaya. Ma hor istaagi doonaan isku-darka.",
         "draftTitle": "Codsi isku-darid oo qabyo ah",

@@ -442,7 +442,6 @@
         "rebase": "بیا بنسټول"
       },
       "terminal": {
-        "alreadyMerged": "مخکې یوځای شوی",
         "closed": "دا پل ریکویسټ تړل شوی",
         "closedMergeRequest": "دا د یوځای کولو غوښتنه تړل شوې ده"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "اړینې بیاکتنې نشته",
         "requiredReviewsDetail": "د اړینو بیاکتونکو تاییدونه نشته یا لا یې انتظار کېږي.",
         "failingChecksTitle": "ناکامې اړینې ازموینې",
-        "failingChecksDetail": "د حالت اړینې ازموینې ناکامې دي.",
         "unstableTitle": "ځینې ازموینې ناکامې دي",
         "unstableDetail": "غیر اړینې ازموینې ناکامې دي. دا د یوځای کولو مخه نه نیسي.",
         "draftTitle": "د پل ریکویسټ مسوده",

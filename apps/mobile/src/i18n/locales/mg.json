@@ -442,7 +442,6 @@
         "rebase": "Famindrana fototra"
       },
       "terminal": {
-        "alreadyMerged": "Efa nampiraisina",
         "closed": "Nakatona ity fangatahana fampiraisana ity",
         "closedMergeRequest": "Nakatona ity fangatahana fampiraisana ity"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Tsy ampy ny fandinihana takina",
         "requiredReviewsDetail": "Mbola tsy azo na mbola andrasana ny fankatoavan'ireo mpandinika voatendry.",
         "failingChecksTitle": "Tsy mahomby ny fanamarinana takina",
-        "failingChecksDetail": "Tsy mahomby ny fanamarinana sata takina.",
         "unstableTitle": "Misy fanamarinana tsy mahomby",
         "unstableDetail": "Tsy mahomby ny fanamarinana tsy takina. Tsy hanakana ny fampiraisana izany.",
         "draftTitle": "PR mbola volavola",

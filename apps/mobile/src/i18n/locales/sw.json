@@ -442,7 +442,6 @@
         "rebase": "Msingi upya"
       },
       "terminal": {
-        "alreadyMerged": "Tayari limeunganishwa",
         "closed": "Ombi hili la kuunganisha limefungwa",
         "closedMergeRequest": "Ombi hili la kuunganisha limefungwa"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Ukaguzi unaohitajika haupo",
         "requiredReviewsDetail": "Idhini za wakaguzi wanaohitajika hazipo au bado zinasubiriwa.",
         "failingChecksTitle": "Vipimo vinavyohitajika havifaulu",
-        "failingChecksDetail": "Vipimo vya hali vinavyohitajika havifaulu.",
         "unstableTitle": "Baadhi ya vipimo havifaulu",
         "unstableDetail": "Vipimo visivyo vya lazima havifaulu. Havitazuia kuunganisha.",
         "draftTitle": "Rasimu ya ombi la kuunganisha",

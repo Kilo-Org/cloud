@@ -442,7 +442,6 @@
         "rebase": "መሠረት መቀየር"
       },
       "terminal": {
-        "alreadyMerged": "አስቀድሞ ተዋህዷል",
         "closed": "ይህ የማዋሃድ ጥያቄ ተዘግቷል",
         "closedMergeRequest": "ይህ የማዋሃድ ጥያቄ ተዘግቷል"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "አስፈላጊ ግምገማዎች አልተሟሉም",
         "requiredReviewsDetail": "ከሚፈለጉት ገምጋሚዎች ይሁንታ አልተገኘም ወይም ገና እየተጠበቀ ነው።",
         "failingChecksTitle": "ያላለፉ አስፈላጊ ፍተሻዎች",
-        "failingChecksDetail": "አስፈላጊ የሁኔታ ፍተሻዎች አላለፉም።",
         "unstableTitle": "አንዳንድ ፍተሻዎች አላለፉም",
         "unstableDetail": "ግዴታ ያልሆኑ ፍተሻዎች አላለፉም። ይህ ግን ውህደቱን አይከለክልም።",
         "draftTitle": "ረቂቅ የማዋሃድ ጥያቄ",

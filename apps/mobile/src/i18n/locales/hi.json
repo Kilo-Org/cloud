@@ -3004,7 +3004,6 @@
         "squash": "स्क्वैश"
       },
       "terminal": {
-        "alreadyMerged": "पहले से मर्ज",
         "closed": "यह पुल रिक्वेस्ट बंद है",
         "closedMergeRequest": "यह मर्ज रिक्वेस्ट बंद है"
       },
@@ -3021,7 +3020,6 @@
         "requiredReviewsTitle": "आवश्यक समीक्षाएँ बाकी हैं",
         "requiredReviewsDetail": "आवश्यक समीक्षकों से मंज़ूरी नहीं मिली है या अभी लंबित है।",
         "failingChecksTitle": "आवश्यक जाँचें विफल",
-        "failingChecksDetail": "आवश्यक स्थिति जाँचें विफल हो रही हैं।",
         "unstableTitle": "कुछ जाँचें विफल हो रही हैं",
         "unstableDetail": "वैकल्पिक जाँचें विफल हो रही हैं। इनसे मर्ज नहीं रुकेगा।",
         "draftTitle": "ड्राफ़्ट पुल रिक्वेस्ट",

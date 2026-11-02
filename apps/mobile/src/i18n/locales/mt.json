@@ -463,7 +463,6 @@
         "rebase": "Tibdil tal-bażi"
       },
       "terminal": {
-        "alreadyMerged": "Diġà magħquda",
         "closed": "Din it-talba għall-għaqda hija magħluqa",
         "closedMergeRequest": "Dan il-merge request huwa magħluq"
       },
@@ -480,7 +479,6 @@
         "requiredReviewsTitle": "Reviżjonijiet meħtieġa nieqsa",
         "requiredReviewsDetail": "L-approvazzjonijiet mir-reviżuri meħtieġa huma nieqsa jew pendenti.",
         "failingChecksTitle": "Kontrolli meħtieġa li qed ifallu",
-        "failingChecksDetail": "Il-kontrolli tal-istatus meħtieġa qed ifallu.",
         "unstableTitle": "Xi kontrolli qed ifallu",
         "unstableDetail": "Xi kontrolli mhux obbligatorji qed ifallu. Dawn ma jimblukkawx l-għaqda.",
         "draftTitle": "Abbozz ta' PR",

@@ -84,6 +84,42 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingExcerpt('Turnkey: 4 files changed.')).toBe('Turnkey: 4 files changed.');
   });
 
+  it('screens each pair of a joined assignment', () => {
+    const body = redactBriefingExcerpt('user=' + 'bob&' + 'password=' + 'hunter2');
+    expect(body).not.toContain('hunter2');
+    expect(body).toContain('[redacted credential]');
+    expect(redactBriefingExcerptOrDrop('user=' + 'bob&' + 'password=' + 'hunter2')).not.toContain(
+      'hunter2'
+    );
+  });
+
+  it('screens a quoted key and its value', () => {
+    const json = redactBriefingExcerpt('{"' + 'password' + '":"' + 'hunter2' + '"}');
+    expect(json).not.toContain('hunter2');
+    expect(redactBriefingExcerptOrDrop('{"' + 'password' + '":"' + 'hunter2' + '"}')).not.toContain(
+      'hunter2'
+    );
+  });
+
+  it('screens a credential word that ends an unseparated key name', () => {
+    for (const key of ['MYSQL' + 'PASSWORD', 'my' + 'token']) {
+      const text = redactBriefingExcerpt(`${key}=${'hunter' + '2'}`);
+      expect(text).not.toContain('hunter' + '2');
+    }
+  });
+
+  it('keeps ordinary keys that merely begin with a credential word', () => {
+    for (const evidence of ['tokenizer=cl100k_base', 'keywords=[plan, test]', 'keyboard=us']) {
+      expect(redactBriefingExcerpt(evidence)).toBe(evidence);
+    }
+  });
+
+  it('screens a hyphenated opaque value', () => {
+    const value = 'Ab3dEf6h-Ij1kLm4n-Op7qRs2t-Uv5wXy8z-Ab3dEf6h-Ij1kLm4n';
+    const text = redactBriefingExcerpt(`Observed ${value} in the transcript.`);
+    expect(text).not.toContain(value);
+  });
+
   it('withholds an excerpt when screening still finds credential material', () => {
     expect(redactBriefingExcerptOrDrop('client_secret: "' + secretKey)).toBeUndefined();
     expect(redactBriefingExcerptOrDrop('Completed response with no credentials.')).toBe(

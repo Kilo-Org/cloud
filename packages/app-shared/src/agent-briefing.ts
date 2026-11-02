@@ -161,11 +161,16 @@ const CREDENTIAL_KEY_WORDS = [
   'cookie',
   'credential',
   'key',
+  'keyid',
   'passwd',
   'password',
   'secret',
   'token',
 ];
+// A credential word that ends the token still names a credential when a product or
+// vendor prefix precedes it (`mysqlpassword`, `mytoken`); generic words are excluded
+// so `turnkey`, `monkey` and `hockey` stay ordinary.
+const CREDENTIAL_SUFFIX_WORDS = ['apikey', 'credential', 'passwd', 'password', 'secret', 'token'];
 const CREDENTIAL_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -190,12 +195,20 @@ const CREDENTIAL_QUALIFIER_WINDOW = Math.max(
 const PRIVATE_KEY_BLOCK = /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g;
 const BEARER_VALUE = /\bbearer\s+[^\s,;"}]+/gi;
 // A credential key name followed by an assignment, quoted or not. `(?![=>])` keeps
-// comparison operators and arrows from being read as an assignment.
-const CREDENTIAL_ASSIGNMENT =
-  /([A-Za-z_$][\w$.-]{0,63})\s*((?::=|[:=]))(?![=>])\s*("[^"\n]*"|'[^'\n]*'|[^\s,;"'\]})]+)/g;
-// Credential value shapes that carry no key name of their own. Opaque runs must be
-// at least 32 characters and mix letters with digits, so file paths, words, and
-// short identifiers in evidence survive.
+// comparison operators and arrows from being read as an assignment. Unquoted values
+// stop at whitespace, quotes, list separators, closing brackets and the separators
+// of a following pair, so one pair never swallows the next (`user=bob&password=...`).
+const UNQUOTED_VALUE = String.raw`[^\s,;"'\]})&|?]+`;
+const ASSIGNMENT_VALUE = String.raw`(?:"[^"\n]*"|'[^'\n]*'|` + UNQUOTED_VALUE + ')';
+// A closing quote between a key name and its separator belongs to a quoted key.
+const CREDENTIAL_ASSIGNMENT = new RegExp(
+  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*(` + ASSIGNMENT_VALUE + ')',
+  'g'
+);
+// Credential value shapes that carry no key name of their own. Opaque runs must mix
+// letters with digits: 32 characters or more in the identifier alphabet, and 48 or
+// more when hyphens are allowed, so file paths, words, and short identifiers in
+// evidence survive.
 const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
   [
     /\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b/g,
@@ -205,11 +218,15 @@ const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
   [/\b(?:sk-|ghp_|github_pat_|glpat-|xox[baprs]-)[A-Za-z0-9_-]+/g, '[redacted token]'],
   [/\bnpm_[A-Za-z0-9]{36}\b/g, '[redacted token]'],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted token]'],
+  [/\b(?=[A-Za-z0-9_-]*[0-9])(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{48,}\b/g, '[redacted value]'],
   [/\b(?=[A-Za-z0-9_]*[0-9])(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]{32,}\b/g, '[redacted value]'],
 ];
 const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
 const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
-const CREDENTIAL_KEY_SCAN = /([A-Za-z_$][\w$.-]{0,63})\s*(?::=|[:=])(?![=>])\s*([^\n]*)/g;
+const CREDENTIAL_KEY_SCAN = new RegExp(
+  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*([^\n&|?]*)`,
+  'g'
+);
 const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
 
 function splitCredentialKeyTokens(key: string): string[] {
@@ -226,7 +243,10 @@ function isCredentialToken(token: string): boolean {
   if (CREDENTIAL_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of CREDENTIAL_KEY_WORDS) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
-      if (index === 0) return true;
+      if (CREDENTIAL_SUFFIX_WORDS.includes(word) && index + word.length === token.length)
+        return true;
+      // A qualifier counts only when it ends immediately before the occurrence, so
+      // the scan before each occurrence never needs more than the longest qualifier.
       const window = token.slice(Math.max(0, index - CREDENTIAL_QUALIFIER_WINDOW), index);
       if (CREDENTIAL_KEY_QUALIFIERS.some(qualifier => window.endsWith(qualifier))) return true;
     }
@@ -256,8 +276,8 @@ export function redactBriefingExcerpt(
   let redacted = value
     .replace(PRIVATE_KEY_BLOCK, '[redacted key]')
     .replace(BEARER_VALUE, '[redacted credential]')
-    .replace(CREDENTIAL_ASSIGNMENT, (match, key: string, _separator: string, value: string) =>
-      isCredentialKeyName(key) && !REDACTION_PLACEHOLDER.test(value)
+    .replace(CREDENTIAL_ASSIGNMENT, (match, key: string, assigned: string) =>
+      isCredentialKeyName(key) && !REDACTION_PLACEHOLDER.test(assigned)
         ? '[redacted credential]'
         : match
     );

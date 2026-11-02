@@ -227,10 +227,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // that is empty: the empty state waits for the open to finish.
       //
       // It is the sessions list's own placeholder — anchored to the bottom and
-      // shaped like the bubbles — and it is rendered as a direct child of the
-      // area so its fade-out plays as the stored transcript arrives. The
-      // transcript lands where the placeholder stood instead of jumping from
-      // the top of the area to the bottom when the open finishes.
+      // shaped like the bubbles — so the transcript lands where the placeholder
+      // stood instead of jumping from the top of the area to the bottom when
+      // the open finishes.
       return <SessionSkeletonMessages sessionId={state.sessionId} />;
     }
     if (messages.length === 0) {

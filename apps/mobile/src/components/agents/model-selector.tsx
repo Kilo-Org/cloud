@@ -99,16 +99,26 @@ export function openModelPicker(
     options: (ModelOption | SessionModelOption)[];
     value: string;
     variant: string;
+    /** Whether the caller stores the picked thinking effort; see `ModelPickerBridge`. */
+    acceptsVariant: boolean;
     onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
     selectionScope?: ModelPickerSelectionScopeContextValue;
   }
 ) {
-  const { options, value, variant, onSelect, selectionScope = UNFENCED_SELECTION_CONTEXT } = params;
+  const {
+    options,
+    value,
+    variant,
+    acceptsVariant,
+    onSelect,
+    selectionScope = UNFENCED_SELECTION_CONTEXT,
+  } = params;
   const routeKey = selectionScope.selectionScope.sessionId;
   modelPickerSlot.set(routeKey, {
     options: options.map(option => toSessionModelOption(option)),
     currentValue: value,
     currentVariant: variant,
+    acceptsVariant,
     selectionScope: selectionScope.selectionScope,
     isSelectionCurrent: selectionScope.isSelectionCurrent,
     onSelect: selection => {
@@ -198,6 +208,8 @@ export function ModelSelector({
       options: pickerOptions,
       value,
       variant,
+      // The composer's selection carries its effort into the session.
+      acceptsVariant: true,
       onSelect,
       selectionScope: selectionContext,
     });
@@ -250,6 +262,7 @@ export function ModelPickerOptionRow({
   option,
   selected,
   selectedVariant,
+  acceptsVariant,
   isFavorite,
   showProvider,
   onSelectModel,
@@ -259,6 +272,12 @@ export function ModelPickerOptionRow({
   option: SessionModelOption;
   selected: boolean;
   selectedVariant: string;
+  /**
+   * Whether the picker's caller keeps a picked effort. When it does not, the
+   * row renders no effort chips: a chip here would close the sheet and drop the
+   * choice, because the caller stores only the model id.
+   */
+  acceptsVariant: boolean;
   isFavorite: boolean;
   /**
    * Whether the row shows its provider line. The list turns it off inside a
@@ -406,7 +425,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
       </View>
-      {selected && option.variants.length > 1 ? (
+      {acceptsVariant && selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('agentChat.modelSelector.thinkingEffort')}

@@ -16,6 +16,7 @@ import {
   cliCatalogOption,
   countWithAccessibilityLabel,
   isInstance,
+  radioChoices,
   renderRow,
   renderSelector,
   rowContainer,
@@ -391,6 +392,25 @@ describe('openModelPicker sheet anchoring', () => {
     expect(keyboardDismiss.mock.invocationCallOrder[0]).toBeLessThan(
       routerPush.mock.invocationCallOrder[0] ?? 0
     );
+  });
+});
+
+// The row only offers a thinking effort where the picker's caller keeps one. A
+// chip under a caller that stores only the model id closes the sheet and drops
+// the pick, so those callers get a plain model row instead.
+describe('ModelPickerOptionRow thinking effort availability', () => {
+  const effortOptions = cliCatalogOption({ variants: ['low', 'high'] });
+
+  it('offers one chip per effort on the selected multi-variant row a caller can keep', () => {
+    const renderer = renderRow(effortOptions, { selected: true });
+
+    expect(radioChoices(renderer)).toHaveLength(2);
+  });
+
+  it('leaves the chips out when the picker caller keeps no variant', () => {
+    const renderer = renderRow(effortOptions, { selected: true, acceptsVariant: false });
+
+    expect(radioChoices(renderer)).toHaveLength(0);
   });
 });
 

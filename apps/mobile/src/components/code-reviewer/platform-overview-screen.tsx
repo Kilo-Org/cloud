@@ -186,6 +186,7 @@ export function PlatformOverviewScreen({
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',
+      acceptsVariant: true,
       onSelect: (modelSlug, variant) => {
         save.mutate({ modelSlug, thinkingEffort: variant || null });
       },

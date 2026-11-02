@@ -40,6 +40,7 @@ export function modelPickerFixtureRoute(path: string): string | null {
     options,
     currentValue: options[0]?.id ?? '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope,
     isSelectionCurrent: scope => scope === selectionScope,
     onSelect: selection => {

@@ -151,7 +151,15 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
-          openModelPicker(router, { options: models, value, variant: '', onSelect });
+          // The Security Agent config stores a model slug and nothing else, so
+          // the picker must not offer a thinking effort it would have to drop.
+          openModelPicker(router, {
+            options: models,
+            value,
+            variant: '',
+            acceptsVariant: false,
+            onSelect,
+          });
         }
       : undefined;
 

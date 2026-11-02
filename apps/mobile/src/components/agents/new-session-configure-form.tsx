@@ -393,6 +393,7 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         startBlockedReason={startBlockedReason}
         startBlockedAction={startBlockedAction}
+        blockedByPlan={planRefusal !== null}
         onStartSession={onStartSession}
       />
     </View>

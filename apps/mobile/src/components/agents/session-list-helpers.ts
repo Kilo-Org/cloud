@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
-import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
+import { CURRENCY_ZERO_THRESHOLD, formatCurrency, formatNumber } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
@@ -264,6 +264,29 @@ export function formatSessionTotalCost(microdollars: number | null | undefined):
     return null;
   }
   return formatCurrency(usd, i18n.language, 4);
+}
+
+/**
+ * The header pill's cost slot: the same amount and digits as
+ * `formatSessionTotalCost`, with the sign in front of the number and no
+ * separator. Several languages format USD as a suffix (`0.0005 $`), which in a
+ * right-to-left interface reads as a currency sign detached from its amount;
+ * the pill shows the sign and the amount as one run in every language, the same
+ * `$0.0005` the percentage sits beside.
+ */
+export function formatSessionCostBadge(microdollars: number | null | undefined): string | null {
+  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
+    return null;
+  }
+  const usd = microdollars / 1_000_000;
+  if (usd < CURRENCY_ZERO_THRESHOLD) {
+    return null;
+  }
+  const fractionDigits = usd >= 0.005 ? 2 : 4;
+  return `$${formatNumber(usd, i18n.language, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}`;
 }
 
 /**

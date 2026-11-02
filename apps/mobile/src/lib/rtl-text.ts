@@ -106,6 +106,19 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
 
 /**
+ * The start alignment for a block of prose. A renderer that resolves a
+ * paragraph's direction from its first strong character — the native markdown
+ * text does — leaves a Latin reply at the left edge of a right-to-left
+ * interface while the rows around it sit on the start edge, so the interface
+ * names the alignment itself. In a left-to-right interface the patch is empty
+ * and the renderer keeps its natural alignment; a centered block is unaffected
+ * because it never takes this patch.
+ */
+export function rtlBlockTextAlign(isRtl: boolean): { textAlign?: 'right' } {
+  return isRtl ? { textAlign: 'right' } : {};
+}
+
+/**
  * A joined script's letters connect into one shape, so `letter-spacing` — a
  * Latin display device — opens every glyph from its neighbour and splits a word
  * mid-shape («الوكلاء» draws as «الوكلا ء»). This is the script, not the

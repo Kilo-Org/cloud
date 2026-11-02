@@ -347,7 +347,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 stackBalance ? 'flex-row items-center gap-1' : 'gap-1'
               )}
             >
-              {amountLine}
+              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
               {stackBalance ? (
                 <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
               ) : (

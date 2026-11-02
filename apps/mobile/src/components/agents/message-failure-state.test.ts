@@ -24,7 +24,10 @@ function assistantInfo(errorName: string): MessageInfo {
     role: 'assistant',
     time: { created: 1_761_000_000_000 },
     // Deliberately carries raw provider text; the helper must never surface it.
-    error: { name: errorName, data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true } } as unknown as AssistantError,
+    error: {
+      name: errorName,
+      data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+    } as unknown as AssistantError,
     parentID: 'u1',
     modelID: 'anthropic/claude-sonnet-4',
     providerID: 'kilo',

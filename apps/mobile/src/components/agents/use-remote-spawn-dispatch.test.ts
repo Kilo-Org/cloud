@@ -105,7 +105,9 @@ vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
 // The membership list is one cache entry the hook reads for the subscription
 // gate's verdict; the tests set it per case.
 const organizationsListMock = vi.hoisted(() => ({
-  data: undefined as { organizationId: string; isTrialExpiredForEnforcement: boolean }[] | undefined,
+  data: undefined as
+    | { organizationId: string; isTrialExpiredForEnforcement: boolean }[]
+    | undefined,
 }));
 
 vi.mock('@/lib/hooks/use-organizations-list', () => ({

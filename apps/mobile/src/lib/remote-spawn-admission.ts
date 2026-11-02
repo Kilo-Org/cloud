@@ -31,9 +31,11 @@ export type RemoteStartPlanInput = {
  * organization is not in it) never refuse: the app does not block a start on a
  * verdict it does not have.
  */
-export function resolveRemoteStartPlan(input: RemoteStartPlanInput): {
-  allowed: true;
-} | { allowed: false; toast: string } {
+export function resolveRemoteStartPlan(input: RemoteStartPlanInput):
+  | {
+      allowed: true;
+    }
+  | { allowed: false; toast: string } {
   const { organizationId, organizations } = input;
   if (organizationId == null || organizations === undefined) {
     return { allowed: true };

@@ -78,9 +78,7 @@ export async function getUserOrganizationsWithSeats(
   // `organization_seats_purchases` is append-only, so the most recently created
   // row is the organization's current subscription state — the same input the
   // subscription gate classifies with.
-  const latestSeatPurchaseStatus = sql<
-    OrganizationSeatsPurchase['subscription_status'] | null
-  >`(
+  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
     SELECT ${organization_seats_purchases.subscription_status}
     FROM ${organization_seats_purchases}
     WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}

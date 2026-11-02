@@ -41,6 +41,7 @@ import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
   addKept,
+  type Asked,
   askedIn,
   dropKept,
   forgetAsked,
@@ -509,6 +510,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       failureKey: null,
       record: recordOfChat(database, current),
     });
+    await dropFoldedKept(current, asked);
     return;
   }
   const { handle, scope } = opened;
@@ -542,6 +544,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
+    await dropFoldedKept(sessionId, asked);
   } catch (error) {
     /* Reading the history or the pending question failed after the session
        opened. The screen settles idle with the reason, so entering the chat
@@ -549,6 +552,24 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
        holds, so its scope is closed here or it leaks. */
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
+  }
+}
+
+/**
+ * Drops the kept record the slot's question was asked from, once the open has
+ * folded it out of the transcript. Without this the record stays written and
+ * comes back as a bubble of its own after the answer lands and the slot's
+ * record is cleared. A write that refuses is not the open's failure: the fold
+ * holds for this session, and the next open folds it again.
+ */
+async function dropFoldedKept(sessionId: string, asked: Asked | null): Promise<void> {
+  if (asked?.from == null) {
+    return;
+  }
+  try {
+    await dropKept(sessionId, [asked.from]);
+  } catch {
+    /* The record stays written; the fold hides it while the slot names it. */
   }
 }
 

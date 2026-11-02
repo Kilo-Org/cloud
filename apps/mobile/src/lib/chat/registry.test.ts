@@ -1222,6 +1222,10 @@ describe('a question a later send took the slot from', () => {
       'interrupted:displaced:b',
       'interrupted:asked',
     ]);
+    // The folded copy is written away too, so it cannot return as a bubble of
+    // its own once the slot's record is cleared.
+    const written = await keptIn('interrupted');
+    expect(written.map(one => one.id)).toEqual(['b']);
   });
 
   it('draws two questions that say the same words with different pictures', async () => {

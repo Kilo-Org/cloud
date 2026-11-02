@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_environment_profile_commands,
   agent_environment_profiles,
@@ -70,13 +71,19 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('Provide one owned fake email matching kilo-<name>@example.com.');
   }
-  const databaseUrl = new URL(process.env.POSTGRES_URL ?? '');
+  // `getSeedDb()` connects with `computeDatabaseUrl()`, which prefers
+  // `POSTGRES_URL_PRODUCTION` when `USE_PRODUCTION_DB=true`; check the URL that
+  // connection actually uses and refuse the production switch outright, as the
+  // neighbouring mobile seeds do.
+  const databaseUrl = new URL(computeDatabaseUrl());
   if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(databaseUrl.hostname) ||
-    process.env.NODE_ENV === 'production' ||
-    process.env.SKIP_STRIPE_API !== 'true'
+    process.env.USE_PRODUCTION_DB === 'true' ||
+    process.env.SKIP_STRIPE_API !== 'true' ||
+    !['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)
   ) {
-    throw new Error('This fixture requires a local development database and SKIP_STRIPE_API=true.');
+    throw new Error(
+      'This fixture requires an isolated loopback database and SKIP_STRIPE_API=true.'
+    );
   }
 
   const db = getSeedDb();

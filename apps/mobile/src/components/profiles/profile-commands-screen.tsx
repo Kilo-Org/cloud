@@ -266,7 +266,7 @@ export function ProfileCommandsScreen({
           label={commandLabel}
           trailing={rowControls}
           accessibilityHint={rowHint}
-          disabled={!canManage}
+          readOnly={!canManage}
           onChangeText={value => {
             setCommands(current => replaceCommand(current, index, value));
           }}

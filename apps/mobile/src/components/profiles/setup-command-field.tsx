@@ -19,6 +19,9 @@ type SetupCommandFieldProps = Readonly<{
   label: string;
   /** Controls that belong to this command's own row, at the end of its label line. */
   trailing?: ReactNode;
+  /** The viewer cannot manage this row: render the command as read-only text. */
+  readOnly?: boolean;
+  /** The row is busy, not unmanageable: the field stays a field, dimmed. */
   disabled?: boolean;
   accessibilityHint?: string;
   onChangeText: (next: string) => void;
@@ -48,6 +51,7 @@ export function SetupCommandField({
   command,
   label,
   trailing,
+  readOnly = false,
   disabled = false,
   accessibilityHint,
   onChangeText,
@@ -56,7 +60,7 @@ export function SetupCommandField({
 }: Readonly<SetupCommandFieldProps>) {
   const { t } = useTranslation();
 
-  if (disabled) {
+  if (readOnly) {
     return (
       <View className="gap-1.5">
         <FormFieldLabel label={label} labelAccessory={trailing} />
@@ -76,8 +80,8 @@ export function SetupCommandField({
   const remaining = MAX_SETUP_COMMAND_LENGTH - command.length;
   // One line at a time: the room left while there is room, the bound once there
   // is none. At zero the count would only restate the sentence below it.
-  const showsCounter = remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
-  const showsBound = remaining <= 0;
+  const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
+  const showsBound = !disabled && remaining <= 0;
 
   return (
     <View className="gap-1.5">
@@ -92,6 +96,7 @@ export function SetupCommandField({
         autoCorrect={false}
         returnKeyType="done"
         accessibilityHint={accessibilityHint}
+        disabled={disabled}
         onEndEditing={onEndEditing}
         onSubmitEditing={onSubmitEditing}
         onChangeText={onChangeText}

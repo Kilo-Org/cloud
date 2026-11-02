@@ -590,6 +590,93 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('indexes Enkrypt usage anonymization by user across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN UPDATE ${schema.enkrypt_usage}
+        SET kilo_user_id = 'deleted', session_id = NULL
+        WHERE ${schema.enkrypt_usage.kilo_user_id} = 'oauth/enkrypt-index-test'
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (kilo_user_id =');
+    });
+  });
+
+  it('routes Enkrypt usage into monthly partitions with a timestamp-qualified primary key', async () => {
+    const partitioning = await schemaTestDb.db.execute(sql`
+      SELECT pg_get_partkeydef(partrelid) AS key
+      FROM pg_partitioned_table
+      WHERE partrelid = 'public.enkrypt_usage'::regclass
+    `);
+    expect(partitioning.rows).toEqual([{ key: 'RANGE (created_at)' }]);
+
+    const rollback = new Error('rollback Enkrypt partition fixtures');
+    await expect(
+      schemaTestDb.db.transaction(async tx => {
+        const [apiKind] = await tx
+          .insert(schema.api_kind)
+          .values({ api_kind: 'chat_completions' })
+          .onConflictDoUpdate({
+            target: schema.api_kind.api_kind,
+            set: { api_kind: 'chat_completions' },
+          })
+          .returning();
+        const [decision] = await tx
+          .insert(schema.enkrypt_usage_decision)
+          .values({ decision: 'allowed' })
+          .onConflictDoUpdate({
+            target: schema.enkrypt_usage_decision.decision,
+            set: { decision: 'allowed' },
+          })
+          .returning();
+        if (!apiKind || !decision) throw new Error('Missing Enkrypt lookup fixtures');
+
+        const now = new Date();
+        const timestamps = [0, 1].map(offset =>
+          new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString()
+        );
+        const usage = {
+          id: crypto.randomUUID(),
+          organization_id: crypto.randomUUID(),
+          kilo_user_id: 'oauth/enkrypt-partition-test',
+          api_kind_id: apiKind.api_kind_id,
+          decision_id: decision.decision_id,
+          charged_microdollars: 100,
+        };
+        await tx
+          .insert(schema.enkrypt_usage)
+          .values(timestamps.map(created_at => ({ ...usage, created_at })));
+        const partitions = await tx.execute(sql`
+          SELECT tableoid::regclass::text AS name
+          FROM ${schema.enkrypt_usage}
+          WHERE ${schema.enkrypt_usage.id} = ${usage.id}
+          ORDER BY ${schema.enkrypt_usage.created_at}
+        `);
+        expect(partitions.rows).toEqual(
+          timestamps.map(timestamp => ({
+            name: `enkrypt_usage_${timestamp.slice(0, 7).replace('-', '_')}`,
+          }))
+        );
+        await expect(
+          tx.transaction(nested =>
+            nested.insert(schema.enkrypt_usage).values({ ...usage, created_at: timestamps[0] })
+          )
+        ).rejects.toThrow();
+        await expect(
+          tx.transaction(nested =>
+            nested.insert(schema.enkrypt_usage).values({
+              ...usage,
+              id: crypto.randomUUID(),
+              decision_id: -1,
+              created_at: timestamps[0],
+            })
+          )
+        ).rejects.toThrow();
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+  });
+
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
 

@@ -79,6 +79,7 @@ import {
   user_feedback,
   cloud_agent_feedback,
   security_advisor_scans,
+  enkrypt_usage,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
   security_agent_commands,
@@ -1954,6 +1955,10 @@ export async function anonymizeCloudUserData(
     .update(security_advisor_scans)
     .set({ kilo_user_id: 'deleted', public_ip: null })
     .where(eq(security_advisor_scans.kilo_user_id, userId));
+  await tx
+    .update(enkrypt_usage)
+    .set({ kilo_user_id: 'deleted', session_id: null })
+    .where(eq(enkrypt_usage.kilo_user_id, userId));
 }
 
 export type UsagePromptPrefixCursor = {

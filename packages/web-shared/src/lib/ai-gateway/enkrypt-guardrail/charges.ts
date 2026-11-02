@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { enkrypt_guardrail_charges } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { api_kind, enkrypt_usage, enkrypt_usage_decision } from '@kilocode/db/schema';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
@@ -49,13 +50,49 @@ export async function recordEnkryptGuardrailCharge(charge: EnkryptGuardrailCharg
   const chargedMicrodollars = enkryptCreditsToMicrodollars(charge.creditsCost);
 
   const organizationUsage = await db.transaction(async tx => {
-    await tx.insert(enkrypt_guardrail_charges).values({
+    let [apiKind] = await tx
+      .select({ id: api_kind.api_kind_id })
+      .from(api_kind)
+      .where(eq(api_kind.api_kind, charge.apiKind));
+    if (!apiKind) {
+      [apiKind] = await tx
+        .insert(api_kind)
+        .values({ api_kind: charge.apiKind })
+        .onConflictDoNothing({ target: api_kind.api_kind })
+        .returning({ id: api_kind.api_kind_id });
+      if (!apiKind) {
+        [apiKind] = await tx
+          .select({ id: api_kind.api_kind_id })
+          .from(api_kind)
+          .where(eq(api_kind.api_kind, charge.apiKind));
+      }
+    }
+    let [decision] = await tx
+      .select({ id: enkrypt_usage_decision.decision_id })
+      .from(enkrypt_usage_decision)
+      .where(eq(enkrypt_usage_decision.decision, charge.decision));
+    if (!decision) {
+      [decision] = await tx
+        .insert(enkrypt_usage_decision)
+        .values({ decision: charge.decision })
+        .onConflictDoNothing({ target: enkrypt_usage_decision.decision })
+        .returning({ id: enkrypt_usage_decision.decision_id });
+      if (!decision) {
+        [decision] = await tx
+          .select({ id: enkrypt_usage_decision.decision_id })
+          .from(enkrypt_usage_decision)
+          .where(eq(enkrypt_usage_decision.decision, charge.decision));
+      }
+    }
+    if (!apiKind || !decision) throw new Error('Enkrypt usage lookup resolution failed');
+
+    await tx.insert(enkrypt_usage).values({
       id,
       organization_id: charge.organizationId,
       kilo_user_id: charge.kiloUserId,
       session_id: charge.sessionId,
-      api_kind: charge.apiKind,
-      decision: charge.decision,
+      api_kind_id: apiKind.id,
+      decision_id: decision.id,
       enkrypt_credits_cost: charge.creditsCost,
       charged_microdollars: chargedMicrodollars,
       added_latency_ms: charge.addedLatencyMs,

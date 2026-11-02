@@ -410,3 +410,31 @@ describe('disabled switch pair contrast (non-text)', () => {
     }
   });
 });
+
+// The `secondary` button variant paints `--secondary-fill`. It used to paint
+// `--secondary`, which is also the dark card an `outline` control paints, so in
+// the dark scheme a filled action and the outlined control beside it (the
+// discard-draft sheet's Save as to-do and Keep editing) rendered one colour.
+describe('filled neutral action contrast (non-text)', () => {
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+
+  it('dark theme: the filled action reads on the card and apart from the outlined fill', () => {
+    for (const surface of [darkColors.card, darkColors.secondary]) {
+      expect(contrastRatio(darkColors.secondaryFill, surface)).toBeGreaterThanOrEqual(
+        MIN_VISIBLE_SURFACE_RATIO
+      );
+    }
+  });
+
+  it('light theme: the filled action keeps the surface it has always painted', () => {
+    expect(lightColors.secondaryFill).toBe(lightColors.secondary);
+  });
+
+  it('every theme: the filled action label clears 4.5:1 on its own fill', () => {
+    for (const colors of [lightColors, darkColors]) {
+      expect(
+        contrastRatio(colors.secondaryForeground, colors.secondaryFill)
+      ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
+  });
+});

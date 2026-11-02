@@ -134,3 +134,50 @@ describe('BriefingCard in the Home card frame', () => {
     expect(pressablesIn(renderCardInFrame('reserved'))).toHaveLength(0);
   });
 });
+
+/**
+ * The frame keeps the taller card's height, so the shorter one has slack to place.
+ * Only the device can measure where it lands, so these pin the layout ownership the
+ * measurement depends on: the embedded card fills its layer, its counts keep their
+ * own padding above the divider, and the summary row absorbs the reserved height
+ * with its content centered.
+ */
+describe('BriefingCard layout ownership', () => {
+  function renderCard(embedded: boolean): ReactTestRenderer {
+    const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        <BriefingCard report={briefingReport} embedded={embedded} />
+      );
+    });
+    if (!ref.current) {
+      throw new Error('BriefingCard did not mount');
+    }
+    return ref.current;
+  }
+
+  function classNames(renderer: ReactTestRenderer): string[] {
+    return renderer.root
+      .findAllByType('View' as ElementType)
+      .map(view => String(view.props.className));
+  }
+
+  function summaryRowClasses(classes: string[]): string[] {
+    return classes.filter(
+      name => name.includes('flex-row items-center gap-2') && name.includes('px-4 py-3')
+    );
+  }
+
+  it('fills the layer it is drawn in and lets the summary row hold its height', () => {
+    const classes = classNames(renderCard(true));
+    expect(classes[0]).toContain('grow');
+    expect(classes.filter(name => name.includes('h-px'))).toEqual(['h-px bg-border']);
+    expect(summaryRowClasses(classes)).toEqual([expect.stringContaining('flex-1')]);
+  });
+
+  it('keeps its intrinsic height outside the frame', () => {
+    const classes = classNames(renderCard(false));
+    expect(classes[0]).not.toContain('grow');
+    expect(summaryRowClasses(classes)).toEqual([expect.not.stringContaining('flex-1')]);
+  });
+});

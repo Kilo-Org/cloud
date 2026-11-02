@@ -396,9 +396,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const workspacePreparations = new Map<string, Promise<void>>();
 
   const hasGit = deps.hasGit ?? defaultHasGit;
-  const readStamp =
-    deps.readStamp ??
-    (async (directory: string) => readWorkspaceStamp(directory, await hasGit(directory)));
+  const readStamp = deps.readStamp ?? readWorkspaceStamp;
   const writeStamp =
     deps.writeStamp ??
     (async (directory: string, stamp: WorkspaceStamp) =>
@@ -709,13 +707,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     return { inspection, stamp };
   }
 
-  /**
-   * Bring the route's directory to a prepared workspace and report how. The
-   * filesystem alone decides (spec: workspace stamp): a stamp from this allocation
-   * needs nothing, one from another allocation is a restored environment snapshot
-   * to adopt, and anything else is cloned. Setup always runs after a clone or an
-   * adopt, with this session's admitted configuration. A session never captures.
-   */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
     directory: string,
@@ -726,9 +717,29 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     onReplacementWorkspace?: () => Promise<boolean>
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
-    deferredStamp: { commit: string } | null;
+    deferredStamp: { commit: string; workspacePrepared?: false } | null;
   }> {
     const workspaceStartedAt = Date.now();
+    const { inspection, stamp } = await inspectWorkspace(directory);
+    if (spec.sessionSnapshot !== undefined) {
+      setStep('restore');
+      const sourceAllocationId = spec.sessionSnapshot.sourceAllocationId;
+      if (
+        stamp === null ||
+        (stamp.allocationId !== sourceAllocationId && stamp.allocationId !== deps.allocationId) ||
+        (spec.git !== undefined && !(await hasGit(directory))) ||
+        !(await fs.stat(directory).then(
+          stat => stat.isDirectory(),
+          () => false
+        ))
+      ) {
+        throw new WrapperBootstrapError({
+          code: 'WORKSPACE_SETUP_FAILED',
+          message: 'Session snapshot workspace provenance does not match the prepared session',
+          retryable: false,
+        });
+      }
+    }
     // Git authenticates through the pinned helper's per-session record, never
     // through `origin`. A reused workspace is refreshed here too, so a renewed
     // grant reaches the next `git push` without touching the remote.
@@ -749,12 +760,34 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         });
       }
     }
-    const inspectStartedAt = Date.now();
-    const { inspection } = await inspectWorkspace(directory);
     log(
-      `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
+      `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
-    if (inspection === 'same') return { outcome: 'same', deferredStamp: null };
+    if (
+      inspection === 'same' ||
+      (spec.sessionSnapshot !== undefined && stamp?.allocationId === deps.allocationId)
+    )
+      return { outcome: 'same', deferredStamp: null };
+    if (spec.sessionSnapshot !== undefined) {
+      emitProgress(spec.sessionId, 'restore', 'Restoring session disk snapshot');
+      if (spec.git) {
+        await withinStep('restore', timers.restoreMs, signal =>
+          configureGitAuthor(
+            directory,
+            (args, options) => runGit(args, { ...options, cwd: directory, env, inheritEnv: false }),
+            spec.git?.author,
+            signal
+          )
+        );
+      }
+      return {
+        outcome: 'adopted',
+        deferredStamp: {
+          commit: await headCommit(directory, env),
+          ...(stamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
+        },
+      };
+    }
     let adopted = false;
     if (inspection === 'foreign') {
       const adoptStartedAt = Date.now();
@@ -1060,7 +1093,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ],
         spec.secretEnvKeys ?? []
       );
-      const needsWorkspace = Boolean(spec.git) || (spec.setupCommands?.length ?? 0) > 0;
+      const needsWorkspace =
+        spec.sessionSnapshot !== undefined ||
+        Boolean(spec.git) ||
+        (spec.setupCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.
@@ -1075,6 +1111,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // after the stamp but before import). An unstamped repository is a partial
       // preparation, not proof of recovery, so it keeps ingest restoration.
       const restoreFilesFor = (): boolean =>
+        spec.sessionSnapshot === undefined &&
         !(replacementWorkspace && localRecoveryApplied) &&
         !(recovery !== undefined && workspace === 'same');
       // One owner for runtime profile, runtime start and session resolution, shared
@@ -1118,7 +1155,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         );
       };
       await withWorkspaceLock(directory, async () => {
-        if (!needsWorkspace) return;
+        if (!needsWorkspace) {
+          await mkdir(directory);
+          return;
+        }
         const preparedWorkspace = await prepareWorkspace(
           spec,
           directory,
@@ -1179,7 +1219,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         if (!owner.released) {
           await writeStamp(directory, {
             allocationId: deps.allocationId,
-            commit: preparedWorkspace.deferredStamp.commit,
+            ...preparedWorkspace.deferredStamp,
           });
         }
       });
@@ -1193,6 +1233,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await ensureRuntimeAndSession(restoreFilesFor());
       }
       if (owner.released) return;
+      if (!needsWorkspace) {
+        await withWorkspaceLock(directory, async () => {
+          if (await readStamp(directory)) return;
+          await writeStamp(directory, {
+            allocationId: deps.allocationId,
+            commit: '',
+            workspacePrepared: false,
+          });
+        });
+      }
       prepared.set(sessionId, {
         key,
         spec,

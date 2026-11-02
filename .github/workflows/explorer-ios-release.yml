@@ -92,10 +92,10 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
       - name: Disable OTA in generated native configuration

@@ -22,6 +22,7 @@ export type CloudAgentAttachments = {
  * the workspace root, so strip that form too.
  */
 const CONTAINER_WORKSPACE_ROOT = /^\/workspace\/app(?=\/|$)/;
+const PUBLIC_CLOUD_AGENT_ROOT = /^\/cloud-agent\/sessions\/ses_[^/]+(?=\/|$)/;
 const ABSOLUTE_CLOUD_AGENT_ROOT =
   /^.*\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+(?=\/|$)/;
 const RELATIVE_CLOUD_AGENT_ROOT =
@@ -31,6 +32,7 @@ const RELATIVE_CLOUD_AGENT_ROOT =
 export function cloudAgentFileLabel(path: string): string {
   const normalized = path.replaceAll('\\', '/');
   const strippedRoot = normalized
+    .replace(PUBLIC_CLOUD_AGENT_ROOT, '')
     .replace(CONTAINER_WORKSPACE_ROOT, '')
     .replace(ABSOLUTE_CLOUD_AGENT_ROOT, '')
     .replace(RELATIVE_CLOUD_AGENT_ROOT, '');

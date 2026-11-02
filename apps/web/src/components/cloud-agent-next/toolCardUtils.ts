@@ -1,3 +1,35 @@
+import * as z from 'zod';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
+import type { ToolPart } from './types';
+
+export const toolPathKeys = [
+  'filePath',
+  'file_path',
+  'filepath',
+  'path',
+  'workdir',
+  'directory',
+  'cwd',
+  'root',
+];
+const argumentsSchema = z.record(z.string(), z.unknown());
+
+export function getToolArguments(toolPart: ToolPart): Record<string, unknown> | undefined {
+  const input = toolPart.state.input;
+  if (toolPart.tool !== 'mcp') return input;
+  const result = argumentsSchema.safeParse(input?.arguments);
+  return result.success ? result.data : undefined;
+}
+
+export function getToolInputPath(input: Record<string, unknown> | undefined): string | undefined {
+  if (!input) return undefined;
+  for (const key of toolPathKeys) {
+    const value = input[key];
+    if (typeof value === 'string' && value.trim()) return cloudAgentFileLabel(value);
+  }
+  return undefined;
+}
+
 export function getFilename(filePath: string): string {
   const parts = filePath.split('/');
   return parts[parts.length - 1] || filePath;

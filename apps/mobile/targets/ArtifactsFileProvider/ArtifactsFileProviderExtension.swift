@@ -68,13 +68,12 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
         completionHandler(nil, NSFileProviderError(.noSuchItem))
         return progress
       }
-      let modified = mirror.fileAttributes(sessionId: sessionId, fileId: fileId)?.modified
       completionHandler(
         ArtifactItem(
           file: file,
           sessionId: sessionId,
           filename: resolvedFilename(file: file, sessionId: sessionId),
-          contentModificationDate: modified
+          contentModificationDate: mirror.fileAttributes(sessionId: sessionId, fileId: fileId)
         ),
         nil
       )
@@ -100,13 +99,11 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
       completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
       return progress
     }
-    let attributes = mirror.fileAttributes(sessionId: sessionId, fileId: fileId)
-    let modified = attributes?.modified
     let item = ArtifactItem(
       file: file,
       sessionId: sessionId,
       filename: resolvedFilename(file: file, sessionId: sessionId),
-      contentModificationDate: modified
+      contentModificationDate: mirror.fileAttributes(sessionId: sessionId, fileId: fileId)
     )
     // The requested version is the system's pinned copy of this file: serving
     // different bytes against it would hand the Files app content that does
@@ -135,21 +132,19 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
    The safe, single-component filename this extension hands out for a manifest
    entry: sanitized, then deduplicated against the rest of the session's
    entries in the manifest's own order, exactly as enumeration resolves them,
-   so the item's filename and the staged URL agree.
+   so the item's filename and the staged URL agree. An entry the session does
+   not hold keeps the sanitized name on its own.
    */
   private func resolvedFilename(file: ArtifactManifest.File, sessionId: String) -> String {
-    var taken = Set<String>()
-    var resolved: String?
-    for entry in mirror.session(id: sessionId)?.files ?? [] {
-      let candidate = ArtifactFileName.unique(
-        ArtifactFileName.sanitize(id: entry.id, name: entry.name, mime: entry.mime),
-        taken: &taken
-      )
-      if entry.id == file.id {
-        resolved = candidate
-      }
+    let fallback = ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime)
+    guard let session = mirror.session(id: sessionId) else {
+      return fallback
     }
-    return resolved ?? ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime)
+    // The last entry carrying this id, which is what the ordered scan this
+    // replaced resolved: one id names one item, so only a duplicate id in a
+    // broken index can tell the two apart.
+    return mirror.resolvedFilenames(in: session).last { $0.file.id == file.id }?.filename
+      ?? fallback
   }
 
   func createItem(
@@ -299,9 +294,6 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
   let contentType: UTType
   let documentSize: NSNumber?
   let contentModificationDate: Date?
-  let version: NSFileProviderItemVersion
-  let capabilities: NSFileProviderItemCapabilities
-
   /**
    The version the framework compares: the mirrored file's size and
    modification date as the content version, stamped as the metadata version.
@@ -312,9 +304,8 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
    the system pins are the same bytes. The protocol requirement is
    non-optional, so folders carry the zero version.
    */
-  var itemVersion: NSFileProviderItemVersion {
-    version
-  }
+  let itemVersion: NSFileProviderItemVersion
+  let capabilities: NSFileProviderItemCapabilities
 
   /** The location's own root, which the Files app titles with the domain name. */
   static let root = ArtifactItem(
@@ -344,7 +335,7 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     self.contentType = contentType
     self.documentSize = documentSize
     self.contentModificationDate = contentModificationDate
-    self.version = itemVersion
+    self.itemVersion = itemVersion
     // `.allowsReading` is the whole of it for a file. The root and a session
     // folder add `.allowsContentEnumerating`; nothing here ever adds a write
     // capability.
@@ -574,21 +565,15 @@ final class ArtifactMirror: @unchecked Sendable {
       guard let session = session(id: sessionId) else {
         return []
       }
-      // Names are sanitized and deduplicated here, so the item the
-      // enumeration hands out and the URL `fetchContents` stages agree on one
+      // Every entry takes the name `resolvedFilenames` hands out, so the item
+      // the enumeration shows and the URL `fetchContents` stages agree on one
       // safe filename per entry.
-      var taken = Set<String>()
-      return session.files.map { file in
-        let name = ArtifactFileName.unique(
-          ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime),
-          taken: &taken
-        )
-        let modified = fileAttributes(sessionId: sessionId, fileId: file.id)?.modified
-        return ArtifactItem(
-          file: file,
+      return resolvedFilenames(in: session).map { entry in
+        ArtifactItem(
+          file: entry.file,
           sessionId: sessionId,
-          filename: name,
-          contentModificationDate: modified
+          filename: entry.filename,
+          contentModificationDate: fileAttributes(sessionId: sessionId, fileId: entry.file.id)
         )
       }
     case .file, .unknown:
@@ -597,17 +582,40 @@ final class ArtifactMirror: @unchecked Sendable {
   }
 
   /**
-   The mirror file's size and modification date, or nil when the file is not
-   on disk or its attributes cannot be read. The version fields and the
-   Files-app timestamp both come from this.
+   Every file of a session with the filename it is handed out under, in the
+   manifest's own order: sanitized, then deduplicated against the entries
+   resolved before it, so the first entry keeps its name and a later collision
+   takes a counter suffix before the extension.
+
+   Enumeration and single-item lookup both read this one result, so the name an
+   item shows and the name `fetchContents` stages for it cannot drift.
    */
-  func fileAttributes(sessionId: String, fileId: String) -> (size: Int?, modified: Date?)? {
-    guard let url = fileURL(sessionId: sessionId, fileId: fileId),
-      let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-    else {
+  func resolvedFilenames(
+    in session: ArtifactManifest.Session
+  ) -> [(file: ArtifactManifest.File, filename: String)] {
+    var taken = Set<String>()
+    return session.files.map { file in
+      (
+        file: file,
+        filename: ArtifactFileName.unique(
+          ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime),
+          taken: &taken
+        )
+      )
+    }
+  }
+
+  /**
+   The mirror file's modification date, or nil when the URL is not one the
+   mirror may address or the attributes cannot be read. The content version and
+   the Files-app timestamp both come from this.
+   */
+  func fileAttributes(sessionId: String, fileId: String) -> Date? {
+    guard let url = fileURL(sessionId: sessionId, fileId: fileId) else {
       return nil
     }
-    return (values.fileSize, values.contentModificationDate)
+    return (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+      .contentModificationDate
   }
 
   private static func rootURL() -> URL? {
@@ -844,16 +852,16 @@ enum ArtifactFileName {
     guard name.utf8.count > maxBytes else {
       return name
     }
-    if let start = name.lastIndex(of: "."), start != name.startIndex,
-      start < name.index(before: name.endIndex)
-    {
-      let extension_ = String(name[start...])
-      if extension_.utf8.count < maxBytes {
-        let stemBudget = maxBytes - extension_.utf8.count
-        let stem = truncateUtf8(String(name[..<start]), stemBudget)
-        if !stem.isEmpty {
-          return stem + extension_
-        }
+    // `splitExtension` answers an empty extension for every name whose dot is
+    // no split point (none, leading, trailing), so those keep the whole-name
+    // truncation below. A split name keeps its extension only when the
+    // extension fits the bound on its own and the stem keeps at least one
+    // character.
+    let (stem, extension_) = splitExtension(name)
+    if extension_.utf8.count < maxBytes {
+      let boundedStem = truncateUtf8(stem, maxBytes - extension_.utf8.count)
+      if !boundedStem.isEmpty {
+        return boundedStem + extension_
       }
     }
     return truncateUtf8(name, maxBytes)

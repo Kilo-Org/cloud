@@ -115,7 +115,7 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('filename: session.title');
     // The file item's filename is the session-resolved safe name, never the
     // raw manifest name (see the filename resolution test below).
-    expect(extensionSource).toContain('filename: name,');
+    expect(extensionSource).toContain('filename: entry.filename,');
     expect(extensionSource).toContain('contentType: UTType(mimeType: file.mime) ?? .data');
   });
 
@@ -133,11 +133,24 @@ describe('artifacts File Provider extension contract', () => {
       'static func unique(_ name: String, taken: inout Set<String>) -> String'
     );
     expect(extensionSource).toContain('static let maxBytes = 200');
-    // Enumeration resolves every entry through the sanitizer, in the
-    // manifest's own order, so the first duplicate keeps its name and a later
-    // one takes a counter suffix.
-    expect(itemsBody).toContain('ArtifactFileName.sanitize(');
-    expect(itemsBody).toContain('ArtifactFileName.unique(');
+    // One ordered resolution owns the mapping: it walks the session's entries
+    // in the manifest's own order with one `taken` set, so the first duplicate
+    // keeps its name and a later one takes a counter suffix.
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.sanitize(');
+    expect(resolvedFilenamesBody).toContain('ArtifactFileName.unique(');
+    expect(resolvedFilenamesBody).toContain('session.files.map');
+    expect(resolvedFilenamesBody).toContain('var taken = Set<String>()');
+    // Enumeration consumes that one result instead of resolving names again,
+    // and so does the single-item lookup, so the two cannot drift.
+    expect(itemsBody).toContain('resolvedFilenames(in: session)');
+    expect(itemsBody).not.toContain('ArtifactFileName.');
+    expect(resolvedFilenameBody).toContain('mirror.resolvedFilenames(in: session)');
+    expect(resolvedFilenameBody).not.toContain('ArtifactFileName.unique(');
+    // An id the session does not hold keeps the sanitized name as an explicit
+    // fallback.
+    expect(resolvedFilenameBody).toContain(
+      'ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime)'
+    );
     // The stage path holds the invariant at the boundary: the component it
     // appends to the per-fetch UUID directory is sanitized again as a
     // last-resort fallback, so an unsafe name can never reach the path API.
@@ -151,7 +164,11 @@ describe('artifacts File Provider extension contract', () => {
     // is `Data`, a String-typed property is never read by the system, and the
     // protocol requirement is non-optional, so folders carry the zero version.
     expect(extensionSource).toContain('let contentModificationDate: Date?');
-    expect(extensionSource).toContain('let version: NSFileProviderItemVersion');
+    // Stored under the protocol's own name: the item hands the framework the
+    // version itself, with no second property to keep in step.
+    expect(extensionSource).toContain('let itemVersion: NSFileProviderItemVersion');
+    expect(extensionSource).not.toContain('let version: NSFileProviderItemVersion');
+    expect(extensionSource).not.toContain('var itemVersion: NSFileProviderItemVersion {');
     expect(extensionSource).toContain(
       'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {'
     );
@@ -168,6 +185,34 @@ describe('artifacts File Provider extension contract', () => {
     expect(fetchContentsBody).toContain(
       'requestedVersion.contentVersion != item.itemVersion.contentVersion'
     );
+  });
+
+  it('reads one modification date per mirrored file', () => {
+    // The Files-app timestamp and the content version read the same stamp, and
+    // the size the version needs already comes off the manifest entry, so the
+    // attribute read asks the filesystem for the date alone. An entry the
+    // mirror may not address, or one whose attributes cannot be read, is nil.
+    expect(extensionSource).toContain(
+      'func fileAttributes(sessionId: String, fileId: String) -> Date?'
+    );
+    expect(fileAttributesBody).toContain('.contentModificationDateKey');
+    expect(fileAttributesBody).not.toContain('fileSizeKey');
+    // Both single-item paths hand the read straight to the item.
+    expect(extensionSource).toContain(
+      'contentModificationDate: mirror.fileAttributes(sessionId: sessionId, fileId: fileId)'
+    );
+  });
+
+  it('bounds a long name through the one extension split', () => {
+    // A name over the bound keeps its extension when the extension fits on its
+    // own and the stem keeps a character; every other shape — no dot, a
+    // leading dot, a trailing dot, an extension at the bound, an empty
+    // truncated stem — truncates the whole name instead. `splitExtension`
+    // already answers an empty extension for each of the first three, so the
+    // bound reads it rather than repeating the dot guard.
+    expect(boundBody).toContain('splitExtension(name)');
+    expect(boundBody).not.toContain('lastIndex');
+    expect(boundBody).toContain('truncateUtf8(name, maxBytes)');
   });
 
   it('registers the domain with the dev-only testing mode', () => {
@@ -470,6 +515,16 @@ const itemsBody = swiftFunctionBody(
 const fetchContentsBody = swiftFunctionBody(
   'func fetchContents(\n    for itemIdentifier: NSFileProviderItemIdentifier,\n    version requestedVersion: NSFileProviderItemVersion?,'
 );
+const resolvedFilenamesBody = swiftFunctionBody(
+  'func resolvedFilenames(\n    in session: ArtifactManifest.Session\n  ) -> [(file: ArtifactManifest.File, filename: String)] {'
+);
+const resolvedFilenameBody = swiftFunctionBody(
+  'private func resolvedFilename(file: ArtifactManifest.File, sessionId: String) -> String {'
+);
+const fileAttributesBody = swiftFunctionBody(
+  'func fileAttributes(sessionId: String, fileId: String) -> Date? {'
+);
+const boundBody = swiftFunctionBody('private static func bound(_ name: String) -> String {');
 
 type MemoFile = { id: string; name: string; mime: string; size: number };
 type MemoSession = { id: string; title: string; files: MemoFile[] };

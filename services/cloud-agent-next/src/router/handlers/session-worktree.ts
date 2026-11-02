@@ -187,7 +187,7 @@ type WorktreeResult = z.infer<typeof CreateWorktreeChatOutput>;
 type HostedWorkspaceSessionResult = z.infer<typeof CreateHostedWorkspaceSessionOutput>;
 type OwnershipRow = z.infer<typeof ownershipRowSchema>;
 type OperationProgress = z.infer<typeof operationProgressSchema>;
-type WorktreeSource = {
+export type WorktreeSource = {
   ownership: OwnershipRow;
   metadata: SessionMetadata;
   workspace: NonNullable<SessionMetadata['workspace']> & {
@@ -197,7 +197,6 @@ type WorktreeSource = {
   repository: NonNullable<SessionMetadata['repository']>;
   worktreeId: CloudAgentWorktreeId;
 };
-
 type SiblingAgentSelection = {
   mode: string;
   model: string;
@@ -209,6 +208,15 @@ type SiblingCreateOptions = {
   requestedKiloSessionId: string | undefined;
   /** Session-scoped agent selection persisted on the new root's metadata. */
   agent?: SiblingAgentSelection;
+  /**
+   * Clone-only sibling: the destination copies the source transcript before its
+   * ownership row is created. Set only by the continuation handler.
+   */
+  clone?: { cloneFromKiloSessionId: string };
+  /** Server-only continuation marker projected onto the destination metadata. */
+  continuation?: boolean;
+  /** Ingest ownership title (`cli_sessions_v2.title`); defaults to the generated title. */
+  title?: string;
   /** Idempotent initial-turn delivery for a sibling that starts with a prompt. */
   initialTurn?: {
     messageId: string;
@@ -684,7 +692,8 @@ function buildRegistrationInput(
   ctx: TRPCContext,
   progress: OperationProgress,
   runtimeAuthorization: WorktreeRuntimeAuthorization,
-  agentOverride?: SiblingAgentSelection
+  agentOverride?: SiblingAgentSelection,
+  continuation?: boolean
 ): Parameters<ReturnType<typeof getSandboxSessionStub>['registerSessionFromMetadata']>[0] {
   const repository = { ...source.repository };
   if ('token' in repository) delete repository.token;
@@ -726,6 +735,7 @@ function buildRegistrationInput(
     ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
     workspace,
+    ...(continuation ? { continuation: true as const } : {}),
     lifecycle: { version: now, timestamp: now },
   };
 
@@ -827,7 +837,8 @@ async function createOwnershipRow(
   rowId: string,
   source: WorktreeSource,
   ctx: TRPCContext,
-  progress: OperationProgress
+  progress: OperationProgress,
+  options: Pick<SiblingCreateOptions, 'clone' | 'title'>
 ): Promise<void> {
   const startedAt = Date.now();
   const diagnostic = {
@@ -838,6 +849,7 @@ async function createOwnershipRow(
     cloudAgentSessionId: progress.cloudAgentSessionId,
     kiloSessionId: progress.kiloSessionId,
   };
+  const cloneFromKiloSessionId = options.clone?.cloneFromKiloSessionId;
   let response: unknown;
   try {
     response = await ctx.env.SESSION_INGEST.createSessionForCloudAgent({
@@ -852,8 +864,9 @@ async function createOwnershipRow(
       organizationId: source.ownership.organizationId ?? undefined,
       createdOnPlatform: source.ownership.createdOnPlatform,
       profileId: source.ownership.profileId ?? undefined,
-      title: `New session - ${new Date().toISOString()}`,
+      title: options.title ?? `New session - ${new Date().toISOString()}`,
       gitUrl: source.ownership.gitUrl ?? canonicalRepositoryUrl(source.repository),
+      ...(cloneFromKiloSessionId ? { cloneFromKiloSessionId } : {}),
     });
   } catch (error) {
     logControlDiagnostic(
@@ -929,7 +942,10 @@ async function createOwnershipRow(
   }
   if (
     parsed.data.clone.sessionId !== progress.kiloSessionId ||
-    parsed.data.clone.copiedItemCount !== 0
+    // A non-clone sibling destination is empty (`copiedItemCount === 0`). A
+    // clone-only sibling legitimately copies items, so any non-negative count is
+    // accepted.
+    (!cloneFromKiloSessionId && parsed.data.clone.copiedItemCount !== 0)
   ) {
     logControlDiagnostic(
       'worktree_chat_result',
@@ -1001,7 +1017,7 @@ async function registerWorktreeSession(
   source: WorktreeSource,
   ctx: TRPCContext,
   progress: OperationProgress,
-  options?: Pick<SiblingCreateOptions, 'agent' | 'initialTurn'>
+  options?: Pick<SiblingCreateOptions, 'agent' | 'initialTurn' | 'continuation' | 'clone'>
 ): Promise<void> {
   const startedAt = Date.now();
   const diagnostic = {
@@ -1040,7 +1056,14 @@ async function registerWorktreeSession(
           source.ownership.organizationId ?? undefined
         );
         return stub.registerSessionFromMetadata(
-          buildRegistrationInput(source, ctx, progress, runtimeAuthorization, options?.agent)
+          buildRegistrationInput(
+            source,
+            ctx,
+            progress,
+            runtimeAuthorization,
+            options?.agent,
+            options?.continuation
+          )
         );
       },
       'registerSession'
@@ -1079,10 +1102,15 @@ async function registerWorktreeSession(
   }
   if (!result.data.success) {
     try {
+      const cloneFromKiloSessionId = options?.clone?.cloneFromKiloSessionId;
       await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
         sessionId: progress.kiloSessionId,
         kiloUserId: ctx.userId,
-        onlyIfEmpty: true,
+        // A clone destination is not empty, so `onlyIfEmpty` would leave it
+        // orphaned. Match the root owner and delete by the clone source instead.
+        ...(cloneFromKiloSessionId
+          ? { cloneSourceSessionId: cloneFromKiloSessionId }
+          : { onlyIfEmpty: true }),
       });
     } catch (error) {
       logControlDiagnostic(
@@ -1211,7 +1239,7 @@ async function executeWorktreeCreate(
     result: 'recorded',
     durationMs: Date.now() - startedAt,
   });
-  await createOwnershipRow(db, row.id, source, ctx, progress);
+  await createOwnershipRow(db, row.id, source, ctx, progress, options);
   await registerWorktreeSession(db, row.id, source, ctx, progress, options);
   logControlDiagnostic('worktree_chat_result', {
     ...diagnostic,
@@ -1329,7 +1357,7 @@ async function reconcileWorktreeCreate(
       throw operationConflict();
     }
   } else {
-    await createOwnershipRow(db, row.id, source, ctx, progress);
+    await createOwnershipRow(db, row.id, source, ctx, progress, options);
   }
 
   if (existingMetadata) {
@@ -1364,11 +1392,11 @@ async function reconcileWorktreeCreate(
   return progress;
 }
 
-type SiblingCreateRun = {
+export type SiblingCreateRun = {
   db: WorkerDb;
   ctx: TRPCContext;
   source: WorktreeSource;
-  intent: 'create_worktree_chat' | 'create_workspace_session';
+  intent: 'create_worktree_chat' | 'create_workspace_session' | 'continue_workspace_session';
   operationKey: string;
   organizationId: string | undefined;
   options: SiblingCreateOptions;
@@ -1379,7 +1407,7 @@ type SiblingCreateRun = {
   ) => WorktreeResult | HostedWorkspaceSessionResult;
 };
 
-async function runSiblingCreate(
+export async function runSiblingCreate(
   run: SiblingCreateRun
 ): Promise<WorktreeResult | HostedWorkspaceSessionResult> {
   const { db, ctx, source, intent, operationKey, organizationId, options } = run;
@@ -1726,6 +1754,78 @@ const createHostedWorkspaceSessionHandler = protectedProcedure
       })
     );
   });
+
+/**
+ * Immutable intent fingerprint of a continuation sibling. It includes the clone
+ * source and the explicit agent selection. The display title is deliberately
+ * excluded: ordinary sibling creation derives display titles outside its intent
+ * fingerprint, and a nullable source title gets a generated fallback, so a
+ * same-key retry must not conflict on a title that only affects display.
+ */
+export async function continuedSiblingIntentFingerprint(input: {
+  workspaceId: CloudAgentWorktreeId;
+  organizationId: string | undefined;
+  sourceKiloSessionId: string;
+  agent: SiblingAgentSelection;
+}): Promise<string> {
+  return sha256Hex(
+    JSON.stringify({
+      workspaceId: input.workspaceId,
+      organizationId: input.organizationId ?? null,
+      sourceKiloSessionId: input.sourceKiloSessionId,
+      agent: input.agent,
+      continuation: true,
+    })
+  );
+}
+
+/**
+ * Creates one clone-only continuation sibling in an existing workspace. Reuses
+ * the hosted sibling owner ({@link loadWorkspaceSource} + {@link runSiblingCreate})
+ * with the `continue_workspace_session` intent, the source title and the
+ * continuation marker. The destination copies the source transcript and is
+ * registered without an initial turn.
+ */
+export async function createContinuedWorkspaceSibling(args: {
+  db: WorkerDb;
+  ctx: TRPCContext;
+  workspaceId: CloudAgentWorktreeId;
+  organizationId: string | undefined;
+  operationKey: string;
+  sourceKiloSessionId: string;
+  title: string;
+  agent: SiblingAgentSelection;
+}): Promise<WorktreeResult> {
+  const source = await loadWorkspaceSource(
+    args.db,
+    args.ctx,
+    args.workspaceId,
+    args.organizationId
+  );
+  const fingerprint = await continuedSiblingIntentFingerprint({
+    workspaceId: args.workspaceId,
+    organizationId: args.organizationId,
+    sourceKiloSessionId: args.sourceKiloSessionId,
+    agent: args.agent,
+  });
+  return (await runSiblingCreate({
+    db: args.db,
+    ctx: args.ctx,
+    source,
+    intent: 'continue_workspace_session',
+    operationKey: args.operationKey,
+    organizationId: args.organizationId,
+    options: {
+      fingerprint,
+      requestedKiloSessionId: undefined,
+      agent: args.agent,
+      clone: { cloneFromKiloSessionId: args.sourceKiloSessionId },
+      continuation: true,
+      title: args.title,
+    },
+    mapProgress: (progress, replayed) => resultFromProgress(progress, replayed),
+  })) as WorktreeResult;
+}
 
 export function createSessionWorktreeHandlers(): {
   createWorktreeChat: typeof createWorktreeChatHandler;

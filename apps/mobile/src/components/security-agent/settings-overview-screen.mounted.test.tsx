@@ -43,6 +43,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
@@ -215,10 +216,14 @@ describe.each([
         const progress = presentation === 'inline' ? 'Skeleton' : 'ActivityIndicator';
         expect(host(root, progress).length).toBeGreaterThan(0);
       } else if (presentation === 'inline') {
-        // The entry screen replaces its failure page with the loading skeleton
-        // while the retry runs, so the attempt is visible without a spinner.
+        // The entry screen replaces its failure page with a pending frame while
+        // the retry runs, so the attempt is visible without a spinner. A retry
+        // of the config read still leaves the destination unknown, so it paints
+        // the dashboard's own frame; retrying a gate read already knows the
+        // destination and keeps the neutral frame.
+        const pending = procedure === 'getConfig' ? 'DashboardLoadingView' : 'Skeleton';
         expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-        expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+        expect(host(root, pending).length).toBeGreaterThan(0);
       } else {
         expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
       }
@@ -316,7 +321,8 @@ describe.each([
     onlineManager.setOnline(false);
     committedConnectivity.status = 'unknown';
     const root = await mount(scope);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    const pending = presentation === 'inline' ? 'DashboardLoadingView' : 'Skeleton';
+    expect(host(root, pending).length).toBeGreaterThan(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
     expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
     expect(host(root, 'Switch')).toHaveLength(0);

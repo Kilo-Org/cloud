@@ -18,20 +18,30 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
     createdUserIds.length = 0;
   });
 
-  test('requires session viewing access', async () => {
+  test('requires API request log export access', async () => {
     const nonAdmin = await createUser({});
     const admin = await createUser({ is_admin: true });
+    const sessionViewer = await createUser({ is_admin: true, can_view_sessions: true });
 
     await expect(
       (await createCallerForUser(nonAdmin.id)).admin.apiRequestLog.getSummary()
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
     await expect(
       (await createCallerForUser(admin.id)).admin.apiRequestLog.getSummary()
-    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Session viewing access required' });
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'API request log export access required',
+    });
+    await expect(
+      (await createCallerForUser(sessionViewer.id)).admin.apiRequestLog.getSummary()
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'API request log export access required',
+    });
   });
 
-  test('returns the summary to a session viewer', async () => {
-    const viewer = await createUser({ is_admin: true, can_view_sessions: true });
+  test('returns the summary to an API request log exporter', async () => {
+    const exporter = await createUser({ is_admin: true, can_export_api_request_logs: true });
     const ownerId = `api-request-log-summary-${crypto.randomUUID()}`;
     await db.insert(api_request_log).values({
       kilo_user_id: ownerId,
@@ -40,7 +50,7 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
       created_at: '2026-08-01T12:00:00.000Z',
     });
 
-    const summary = await (await createCallerForUser(viewer.id)).admin.apiRequestLog.getSummary();
+    const summary = await (await createCallerForUser(exporter.id)).admin.apiRequestLog.getSummary();
 
     expect(summary.recordCount).toBeGreaterThan(0);
     expect(summary.sizeBytes).toBeGreaterThan(0);

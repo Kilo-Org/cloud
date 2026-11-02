@@ -666,11 +666,13 @@ export async function handleLlmProxyRequest(
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // Anonymous callers cannot use private custom LLMs, so for them a private
-  // custom LLM id must behave exactly like an unknown id.
+  // A public custom LLM owns its id, so it is publicly free exactly when it sets
+  // no pricing. Anonymous callers cannot use private custom LLMs, so for them a
+  // private custom LLM id must behave exactly like an unknown id.
   const isPubliclyFreeModel =
-    (customLlm !== null && !isPrivateCustomLlm) ||
-    isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+    customLlm !== null && !isPrivateCustomLlm
+      ? !customLlm.definition.pricing
+      : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -812,6 +814,7 @@ export async function handleLlmProxyRequest(
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
             is_free: false,
+            custom_llm_pricing: null,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -1014,23 +1017,14 @@ export async function handleLlmProxyRequest(
   }
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
-    const {
-      allowedProviders,
-      balance,
-      balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
-      groupModelAllowed,
-      groupModelAllowedForInferenceProviderUserByok,
-      groupProvidersAllowed,
-    } = await accessCheckResolver.get();
-
-    if (
-      !canSpendPaidUsage(balance) &&
-      !effectiveProviderContext.isFree &&
-      !effectiveProviderContext.userByok &&
-      !effectiveProviderContext.skipBalanceCheck
-    ) {
+  if (
+    !isAnonymousContext(user) &&
+    !effectiveProviderContext.isFree &&
+    !effectiveProviderContext.userByok &&
+    !effectiveProviderContext.skipBalanceCheck
+  ) {
+    const { balance, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
+    if (!canSpendPaidUsage(balance)) {
       return await creditsBlockedResponse({
         user,
         balance,
@@ -1038,6 +1032,16 @@ export async function handleLlmProxyRequest(
         balanceLimitedByUserAllowance,
       });
     }
+  }
+
+  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
+    const {
+      allowedProviders,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
+      groupProvidersAllowed,
+    } = await accessCheckResolver.get();
 
     if (effectiveProviderContext.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
@@ -1084,6 +1088,7 @@ export async function handleLlmProxyRequest(
     provider: effectiveProviderContext.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
+    custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -1332,6 +1337,7 @@ export async function handleLlmProxyRequest(
     kind: requestBodyParsed.kind,
     isFree: usageContext.is_free,
     userByok: usageContext.user_byok,
+    customLlmPricing: usageContext.custom_llm_pricing,
     logging: requestLogging,
     responseTransforms: effectiveProviderContext.provider.responseTransforms,
   });

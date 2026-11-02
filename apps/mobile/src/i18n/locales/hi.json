@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "टूल सारांश का अनुवाद करें",
     "toolSummaryTranslationSubtitle": "हर टूल सारांश को मॉडल पर भेजें ताकि उसका अनुवाद आपके ऐप की भाषा में हो सके। अनुवाद विफल होने पर मूल दिखाया जाता है।",
     "toolSummaryTranslationModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(common.model) पर टैप करें।",
+    "translateSummaries": "सारांश का अनुवाद करें",
     "autoExpandThinkingInactiveSubtitle": "विचार प्रक्रिया का विवरण छिपाने पर कोई प्रभाव नहीं होगा।"
   },
   "notifications": {
@@ -1313,6 +1314,7 @@
       "repoSummaryHigh_zero": "{{displayCount}} उच्च",
       "repositoryActionPlan": "रिपॉज़िटरी के लिए कार्ययोजना",
       "settings": "सेटिंग",
+      "syncing": "सिंक हो रहा है…",
       "syncNow": "अभी सिंक करें",
       "syncQueued": "सिंक का अनुरोध कतार में जोड़ा गया।",
       "syncStatusUnavailable": "सिंक की स्थिति उपलब्ध नहीं है।",
@@ -1464,6 +1466,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot अलर्ट अपने आप सिंक करने और अपनी रिपॉज़िटरी में सुरक्षा समस्याएँ प्रबंधित करने के लिए Kilo GitHub ऐप इंस्टॉल करें।",
+      "connectOwnerOnly": "किसी संगठन के मालिक या एडमिन से {{platform}} कनेक्ट करने के लिए कहें।",
       "connectTitle": "शुरू करने के लिए GitHub कनेक्ट करें",
       "couldNotLoad": "सुरक्षा एजेंट लोड नहीं हो सका।",
       "installApp": "GitHub ऐप इंस्टॉल करें",
@@ -1695,6 +1698,8 @@
       "cannotCompleteTitle": "इंस्टॉलेशन पूरा नहीं किया जा सकता",
       "notAdminMessage": "केवल उस खाते का GitHub एडमिन ही इसे कनेक्ट कर सकता है। Kilo इंस्टॉल करने के लिए संगठन के एडमिन से कहें।",
       "alreadyClaimedMessage": "वह GitHub इंस्टॉलेशन पहले से किसी दूसरे Kilo खाते से कनेक्ट है। पहले वहाँ इसे डिस्कनेक्ट करें।",
+      "installationUnavailableMessage": "यह GitHub App इंस्टॉलेशन सस्पेंड है या अब उपलब्ध नहीं है। इसे GitHub में रीस्टोर करें या फिर से इंस्टॉल करें, फिर दोबारा शुरू करें।",
+      "multipleInstallationsMessage": "यह Kilo संगठन अभी सिर्फ़ एक ही GitHub संगठन से कनेक्ट हो सकता है।",
       "didNotCompleteTitle": "इंस्टॉलेशन पूरा नहीं हुआ",
       "didNotCompleteMessage": "GitHub ऐप का इंस्टॉलेशन पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
     },
@@ -1851,7 +1856,7 @@
       "defaultProfileResolvesTo": "वर्तमान में {{name}} पर सेट",
       "defaultProfileResolvesToAccessibility": "डिफ़ॉल्ट प्रोफ़ाइल: {{name}}",
       "manageProfiles": "प्रोफ़ाइल प्रबंधित करें",
-      "noProfiles": "अभी तक कोई प्रोफ़ाइल नहीं। पर्यावरण चर, MCP सर्वर और कौशल जोड़ने के लिए एक बनाएं।",
+
       "advancedConfig": "उन्नत विन्यास",
       "advancedConfigDescription": "यह इस सत्र पर लागू होता है। प्रोफ़ाइल के रूप में सहेजने पर यह अगली बार के लिए रहता है।",
       "saveAsProfile": "प्रोफ़ाइल के रूप में सहेजें",
@@ -2537,7 +2542,8 @@
     "newSessionOn": "{{name}} पर नया सत्र",
     "noMatchingSessions": "कोई सत्र मेल नहीं खाता।",
     "onlyFirstFilesAttached": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।",
-    "staleMessage": "साझा की गई यह सामग्री अब उपलब्ध नहीं है।",
+    "staleMessage": "जिस ऐप से आपने साझा किया, उससे इसे फिर से भेजें।",
+    "staleTitle": "साझाकरण अनुपलब्ध",
     "retryableMessage": "आपके सत्र लोड नहीं हो सके।",
     "emptyMessage": "अभी कोई सत्र नहीं है — इसे भेजने के लिए नया सत्र शुरू करें।",
     "cliNotConnectedTitle": "सत्र कनेक्ट नहीं है",
@@ -2717,6 +2723,9 @@
       "reconnectTitle": "GitHub को फिर से कनेक्ट करें",
       "reconnectDescription": "आपका GitHub कनेक्शन रद्द कर दिया गया।",
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट की समीक्षा करें",
+      "gitlabInstanceMismatchTitle": "GitLab कनेक्शन किसी अन्य इंस्टेंस के लिए है",
+      "gitlabInstanceMismatchDescription": "आपका GitLab कनेक्शन {{connected}} के लिए है, लेकिन यह मर्ज रिक्वेस्ट {{requested}} पर है। इसकी समीक्षा करने के लिए उस इंस्टेंस पर GitLab कनेक्ट करें।",
+      "checkActiveConnection": "कनेक्शन सक्रिय है, लेकिन यह आइटम अभी भी लोड नहीं हो सकता।",
       "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
       "bitbucketOrgOnlyNoOrganizationDescription": "इस खाते में अभी तक कोई संगठन नहीं है। संगठन बनाने या किसी संगठन में शामिल होने के बाद ही Bitbucket पुल रिक्वेस्ट समीक्षित किए जा सकते हैं।",
       "gitlabReconnectAdminOnlyDescription": "इसे फिर से कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",

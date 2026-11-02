@@ -935,6 +935,7 @@ describe('logMicrodollarUsage', () => {
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -1844,6 +1845,48 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.is_free).toBe(true);
   });
 
+  test('bills custom LLM usage at the custom LLM pricing instead of the upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'custom',
+        requested_model: 'acme/priced-custom-model',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({ provider: 'custom', cost: pricedCost });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
   test.each([
     ['custom', 'deleted'],
     ['custom', 'unavailable'],
@@ -2356,6 +2399,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       project_id: null,
       requested_model: 'provider/requested-model',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,

@@ -181,6 +181,106 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     expect(result).toMatchObject({ selected: true, token: 'access-token' });
   });
 
+  it('uses a bounded, manual-redirect probe for attachment user authorization', async () => {
+    const result = await makeService().selectUserAuthorization({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+      strictRepositoryLookup: true,
+    });
+
+    expect(result).toMatchObject({ selected: true, token: 'access-token' });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      'https://api.github.com/repos/acme/repo',
+      expect.objectContaining({
+        redirect: 'manual',
+        signal: expect.any(AbortSignal),
+        headers: expect.objectContaining({ Authorization: 'Bearer access-token' }),
+      })
+    );
+  });
+
+  it.each([302, 403, 404, 503])(
+    'rejects and cancels attachment authorization probes returning %s',
+    async status => {
+      const cancel = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response(new ReadableStream({ cancel }), { status }))
+      );
+
+      await expect(
+        makeService().selectUserAuthorization({
+          userId: 'user_1',
+          githubRepo: 'acme/repo',
+          strictRepositoryLookup: true,
+        })
+      ).resolves.toEqual({ selected: false, reason: 'insufficient_user_access' });
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([false, true])(
+    'revokes a GitHub-rejected attachment token even when body cancellation rejects=%s',
+    async cancellationRejects => {
+      const cancel = vi.fn(() =>
+        cancellationRejects ? Promise.reject(new Error('cancellation failed')) : Promise.resolve()
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response(new ReadableStream({ cancel }), { status: 401 }))
+      );
+
+      await expect(
+        makeService().selectUserAuthorization({
+          userId: 'user_1',
+          githubRepo: 'acme/repo',
+          strictRepositoryLookup: true,
+        })
+      ).resolves.toEqual({ selected: false, reason: 'revoked' });
+      expect(database.updates).toHaveLength(1);
+      expect(database.updates[0]).toMatchObject({
+        revoked_at: expect.any(String),
+        revocation_reason: 'github_token_rejected',
+      });
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('rejects oversized attachment authorization metadata before accepting push access', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          permissions: { push: true },
+          padding: 'x'.repeat(64 * 1024),
+        })
+      )
+    );
+
+    await expect(
+      makeService().selectUserAuthorization({
+        userId: 'user_1',
+        githubRepo: 'acme/repo',
+        strictRepositoryLookup: true,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('rejects attachment authorization without repository push access', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ permissions: { push: false } }))
+    );
+
+    await expect(
+      makeService().selectUserAuthorization({
+        userId: 'user_1',
+        githubRepo: 'acme/repo',
+        strictRepositoryLookup: true,
+      })
+    ).resolves.toEqual({ selected: false, reason: 'insufficient_user_access' });
+  });
+
   it('probes the repo through a configured GitHub API base override', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ permissions: { push: true } }));
     vi.stubGlobal('fetch', fetchMock);

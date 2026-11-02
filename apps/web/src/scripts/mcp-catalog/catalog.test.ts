@@ -440,6 +440,7 @@ describe('mcp-catalog catalog', () => {
       ['creditManagerProcedure.query(async () => ({}))', true],
       ['superadminProcedure.query(async () => ({}))', true],
       ['sessionViewerProcedure.query(async () => ({}))', true],
+      ['apiRequestLogExporterProcedure.query(async () => ({}))', true],
       ['baseProcedure.query(async () => ({}))', false],
       ['protectedProcedure.query(async () => ({}))', false],
       // A guard elsewhere in the chain does not make the procedure admin-only.

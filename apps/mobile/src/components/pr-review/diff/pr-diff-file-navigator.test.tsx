@@ -705,7 +705,7 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
 // App (Bitbucket Cloud has no such App).
 describe('PrDiffFileNavigator provider wording', () => {
   const GITHUB_APP_CLAUSE = "the Kilo GitHub App isn't installed on it";
-  const NEUTRAL_DESCRIPTION = 'It may have been deleted, or you may not have access to it.';
+  const NEUTRAL_DESCRIPTION = 'It may be deleted, or you may lack access.';
 
   const GITLAB_REF: ProviderPrRef = {
     platform: 'gitlab',

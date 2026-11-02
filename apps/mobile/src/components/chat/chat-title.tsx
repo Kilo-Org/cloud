@@ -30,7 +30,10 @@ export function ChatTitle({ title, initialValue, canRename, onRename }: Readonly
         onPress={() => {
           setRenaming(true);
         }}
-        className={cn(HEADER_TITLE_TARGET_CLASS, 'shrink flex-row items-center gap-2 active:opacity-70')}
+        className={cn(
+          HEADER_TITLE_TARGET_CLASS,
+          'shrink flex-row items-center gap-2 active:opacity-70'
+        )}
       >
         <Text className="shrink text-lg font-semibold text-foreground" numberOfLines={1}>
           {title}

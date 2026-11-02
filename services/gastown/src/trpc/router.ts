@@ -120,13 +120,15 @@ async function workerAdminAllows(
   target: { kind: 'town' | 'user' | 'wasteland' | 'service'; id: string }
 ): Promise<boolean> {
   const decision = await ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, target);
-  emitWorkerAdminDecision(ctx.env, decision, {
-    action: `trpc:${ctx.procedurePath}`,
-    userId: ctx.userId || null,
-    townId: target.kind === 'town' ? target.id : null,
-    jti: decision.allowed ? decision.jti : null,
-    delivery: 'trpc',
-  });
+  if (ctx.workerAdmin.takeDecisionReport(`trpc:${ctx.procedurePath}`, target)) {
+    emitWorkerAdminDecision(ctx.env, decision, {
+      action: `trpc:${ctx.procedurePath}`,
+      userId: ctx.userId || null,
+      townId: target.kind === 'town' ? target.id : null,
+      jti: decision.allowed ? decision.jti : null,
+      delivery: 'trpc',
+    });
+  }
   if (!decision.allowed && decision.status === 503) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',
@@ -339,14 +341,19 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
     }
 
-    if (config.owner_type === 'org' && config.organization_id) {
-      const orgStub = getGastownOrgStub(env, config.organization_id);
-      const orgRig = await orgStub.getRigAsync(rigId);
-      if (orgRig) return orgRig;
-    } else if (config.owner_user_id) {
-      const ownerStub = getGastownUserStub(env, config.owner_user_id);
-      const ownerRig = await ownerStub.getRigAsync(rigId);
-      if (ownerRig) return ownerRig;
+    const ownerRig =
+      config.owner_type === 'org' && config.organization_id
+        ? await getGastownOrgStub(env, config.organization_id).getRigAsync(rigId)
+        : config.owner_user_id
+          ? await getGastownUserStub(env, config.owner_user_id).getRigAsync(rigId)
+          : null;
+    if (ownerRig) {
+      // The bypass names one town; a rig from another town of the same owner
+      // must not become reachable through it.
+      if (ownerRig.town_id !== townIdHint) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
+      }
+      return ownerRig;
     }
   }
 
@@ -435,9 +442,6 @@ export const gastownRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      if (!(await workerAdminAllows(ctx, { kind: 'town', id: input.townId }))) {
-        return { isAdminViewing: false, ownerUserId: null, ownerOrgId: null };
-      }
       const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'admin') {
         // Admin is viewing a town they don't own — resolve the real owner

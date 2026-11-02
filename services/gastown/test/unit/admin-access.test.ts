@@ -32,6 +32,7 @@ describe('adminAuditMiddleware', () => {
           ? ({
               legacyClaim: false,
               hasCapability: true,
+              takeDecisionReport: () => true,
               capabilityError: null,
               mode: 'reject',
               decide: async () => ({
@@ -45,6 +46,7 @@ describe('adminAuditMiddleware', () => {
           : ({
               legacyClaim: isAdmin,
               hasCapability: false,
+              takeDecisionReport: () => true,
               capabilityError: null,
               mode: 'honor',
               decide: async () => ({

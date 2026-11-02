@@ -24,10 +24,11 @@ export const adminAuditMiddleware = createMiddleware<GastownEnv>(async (c, next)
 
   const townId = c.req.param('townId');
   const action = restActionForRequest(c) ?? `rest:${c.req.method} ${c.req.path}`;
-  const decision = await authority.decide(
-    action,
-    townId ? { kind: 'town', id: townId } : { kind: 'service', id: 'gastown' }
-  );
+  const target = townId
+    ? { kind: 'town' as const, id: townId }
+    : { kind: 'service' as const, id: 'gastown' };
+  const decision = await authority.decide(action, target);
+  if (!authority.takeDecisionReport(action, target)) return next();
   const claims = c.get('kiloTokenClaims');
   const lifetimeSeconds =
     typeof claims?.exp === 'number' && typeof claims?.iat === 'number'

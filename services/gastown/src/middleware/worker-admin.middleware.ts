@@ -14,8 +14,6 @@ import {
   type WorkerAdminDecision,
   type WorkerAdminIntrospectionCache,
   type WorkerAdminIntrospectionRequest,
-  type WorkerAdminTarget,
-  type WorkerAdminTargetKind,
 } from '@kilocode/worker-utils/worker-admin-capability';
 import type { GastownEnv } from '../gastown.worker';
 import { resolveSecret } from '../util/secret.util';
@@ -84,21 +82,6 @@ export function getWorkerAdmin(c: Context<GastownEnv>): WorkerAdminAuthority | n
   return c.get('workerAdmin') ?? null;
 }
 
-export function targetForRequest(
-  c: Context<GastownEnv>,
-  kind: WorkerAdminTargetKind
-): WorkerAdminTarget | null {
-  const id =
-    kind === 'town'
-      ? c.req.param('townId')
-      : kind === 'user'
-        ? c.req.param('userId')
-        : kind === 'wasteland'
-          ? c.req.param('wastelandId')
-          : 'gastown';
-  return id ? { kind, id } : null;
-}
-
 export function restActionForRequest(c: Context<GastownEnv>): string | null {
   return matchWorkerAdminRestAction(GASTOWN_ADMIN_AUDIENCE, c.req.method, c.req.path);
 }
@@ -134,7 +117,7 @@ export function emitWorkerAdminDecision(
     JSON.stringify({
       tag: 'worker-admin',
       event,
-      mode: decision.source,
+      source: decision.source,
       outcome: decision.allowed
         ? decision.wouldDeny
           ? 'observe_would_deny'

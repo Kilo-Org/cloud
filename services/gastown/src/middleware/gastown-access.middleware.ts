@@ -24,8 +24,7 @@ export const gastownAccessMiddleware = createMiddleware<GastownEnv>(async (c, ne
  * Must run after `kiloAuthMiddleware`, which sets `kiloGastownAccess`.
  */
 export const gastownRouteAccessMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
-  const authority = c.get('workerAdmin');
-  if (!c.get('kiloGastownAccess') && !c.get('kiloIsAdmin') && !authority?.hasCapability) {
+  if (!c.get('kiloGastownAccess') && !c.get('kiloIsAdmin')) {
     return c.json(resError('Gastown access required'), 403);
   }
   return next();

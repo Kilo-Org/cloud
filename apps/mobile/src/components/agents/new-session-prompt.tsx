@@ -69,8 +69,13 @@ import {
 // Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
-/** The input's `py-2`: the inset between the field's edge and its text box. */
-const PROMPT_INPUT_VERTICAL_INSET = 8;
+/**
+ * The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is
+ * 7, which the design-gate dump reports as `paddingBlock: 7`. The top fade
+ * starts here, at the text box, so the 1 dp band where a scrolled line is
+ * clipped is covered rather than left as a hard cut.
+ */
+const PROMPT_INPUT_VERTICAL_INSET = 7;
 /** A sub-pixel scroll is not a hidden line above the field. */
 const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -209,20 +214,18 @@ export function NewSessionPrompt({
   // grew to its text and only scrolled once the cap stopped it.
   const [contentHeight, setContentHeight] = useState(0);
   const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
-  // A scrolled draft is clipped at the text box's top edge, so its topmost
-  // visible line is a slice of the line above. The fade below covers that band
-  // so the slice never bottoms against the toolbar. It stays off at scroll
-  // offset 0, where the first line is whole: dimming a readable line is worse
-  // than the slice it would hide.
-  const [promptScrolled, setPromptScrolled] = useState(false);
-  // The fade only has a slice to cover while the field scrolls: a draft that
-  // fits leaves the input unscrollable, so any scroll state left over from a
-  // longer draft must not dim its first line.
-  const promptTopFade = promptScrolls && promptScrolled;
+  // How far the draft has scrolled above the text box's top edge, which is
+  // exactly how much of its topmost line the field clips. The fade covers that
+  // band and nothing more, so it never dims a line the reader can see whole: a
+  // draft that fits, or a field still at its top, has offset 0 and no fade, and
+  // a field scrolled by two of the line's 24 dp fades two.
+  const [promptScrolledBy, setPromptScrolledBy] = useState(0);
+  const promptTopFadeHeight = Math.min(promptScrolledBy, promptLineHeight);
+  const promptTopFade = promptTopFadeHeight > PROMPT_SCROLLED_THRESHOLD;
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const next = event.nativeEvent.contentOffset.y > PROMPT_SCROLLED_THRESHOLD;
-    setPromptScrolled(current => (current === next ? current : next));
+    const next = Math.max(0, event.nativeEvent.contentOffset.y);
+    setPromptScrolledBy(current => (Math.abs(current - next) <= 0.5 ? current : next));
   }
 
   const promptInputStyle = {
@@ -494,7 +497,7 @@ export function NewSessionPrompt({
               if (!shouldEnableComposerInputScroll(next, promptHeight)) {
                 // The draft fits again: the field is back at its top, where the
                 // first line is whole.
-                setPromptScrolled(false);
+                setPromptScrolledBy(0);
               }
             }}
             onScroll={handlePromptScroll}
@@ -522,7 +525,7 @@ export function NewSessionPrompt({
               colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
-              style={[PROMPT_TOP_FADE_STYLE, { height: promptLineHeight }]}
+              style={[PROMPT_TOP_FADE_STYLE, { height: promptTopFadeHeight }]}
             />
           ) : null}
         </View>

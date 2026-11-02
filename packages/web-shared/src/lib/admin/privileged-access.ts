@@ -46,6 +46,8 @@ export type AdminStepUpState =
   /** The actor is enrolled but has no live proof for this session and action. */
   | { status: 'required' }
   | { status: 'expired'; verifiedAt: string }
+  /** The newest proof for this session and action was explicitly revoked. */
+  | { status: 'revoked'; verifiedAt: string }
   | {
       status: 'fresh';
       method: 'webauthn_uv';

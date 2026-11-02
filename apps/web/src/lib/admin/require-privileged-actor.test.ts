@@ -165,7 +165,7 @@ describe('requirePrivilegedActor', () => {
       contextFor(user)
     );
 
-    expect(actor.assurance.stepUp.status).not.toBe('fresh');
+    expect(actor.assurance.stepUp.status).toBe('revoked');
   });
 
   it('requires an operation-bound proof for a sensitive write', async () => {

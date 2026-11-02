@@ -5505,6 +5505,7 @@ export const session_step_up_proofs = pgTable(
       table.expires_at
     ),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
+    index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
     check(
       'check_session_step_up_proofs_purpose',

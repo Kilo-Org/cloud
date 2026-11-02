@@ -143,7 +143,10 @@ export async function evaluateStepUp(
   }
 
   const [latestProof] = await fromDb
-    .select({ verified_at: session_step_up_proofs.verified_at })
+    .select({
+      verified_at: session_step_up_proofs.verified_at,
+      revoked_at: session_step_up_proofs.revoked_at,
+    })
     .from(session_step_up_proofs)
     .where(
       and(
@@ -160,7 +163,15 @@ export async function evaluateStepUp(
 
   if (latestProof) {
     return {
-      state: { status: 'expired', verifiedAt: new Date(latestProof.verified_at).toISOString() },
+      state: latestProof.revoked_at
+        ? {
+            status: 'revoked',
+            verifiedAt: new Date(latestProof.verified_at).toISOString(),
+          }
+        : {
+            status: 'expired',
+            verifiedAt: new Date(latestProof.verified_at).toISOString(),
+          },
       proof: null,
       passkeyCount,
     };

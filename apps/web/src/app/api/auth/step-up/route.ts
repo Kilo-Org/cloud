@@ -11,6 +11,7 @@ import {
   verifyStepUp,
 } from '@/lib/auth/session-step-up';
 import { getUserFromSessionForStepUp } from '@kilocode/web-shared/lib/user/server';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 
 /**
  * Firewall rate-limit rule ids. Both rules are ops prerequisites: create them
@@ -116,6 +117,9 @@ export async function POST(request: NextRequest) {
     if (error instanceof StepUpVerificationError) {
       return NextResponse.json({ error: error.code }, { status: 401 });
     }
-    throw error;
+    // Drizzle errors carry statement parameters, including session hashes and
+    // challenges. Report only the error shape and return an opaque failure.
+    reportStepUpFailure('admin_step_up_route', error);
+    return NextResponse.json({ error: 'STEP_UP_UNAVAILABLE' }, { status: 503 });
   }
 }

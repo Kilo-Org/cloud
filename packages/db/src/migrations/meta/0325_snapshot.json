@@ -1,5 +1,5 @@
 {
-  "id": "7a12769c-31e7-4fbb-9cf0-e65eabbd4f5a",
+  "id": "1c6c4cdc-f66b-4a83-8b46-437c421044d4",
   "prevId": "704d1452-61a4-44cb-914a-07bd75ae0e34",
   "version": "7",
   "dialect": "postgresql",
@@ -32906,6 +32906,21 @@
           "columns": [
             {
               "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_session_step_up_proofs_passkey_credential_id": {
+          "name": "idx_session_step_up_proofs_passkey_credential_id",
+          "columns": [
+            {
+              "expression": "passkey_credential_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

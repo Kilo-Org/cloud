@@ -12,12 +12,14 @@ import {
   organization_memberships,
   organizations,
   passkey_credentials,
+  session_step_up_proofs,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
@@ -2772,7 +2774,7 @@ describe('user router - passkeys', () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
     const caller = await createSessionCallerForUser(owner.id);
 
-    const result = await caller.user.deletePasskey({ id: row.id });
+    const result = await caller.user.deletePasskey({ id: row!.id });
 
     expect(result).toEqual({ success: true });
     const stored = await db
@@ -2843,5 +2845,27 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored).toHaveLength(1);
+  });
+
+  it('deleting a passkey removes its step-up proofs', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    await db.insert(session_step_up_proofs).values({
+      kilo_user_id: owner.id,
+      session_id_hash: hashWebSessionId('passkey-delete-session'),
+      method: 'webauthn_uv',
+      passkey_credential_id: row!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    });
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await caller.user.deletePasskey({ id: row!.id });
+
+    const proofs = await db
+      .select()
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.passkey_credential_id, row!.id));
+    expect(proofs).toHaveLength(0);
   });
 });

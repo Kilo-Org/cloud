@@ -37,4 +37,5 @@ ALTER TABLE "session_step_up_proofs" ADD CONSTRAINT "session_step_up_proofs_pass
 CREATE INDEX "idx_session_step_up_challenges_expires_at" ON "session_step_up_challenges" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "idx_session_step_up_challenges_kilo_user_id" ON "session_step_up_challenges" USING btree ("kilo_user_id");--> statement-breakpoint
 CREATE INDEX "idx_session_step_up_proofs_user_session_expires" ON "session_step_up_proofs" USING btree ("kilo_user_id","session_id_hash","expires_at");--> statement-breakpoint
-CREATE INDEX "idx_session_step_up_proofs_expires_at" ON "session_step_up_proofs" USING btree ("expires_at");
+CREATE INDEX "idx_session_step_up_proofs_expires_at" ON "session_step_up_proofs" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "idx_session_step_up_proofs_passkey_credential_id" ON "session_step_up_proofs" USING btree ("passkey_credential_id");

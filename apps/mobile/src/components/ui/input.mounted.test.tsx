@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Input } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 import { lightColors } from '@/lib/hooks/theme-colors.generated';
+import { LTR_INPUT_DIRECTION } from '@/lib/rtl-text';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
 // Mutable so a suite can prove the placeholder follows the active palette. The
@@ -82,5 +83,18 @@ describe('Input single-line box', () => {
     rtl.isRTL = false;
 
     expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
+  });
+
+  it('keeps a caller left-to-right paragraph direction over the RTL alignment', () => {
+    // A field holding machine-read content names its own direction: the shared
+    // RTL alignment must not right-align it, and the paragraph direction must
+    // not be the interface's.
+    rtl.isRTL = true;
+
+    expect(flattenStyle(mountInput({ style: LTR_INPUT_DIRECTION }).props.style)).toMatchObject({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+      textAlign: 'left',
+    });
   });
 });

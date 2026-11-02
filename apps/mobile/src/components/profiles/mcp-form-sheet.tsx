@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { LTR_INPUT_DIRECTION } from '@/lib/rtl-text';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -232,6 +233,9 @@ export function McpFormSheet({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder={t('profiles.mcp.commandPlaceholder')}
+            // A command line is machine-read: it keeps its left-to-right
+            // direction and left edge in an RTL interface too.
+            style={LTR_INPUT_DIRECTION}
             containerOnLayout={fieldLayout('command')}
             onChangeText={value => {
               commandRef.current = value;
@@ -270,6 +274,9 @@ export function McpFormSheet({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder={t('profiles.mcp.jsonPlaceholder')}
+            // JSON, and its example, is machine-read: an RTL interface must not
+            // reorder its brackets or right-align its keys.
+            style={LTR_INPUT_DIRECTION}
             onChangeText={value => {
               configRef.current = value;
               setError(null);

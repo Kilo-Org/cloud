@@ -70,11 +70,11 @@ export function stepUpDialogDescription(requirement: StepUpRequirement): string 
     case 'NOT_ENROLLED':
       return 'Admin actions need a passkey. Add one now, then verify it to continue.';
     case 'SESSION_UNBOUND':
-      return 'This browser session predates session-bound MFA. Sign in again, then retry the action.';
+      return 'This browser session predates session-bound MFA. Signing out signs you out of every browser; then sign in and retry the action.';
     case 'BEARER_NOT_ALLOWED':
       return 'API tokens cannot complete MFA. Use the Kilo web console with a browser session.';
     case 'REAUTH_REQUIRED':
-      return 'Sign in again, or verify with an existing passkey, before adding another passkey.';
+      return 'Sign in again before adding another passkey. Signing out signs you out of every browser.';
     case 'MFA_EXPIRED':
       return 'Confirm it is you with your passkey to continue.';
     case 'MFA_REQUIRED':

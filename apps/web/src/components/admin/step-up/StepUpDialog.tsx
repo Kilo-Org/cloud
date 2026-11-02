@@ -1,8 +1,8 @@
 'use client';
 
+import React from 'react';
 import { KeyRound, Loader2, ShieldCheck } from 'lucide-react';
-import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   startAuthentication,
@@ -24,12 +24,10 @@ import {
   stepUpDialogTitle,
   type StepUpRequirement,
 } from './step-up-error';
+import { runStepUpCeremony, type StepUpOptions } from './step-up-ceremony';
+import { StepUpSignInAgainButton } from './StepUpSignInAgainButton';
 
-type OptionsResponse =
-  | { ok: true; challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }
-  | { ok: false; code?: string };
-
-async function requestOptions(): Promise<OptionsResponse> {
+async function requestOptions(): Promise<StepUpOptions> {
   const response = await fetch('/api/auth/step-up', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -69,6 +67,8 @@ function errorMessage(code?: string): string {
     case 'CHALLENGE_ALREADY_USED':
     case 'CHALLENGE_EXPIRED':
       return 'That verification expired. Try again.';
+    case 'STEP_UP_UNAVAILABLE':
+      return 'Verification is temporarily unavailable. Try again shortly.';
     default:
       return 'Could not verify with a passkey. Try again.';
   }
@@ -92,6 +92,7 @@ export function StepUpDialog({
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
   const statusQuery = useQuery({
     ...trpc.stepUp.getStatus.queryOptions(),
     enabled: open,
@@ -110,23 +111,21 @@ export function StepUpDialog({
     setError(null);
 
     try {
-      let options = await requestOptions();
-      if (!options.ok && options.code === 'NOT_ENROLLED') {
-        await registerNewPasskey();
-        options = await requestOptions();
-      }
-      if (!options.ok) {
-        setError(errorMessage(options.code));
+      const result = await runStepUpCeremony({
+        requestOptions,
+        startAuthentication: options => startAuthentication({ optionsJSON: options }),
+        submitAssertion,
+        enroll: registerNewPasskey,
+      });
+      if (result.ok) {
+        onVerified();
         return;
       }
-
-      const assertion = await startAuthentication({ optionsJSON: options.options });
-      if (!(await submitAssertion(options.challengeId, assertion))) {
-        setError(errorMessage());
-        return;
+      if (result.code === 'CANCELLED') {
+        setError('Passkey verification was cancelled. No verification was recorded.');
+      } else {
+        setError(errorMessage(result.code));
       }
-
-      onVerified();
     } catch (caught) {
       if (caught instanceof PasskeyRegistrationError && caught.failure === 'cancelled') {
         setError('Passkey creation was cancelled. No passkey was added.');
@@ -137,6 +136,10 @@ export function StepUpDialog({
       setIsRunning(false);
     }
   }
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   const enrolled = statusQuery.data?.enrolled ?? false;
   const actionLabel =
@@ -171,16 +174,14 @@ export function StepUpDialog({
         ) : null}
 
         {error ? (
-          <p className="text-sm text-destructive" role="alert">
+          <p ref={errorRef} tabIndex={-1} className="text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}
 
         <DialogFooter>
           {needsSignIn ? (
-            <Button asChild>
-              <Link href="/users/sign_in">Sign in again</Link>
-            </Button>
+            <StepUpSignInAgainButton size="default" />
           ) : (
             <Button onClick={() => void runCeremony()} disabled={isRunning}>
               {isRunning ? (

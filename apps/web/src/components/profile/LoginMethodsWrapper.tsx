@@ -17,9 +17,13 @@ import { DiscordGuildStatus } from './DiscordGuildStatus';
 
 type LoginMethodsWrapperProps = {
   primaryEmail: string;
+  showAdminStepUpNote?: boolean;
 };
 
-export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) {
+export function LoginMethodsWrapper({
+  primaryEmail,
+  showAdminStepUpNote = false,
+}: LoginMethodsWrapperProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [linkedProviderName, setLinkedProviderName] = useState<string | null>(null);
@@ -174,7 +178,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
           onRefetch={refetchProviders}
           onError={setErrorMessage}
         />
-        <PasskeysCard />
+        <PasskeysCard showAdminStepUpNote={showAdminStepUpNote} />
       </div>
 
       <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} />

@@ -11,14 +11,12 @@ jest.mock('@/lib/auth/passkey', () => ({
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 jest.mock('@/lib/admin/admin-action-audit');
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags');
 jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
   evaluateStepUp: jest.fn(),
 }));
 
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
@@ -32,7 +30,6 @@ import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromSessionForCredentialIssuance);
-const mockIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockEvaluateStepUp = jest.mocked(evaluateStepUp);
 const mockRecordAdminAction = jest.mocked(recordAdminAction);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
@@ -75,7 +72,6 @@ describe('POST /api/auth/passkey/register', () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-    mockIsReleaseToggleEnabled.mockResolvedValue(false);
     mockGetUserFromAuth.mockResolvedValue({
       user: fakeUser,
       authFailedResponse: null,
@@ -236,7 +232,6 @@ describe('POST /api/auth/passkey/register', () => {
       webSessionId: 'session-1',
       authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
     } as never);
-    mockIsReleaseToggleEnabled.mockResolvedValue(true);
     mockEvaluateStepUp.mockResolvedValue({
       state: { status: 'required' },
       proof: null,
@@ -252,6 +247,26 @@ describe('POST /api/auth/passkey/register', () => {
     expect(mockVerifyRegistration).not.toHaveBeenCalled();
   });
 
+  it('refuses the options step for a stale admin enrollment', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+  });
+
   it('allows an admin enrollment from a fresh sign-in', async () => {
     mockGetUserFromAuth.mockResolvedValue({
       user: { ...fakeUser, is_admin: true },
@@ -259,7 +274,6 @@ describe('POST /api/auth/passkey/register', () => {
       webSessionId: 'session-1',
       authenticatedAt: Math.floor(Date.now() / 1000) - 60,
     } as never);
-    mockIsReleaseToggleEnabled.mockResolvedValue(true);
     mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
 
     const response = await POST(
@@ -281,7 +295,6 @@ describe('POST /api/auth/passkey/register', () => {
       webSessionId: 'session-1',
       authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
     } as never);
-    mockIsReleaseToggleEnabled.mockResolvedValue(true);
     mockEvaluateStepUp.mockResolvedValue({
       state: {
         status: 'fresh',

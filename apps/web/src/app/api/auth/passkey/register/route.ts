@@ -10,12 +10,9 @@ import {
 import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
-import {
-  ADMIN_STEP_UP_ENROLLMENT_FLAG,
-  STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS,
-} from '@kilocode/web-shared/lib/admin/step-up-policy';
+import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { captureException } from '@sentry/nextjs';
 
@@ -56,7 +53,10 @@ const requestSchema = z.discriminatedUnion('action', [
  * Admins may only enroll another sign-in factor when this browser session is
  * fresh: a live step-up proof is sufficient, and a first passkey (which cannot
  * have a proof yet) requires a primary sign-in from the last ten minutes.
- * Gated by the enrollment release toggle so the rollout can be staged.
+ *
+ * This applies to every admin, not behind a release toggle: a stolen admin
+ * cookie must not be enough to add a durable sign-in factor. Non-admins are
+ * unaffected.
  */
 async function refuseStaleAdminEnrollment(params: {
   user: { id: string; is_admin: boolean };
@@ -64,9 +64,6 @@ async function refuseStaleAdminEnrollment(params: {
   authenticatedAt?: number;
 }): Promise<NextResponse | null> {
   if (!params.user.is_admin) return null;
-  if (!(await isReleaseToggleEnabled(ADMIN_STEP_UP_ENROLLMENT_FLAG, params.user.id))) {
-    return null;
-  }
 
   if (
     typeof params.authenticatedAt === 'number' &&
@@ -76,12 +73,19 @@ async function refuseStaleAdminEnrollment(params: {
   }
 
   if (params.webSessionId) {
-    const evaluation = await evaluateStepUp({
-      userId: params.user.id,
-      webSessionId: params.webSessionId,
-      actionClass: 'platform_read',
-    });
-    if (evaluation.state.status === 'fresh') return null;
+    try {
+      const evaluation = await evaluateStepUp({
+        userId: params.user.id,
+        webSessionId: params.webSessionId,
+        actionClass: 'platform_read',
+      });
+      if (evaluation.state.status === 'fresh') return null;
+    } catch (error) {
+      // The freshness rule is a security control, so an unknown answer fails
+      // closed for this request. The original Drizzle error is not reported.
+      reportStepUpFailure('admin_passkey_enrollment', error);
+      return NextResponse.json({ error: 'STEP_UP_UNAVAILABLE' }, { status: 503 });
+    }
   }
 
   return NextResponse.json({ error: 'REAUTH_REQUIRED' }, { status: 401 });
@@ -115,6 +119,13 @@ export async function POST(request: NextRequest) {
       if (limit === 'unavailable') {
         return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
       }
+
+      const reauth = await refuseStaleAdminEnrollment({
+        user,
+        webSessionId,
+        authenticatedAt,
+      });
+      if (reauth) return reauth;
 
       const { challengeId, options } = await createRegistrationOptions(
         user.id,

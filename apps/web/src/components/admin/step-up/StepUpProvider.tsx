@@ -1,14 +1,13 @@
 'use client';
 
+import React from 'react';
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import {
-  StepUpCancelledError,
-  stepUpRequirementFromError,
-  type StepUpRequirement,
-} from './step-up-error';
+import { stepUpRequirementFromError, type StepUpRequirement } from './step-up-error';
+import { runWithStepUp } from './step-up-ceremony';
+import { StepUpRequestQueue } from './step-up-requests';
 import { StepUpDialog } from './StepUpDialog';
 
 type StepUpContextValue = {
@@ -33,22 +32,20 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [requirement, setRequirement] = useState<StepUpRequirement | null>(null);
-  const resolver = useRef<((verified: boolean) => void) | null>(null);
+  const queue = useRef(new StepUpRequestQueue());
 
   const requestStepUp = useCallback(
-    (nextRequirement: StepUpRequirement = { code: 'MFA_REQUIRED' }) =>
-      new Promise<boolean>(resolve => {
-        resolver.current = resolve;
-        setRequirement(nextRequirement);
-      }),
+    (nextRequirement: StepUpRequirement = { code: 'MFA_REQUIRED' }) => {
+      const pending = queue.current.begin();
+      setRequirement(nextRequirement);
+      return pending;
+    },
     []
   );
 
   const settle = useCallback((verified: boolean) => {
-    const resolve = resolver.current;
-    resolver.current = null;
     setRequirement(null);
-    resolve?.(verified);
+    queue.current.settle(verified);
   }, []);
 
   const onVerified = useCallback(() => {
@@ -60,15 +57,8 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
 
   const withStepUp = useCallback(
     async <T,>(operation: () => Promise<T>): Promise<T> => {
-      try {
-        return await operation();
-      } catch (error) {
-        const nextRequirement = stepUpRequirementFromError(error);
-        if (!nextRequirement) throw error;
-        const verified = await requestStepUp(nextRequirement);
-        if (!verified) throw new StepUpCancelledError();
-        return await operation();
-      }
+      const result = await runWithStepUp(operation, requestStepUp, stepUpRequirementFromError);
+      return result;
     },
     [requestStepUp]
   );

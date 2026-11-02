@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
+import { StepUpSignInAgainButton } from '@/components/admin/step-up/StepUpSignInAgainButton';
 
 /** The one route that mints registration options and verifies the attestation. */
 const REGISTER_ROUTE = '/api/auth/passkey/register';
@@ -32,8 +32,10 @@ const REGISTER_ROUTE = '/api/auth/passkey/register';
  *   a fresh attempt is a new ceremony rather than a retry of this one.
  * - `failed`: the request or the verification failed. Nothing was stored, and
  *   the "Add a passkey" control is a working retry.
+ * - `reauth_required`: an admin enrollment needs a fresh sign-in or a live
+ *   step-up proof. Retrying the same session cannot succeed.
  */
-export type PasskeyRegistrationFailure = 'cancelled' | 'failed';
+export type PasskeyRegistrationFailure = 'cancelled' | 'failed' | 'reauth_required';
 
 export class PasskeyRegistrationError extends Error {
   readonly failure: PasskeyRegistrationFailure;
@@ -61,6 +63,10 @@ export async function registerNewPasskey(): Promise<void> {
       body: JSON.stringify({ action: 'options' }),
     });
     if (!optionsResponse.ok) {
+      const body = (await optionsResponse.json().catch(() => ({}))) as { error?: unknown };
+      if (optionsResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
+        throw new PasskeyRegistrationError('reauth_required');
+      }
       throw new PasskeyRegistrationError('failed');
     }
 
@@ -90,6 +96,10 @@ export async function registerNewPasskey(): Promise<void> {
       }),
     });
     if (!verifyResponse.ok) {
+      const body = (await verifyResponse.json().catch(() => ({}))) as { error?: unknown };
+      if (verifyResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
+        throw new PasskeyRegistrationError('reauth_required');
+      }
       throw new PasskeyRegistrationError('failed');
     }
   } catch (error) {
@@ -127,15 +137,9 @@ function passkeyLabel(passkey: PasskeySummary): string {
  * A failed request keeps whatever the list already showed — including a row
  * whose removal failed — and reports the failure inline beside a working retry.
  */
-export function PasskeysCard() {
+export function PasskeysCard({ showAdminStepUpNote = false }: { showAdminStepUpNote?: boolean }) {
   const trpc = useTRPC();
-  const session = useSession();
   const passkeysQuery = useQuery(trpc.user.getPasskeys.queryOptions());
-  const stepUpStatusQuery = useQuery({
-    ...trpc.stepUp.getStatus.queryOptions(),
-    enabled: session.status === 'authenticated' && session.data?.isAdmin === true,
-    staleTime: 60_000,
-  });
 
   // The credential API is a browser global, so support starts unknown (`null`)
   // and is only ever `true`/`false` after the client has read it. The unsupported
@@ -211,7 +215,9 @@ export function PasskeysCard() {
       ? 'Could not add a passkey. Try again.'
       : addFailure === 'cancelled'
         ? 'Passkey creation was cancelled. No passkey was added.'
-        : null;
+        : addFailure === 'reauth_required'
+          ? 'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
+          : null;
 
   return (
     <Card className="h-full w-full rounded-xl shadow-sm">
@@ -222,7 +228,7 @@ export function PasskeysCard() {
             <span className="font-medium">Passkeys</span>
           </div>
 
-          {stepUpStatusQuery.data?.enrollmentEnabled ? (
+          {showAdminStepUpNote ? (
             <p className="text-sm text-muted-foreground">
               Admin passkeys: adding or replacing one may ask you to sign in again or verify with an
               existing passkey.
@@ -337,6 +343,8 @@ export function PasskeysCard() {
               {addFailureMessage}
             </p>
           )}
+
+          {addFailure === 'reauth_required' ? <StepUpSignInAgainButton /> : null}
 
           {removeFailure && (
             <p role="alert" className="text-muted-foreground text-sm leading-relaxed">

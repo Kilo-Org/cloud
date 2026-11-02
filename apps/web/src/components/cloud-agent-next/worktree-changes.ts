@@ -12,18 +12,22 @@ export type WorktreeChangesViewMode = 'flat' | 'tree';
 export type WorktreeChangesFile = WorktreeChangesSnapshot['files'][number];
 
 type WorktreeChangesScope = {
+  /** The signed-in user: another account's snapshot is never served from here. */
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
 };
 
 export function getWorktreeChangesQueryKey({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
 }: WorktreeChangesScope) {
   return [
     'worktree-changes',
+    userId,
     organizationId ?? null,
     worktreeId === undefined ? ['session', cloudAgentSessionId] : ['worktree', worktreeId],
   ] as const;

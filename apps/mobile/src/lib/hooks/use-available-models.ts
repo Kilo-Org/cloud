@@ -223,6 +223,16 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 60_000,
+    // The org default must settle even while the online manager reports
+    // offline: NetInfo can hold the device offline while the backend is
+    // reachable, and a paused read leaves `isLoading` false with no request and
+    // no failure, so the model picker's auto-selection waits on a value that
+    // never arrives. See `use-current-user-id`.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   return { defaultModel: data?.defaultModel, isLoading };
 }
@@ -240,6 +250,16 @@ export function useAvailableModels(
     queryKey: ['available-models', organizationId, audience] as const,
     queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
+    // The catalogue must settle even while the online manager reports offline:
+    // NetInfo can hold the device offline while the backend is reachable, and a
+    // paused read sends no request, reports `isLoading` false and reaches no
+    // error, so the picker lists no model and auto-selection never resolves.
+    // See `use-current-user-id`.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
   const models = useMemo(() => toModelOptions(data), [data]);

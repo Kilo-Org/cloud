@@ -5,6 +5,7 @@ import {
   contains,
   contentBox,
   intersection,
+  layoutRect,
   right,
   type LayoutNode,
   type LayoutTree,
@@ -42,19 +43,29 @@ export function checkClipped(tree: LayoutTree): Finding[] {
   for (const node of tree.nodes) {
     const { parent } = node;
     if (!parent) continue;
+    // A node's own transform moves its descendants and never its own frame, so
+    // a natively presented formSheet reports its screen at the window origin
+    // and its content translated by the detent. Overflow is only a visual cut
+    // when both boxes are measured in the transform-free space.
+    const box = layoutRect(node);
     let measured = 0;
     let against: LayoutNode | undefined;
     const clipper = ancestors(node).find(ancestor => ancestor.clips);
     if (clipper) {
-      const box = node.absolute ? clipper.rect : contentBox(clipper, tree.env.isRTL);
-      const amount = overflowBeyond(node.rect, box, { x: !clipper.scroll.x, y: !clipper.scroll.y });
+      const clipperBox = node.absolute
+        ? layoutRect(clipper)
+        : contentBox(clipper, tree.env.isRTL, layoutRect(clipper));
+      const amount = overflowBeyond(box, clipperBox, {
+        x: !clipper.scroll.x,
+        y: !clipper.scroll.y,
+      });
       if (amount > measured) {
         measured = amount;
         against = clipper;
       }
     }
     if (!node.absolute && node.paints) {
-      const amount = overflowBeyond(node.rect, contentBox(parent, tree.env.isRTL), {
+      const amount = overflowBeyond(box, contentBox(parent, tree.env.isRTL, layoutRect(parent)), {
         x: !parent.scroll.x,
         y: !parent.scroll.y,
       });

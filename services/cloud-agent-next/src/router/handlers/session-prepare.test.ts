@@ -544,6 +544,104 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock).not.toHaveBeenCalled();
   });
 
+  it.each(['webhook', 'scheduled'])(
+    'prepares a repository agent without runtimeAgents for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+
+      await caller.prepareSession({
+        prompt: 'Use the repository foreman agent',
+        mode: 'foreman',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform,
+      });
+
+      expect(registerNewSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agent: expect.objectContaining({ mode: 'foreman' }),
+          options: expect.objectContaining({ createdOnPlatform }),
+          profile: expect.objectContaining({
+            resolved: expect.objectContaining({ runtimeAgents: undefined }),
+          }),
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+      expect(assertKiloModelAvailableMock).toHaveBeenCalledOnce();
+      expect(assertBitbucketRepositoryAccessMock).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'retains explicit runtimeAgents validation for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+      await expect(
+        caller.prepareSession({
+          prompt: 'Use foreman',
+          mode: 'foreman',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          createdOnPlatform,
+          runtimeAgents: [],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('does not match any runtimeAgents'),
+      });
+      expect(registerNewSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'preserves profile-defined agents for %s',
+    async createdOnPlatform => {
+      const agent = {
+        slug: 'foreman',
+        name: 'Foreman',
+        config: { mode: 'primary' as const, prompt: 'Use the profile foreman' },
+      };
+      mergeProfileConfigurationMock.mockResolvedValueOnce({ agents: [agent] });
+      const caller = router.createCaller(createContext());
+      await caller.prepareSession({
+        prompt: 'Use foreman',
+        mode: 'foreman',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform,
+        profileId: '123e4567-e89b-12d3-a456-426614174011',
+      });
+      expect(registerNewSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agent: expect.objectContaining({ mode: 'foreman' }),
+          profile: expect.objectContaining({
+            resolved: expect.objectContaining({ runtimeAgents: [agent] }),
+          }),
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
+
+  it.each(['cloud-agent-web', 'discord', 'slack', 'code-review', undefined])(
+    'retains missing custom-agent rejection for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+      await expect(
+        caller.prepareSession({
+          prompt: 'Use foreman',
+          mode: 'foreman',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          createdOnPlatform,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(registerNewSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
   it('passes the exact profile-resolved request to registration', async () => {
     const caller = router.createCaller(createContext());
     const profileId = '123e4567-e89b-12d3-a456-426614174011';

@@ -110,15 +110,15 @@ describe('Button native target contract', () => {
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 48 }]);
   });
 
-  it('keeps a 36-point compact minimum plus four-point hitSlop on every edge', async () => {
+  it('keeps a 36-point compact minimum plus five-point hitSlop on every edge', async () => {
     const button = renderButton({ size: 'sm' });
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 36 }]);
-    expect(button.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
+    expect(button.props.hitSlop).toEqual({ top: 5, bottom: 5, left: 5, right: 5 });
   });
 
-  it('keeps an icon target 44 points wide and tall without requiring label content', async () => {
+  it('gives the icon size the shared 48dp target without label content', async () => {
     const button = renderButton({ size: 'icon', children: null, accessibilityLabel: 'Close' });
-    expect(await nativeDimensions(button)).toEqual([{ height: 44, width: 44 }]);
+    expect(await nativeDimensions(button)).toEqual([{ height: 48, width: 48 }]);
     expect(button.props.role).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Close');
   });
@@ -134,6 +134,7 @@ describe('Button native target contract', () => {
     'default',
     'destructive',
     'outline',
+    'outline-destructive',
     'secondary',
     'ghost',
     'link',
@@ -322,8 +323,11 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+    // A busy non-primary control has only its indicator to show, so it must not
+    // dim either: half opacity leaves an icon-only button looking empty on dark.
+    const outlined = renderButton({ variant: 'outline', size: 'icon', loading: true });
+    expect((outlined.props.className as string).split(' ')).not.toContain('opacity-50');
   });
-
   it('centers the label so a wrapped label stays under its own lines', () => {
     // Android can paint a wrapped label even when the layout reports one line;
     // centered text keeps the wrapped lines aligned under each other instead

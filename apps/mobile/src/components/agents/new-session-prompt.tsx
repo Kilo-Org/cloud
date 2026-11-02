@@ -40,7 +40,10 @@ import {
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
-import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import {
+  resolveNewSessionPromptControlState,
+  resolvePromptCounterRemaining,
+} from '@/components/agents/new-session-prompt-state';
 import {
   resolveNewSessionPromptMaxHeight,
   resolveNewSessionPromptMinHeight,
@@ -52,6 +55,7 @@ import { hasVisibleComposerText } from '@/lib/composer-text';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { cn } from '@/lib/utils';
 import {
   applyVoiceDraftAtSelection,
@@ -65,7 +69,7 @@ import {
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
@@ -76,8 +80,6 @@ const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
-/** Hide the remaining-characters counter until the draft nears the limit. */
-const PROMPT_COUNTER_VISIBLE_REMAINING = 1000;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 
@@ -145,7 +147,15 @@ export function NewSessionPrompt({
   const insets = useSafeAreaInsets();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [promptCharacterCount, setPromptCharacterCount] = useState(initialPrompt?.length ?? 0);
+  // The counter's remaining count, or null while it is hidden. Only the value
+  // the card renders is held: the raw character count is not, so a keystroke
+  // that leaves the counter hidden publishes nothing and re-renders nothing.
+  const [counterRemaining, setCounterRemaining] = useState<number | null>(() =>
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
+  const publishedCounterRef = useRef<number | null>(
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
@@ -172,8 +182,7 @@ export function NewSessionPrompt({
   const showsAttachmentStatus = attachments.some(
     attachment => attachment.metadataStripFailed === true
   );
-  const showsCounter =
-    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  const showsCounter = counterRemaining !== null;
   // The chrome the card renders around the input, measured by the card's
   // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
   // the frame leaves for the input.
@@ -252,17 +261,30 @@ export function NewSessionPrompt({
     promptMeasureSetTextRef.current(initialPromptRef.current);
   }, []);
 
+  // Publish the counter only when the value the card renders changes: the
+  // count stays hidden until the draft nears the limit, and republishing the
+  // raw length re-rendered this card — its toolbar, attachment strip, controls
+  // and voice surface — on every keystroke of a draft that never shows it.
+  const publishCounter = useCallback((length: number) => {
+    const next = resolvePromptCounterRemaining(length);
+    if (next === publishedCounterRef.current) {
+      return;
+    }
+    publishedCounterRef.current = next;
+    setCounterRemaining(next);
+  }, []);
+
   const handlePromptChange = useCallback(
     (text: string) => {
       promptRef.current = text;
       promptMeasure.setText(text);
-      setPromptCharacterCount(text.length);
+      publishCounter(text.length);
       onChangeText(text);
     },
-    [onChangeText, promptMeasure]
+    [onChangeText, promptMeasure, publishCounter]
   );
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef: promptInputRef,
     maxLength: PROMPT_INPUT_MAX_CHARS,
@@ -342,9 +364,7 @@ export function NewSessionPrompt({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
@@ -455,6 +475,16 @@ export function NewSessionPrompt({
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}
+      {sharePrefill.failed ? (
+        <SharePrefillFailure
+          onRetry={() => {
+            sharePrefill.retry();
+          }}
+          onDismiss={() => {
+            sharePrefill.dismiss();
+          }}
+        />
+      ) : null}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -516,10 +546,10 @@ export function NewSessionPrompt({
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                count: PROMPT_INPUT_MAX_CHARS - promptCharacterCount,
+                count: counterRemaining,
               })}
             >
-              {PROMPT_INPUT_MAX_CHARS - promptCharacterCount}
+              {counterRemaining}
             </Text>
           </View>
         ) : null}

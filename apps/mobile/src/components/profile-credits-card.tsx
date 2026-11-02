@@ -7,7 +7,7 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
@@ -125,6 +125,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
+  // One formatted amount for the painted value and its spoken label: a label
+  // that stops being passed keeps its old native value, so the shown amount
+  // would otherwise still be announced as the hidden one.
+  const balanceText = formatMoney(balanceDollars, i18n.language);
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.
@@ -262,29 +266,28 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               <ScrollView horizontal className="min-w-0">
                 <Text
                   className="text-2xl font-bold tabular-nums"
-                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
                 >
-                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                  {hideBalance ? HIDDEN_BALANCE : balanceText}
                 </Text>
               </ScrollView>
+              {/* One line, swapped without an entrance fade: the caption holds
+                  the second row of this block, so a fade that paints it late
+                  leaves the reserved row empty under the amount. */}
               {creditsFailed && (
                 <Text className="text-xs text-muted-foreground">
                   {t('credits.expiryUnavailable')}
                 </Text>
               )}
               {!creditsFailed && creditsPending && (
-                <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
-                </Animated.View>
+                <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
               )}
               {!creditsFailed && !creditsPending && (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                  <CreditExpiryNote
-                    creditBlocks={creditData.creditBlocks}
-                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
-                    emptyMessage={t('credits.noExpiringCredits')}
-                  />
-                </Animated.View>
+                <CreditExpiryNote
+                  creditBlocks={creditData.creditBlocks}
+                  hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                  emptyMessage={t('credits.noExpiringCredits')}
+                />
               )}
             </View>
             <Pressable

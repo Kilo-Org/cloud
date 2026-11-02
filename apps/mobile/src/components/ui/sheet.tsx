@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports
@@ -89,6 +90,10 @@ export function Sheet({
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
+  // The app-wide touch gate stays shut for as long as this sheet is presented:
+  // until the sheet's own window takes touch, a tap made while it opens would
+  // land on the screen and the tab bar behind it.
+  useSheetTouchHold(visible);
   // A dismissal handed to the native sheet that has not reported back yet.
   const [dismissalPending, setDismissalPending] = useState(false);
 

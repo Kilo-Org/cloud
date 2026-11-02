@@ -841,7 +841,11 @@ describe('production SFO queued accounting', () => {
     expect(directFallbacks).toEqual(
       Array.from({ length: 3 }, () => [
         'usage accounting queue publisher not configured',
-        { usageId: expect.any(String), fallback: 'direct' },
+        {
+          execution_region: process.env.VERCEL_REGION,
+          usageId: expect.any(String),
+          fallback: 'direct',
+        },
       ])
     );
     expect(error).not.toHaveBeenCalled();
@@ -1071,6 +1075,7 @@ describe('gateway accounting integration', () => {
       expect(db.transaction).not.toHaveBeenCalled();
       expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith('usage accounting queued', {
+        execution_region: process.env.VERCEL_REGION,
         usageId: record?.usageId,
       });
       expect(warn).not.toHaveBeenCalled();
@@ -1208,6 +1213,35 @@ describe('gateway accounting integration', () => {
 
 describe('queued usage accounting', () => {
   test.each([
+    ['fra1', 'fra1'],
+    ['sfo1', 'sfo1'],
+    ['lhr1', 'unknown'],
+    ['', 'unknown'],
+    [undefined, 'unknown'],
+  ])('logs %s publication failure in execution region %s', async (region, expectedRegion) => {
+    config.USAGE_QUEUE_ONLY_ENABLED = true;
+    if (region === undefined) delete process.env.VERCEL_REGION;
+    else process.env.VERCEL_REGION = region;
+    jest
+      .mocked(publisher.enqueueUsage)
+      .mockResolvedValue({ kind: 'unavailable', reason: 'http_401' });
+    const lifecycle = requestLifetime();
+    const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(record).toBeNull();
+    expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
+      usageId: jest.mocked(publisher.enqueueUsage).mock.calls[0][0].core.id,
+      execution_region: expectedRegion,
+      reason: 'http_401',
+    });
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+    expect(writer).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  test.each([
     [undefined, 'staging', 'preview', false],
     ['false', 'staging', 'preview', false],
     ['TRUE', 'staging', 'preview', false],
@@ -1243,12 +1277,19 @@ describe('queued usage accounting', () => {
     }
   });
 
-  test.each(['fra1', 'sfo1'])(
-    '%s confirmed acceptance queues once without a direct write',
-    async region => {
+  test.each([
+    ['fra1', 'fra1'],
+    ['sfo1', 'sfo1'],
+    ['lhr1', 'unknown'],
+    ['', 'unknown'],
+    [undefined, 'unknown'],
+  ])(
+    '%s confirmed acceptance logs execution region %s and queues once without a direct write',
+    async (region, expectedRegion) => {
       config.USAGE_QUEUE_ONLY_ENABLED = true;
 
-      process.env.VERCEL_REGION = region;
+      if (region === undefined) delete process.env.VERCEL_REGION;
+      else process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const event = { request_id: 'synthetic-request', payload: { cost: 1234 } };
       const record = await lifecycle.run(() =>
@@ -1273,7 +1314,10 @@ describe('queued usage accounting', () => {
       expect(writer).not.toHaveBeenCalled();
       expect(db.transaction).not.toHaveBeenCalled();
       expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
-      expect(info).toHaveBeenCalledWith('usage accounting queued', { usageId: record?.usageId });
+      expect(info).toHaveBeenCalledWith('usage accounting queued', {
+        execution_region: expectedRegion,
+        usageId: record?.usageId,
+      });
       expect(warn).not.toHaveBeenCalled();
       expect(lifecycle.errors).toEqual([]);
     }
@@ -1326,6 +1370,7 @@ describe('queued usage accounting', () => {
         expect(result).toBeNull();
         expect(info).not.toHaveBeenCalled();
         expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
+          execution_region: process.env.VERCEL_REGION,
           usageId: jest.mocked(publisher.enqueueUsage).mock.calls[0][0].core.id,
           reason: 'http_503',
         });
@@ -1518,6 +1563,7 @@ describe('queued usage accounting', () => {
           }
           expect(error).not.toHaveBeenCalled();
           expect(warn).toHaveBeenCalledWith('usage accounting queue publisher not configured', {
+            execution_region: process.env.VERCEL_REGION,
             usageId: payload.core.id,
             fallback: 'direct',
           });
@@ -1542,6 +1588,7 @@ describe('queued usage accounting', () => {
           expect(db.transaction).not.toHaveBeenCalled();
           expect(error).toHaveBeenCalledTimes(1);
           expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
+            execution_region: process.env.VERCEL_REGION,
             usageId: payload.core.id,
             reason: failure === 'transport_failure' ? 'request_failed' : failure,
           });
@@ -1616,7 +1663,12 @@ describe('queued usage accounting', () => {
         expect(warn.mock.calls).toEqual([
           [
             'usage accounting queue unavailable without a request lifetime',
-            { usageId: record?.usageId, reason: 'registration_failed', fallback: 'direct' },
+            {
+              execution_region: process.env.VERCEL_REGION,
+              usageId: record?.usageId,
+              reason: 'registration_failed',
+              fallback: 'direct',
+            },
           ],
         ]);
         expect(info).not.toHaveBeenCalled();
@@ -1670,6 +1722,7 @@ describe('queued usage accounting', () => {
         expect(record).toBeNull();
         expect(info).not.toHaveBeenCalled();
         expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
+          execution_region: process.env.VERCEL_REGION,
           usageId: sent[0].core.id,
           reason: 'http_503',
         });

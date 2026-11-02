@@ -161,7 +161,7 @@ describe('getProvider local fake deterministic routing', () => {
       userByok: null,
       isFree: true,
       provider: {
-        id: 'custom',
+        type: 'custom',
         apiUrl: 'http://localhost:8811/api/openrouter',
       },
     });
@@ -214,7 +214,7 @@ describe('getProvider local fake deterministic routing', () => {
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
     const { provider, userByok } = await getTranscriptionProvider();
     expect(provider).toMatchObject({
-      id: 'openrouter',
+      type: 'openrouter',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });
@@ -357,7 +357,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: null,
       bypassAccessCheck: false,
       provider: {
-        id: 'openai-chatgpt',
+        type: 'openai-chatgpt',
         apiUrl: 'https://api.openai.com/v1',
         apiKey: 'partner-project-key',
       },
@@ -508,7 +508,7 @@ describe('getProvider gateway BYOK routing', () => {
     const result = await resolve();
 
     expect(result).toMatchObject({
-      provider: { id: 'openrouter', apiUrl: OPENROUTER.apiUrl, apiKey: 'user-openrouter-key' },
+      provider: { type: 'openrouter', apiUrl: OPENROUTER.apiUrl, apiKey: 'user-openrouter-key' },
       userByok: [openRouterKey],
       isFree: false,
       bypassAccessCheck: false,
@@ -523,7 +523,7 @@ describe('getProvider gateway BYOK routing', () => {
 
     expect(result).toMatchObject({
       provider: {
-        id: 'vercel',
+        type: 'vercel',
         apiUrl: VERCEL_AI_GATEWAY.apiUrl,
         apiKey: 'user-vercel-gateway-key',
       },
@@ -540,7 +540,7 @@ describe('getProvider gateway BYOK routing', () => {
 
     const result = await resolve();
 
-    expect(result.provider).toMatchObject({ id: 'openrouter', apiKey: 'user-openrouter-key' });
+    expect(result.provider).toMatchObject({ type: 'openrouter', apiKey: 'user-openrouter-key' });
     expect(result.userByok).toEqual([openRouterKey]);
   });
 
@@ -580,7 +580,7 @@ describe('getProvider gateway BYOK routing', () => {
       kiloIgnoredProviders: ['anthropic'],
     });
 
-    expect(result.provider).toMatchObject({ id: 'vercel', apiKey: 'user-vercel-gateway-key' });
+    expect(result.provider).toMatchObject({ type: 'vercel', apiKey: 'user-vercel-gateway-key' });
     const getRoutingProviderConfig = jest.mocked(canRouteToVercel).mock.calls[0][1];
     await expect(getRoutingProviderConfig()).resolves.toEqual(callerProvider);
   });
@@ -612,7 +612,7 @@ describe('getProvider gateway BYOK routing', () => {
       'openrouter',
     ]);
     expect(getBYOKforUser).not.toHaveBeenCalled();
-    expect(result.provider).toMatchObject({ id: 'openrouter', apiKey: 'user-openrouter-key' });
+    expect(result.provider).toMatchObject({ type: 'openrouter', apiKey: 'user-openrouter-key' });
   });
 
   test('skips gateway catalog discovery when the owner has no gateway key', async () => {
@@ -740,7 +740,7 @@ describe('getProvider direct BYOK routing', () => {
         { type: 'user', id: user.id },
         [providerId]
       );
-      expect(result.provider.id).toBe('direct-byok');
+      expect(result.provider.type).toBe('direct-byok');
       expect(result.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
       expect(result.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
       expect(directByokTransform).toHaveBeenCalledTimes(1);
@@ -802,7 +802,7 @@ describe('getProvider direct BYOK routing', () => {
       stream: true,
     });
     expect(result.provider).toMatchObject({
-      id: 'direct-byok',
+      type: 'direct-byok',
       apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
       apiKey: '',
       supportedChatApis: ['chat_completions'],
@@ -884,7 +884,7 @@ describe('getProvider direct BYOK routing', () => {
       ['synthetic', 'zai-coding']
     );
     expect(result.provider).toMatchObject({
-      id: 'direct-byok',
+      type: 'direct-byok',
       apiUrl: 'https://zai-coding.example/v1',
       apiKey: 'zai-key',
     });
@@ -941,7 +941,7 @@ describe('getProvider direct BYOK routing', () => {
     );
     expect(result).toMatchObject({
       kind: 'provider',
-      provider: { id: 'direct-byok', apiKey: 'zai-key' },
+      provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
     });
   });
@@ -1008,7 +1008,7 @@ describe('getProvider direct BYOK routing', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
-      provider: { id: 'direct-byok', apiKey: 'zai-key' },
+      provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
     });
   });
@@ -1034,7 +1034,7 @@ describe('getProvider direct BYOK routing', () => {
 
     if (result.kind !== 'provider') throw new Error('expected provider result');
     expect(result.provider).toMatchObject({
-      id: 'direct-byok',
+      type: 'direct-byok',
       apiKey: 'synthetic-key',
       supportedChatApis: ['chat_completions'],
     });

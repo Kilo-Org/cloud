@@ -108,8 +108,12 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The probe runs tsx over the local dev/local scripts, so it needs only
+      # the root project's dependencies. A duplicate that reaches this job
+      # after another run published pays this filtered install instead of the
+      # recursive workspace one, and the guarded install below then never runs.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Check whether another run published this artifact
         id: published
@@ -117,6 +121,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
+
+      - name: Install dependencies
+        if: steps.published.outputs.published != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Build trpc types
         if: steps.published.outputs.published != 'true'
@@ -216,8 +224,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Same split as the ios job: the filtered install is enough for the
+      # probe, and a duplicate never reaches the workspace install.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Check whether another run published this artifact
         id: published
@@ -225,6 +235,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
+
+      - name: Install dependencies
+        if: steps.published.outputs.published != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Build trpc types
         if: steps.published.outputs.published != 'true'

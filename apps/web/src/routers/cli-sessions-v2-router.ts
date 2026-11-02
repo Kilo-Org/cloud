@@ -1673,6 +1673,11 @@ export const cliSessionsV2Router = createTRPCRouter({
           : pageResult),
         watermarkEventId,
         preparationAttempts,
+        // The access check already read the row, so the page can answer the
+        // session's parent without a second full-session query. Always
+        // present: `null` means a root session, and a client that opens this
+        // session has no further read to make.
+        parentSessionId: session.parent_session_id,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),

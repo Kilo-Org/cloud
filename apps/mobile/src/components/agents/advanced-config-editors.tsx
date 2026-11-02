@@ -4,7 +4,6 @@ import { Pressable, View } from 'react-native';
 
 import {
   addCommand,
-  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMANDS,
   moveCommand,
@@ -153,22 +152,16 @@ export function ManualSetupCommandsEditor({
       {commands.map((command, index) => {
         const isFirst = index === 0;
         const isLast = index === commands.length - 1;
-        const position = commandPosition(commands, index);
+        // Every row is a command slot, so a blank draft row keeps the position
+        // it occupies in the list and its controls name that command.
+        const position = index + 1;
         const rowHint = commandRowA11yLabel(index, commands.length);
-        // A blank draft row is not a command, so it keeps the plain labels
-        // rather than claiming a number the saved list does not hold.
-        const upLabel =
-          position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
-        const downLabel =
-          position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
-        const deleteLabel =
-          position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
+        const upLabel = t('profiles.moveCommandUp', { position });
+        const downLabel = t('profiles.moveCommandDown', { position });
+        const deleteLabel = t('profiles.deleteCommand', { position });
         // The field's label is also its accessible name, so it carries the same
         // position the row's move and delete controls announce.
-        const commandLabel =
-          position === null
-            ? t('profiles.commandLabel')
-            : t('profiles.commandLabelPosition', { position });
+        const commandLabel = t('profiles.commandLabelPosition', { position });
         return (
           <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
             <SetupCommandField

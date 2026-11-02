@@ -378,6 +378,12 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
   };
 }
 
+function mockGitLabReviewIntegration() {
+  mockGetIntegrationById.mockResolvedValue(
+    makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+  );
+}
+
 function mockCreatedInfraRetryFlow(
   overrides: {
     failedAttemptId?: string;
@@ -689,7 +695,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockGetIntegrationById).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockAddReactionToPR).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
@@ -912,6 +917,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
 
       const response = await POST(
         makeRequest({
@@ -969,6 +975,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           platform: 'bitbucket',
           integration_type: 'workspace_access_token',
           platform_installation_id: null,
+          owned_by_user_id: null,
+          owned_by_organization_id: '123e4567-e89b-12d3-a456-426614174099',
         })
       );
 
@@ -2980,6 +2988,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockUpdateCodeReviewStatus.mockImplementation(async () => {
         callOrder.push('persist');
       });
@@ -3149,6 +3158,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           check_run_id: null,
         })
       );
+      mockGitLabReviewIntegration();
 
       await POST(
         makeRequest({
@@ -3342,6 +3352,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
 
       await POST(
         makeRequest({
@@ -3598,6 +3609,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockHasMRNoteWithMarker.mockResolvedValue(false);
 
       await POST(
@@ -3629,6 +3641,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockHasMRNoteWithMarker.mockResolvedValue(true);
 
       await POST(
@@ -3731,6 +3744,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue(null);
       const detailedErrorMessage =
         'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.';
@@ -3879,6 +3893,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue(null);
 
       await POST(
@@ -3900,7 +3915,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
       mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
-      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue({ noteId: 321, body: 'old summary' });
 
       await POST(
@@ -4093,6 +4108,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         total_tokens_out: 200,
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockGitLabReviewIntegration();
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
@@ -4222,6 +4238,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
+      mockGitLabReviewIntegration();
       mockAppendPreviousReviewSummaryHistory.mockReturnValue('notice with history');
 
       await POST(makeRequest(byokRateLimitRequest), makeParams(REVIEW_ID));
@@ -4448,6 +4465,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         total_tokens_out: 200,
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockGitLabReviewIntegration();
       mockFindKiloReviewNote.mockResolvedValue({ noteId: 88, body: 'note lookup body' });
 
       const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
@@ -4526,6 +4544,20 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
       expect(mockFindKiloReviewNote).not.toHaveBeenCalled();
+    });
+
+    it('skips provider effects when the review integration belongs to another owner', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration({ owned_by_user_id: 'other-user' }));
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordCodeReviewPublicationOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ platformIntegrationId: null, shouldPublish: true })
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
     });
 
     it('records unknown for a completed Bitbucket review without a provider read', async () => {

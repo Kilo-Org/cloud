@@ -1,5 +1,7 @@
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 
+import { CharacterBoundedCache } from './character-bounded-cache';
+
 /**
  * Resolve a markdown fence info string to the language name used by the
  * highlighter, or `null` for no language. Only the first word counts
@@ -81,15 +83,20 @@ export function nextChunkMountCount(mounted: number, totalChunks: number): numbe
   return Math.min(mounted + CODE_CHUNK_MOUNT_BATCH, totalChunks);
 }
 
-/** Tagged runs in one line or segment: the runs that cost an Android span. */
-function taggedRunCount(tokens: readonly HighlightToken[]): number {
-  let tagged = 0;
+/**
+ * What one placed segment costs: the tagged runs that become Android spans, and
+ * the characters its token texts hold, which is what the walk cache retains.
+ */
+function segmentCost(tokens: readonly HighlightToken[]) {
+  let tags = 0;
+  let characters = 0;
   for (const token of tokens) {
     if (token.className !== null) {
-      tagged += 1;
+      tags += 1;
     }
+    characters += token.text.length;
   }
-  return tagged;
+  return { tags, characters };
 }
 
 /**
@@ -147,6 +154,10 @@ type ChunkWalk = {
   chunks: HighlightToken[][][];
   chunk: HighlightToken[][];
   tagged: number;
+  // What the placed chunks retain: the cache budget is charged by these, so a
+  // walk is weighed by the highlighted tokens it holds and not only by its key.
+  retainedTokens: number;
+  retainedCharacters: number;
   done: boolean;
 };
 
@@ -158,6 +169,8 @@ function createChunkWalk(pullLine: () => HighlightToken[] | undefined): ChunkWal
     chunks: [],
     chunk: [],
     tagged: 0,
+    retainedTokens: 0,
+    retainedCharacters: 0,
     done: false,
   };
 }
@@ -191,14 +204,16 @@ function advanceChunkWalk(walk: ChunkWalk, maxChunks: number): void {
       walk.pendingIndex = 1;
       segment = segments[0] ?? [];
     }
-    const runs = taggedRunCount(segment);
-    if (walk.chunk.length > 0 && walk.tagged + runs > CODE_CHUNK_TOKENS) {
+    const { tags, characters } = segmentCost(segment);
+    if (walk.chunk.length > 0 && walk.tagged + tags > CODE_CHUNK_TOKENS) {
       walk.chunks.push(walk.chunk);
       walk.chunk = [];
       walk.tagged = 0;
     }
     walk.chunk.push(segment);
-    walk.tagged += runs;
+    walk.tagged += tags;
+    walk.retainedTokens += segment.length;
+    walk.retainedCharacters += characters;
     if (walk.chunk.length >= CODE_CHUNK_LINES) {
       walk.chunks.push(walk.chunk);
       walk.chunk = [];
@@ -229,56 +244,52 @@ export function chunkTokenLines(lines: readonly HighlightToken[][]): HighlightTo
 // the markdown parse caches use. One entry per fence value is what lets a mount
 // batch continue the previous walk instead of re-highlighting its prefix.
 const CODE_FENCE_WALK_CACHE_CHARACTERS = 2_000_000;
-const fenceWalkCache = new Map<string, { walk: ChunkWalk; weight: number }>();
-let fenceWalkCacheWeight = 0;
 
-function evictFenceWalks(): void {
-  // Keep the newest entry even when it alone outweighs the budget. The key is
-  // the fence's whole source, so at 10x the audit's 200 KB fence the key is
-  // over 2,000,000 characters and the entry is heavier than the cache. Evicting
-  // it the instant it was inserted dropped the walk the current mount batch had
-  // just built, so the next batch rebuilt it from line 0 and re-highlighted the
-  // whole prefix — quadratic in the fence's line count. The newest entry is the
-  // active fence, so it must survive; dropping older entries first still bounds
-  // the cache to one oversized fence plus whatever fits beside it.
-  while (fenceWalkCacheWeight > CODE_FENCE_WALK_CACHE_CHARACTERS && fenceWalkCache.size > 1) {
-    const oldest = fenceWalkCache.keys().next();
-    if (oldest.done) {
-      return;
-    }
-    const entry = fenceWalkCache.get(oldest.value);
-    fenceWalkCache.delete(oldest.value);
-    fenceWalkCacheWeight -= entry?.weight ?? 0;
-  }
+// Characters charged per retained highlight token on top of its own text: a
+// token is a two-property object (its text and its class), about 32 bytes, so
+// sixteen source characters stand in for its own overhead. The budget then
+// bounds the highlighted copies of message text a walk keeps, which the fence
+// source alone does not account for.
+const FENCE_WALK_TOKEN_CHARGE = 16;
+
+const fenceWalkCache = new CharacterBoundedCache<ChunkWalk>(CODE_FENCE_WALK_CACHE_CHARACTERS);
+
+// Mounted blocks per walk key. The cache is keyed by the fence's value, not by
+// an instance, so two blocks rendering the same fence share one walk; a block
+// that goes away may only drop the walk once no other mounted block holds it.
+const fenceWalkHolders = new Map<string, number>();
+
+function fenceWalkKey(code: string, language: string | null): string {
+  return `${language ?? ''}\u0000${code}`;
+}
+
+/**
+ * What one cached walk retains: its key, which holds the fence's whole source,
+ * plus the highlighted token text and token objects the walk has placed.
+ */
+function fenceWalkWeight(key: string, walk: ChunkWalk): number {
+  return key.length + walk.retainedCharacters + walk.retainedTokens * FENCE_WALK_TOKEN_CHARGE;
 }
 
 /**
  * The resumable walk for one fence, keyed by its language and full source.
  * Repeated calls with a larger `maxChunks` continue the same walk, so each
  * source line is highlighted once no matter how many mount batches it takes.
- * The key holds the whole source, so the character budget bounds the cache.
+ * A new walk is not cached here: `chunkCodeLines` caches it once it knows what
+ * the walk retains.
  */
 function getFenceChunkWalk(code: string, language: string | null): ChunkWalk {
-  const key = `${language ?? ''}\u0000${code}`;
-  const cached = fenceWalkCache.get(key);
+  const cached = fenceWalkCache.get(fenceWalkKey(code, language));
   if (cached !== undefined) {
-    // Refresh recency: a Map iterates in insertion order.
-    fenceWalkCache.delete(key);
-    fenceWalkCache.set(key, cached);
-    return cached.walk;
+    return cached;
   }
   const lines = code.split('\n');
   let index = 0;
-  const walk = createChunkWalk(() => {
+  return createChunkWalk(() => {
     const line = lines[index];
     index += 1;
     return line === undefined ? undefined : highlightLine(line, language);
   });
-  const weight = key.length;
-  fenceWalkCache.set(key, { walk, weight });
-  fenceWalkCacheWeight += weight;
-  evictFenceWalks();
-  return walk;
 }
 
 /**
@@ -306,8 +317,13 @@ export function chunkCodeLines(
   language: string | null,
   maxChunks: number
 ): CodeChunkPage {
+  const key = fenceWalkKey(code, language);
   const walk = getFenceChunkWalk(code, language);
   advanceChunkWalk(walk, maxChunks);
+  // Charge the cache for what the walk now retains. `set` also moves the entry
+  // to the most-recent end, which is what keeps the fence being mounted ahead
+  // of the walks of the fences the user scrolled past.
+  fenceWalkCache.set(key, walk, fenceWalkWeight(key, walk));
   // Return a snapshot capped at `maxChunks`: the walk's array grows on the next
   // batch (and may already hold more if another instance sharing the same
   // source advanced it first), and a caller memoized on the array's identity
@@ -319,10 +335,53 @@ export function chunkCodeLines(
   return { chunks, hasMore: !walk.done || walk.chunks.length > chunks.length };
 }
 
+/**
+ * Record that a mounted fence is using its walk. Paired with
+ * `releaseFenceChunkWalk` for the same language and source; the walk survives
+ * one holder leaving while another still renders the same fence.
+ */
+export function retainFenceChunkWalk(code: string, language: string | null): void {
+  const key = fenceWalkKey(code, language);
+  fenceWalkHolders.set(key, (fenceWalkHolders.get(key) ?? 0) + 1);
+}
+
+/**
+ * Release the walk of one fence. `CodeBlock` calls this when the fence it
+ * rendered is gone or its text was replaced, so a transcript the user scrolled
+ * past keeps no highlighted copy of its code. The walk is dropped only once no
+ * mounted block holds it: a fence still on screen keeps its walk (a FlashList
+ * remount then mounts without re-highlighting its lines), and its retained
+ * tokens are what the cache budget is charged for.
+ */
+export function releaseFenceChunkWalk(code: string, language: string | null): void {
+  const key = fenceWalkKey(code, language);
+  const holders = fenceWalkHolders.get(key) ?? 0;
+  if (holders > 1) {
+    fenceWalkHolders.set(key, holders - 1);
+    return;
+  }
+  fenceWalkHolders.delete(key);
+  // A block that renders the same fence can mount in the same commit as this
+  // release, and React runs a commit's effect cleanups before its effect
+  // creates: that new block's retain has not landed yet. Drop the entry on the
+  // next task instead, once the commit's creates have run, and keep it if one
+  // of them retained it.
+  queueMicrotask(() => {
+    if (!fenceWalkHolders.has(key)) {
+      fenceWalkCache.delete(key);
+    }
+  });
+}
+
 /** For tests: drop the resumable fence walks so a suite starts cold. */
 export function clearFenceWalkCacheForTests(): void {
   fenceWalkCache.clear();
-  fenceWalkCacheWeight = 0;
+  fenceWalkHolders.clear();
+}
+
+/** For tests: the walks currently retained and the total weight they are charged. */
+export function fenceWalkCacheStatsForTests() {
+  return { entries: fenceWalkCache.size, weight: fenceWalkCache.weight };
 }
 
 /**

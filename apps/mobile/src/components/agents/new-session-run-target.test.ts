@@ -18,6 +18,17 @@ vi.mock('react-i18next', async importOriginal => {
 
 vi.mock('react-native', () => ({ View: 'View' }));
 
+vi.mock('react-native-reanimated', () => {
+  type Rotation = { value: number };
+  return {
+    default: { View: 'AnimatedView' },
+    Easing: { inOut: (value: unknown) => value, cubic: 'cubic' },
+    useSharedValue: (initial: number): Rotation => ({ value: initial }),
+    useAnimatedStyle: () => ({}),
+    withTiming: () => 360,
+  };
+});
+
 vi.mock('@/components/agents/instance-selector', () => ({
   InstanceSelector: 'InstanceSelector',
 }));
@@ -115,7 +126,7 @@ describe('NewSessionRunTarget', () => {
   });
 
   it.each([false, true])(
-    'renders the refresh control with fetching=%s driving disabled and busy',
+    'keeps the refresh glyph drawn with fetching=%s and reports only the busy state',
     async isFetchingInstances => {
       const { NewSessionRunTarget } = await import('./new-session-run-target');
       const props = { ...baseProps(), isFetchingInstances };
@@ -127,19 +138,22 @@ describe('NewSessionRunTarget', () => {
       expect(button).toMatchObject({
         accessibilityLabel: 'Refresh',
         size: 'icon',
-        disabled: isFetchingInstances,
-        loading: isFetchingInstances,
-        onPress: props.onRefreshInstances,
+        disabled: false,
+        accessibilityState: { busy: isFetchingInstances },
       });
-      if (!isFetchingInstances) {
-        const onPress = button?.onPress as (() => void) | undefined;
-        if (!onPress) {
-          throw new Error('Missing target refresh handler');
-        }
-        onPress();
-        expect(props.onRefreshInstances).toHaveBeenCalledOnce();
-        expect(props.onChangeRunOnInstance).not.toHaveBeenCalled();
+      // A refetch runs on a cold launch and on every foreground return; swapping
+      // the glyph for a spinner left the icon-only square empty in the design
+      // gate. The glyph is the button's whole identity, so it stays drawn.
+      expect(button?.loading).toBeUndefined();
+      expect(findElementByType(element, 'RefreshCw')).not.toBeNull();
+
+      const onPress = button?.onPress as (() => void) | undefined;
+      if (!onPress) {
+        throw new Error('Missing target refresh handler');
       }
+      onPress();
+      expect(props.onRefreshInstances).toHaveBeenCalledOnce();
+      expect(props.onChangeRunOnInstance).not.toHaveBeenCalled();
     }
   );
 

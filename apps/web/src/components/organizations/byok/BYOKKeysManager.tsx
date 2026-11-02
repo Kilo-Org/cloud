@@ -69,6 +69,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
   azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
+  cohere: 'Cohere',
   deepseek: 'DeepSeek',
   openai: 'OpenAI API key',
   inception: 'Inception',

@@ -47,6 +47,29 @@ const baseStartInput = {
   repository: { type: 'github' as const, repo: 'acme/repo' },
 };
 
+describe('GetSessionOutput runtime agents', () => {
+  it('preserves picker visibility without removing agents used for delegation', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    const response = GetSessionOutput.parse({
+      sessionId: validSessionId,
+      userId: 'user_test',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+      runtimeAgents,
+    });
+
+    expect(response.runtimeAgents).toEqual(runtimeAgents);
+  });
+});
+
 describe('grouped unified session input contracts', () => {
   it('accepts an optional operation key on start for any client origin', () => {
     const valid = {
@@ -89,6 +112,25 @@ describe('grouped unified session input contracts', () => {
         replayed: 'true',
       }).success
     ).toBe(false);
+  });
+
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves audit settings at grouped and legacy boundaries: %j', policy => {
+    expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(policy);
+    const legacy = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(legacy.egressAudit).toBe(policy.egressAudit);
+    expect(legacy.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+    expect(legacy.egressAllowlist).toBeUndefined();
   });
 
   it.each(
@@ -137,6 +179,8 @@ describe('grouped unified session input contracts', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
     const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
     const legacy = PrepareSessionInput.safeParse({

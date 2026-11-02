@@ -570,13 +570,15 @@ export function SessionDetailContent({
     if (sessionProfile) {
       // The session screen is on the root `(app)` Stack: the profile editor has
       // to join it there, or Back would land on the Profile tab root instead of
-      // this session.
+      // this session. The `openedFrom` marker also keeps Back here rather than
+      // rebuilding the profiles list under a screen the reader reached from a
+      // session (`profile-route-stack.ts`).
       router.push(
-        getProfileOverviewPath(
-          sessionProfile.id,
-          profileOrganizationId(organizationId, sessionProfile),
-          'app'
-        )
+        getProfileOverviewPath(sessionProfile.id, {
+          organizationId: profileOrganizationId(organizationId, sessionProfile),
+          stack: 'app',
+          openedFrom: 'session',
+        })
       );
     }
   };
@@ -2612,7 +2614,7 @@ export function SessionDetailContent({
               {t('agentChat.session.readOnly')}
             </Text>
             <Button
-              variant="outline"
+              variant="default"
               size="action"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
@@ -2830,7 +2832,7 @@ export function SessionDetailContent({
     return (
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
-      // skeleton's `exiting` crossfade still carries the swap visually.
+      // skeleton is swapped for the rows in one commit, so it needs none.
       <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}

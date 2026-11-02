@@ -188,15 +188,14 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider' | 'sandboxKind'>
 ): void {
-  if (input.runtime?.egressMode !== 'allowlist') return;
+  if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
   if (
     allocation.sandboxProvider !== 'cloudflare-containers' ||
     allocation.sandboxKind === 'shared'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message:
-        'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
+      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
     });
   }
 }
@@ -1266,6 +1265,9 @@ function buildSessionRegistrationCommand(
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
       ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
+      ...(input.runtime?.egressAudit === undefined
+        ? {}
+        : { egressAudit: input.runtime.egressAudit }),
       ...(input.runtime?.egressMode === 'allowlist'
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
@@ -1834,7 +1836,9 @@ export async function sessionCreateIntentFingerprint(
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'allowlist'
+        input.runtime?.sandboxAllocation ||
+        input.runtime?.egressMode === 'allowlist' ||
+        input.runtime?.egressAudit === true
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -1847,6 +1851,7 @@ export async function sessionCreateIntentFingerprint(
                     ),
                   }
                 : {}),
+              ...(input.runtime.egressAudit === true ? { egressAudit: true } : {}),
             }
           : undefined,
       options: input.options
@@ -1898,7 +1903,9 @@ async function assertCreateIntentUnchanged(
     // saved choice is resolved after admission and is not part of the fingerprint.
     (!options?.freshAdmission &&
       !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)) ||
-    ((selectable !== undefined || input.runtime?.egressMode === 'allowlist') &&
+    ((selectable !== undefined ||
+      input.runtime?.egressMode === 'allowlist' ||
+      input.runtime?.egressAudit === true) &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -2477,6 +2484,7 @@ async function readSessionMetadata(
     metadata !== null &&
     ((metadata.workspace?.egressMode ?? 'unrestricted') !==
       (input.runtime?.egressMode ?? 'unrestricted') ||
+      (metadata.workspace?.egressAudit ?? false) !== (input.runtime?.egressAudit ?? false) ||
       JSON.stringify(metadata.workspace?.egressAllowlist ?? []) !==
         JSON.stringify(egressAllowlistSchema.parse(input.runtime?.egressAllowlist ?? [])))
   ) {

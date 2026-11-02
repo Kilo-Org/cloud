@@ -137,7 +137,7 @@ async function directByokProviderResult(
   return {
     kind: 'provider',
     provider: {
-      id: 'direct-byok',
+      type: 'direct-byok',
       ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
@@ -335,13 +335,13 @@ async function resolveCustomLlmProvider(
   }
 
   const { definition } = customLlm;
+  const isPublic = isPublicCustomLlm(definition);
   const provider = buildDirectProvider(
-    'custom',
+    isPublic ? 'custom-public' : 'custom',
     getCustomLlmApiKinds(definition),
     definition,
     await resolveCustomLlmAuth(credentials)
   );
-  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,

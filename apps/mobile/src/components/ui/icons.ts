@@ -40,6 +40,7 @@ export { default as Clock3 } from 'lucide-react-native/icons/clock-3';
 export { default as Cloud } from 'lucide-react-native/icons/cloud';
 export { default as Code } from 'lucide-react-native/icons/code';
 export { default as Columns2 } from 'lucide-react-native/icons/columns-2';
+export { default as Copy } from 'lucide-react-native/icons/copy';
 export { default as CornerDownLeft } from 'lucide-react-native/icons/corner-down-left';
 export { default as Cpu } from 'lucide-react-native/icons/cpu';
 export { default as CreditCard } from 'lucide-react-native/icons/credit-card';

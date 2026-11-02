@@ -13,14 +13,11 @@ import {
 type BillingErrorProps = ComponentProps<typeof CloudAgentBillingError>;
 
 const personal = { payerName: 'Your account', action: { href: '/credits', label: 'Add credits' } };
-const orgMember = {
+const orgBillingManager = {
   payerName: 'Acme Engineering',
-  action: {
-    href: '/organizations/org-1/payment-details',
-    label: 'View organization billing',
-    memberGuidance: true,
-  },
+  action: { href: '/organizations/org-1', label: 'Add organization credits' },
 };
+const orgMember = { payerName: 'Acme Engineering', memberGuidance: true };
 
 function renderBillingError(props: BillingErrorProps): string {
   return renderToStaticMarkup(createElement(CloudAgentBillingError, props));
@@ -56,12 +53,25 @@ describe('CloudAgentBillingError', () => {
         retryable: false,
         [key]: key === 'remainingMicrodollars' ? 1_000_000 : 2_000_000,
       },
-      presentation: orgMember,
+      presentation: orgBillingManager,
     });
     expect(html).toContain(text);
     expect(html).toContain('Acme Engineering');
-    expect(html).toContain('View organization billing');
+    expect(html).toContain('Add organization credits');
+  });
+
+  it('names the roles that can pay a member organization without navigating there', () => {
+    const html = renderBillingError({
+      failure: {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: false,
+      },
+      presentation: orgMember,
+    });
+    expect(html).toContain('Acme Engineering needs more credits to start Cloud Agent compute.');
     expect(html).toContain('An organization owner, admin, or billing manager can add credits.');
+    expect(html).not.toContain('<button');
   });
 
   it.each([

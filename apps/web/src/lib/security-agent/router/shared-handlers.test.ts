@@ -15,6 +15,8 @@ import {
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { SECURITY_SYNC_PRECONDITION_CODES } from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -88,6 +90,7 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
+const mockHasSecurityReviewPermissions = jest.fn<(...args: unknown[]) => boolean>(() => true);
 const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: string, integrationId: string) => Promise<unknown[]>>();
 const mockUpdateRepositoriesForIntegration =
@@ -116,7 +119,8 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
   settleOperation: mockSettleOperation,
 }));
 jest.mock('../github/permissions', () => ({
-  hasSecurityReviewPermissions: () => true,
+  hasSecurityReviewPermissions: (integration: unknown) =>
+    mockHasSecurityReviewPermissions(integration),
   getReauthorizeUrl: mockGetReauthorizeUrl,
 }));
 jest.mock('../github/dependabot-api', () => ({
@@ -191,6 +195,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // `jest.clearAllMocks` keeps a mock's implementation, but an earlier test may
+  // have narrowed this one to the missing-permission branch.
+  mockHasSecurityReviewPermissions.mockImplementation(() => true);
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
@@ -1151,6 +1158,99 @@ describe('getAnalysis remediation timeline', () => {
     });
   });
 });
+
+describe('setEnabled precondition markers', () => {
+  it('marks the refusal that gates enabling without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    const error = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    // The English sentence stays the web surface's copy; the code is what a
+    // device maps onto its own catalog copy.
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub App does not have vulnerability_alerts permission',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.missingPermission);
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+  });
+
+  it('lets a disable through without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    await expect(
+      createHandlers().setEnabled.handler({ ctx: context, input: { isEnabled: false } })
+    ).resolves.toEqual({ success: true });
+  });
+
+  it('marks the refusal that gates enabling with no repository in scope', async () => {
+    const orgError = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(orgError).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(causeUpstreamCode(orgError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    // The personal router runs the same handler, so it marks the refusal too.
+    const personalError = await createPersonalHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+    expect(causeUpstreamCode(personalError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+});
+
+describe('triggerSync precondition markers', () => {
+  it('marks a rejection with no repository in the sync scope', async () => {
+    const error = await createHandlers()
+      .triggerSync.handler({ ctx: context, input: {} })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'No repositories configured for security reviews',
+    });
+    // `upstreamCode` is the value the mobile ledger maps onto translated copy;
+    // the English message stays for the web surface.
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+  });
+
+  it('marks a rejection caused by a missing or inactive integration', async () => {
+    const error = await createHandlersWithUnhealthyStatusIntegration()
+      .triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub integration not found or inactive',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.integrationInactive);
+  });
+});
+
+/** The stable code the tRPC error formatter exposes as `data.upstreamCode`. */
+function causeUpstreamCode(error: unknown): string | undefined {
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  return cause instanceof UpstreamApiError ? cause.upstreamCode : undefined;
+}
 
 describe('queue-backed handlers', () => {
   it('returns sync command correlation', async () => {

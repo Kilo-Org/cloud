@@ -153,7 +153,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { redactProviderHints } from '@kilocode/auto-routing-contracts';
+import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
@@ -690,8 +690,13 @@ export async function handleLlmProxyRequest(
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern.
-    const isExempt = isPrivateCustomLlm && rateLimitSubject.kind === 'account';
+    // matches a free-model pattern. So is the default internal benchmark user: a run
+    // sends every case of every free model it measures, and the anti-abuse limit
+    // would otherwise throttle the measurement itself. A benchmark user override is
+    // not exempt.
+    const isExempt =
+      rateLimitSubject.kind === 'account' &&
+      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
     if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
@@ -970,7 +975,7 @@ export async function handleLlmProxyRequest(
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
       const directByokTarget = await getDirectByokModel(routingTarget);
-      if (directByokTarget.provider && effectiveProviderContext.provider.id !== 'direct-byok') {
+      if (directByokTarget.provider && effectiveProviderContext.provider.type !== 'direct-byok') {
         return organizationAutoConfigurationResponse(
           `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
         );
@@ -986,7 +991,7 @@ export async function handleLlmProxyRequest(
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
       effectiveProviderContext.provider.supportedChatApis,
-      effectiveProviderContext.provider.id === 'direct-byok'
+      effectiveProviderContext.provider.type === 'direct-byok'
         ? effectiveProviderContext.userByok?.[0]?.providerId
         : undefined
     );
@@ -1033,7 +1038,7 @@ export async function handleLlmProxyRequest(
       });
     }
 
-    if (effectiveProviderContext.provider.id === 'direct-byok') {
+    if (effectiveProviderContext.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
       const directByokProvider = findDirectByokProvider(
@@ -1054,7 +1059,7 @@ export async function handleLlmProxyRequest(
       }
       if (!groupProvidersAllowed) return modelNotAllowedResponse();
       if (
-        effectiveProviderContext.provider.id === 'vercel' &&
+        effectiveProviderContext.provider.type === 'vercel' &&
         effectiveProviderContext.userByok?.some(
           byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
         )
@@ -1068,14 +1073,14 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
+  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`);
 
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
     api_kind: requestBodyParsed.kind,
     kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.id,
+    provider: effectiveProviderContext.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
     promptInfo,
@@ -1188,7 +1193,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: effectiveProviderContext.provider.id,
+      providerId: effectiveProviderContext.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -1232,7 +1237,7 @@ export async function handleLlmProxyRequest(
       isStreaming: requestBodyParsed.body.stream === true,
       userByok: !!effectiveProviderContext.userByok,
       mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.id,
+      provider: effectiveProviderContext.provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
       toolsAvailable,
@@ -1251,7 +1256,7 @@ export async function handleLlmProxyRequest(
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
-    providerId: effectiveProviderContext.provider.id,
+    providerId: effectiveProviderContext.provider.type,
     isUserByok: !!effectiveProviderContext.userByok,
     user,
     request: requestBodyParsed.body,
@@ -1299,7 +1304,7 @@ export async function handleLlmProxyRequest(
 
   {
     const errorResponse = await makeErrorReadable({
-      providerId: effectiveProviderContext.provider.id,
+      provider: effectiveProviderContext.provider.type,
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
@@ -1309,7 +1314,7 @@ export async function handleLlmProxyRequest(
       await logUnrewrittenResponse({
         response,
         model: effectiveModelIdLowerCased,
-        providerId: effectiveProviderContext.provider.id,
+        providerId: effectiveProviderContext.provider.type,
         logging: requestLogging,
         error: null,
       });
@@ -1320,7 +1325,7 @@ export async function handleLlmProxyRequest(
   return await rewriteModelResponse({
     response,
     model: effectiveModelIdLowerCased,
-    providerId: effectiveProviderContext.provider.id,
+    providerId: effectiveProviderContext.provider.type,
     kind: requestBodyParsed.kind,
     isFree: usageContext.is_free,
     userByok: usageContext.user_byok,

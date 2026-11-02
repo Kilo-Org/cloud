@@ -26,30 +26,47 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
-function ScopeEntrySkeleton() {
+/**
+ * The pending body reserves the centred setup state's shape — icon circle,
+ * title line, two description lines, full-width button — so the placeholder
+ * names the size and the position of the content that replaces it instead of
+ * painting a bar and a card at the top of the screen.
+ *
+ * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
+ * title line, two `text-sm` description lines, the `mt-3` the button carries,
+ * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ */
+function ScopeEntryBodySkeleton() {
+  return (
+    <View className="flex-1 items-center justify-center px-6">
+      <View className="w-full items-center gap-3">
+        <Skeleton className="size-[28px] rounded-full" />
+        <Skeleton className="h-[20px] w-40 rounded" />
+        <Skeleton className="h-[14px] w-full rounded" />
+        <Skeleton className="h-[14px] w-2/3 rounded" />
+        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
+      </View>
+    </View>
+  );
+}
+
+function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-10 w-full rounded-lg" />
-        <View className="flex-row flex-wrap gap-3">
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-        </View>
-        <Skeleton className="h-32 w-full rounded-lg" />
-        <Skeleton className="h-48 w-full rounded-lg" />
-      </View>
+      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScopeEntryBodySkeleton />
     </View>
   );
 }
 
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -182,7 +199,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -208,7 +226,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     // started from. A retry that resolves the other reads still lands on their
     // own view, as before.
     if (recovery.isRetrying) {
-      return <ScopeEntrySkeleton />;
+      return <ScopeEntrySkeleton scope={scope} />;
     }
     // Only the reads that produced this screen carry the cause. A read that
     // still holds cached data, or that resolved, must not vote on it.
@@ -230,7 +248,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     });
     return (
       <PlatformErrorScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         variant={failure.variant}
         message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
@@ -240,7 +259,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   if (view === 'loading') {
-    return <ScopeEntrySkeleton />;
+    return <ScopeEntrySkeleton scope={scope} />;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or
@@ -258,14 +277,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
           />
           {!connectUrl && isMinting ? (
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
+            <ScopeEntryBodySkeleton />
           ) : (
             <SecurityAgentSetup
               title={t('securityAgent.scopeEntry.connectTitle')}
@@ -290,14 +307,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
           />
           {!reauthUrl && !connectUrl && isMinting ? (
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
+            <ScopeEntryBodySkeleton />
           ) : (
             <SecurityAgentSetup
               title={t('securityAgent.scopeEntry.reauthorizeTitle')}

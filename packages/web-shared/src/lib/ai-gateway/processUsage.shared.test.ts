@@ -6,7 +6,7 @@ import {
   selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type { VercelProviderMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -163,7 +163,7 @@ describe('selectUsageCostFields', () => {
     name: string;
     usage: Parameters<typeof selectUsageCostFields>[0];
     providerMetadata?: VercelProviderMetaData | null;
-    provider?: ProviderId;
+    provider?: ProviderType;
     expected: ReturnType<typeof selectUsageCostFields>;
     warns?: boolean;
   };
@@ -212,7 +212,7 @@ describe('selectUsageCostFields', () => {
     {
       name: 'missing is_byok with non-zero cost does not warn for providers that never report it',
       usage: { cost: 0.001 },
-      provider: 'martian',
+      provider: 'direct-byok',
       expected: { cost_mUsd: 1000, is_byok: null },
     },
     {

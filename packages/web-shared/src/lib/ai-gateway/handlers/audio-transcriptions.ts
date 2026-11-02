@@ -254,7 +254,7 @@ export async function handleAudioTranscriptionsRequest(
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'audio_transcriptions',
     kiloUserId: user.id,
-    provider: provider.id,
+    provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
     promptInfo,
@@ -385,7 +385,7 @@ export async function handleAudioTranscriptionsRequest(
       isAnonymous: false,
       isStreaming: false,
       userByok: !!userByok,
-      provider: provider.id,
+      provider: provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(requestedModelLowerCased),
       toolsAvailable: [],
@@ -399,7 +399,7 @@ export async function handleAudioTranscriptionsRequest(
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
-    providerId: provider.id,
+    providerId: provider.type,
     isUserByok: !!userByok,
     user,
     request: upstreamBody,

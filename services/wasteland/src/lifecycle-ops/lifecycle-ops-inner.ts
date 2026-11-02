@@ -30,6 +30,13 @@ export type LifecycleOpsInnerContext = {
   ownerEmail: string;
   /** DoltHub OAuth or PAT token. */
   token: string;
+  /**
+   * True only when a server-side record already proved this token's
+   * account may act for `forkOrg` (see `JoinOptions.orgProven`). The
+   * worker sets it from the stored credential, whose rig handle is
+   * written only by flows that proved the org through a DoltHub write.
+   */
+  orgProven?: boolean;
 };
 
 export type JoinOpResult = {
@@ -105,6 +112,7 @@ export async function joinViaSdk(
       displayName: ctx.displayName,
       ownerEmail: ctx.ownerEmail,
       version: `cloud-worker:${WL_SDK_VERSION}`,
+      orgProven: ctx.orgProven === true,
     });
   } catch (err) {
     throw wrapSdkError(err, 'Join wasteland');

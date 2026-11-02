@@ -66,6 +66,17 @@ export function agentComposerDraftKey(sessionId: string): string {
 /** New-session prompt draft entity key. */
 export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
 
+/**
+ * New-session repository draft entity key, scoped to the account's active
+ * organization instead of sharing the prompt's key: the picker lists
+ * organization-scoped repositories, so a selection made in one organization
+ * must never seed another organization's form. `null` is the personal scope,
+ * which is also the key an explicit Personal choice reads.
+ */
+export function newSessionRepositoryDraftKey(organizationId: string | null): string {
+  return `agent-composer:new:repository:${organizationId ?? 'personal'}`;
+}
+
 /** Durable pending share-intent payloads (map + insertion order) entity key. */
 export const SHARE_PAYLOADS_DRAFT_KEY = 'share-payloads';
 

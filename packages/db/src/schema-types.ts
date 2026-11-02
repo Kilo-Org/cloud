@@ -1360,7 +1360,8 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'remote'; url: string }
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
-export const OrganizationDataRegionSchema = z.enum(['eu', 'us']);
+// The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 const OrganizationSettingsSchema = z.object({

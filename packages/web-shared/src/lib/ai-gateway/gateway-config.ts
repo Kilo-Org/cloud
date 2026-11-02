@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 export const DEFAULT_VERCEL_ROUTING_ENABLED = true;
 
@@ -92,9 +93,16 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   data_region: {
     label: 'Data region',
     description:
-      'Lets the organization pin Vercel AI Gateway requests to the EU or the US on its Providers & Models page.',
+      'Lets the organization pin Vercel AI Gateway requests to a region on its Providers & Models page.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
+
+export const ORGANIZATION_DATA_REGION_NAMES = {
+  us: 'United States',
+  eu: 'European Union',
+  au: 'Australia',
+  jp: 'Japan',
+} as const satisfies Record<OrganizationDataRegion, string>;
 
 export const DEFAULT_ORGANIZATION_FEATURES: OrganizationFeatures = OrganizationFeaturesSchema.parse(
   {}

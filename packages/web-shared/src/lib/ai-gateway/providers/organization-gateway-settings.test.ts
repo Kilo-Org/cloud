@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
 import type {
   Provider,
   TransformRequestContext,
@@ -93,6 +94,24 @@ describe('withDataRegion', () => {
       gateway: { only: ['anthropic'], inferenceRegion: { scope: 'zone', geoRegion: 'eu' } },
     });
   });
+
+  it.each(OrganizationDataRegionSchema.options)(
+    'pins Vercel AI Gateway inference to %s',
+    async region => {
+      const regional = withDataRegion(makeProvider('vercel'), region);
+      const request = {
+        kind: 'chat_completions',
+        body: { model: 'anthropic/claude-sonnet-5', messages: [] },
+      } as unknown as GatewayRequest;
+
+      await regional.transformRequest(makeContext(regional, request));
+
+      expect(request.body.providerOptions?.gateway?.inferenceRegion).toEqual({
+        scope: 'zone',
+        geoRegion: region,
+      });
+    }
+  );
 
   it.each(['openrouter', 'custom'] as const)('leaves %s providers unchanged', providerType => {
     const provider = makeProvider(providerType);

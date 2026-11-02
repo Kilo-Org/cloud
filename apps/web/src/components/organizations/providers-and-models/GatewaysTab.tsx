@@ -17,6 +17,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
 import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 type GatewaySettings =
   inferRouterOutputs<RootRouter>['organizations']['settings']['getGatewaySettings'];
@@ -118,12 +119,11 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
                   <SelectItem value={GLOBAL_REGION} className="min-h-11">
                     Global
                   </SelectItem>
-                  <SelectItem value="eu" className="min-h-11">
-                    EU
-                  </SelectItem>
-                  <SelectItem value="us" className="min-h-11">
-                    US
-                  </SelectItem>
+                  {OrganizationDataRegionSchema.options.map(region => (
+                    <SelectItem key={region} value={region} className="min-h-11">
+                      {ORGANIZATION_DATA_REGION_NAMES[region]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

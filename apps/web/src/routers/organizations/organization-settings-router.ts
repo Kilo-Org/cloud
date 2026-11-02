@@ -28,6 +28,7 @@ import {
   isOrganizationFeatureEnabled,
   readOrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -343,8 +344,6 @@ async function getGatewayFeatures(organizationId: string) {
   };
 }
 
-const DATA_REGION_NAMES = { eu: 'EU', us: 'US' } as const;
-
 function createGatewaySettingsDiffMessage(
   oldSettings: OrganizationSettings,
   newSettings: OrganizationSettings
@@ -360,7 +359,7 @@ function createGatewaySettingsDiffMessage(
   }
   if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
     changes.push(
-      `Data region: ${newSettings.data_region ? DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+      `Data region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
     );
   }
   return changes.length > 0

@@ -13,7 +13,9 @@ import {
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { EmptyState } from '@/components/empty-state';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -142,37 +144,42 @@ export function GlanceableActiveCard({
           value on the native view, and Android keeps announcing the previous
           account's session from the reused node. A new node per session and
           per zero state is the same remedy the PR-review inbox slot uses. */}
-      <CardControl
-        key={newestSession?.id ?? 'no-session'}
-        className={empty ? 'flex-1' : undefined}
-        disabled={newestSession === null}
-        onPress={() => {
-          if (newestSession !== null) {
+      {newestSession !== null && newestTitle !== null && newestKind !== null ? (
+        <CardControl
+          key={newestSession.id}
+          className="flex-1"
+          onPress={() => {
             onPressSession(newestSession);
-          }
-        }}
-        accessibilityRole={newestSession === null ? undefined : 'button'}
-        accessibilityLabel={newestSession === null ? undefined : newestLabel}
-      >
-        <View className={cn(NEWEST_BLOCK_CLASS, empty && 'flex-1 items-center')}>
-          {newestTitle !== null && newestKind !== null ? (
-            <>
-              <Text className="text-sm text-foreground">{newestTitle}</Text>
-              <View className={NEWEST_ROW_CLASS}>
-                <SessionStatusIcon kind={newestKind} />
-                <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
-                  {newestAge !== null ? (
-                    <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
-                  ) : null}
-                </View>
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={newestLabel}
+        >
+          <View className={NEWEST_BLOCK_CLASS}>
+            <Text className="text-sm text-foreground">{newestTitle}</Text>
+            <View className={NEWEST_ROW_CLASS}>
+              <SessionStatusIcon kind={newestKind} />
+              <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
+                {newestAge !== null ? (
+                  <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
+                ) : null}
               </View>
-            </>
-          ) : (
-            <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
-          )}
+            </View>
+          </View>
+        </CardControl>
+      ) : (
+        <View key="no-session" className="flex-1 justify-center">
+          {/* The card keeps its reserved frame with nothing live, so the zero
+              state fills that frame with the shared empty state's icon, title
+              and one-line hint instead of a lone line in a blank card. */}
+          <EmptyState
+            placement="static"
+            icon={Bot}
+            title={t('home.noLiveSessions')}
+            description={t('agents.sessionList.noSessionsYetDescription')}
+          />
         </View>
-      </CardControl>
+      )}
     </View>
   );
 }

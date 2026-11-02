@@ -12,9 +12,9 @@ index a803387b98bfb68e0c9bbb783e25bc649566e6a3..399f12b67f54d8ba5b82cee21c55f8e6
 -    }
 +  // An explicit label already names the field; the placeholder is example copy,
 +  // and appending it made the field read as its label followed by a JSON sample,
-+  // which a screen-reader user cannot tell from a saved value. Single-line
-+  // fields never compose the two. The placeholder stays the fallback name for a
-+  // field that carries no label of its own.
++  // which a screen-reader user cannot tell from a saved value. The single-line
++  // text field (RCTUITextField.mm) never composes the two. The placeholder stays
++  // the fallback name for a field that carries no label of its own.
 +  if (superAccessibilityLabel.length == 0 && self.placeholder.length > 0 &&
 +      self.attributedText.string.length == 0) {
      [accessibilityLabel appendString:self.placeholder];

@@ -167,9 +167,11 @@ function MessageBubbleImpl({
     failure !== null && relevantHandlerWired ? (
       /* The actions close the turn rather than opening the next one: the space
          under them is the gap between turns, so a Retry is never read as part of
-         the message that follows it. `items-end` is logical, so the status stays
+         the message that follows it. 24 dp is more than twice the gap between a
+         bubble and its own status line, which is what keeps a turn's status and
+         actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
-      <View className={cn('gap-1 px-4 pt-1 pb-[16px]', trailingFailure && 'items-end')}>
+      <View className={cn('gap-1 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
         <Text
           className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
           accessibilityLabel={messageFailureLabel(failure)}

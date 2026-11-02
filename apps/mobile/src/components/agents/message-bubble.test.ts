@@ -313,7 +313,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     const userFooter = footerOf(userTree);
-    expect(String(userFooter?.props.className)).toBe('gap-1 px-4 pt-1 pb-[16px] items-end');
+    expect(String(userFooter?.props.className)).toBe('gap-1 px-4 pt-1 pb-[24px] items-end');
     // The title and the detail line end-align with the bubble's trailing edge,
     // so a wrapped line does not fall back to the leading edge, and each keeps
     // its own size and colour. The action row is unchanged: the column places it.
@@ -327,7 +327,7 @@ describe('MessageBubble failure footer', () => {
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
-    expect(String(assistantFooter?.props.className)).toBe('gap-1 px-4 pt-1 pb-[16px]');
+    expect(String(assistantFooter?.props.className)).toBe('gap-1 px-4 pt-1 pb-[24px]');
     expect(
       classNamesIn(assistantFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -431,7 +431,7 @@ describe('MessageBubble failure footer', () => {
     // The footer container is a plain View: no accessible, no role, no label,
     // so Retry and Copy stay individually focusable.
     const footer = findElementByType(tree, 'View', p =>
-      String(p.className).startsWith('gap-1 px-4 pt-1 pb-[16px]')
+      String(p.className).startsWith('gap-1 px-4 pt-1 pb-[24px]')
     );
     expect(footer).not.toBeNull();
     expect(footer?.props.accessible).toBeUndefined();
@@ -1109,7 +1109,7 @@ function findElementByLabel(
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
   return findElementByType(tree, 'View', p =>
-    String(p.className).startsWith('gap-1 px-4 pt-1 pb-[16px]')
+    String(p.className).startsWith('gap-1 px-4 pt-1 pb-[24px]')
   );
 }
 

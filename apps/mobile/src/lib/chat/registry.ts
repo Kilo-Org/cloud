@@ -946,13 +946,15 @@ function why(cause: Cause.Cause<unknown>): string {
 /**
  * The kept questions left once the answer to one of them is a stored turn.
  *
- * The question that was answered leaves, and the ones said after it move one
- * turn down: the answer is the newest turn, and a question said after the one it
- * answers has to stay under it rather than reading above it.
+ * The question that was answered leaves, and the ones said after it move down
+ * by the turns that exchange added: an answer stores the question's own turn and
+ * the answer's, so a question said after the one it answers has to stay under
+ * both of them rather than reading between them.
  */
 function withoutAnswered(
   kept: readonly Displaced[],
-  answeredFrom: string | null
+  answeredFrom: string | null,
+  addedTurns: number
 ): readonly Displaced[] {
   if (answeredFrom === null) {
     return kept;
@@ -968,7 +970,7 @@ function withoutAnswered(
     }
     return [
       index > answeredIndex && one.afterTurns >= answered.afterTurns
-        ? { ...one, afterTurns: one.afterTurns + 1 }
+        ? { ...one, afterTurns: one.afterTurns + addedTurns }
         : one,
     ];
   });
@@ -1000,16 +1002,27 @@ async function settle(
      that bubble is where the failure is shown. */
   const held = snapshotOf(sessionId);
   const answeredFrom = failed === null ? held.askedFrom : null;
-  const kept = withoutAnswered(held.displaced, answeredFrom);
+  const kept = withoutAnswered(
+    held.displaced,
+    answeredFrom,
+    Math.max(0, turns.length - held.turns.length)
+  );
   if (failed === null) {
-    await forgetAsked(sessionId);
+    /* The list is written before the slot's record goes: a refused write leaves
+       both records, and an open folds the pair into the one bubble it already
+       drew. Dropping the slot first would leave the answered question with no
+       way back, drawn beside the answer for good. */
     if (kept !== held.displaced) {
       try {
         await replaceKept(sessionId, kept);
+        await forgetAsked(sessionId);
       } catch {
-        /* The state below still drops it, and the next write of the list carries
-           it out; a restart before then draws the bubble again. */
+        /* The written list still counts the answered question, and the slot's
+           record still names it, so an open folds the two into the bubble it
+           drew. The next write of the list leaves one record behind. */
       }
+    } else {
+      await forgetAsked(sessionId);
     }
   }
   chat.answering = undefined;

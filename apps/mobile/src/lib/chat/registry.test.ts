@@ -151,6 +151,14 @@ const TURN = {
   parts: [{ id: 'prt_1', kind: 'text', body: 'hi' }],
 } as const;
 
+/** The answer to it: an answered question is stored as both turns, not as one. */
+const ANSWER = {
+  id: 'trn_2',
+  sessionId: 's1',
+  role: 'assistant',
+  parts: [{ id: 'prt_2', kind: 'text', body: 'because' }],
+} as const;
+
 const handleFor = (id: string) => {
   totals.set(id, { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
   routedTotals.delete(id);
@@ -1184,22 +1192,24 @@ describe('a question a later send took the slot from', () => {
     creditsFailureFor = undefined;
     await retryChat(opened, first);
     await settled();
-    // The answer to the question asked again is a turn the store holds.
-    storedHistory = [TURN];
+    /* The answer to the question asked again is stored as its own turn and the
+       answer's, which is what the exchange writes. */
+    storedHistory = [TURN, ANSWER];
     finish?.();
     await settled();
 
     const held = snapshotOf(opened);
-    /* The answer is the newest turn, and the question said after the one it
-       answers moved one turn down rather than reading above it. */
-    expect(held.displaced.map(one => [one.text, one.afterTurns])).toEqual([['second', 1]]);
+    /* The question said after the one it answers moves under both stored turns,
+       so it reads after the answer rather than between it and its question. */
+    expect(held.displaced.map(one => [one.text, one.afterTurns])).toEqual([['second', 2]]);
     expect(asMessages(held).map(one => one.info.id)).toEqual([
       TURN.id,
+      ANSWER.id,
       `${held.sessionId}:displaced:${held.displaced[0]?.id ?? ''}`,
     ]);
     // The list is written as it is drawn, so a reopen keeps the order.
     const written = await keptIn(held.sessionId);
-    expect(written.map(one => one.afterTurns)).toEqual([1]);
+    expect(written.map(one => one.afterTurns)).toEqual([2]);
   });
 
   it('is still named for the question that opened the chat after it is asked again', async () => {

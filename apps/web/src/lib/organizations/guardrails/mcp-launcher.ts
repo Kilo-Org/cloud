@@ -10,6 +10,7 @@ export type LauncherParseResult =
   | { eligible: false; reason: string };
 
 const NPM_SPEC = /^(@[^/@:\s]+\/[^/@:\s]+|[^/@:\s]+)(?:@(.+))?$/;
+const NPM_VERSION_OR_TAG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PYPI_SPEC =
   /^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[A-Za-z0-9,._-]+\])?(?:(?:==|>=|@)([0-9][^\s,;]*)|@latest)?$/;
 
@@ -26,13 +27,19 @@ function versionHint(version: string | undefined): string | null {
 function parseNpmSpec(spec: string): LauncherParseResult {
   const match = NPM_SPEC.exec(spec);
   if (!match) return ineligible('The package isn’t a plain npm package name.');
+  const suffix = match[2];
+  if (suffix !== undefined && !NPM_VERSION_OR_TAG.test(suffix)) {
+    return ineligible(
+      'The package can only be pinned to a version or a dist-tag, such as 1.2.3 or latest.'
+    );
+  }
   const identifier = normalizePackageIdentifier('npm', match[1]);
   if (!identifier.ok) return ineligible(identifier.reason);
   return {
     eligible: true,
     ecosystem: 'npm',
     identifier: identifier.value,
-    versionHint: versionHint(match[2]),
+    versionHint: versionHint(suffix),
   };
 }
 

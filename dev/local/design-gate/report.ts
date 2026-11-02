@@ -193,7 +193,8 @@ export function skippedRules(cells: readonly CellRun[], out: string) {
           cell: cell.id,
           target: screen.target,
           rule: 'safe-area',
-          reason: 'content is hosted by a native dialog or sheet, whose frames are surface-local',
+          reason:
+            'a partial native dialog or sheet hosts the content, so its frames are surface-local',
         });
       }
       return entries;

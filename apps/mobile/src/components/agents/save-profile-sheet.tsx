@@ -13,7 +13,8 @@ import { Lock } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription } from '@/lib/agent-profile-forms';
+import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 
@@ -54,10 +55,9 @@ export function SaveProfileSheet({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const nameRef = useRef('');
+  const nameField = useProfileNameField();
   const descriptionRef = useRef('');
   const [setAsDefault, setSetAsDefault] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,26 +71,23 @@ export function SaveProfileSheet({
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
-      nameRef.current.trim().length > 0 || descriptionRef.current.trim().length > 0 || setAsDefault,
+      nameField.valueRef.current.trim().length > 0 ||
+      descriptionRef.current.trim().length > 0 ||
+      setAsDefault,
     onDiscard: onClose,
   });
 
   const submit = async () => {
-    const name = nameRef.current.trim();
-    const description = descriptionRef.current.trim();
-
-    const nameIssue = validateProfileName(name);
-    if (nameIssue !== null) {
-      setNameError(
-        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
-      );
+    const name = nameField.commit();
+    if (name === null) {
       return;
     }
+    const description = descriptionRef.current.trim();
+
     if (validateProfileDescription(description) !== null) {
       setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
-    setNameError(null);
     setDescriptionError(null);
 
     setIsSubmitting(true);
@@ -126,15 +123,10 @@ export function SaveProfileSheet({
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
         <ProfileNameField
           defaultValue=""
-          error={nameError ?? undefined}
+          error={nameField.error}
           disabled={isSubmitting}
           autoCorrect={false}
-          onChangeText={value => {
-            nameRef.current = value;
-            if (nameError !== null) {
-              setNameError(validateProfileName(value.trim()) === null ? null : nameError);
-            }
-          }}
+          onChangeText={nameField.handleChangeText}
         />
         <ProfileDescriptionField
           defaultValue=""

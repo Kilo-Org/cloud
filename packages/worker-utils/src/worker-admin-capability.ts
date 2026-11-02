@@ -1,6 +1,6 @@
 import { decodeProtectedHeader, importJWK, jwtVerify, type JWK } from 'jose';
 import { z } from 'zod';
-import { bytesToBase64url } from './base64url.js';
+import { bytesToBase64url } from './base64url';
 
 /**
  * Worker admin capability tokens.
@@ -319,6 +319,7 @@ export function createWorkerAdminIntrospection(params: {
         'X-Internal-Api-Key': params.secret,
       },
       body: JSON.stringify(request),
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
       throw new Error(`Worker admin capability introspection failed: ${response.status}`);
@@ -369,6 +370,8 @@ export type WorkerAdminAuthority = {
   capabilityJti: string | null;
   decide(actionId: string, target: WorkerAdminTarget): Promise<WorkerAdminDecision>;
   allows(actionId: string, target: WorkerAdminTarget): Promise<boolean>;
+  /** First call for an action/target returns true; later ones return false. */
+  takeDecisionReport(actionId: string, target: WorkerAdminTarget): boolean;
 };
 
 export type WorkerAdminIntrospectionCache = {
@@ -419,14 +422,15 @@ export function parseWorkerAdminJwks(value: unknown): WorkerAdminJwks | null {
   return result.success ? result.data : null;
 }
 
-const importedKeyCache = new Map<string, CryptoKey>();
+type ImportedJoseKey = Awaited<ReturnType<typeof importJWK>>;
 
-async function importWorkerAdminKey(jwk: Record<string, unknown>): Promise<CryptoKey> {
+const importedKeyCache = new Map<string, ImportedJoseKey>();
+
+async function importWorkerAdminKey(jwk: Record<string, unknown>): Promise<ImportedJoseKey> {
   const keyId = JSON.stringify(jwk);
   const cached = importedKeyCache.get(keyId);
   if (cached) return cached;
   const key = await importJWK(jwk as JWK, 'ES256');
-  if (!(key instanceof CryptoKey)) throw new Error('Unsupported worker admin capability key');
   importedKeyCache.set(keyId, key);
   return key;
 }
@@ -535,6 +539,7 @@ export async function createWorkerAdminAuthority(
 
   const decisionMemo = new Map<string, Promise<WorkerAdminDecision>>();
   const introspectionMemo = new Map<string, Promise<WorkerAdminIntrospectionResponse>>();
+  const reported = new Set<string>();
 
   async function introspectOnce(
     claims: WorkerAdminCapabilityClaims,
@@ -678,6 +683,12 @@ export async function createWorkerAdminAuthority(
     decide,
     async allows(actionId, target) {
       return (await decide(actionId, target)).allowed;
+    },
+    takeDecisionReport(actionId, target) {
+      const key = `${actionId}\u0000${target.kind}\u0000${target.id}`;
+      if (reported.has(key)) return false;
+      reported.add(key);
+      return true;
     },
   };
 }

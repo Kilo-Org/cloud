@@ -17,7 +17,7 @@ import {
   workerAdminServiceTarget,
   type WorkerAdminCapabilityClaims,
   type WorkerAdminJwks,
-} from './worker-admin-capability.js';
+} from './worker-admin-capability';
 
 const NOW = 1_800_000_000;
 const KID = 'wac-test';

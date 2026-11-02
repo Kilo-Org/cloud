@@ -54,6 +54,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     org: {
       organizationId: 'org-1',
       organizationName: 'Acme',
+      parentOrganizationId: null,
       balance: 5_000_000,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
@@ -92,10 +93,6 @@ vi.mock('@/lib/agent-color', () => ({
 
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
-}));
-
-vi.mock('@/components/organization/org-kilo-pass-row-state', () => ({
-  getOrgKiloPassRowState: () => null,
 }));
 
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
@@ -356,5 +353,32 @@ describe('Organization hub settings availability', () => {
     );
     expect(membersQuery.refetch).not.toHaveBeenCalled();
     unmount();
+  });
+});
+
+describe('Organization hub billing card while its data loads', () => {
+  function bellRow(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findAllByType('ConfigureRow').find(node => node.props.icon === 'Bell');
+  }
+
+  it('keeps every row from the first frame and reserves the subtitle line', async () => {
+    const settled = await renderHub();
+    expect(bellRow(settled.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
+    expect(bellRow(settled.renderer)?.props.subtitleLoading).toBe(false);
+    settled.unmount();
+
+    membersQuery.data = undefined;
+    const loading = await renderHub();
+    // The Kilo Pass row used to appear only once the membership payload arrived.
+    const kiloPassTitle = i18n.t('kiloPass.title');
+    expect(
+      loading.renderer.root.findAll(node =>
+        String(node.props.accessibilityLabel).startsWith(kiloPassTitle)
+      )
+    ).not.toEqual([]);
+    // Loading copy is not a subtitle; the row reserves its settled line instead.
+    expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
+    expect(bellRow(loading.renderer)?.props.subtitleLoading).toBe(true);
+    loading.unmount();
   });
 });

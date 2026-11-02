@@ -6,6 +6,7 @@ import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type RowHue, rowTint, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
@@ -52,6 +53,13 @@ type ConfigureRowProps = {
    */
   subtitleNumberOfLines?: number;
   /**
+   * Render a placeholder line in the subtitle's place while the value that
+   * fills it loads. The settled subtitle is one line of `text-xs`, so the
+   * placeholder takes exactly that height: the row keeps its settled size, the
+   * rows below it never move, and the card does not print loading copy.
+   */
+  subtitleLoading?: boolean;
+  /**
    * Semantic tone override (good / warn / danger). When omitted the row uses
    * the shared neutral tile, so every row in a settings list carries the same
    * accent instead of a hue hashed from its title.
@@ -86,6 +94,7 @@ export function ConfigureRow({
   title,
   subtitle,
   subtitleNumberOfLines,
+  subtitleLoading,
   tone,
   hue,
   onPress,
@@ -123,17 +132,21 @@ export function ConfigureRow({
 
   const iconTile = <IconTile icon={Icon} tint={tint} />;
 
+  let subtitleNode: ReactNode = null;
+  if (subtitle) {
+    subtitleNode = (
+      <Text numberOfLines={subtitleNumberOfLines} className="mt-0.5 text-xs text-muted-foreground">
+        {subtitle}
+      </Text>
+    );
+  } else if (subtitleLoading) {
+    subtitleNode = <Skeleton className="mt-0.5 h-4 w-12 rounded" />;
+  }
+
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
       <Text className="text-sm font-medium text-foreground">{title}</Text>
-      {subtitle ? (
-        <Text
-          numberOfLines={subtitleNumberOfLines}
-          className="mt-0.5 text-xs text-muted-foreground"
-        >
-          {subtitle}
-        </Text>
-      ) : null}
+      {subtitleNode}
     </View>
   );
 

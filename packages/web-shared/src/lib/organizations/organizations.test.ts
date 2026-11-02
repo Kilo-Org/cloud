@@ -202,6 +202,7 @@ describe('Organizations', () => {
           'memberCount',
           'organizationId',
           'organizationName',
+          'parentOrganizationId',
           'plan',
           'requireSeats',
           'role',

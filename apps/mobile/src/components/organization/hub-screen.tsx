@@ -73,8 +73,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const orgWithMembers = useOrgWithMembers(organizationId);
   // The summary API is parent-only (`organizationParentBillingProcedure`
   // rejects child orgs and non-billing roles), so a child org must never fire
-  // it — gate on the loaded membership payload, not just the role.
-  const showKiloPass = isMoneyRole(role) && orgWithMembers.data?.parent_organization_id === null;
+  // it. `organizations.list` carries the same parent link the membership
+  // payload does, and the hub only renders once that list resolved, so the
+  // billing group knows from its first frame whether this org has a Kilo Pass
+  // row instead of adding one a request later and pushing the rows under it
+  // down.
+  const showKiloPass = isMoneyRole(role) && org?.parentOrganizationId === null;
   const kiloPassSummary = useOrgKiloPassSummary(organizationId, showKiloPass);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
@@ -98,7 +102,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const lowBalanceUnavailable =
     orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  let lowBalanceSubtitle = t('common.loading');
+  // The row shows a placeholder line, not loading copy, until the membership
+  // payload supplies the value: the settled subtitle is one short phrase
+  // ("Off", or the threshold sentence), so an unfinished card must not print an
+  // indefinite sentence in its place.
+  let lowBalanceSubtitle: string | undefined = undefined;
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
       amount: formatMoney(minimumBalance, i18n.language),
@@ -110,6 +118,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
     );
   }
+  const lowBalanceLoading = orgWithMembers.data == null && !lowBalanceUnavailable;
 
   return (
     <View className="flex-1 bg-background">
@@ -219,6 +228,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
+                subtitleLoading={lowBalanceLoading}
                 trailing={
                   lowBalanceUnavailable ? (
                     <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
@@ -317,7 +327,7 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       <View className="flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         {state.loading ? (
-          <Skeleton className="mt-0.5 h-3 w-28 rounded" />
+          <Skeleton className="mt-0.5 h-4 w-28 rounded" />
         ) : (
           <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
         )}

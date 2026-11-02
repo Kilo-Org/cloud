@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import catalogJson from '../catalog.json';
 import type { CloudAgentAuthority } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import { isCanonicalMessageId } from '../../../packages/session-ingest-contracts/src/message-id';
 import { childSessionTools, runChildSessionTool } from './child-session-tools';
 import { createMcpHandler } from './index';
 import type { Catalog, ForwardedAuth } from './types';
@@ -79,6 +80,7 @@ describe('dedicated child session tools', () => {
     const scoped = await rpc('tools/list', {});
     expect(scoped.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'search_models',
+      'generate_message_id',
       'spawn_session',
       'list_child_sessions',
       'get_session',
@@ -100,6 +102,77 @@ describe('dedicated child session tools', () => {
         .message
     ).toContain('Unknown tool');
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not expose message ID generation to general connections', async () => {
+    const { cloudAgentAuthority: omitted, ...generalAuth } = auth;
+    expect(omitted).toEqual(authority);
+    const result = await rpc(
+      'tools/call',
+      { name: 'generate_message_id', arguments: {} },
+      generalAuth
+    );
+    expect(result.error.message).toContain('Unknown tool');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([null, organizationId])(
+    'generates fresh canonical message IDs locally for scope %s',
+    async org => {
+      const connection = {
+        ...auth,
+        ...(org ? { organizationId: org } : {}),
+        cloudAgentAuthority: { ...authority, organizationId: org },
+      };
+      const first = await rpc(
+        'tools/call',
+        { name: 'generate_message_id', arguments: {} },
+        connection
+      );
+      const second = await rpc(
+        'tools/call',
+        { name: 'generate_message_id', arguments: {} },
+        connection
+      );
+      const firstId = JSON.parse(first.result.content[0].text).messageId;
+      const secondId = JSON.parse(second.result.content[0].text).messageId;
+      expect(isCanonicalMessageId(firstId)).toBe(true);
+      expect(isCanonicalMessageId(secondId)).toBe(true);
+      expect(secondId).not.toBe(firstId);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([{ messageId }, { cloudAgentSessionId: childId }, { count: 2 }])(
+    'rejects message ID generation arguments: %j',
+    async args => {
+      await expect(run('generate_message_id', args)).rejects.toThrow(
+        'Invalid generate_message_id arguments'
+      );
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
+  it('uses a generated ID unchanged for a follow-up and its durable result', async () => {
+    const generated = JSON.parse((await run('generate_message_id')).text) as { messageId: string };
+    const input = {
+      cloudAgentSessionId: childId,
+      messageId: generated.messageId,
+      payload: { type: 'prompt', prompt: 'Run additional checks', mode: 'code', model: model.id },
+      autoCommit: false,
+    };
+    await run('send_message', input);
+    expect(await new Request(...fetchImpl.mock.calls[0]!).json()).toEqual(input);
+    await run('get_message_result', {
+      cloudAgentSessionId: childId,
+      messageId: generated.messageId,
+    });
+    const resultUrl = new URL(new Request(...fetchImpl.mock.calls[1]!).url);
+    expect(JSON.parse(resultUrl.searchParams.get('input')!)).toEqual({
+      cloudAgentSessionId: childId,
+      messageId: generated.messageId,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it.each(['call_protected', 'submit_otp', 'delete_session'])(
@@ -224,7 +297,7 @@ describe('dedicated child session tools', () => {
   });
 
   it('rejects expired or mismatched scoped credentials before model or session fetches', async () => {
-    for (const name of ['search_models', 'spawn_session']) {
+    for (const name of ['search_models', 'generate_message_id', 'spawn_session']) {
       for (const override of [
         { cloudAgentAuthority: { ...authority, expiresAt: 1 } },
         { kiloUserId: 'other-user' },
@@ -253,6 +326,12 @@ describe('dedicated child session tools', () => {
       tools.find(tool => tool.name === 'search_models')?.inputSchema.required ?? []
     ).not.toContain('limit');
     expect(tools.find(tool => tool.name === 'search_models')?.annotations.readOnlyHint).toBe(true);
+    expect(tools.find(tool => tool.name === 'generate_message_id')?.annotations).toEqual({
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    });
     expect(tools.find(tool => tool.name === 'spawn_session')?.annotations.readOnlyHint).toBe(false);
     expect(tools.find(tool => tool.name === 'interrupt_session')?.annotations.destructiveHint).toBe(
       true

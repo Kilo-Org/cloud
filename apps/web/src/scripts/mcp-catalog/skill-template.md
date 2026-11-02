@@ -40,23 +40,56 @@ file, for current detail.
 
 ## Parent-scoped child sessions
 
-These connections publish `search_models`, `spawn_session`, `list_child_sessions`,
-`get_session`, `get_message_result`, `send_message`, `interrupt_session`,
+These connections publish `search_models`, `generate_message_id`, `spawn_session`,
+`list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
 `list_folders`, and `assign_workspace_to_folder`.
 They do not expose API `search` or `call`.
 
-1. Launch a child only when the user explicitly asks for a new Cloud Agent session. Use local tools for work in the current worktree; a child has its own sandbox and independent worktree.
-2. Call `search_models` with the requested model name or partial identifier. Copy the returned `id` exactly into `model`; select only a returned `variant` and pass it separately. Do not guess IDs or silently substitute another model. An `alias_target` identifies a floating alias's target; catalog discovery does not guarantee organization policy approval.
-3. Call `spawn_session` with the repository, complete task prompt, mode, exact model ID, and a fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. The child starts immediately in a registered workspace with multi-chat support. Organization and `createdOnPlatform` are inherited from trusted parent state, not chosen by the caller.
-4. Set `callbackTarget: { "url": "session:parent" }` to receive completion, failure, or interruption as a new parent message. Omit it for no notification. Prefer callbacks over polling; never hold a tool open waiting for a callback.
-5. Use `list_child_sessions` to rediscover IDs, `get_session` for a bounded status check, and `get_message_result` for an initial or follow-up message's durable outcome. Creation and message admission are not completion. Use `send_message` or `interrupt_session` only for authorized follow-ups or Stop.
-6. To organize a child workspace, call `list_folders` to find an existing folder's exact ID, then `assign_workspace_to_folder` with that `folderId` and the child's `cloudAgentSessionId` and `worktreeId` from `list_child_sessions` or `get_session`. This files the whole worktree, including sibling chats. Set `folderId: null` to unfile it. Only workspaces created by this parent are movable; these tools cannot create, edit, delete, or reorder folders. Folder listing returns metadata, not other workspaces' membership.
+1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
+2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
+3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
+4. Set `callbackTarget: { "url": "session:parent" }` for completion/failure/interruption messages; omit for none. Prefer callbacks over polling; never wait in a tool for one.
+5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
+6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
 7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
+8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
 
-Authority and callbacks belong to the workspace's canonical parent, the original
-root chat, even when a sibling chat invokes the tool. Only its direct children
-are manageable; unrelated sessions and the parent itself are not. Children cannot
-spawn grandchildren.
+Authority/callbacks belong to the canonical parent (original root chat), even from
+siblings. Only direct children are manageable, never unrelated sessions or the
+parent. No grandchildren.
+
+### Examples
+
+Pseudocode; `modelId` comes from `search_models`; `launchUuid` is a fresh retained UUID.
+
+```js
+const child = await spawn_session({
+  githubRepo: 'owner/repo', model: modelId, mode: 'code',
+  prompt: 'Fix the bug, run focused tests, and report. Do not commit, push, or create a PR.',
+  operationKey: launchUuid, autoCommit: false,
+  callbackTarget: { url: 'session:parent' },
+});
+```
+
+After the callback, retrieve `initialMessageId` via `list_child_sessions` and pass
+it with `child.cloudAgentSessionId` to `get_message_result`. Authorized follow-up:
+
+```js
+const { messageId } = await generate_message_id({});
+await send_message({
+  cloudAgentSessionId: child.cloudAgentSessionId, messageId,
+  payload: { type: 'prompt', prompt: followUpTask, mode: 'code', model: modelId },
+  autoCommit: false,
+});
+```
+
+After the callback, or as one bounded check:
+
+```js
+await get_message_result({ cloudAgentSessionId: child.cloudAgentSessionId, messageId });
+```
+
+Retain publication constraints in `followUpTask`.
 
 ## Reporting feedback and bugs
 

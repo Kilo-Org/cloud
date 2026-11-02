@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import {
+  buildMessageId,
+  MESSAGE_ID_RANDOM_LENGTH,
+} from '../../../packages/session-ingest-contracts/src/message-id';
+import {
   cloudAgentAuthorityInputSchema,
   type CloudAgentAuthority,
 } from '../../../packages/worker-utils/src/cloud-agent-authority';
@@ -40,7 +44,7 @@ const childOperations = [
     name: 'send_message',
     procedure: 'sendMessage',
     description:
-      'Send an explicitly authorized follow-up prompt to an existing direct child, reusing its workspace and delegation. Supply payload {type:"prompt", prompt, mode, model, variant?}; resolve the exact model id and variant with search_models. Generate one canonical messageId for new work and retain that same ID when reconciling the same submission. Admission does not mean completion. Cannot run command payloads, replace runtime configuration, broaden authority, or recover expired delegation.',
+      'Send an explicitly authorized follow-up prompt to an existing direct child, reusing its workspace and delegation. Supply payload {type:"prompt", prompt, mode, model, variant?}; resolve the exact model id and variant with search_models. First call generate_message_id with {} and copy its returned messageId; retain that same ID when reconciling or retrying the same submission. Do not generate another ID after an uncertain send. Automatic commit/push is not requested when autoCommit is omitted and does not inherit a previous message setting. Admission does not mean completion. Cannot run command payloads, replace runtime configuration, broaden authority, or recover expired delegation.',
   },
   {
     name: 'interrupt_session',
@@ -84,17 +88,31 @@ const modelSchema = z.object({
   alias_target: z.string().optional(),
 });
 
+const generateMessageIdArgs = z.object({}).strict();
+
 export const CHILD_SESSION_TOOL_NAMES = [
   'search_models',
+  'generate_message_id',
   ...childOperations.map(tool => tool.name),
 ];
 
-export const CHILD_SESSION_INSTRUCTIONS =
-  'This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace\'s canonical parent session, the original root chat, not to the sibling chat that invoked this tool. Launch a child only when the user explicitly asks to spin up a new Cloud Agent session. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree. First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval. Call spawn_session with a complete task brief and a fresh UUID operationKey. Organization and createdOnPlatform come from trusted parent state, not caller input. Include callbackTarget: { url: "session:parent" } to receive the result as a new message in the canonical parent; omit for no notification. Prefer callbacks over polling. Do not poll or wait in a tool for a callback; keep any status check bounded. Use list_child_sessions to recover IDs, get_session for status, get_message_result for a specific message outcome, send_message for authorized follow-ups, and interrupt_session for authorized Stop. Use list_folders to discover existing folder IDs in the fixed parent scope, then assign_workspace_to_folder with the direct child\'s cloudAgentSessionId and worktreeId to file its entire workspace; folderId:null removes the assignment. Folder tools cannot organize unrelated workspaces or create, edit, delete, or reorder folders. You may list, inspect, check status, stop, send a follow-up to, or spawn only direct child Cloud Agent sessions of this parent and must not access unrelated sessions. An accepted launch or follow-up is not completed work. After an ambiguous mutation failure, reconcile state before retrying and retain the original operationKey/messageId. Spawned children cannot spawn further children; do not launch a child from a child session, and do not ask a child to launch one.';
+export const CHILD_SESSION_INSTRUCTIONS = [
+  "This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace's canonical parent session, the original root chat, not to the sibling chat that invoked this tool.",
+  'Launch a child only when the user explicitly asks to spin up a new Cloud Agent session. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree.',
+  'First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. If no model was requested, use an already-established user preference and resolve it with search_models; otherwise browse search_models with {} and ask the user to choose. There is no implicit model default; isPreferred is a recommendation, not a selected account default. Omit variant unless requested. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval.',
+  "Call spawn_session with a complete task brief and a fresh UUID operationKey. Organization and createdOnPlatform come from trusted parent state, not caller input. Automatic commit/push is not requested when autoCommit is omitted; set true explicitly on the launch and each follow-up where authorized, because follow-ups do not inherit it. When publication is forbidden, set false and also forbid commit/push/PR actions in the task prompt; false alone does not restrict the child agent's Git tools. PR creation must be requested in the task prompt.",
+  'Include callbackTarget: { url: "session:parent" } to receive the result as a new message in the canonical parent; omit for no notification. Prefer callbacks over polling. Do not poll or wait in a tool for a callback; keep any status check bounded.',
+  'Use list_child_sessions to recover IDs, get_session for status, get_message_result for a specific message outcome, send_message for authorized follow-ups, and interrupt_session for authorized Stop. Before each new follow-up, call generate_message_id with {} and copy the returned messageId into send_message; this only generates an ID and does not send work. Keep that ID for reconciliation and retries of the same submission; never generate a replacement after an uncertain send. For the initial task, use initialMessageId from list_child_sessions when recorded; if absent, report the missing ID rather than generating a replacement.',
+  "Use list_folders to discover existing folder IDs in the fixed parent scope, then assign_workspace_to_folder with the direct child's cloudAgentSessionId and worktreeId to file its entire workspace; folderId:null removes the assignment. Folder tools cannot organize unrelated workspaces or create, edit, delete, or reorder folders.",
+  'You may list, inspect, check status, stop, send a follow-up to, or spawn only direct child Cloud Agent sessions of this parent and must not access unrelated sessions. An accepted launch or follow-up is not completed work. After an ambiguous mutation failure, reconcile state before retrying and retain the original operationKey/messageId. Spawned children cannot spawn further children; do not launch a child from a child session, and do not ask a child to launch one.',
+  'Example launch sequence: search_models({query: requestedModel}), select the exact returned model.id, then spawn_session({githubRepo:"owner/repo",model:model.id,mode:"code",prompt:"Fix the bug, run focused tests, and report results. Do not commit, push, or create a PR.",operationKey:freshUuid,autoCommit:false,callbackTarget:{url:"session:parent"}}). After the callback, use list_child_sessions to find this child\'s initialMessageId and get_message_result({cloudAgentSessionId:child.cloudAgentSessionId,messageId:child.initialMessageId}).',
+  'Example follow-up sequence: generate_message_id({}) returns {messageId}; send_message({cloudAgentSessionId:child.cloudAgentSessionId,messageId,payload:{type:"prompt",prompt:"Run the additional authorized checks and report results. Do not commit, push, or create a PR.",mode:"code",model:model.id},autoCommit:false}); after the callback, or as one bounded check, get_message_result({cloudAgentSessionId:child.cloudAgentSessionId,messageId}) reads that exact message\'s outcome. Do not interpret queued/running or a missing result as completion.',
+].join(' ');
 
 const fieldDescriptions: Record<string, string> = {
   githubRepo: 'GitHub repository in owner/repository form. The child checks it out independently.',
-  model: 'Exact model id returned by search_models, not its display name or a guessed identifier.',
+  model:
+    'Required exact model id returned by search_models. No implicit default: resolve an established user preference, or ask the user to choose. isPreferred is not an account default.',
   variant:
     'A supported variant returned by search_models for this exact model. Omit if not requested; do not put it in the model ID.',
   prompt:
@@ -103,7 +121,7 @@ const fieldDescriptions: Record<string, string> = {
   operationKey:
     'A fresh UUID for this launch. Keep this value and the same task input when reconciling or retrying the same launch; do not generate a replacement after a timeout.',
   autoCommit:
-    'Whether automatic finalization may commit and push changes. Set false when the user forbids publication. PR creation must be requested in the task prompt.',
+    "Whether this message requests automatic commit/push on finalization. Omitted means no request; follow-ups do not inherit the earlier setting. Set true only when authorized. If publication is forbidden, set false and forbid commit/push/PR actions in the prompt too; false does not restrict agent Git tools or cancel another prompt's request. PR creation must be requested in the prompt.",
   upstreamBranch: 'Repository branch to start from; omit to use the repository default.',
   callbackTarget:
     'Set {"url":"session:parent"} for completion/failure/interruption notification in the canonical parent chat. Omit for no callback.',
@@ -111,7 +129,7 @@ const fieldDescriptions: Record<string, string> = {
     'The workspace_* child session ID from spawn_session or list_child_sessions, not kiloSessionId.',
   sessionId: 'The workspace_* child cloudAgentSessionId to interrupt, not kiloSessionId.',
   messageId:
-    'Canonical message ID matching msg_[12 lowercase hex][14 alphanumeric]. For a new follow-up generate a fresh ID; reuse it only for that same submission. For a result use initialMessageId or the submitted follow-up ID.',
+    'For a new follow-up, call generate_message_id with {} and copy its returned messageId. Retain that same ID for reconciliation/retries; never generate another after an uncertain send. For a result use initialMessageId or the submitted follow-up ID.',
   expectedWorktreeId:
     'Optional worktree_* ID from list_child_sessions to verify the child workspace binding.',
   worktreeId:
@@ -131,13 +149,25 @@ export function childSessionTools(authority: CloudAgentAuthority) {
     {
       name: 'search_models',
       description:
-        'Find model identifiers and supported reasoning variants before spawning a child or changing its model. Searches the current model catalog by human name, provider, partial name, or exact ID, ignoring case, spacing, and punctuation. Returns id, name, variants, isPreferred, supportsVision, and alias_target when present. Copy id exactly to model and pass a supported variant separately; never invent either. Omit query to browse preferred models first. hasMore means narrow the query or increase limit (maximum 20). Multiple matches are candidates, not a selection; do not silently substitute a different requested model. An empty variants list means no named variants are advertised. Catalog identity does not guarantee organization policy approval at launch.',
+        'Find model identifiers and supported reasoning variants before spawning a child or changing its model. Searches the current model catalog by human name, provider, partial name, or exact ID, ignoring case, spacing, and punctuation. Returns id, name, variants, isPreferred, supportsVision, and alias_target when present. Copy id exactly to model and pass a supported variant separately; never invent either. Omit query to browse preferred models first. No implicit model default: if the user omitted a model, resolve an established user preference or ask them to choose. isPreferred is a recommendation, not a selected account default. Omit variant unless requested. hasMore means narrow the query or increase limit (maximum 20). Multiple matches are candidates, not a selection; do not silently substitute a different requested model. An empty variants list means no named variants are advertised. Catalog identity does not guarantee organization policy approval at launch.',
       inputSchema: z.toJSONSchema(searchModelsArgs, { io: 'input' }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true,
+      },
+    },
+    {
+      name: 'generate_message_id',
+      description:
+        'Generate a fresh canonical message ID for one new authorized send_message follow-up. Call with {} and copy the returned {messageId}; do not construct IDs yourself. Each call returns a new ID without creating a session, reserving a message, or sending work. Retain the ID before sending and reuse it for reconciliation/retries of that same submission; never generate a replacement after an uncertain send. Initial task IDs come from list_child_sessions.initialMessageId instead. This is not the UUID operationKey used for a launch.',
+      inputSchema: z.toJSONSchema(generateMessageIdArgs, { io: 'input' }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
       },
     },
     ...childOperations.map(tool => {
@@ -194,6 +224,23 @@ export async function runChildSessionTool(options: {
       -32602,
       `Unknown tool "${name}". Available tools: ${CHILD_SESSION_TOOL_NAMES.join(', ')}.`
     );
+  }
+  if (
+    authority.ownerId !== auth.kiloUserId ||
+    authority.organizationId !== (auth.organizationId ?? null) ||
+    authority.expiresAt <= Math.floor(Date.now() / 1000)
+  ) {
+    throw new JsonRpcFailure(-32602, 'Cloud Agent authority does not permit this request');
+  }
+  if (name === 'generate_message_id') {
+    if (!generateMessageIdArgs.safeParse(args).success) {
+      throw new JsonRpcFailure(-32602, 'Invalid generate_message_id arguments: pass an empty {}.');
+    }
+    const messageId = buildMessageId(
+      Date.now(),
+      crypto.getRandomValues(new Uint8Array(MESSAGE_ID_RANDOM_LENGTH))
+    );
+    return { text: JSON.stringify({ messageId }), truncated: false };
   }
   if (name === 'search_models') {
     const parsedArgs = searchModelsArgs.safeParse(args);

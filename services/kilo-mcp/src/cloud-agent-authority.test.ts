@@ -652,6 +652,14 @@ describe('Cloud Agent MCP authority', () => {
       );
       expect(body.result.instructions).toContain('spawn_session');
       expect(body.result.instructions).toContain('search_models');
+      expect(body.result.instructions).toContain('generate_message_id');
+      expect(body.result.instructions).toContain('There is no implicit model default');
+      expect(body.result.instructions).toContain('follow-ups do not inherit it');
+      expect(body.result.instructions).toContain(
+        'never generate a replacement after an uncertain send'
+      );
+      expect(body.result.instructions).toContain('Example launch sequence:');
+      expect(body.result.instructions).toContain('Example follow-up sequence:');
       expect(body.result.instructions).not.toContain('Search before every call');
     }
   );
@@ -685,6 +693,7 @@ describe('Cloud Agent MCP authority', () => {
       };
       expect(body.result.tools.map(tool => tool.name)).toEqual([
         'search_models',
+        'generate_message_id',
         'spawn_session',
         'list_child_sessions',
         'get_session',

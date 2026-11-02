@@ -486,6 +486,34 @@ const workerEntries: PrivilegedInventoryEntry[] = [
     actionClass: 'worker_admin',
     target: 'service',
   },
+  {
+    id: 'worker.gastown.ownershipBypass',
+    surface: 'worker',
+    route: 'trpc:gastown.* ownership bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.gastown.townRestBypass',
+    surface: 'worker',
+    route: 'rest:/api/towns/:townId/* admin bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.gastown.userRestAdminRead',
+    surface: 'worker',
+    route: 'rest:GET /api/users/:userId/* admin read',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.wasteland.ownershipBypass',
+    surface: 'worker',
+    route: 'trpc:wasteland.* ownership bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
 ];
 
 export const privilegedInventory: readonly PrivilegedInventoryEntry[] = [
@@ -672,13 +700,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
-    id: 'internal.auth.resourceDelegation',
-    file: 'apps/web/src/lib/auth/resource-delegation.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 3,
-  },
-  {
     id: 'internal.botUsers.botUserService',
     file: 'apps/web/src/lib/bot-users/bot-user-service.ts',
     actionClass: 'platform_read',
@@ -747,6 +768,27 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'platform_read',
     surface: 'server-component',
     occurrences: 4,
+  },
+  {
+    id: 'internal.workerAdmin.actorGuard',
+    file: 'apps/web/src/lib/worker-admin/actor-guard.ts',
+    actionClass: 'worker_admin',
+    surface: 'rest',
+    occurrences: 4,
+  },
+  {
+    id: 'internal.workerAdmin.capabilityIssuer',
+    file: 'apps/web/src/lib/worker-admin/capability-issuer.ts',
+    actionClass: 'worker_admin',
+    surface: 'rest',
+    occurrences: 1,
+  },
+  {
+    id: 'internal.workerAdmin.capabilityIntrospection',
+    file: 'apps/web/src/app/api/internal/worker-admin-capabilities/introspect/route.ts',
+    actionClass: 'worker_admin',
+    surface: 'rest',
+    occurrences: 1,
   },
   {
     id: 'internal.wasteland.serverResolve',

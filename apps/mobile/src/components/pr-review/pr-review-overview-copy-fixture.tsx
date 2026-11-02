@@ -11,7 +11,12 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
-import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrScope,
+  ProviderPrScopeProvider,
+  providerPrWebUrl,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { TRPCProvider } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -218,6 +223,17 @@ export function PrReviewOverviewCopyFixture({
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
+  const isGitHub = SURFACE_READS[surface].scope === 'github';
+  // The screen publishes the loaded PR/MR's own URL to the body (see
+  // `pr-review-screen.tsx`), and the no-checks card renders its
+  // view-on-provider button from it. A GitHub read always has one, so the
+  // fixture publishes it too; a provider surface whose read failed has none.
+  const webUrl = isGitHub
+    ? providerPrWebUrl({
+        ref: { platform: 'github', ...triple },
+        serverWebUrl: null,
+      })
+    : null;
   const body = (
     <View className="flex-1 bg-background">
       <PrReviewOverview {...triple} isActive />
@@ -226,11 +242,13 @@ export function PrReviewOverviewCopyFixture({
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
-        {SURFACE_READS[surface].scope === 'github' ? (
-          body
-        ) : (
-          <ProviderPrScopeProvider value={gitlabScope}>{body}</ProviderPrScopeProvider>
-        )}
+        <ProviderPrWebUrlProvider value={webUrl}>
+          {isGitHub ? (
+            body
+          ) : (
+            <ProviderPrScopeProvider value={gitlabScope}>{body}</ProviderPrScopeProvider>
+          )}
+        </ProviderPrWebUrlProvider>
       </TRPCProvider>
     </QueryClientProvider>
   );

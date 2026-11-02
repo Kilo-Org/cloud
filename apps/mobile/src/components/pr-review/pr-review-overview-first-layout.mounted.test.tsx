@@ -21,7 +21,7 @@ const rendered = vi.hoisted(() => ({ names: [] as string[] }));
 
 const reads = vi.hoisted(() => {
   const checks = Promise.withResolvers<undefined>();
-  const state = { overviewAnswered: false };
+  const state = { overviewAnswered: false, headSha: '0123456789abcdef0123456789abcdef01234567' };
   return {
     state,
     /** Let the checks read answer; the overview's gate must hold until then. */
@@ -82,7 +82,7 @@ vi.mock('@/lib/trpc', () => ({
           queryKey: ['overview', input],
           queryFn: () => {
             reads.state.overviewAnswered = true;
-            return overview;
+            return { ...overview, headSha: reads.state.headSha };
           },
         }),
       },
@@ -208,6 +208,33 @@ describe('PrReviewOverview first body frame', () => {
     const beforeBody = rendered.names.slice(0, rendered.names.indexOf('chip'));
     expect(beforeBody.length).toBeGreaterThan(0);
     expect(beforeBody.every(name => name === 'skeleton')).toBe(true);
+
+    act(() => {
+      unmount();
+    });
+  });
+
+  it('keeps the painted body when a refresh returns a new head', async () => {
+    // The checks read is keyed by the head SHA, so a refresh that returns a new
+    // commit starts a new read. The body must keep painting from the card that
+    // is already on screen: dropping back to the skeleton would replace the
+    // whole settled page, which is a bigger shift than the one this gate fixes.
+    rendered.names.length = 0;
+    reads.state.headSha = '0123456789abcdef0123456789abcdef01234567';
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, props)
+    );
+    await waitFor(() => rendered.names.includes('merge'));
+    const paintedFrames = bodyFrames().length;
+
+    reads.state.headSha = 'fedcba9876543210fedcba9876543210fedcba98';
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+    await waitFor(() => bodyFrames().length > paintedFrames);
+
+    const firstBody = rendered.names.indexOf('chip');
+    expect(rendered.names.slice(firstBody)).not.toContain('skeleton');
 
     act(() => {
       unmount();

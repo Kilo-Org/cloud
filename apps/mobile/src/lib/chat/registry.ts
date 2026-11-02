@@ -788,8 +788,14 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
     }
     return;
   }
-  const { sessionId: current, asked, askedImages, askedModel, askedEffort, askedFrom } =
-    snapshotOf(sessionId);
+  const {
+    sessionId: current,
+    asked,
+    askedImages,
+    askedModel,
+    askedEffort,
+    askedFrom,
+  } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
     /* The slot already holds it, so asking it again takes its place back rather
        than leaving a second copy of itself in the transcript. A retry of a kept

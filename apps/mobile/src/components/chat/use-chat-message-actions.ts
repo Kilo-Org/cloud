@@ -129,8 +129,7 @@ export function useChatMessageActions(
   // asked again. The sheet then closes.
   const shown = messages.find(message => message.info.id === detailsId) ?? null;
   const shownSlot = shown !== null && shown.info.id === unanswered ? delivery : undefined;
-  const shownKept =
-    shown === null || shownSlot !== undefined ? undefined : kept.get(shown.info.id);
+  const shownKept = shown === null || shownSlot !== undefined ? undefined : kept.get(shown.info.id);
   const detailsDelivery = shownSlot ?? shownKept?.delivery;
   return {
     composerControlRef,

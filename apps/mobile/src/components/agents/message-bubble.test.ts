@@ -386,7 +386,11 @@ describe('MessageBubble failure footer', () => {
 
     // The footer container is a plain View: no accessible, no role, no label,
     // so Retry and Copy stay individually focusable.
-    const footer = findElementByType(tree, 'View', p => p.className === 'gap-1 px-4 pt-1 pb-[16px]');
+    const footer = findElementByType(
+      tree,
+      'View',
+      p => p.className === 'gap-1 px-4 pt-1 pb-[16px]'
+    );
     expect(footer).not.toBeNull();
     expect(footer?.props.accessible).toBeUndefined();
     expect(footer?.props.accessibilityRole).toBeUndefined();

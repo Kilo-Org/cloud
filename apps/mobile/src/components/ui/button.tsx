@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Text, TextClassContext } from '@/components/ui/text';
-import { COMPACT_BUTTON_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { COMPACT_BUTTON_HIT_SLOP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -39,16 +39,20 @@ const buttonVariants = cva(
         'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
-        // min-h (not fixed h) so the button grows to fit text scaled by large
-        // Dynamic Type instead of clipping the label; the min still guarantees
+        // min-h (not fixed h) so a button with a label grows to fit text scaled
+        // by large Dynamic Type instead of clipping it; the min still guarantees
         // the 48pt action / 44pt default/lg / 46pt-reach sm target, whose 36pt
         // frame carries the rest as `COMPACT_BUTTON_HIT_SLOP`.
+        // `icon` has no label to scale, so it is exactly the shared icon target
+        // (`ICON_TARGET_BOX_CLASS`): the audit reads the node's own view rect, so
+        // a smaller frame plus `hitSlop` would still measure under Android's
+        // 48dp minimum. The glyph keeps its own size and the box centres it.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
         action: 'min-h-[48px] px-4 py-2',
-        icon: 'h-[44px] w-[44px]',
+        icon: ICON_TARGET_BOX_CLASS,
       },
     },
     defaultVariants: {

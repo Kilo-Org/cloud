@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
+      "reconnectTitleGitLab": "GitLabga qayta ulanish",
+      "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
@@ -1614,6 +1616,8 @@
       "set": "Belgilangan",
       "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
+      "nSelected_one": "{{displayCount}} ta tanlangan",
+      "nSelected_other": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },
     "decision": {

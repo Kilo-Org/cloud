@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
       "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
+      "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
+      "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
       "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна.",
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "gitlabInstanceMismatchTitle": "GitLab холболт нь өөр инстанцад хамаарна",
@@ -1614,6 +1616,8 @@
       "set": "Тохируулсан",
       "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
+      "nSelected_one": "{{displayCount}} сонгогдсон",
+      "nSelected_other": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
     "decision": {

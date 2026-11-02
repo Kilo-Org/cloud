@@ -2786,6 +2786,8 @@
       "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
       "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
       "reconnectTitle": "Подключить GitHub снова",
+      "reconnectTitleGitLab": "Подключить GitLab снова",
+      "reconnectTitleBitbucket": "Подключить Bitbucket снова",
       "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван.",
       "gitlabDescription": "Проверка запросов на слияние на телефоне",
       "gitlabInstanceMismatchTitle": "Подключение GitLab предназначено для другого экземпляра",

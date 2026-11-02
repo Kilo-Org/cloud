@@ -2757,6 +2757,8 @@
       "checkFailedTitleBitbucket": "Impossible de vérifier la connexion Bitbucket.",
       "providerCheckFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
       "reconnectTitle": "Reconnecter GitHub",
+      "reconnectTitleGitLab": "Reconnecter GitLab",
+      "reconnectTitleBitbucket": "Reconnecter Bitbucket",
       "reconnectDescription": "L'accès à votre compte GitHub a été révoqué.",
       "gitlabDescription": "Examiner les merge requests sur mobile",
       "gitlabInstanceMismatchTitle": "La connexion GitLab concerne une autre instance",

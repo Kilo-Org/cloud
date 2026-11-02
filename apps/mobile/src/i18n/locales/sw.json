@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Imeshindikana kuangalia muunganisho wa Bitbucket.",
       "providerCheckFailedMessage": "Hali ya muunganisho haipatikani hadi hii ipakie.",
       "reconnectTitle": "Unganisha GitHub tena",
+      "reconnectTitleGitLab": "Unganisha GitLab tena",
+      "reconnectTitleBitbucket": "Unganisha Bitbucket tena",
       "reconnectDescription": "Ruhusa ya muunganisho wako wa GitHub imebatilishwa.",
       "gitlabDescription": "Kagua maombi ya kuunganisha kwenye simu",
       "gitlabInstanceMismatchTitle": "Muunganisho wa GitLab ni wa mfumo mwingine",

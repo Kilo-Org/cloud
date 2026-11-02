@@ -2856,6 +2856,8 @@
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
       "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
       "reconnectTitle": "إعادة ربط GitHub",
+      "reconnectTitleGitLab": "إعادة ربط GitLab",
+      "reconnectTitleBitbucket": "إعادة ربط Bitbucket",
       "reconnectDescription": "أُلغي ربط حسابك على GitHub.",
       "gitlabDescription": "مراجعة طلبات الدمج على الجوال",
       "gitlabInstanceMismatchTitle": "اتصال GitLab مخصص لنسخة أخرى",

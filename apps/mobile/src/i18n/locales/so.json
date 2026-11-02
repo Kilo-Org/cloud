@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Xiriirka Bitbucket lama hubin karin.",
       "providerCheckFailedMessage": "Xaaladda xiriirka ma muuqato inta la soo dhacayo.",
       "reconnectTitle": "Dib u xir GitHub",
+      "reconnectTitleGitLab": "Dib u xir GitLab",
+      "reconnectTitleBitbucket": "Dib u xir Bitbucket",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday.",
       "gitlabDescription": "Taleefanka ku eeg merge request-yada",
       "gitlabInstanceMismatchTitle": "Xiriirka GitLab waa server kale",

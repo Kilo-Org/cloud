@@ -696,6 +696,8 @@
       "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
       "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
+      "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
+      "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve.",
       "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
       "gitlabInstanceMismatchTitle": "GitLab savienojums ir paredzēts citai instancei",

@@ -2716,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
       "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
       "reconnectTitle": "GitHubに再接続",
+      "reconnectTitleGitLab": "GitLabに再接続",
+      "reconnectTitleBitbucket": "Bitbucketに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。",
       "gitlabDescription": "モバイルでマージリクエストをレビュー",
       "gitlabInstanceMismatchTitle": "GitLabの接続先が別のインスタンスです",

@@ -2716,6 +2716,8 @@
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
       "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
       "reconnectTitle": "GitHub opnieuw verbinden",
+      "reconnectTitleGitLab": "GitLab opnieuw verbinden",
+      "reconnectTitleBitbucket": "Bitbucket opnieuw verbinden",
       "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
       "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "gitlabInstanceMismatchTitle": "GitLab-verbinding is voor een andere instantie",

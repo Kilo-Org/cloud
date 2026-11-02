@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Asikwazanga ukuhlola ukuxhumana kwe-Bitbucket.",
       "providerCheckFailedMessage": "Isimo sokuxhumana asitholakali kuze kulayishwe lokhu.",
       "reconnectTitle": "Xhuma kabusha i-GitHub",
+      "reconnectTitleGitLab": "Xhuma kabusha i-GitLab",
+      "reconnectTitleBitbucket": "Xhuma kabusha i-Bitbucket",
       "reconnectDescription": "Ukuxhumana kwakho kwe-GitHub kuhoxisiwe.",
       "gitlabDescription": "Hlola izicelo zokuhlanganisa kuselula",
       "gitlabInstanceMismatchTitle": "Ukuxhumana kwe-GitLab kwenzelwe isikhungo esinye",

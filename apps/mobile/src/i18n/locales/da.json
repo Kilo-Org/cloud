@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket-forbindelsen kunne ikke kontrolleres.",
       "providerCheckFailedMessage": "Din forbindelsesstatus kan først vises, når indlæsningen er færdig.",
       "reconnectTitle": "Opret forbindelse til GitHub igen",
+      "reconnectTitleGitLab": "Opret forbindelse til GitLab igen",
+      "reconnectTitleBitbucket": "Opret forbindelse til Bitbucket igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt.",
       "gitlabDescription": "Gennemgå merge requests på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-forbindelsen er til en anden instans",

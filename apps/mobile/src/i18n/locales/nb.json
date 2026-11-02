@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Kunne ikke sjekke Bitbucket-tilkoblingen.",
       "providerCheckFailedMessage": "Tilkoblingsstatusen er ikke tilgjengelig før innlastingen er fullført.",
       "reconnectTitle": "Koble til GitHub på nytt",
+      "reconnectTitleGitLab": "Koble til GitLab på nytt",
+      "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
       "gitlabDescription": "Gå gjennom merge requests på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",

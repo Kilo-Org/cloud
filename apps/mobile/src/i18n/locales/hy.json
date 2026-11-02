@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը։",
       "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
+      "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
+      "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։",
       "gitlabDescription": "Ստուգել միաձուլման հարցումները բջջային սարքում",
       "gitlabInstanceMismatchTitle": "GitLab-ի միացումը այլ ինստանսի համար է",

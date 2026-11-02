@@ -2751,6 +2751,8 @@
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
       "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
+      "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
+      "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל.",
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "gitlabInstanceMismatchTitle": "חיבור GitLab מיועד למופע אחר",

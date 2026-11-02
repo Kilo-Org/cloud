@@ -2716,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
       "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
       "reconnectTitle": "Kết nối lại GitHub",
+      "reconnectTitleGitLab": "Kết nối lại GitLab",
+      "reconnectTitleBitbucket": "Kết nối lại Bitbucket",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi.",
       "gitlabDescription": "Rà soát merge request trên điện thoại",
       "gitlabInstanceMismatchTitle": "Kết nối GitLab dành cho một máy chủ khác",

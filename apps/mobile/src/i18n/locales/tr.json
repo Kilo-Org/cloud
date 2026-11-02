@@ -2716,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Bitbucket bağlantısı kontrol edilemedi.",
       "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
+      "reconnectTitleGitLab": "GitLab'a yeniden bağlan",
+      "reconnectTitleBitbucket": "Bitbucket'a yeniden bağlan",
       "reconnectDescription": "GitHub bağlantının izni kaldırıldı.",
       "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "gitlabInstanceMismatchTitle": "GitLab bağlantısı başka bir örneğe ait",

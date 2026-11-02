@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "نەتوانرا پەیوەندی بە Bitbucket بپشکنرێت.",
       "providerCheckFailedMessage": "دۆخی پەیوەندی تا بارکردن بەردەست نییە.",
       "reconnectTitle": "دووبارە بەستنەوەی GitHub",
+      "reconnectTitleGitLab": "دووبارە بەستنەوەی GitLab",
+      "reconnectTitleBitbucket": "دووبارە بەستنەوەی Bitbucket",
       "reconnectDescription": "مۆڵەتی پەیوەندییەکەت بە GitHub هەڵوەشێنراوەتەوە.",
       "gitlabDescription": "پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا",
       "gitlabInstanceMismatchTitle": "بەستنەوەی GitLab بۆ نمونەیەکی ترە",

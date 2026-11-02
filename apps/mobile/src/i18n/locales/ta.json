@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket இணைப்பைச் சரிபார்க்க முடியவில்லை.",
       "providerCheckFailedMessage": "இது ஏற்றும் வரை இணைப்பு நிலை கிடைக்காது.",
       "reconnectTitle": "GitHub உடன் மீண்டும் இணைக்கவும்",
+      "reconnectTitleGitLab": "GitLab உடன் மீண்டும் இணைக்கவும்",
+      "reconnectTitleBitbucket": "Bitbucket உடன் மீண்டும் இணைக்கவும்",
       "reconnectDescription": "உங்கள் GitHub இணைப்பு ரத்து செய்யப்பட்டது.",
       "gitlabDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்யவும்",
       "gitlabInstanceMismatchTitle": "GitLab இணைப்பு வேறொரு இன்ஸ்டன்ஸிற்கானது",

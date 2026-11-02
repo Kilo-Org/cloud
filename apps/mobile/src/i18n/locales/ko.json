@@ -2716,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
       "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
       "reconnectTitle": "GitHub 다시 연결",
+      "reconnectTitleGitLab": "GitLab 다시 연결",
+      "reconnectTitleBitbucket": "Bitbucket 다시 연결",
       "reconnectDescription": "GitHub 연결이 해제되었습니다.",
       "gitlabDescription": "모바일에서 머지 요청 리뷰",
       "gitlabInstanceMismatchTitle": "GitLab 연결이 다른 인스턴스용입니다",

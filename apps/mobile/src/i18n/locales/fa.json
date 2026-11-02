@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
+      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
+      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
       "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",

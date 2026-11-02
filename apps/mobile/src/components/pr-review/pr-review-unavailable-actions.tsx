@@ -31,6 +31,12 @@ import { useTRPC } from '@/lib/trpc';
  * Renders nothing on a GitHub scope: GitHub's not-found has its own install
  * CTA and its connectivity is the GitHub App authorization, not an
  * integration status this hook can check.
+ *
+ * The retry is the state's one filled primary, as on the connect gate and the
+ * GitHub install CTA: it is the action that can recover the item from here.
+ * The connection check stays the outlined secondary below it, because it
+ * answers a different question — whether the account is still connected — and
+ * a state with two equally weighted buttons has no primary at all.
  */
 export function PrReviewUnavailableActions({
   onRetry,
@@ -115,12 +121,7 @@ export function PrReviewUnavailableActions({
 
   return (
     <View className="mt-3 w-full gap-2">
-      <Button
-        className={STATE_ACTION_CLASS}
-        variant="outline"
-        onPress={onRetry}
-        loading={isRetrying}
-      >
+      <Button className={STATE_ACTION_CLASS} onPress={onRetry} loading={isRetrying}>
         <Text>{t('common.retry')}</Text>
       </Button>
       <Button

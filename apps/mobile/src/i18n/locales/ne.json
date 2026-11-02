@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
       "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
       "reconnectTitle": "GitHub मा पुनः जडान",
+      "reconnectTitleGitLab": "GitLab मा पुनः जडान",
+      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",

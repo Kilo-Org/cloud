@@ -711,6 +711,8 @@
       "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
       "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
+      "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
+      "reconnectTitleBitbucket": "Prisijungti prie Bitbucket iš naujo",
       "reconnectDescription": "Tavo GitHub prieiga atšaukta.",
       "gitlabDescription": "Peržiūrėti merge requests mobiliajame įrenginyje",
       "gitlabInstanceMismatchTitle": "GitLab ryšys skirtas kitai instancijai",

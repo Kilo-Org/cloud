@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
       "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
       "reconnectTitle": "Sambung semula ke GitHub",
+      "reconnectTitleGitLab": "Sambung semula ke GitLab",
+      "reconnectTitleBitbucket": "Sambung semula ke Bitbucket",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan.",
       "gitlabDescription": "Semak permintaan gabungan pada peranti mudah alih",
       "gitlabInstanceMismatchTitle": "Sambungan GitLab adalah untuk instans lain",

@@ -37,7 +37,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeGatewayModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -323,10 +323,7 @@ export async function applyProviderSpecificLogic(
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (
-    isFreeModelExcludingCustomLlms(requestedModel) ||
-    (userByok !== null && !usesUserGatewayKey)
-  ) {
+  if ((await isFreeGatewayModel(requestedModel)) || (userByok !== null && !usesUserGatewayKey)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

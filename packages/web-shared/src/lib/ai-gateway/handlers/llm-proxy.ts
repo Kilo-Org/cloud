@@ -38,8 +38,8 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
+  isFreeGatewayModel,
   isFreeModel,
-  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findCustomLlm,
@@ -668,7 +668,7 @@ export async function handleLlmProxyRequest(
   // custom LLM id must behave exactly like an unknown id.
   const isPubliclyFreeModel =
     (customLlm !== null && !isPrivateCustomLlm) ||
-    isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+    (await isFreeGatewayModel(effectiveModelIdLowerCased));
 
   if (!ipAddress) {
     return NextResponse.json(

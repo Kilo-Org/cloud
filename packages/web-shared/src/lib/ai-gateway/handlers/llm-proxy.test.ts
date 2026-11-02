@@ -31,6 +31,7 @@ import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/u
 import {
   getOpenRouterModelsFromDatabase,
   getVercelModelsFromDatabase,
+  getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -1753,6 +1754,35 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       ipAddress: '127.0.0.1',
     });
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies free-model rate limiting to a free Vercel-only model', async () => {
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      'reflection/beam-free': {
+        id: 'reflection/beam-free',
+        name: 'Beam (Free)',
+        type: 'language',
+        endpoints: [{ provider_name: 'reflection', pricing: { prompt: '0', completion: '0' } }],
+        catalog: {
+          description: '',
+          created: 1_790_000_000,
+          context_window: 128_000,
+          modalities: { input: ['text'], output: ['text'] },
+          pricing: { input: '0', output: '0' },
+        },
+      },
+    });
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('reflection/beam-free')) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('does not apply free-model rate limiting to paid models', async () => {

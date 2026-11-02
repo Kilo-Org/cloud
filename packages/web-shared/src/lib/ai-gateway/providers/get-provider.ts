@@ -80,7 +80,10 @@ import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isFreeGatewayModel,
+  isFreeModelExcludingCustomLlms,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
@@ -613,7 +616,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     kind: 'provider',
     provider: kiloGateway === 'vercel' ? VERCEL_AI_GATEWAY : OPENROUTER,
     userByok: null,
-    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    isFree: await isFreeGatewayModel(requestedModel),
     bypassAccessCheck: false,
   };
 }

@@ -12,6 +12,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import { isFreeVercelStoredModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
 import {
   findVercelOnlyModels,
   getVendorNamesByModelPrefix,
@@ -38,7 +39,8 @@ function toVercelEndpointModel(
   model: OpenRouterModel,
   endpoint: Endpoint,
   providerDisplayName: string,
-  dataPolicy?: { training: boolean; retainsPrompts: boolean }
+  dataPolicy?: { training: boolean; retainsPrompts: boolean },
+  isFree = !endpoint.pricing?.prompt
 ): OpenRouterModel {
   const freeSuffixIndex = model.name.indexOf(' (free)');
   return {
@@ -47,7 +49,7 @@ function toVercelEndpointModel(
     context_length: endpoint.context_length ?? model.context_length,
     endpoint: {
       provider_display_name: providerDisplayName,
-      is_free: !endpoint.pricing?.prompt,
+      is_free: isFree,
       pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
       ...(dataPolicy && { data_policy: dataPolicy }),
     },
@@ -163,20 +165,24 @@ function survivesNormalization(providerId: string, caller: string) {
 /**
  * Lists `model` under a provider for one Vercel endpoint. Vercel reports per-endpoint ZDR and
  * no-training guarantees; a missing guarantee is treated as training on and retaining prompts.
- * Providers that only Vercel lists take the worst policy of their endpoints.
+ * Providers that only Vercel lists take the worst policy of their endpoints. A model Kilo serves
+ * for free is assumed to train on and retain prompts, like free OpenRouter endpoints.
  */
 function addVercelEndpointModel(
   providerData: ProviderModelData[number],
   model: OpenRouterModel,
-  endpoint: Endpoint
+  endpoint: Endpoint,
+  isFree?: boolean
 ) {
-  const training = endpoint.has_no_training !== true;
-  const retainsPrompts = endpoint.has_zdr !== true;
+  const endpointTraining = endpoint.has_no_training !== true;
+  const endpointRetainsPrompts = endpoint.has_zdr !== true;
   if (providersOnlyVercelLists.has(providerData.provider)) {
     const { dataPolicy } = providerData.provider;
-    dataPolicy.training ||= training;
-    dataPolicy.retainsPrompts ||= retainsPrompts;
+    dataPolicy.training ||= endpointTraining;
+    dataPolicy.retainsPrompts ||= endpointRetainsPrompts;
   }
+  const training = isFree === true || endpointTraining;
+  const retainsPrompts = isFree === true || endpointRetainsPrompts;
 
   const existing = providerData.models.find(m => m.slug === model.slug);
   if (existing?.endpoint) {
@@ -188,10 +194,13 @@ function addVercelEndpointModel(
   }
 
   providerData.models.push(
-    toVercelEndpointModel(model, endpoint, providerData.provider.displayName, {
-      training,
-      retainsPrompts,
-    })
+    toVercelEndpointModel(
+      model,
+      endpoint,
+      providerData.provider.displayName,
+      { training, retainsPrompts },
+      isFree
+    )
   );
 }
 
@@ -267,6 +276,7 @@ export function injectVercelOnlyModels({
 
   for (const vercelOnlyModel of vercelOnlyModels) {
     const { id, storedModel, catalog } = vercelOnlyModel;
+    const isFree = isFreeVercelStoredModel(id, storedModel);
     const model: OpenRouterModel = {
       slug: id,
       name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
@@ -291,13 +301,18 @@ export function injectVercelOnlyModels({
         providerData = { provider: createVercelOnlyProvider(providerId), models: [] };
         providerModelData.push(providerData);
       }
-      addVercelEndpointModel(providerData, model, {
-        ...endpoint,
-        pricing: endpoint.pricing ?? {
-          prompt: catalog.pricing.input,
-          completion: catalog.pricing.output,
+      addVercelEndpointModel(
+        providerData,
+        model,
+        {
+          ...endpoint,
+          pricing: endpoint.pricing ?? {
+            prompt: catalog.pricing.input,
+            completion: catalog.pricing.output,
+          },
         },
-      });
+        isFree
+      );
     }
   }
 

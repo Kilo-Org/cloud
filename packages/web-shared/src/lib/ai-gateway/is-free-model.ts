@@ -6,10 +6,19 @@ import {
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isFreeVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
 
 /** Whether Kilo charges nothing for the model. Custom LLMs are always free. */
 export async function isFreeModel(modelId: string): Promise<boolean> {
-  return (await isCustomLlm(modelId)) || isFreeModelExcludingCustomLlms(modelId);
+  return (await isCustomLlm(modelId)) || (await isFreeGatewayModel(modelId));
+}
+
+/**
+ * The built-in free model rules plus free Vercel-only models, without custom LLMs. Prefer it over
+ * `isFreeModelExcludingCustomLlms` on chat routes, where Vercel-only models are served.
+ */
+export async function isFreeGatewayModel(modelId: string): Promise<boolean> {
+  return isFreeModelExcludingCustomLlms(modelId) || (await isFreeVercelModel(modelId));
 }
 
 /**

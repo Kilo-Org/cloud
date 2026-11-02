@@ -446,4 +446,43 @@ describe('injectVercelOnlyModels', () => {
       ['qwen/qwen3.5-flash', { prompt: '0.0000001', completion: '0.0000004' }],
     ]);
   });
+
+  test('marks a free Vercel-only model free and assumes it trains on prompts', () => {
+    const data = providerModelData();
+    injectVercelOnlyModels({
+      vercelModels: {
+        'reflection/beam-free': {
+          id: 'reflection/beam-free',
+          name: 'Beam (Free)',
+          type: 'language',
+          catalog: { ...catalog, pricing: { input: '0', output: '0' } },
+          endpoints: [
+            {
+              provider_name: 'reflection',
+              pricing: { prompt: '0', completion: '0' },
+              has_zdr: true,
+              has_no_training: true,
+            },
+          ],
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    const reflection = data.find(({ provider }) => provider.slug === 'reflection');
+    expect(reflection?.provider.dataPolicy).toMatchObject({
+      training: false,
+      retainsPrompts: false,
+    });
+    expect(reflection?.models[0]?.endpoint).toEqual({
+      provider_display_name: 'Reflection',
+      is_free: true,
+      pricing: { prompt: '0', completion: '0' },
+      data_policy: { training: true, retainsPrompts: true },
+    });
+  });
 });

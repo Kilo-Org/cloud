@@ -1656,7 +1656,7 @@ const createHostedWorkspaceSessionHandler = protectedProcedure
       input.workspaceId,
       input.kilocodeOrganizationId
     );
-    assertModeAvailableForProfile(input.agent.mode, source.metadata.profile ?? {});
+    assertModeAvailableForProfile(input.agent.mode, source.metadata.profile ?? {}, false);
     const requestedMessageId = input.message.id;
     const initialMessageId = requestedMessageId ?? createMessageId();
     const fingerprint = await workspaceSessionIntentFingerprint(input, source);

@@ -63,8 +63,13 @@ import { Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CUSTOM_AGENT_OPTION = '__custom_agent__';
-const TRIGGER_MODE_OPTIONS = [
+const BUILTIN_TRIGGER_MODE_OPTIONS = [
   ...LEGACY_MODE_OPTIONS,
+  { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
+  { value: 'build', label: 'Build', description: 'Write and modify code' },
+];
+const TRIGGER_MODE_OPTIONS = [
+  ...BUILTIN_TRIGGER_MODE_OPTIONS,
   {
     value: CUSTOM_AGENT_OPTION,
     label: 'Custom agent',
@@ -198,7 +203,8 @@ export function TriggerForm({
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
   const [agentMode, setAgentMode] = useState(initialData?.mode ?? 'ask');
   const [useCustomAgent, setUseCustomAgent] = useState(
-    !!initialData?.mode && !LEGACY_MODE_OPTIONS.some(option => option.value === initialData.mode)
+    !!initialData?.mode &&
+      !BUILTIN_TRIGGER_MODE_OPTIONS.some(option => option.value === initialData.mode)
   );
   const agentModeResult = webhookTriggerModeSchema.safeParse(agentMode);
   const agentModeError = agentModeResult.success ? null : agentModeResult.error.issues[0].message;
@@ -283,7 +289,8 @@ export function TriggerForm({
       setGithubRepo(initialData.githubRepo);
       setAgentMode(initialData.mode ?? 'ask');
       setUseCustomAgent(
-        !!initialData.mode && !LEGACY_MODE_OPTIONS.some(option => option.value === initialData.mode)
+        !!initialData.mode &&
+          !BUILTIN_TRIGGER_MODE_OPTIONS.some(option => option.value === initialData.mode)
       );
       setModel(initialData.model);
       setVariant(initialData.variant);

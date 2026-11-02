@@ -125,10 +125,12 @@ export function validateModeAgainstRuntimeAgents(
   metadata: SessionMetadata,
   mode = metadata.agent?.mode
 ): string | null {
+  // Only internal automation can stamp the Worker-owned billing origin.
+  const { billingOrigin, createdOnPlatform } = metadata.identity;
   if (
     !mode ||
     BUILTIN_AGENT_MODES.has(mode) ||
-    isRepositoryAgentOrigin(metadata.identity.createdOnPlatform)
+    (billingOrigin === createdOnPlatform && isRepositoryAgentOrigin(billingOrigin))
   )
     return null;
 

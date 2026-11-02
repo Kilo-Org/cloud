@@ -269,10 +269,10 @@ export async function resolveEffectiveSessionConfiguration(
 export function assertModeAvailableForProfile(
   mode: string,
   profile: SessionProfileBundle,
-  createdOnPlatform?: string
+  allowRepositoryAgent: boolean
 ): void {
   // Automation repositories are cloned later; Kilo resolves their agent files at execution.
-  if (isBuiltinMode(mode) || isRepositoryAgentOrigin(createdOnPlatform)) return;
+  if (isBuiltinMode(mode) || allowRepositoryAgent) return;
   const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
   if (slugs.has(mode)) return;
 
@@ -356,7 +356,8 @@ export async function preflightSessionCreation(
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
     resolvedRequest.profile?.resolved ?? {},
-    resolvedRequest.options?.createdOnPlatform
+    procedure === 'prepareSession' &&
+      isRepositoryAgentOrigin(resolvedRequest.options?.createdOnPlatform)
   );
   await validateEndpoint?.(resolvedRequest);
 

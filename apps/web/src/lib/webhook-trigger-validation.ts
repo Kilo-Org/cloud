@@ -5,10 +5,9 @@ export const webhookTriggerModeSchema = z
   .min(1, 'Agent mode is required')
   .max(50, 'Agent mode must be 50 characters or less')
   .regex(
-    /^[a-z][a-z0-9-]*$/,
-    'Agent mode must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens'
-  )
-  .refine(mode => mode !== 'custom', 'The custom mode is reserved; use a named custom agent');
+    /^(?!custom$)[a-z][a-z0-9-]*$/,
+    'Use a named agent other than custom, starting with a lowercase letter and containing only lowercase letters, numbers, and hyphens'
+  );
 
 /**
  * Reserved trigger IDs that cannot be used by users.

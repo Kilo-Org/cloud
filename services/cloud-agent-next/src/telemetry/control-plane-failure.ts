@@ -10,6 +10,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   assistantTerminalCode,
+  missingAgentSlug,
   resolveAssistantProviderOwnership,
 } from '../shared/assistant-failure.js';
 
@@ -237,13 +238,18 @@ export function classifyControlPlaneRunFailure(input: {
     input.assistantReason,
     input.admittedModel
   );
-  const mapped = classifyCloudAgentFailure({
-    source: 'run',
-    stage,
-    code,
-    assistantReason: input.assistantReason,
-    ...(providerOwnership === undefined ? {} : { providerOwnership }),
-  });
+  // Missing repository/profile agents are user configuration errors, not provider rejections.
+  const localConfigurationFailure =
+    input.assistantReason === 'invalid_request' && missingAgentSlug(input.reason) !== undefined;
+  const mapped = localConfigurationFailure
+    ? { responsibility: 'user' as const, reason: 'assistant_invalid_request' as const }
+    : classifyCloudAgentFailure({
+        source: 'run',
+        stage,
+        code,
+        assistantReason: input.assistantReason,
+        ...(providerOwnership === undefined ? {} : { providerOwnership }),
+      });
   return {
     stage,
     code,

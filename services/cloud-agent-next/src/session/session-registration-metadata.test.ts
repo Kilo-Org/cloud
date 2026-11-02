@@ -70,7 +70,12 @@ describe('session registration repository metadata', () => {
     'preserves a repository agent without runtimeAgents for %s',
     async createdOnPlatform => {
       const result = await buildSessionMetadataFromRegistration({
-        identity: { sessionId: 'workspace_probe', userId: 'user_fixture', createdOnPlatform },
+        identity: {
+          sessionId: 'workspace_probe',
+          userId: 'user_fixture',
+          createdOnPlatform,
+          billingOrigin: createdOnPlatform,
+        },
         auth: {},
         agent: { mode: 'foreman', model: 'kilo/test-model' },
         repository: GITHUB_REPOSITORY,
@@ -82,11 +87,38 @@ describe('session registration repository metadata', () => {
     }
   );
 
+  it.each(['webhook', 'scheduled'])(
+    'does not defer to a client-supplied %s label with a public billing origin',
+    async createdOnPlatform => {
+      const result = await buildSessionMetadataFromRegistration({
+        identity: {
+          sessionId: 'workspace_probe',
+          userId: 'user_fixture',
+          createdOnPlatform,
+          billingOrigin: 'cloud-agent',
+        },
+        auth: {},
+        agent: { mode: 'foreman', model: 'kilo/test-model' },
+        repository: GITHUB_REPOSITORY,
+      });
+      expect(result).toEqual({
+        ok: false,
+        error:
+          'Mode "foreman" is not a built-in and does not match any runtimeAgents on this session',
+      });
+    }
+  );
+
   it.each(['cloud-agent-web', 'discord', 'slack', 'code-review', undefined])(
     'retains missing custom-agent rejection for %s',
     async createdOnPlatform => {
       const result = await buildSessionMetadataFromRegistration({
-        identity: { sessionId: 'workspace_probe', userId: 'user_fixture', createdOnPlatform },
+        identity: {
+          sessionId: 'workspace_probe',
+          userId: 'user_fixture',
+          createdOnPlatform,
+          billingOrigin: createdOnPlatform,
+        },
         auth: {},
         agent: { mode: 'foreman', model: 'kilo/test-model' },
         repository: GITHUB_REPOSITORY,

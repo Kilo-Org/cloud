@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
@@ -288,6 +289,15 @@ describe('webhook trigger variant inputs', () => {
       expect(WebhookTriggerUpdateInput.parse({ triggerId: 'trigger-id', mode }).mode).toBe(mode);
     }
   );
+
+  it('expresses the reserved custom slug in the generated JSON Schema', () => {
+    const schema = z.toJSONSchema(webhookTriggerModeSchema);
+    expect(schema.pattern).toBeDefined();
+    const pattern = new RegExp(schema.pattern ?? '');
+    expect(pattern.test('custom')).toBe(false);
+    expect(pattern.test('custom-reviewer')).toBe(true);
+    expect(pattern.test('plan')).toBe(true);
+  });
 
   it.each(['a', 'reviewer', 'team-reviewer-2', 'a'.repeat(50)])(
     'accepts named custom mode %s without rewriting it',

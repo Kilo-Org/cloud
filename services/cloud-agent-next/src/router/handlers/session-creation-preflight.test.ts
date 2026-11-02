@@ -394,6 +394,38 @@ describe('session creation preflight', () => {
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
+  it.each(['webhook', 'scheduled'])(
+    'defers repository-agent membership on the internal prepareSession route for %s',
+    async createdOnPlatform => {
+      await expect(
+        preflightSessionCreation(
+          request({
+            agent: { mode: 'missing-agent', model: 'kilo/test-model' },
+            options: { createdOnPlatform },
+          }),
+          context,
+          'prepareSession'
+        )
+      ).resolves.toBeDefined();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'does not trust a public start %s label to defer repository-agent membership',
+    async createdOnPlatform => {
+      await expect(
+        preflightSessionCreation(
+          request({
+            agent: { mode: 'missing-agent', model: 'kilo/test-model' },
+            options: { createdOnPlatform },
+          }),
+          context,
+          'start'
+        )
+      ).rejects.toThrow('does not match any runtimeAgents');
+    }
+  );
+
   it.each([
     {
       name: 'command',

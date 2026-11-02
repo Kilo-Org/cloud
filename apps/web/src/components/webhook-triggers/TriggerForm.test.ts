@@ -418,6 +418,37 @@ describe('TriggerForm variants', () => {
     return { container: dom.container, onSubmit, allProps };
   }
 
+  it.each(['architect', 'code', 'ask', 'debug', 'orchestrator', 'plan', 'build'])(
+    'round-trips built-in agent %s without custom-agent guidance',
+    mode => {
+      const { container, onSubmit } = render({
+        initialData: { ...initialData(), mode },
+      });
+      expect(container.querySelector(`[data-agent-mode="${mode}"]`)).not.toBeNull();
+      expect(container.querySelector('#customAgentSlug')).toBeNull();
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode }));
+    }
+  );
+
+  it.each(['plan', 'build'])('resets custom-agent state when edit data changes to %s', mode => {
+    const { container, allProps, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...allProps,
+          initialData: { ...initialData(), mode },
+        })
+      )
+    );
+    expect(container.querySelector(`[data-agent-mode="${mode}"]`)).not.toBeNull();
+    expect(container.querySelector('#customAgentSlug')).toBeNull();
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode }));
+  });
+
   it.each(['webhook', 'scheduled'] as const)(
     'submits a custom agent with a selected profile for a %s trigger',
     activationMode => {

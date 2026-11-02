@@ -35386,7 +35386,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 50,
-          "pattern": "^[a-z][a-z0-9-]*$"
+          "pattern": "^(?!custom$)[a-z][a-z0-9-]*$"
         },
         "model": {
           "type": "string",
@@ -35742,7 +35742,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 50,
-          "pattern": "^[a-z][a-z0-9-]*$"
+          "pattern": "^(?!custom$)[a-z][a-z0-9-]*$"
         },
         "model": {
           "type": "string",

@@ -29,11 +29,11 @@ export function getOrganizationGatewaySettings(
 
 export function isManagedGatewayDisabled(
   settings: OrganizationGatewaySettings,
-  providerId: Provider['id']
-): providerId is ManagedGatewayId {
+  providerType: Provider['type']
+): providerType is ManagedGatewayId {
   return (
-    (providerId === 'openrouter' || providerId === 'vercel') &&
-    settings.disabledGateways.has(providerId)
+    (providerType === 'openrouter' || providerType === 'vercel') &&
+    settings.disabledGateways.has(providerType)
   );
 }
 
@@ -44,7 +44,7 @@ export function isManagedGatewayDisabled(
  * regional hosts need a Business plan we do not have, so OpenRouter and other providers are unchanged.
  */
 export function withDataRegion(provider: Provider, dataRegion: OrganizationDataRegion): Provider {
-  if (provider.id === 'vercel') {
+  if (provider.type === 'vercel') {
     return {
       ...provider,
       async transformRequest(context) {

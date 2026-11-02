@@ -990,9 +990,9 @@ export async function handleLlmProxyRequest(
     : null;
   if (
     organizationGatewaySettings &&
-    isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.id)
+    isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.type)
   ) {
-    return managedGatewayDisabledResponse(providerResult.provider.id);
+    return managedGatewayDisabledResponse(providerResult.provider.type);
   }
   const effectiveProviderContext = organizationGatewaySettings?.dataRegion
     ? {

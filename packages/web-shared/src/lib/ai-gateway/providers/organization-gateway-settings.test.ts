@@ -19,9 +19,9 @@ const allFeatures = {
   data_region: [organizationId],
 };
 
-function makeProvider(id: Provider['id']): Provider {
+function makeProvider(type: Provider['type']): Provider {
   return {
-    id,
+    type,
     apiUrl: 'https://upstream.example.com/v1',
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -94,8 +94,8 @@ describe('withDataRegion', () => {
     });
   });
 
-  it.each(['openrouter', 'custom'] as const)('leaves %s providers unchanged', providerId => {
-    const provider = makeProvider(providerId);
+  it.each(['openrouter', 'custom'] as const)('leaves %s providers unchanged', providerType => {
+    const provider = makeProvider(providerType);
     expect(withDataRegion(provider, 'eu')).toBe(provider);
   });
 });

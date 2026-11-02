@@ -1398,7 +1398,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   describe('organization gateway settings', () => {
-    const vercelProvider = { ...provider, id: 'vercel' } satisfies Provider;
+    const vercelProvider = { ...provider, type: 'vercel' } satisfies Provider;
 
     afterEach(() => {
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);

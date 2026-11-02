@@ -15,8 +15,8 @@ interface __BaseEnv_Env {
 	CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 	KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
 	KILO_INTERNAL_API_URL: "http://localhost:3000" | "https://api.kilo.ai";
-	LEGACY_ADMIN_CLAIM_MODE: "honor";
-	WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: "";
+	LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+	WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 	GASTOWN_API_URL: "http://192.168.65.254:8803" | "https://gastown.kiloapps.io";
 	WASTELAND_API_URL: "http://192.168.65.254:8788" | "https://wasteland.kiloapps.io";
 	GASTOWN_BILLING_ENABLED: "false" | "true";
@@ -98,8 +98,8 @@ declare namespace Cloudflare {
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 		KILO_API_URL: "http://192.168.65.254:3000";
 		KILO_INTERNAL_API_URL: "http://localhost:3000";
-		LEGACY_ADMIN_CLAIM_MODE: "honor";
-		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: "";
+		LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 		GASTOWN_API_URL: "http://192.168.65.254:8803";
 		WASTELAND_API_URL: "http://192.168.65.254:8788";
 		GASTOWN_BILLING_ENABLED: "false" | "true";

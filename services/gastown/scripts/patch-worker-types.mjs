@@ -28,6 +28,14 @@ src = src.replaceAll(
   'GASTOWN_BILLING_ENABLED: "true"',
   'GASTOWN_BILLING_ENABLED: "false" | "true"'
 );
+src = src.replaceAll(
+  'LEGACY_ADMIN_CLAIM_MODE: "honor"',
+  'LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject"'
+);
+src = src.replaceAll(
+  'WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: ""',
+  'WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string'
+);
 
 // 2. Add SENTRY_DSN worker secret to Cloudflare.Env (if not already present)
 if (!src.includes('SENTRY_DSN')) {

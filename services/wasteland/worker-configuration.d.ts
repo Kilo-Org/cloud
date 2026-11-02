@@ -15,8 +15,8 @@ interface __BaseEnv_Env {
 	KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
 	KILO_INTERNAL_API_URL: "http://localhost:3000" | "https://api.kilo.ai";
 	WASTELAND_API_URL: "http://192.168.65.254:8787" | "https://wasteland.kiloapps.io";
-	LEGACY_ADMIN_CLAIM_MODE: "honor";
-	WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: "";
+	LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+	WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 	WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 	WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
 	CF_VERSION_METADATA?: WorkerVersionMetadata;
@@ -39,8 +39,8 @@ declare namespace Cloudflare {
 		KILO_API_URL: "http://192.168.65.254:3000";
 		KILO_INTERNAL_API_URL: "http://localhost:3000";
 		WASTELAND_API_URL: "http://192.168.65.254:8787";
-		LEGACY_ADMIN_CLAIM_MODE: "honor";
-		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: "";
+		LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject";
+		WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string;
 		WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
 	}

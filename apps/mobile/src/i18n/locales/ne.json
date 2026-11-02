@@ -442,7 +442,6 @@
         "rebase": "रिबेस"
       },
       "terminal": {
-        "alreadyMerged": "पहिले नै मर्ज भइसकेको",
         "closed": "यो पुल रिक्वेस्ट बन्द छ",
         "closedMergeRequest": "यो मर्ज रिक्वेस्ट बन्द छ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "आवश्यक समीक्षाहरू छैनन्",
         "requiredReviewsDetail": "आवश्यक समीक्षकहरूको स्वीकृति अझै प्राप्त भएको छैन वा विचाराधीन छ।",
         "failingChecksTitle": "असफल आवश्यक जाँचहरू",
-        "failingChecksDetail": "आवश्यक स्थिति जाँचहरू असफल भइरहेका छन्।",
         "unstableTitle": "केही जाँचहरू असफल भइरहेका छन्",
         "unstableDetail": "अनिवार्य नभएका जाँचहरू असफल भइरहेका छन्। यसले मर्ज गर्न रोक्दैन।",
         "draftTitle": "मस्यौदा पुल रिक्वेस्ट",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
       "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
       "reconnectTitle": "GitHub मा पुनः जडान",
+      "reconnectTitleGitLab": "GitLab मा पुनः जडान",
+      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",
@@ -1614,6 +1614,8 @@
       "set": "तोकिएको",
       "notSet": "तोकिएको छैन",
       "nSelected": "{{displayCount}} चयन गरिएको",
+      "nSelected_one": "{{displayCount}} चयन गरिएको",
+      "nSelected_other": "{{displayCount}} चयन गरिएको",
       "proposedReviewMdGuidance": "REVIEW.md का लागि प्रस्तावित निर्देशनहरू"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "क्लोन पुनः प्रयास गर्दै ({{total}} मध्ये {{attempt}} प्रयास)",
       "detailSetupCommandFailed": "सेटअप आदेश {{index}} असफल भयो",
       "detailSetupCommandTimedOut": "सेटअप आदेश {{index}} समय सकियो",
-      "detailColdRestore": "कोल्ड रिस्टोर, स्न्यापसट लागू गरियो, {{total}} मध्ये {{applied}} फाइल रिस्टोर भयो",
+      "detailColdRestore": "कोल्ड रिस्टोर, स्न्यापसट लागू गरियो, रिस्टोर गरिएका फाइलहरू: {{total}} मध्ये {{applied}}",
       "detailProgressPercent": "{{percent}}% पूरा भयो",
-      "detailRestoreIncompleteReport": "सेसन रिस्टोर अपूर्ण: {{total}} मध्ये {{skipped}} फाइल रिस्टोर भएनन् ({{reasons}})।",
+      "detailRestoreIncompleteReport": "सेसन रिस्टोर अपूर्ण, रिस्टोर नभएका फाइलहरू: {{total}} मध्ये {{skipped}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "छुटेका: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} र {{omitted}} थप",
       "detailReasonPatchFailed": "प्याच लागू भएन",

@@ -1090,6 +1090,10 @@
     "overview": {
       "allAreas": "Усі напрями",
       "nSelected": "Вибрано: {{displayCount}}",
+      "nSelected_one": "Вибрано: {{displayCount}}",
+      "nSelected_other": "Вибрано: {{displayCount}}",
+      "nSelected_few": "Вибрано: {{displayCount}}",
+      "nSelected_many": "Вибрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Запропоновані настанови для REVIEW.md",
       "set": "Встановлено",
       "notSet": "Не встановлено"
@@ -2116,9 +2120,9 @@
       "detailRetryingClone": "Повторне клонування (спроба {{attempt}} з {{total}})",
       "detailSetupCommandFailed": "Помилка команди налаштування {{index}}",
       "detailSetupCommandTimedOut": "Перевищено час очікування команди налаштування {{index}}",
-      "detailColdRestore": "Холодне відновлення, знімок застосовано, відновлено {{applied}} з {{total}} файлів",
+      "detailColdRestore": "Холодне відновлення, знімок застосовано, відновлено файли: {{applied}} з {{total}}",
       "detailProgressPercent": "Виконано {{percent}}%",
-      "detailRestoreIncompleteReport": "Відновлення сесії неповне: не вдалося відновити {{skipped}} з {{total}} файлів ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Відновлення сесії неповне — не вдалося відновити файли: {{skipped}} з {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Відсутні: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} і ще {{omitted}}",
       "detailReasonPatchFailed": "патч не застосовано",
@@ -2782,6 +2786,8 @@
       "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
       "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
       "reconnectTitle": "Підключити GitHub знову",
+      "reconnectTitleGitLab": "Підключити GitLab знову",
+      "reconnectTitleBitbucket": "Підключити Bitbucket знову",
       "reconnectDescription": "Доступ до GitHub відкликано.",
       "gitlabDescription": "Перевірка merge-запитів на мобільному пристрої",
       "gitlabInstanceMismatchTitle": "Підключення GitLab призначене для іншого екземпляра",
@@ -3081,7 +3087,6 @@
         "squash": "Об'єднання"
       },
       "terminal": {
-        "alreadyMerged": "Уже злито",
         "closed": "Цей запит на злиття закрито",
         "closedMergeRequest": "Цей merge-запит закрито"
       },
@@ -3098,7 +3103,6 @@
         "requiredReviewsTitle": "Бракує обов'язкових перевірок коду",
         "requiredReviewsDetail": "Ще не отримано схвалення від усіх, хто має перевірити код.",
         "failingChecksTitle": "Помилки в обов'язкових перевірках",
-        "failingChecksDetail": "Обов'язкові перевірки стану завершуються з помилками.",
         "unstableTitle": "Деякі перевірки завершуються з помилками",
         "unstableDetail": "Необов'язкові перевірки завершуються з помилками. Це не блокує злиття.",
         "draftTitle": "Чернетка запиту на злиття",

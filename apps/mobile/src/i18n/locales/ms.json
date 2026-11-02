@@ -442,7 +442,6 @@
         "rebase": "Asas semula"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "Permintaan tarik ini telah ditutup",
         "closedMergeRequest": "Permintaan gabungan ini telah ditutup"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Semakan wajib belum diterima",
         "requiredReviewsDetail": "Kelulusan daripada penyemak yang ditetapkan belum diterima atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan yang tidak wajib gagal. Kegagalan ini tidak menghalang penggabungan.",
         "draftTitle": "PR draf",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
       "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
       "reconnectTitle": "Sambung semula ke GitHub",
+      "reconnectTitleGitLab": "Sambung semula ke GitLab",
+      "reconnectTitleBitbucket": "Sambung semula ke Bitbucket",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan.",
       "gitlabDescription": "Semak permintaan gabungan pada peranti mudah alih",
       "gitlabInstanceMismatchTitle": "Sambungan GitLab adalah untuk instans lain",
@@ -1614,6 +1614,8 @@
       "set": "Ditetapkan",
       "notSet": "Tidak ditetapkan",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },
     "decision": {

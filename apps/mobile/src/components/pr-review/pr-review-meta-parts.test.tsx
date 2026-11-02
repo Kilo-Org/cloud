@@ -135,6 +135,24 @@ describe('PrOverviewMeta', () => {
     expect(pending.props.color).toBe(lightColors.mutedForeground);
   });
 
+  it('drops a pending reviewer once the pull request is no longer open', () => {
+    const reviewers = [
+      { login: 'ada', avatarUrl: null, state: 'APPROVED' as const },
+      { login: 'grace', avatarUrl: null, state: 'PENDING' as const },
+    ];
+    const merged = render(overview({ state: 'merged', reviewers }));
+    // The request can no longer be answered, so no row claims it is awaiting.
+    expect(
+      merged.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'grace')
+    ).toHaveLength(0);
+    expect(merged.root.findAll(node => String(node.type) === 'CircleCheck')).toHaveLength(1);
+
+    const open = render(overview({ reviewers }));
+    expect(
+      open.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'grace')
+    ).toHaveLength(1);
+  });
+
   it('opens a linked issue in the browser', async () => {
     const { openBrowserAsync } = await import('expo-web-browser');
     const renderer = render(

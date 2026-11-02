@@ -442,7 +442,6 @@
         "rebase": "ری‌بیس"
       },
       "terminal": {
-        "alreadyMerged": "قبلاً ادغام شده",
         "closed": "این درخواست ادغام بسته شده است",
         "closedMergeRequest": "این درخواست ادغام بسته شده است"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "بازبینی‌های الزامی انجام نشده‌اند",
         "requiredReviewsDetail": "بازبین‌های تعیین‌شده هنوز تأیید لازم را نداده‌اند.",
         "failingChecksTitle": "بررسی‌های الزامی ناموفق",
-        "failingChecksDetail": "بررسی‌های الزامی وضعیت با خطا روبه‌رو شده‌اند.",
         "unstableTitle": "برخی بررسی‌ها ناموفق‌اند",
         "unstableDetail": "بررسی‌های غیرالزامی با خطا روبه‌رو شده‌اند. این خطاها مانع ادغام نمی‌شوند.",
         "draftTitle": "پول ریکوئست پیش‌نویس",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
+      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
+      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
       "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",
@@ -1614,6 +1614,8 @@
       "set": "تنظیم‌شده",
       "notSet": "تنظیم‌نشده",
       "nSelected": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_one": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_other": "{{displayCount}} مورد انتخاب‌شده",
       "proposedReviewMdGuidance": "دستورالعمل‌های پیشنهادی برای REVIEW.md"
     },
     "decision": {
@@ -2612,9 +2614,9 @@
       "detailRetryingClone": "تلاش مجدد برای کلون (تلاش {{attempt}} از {{total}})",
       "detailSetupCommandFailed": "دستور راه‌اندازی {{index}} ناموفق بود",
       "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
-      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، {{applied}} از {{total}} فایل بازیابی شد",
+      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، فایل‌های بازیابی‌شده: {{applied}} از {{total}}",
       "detailProgressPercent": "{{percent}}٪ کامل شد",
-      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود: {{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
+      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود، فایل‌های بازیابی‌نشده: {{skipped}} از {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
       "detailReasonPatchFailed": "وصله اعمال نشد",

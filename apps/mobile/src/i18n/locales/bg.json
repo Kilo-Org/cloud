@@ -442,7 +442,6 @@
         "rebase": "Пребазиране"
       },
       "terminal": {
-        "alreadyMerged": "Вече обединена",
         "closed": "Заявката е затворена",
         "closedMergeRequest": "Тази merge заявка е затворена"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Липсват задължителни прегледи",
         "requiredReviewsDetail": "Липсват одобрения от задължителните проверяващи или все още се очакват.",
         "failingChecksTitle": "Неуспешни задължителни проверки",
-        "failingChecksDetail": "Задължителните проверки на състоянието са неуспешни.",
         "unstableTitle": "Някои проверки са неуспешни",
         "unstableDetail": "Незадължителните проверки са неуспешни. Те няма да попречат на обединяването.",
         "draftTitle": "Чернова на заявка за сливане",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
       "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
       "reconnectTitle": "Повторно свързване с GitHub",
+      "reconnectTitleGitLab": "Повторно свързване с GitLab",
+      "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
       "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
@@ -1614,6 +1614,8 @@
       "set": "Зададено",
       "notSet": "Не е зададено",
       "nSelected": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Нов опит за клониране (опит {{attempt}} от {{total}})",
       "detailSetupCommandFailed": "Командата за настройка {{index}} не успя",
       "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
-      "detailColdRestore": "Студено възстановяване, снимката е приложена, {{applied}} от {{total}} файла са възстановени",
+      "detailColdRestore": "Студено възстановяване, снимката е приложена, възстановени файлове: {{applied}} от {{total}}",
       "detailProgressPercent": "{{percent}}% завършено",
-      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно: {{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно — невъзстановени файлове: {{skipped}} от {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
       "detailReasonPatchFailed": "кръпката не беше приложена",

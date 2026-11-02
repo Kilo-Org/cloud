@@ -442,7 +442,6 @@
         "rebase": "Ny basis"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne pull request er lukket",
         "closedMergeRequest": "Denne merge request er lukket"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Påkrævede gennemgange mangler",
         "requiredReviewsDetail": "Godkendelser fra de påkrævede gennemlæsere mangler eller afventes stadig.",
         "failingChecksTitle": "Påkrævede kontroller fejler",
-        "failingChecksDetail": "Påkrævede statuskontroller fejler.",
         "unstableTitle": "Nogle kontroller fejler",
         "unstableDetail": "Nogle valgfrie kontroller fejler. De blokerer ikke fletningen.",
         "draftTitle": "PR-kladde",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket-forbindelsen kunne ikke kontrolleres.",
       "providerCheckFailedMessage": "Din forbindelsesstatus kan først vises, når indlæsningen er færdig.",
       "reconnectTitle": "Opret forbindelse til GitHub igen",
+      "reconnectTitleGitLab": "Opret forbindelse til GitLab igen",
+      "reconnectTitleBitbucket": "Opret forbindelse til Bitbucket igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt.",
       "gitlabDescription": "Gennemgå merge requests på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-forbindelsen er til en anden instans",
@@ -1614,6 +1614,8 @@
       "set": "Angivet",
       "notSet": "Ikke angivet",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Prøver klon igen (forsøg {{attempt}} af {{total}})",
       "detailSetupCommandFailed": "Opsætningskommando {{index}} mislykkedes",
       "detailSetupCommandTimedOut": "Opsætningskommando {{index}} fik timeout",
-      "detailColdRestore": "Kold gendannelse, snapshot anvendt, {{applied}} af {{total}} filer gendannet",
+      "detailColdRestore": "Kold gendannelse, snapshot anvendt, gendannede filer: {{applied}} af {{total}}",
       "detailProgressPercent": "{{percent}}% fuldført",
-      "detailRestoreIncompleteReport": "Gendannelse af session ufuldstændig: {{skipped}} af {{total}} filer blev ikke gendannet ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Gendannelse af session ufuldstændig, filer der ikke blev gendannet: {{skipped}} af {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} mere",
       "detailReasonPatchFailed": "patchen blev ikke anvendt",

@@ -412,15 +412,14 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       const expectedTitle =
         provider === 'github' ? 'Reconnect GitHub' : 'GitLab connection expired';
       // The GitHub arm labels its recovery action with the same reconnect
-      // copy; the provider gate's action is the integration-page CTA, so it
-      // keeps that provider's Connect label.
-      const expectedAction = provider === 'github' ? 'Reconnect GitHub' : 'Connect GitLab';
+      // copy; the provider gate names the re-authorization the same way, so
+      // neither expired arm reads like a first-time connect.
+      const expectedAction = provider === 'github' ? 'Reconnect GitHub' : 'Reconnect GitLab';
       const renderer = mount(provider, null);
       const emptyState = renderer.root.findByType('EmptyState');
       expect(emptyState.props.title).toBe(expectedTitle);
-      // The recovery action is the same integration-page CTA as Connect, so
-      // its label is the provider's Connect label rather than the expired-state
-      // title above it.
+      // The recovery action names the reconnection, not the Connect label the
+      // gate uses when there is no connection yet.
       const labels = renderer.root
         .findAllByType('Text')
         .map(node => node.children.find(child => typeof child === 'string'));

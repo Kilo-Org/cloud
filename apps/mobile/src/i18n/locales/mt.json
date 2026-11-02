@@ -463,7 +463,6 @@
         "rebase": "Tibdil tal-bażi"
       },
       "terminal": {
-        "alreadyMerged": "Diġà magħquda",
         "closed": "Din it-talba għall-għaqda hija magħluqa",
         "closedMergeRequest": "Dan il-merge request huwa magħluq"
       },
@@ -480,7 +479,6 @@
         "requiredReviewsTitle": "Reviżjonijiet meħtieġa nieqsa",
         "requiredReviewsDetail": "L-approvazzjonijiet mir-reviżuri meħtieġa huma nieqsa jew pendenti.",
         "failingChecksTitle": "Kontrolli meħtieġa li qed ifallu",
-        "failingChecksDetail": "Il-kontrolli tal-istatus meħtieġa qed ifallu.",
         "unstableTitle": "Xi kontrolli qed ifallu",
         "unstableDetail": "Xi kontrolli mhux obbligatorji qed ifallu. Dawn ma jimblukkawx l-għaqda.",
         "draftTitle": "Abbozz ta' PR",
@@ -726,6 +724,8 @@
       "checkFailedTitleBitbucket": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' Bitbucket.",
       "providerCheckFailedMessage": "L-istat tal-konnessjoni mhux disponibbli sakemm jitgħabba.",
       "reconnectTitle": "Erġa' kkonnetta GitHub",
+      "reconnectTitleGitLab": "Erġa' kkonnetta GitLab",
+      "reconnectTitleBitbucket": "Erġa' kkonnetta Bitbucket",
       "reconnectDescription": "L-aċċess tiegħek għal GitHub ġie revokat.",
       "gitlabDescription": "Irrevedi l-merge requests fuq il-mowbajl",
       "gitlabInstanceMismatchTitle": "Il-konnessjoni ta' GitLab hija għal istanza oħra",
@@ -1680,6 +1680,11 @@
       "set": "Issettjat",
       "notSet": "Mhux issettjat",
       "nSelected": "{{displayCount}} magħżula",
+      "nSelected_one": "{{displayCount}} magħżula",
+      "nSelected_other": "{{displayCount}} magħżula",
+      "nSelected_few": "{{displayCount}} magħżula",
+      "nSelected_many": "{{displayCount}} magħżula",
+      "nSelected_two": "{{displayCount}} magħżula",
       "proposedReviewMdGuidance": "Linji gwida proposti għal REVIEW.md"
     },
     "decision": {
@@ -2729,9 +2734,9 @@
       "detailRetryingClone": "Ritentattiv tal-klonjar (tentattiv {{attempt}} minn {{total}})",
       "detailSetupCommandFailed": "Il-kmand tat-tħejjija {{index}} falla",
       "detailSetupCommandTimedOut": "Il-kmand tat-tħejjija {{index}} skada ż-żmien",
-      "detailColdRestore": "Irkupru kiesaħ, snapshot applikat, {{applied}} minn {{total}} fajls rkuprati",
+      "detailColdRestore": "Irkupru kiesaħ, snapshot applikat, fajls rkuprati: {{applied}} minn {{total}}",
       "detailProgressPercent": "{{percent}}% komplut",
-      "detailRestoreIncompleteReport": "Irkupru tas-sessjoni mhux komplut: {{skipped}} minn {{total}} fajls ma ġewx rkuprati ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Irkupru tas-sessjoni mhux komplut, fajls mhumiex rkuprati: {{skipped}} minn {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nieqes: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} u {{omitted}} oħrajn",
       "detailReasonPatchFailed": "il-patch ma applikatx",

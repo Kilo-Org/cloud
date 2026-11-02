@@ -456,7 +456,6 @@
         "rebase": "Prestavitev osnove"
       },
       "terminal": {
-        "alreadyMerged": "Že združeno",
         "closed": "Zahtevek za združitev je zaprt",
         "closedMergeRequest": "Ta merge request je zaprt"
       },
@@ -473,7 +472,6 @@
         "requiredReviewsTitle": "Manjkajo zahtevani pregledi",
         "requiredReviewsDetail": "Manjkajo odobritve obveznih pregledovalcev ali pa nanje še čakamo.",
         "failingChecksTitle": "Neuspešna obvezna preverjanja",
-        "failingChecksDetail": "Obvezna preverjanja stanja niso uspešna.",
         "unstableTitle": "Nekatera preverjanja niso uspešna",
         "unstableDetail": "Nekatera neobvezna preverjanja niso uspešna. To ne preprečuje združitve.",
         "draftTitle": "Osnutek zahteve za združitev",
@@ -711,6 +709,8 @@
       "checkFailedTitleBitbucket": "Povezave z Bitbucketom ni bilo mogoče preveriti.",
       "providerCheckFailedMessage": "Stanje povezave bo na voljo po končanem nalaganju.",
       "reconnectTitle": "Ponovna povezava z GitHubom",
+      "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
+      "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana.",
       "gitlabDescription": "Preglej merge requeste na mobilni napravi",
       "gitlabInstanceMismatchTitle": "Povezava z GitLabom je za drugo instanco",
@@ -1658,6 +1658,10 @@
       "set": "Nastavljeno",
       "notSet": "Ni nastavljeno",
       "nSelected": "Izbrano {{displayCount}}",
+      "nSelected_one": "Izbrano {{displayCount}}",
+      "nSelected_other": "Izbrano {{displayCount}}",
+      "nSelected_few": "Izbrano {{displayCount}}",
+      "nSelected_two": "Izbrano {{displayCount}}",
       "proposedReviewMdGuidance": "Predlagane smernice za REVIEW.md"
     },
     "decision": {
@@ -2688,9 +2692,9 @@
       "detailRetryingClone": "Ponovni poskus kloniranja (poskus {{attempt}} od {{total}})",
       "detailSetupCommandFailed": "Ukaz za pripravo {{index}} ni uspel",
       "detailSetupCommandTimedOut": "Čas ukaza za pripravo {{index}} je potekel",
-      "detailColdRestore": "Hladna obnovitev, posnetek uveljavljen, obnovljenih {{applied}} od {{total}} datotek",
+      "detailColdRestore": "Hladna obnovitev, posnetek uveljavljen, obnovljene datoteke: {{applied}} od {{total}}",
       "detailProgressPercent": "{{percent}}% dokončano",
-      "detailRestoreIncompleteReport": "Obnovitev seje ni dokončana: {{skipped}} od {{total}} datotek ni bilo obnovljenih ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Obnovitev seje ni dokončana – datoteke niso obnovljene: {{skipped}} od {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Manjka: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} in še {{omitted}}",
       "detailReasonPatchFailed": "popravek se ni uveljavil",

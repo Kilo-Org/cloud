@@ -25,9 +25,9 @@ export function MethodPicker({
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.methodLabel')}
-      </Text>
+      {/* Same label style as the sheet's commit-title and commit-message
+          fields: the chips below are form controls, not a section heading. */}
+      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.methodLabel')}</Text>
       <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;

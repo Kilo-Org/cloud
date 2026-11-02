@@ -442,7 +442,6 @@
         "rebase": "Újraalapozás"
       },
       "terminal": {
-        "alreadyMerged": "Már összevonva",
         "closed": "A módosítási kérelem lezárva",
         "closedMergeRequest": "Ez a merge request le van zárva"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Hiányoznak a kötelező kódellenőrzések",
         "requiredReviewsDetail": "A kötelező kódellenőrök jóváhagyásai hiányoznak vagy még függőben vannak.",
         "failingChecksTitle": "Sikertelen kötelező ellenőrzések",
-        "failingChecksDetail": "A kötelező állapotellenőrzések sikertelenek.",
         "unstableTitle": "Egyes ellenőrzések sikertelenek",
         "unstableDetail": "Egyes nem kötelező ellenőrzések sikertelenek. Ezek nem akadályozzák az összevonást.",
         "draftTitle": "PR-piszkozat",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
+      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
+      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
@@ -1614,6 +1614,8 @@
       "set": "Beállítva",
       "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
+      "nSelected_one": "{{displayCount}} kijelölve",
+      "nSelected_other": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
     "decision": {

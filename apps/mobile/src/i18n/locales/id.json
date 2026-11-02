@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Semua area",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "set": "Sudah diatur",
       "notSet": "Belum diatur"
@@ -2714,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
+      "reconnectTitleGitLab": "Hubungkan ulang GitLab",
+      "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
       "gitlabInstanceMismatchTitle": "Koneksi GitLab untuk instance lain",
@@ -2993,7 +2997,6 @@
         "squash": "Ringkas"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "PR ini sudah ditutup",
         "closedMergeRequest": "Merge request ini sudah ditutup"
       },
@@ -3010,7 +3013,6 @@
         "requiredReviewsTitle": "Tinjauan wajib belum lengkap",
         "requiredReviewsDetail": "Persetujuan dari peninjau wajib belum ada atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan opsional gagal. Kegagalan ini tidak menghalangi penggabungan.",
         "draftTitle": "Draf PR",

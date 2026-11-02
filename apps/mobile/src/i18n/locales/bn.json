@@ -442,7 +442,6 @@
         "rebase": "রিবেস"
       },
       "terminal": {
-        "alreadyMerged": "ইতিমধ্যে মার্জ হয়েছে",
         "closed": "এই পুল রিকোয়েস্ট বন্ধ",
         "closedMergeRequest": "এই মার্জ রিকোয়েস্ট বন্ধ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "প্রয়োজনীয় রিভিউ বাকি",
         "requiredReviewsDetail": "যাঁদের রিভিউ প্রয়োজন, তাঁদের অনুমোদন এখনও পাওয়া যায়নি বা অপেক্ষমাণ।",
         "failingChecksTitle": "প্রয়োজনীয় চেক ব্যর্থ হচ্ছে",
-        "failingChecksDetail": "প্রয়োজনীয় স্ট্যাটাস চেকগুলো ব্যর্থ হচ্ছে।",
         "unstableTitle": "কিছু চেক ব্যর্থ হচ্ছে",
         "unstableDetail": "বাধ্যতামূলক নয় এমন কিছু চেক ব্যর্থ হচ্ছে। এগুলো মার্জে বাধা দেবে না।",
         "draftTitle": "খসড়া পুল রিকোয়েস্ট",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "লোড হওয়া পর্যন্ত সংযোগের অবস্থা উপলব্ধ নয়।",
       "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
@@ -1614,6 +1614,8 @@
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_one": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_other": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {

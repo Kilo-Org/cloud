@@ -442,7 +442,6 @@
         "rebase": "Whakapūtake anō"
       },
       "terminal": {
-        "alreadyMerged": "Kua whakakotahitia kē",
         "closed": "Kua katia tēnei tono kume",
         "closedMergeRequest": "Kua katia tēnei tono whakakotahi"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Kei te ngaro ngā arotake e hiahiatia ana",
         "requiredReviewsDetail": "Kei te ngaro ngā whakaaetanga a ngā kaiarotake e hiahiatia ana, kei te tāria rānei.",
         "failingChecksTitle": "Kei te rahua ngā arowhai e hiahiatia ana",
-        "failingChecksDetail": "Kei te rahua ngā arowhai tūnga e hiahiatia ana.",
         "unstableTitle": "Kei te rahua ētahi arowhai",
         "unstableDetail": "Kei te rahua ētahi arowhai kāore e herea ana. E kore ēnei e ārai i te whakakotahitanga.",
         "draftTitle": "Tono kume hukihuki",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Kāore i taea te tirotiro i te hononga Bitbucket.",
       "providerCheckFailedMessage": "Kāore e wātea te tūnga hononga kia uta ra ano.",
       "reconnectTitle": "Hono anō ki GitHub",
+      "reconnectTitleGitLab": "Hono anō ki GitLab",
+      "reconnectTitleBitbucket": "Hono anō ki Bitbucket",
       "reconnectDescription": "Kua whakakorea tō hononga GitHub.",
       "gitlabDescription": "Arotakengia ngā tono whakakotahi mā te pūrere pūkoro",
       "gitlabInstanceMismatchTitle": "Ko te hononga GitLab mō tētahi atu wāhanga",
@@ -1614,6 +1614,8 @@
       "set": "Kua whakaritea",
       "notSet": "Kāore i whakaritea",
       "nSelected": "{{displayCount}} kua kōwhiria",
+      "nSelected_one": "{{displayCount}} kua kōwhiria",
+      "nSelected_other": "{{displayCount}} kua kōwhiria",
       "proposedReviewMdGuidance": "Ngā aratohu REVIEW.md e tūtohutia ana"
     },
     "decision": {

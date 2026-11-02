@@ -361,3 +361,31 @@ test('safe-area: content scrolled under a system inset is fine', () => {
     []
   );
 });
+
+test('touch-overlap: a presented sheet never competes with the window behind it', () => {
+  // The button is on a sheet the platform presents in its own window, so the
+  // window's header control takes no part of that tap whatever the two boxes
+  // say. `normalize` places both in window space first.
+  const header: ProbeNode = { parent: 0, tag: 'View', rect: [0, 0, 48, 48], pressable: true };
+  const presented: ProbeNode[] = [
+    header,
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 400, 200] },
+    { parent: 2, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 400, 200] },
+    { parent: 3, tag: 'View', rect: [0, 0, 400, 44], pressable: true },
+  ];
+
+  // Precondition: their placed boxes do intersect.
+  const placed = tree(presented);
+  const [headerNode, sheetButton] = [placed.nodes[1], placed.nodes[4]];
+  assert.deepEqual(sheetButton.rect, [0, 600, 400, 44]);
+  assert.deepEqual(headerNode.rect, [0, 0, 48, 48]);
+
+  assert.deepEqual(run('touch-overlap', presented), []);
+
+  // Two controls of the same window still collide.
+  const [finding] = run('touch-overlap', [
+    header,
+    { parent: 0, tag: 'View', rect: [20, 20, 40, 40], pressable: true },
+  ]);
+  assert.ok(finding);
+});

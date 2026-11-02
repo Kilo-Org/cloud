@@ -3835,9 +3835,9 @@
   "spendAlerts": {
     "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
     "thresholdTitle": "חציית סף",
-    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "thresholdSubtitle": "ההוצאה המצטברת של תחום זה בחלון הנבחר חוצה את המגבלה שלך",
     "anomalyTitle": "זינוק שעתי",
-    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "anomalySubtitle": "הקצב השעתי של תחום זה גבוה בהרבה מקו הבסיס p95 שלו",
     "limitLabel": "מגבלה (USD)",
     "windowLabel": "חלון",
     "window24h": "24 שעות",
@@ -3854,7 +3854,7 @@
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות",
     "multiplierMaxError": "הזן מכפיל של {{max}} או פחות",
-    "thresholdMaxError": "הזן סכום של {{max}} או פחות."
+    "thresholdMaxError": "הזן סכום של {{max}} או פחות"
   },
   "profiles": {
     "title": "פרופילים",

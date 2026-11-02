@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Bu kapsamın harcaması bir sınırı aştığında veya olağan saatlik hızının üzerine çıktığında faturalandırma kişilerine e-posta veya push ile uyarı gönder.",
     "thresholdTitle": "Eşik aşımı",
-    "thresholdSubtitle": "Cari harcama limitini aşıyor",
+    "thresholdSubtitle": "Bu kapsamın seçilen penceredeki cari harcaması limitini aşıyor",
     "anomalyTitle": "Saatlik artış",
-    "anomalySubtitle": "Bir saat bu kapsamın olağan hızının çok üzerinde",
+    "anomalySubtitle": "Bu kapsamın saatlik hızı kendi p95 temelinin çok üzerinde",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Pencere",
     "window24h": "24 saat",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
     "pushOffByCategory": "Bildirimler'de kapalı",
     "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
-    "thresholdMaxError": "{{max}} veya daha az bir tutar gir."
+    "thresholdMaxError": "{{max}} veya daha az bir tutar gir"
   },
   "profiles": {
     "title": "Profiller",

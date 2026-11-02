@@ -382,13 +382,13 @@
       "filesStillLoading": "فایلونه لا هم بارېږي. د تازه کولو لپاره ښکته راکش کړئ.",
       "goToOverview": "عمومي کتنې ته لاړ شئ",
       "goToOverviewTab": "د عمومي کتنې ټب ته لاړ شئ",
-      "expandAllLines_one": "ټولې {{displayCount}} کرښې ښکاره کړئ",
+      "expandAllLines_one": "ټوله {{displayCount}} کرښه ښکاره کړئ",
       "expandAllLines_other": "ټولې {{displayCount}} کرښې ښکاره کړئ",
-      "expandLines_one": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandLines_one": "{{displayCount}} کرښه ښکاره کړئ ({{start}}–{{end}})",
       "expandLines_other": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
+      "expandLinesOfContext_one": "{{displayCount}} شاوخوا کرښه ښکاره کړئ",
       "expandLinesOfContext_other": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
-      "expandMoreLines_one": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandMoreLines_one": "{{displayCount}} نوره کرښه ښکاره کړئ ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
       "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوي",
       "loadedOfTotalFiles_other": "له {{total}} فایلونو څخه {{loaded}} بار شوي"
@@ -584,7 +584,7 @@
       },
       "deletedUser": "ړنګ شوی کارن",
       "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
-      "moreLinesAbove_one": "… پورته {{displayCount}} نورې کرښې شته.",
+      "moreLinesAbove_one": "… پورته {{displayCount}} نوره کرښه شته.",
       "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته.",
       "deleteComment": "تبصره ړنګه کړئ",
       "deleteCommentTitle": "تبصره ړنګه شي؟",
@@ -638,7 +638,7 @@
       "skipped_one": "{{displayCount}} پرېښودل شوې",
       "skipped_other": "{{displayCount}} پرېښودل شوې",
       "checksCount": "{{displayCount}} ازموینې",
-      "checksCount_one": "{{displayCount}} ازموینې",
+      "checksCount_one": "{{displayCount}} ازموینه",
       "checksCount_other": "{{displayCount}} ازموینې",
       "checkDetails": "د ازموینې جزئیات"
     },
@@ -784,7 +784,7 @@
       "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} کرښه: {{text}}",
       "emptyLine": "(خالي)",
-      "truncationBanner_one": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی.",
+      "truncationBanner_one": "له {{total}} بدل شوي فایل څخه لومړنی {{limit}} ښودل کېږي — دا د GitHub API حد دی.",
       "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
@@ -991,7 +991,7 @@
       "uploadFailed": "پورته کول ناکام شول.",
       "nothingToPaste": "د پیسټ کولو لپاره څه نشته.",
       "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه.",
-      "limit_one": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ.",
+      "limit_one": "تاسو کولی شئ تر {{displayCount}} پورې فایل ونښلوئ.",
       "limit_other": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ."
     },
     "attachmentPreview": {
@@ -1801,9 +1801,9 @@
       "syncNow": "اوس همغږي وکړئ",
       "syncQueued": "همغږي په کتار کې واچول شوه",
       "syncStatusUnavailable": "د همغږي کېدو حالت نه دی معلوم.",
-      "daysOverdue_one": "{{displayCount}} ورځې له مهلته تېرې",
+      "daysOverdue_one": "{{displayCount}} ورځ له مهلته تېره",
       "daysOverdue_other": "{{displayCount}} ورځې له مهلته تېرې",
-      "findingsCount_one": "{{displayCount}} موندنې",
+      "findingsCount_one": "{{displayCount}} موندنه",
       "findingsCount_other": "{{displayCount}} موندنې"
     },
     "dashboardMetrics": {
@@ -1984,7 +1984,7 @@
       "events": "پېښې",
       "eventConfidence": "باور: {{confidence}}",
       "eventReason": "دلیل: {{reason}}",
-      "eventsCount_one": "{{displayCount}} پېښې",
+      "eventsCount_one": "{{displayCount}} پېښه",
       "eventsCount_other": "{{displayCount}} پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",
       "noActivity": "هېڅ ثبت شوی فعالیت نشته",
@@ -2430,11 +2430,11 @@
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
       "matchesBadge": "{{displayCount}} پایلې",
-      "filesBadge_one": "{{displayCount}} فایلونه",
+      "filesBadge_one": "{{displayCount}} فایل",
       "filesBadge_other": "{{displayCount}} فایلونه",
-      "linesBadge_one": "{{displayCount}} کرښې",
+      "linesBadge_one": "{{displayCount}} کرښه",
       "linesBadge_other": "{{displayCount}} کرښې",
-      "matchesBadge_one": "{{displayCount}} پایلې",
+      "matchesBadge_one": "{{displayCount}} پایله",
       "matchesBadge_other": "{{displayCount}} پایلې",
       "noOutput": "هېڅ پایلې نشته.",
       "translationFailed": "ژباړه ناکامه شوه"
@@ -2608,9 +2608,9 @@
       "detailRetryingClone": "د کلون بیا هڅه (هڅه {{attempt}} له {{total}} څخه)",
       "detailSetupCommandFailed": "د چمتو کولو امر {{index}} ناکام شو",
       "detailSetupCommandTimedOut": "د چمتو کولو امر {{index}} وخت تېر شو",
-      "detailColdRestore": "ساړه بیا راوړنه، سناپشاټ پلی شو، له {{total}} څخه {{applied}} فایلونه بېرته راوړل شول",
+      "detailColdRestore": "ساړه بیا راوړنه، سناپشاټ پلی شو، بېرته راوړل شوي فایلونه: {{applied}} له {{total}}",
       "detailProgressPercent": "{{percent}}% بشپړ شو",
-      "detailRestoreIncompleteReport": "د غونډې بېرته راوړل بشپړ نه شو: له {{total}} څخه {{skipped}} فایلونه بېرته نه دي راوړل شول ({{reasons}}).",
+      "detailRestoreIncompleteReport": "د غونډې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: {{skipped}} له {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "ورک: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} او {{omitted}} نور",
       "detailReasonPatchFailed": "پېچ پلی نه شو",
@@ -2783,7 +2783,7 @@
       "couldNotOpenPhotoPicker": "د انځور غوره کولو کړکۍ پرانیستل نه شوه. Kilo بیا پیل کړئ او بیا هڅه وکړئ.",
       "maxFilesAllowed": "تر {{displayCount}} فایلونو پورې اجازه شته.",
       "onlyAddingFiles": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
-      "maxFilesAllowed_one": "تر {{displayCount}} فایلونو پورې اجازه شته.",
+      "maxFilesAllowed_one": "تر {{displayCount}} فایل پورې اجازه شته.",
       "maxFilesAllowed_other": "تر {{displayCount}} فایلونو پورې اجازه شته.",
       "onlyAddingFiles_one": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
       "onlyAddingFiles_other": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})"
@@ -2810,7 +2810,7 @@
       "discardAttachmentsTitle": "ضمیمې ړنګې کړم؟",
       "charactersRemaining": "{{count}} توري پاتې دي",
       "insertNewline": "نوې کرښه دننه کړئ",
-      "charactersRemaining_one": "{{count}} توري پاتې دي",
+      "charactersRemaining_one": "{{count}} توری پاتې دی",
       "charactersRemaining_other": "{{count}} توري پاتې دي"
     },
     "chatLink": {
@@ -2939,7 +2939,7 @@
     "toolRun": {
       "sheetTitle": "د وسیلې غوښتنې",
       "condensedLabel": "{{itemCount}} توکي; {{last}}",
-      "condensedLabel_one": "{{itemCount}} توکي; {{last}}",
+      "condensedLabel_one": "{{itemCount}} توکی; {{last}}",
       "condensedLabel_other": "{{itemCount}} توکي; {{last}}"
     }
   },
@@ -3081,7 +3081,7 @@
     "cliCantReceiveFilesMessage": "هغه Kilo CLI چې دا ناسته چلوي، فایلونه نه شي ترلاسه کولی. په هغه ماشین کې CLI تازه کړئ، یا منځپانګه له نوې ناستې سره شریکه کړئ.",
     "contentlessMessage": "د شریکولو لپاره هېڅ نشته — هېڅ متن یا فایل نه و شامل شوی.",
     "couldNotReadContent": "شریکه شوې منځپانګه ونه لوستل شوه.",
-    "onlyFirstFilesAttached_one": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
+    "onlyFirstFilesAttached_one": "یوازې لومړنی {{displayCount}} فایل به ضمیمه شي.",
     "onlyFirstFilesAttached_other": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي."
   },
   "kiloPass": {
@@ -4094,7 +4094,7 @@
       "deleted": "دنده ړنګه شوه",
       "undo": "بېرته راوګرځوئ",
       "runCount_one": "{{count}} اجرا",
-      "runCount_other": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجراوې",
       "startNow": "بې له بیاکتنې پیل کړئ",
       "startNowHint": "د بیاکتنې پرته د پیل لپاره اوږده کېکاږئ",
       "titleLabel": "د دندې سرلیک",

@@ -16,6 +16,7 @@ import { NewSessionRunTarget } from '@/components/agents/new-session-run-target'
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -146,6 +147,7 @@ export function NewSessionConfigureForm({
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  planRefusal = null,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -268,6 +270,13 @@ export function NewSessionConfigureForm({
           setRunTargetHeight(current => (current === next ? current : next));
         }}
       >
+        {/* The plan refusal is known before the press, so it sits in the scroll
+            content under the composer rather than in the pinned footer: it
+            never takes height from the fields (the launch folder included),
+            and the frame fit above reserves it with the rows it belongs to. */}
+        {planRefusal !== null ? (
+          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
+        ) : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

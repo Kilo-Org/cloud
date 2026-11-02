@@ -48,6 +48,29 @@ export function resolveRemoteStartPlan(input: RemoteStartPlanInput):
 }
 
 /**
+ * The plan explanation a remote target shows before any press, or `null` when
+ * it may start. Split from `resolveRemoteStartPlan` so the screen body asks one
+ * question: a cloud target is never refused for the organization's plan (the
+ * server's own gate answers that path and the form shows its rejection), and a
+ * remote target reads the verdict the list already carries.
+ */
+export function remoteStartPlanRefusal(input: {
+  /** True when the run target is a remote CLI instance (or the computer target). */
+  isRemoteTargetSelected: boolean;
+  organizationId?: string | null;
+  organizations?: readonly OrganizationPlanState[];
+}): string | null {
+  if (!input.isRemoteTargetSelected) {
+    return null;
+  }
+  const plan = resolveRemoteStartPlan({
+    organizationId: input.organizationId,
+    organizations: input.organizations,
+  });
+  return plan.allowed ? null : plan.toast;
+}
+
+/**
  * Whether a remote spawn may proceed from the press-time state. The
  * organization's plan is checked first: a lapsed organization cannot run the
  * session at all, so its explanation wins over a capability refusal.

@@ -9,11 +9,11 @@ import { ScreenHeader } from '@/components/screen-header';
 import { i18n } from '@/i18n';
 
 // Development-only visual fixture: kiloapp:///dev/new-session-plan-refusal-fixture.
-// Renders the real new-session body with the refusal the spawn admission sets
-// when the selected organization's trial has lapsed: the plan explanation in
-// the reserved failure spot above Start, and no Retry, because resending the
-// same start cannot succeed until billing changes. Starting is refused on
-// purpose so the fixture cannot spawn anything on the account that runs it.
+// Renders the real new-session body in the state a lapsed organization's plan
+// produces before any press: `organizations.list` carries the server gate's
+// own verdict, so the form shows the plan explanation under the composer and
+// keeps Start in its disabled style. Nothing can spawn from here, which is why
+// the fixture is safe on the account that runs it.
 const INSTANCE: InstancePickerInstance = {
   connectionId: 'fixture-remote-instance',
   name: 'fixture-laptop',
@@ -96,10 +96,9 @@ export function NewSessionPlanRefusalFixture() {
         autoCommit={false}
         onAutoCommitChange={noop}
         isSpawningRemote={false}
-        isStartDisabled={false}
+        isStartDisabled
         onStartSession={noop}
-        remoteSpawnFailure={{ retryable: false, message: i18n.t('common.organizationTrialEnded') }}
-        onRetryRemoteSpawn={noop}
+        planRefusal={i18n.t('common.organizationTrialEnded')}
       />
     </View>
   );

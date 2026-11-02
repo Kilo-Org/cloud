@@ -7,6 +7,7 @@ import { type SharePayload } from '@/lib/share-payload';
 import {
   type OrganizationPlanState,
   remoteSpawnFilesNotSupportedToast,
+  remoteStartPlanRefusal,
   resolveRemoteSpawnAdmission,
   resolveRemoteStartPlan,
 } from './remote-spawn-admission';
@@ -138,5 +139,51 @@ describe('resolveRemoteStartPlan', () => {
     expect(resolveRemoteStartPlan({ organizationId: null, organizations: lapsed })).toEqual({
       allowed: true,
     });
+  });
+});
+
+describe('remoteStartPlanRefusal', () => {
+  it('explains a remote start under a lapsed organization before any press', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: lapsed,
+      })
+    ).toBe(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('leaves an entitled organization, a personal start and an unsettled list alone', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: entitled,
+      })
+    ).toBeNull();
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: null,
+        organizations: lapsed,
+      })
+    ).toBeNull();
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: undefined,
+      })
+    ).toBeNull();
+  });
+
+  it('never refuses a Cloud Agent start: the server gate answers that path', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: false,
+        organizationId: 'org-1',
+        organizations: lapsed,
+      })
+    ).toBeNull();
   });
 });

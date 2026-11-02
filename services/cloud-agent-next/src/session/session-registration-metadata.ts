@@ -19,6 +19,8 @@ export type GroupedRegisterSessionInput = {
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
   clone?: SessionMetadata['clone'];
+  /** Server-only continuation marker; never client-controlled. */
+  continuation?: boolean;
   /** Omitted for a clone-only create: no synthetic initial turn is registered. */
   message?: {
     initialMessageId?: string;
@@ -203,6 +205,7 @@ export async function buildSessionMetadataFromRegistration(
     // Metadata without clone remains an empty-session bootstrap; remove
     // this fallback only after old prepared sessions age out.
     clone: input.clone,
+    ...(input.continuation ? { continuation: true as const } : {}),
     repository,
     ...(initialMessage ? { initialMessage } : {}),
     agent: {

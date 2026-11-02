@@ -1,5 +1,132 @@
 import { describe, expect, it } from 'vitest';
-import { allowsSubagentSessions, isTrustedWorktreeCreateOrigin } from './session-registration.js';
+import {
+  allowsSubagentSessions,
+  isEligibleFirstWorktreeSession,
+  isTrustedWorktreeCreateOrigin,
+} from './session-registration.js';
+import type {
+  SessionRegistrationContext,
+  SessionRegistrationInput,
+} from './session-registration.js';
+
+const ctx = {
+  env: {},
+  userId: 'usr_test',
+  authToken: 'token',
+} as unknown as SessionRegistrationContext;
+
+function input(overrides: Partial<SessionRegistrationInput>): SessionRegistrationInput {
+  return {
+    repository: { type: 'github', repo: 'Kilo-Org/cloud' },
+    agent: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
+    options: { clientProvenance: 'agent-manager', createdOnPlatform: 'agent-manager' },
+    ...overrides,
+  } as SessionRegistrationInput;
+}
+
+describe('isEligibleFirstWorktreeSession', () => {
+  it('admits the original agent-manager initial-turn create', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+          initialTurn: { messageId: 'msg_1' } as never,
+        }),
+        ctx
+      )
+    ).toBe(true);
+  });
+
+  it('admits a server-marked clone-only continuation create', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'cloud-agent-web',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            workspaceContinuation: true,
+          },
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        }),
+        ctx
+      )
+    ).toBe(true);
+  });
+
+  it('does not admit an unmarked clone-only create, preserving clone behavior', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+
+  it('does not admit a marked create that still has an initial turn', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'cloud-agent-web',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            workspaceContinuation: true,
+          },
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+          initialTurn: { messageId: 'msg_1' } as never,
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+
+  it.each([
+    { clientProvenance: 'browser', createdOnPlatform: 'cloud-agent-web' },
+    { clientProvenance: 'agent-manager', createdOnPlatform: 'agent-manager' },
+  ] as const)('rejects a continuation with the wrong provenance or platform: %j', options => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            ...options,
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            workspaceContinuation: true,
+          },
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+
+  it('rejects a Cloud-platform create without the server continuation marker', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'cloud-agent-web',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+          initialTurn: { messageId: 'msg_1' } as never,
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+});
 
 describe('isTrustedWorktreeCreateOrigin', () => {
   it('allows the authenticated browser workspace-create pair', () => {

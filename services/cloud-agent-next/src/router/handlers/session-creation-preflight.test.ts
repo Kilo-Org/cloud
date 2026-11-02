@@ -58,6 +58,7 @@ vi.mock('../../balance-validation.js', () => ({ validateBalanceOnly: balanceMock
 import {
   preflightSessionCreation,
   profileResolutionPolicyForSessionCreateOrigin,
+  resolveContinuationMode,
 } from './session-creation-preflight.js';
 
 function environmentLoad(
@@ -713,6 +714,59 @@ describe('profile resolution policy', () => {
   ])('selects $expected for origin $origin', ({ origin, expected }) => {
     expect(profileResolutionPolicyForSessionCreateOrigin(origin)).toEqual({
       defaultProfileResolution: expected,
+    });
+  });
+});
+
+describe('resolveContinuationMode', () => {
+  it('keeps a built-in mode and reports no fallback', () => {
+    expect(resolveContinuationMode('code', {})).toEqual({ mode: 'code', modeFallback: false });
+  });
+
+  it('keeps a mode that matches a runtimeAgents slug', () => {
+    expect(
+      resolveContinuationMode('reviewer', { runtimeAgents: [{ slug: 'reviewer' }] } as never)
+    ).toEqual({ mode: 'reviewer', modeFallback: false });
+  });
+
+  it('falls back to code for an unknown mode without failing', () => {
+    expect(resolveContinuationMode('local-custom-mode', {})).toEqual({
+      mode: 'code',
+      modeFallback: true,
+    });
+  });
+});
+
+describe('preflight continuation mode resolution', () => {
+  it('applies the mode fallback without mutating the caller request', async () => {
+    const creation = request({
+      agent: { mode: 'local-custom-mode', model: 'kilo/test-model' },
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      options: {
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'agent-manager',
+        workspaceContinuation: true,
+        operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    });
+
+    const resolved = await preflightSessionCreation(
+      creation,
+      context,
+      'continueHostedWorkspace',
+      undefined,
+      {
+        includeWebDefaults: true,
+        continuationModeResolution: true,
+      }
+    );
+
+    expect(resolved.agent.mode).toBe('code');
+    // The caller's request object is not rewritten in place.
+    expect(creation.agent.mode).toBe('local-custom-mode');
+    expect(resolveContinuationMode(creation.agent.mode, resolved.profile?.resolved ?? {})).toEqual({
+      mode: 'code',
+      modeFallback: true,
     });
   });
 });

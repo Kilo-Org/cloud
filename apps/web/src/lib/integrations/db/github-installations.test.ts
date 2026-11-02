@@ -2693,6 +2693,46 @@ describe('GitHub installation persistence', () => {
     await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
   });
 
+  test('a pending request and a suspended association leave the workflow connection empty', async () => {
+    const pendingOrganization = await createTestOrganization('Pending request', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: pendingOrganization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: null,
+      platform_account_id: '778001',
+      platform_account_login: 'acme',
+      integration_status: 'pending',
+      github_app_type: 'standard',
+      metadata: { pending_approval: { status: 'awaiting_installation' } },
+    });
+    const suspendedOrganization = await createTestOrganization('Suspended app', ownerId, 0);
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: suspendedOrganization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '778002',
+      platform_account_login: 'acme',
+      integration_status: 'suspended',
+      suspended_at: new Date().toISOString(),
+      suspended_by: 'github_suspend',
+      github_app_type: 'standard',
+      github_connection_role: 'workflow',
+      repository_access: 'all',
+    });
+
+    // The Security Agent's install slot is this connection: neither a request
+    // no installation backs yet nor an association GitHub will not serve is a
+    // connection the organization can act on, so both are exactly the states
+    // the install page resolves.
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(pendingOrganization.id)
+    ).resolves.toBeNull();
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(suspendedOrganization.id)
+    ).resolves.toBeNull();
+  });
+
   test('the organization workflow connection definition only matches GitHub rows owned by an organization', async () => {
     const organization = await createTestOrganization('Definition scope', ownerId, 0);
     const [organizationRow] = await db

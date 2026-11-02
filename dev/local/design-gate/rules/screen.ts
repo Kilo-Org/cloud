@@ -130,6 +130,9 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
     for (let j = i + 1; j < pressables.length; j++) {
       const a = pressables[i];
       const b = pressables[j];
+      // A sheet the platform presents in its own window takes the tap first, so
+      // a control behind it never competes with one on it.
+      if (a.presented?.space !== b.presented?.space) continue;
       if (nearestScroll(a) !== nearestScroll(b)) continue;
       if (!intersects(a.visibleRect, b.visibleRect)) continue;
       if (contains(a.rect, b.rect, TOLERANCE_DP) || contains(b.rect, a.rect, TOLERANCE_DP))

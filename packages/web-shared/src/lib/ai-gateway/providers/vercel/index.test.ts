@@ -705,6 +705,26 @@ describe('applyVercelSettings BYOK pinning', () => {
       openai: [{ apiKey: 'sk-user-openai' }],
     });
   });
+
+  it('pins Cohere requests to the provider and forwards the user API key', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'cohere/command-a',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('cohere/command-a', request, [
+      { decryptedAPIKey: 'cohere-user-key', providerId: 'cohere' },
+    ]);
+
+    expect(request.body.model).toBe('cohere/command-a');
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      only: ['cohere'],
+      byok: { cohere: [{ apiKey: 'cohere-user-key' }] },
+    });
+  });
 });
 
 describe('applyVercelSettings managed requests', () => {

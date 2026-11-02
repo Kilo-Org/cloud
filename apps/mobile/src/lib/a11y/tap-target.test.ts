@@ -7,6 +7,9 @@ import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
 import {
+  CHIP_FRAME_DP,
+  CHIP_HIT_SLOP,
+  CHIP_HIT_SLOP_DP,
   COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -213,6 +216,24 @@ describe('shared tap-target geometry', () => {
     expect(tapTargetReachDp(DENSE_ROW_FRAME_DP, DENSE_ROW_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
+  });
+
+  it('carries a composer chip from its compact frame past the design target', () => {
+    // The regression this guards: the chips' `px-3 py-1.5` line measures 27.81pt
+    // on Android, under the design target, so the vertical slop is what has to
+    // lift the touch region clear of 44pt — 8pt per side lands on 43.81pt.
+    expect(CHIP_FRAME_DP).toBeLessThan(TOUCH_TARGET_DP);
+    expect(CHIP_HIT_SLOP).toEqual({ top: CHIP_HIT_SLOP_DP, bottom: CHIP_HIT_SLOP_DP });
+    // Past the half point the control-size audit allows for pixel rounding, so
+    // the reach still clears the target when Android truncates each fractional
+    // inset to a whole pixel.
+    expect(tapTargetReachDp(CHIP_FRAME_DP, CHIP_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP + 0.5
+    );
+    // Vertical only: the chip is wider than the target on its own, and a
+    // horizontal reach would land on the chip beside it and the paste button.
+    expect(CHIP_HIT_SLOP).not.toHaveProperty('left');
+    expect(CHIP_HIT_SLOP).not.toHaveProperty('right');
   });
 
   it('carries an inline link from the audit floor to the design target with its slop', () => {

@@ -53,6 +53,7 @@ export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 };
 
 export type SessionCreateRequest = {

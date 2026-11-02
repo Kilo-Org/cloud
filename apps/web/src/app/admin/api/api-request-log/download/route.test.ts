@@ -1,13 +1,13 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest } from 'next/server';
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
-import { api_request_log, kilocode_users } from '@kilocode/db/schema';
+import { api_request_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
-import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -67,17 +67,47 @@ const baseRow = {
 };
 
 describe('GET /admin/api/api-request-log/download', () => {
-  beforeEach(() => {
+  let exporter: User;
+  let sessionViewer: User;
+
+  beforeEach(async () => {
     fakeR2.objects.clear();
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: defineTestUser({ is_admin: true }),
-      authFailedResponse: null,
-    });
+    exporter = await insertTestUser({ is_admin: true, can_export_api_request_logs: true });
+    sessionViewer = await insertTestUser({ is_admin: true, can_view_sessions: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: exporter, authFailedResponse: null });
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, TEST_USER_ID));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [exporter.id, sessionViewer.id]));
+  });
+
+  it('requires export access, not session viewing, before reading rows or bodies', async () => {
+    const request_r2_key = '2026-08-01/access/request.json';
+    fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ access: true }));
+    await db.insert(api_request_log).values({ ...baseRow, request_r2_key });
+    const send = jest.spyOn(fakeR2, 'send');
+    mockedGetUserFromAuth.mockResolvedValue({ user: sessionViewer, authFailedResponse: null });
+
+    const response = await GET(createRequest());
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'API request log export access required' });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('applies a permission change to a session that is already signed in', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { ...sessionViewer, can_export_api_request_logs: true },
+      authFailedResponse: null,
+    });
+
+    const response = await GET(createRequest());
+
+    expect(response.status).toBe(403);
   });
 
   it('streams a complete ZIP of R2-backed bodies across backpressured DB batches', async () => {

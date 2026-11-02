@@ -75,6 +75,16 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
+  // `organization_seats_purchases` is append-only, so the most recently created
+  // row is the organization's current subscription state — the same input the
+  // subscription gate classifies with.
+  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
@@ -85,6 +95,9 @@ export async function getUserOrganizationsWithSeats(
       requireSeats: organizations.require_seats,
       plan: organizations.plan,
       createdAt: organizations.created_at,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      settings: organizations.settings,
+      latestSeatPurchaseStatus,
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -112,6 +125,7 @@ export async function getUserOrganizationsWithSeats(
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
+  const now = new Date();
   return results.map(result => ({
     organizationName: result.organizationName,
     organizationId: result.organizationId,
@@ -122,6 +136,16 @@ export async function getUserOrganizationsWithSeats(
     plan: result.plan,
     created_at: result.createdAt,
     isSalesDemo: result.isSalesDemo,
+    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+      organization: {
+        created_at: result.createdAt,
+        free_trial_end_at: result.freeTrialEndAt,
+        require_seats: result.requireSeats,
+        settings: result.settings,
+      },
+      latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
+      now,
+    }).isTrialExpiredForEnforcement,
     seatCount: {
       used: result.total_member_count,
       total: result.seatCountTotal,
@@ -864,7 +888,6 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
         kilo_user_id: userId,

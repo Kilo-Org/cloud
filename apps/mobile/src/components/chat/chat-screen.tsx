@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
+import { ChatTranscriptFailure } from './chat-transcript-failure';
 import { ChatDetailsSheet } from './chat-details-sheet';
 import { useChatDetails } from './chat-details-state';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
@@ -65,6 +66,14 @@ type ChatScreenProps = {
   /** The session the route named. A model switch moves the chat off it. */
   opened: string;
 };
+
+/**
+ * The chats a chat was opened from, and the destination its error state's Back
+ * names. A chat is also reachable without that list beneath it — a deep link,
+ * or a stack where the list itself already left — so Back cannot just pop and
+ * inherit whatever route happens to be there.
+ */
+const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
@@ -220,6 +229,16 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     void stop();
   }, [stop]);
 
+  // A chat that settled with a failure and no transcript has nothing to read:
+  // the failure is the transcript. The area draws it once, in place of the
+  // empty state, so the screen does not show a chat that is ready for a first
+  // message beside an error saying there is nothing to open.
+  const transcriptFailure =
+    state.status === 'idle' && messages.length === 0 ? state.failureKey : null;
+  // A chat that is not one this place may read is not one this place can retry
+  // into: entering it again settles the same state.
+  const retryable = !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY;
+
   function renderTranscript() {
     if (state.status === 'opening') {
       // The chat is being reopened. A stored conversation has history that is
@@ -231,6 +250,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // stood instead of jumping from the top of the area to the bottom when
       // the open finishes.
       return <SessionSkeletonMessages sessionId={state.sessionId} />;
+    }
+    if (transcriptFailure !== null) {
+      return (
+        <ChatTranscriptFailure
+          failureKey={transcriptFailure}
+          retryable={retryable}
+          onRetry={() => void retry()}
+          onBack={() => {
+            // POP_TO keeps the list's scroll position when the chat was opened
+            // from it, and puts the list on the stack when it was not.
+            router.dismissTo(CHAT_LIST_HREF);
+          }}
+        />
+      );
     }
     if (messages.length === 0) {
       return (
@@ -268,28 +301,32 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       <>
         <View className="flex-1">{renderTranscript()}</View>
 
-        <ChatComposerArea
-          status={state.status}
-          messages={messages}
-          failureKey={state.failureKey}
-          // A chat that is not one this place may read is not one this place can
-          // retry into: entering it again settles the same state.
-          retryable={!actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY}
-          onRetry={() => void retry()}
-          onAddCredits={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-          onSend={handleSend}
-          composerControlRef={actions.composerControlRef}
-          onStop={handleStop}
-          model={model}
-          variant={variant}
-          onModelSelect={selectModel}
-          modelOptions={availableOptions}
-          attachmentsEnabled={imagesSupported}
-          organizationId={organizationId ?? undefined}
-          disabled={modelsFailed && availableOptions.length === 0}
-        />
+        {/* A failure with no transcript owns the screen: there is no chat to
+            type into, so the composer would offer a question the state cannot
+            take, and sit beside the state's own way out as a second answer to
+            the same screen. It returns as soon as the chat has a transcript. */}
+        {transcriptFailure === null ? (
+          <ChatComposerArea
+            status={state.status}
+            messages={messages}
+            failureKey={state.failureKey}
+            retryable={retryable}
+            onRetry={() => void retry()}
+            onAddCredits={() => {
+              router.push('/(app)/credits' as Href);
+            }}
+            onSend={handleSend}
+            composerControlRef={actions.composerControlRef}
+            onStop={handleStop}
+            model={model}
+            variant={variant}
+            onModelSelect={selectModel}
+            modelOptions={availableOptions}
+            attachmentsEnabled={imagesSupported}
+            organizationId={organizationId ?? undefined}
+            disabled={modelsFailed && availableOptions.length === 0}
+          />
+        ) : null}
       </>
     );
   }

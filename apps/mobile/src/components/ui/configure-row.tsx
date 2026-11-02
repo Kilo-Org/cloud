@@ -121,11 +121,28 @@ export function ConfigureRow({
     trailing ??
     (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
 
-  const iconTile = <IconTile icon={Icon} tint={tint} />;
+  // A disabled row dims by token, once, and never by row opacity: halving the
+  // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
+  // card and 1.95:1 on the light one, so the last line of an unavailable row
+  // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
+  // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
+  // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
+  // and the chevron, the pressed feedback and `accessibilityState` are what
+  // still say "unavailable".
+  const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
+
+  const iconTile = <IconTile icon={Icon} tint={iconTint} />;
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
-      <Text className="text-sm font-medium text-foreground">{title}</Text>
+      <Text
+        className={cn(
+          'text-sm font-medium',
+          disabled ? 'text-muted-foreground' : 'text-foreground'
+        )}
+      >
+        {title}
+      </Text>
       {subtitle ? (
         <Text
           numberOfLines={subtitleNumberOfLines}
@@ -143,7 +160,6 @@ export function ConfigureRow({
       className={cn(
         stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
-        disabled && 'opacity-50',
         className
       )}
     >

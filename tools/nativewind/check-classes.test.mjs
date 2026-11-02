@@ -422,3 +422,124 @@ test('checkSourceFile reports one file and keeps no state between calls', contex
   assert.deepEqual(second, first);
   assert.deepEqual(clean, []);
 });
+
+test('reads the container classes past a nested template literal', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <ScrollView\n' +
+      '    renderItem={() => (\n' +
+      "      <View accessibilityLabel={`${rows.map(row => `${row.name}'s`).join(', ')}`} />\n" +
+      '    )}\n' +
+      '    className="px-4"\n' +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /screen\.tsx:2: <ScrollView> carries "px-4" on its own className/);
+});
+
+test('reports each ban at its own line from one whole-text scan', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/bans.ts':
+      'const a = 1;\n' +
+      '\n' +
+      'const b = "text-start";\n' +
+      'const c = 2;\n' +
+      'const d = "ltr: leading-9";\n' +
+      '// "bg-primary/50" in the rule comment is documentation\n' +
+      ' * text-start in a block-comment body\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(
+    result.stderr.split('\n').filter(line => line.startsWith('apps/')),
+    [
+      `apps/mobile/src/bans.ts:3: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+      `apps/mobile/src/bans.ts:5: "ltr:" the ltr: variant also matches in RTL; express the rule with rtl: instead`,
+      `apps/mobile/src/bans.ts:5: "leading-9" a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]`,
+    ]
+  );
+});
+
+test('keeps the Intl scan line-shaped across a line break', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts':
+      'export const a = Intl.NumberFormat\n' +
+      '  ("en-US");\n' +
+      'export const b = new Intl.DateTimeFormat\n' +
+      '  ("en-US");\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /"new Intl\.DateTimeFormat" builds its own formatter/);
+  // The constructor called on the next line stays out, as it did line by line.
+  assert.doesNotMatch(result.stderr, /"Intl\.NumberFormat"/);
+});
+
+test('reports a constructor whose new ends the previous line', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts': 'export const a = new\nIntl.DateTimeFormat("en");\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  // The line-by-line scan reported the call on its own line; the rejected
+  // `new\nIntl…` match must not swallow it.
+  assert.match(result.stderr, /format\.ts:2: "Intl\.DateTimeFormat\(" builds its own formatter/);
+});
+
+test('reads one relative path the same however it is spelled', context => {
+  const widget = 'apps/mobile/src/glanceable-ios/active-agents-widget.tsx';
+  const root = makeFixture(context, {
+    'apps/mobile/src/panel.tsx':
+      "import { Text } from 'react-native';\n" + "export const a = Intl.DateTimeFormat('en-US');\n",
+    'apps/mobile/src/glanceable-ios/active-agents-widget.tsx':
+      "export const a = Intl.DateTimeFormat('en-US');\n",
+  });
+  const source =
+    "import { Text } from 'react-native';\n" + "export const a = Intl.DateTimeFormat('en-US');\n";
+  writeFileSync(
+    join(root, 'probe.mjs'),
+    [
+      "import { checkSourceFile } from './tools/nativewind/check-classes.mjs';",
+      'const paths = [',
+      '  "apps/mobile/src/panel.tsx",',
+      '  "./apps/mobile/src/panel.tsx",',
+      '  "/apps/mobile/src/panel.tsx",',
+      '];',
+      'const widget = "apps/mobile/src/glanceable-ios/active-agents-widget.tsx";',
+      `const source = ${JSON.stringify(source)};`,
+      'const results = {};',
+      'for (const path of paths) {',
+      `  results[path] = checkSourceFile(path, ${JSON.stringify(join(root, 'apps/mobile/src/panel.tsx'))}, source);`,
+      '}',
+      'for (const path of [widget, `/${widget}`, `./${widget}`]) {',
+      `  results[path] = checkSourceFile(path, ${JSON.stringify(join(root, widget))}, "export const a = Intl.DateTimeFormat('en-US');\\n");`,
+      '}',
+      'console.log(JSON.stringify(results));',
+    ].join('\n')
+  );
+  const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const results = JSON.parse(result.stdout);
+  const plain = results['apps/mobile/src/panel.tsx'];
+  assert.equal(plain.length, 2);
+  // Every diagnostic names the normalised path, so the finding is the same file.
+  assert.deepEqual(
+    results['./apps/mobile/src/panel.tsx'],
+    plain,
+    'a ./ prefix must not change the verdict'
+  );
+  assert.deepEqual(
+    results['/apps/mobile/src/panel.tsx'],
+    plain,
+    'a leading slash must not change the verdict'
+  );
+  // The widget-process exemption reads the same normalised path as every check.
+  const widgetPlain = results[widget];
+  assert.deepEqual(widgetPlain, [], 'the widget layout keeps its exemption');
+  assert.deepEqual(results[`/${widget}`], widgetPlain);
+  assert.deepEqual(results[`./${widget}`], widgetPlain);
+});

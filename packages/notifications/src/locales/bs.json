@@ -9,6 +9,7 @@
       "lowBalance": "Vaš saldo treba pažnju",
       "spendAlert": "Vaša potrošnja treba pažnju",
       "securityFinding": "Sigurnosni nalaz treba pažnju",
+      "securityUpdate": "Sigurnosna provjera ima ažuriranje",
       "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Sigurnosni nalaz treba pažnju"
+      "body": "Sigurnosna provjera ima ažuriranje"
     }
   },
   "instanceLifecycle": {

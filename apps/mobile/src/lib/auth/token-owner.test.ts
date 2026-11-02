@@ -19,6 +19,7 @@ vi.mock('expo-secure-store', () => ({
 
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { bumpAuthEpoch } from './auth-epoch';
 import {
@@ -47,6 +48,7 @@ describe('token-owner', () => {
     store.clear();
     clearActiveToken();
     setSignOutTeardownActive(false);
+    setProtectedDataAvailable(true);
   });
 
   it('returns null when no token is held', () => {
@@ -112,6 +114,99 @@ describe('token-owner', () => {
       await getAuthTokenForRequest();
       // One SecureStore read for the first (cold) call, none for the warm hit.
       expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns no token and never reads the keychain while protected data is unavailable', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      setProtectedDataAvailable(false);
+
+      await expect(getAuthTokenForRequest()).resolves.toBeNull();
+      // The refused path never reaches the keychain, so the lock cannot reject
+      // the request that asked for a token.
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+      // A lock is not a stored credential: nothing is warmed.
+      expect(getActiveToken()).toBeNull();
+
+      // After unlock the same call resolves the stored token and warms it.
+      setProtectedDataAvailable(true);
+      await expect(getAuthTokenForRequest()).resolves.toBe('stored-token');
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+      expect(getActiveToken()).toEqual({ token: 'stored-token', expiresAtMs: null });
+    });
+
+    it('still serves the held token while protected data is unavailable', async () => {
+      setActiveToken('mem-token', 1234);
+      setProtectedDataAvailable(false);
+
+      await expect(getAuthTokenForRequest()).resolves.toBe('mem-token');
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns no token when the device locks between the read attempts', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      const getItemAsync = vi.mocked(SecureStore.getItemAsync);
+      const original = getItemAsync.getMockImplementation();
+      // The first attempt hits the transient rejection a device that just
+      // foregrounded gives, so the read backs off before its next attempt.
+      getItemAsync.mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error('keychain temporarily unavailable');
+      });
+
+      vi.useFakeTimers();
+      try {
+        const pending = getAuthTokenForRequest();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(getItemAsync).toHaveBeenCalledTimes(1);
+
+        // The lock lands during the backoff: the next attempt refuses the
+        // keychain, and that refusal must answer the caller with no token.
+        setProtectedDataAvailable(false);
+        await vi.advanceTimersByTimeAsync(250);
+
+        await expect(pending).resolves.toBeNull();
+        expect(getActiveToken()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+        if (original) {
+          getItemAsync.mockImplementation(original);
+        }
+      }
+    });
+
+    it('still serves a newer owner when the read refused because the device locked', async () => {
+      const getItemAsync = vi.mocked(SecureStore.getItemAsync);
+      const original = getItemAsync.getMockImplementation();
+      getItemAsync.mockImplementationOnce(() => {
+        // The read is refused because the device locked, and a newer owner was
+        // published while it ran.
+        setProtectedDataAvailable(false);
+        setActiveToken('newer-token', 9999);
+        throw new Error('User interaction is not allowed.');
+      });
+
+      try {
+        await expect(getAuthTokenForRequest()).resolves.toBe('newer-token');
+      } finally {
+        if (original) {
+          getItemAsync.mockImplementation(original);
+        }
+      }
+    });
+
+    it('still rejects a cold read that fails for another reason', async () => {
+      const getItemAsync = vi.mocked(SecureStore.getItemAsync);
+      const original = getItemAsync.getMockImplementation();
+      getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+      try {
+        // Only the lock state is answered locally; every other failure keeps
+        // the caller's behavior.
+        await expect(getAuthTokenForRequest()).rejects.toThrow('keychain unavailable');
+      } finally {
+        if (original) {
+          getItemAsync.mockImplementation(original);
+        }
+      }
     });
 
     it('does not warm the owner when the epoch changes mid-read', async () => {

@@ -2782,6 +2782,8 @@
       "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
       "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
       "reconnectTitle": "Підключити GitHub знову",
+      "reconnectTitleGitLab": "Підключити GitLab знову",
+      "reconnectTitleBitbucket": "Підключити Bitbucket знову",
       "reconnectDescription": "Доступ до GitHub відкликано.",
       "gitlabDescription": "Перевірка merge-запитів на мобільному пристрої",
       "gitlabInstanceMismatchTitle": "Підключення GitLab призначене для іншого екземпляра",

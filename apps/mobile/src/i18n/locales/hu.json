@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
+      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
+      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",

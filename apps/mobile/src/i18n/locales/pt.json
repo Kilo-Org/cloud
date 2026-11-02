@@ -448,7 +448,6 @@
         "rebase": "Reaplicar"
       },
       "terminal": {
-        "alreadyMerged": "Já integrado",
         "closed": "Este PR está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -465,7 +464,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "As aprovações dos revisores obrigatórios estão em falta ou pendentes.",
         "failingChecksTitle": "Verificações obrigatórias com falhas",
-        "failingChecksDetail": "As verificações de estado obrigatórias estão a falhar.",
         "unstableTitle": "Algumas verificações estão a falhar",
         "unstableDetail": "Algumas verificações não obrigatórias estão a falhar, mas não impedem a integração.",
         "draftTitle": "PR em rascunho",

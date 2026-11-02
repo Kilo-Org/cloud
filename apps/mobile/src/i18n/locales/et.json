@@ -441,7 +441,6 @@
         "rebase": "Ümberbaseerimine"
       },
       "terminal": {
-        "alreadyMerged": "Juba ühendatud",
         "closed": "See tõmbetaotlus on suletud",
         "closedMergeRequest": "See liitmistaotlus on suletud"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Nõutud ülevaatused puuduvad",
         "requiredReviewsDetail": "Nõutud ülevaatajate kinnitused puuduvad või on ootel.",
         "failingChecksTitle": "Nõutud kontrollid ebaõnnestusid",
-        "failingChecksDetail": "Nõutud olekukontrollid ebaõnnestusid.",
         "unstableTitle": "Mõned kontrollid ebaõnnestusid",
         "unstableDetail": "Valikulised kontrollid ebaõnnestusid. Need ei takista ühendamist.",
         "draftTitle": "Tõmbetaotluse mustand",

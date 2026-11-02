@@ -441,7 +441,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Redan sammanslagen",
         "closed": "Den här PR:en är stängd",
         "closedMergeRequest": "Den här merge requesten är stängd"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Obligatoriska granskningar saknas",
         "requiredReviewsDetail": "De granskare som måste godkänna ändringarna har ännu inte gjort det.",
         "failingChecksTitle": "Misslyckade obligatoriska kontroller",
-        "failingChecksDetail": "Obligatoriska statuskontroller har misslyckats.",
         "unstableTitle": "Vissa kontroller har misslyckats",
         "unstableDetail": "Kontroller som inte är obligatoriska har misslyckats. De blockerar inte sammanslagningen.",
         "draftTitle": "PR-utkast",

@@ -2986,7 +2986,6 @@
         "squash": "Squashen"
       },
       "terminal": {
-        "alreadyMerged": "Al samengevoegd",
         "closed": "Deze PR is gesloten",
         "closedMergeRequest": "Deze merge request is gesloten"
       },
@@ -3003,7 +3002,6 @@
         "requiredReviewsTitle": "Vereiste beoordelingen ontbreken",
         "requiredReviewsDetail": "De vereiste beoordelaars hebben nog geen goedkeuring gegeven.",
         "failingChecksTitle": "Vereiste controles mislukt",
-        "failingChecksDetail": "Vereiste statuscontroles mislukken.",
         "unstableTitle": "Sommige controles mislukken",
         "unstableDetail": "Niet-verplichte controles mislukken. Ze blokkeren het samenvoegen niet.",
         "draftTitle": "Concept-PR",

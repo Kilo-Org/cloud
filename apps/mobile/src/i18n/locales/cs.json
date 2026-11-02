@@ -455,7 +455,6 @@
         "rebase": "Přesazení"
       },
       "terminal": {
-        "alreadyMerged": "Již sloučeno",
         "closed": "Tento PR je uzavřen",
         "closedMergeRequest": "Tento merge request je uzavřen"
       },
@@ -472,7 +471,6 @@
         "requiredReviewsTitle": "Chybí povinné revize",
         "requiredReviewsDetail": "Chybí schválení od všech, jejichž revize je povinná, nebo se na ně ještě čeká.",
         "failingChecksTitle": "Neúspěšné povinné kontroly",
-        "failingChecksDetail": "Povinné stavové kontroly neprocházejí.",
         "unstableTitle": "Některé kontroly neprocházejí",
         "unstableDetail": "Některé nepovinné kontroly neprocházejí. Sloučení neblokují.",
         "draftTitle": "Koncept PR",

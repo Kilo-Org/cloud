@@ -441,7 +441,6 @@
         "rebase": "Cambio de base"
       },
       "terminal": {
-        "alreadyMerged": "Xa fusionada",
         "closed": "Solicitude de integración pechada",
         "closedMergeRequest": "Solicitude de fusión pechada"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Faltan revisións obrigatorias",
         "requiredReviewsDetail": "Faltan as aprobacións dos revisores obrigatorios ou aínda están pendentes.",
         "failingChecksTitle": "Comprobacións obrigatorias con erros",
-        "failingChecksDetail": "As comprobacións de estado obrigatorias dan erro.",
         "unstableTitle": "Algunhas comprobacións dan erro",
         "unstableDetail": "As comprobacións non obrigatorias dan erro, pero non bloquearán a fusión.",
         "draftTitle": "Solicitude de cambios en borrador",

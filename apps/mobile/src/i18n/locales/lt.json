@@ -455,7 +455,6 @@
         "rebase": "Bazės keitimas"
       },
       "terminal": {
-        "alreadyMerged": "Jau sujungta",
         "closed": "Ši pakeitimų užklausa uždaryta",
         "closedMergeRequest": "Šis merge request uždarytas"
       },
@@ -472,7 +471,6 @@
         "requiredReviewsTitle": "Trūksta privalomų peržiūrų",
         "requiredReviewsDetail": "Trūksta privalomų peržiūrėtojų patvirtinimų arba jų dar laukiama.",
         "failingChecksTitle": "Nesėkmingi privalomi patikrinimai",
-        "failingChecksDetail": "Privalomų būsenos patikrinimų rezultatai nesėkmingi.",
         "unstableTitle": "Kai kurie patikrinimai nesėkmingi",
         "unstableDetail": "Neprivalomų patikrinimų rezultatai nesėkmingi. Jie netrukdo sujungti.",
         "draftTitle": "Pakeitimų užklausos juodraštis",

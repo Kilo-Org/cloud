@@ -455,7 +455,6 @@
         "rebase": "Prestavitev osnove"
       },
       "terminal": {
-        "alreadyMerged": "Že združeno",
         "closed": "Zahtevek za združitev je zaprt",
         "closedMergeRequest": "Ta merge request je zaprt"
       },
@@ -472,7 +471,6 @@
         "requiredReviewsTitle": "Manjkajo zahtevani pregledi",
         "requiredReviewsDetail": "Manjkajo odobritve obveznih pregledovalcev ali pa nanje še čakamo.",
         "failingChecksTitle": "Neuspešna obvezna preverjanja",
-        "failingChecksDetail": "Obvezna preverjanja stanja niso uspešna.",
         "unstableTitle": "Nekatera preverjanja niso uspešna",
         "unstableDetail": "Nekatera neobvezna preverjanja niso uspešna. To ne preprečuje združitve.",
         "draftTitle": "Osnutek zahteve za združitev",

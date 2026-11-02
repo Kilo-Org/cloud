@@ -12,6 +12,7 @@ import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber } from '@/lib/format';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -225,6 +226,11 @@ function localizeNumber(n: number): string {
   return formatNumber(n, i18n.language);
 }
 
+/**
+ * The added/removed counts as one left-to-right run. Without the isolate, bidi
+ * on a right-to-left screen moves each sign behind its number, so the line
+ * reads "3+ / 1−" and the counts look like they added the sign.
+ */
 export function formatPrCounts(additions: number, deletions: number): string {
-  return `+${localizeNumber(additions)} / −${localizeNumber(deletions)}`;
+  return isolateLtrBidiText(`+${localizeNumber(additions)} / −${localizeNumber(deletions)}`);
 }

@@ -441,7 +441,6 @@
         "rebase": "Ny basis"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne pull request er lukket",
         "closedMergeRequest": "Denne merge request er lukket"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Påkrævede gennemgange mangler",
         "requiredReviewsDetail": "Godkendelser fra de påkrævede gennemlæsere mangler eller afventes stadig.",
         "failingChecksTitle": "Påkrævede kontroller fejler",
-        "failingChecksDetail": "Påkrævede statuskontroller fejler.",
         "unstableTitle": "Nogle kontroller fejler",
         "unstableDetail": "Nogle valgfrie kontroller fejler. De blokerer ikke fletningen.",
         "draftTitle": "PR-kladde",

@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -233,19 +234,17 @@ export function PrReviewChecksSection({
 
   const checks = useQuery(queries.checksOptions(headSha));
 
-  // Loading (first time, no cached data): the card that settles here is the
-  // compact body — the "no checks reported" card, one copy line and, when the
-  // screen published a provider URL, the view-on-provider button — because a
-  // head commit right after a push reports no runs and that is the shape the
-  // read usually answers with. The placeholder mirrors that card's box
-  // exactly: the same `p-4` padding and `gap-3` line gap, a bar the height of
-  // the `text-sm` line, and the button's bar only for the arm that renders the
-  // button, so a provider URL that never arrives cannot leave a control-sized
-  // gap behind. The Review button and PrMergeSection below stay put at the
-  // swap, and a card that does report runs grows downward from here, which is
-  // the direction the page absorbs; reserving four status rows up front
-  // instead pulled those two actions ~100 dp upward whenever the head had no
-  // checks (`pr-review-acme-widgets-1`, design review at a36db10).
+  // Loading (first time, no cached data). The card settles into one shape for
+  // a head that reports runs: a count line over one collapsed status group,
+  // which is what a reviewed PR's head has. The placeholder reserves that box
+  // row for row — the same `px-4 py-2` header and the same `ROW_TARGET_CLASS`
+  // group row — so the review and merge actions below never move when the read
+  // answers. Mirroring the empty card instead grew the card by one group row
+  // (measured 30.9 dp) and pushed everything below it down; the oldest shape of
+  // this placeholder pulled those actions ~100 dp upward by reserving four
+  // status rows (`pr-review-acme-widgets-1`, design review at a36db10). A head
+  // that reports no runs still settles one group row shorter than this box,
+  // the one case the reservation cannot predict from the loading state.
   // The bars must NOT be `bg-muted` here: `--muted` and `--secondary` are
   // the same colour in both themes (apps/mobile/src/global.css), so a
   // `bg-muted` bar inside this `bg-secondary` card paints nothing and the
@@ -258,12 +257,17 @@ export function PrReviewChecksSection({
         <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View
           key={LOADING_CARD_KEY}
-          className="gap-3 rounded-lg bg-secondary p-4"
+          className="overflow-hidden rounded-lg bg-secondary"
           accessibilityRole="progressbar"
           accessibilityLabel={t('common.loading')}
         >
-          <Skeleton className="h-[18px] w-2/3 rounded-md bg-muted-soft" />
-          {prUrl ? <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" /> : null}
+          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
+            <Skeleton className="h-4 w-2/5 rounded bg-muted-soft" />
+          </View>
+          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+            <Skeleton className="h-4 w-4 rounded bg-muted-soft" />
+            <Skeleton className="h-4 w-1/3 rounded bg-muted-soft" />
+          </View>
         </View>
       </View>
     );

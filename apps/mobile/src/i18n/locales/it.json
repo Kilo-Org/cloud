@@ -3030,7 +3030,6 @@
         "squash": "Accorpamento"
       },
       "terminal": {
-        "alreadyMerged": "Già unita",
         "closed": "Questa pull request è chiusa",
         "closedMergeRequest": "Questo merge request è chiuso"
       },
@@ -3047,7 +3046,6 @@
         "requiredReviewsTitle": "Revisioni obbligatorie mancanti",
         "requiredReviewsDetail": "Le approvazioni dei revisori designati mancano o sono ancora in attesa.",
         "failingChecksTitle": "Controlli obbligatori non superati",
-        "failingChecksDetail": "I controlli di stato obbligatori non sono stati superati.",
         "unstableTitle": "Alcuni controlli non sono stati superati",
         "unstableDetail": "Alcuni controlli facoltativi non sono stati superati. Non impediranno l'unione.",
         "draftTitle": "PR in bozza",

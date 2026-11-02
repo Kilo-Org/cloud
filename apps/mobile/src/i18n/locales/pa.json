@@ -441,7 +441,6 @@
         "rebase": "ਰੀਬੇਸ"
       },
       "terminal": {
-        "alreadyMerged": "ਪਹਿਲਾਂ ਹੀ ਮਰਜ ਹੋ ਗਈ",
         "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ",
         "closedMergeRequest": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "ਲੋੜੀਂਦੀਆਂ ਸਮੀਖਿਆਵਾਂ ਅਜੇ ਬਾਕੀ",
         "requiredReviewsDetail": "ਲੋੜੀਂਦੇ ਸਮੀਖਿਅਕਾਂ ਦੀ ਮਨਜ਼ੂਰੀ ਅਜੇ ਨਹੀਂ ਮਿਲੀ ਜਾਂ ਬਾਕੀ ਹੈ।",
         "failingChecksTitle": "ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ",
-        "failingChecksDetail": "ਸਥਿਤੀ ਦੀਆਂ ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ।",
         "unstableTitle": "ਕੁਝ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ",
         "unstableDetail": "ਕੁਝ ਵਿਕਲਪਿਕ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ। ਇਹ ਮਰਜ ਨੂੰ ਨਹੀਂ ਰੋਕਣਗੀਆਂ।",
         "draftTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਖਰੜਾ",

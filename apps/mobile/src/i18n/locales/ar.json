@@ -3162,7 +3162,6 @@
         "squash": "دمج مضغوط"
       },
       "terminal": {
-        "alreadyMerged": "تم الدمج بالفعل",
         "closed": "طلب السحب هذا مغلق",
         "closedMergeRequest": "طلب الدمج هذا مغلق"
       },
@@ -3179,7 +3178,6 @@
         "requiredReviewsTitle": "المراجعات المطلوبة لم تكتمل",
         "requiredReviewsDetail": "لم تصل موافقات المراجعين المطلوبين بعد، أو لا تزال قيد الانتظار.",
         "failingChecksTitle": "فشل الفحوصات المطلوبة",
-        "failingChecksDetail": "لم تنجح فحوصات الحالة المطلوبة.",
         "unstableTitle": "بعض الفحوصات لم تنجح",
         "unstableDetail": "لم تنجح بعض الفحوصات غير المطلوبة. لن تمنع الدمج.",
         "draftTitle": "مسودة طلب سحب",

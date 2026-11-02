@@ -441,7 +441,6 @@
         "rebase": "Ribazim"
       },
       "terminal": {
-        "alreadyMerged": "Tashmë e bashkuar",
         "closed": "Kjo kërkesë për bashkim është mbyllur",
         "closedMergeRequest": "Kjo kërkesë integrimi është mbyllur"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Mungojnë rishikimet e detyrueshme",
         "requiredReviewsDetail": "Miratimet e rishikuesve të caktuar mungojnë ose janë në pritje.",
         "failingChecksTitle": "Kontrolle të detyrueshme të dështuara",
-        "failingChecksDetail": "Kontrollet e detyrueshme të statusit po dështojnë.",
         "unstableTitle": "Disa kontrolle po dështojnë",
         "unstableDetail": "Kontrollet opsionale po dështojnë. Ato nuk do ta bllokojnë bashkimin.",
         "draftTitle": "Kërkesë bashkimi paraprake",

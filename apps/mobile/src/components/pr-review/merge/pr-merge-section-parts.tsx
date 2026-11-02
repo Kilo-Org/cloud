@@ -12,10 +12,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
-import {
-  type MergeBlockedReason,
-  type PrOverviewDto,
-} from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { type MergeBlockedReason } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
 // Mid-sentence lowercase noun (common.*) vs the capitalized standalone
 // label (prReview.terms.*) — see providerPrTermKey.
@@ -23,26 +20,22 @@ import {
 // capitalized standalone label; languages case-decline them apart.
 type TerminalNounKey = 'common.mergeRequest' | 'common.pullRequest';
 
-function terminalLabelKey(
-  state: PrOverviewDto['state'],
+function closedLabelKey(
   nounKey: TerminalNounKey
-):
-  | 'prReview.merge.terminal.alreadyMerged'
-  | 'prReview.merge.terminal.closedMergeRequest'
-  | 'prReview.merge.terminal.closed' {
-  if (state === 'merged') {
-    return 'prReview.merge.terminal.alreadyMerged';
-  }
+): 'prReview.merge.terminal.closedMergeRequest' | 'prReview.merge.terminal.closed' {
   return nounKey === 'common.mergeRequest'
     ? 'prReview.merge.terminal.closedMergeRequest'
     : 'prReview.merge.terminal.closed';
 }
 
-export function TerminalChip({
-  state,
+/**
+ * The sentence a closed review still needs. A merged review renders nothing at
+ * this slot: its state chip and the merged-by line already say it merged, so a
+ * box repeating them only doubled the text.
+ */
+export function ClosedChip({
   nounKey = 'common.pullRequest',
 }: Readonly<{
-  state: PrOverviewDto['state'];
   /**
    * The provider's own noun for the closed sentence (s6): a GitLab merge
    * request says "merge request", GitHub and Bitbucket say "pull request".
@@ -50,7 +43,7 @@ export function TerminalChip({
   nounKey?: TerminalNounKey;
 }>) {
   const { t } = useTranslation();
-  const label = t(terminalLabelKey(state, nounKey));
+  const label = t(closedLabelKey(nounKey));
   return (
     <View className="gap-2">
       <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
@@ -115,9 +108,11 @@ function BlockedReasonRow({ reason }: Readonly<{ reason: MergeBlockedReason }>) 
       <Icon size={16} color={tone} />
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium text-foreground">{reason.title}</Text>
-        <Text variant="muted" className="text-xs">
-          {reason.detail}
-        </Text>
+        {reason.detail === undefined ? null : (
+          <Text variant="muted" className="text-xs">
+            {reason.detail}
+          </Text>
+        )}
       </View>
     </View>
   );

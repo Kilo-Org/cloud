@@ -441,7 +441,6 @@
         "rebase": "Asas semula"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "Permintaan tarik ini telah ditutup",
         "closedMergeRequest": "Permintaan gabungan ini telah ditutup"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Semakan wajib belum diterima",
         "requiredReviewsDetail": "Kelulusan daripada penyemak yang ditetapkan belum diterima atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan yang tidak wajib gagal. Kegagalan ini tidak menghalang penggabungan.",
         "draftTitle": "PR draf",

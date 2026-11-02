@@ -2986,7 +2986,6 @@
         "squash": "压缩合并"
       },
       "terminal": {
-        "alreadyMerged": "已合并",
         "closed": "此拉取请求已关闭",
         "closedMergeRequest": "此合并请求已关闭"
       },
@@ -3003,7 +3002,6 @@
         "requiredReviewsTitle": "尚未获得所需的审查批准",
         "requiredReviewsDetail": "尚未获得必需审查者的批准，或仍在等待批准。",
         "failingChecksTitle": "必需检查未通过",
-        "failingChecksDetail": "必需的状态检查未通过。",
         "unstableTitle": "部分检查未通过",
         "unstableDetail": "部分非必需检查未通过，但不影响合并。",
         "draftTitle": "拉取请求草稿",

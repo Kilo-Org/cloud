@@ -441,7 +441,6 @@
         "rebase": "Asosni almashtirish"
       },
       "terminal": {
-        "alreadyMerged": "Allaqachon birlashtirilgan",
         "closed": "Bu PR yopilgan",
         "closedMergeRequest": "Bu merge so‘rovi yopilgan"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Majburiy ko'rib chiqishlar yetishmayapti",
         "requiredReviewsDetail": "Belgilangan tekshiruvchilar hali tasdiqlamagan yoki ularning tasdig'i kutilmoqda.",
         "failingChecksTitle": "Majburiy tekshiruvlar o'tmadi",
-        "failingChecksDetail": "Majburiy holat tekshiruvlari xato bilan yakunlanmoqda.",
         "unstableTitle": "Ayrim tekshiruvlar o'tmadi",
         "unstableDetail": "Majburiy bo'lmagan tekshiruvlar xato bilan yakunlanmoqda. Ular birlashtirishga to'sqinlik qilmaydi.",
         "draftTitle": "Qoralama PR",

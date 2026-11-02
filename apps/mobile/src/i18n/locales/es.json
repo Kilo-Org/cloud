@@ -3030,7 +3030,6 @@
         "squash": "Compactación"
       },
       "terminal": {
-        "alreadyMerged": "Ya fusionada",
         "closed": "PR cerrada",
         "closedMergeRequest": "Este merge request está cerrado"
       },
@@ -3047,7 +3046,6 @@
         "requiredReviewsTitle": "Faltan revisiones obligatorias",
         "requiredReviewsDetail": "Faltan aprobaciones de los revisores obligatorios o siguen pendientes.",
         "failingChecksTitle": "Verificaciones obligatorias con errores",
-        "failingChecksDetail": "Las verificaciones de estado obligatorias están fallando.",
         "unstableTitle": "Fallan algunas verificaciones",
         "unstableDetail": "Algunas verificaciones opcionales están fallando. No bloquearán la fusión.",
         "draftTitle": "PR en borrador",

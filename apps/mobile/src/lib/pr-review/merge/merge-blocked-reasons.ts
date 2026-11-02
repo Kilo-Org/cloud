@@ -37,7 +37,13 @@ export type MergeBlockedReason = {
   iconKind: MergeBlockedReasonId;
   severity: MergeBlockedReasonSeverity;
   title: string;
-  detail: string;
+  /**
+   * What the title cannot say on its own: the action to take, or a nuance such
+   * as a non-required check not blocking the merge. A reason whose title is
+   * already the whole story leaves this out, so the row does not print the same
+   * sentence twice.
+   */
+  detail?: string;
 };
 
 export type MergeBlockedReasonsArgs = {
@@ -102,7 +108,6 @@ function requiredReviewsReason(): MergeBlockedReason {
     iconKind: 'required-reviews',
     severity: 'warn',
     title: i18n.t('prReview.merge.blocked.requiredReviewsTitle'),
-    detail: i18n.t('prReview.merge.blocked.requiredReviewsDetail'),
   };
 }
 
@@ -112,7 +117,6 @@ function failingChecksReason(): MergeBlockedReason {
     iconKind: 'failing-checks',
     severity: 'destructive',
     title: i18n.t('prReview.merge.blocked.failingChecksTitle'),
-    detail: i18n.t('prReview.merge.blocked.failingChecksDetail'),
   };
 }
 

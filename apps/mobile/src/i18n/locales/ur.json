@@ -441,7 +441,6 @@
         "rebase": "ریبیس"
       },
       "terminal": {
-        "alreadyMerged": "پہلے ہی مرج شدہ",
         "closed": "یہ پل ریکویسٹ بند ہے",
         "closedMergeRequest": "یہ مرج ریکویسٹ بند ہے"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "ضروری جائزے باقی ہیں",
         "requiredReviewsDetail": "ضروری جائزہ لینے والوں کی منظوری ابھی نہیں ملی یا زیر التوا ہے۔",
         "failingChecksTitle": "ضروری جانچیں ناکام ہیں",
-        "failingChecksDetail": "حالت کی ضروری جانچیں ناکام ہو رہی ہیں۔",
         "unstableTitle": "کچھ جانچیں ناکام ہیں",
         "unstableDetail": "اختیاری جانچیں ناکام ہو رہی ہیں۔ ان کی ناکامی مرج میں رکاوٹ نہیں بنے گی۔",
         "draftTitle": "پل ریکویسٹ کا مسودہ",

@@ -2,7 +2,6 @@ import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -26,7 +25,9 @@ export function MethodPicker({
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <PrReviewSectionLabel label={t('prReview.merge.methodLabel')} />
+      {/* Same label style as the sheet's commit-title and commit-message
+          fields: the chips below are form controls, not a section heading. */}
+      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.methodLabel')}</Text>
       <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;

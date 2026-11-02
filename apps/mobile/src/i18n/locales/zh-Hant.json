@@ -2986,7 +2986,6 @@
         "squash": "壓縮"
       },
       "terminal": {
-        "alreadyMerged": "已合併",
         "closed": "此提取請求已關閉",
         "closedMergeRequest": "此合併請求已關閉"
       },
@@ -3003,7 +3002,6 @@
         "requiredReviewsTitle": "尚未完成必要審查",
         "requiredReviewsDetail": "尚未取得必要審查者的核准。",
         "failingChecksTitle": "必要檢查未通過",
-        "failingChecksDetail": "必要狀態檢查未通過。",
         "unstableTitle": "部分檢查未通過",
         "unstableDetail": "部分非必要檢查未通過，但不影響合併。",
         "draftTitle": "提取要求草稿",

@@ -441,7 +441,6 @@
         "rebase": "Bu'uura jijjiiruu"
       },
       "terminal": {
-        "alreadyMerged": "Duraan walitti makameera",
         "closed": "Gaaffiin walitti makuu kun cufameera",
         "closedMergeRequest": "Gaaffiin walitti makuu kun cufameera"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Gamaaggamni barbaachisu hin jiru",
         "requiredReviewsDetail": "Mirkaneessi gamaaggamtoota barbaachisan irraa argamuu qabu hin jiru ykn eegamaa jira.",
         "failingChecksTitle": "Qorannoowwan barbaachisoo hin milkoofne",
-        "failingChecksDetail": "Qorannoowwan haalaa barbaachisoo ta'an hin milkoofne.",
         "unstableTitle": "Qorannoowwan tokko tokko hin milkoofne",
         "unstableDetail": "Qorannoowwan dirqama hin taane hin milkoofne. Isaan walitti makuu hin dhorkan.",
         "draftTitle": "Wixinee gaaffii walitti makuu",

@@ -441,7 +441,6 @@
         "rebase": "Újraalapozás"
       },
       "terminal": {
-        "alreadyMerged": "Már összevonva",
         "closed": "A módosítási kérelem lezárva",
         "closedMergeRequest": "Ez a merge request le van zárva"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Hiányoznak a kötelező kódellenőrzések",
         "requiredReviewsDetail": "A kötelező kódellenőrök jóváhagyásai hiányoznak vagy még függőben vannak.",
         "failingChecksTitle": "Sikertelen kötelező ellenőrzések",
-        "failingChecksDetail": "A kötelező állapotellenőrzések sikertelenek.",
         "unstableTitle": "Egyes ellenőrzések sikertelenek",
         "unstableDetail": "Egyes nem kötelező ellenőrzések sikertelenek. Ezek nem akadályozzák az összevonást.",
         "draftTitle": "PR-piszkozat",

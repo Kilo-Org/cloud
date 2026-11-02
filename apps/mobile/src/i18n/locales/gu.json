@@ -441,7 +441,6 @@
         "rebase": "રીબેઝ"
       },
       "terminal": {
-        "alreadyMerged": "પહેલેથી મર્જ થયેલી",
         "closed": "આ પુલ રિક્વેસ્ટ બંધ છે",
         "closedMergeRequest": "આ મર્જ રિક્વેસ્ટ બંધ છે"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "જરૂરી સમીક્ષાઓ બાકી છે",
         "requiredReviewsDetail": "જરૂરી સમીક્ષકોની મંજૂરી મળી નથી અથવા હજી બાકી છે.",
         "failingChecksTitle": "નિષ્ફળ થતી જરૂરી તપાસો",
-        "failingChecksDetail": "સ્થિતિની જરૂરી તપાસો નિષ્ફળ થઈ રહી છે.",
         "unstableTitle": "કેટલીક તપાસો નિષ્ફળ થઈ રહી છે",
         "unstableDetail": "ફરજિયાત ન હોય તેવી તપાસો નિષ્ફળ થઈ રહી છે. તે મર્જ થતું રોકશે નહીં.",
         "draftTitle": "ડ્રાફ્ટ પુલ રિક્વેસ્ટ",

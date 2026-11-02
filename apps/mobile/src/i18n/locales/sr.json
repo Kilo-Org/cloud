@@ -448,7 +448,6 @@
         "rebase": "Prebaziranje"
       },
       "terminal": {
-        "alreadyMerged": "Već spojeno",
         "closed": "Zahtev za spajanje je zatvoren",
         "closedMergeRequest": "Ovaj merge request je zatvoren"
       },
@@ -465,7 +464,6 @@
         "requiredReviewsTitle": "Nedostaju obavezni pregledi",
         "requiredReviewsDetail": "Nedostaju odobrenja obaveznih recenzenata ili se još čekaju.",
         "failingChecksTitle": "Neuspešne obavezne provere",
-        "failingChecksDetail": "Obavezne provere statusa nisu prošle.",
         "unstableTitle": "Neke provere nisu prošle",
         "unstableDetail": "Neobavezne provere nisu prošle. One neće sprečiti spajanje.",
         "draftTitle": "PR u nacrtu",

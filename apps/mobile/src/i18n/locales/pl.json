@@ -3074,7 +3074,6 @@
         "squash": "Połączenie commitów"
       },
       "terminal": {
-        "alreadyMerged": "Już scalono",
         "closed": "PR zamknięty",
         "closedMergeRequest": "Merge request zamknięty"
       },
@@ -3091,7 +3090,6 @@
         "requiredReviewsTitle": "Brak wymaganych przeglądów",
         "requiredReviewsDetail": "Osoby wyznaczone do przeglądu nie zatwierdziły jeszcze zmian.",
         "failingChecksTitle": "Błędy wymaganych kontroli",
-        "failingChecksDetail": "Wymagane kontrole statusu wykazują błędy.",
         "unstableTitle": "Niektóre kontrole wykazują błędy",
         "unstableDetail": "Niewymagane kontrole wykazują błędy. Nie blokują one scalania.",
         "draftTitle": "Wersja robocza PR",

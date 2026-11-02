@@ -462,7 +462,6 @@
         "rebase": "Athbhunú"
       },
       "terminal": {
-        "alreadyMerged": "Cumaiscthe cheana",
         "closed": "Tá an t-iarratas tarraingthe seo dúnta",
         "closedMergeRequest": "Tá an t-iarratas cumaisc seo dúnta"
       },
@@ -479,7 +478,6 @@
         "requiredReviewsTitle": "Athbhreithnithe riachtanacha ar iarraidh",
         "requiredReviewsDetail": "Tá formheasanna ó na hathbhreithneoirí riachtanacha ar iarraidh nó ar feitheamh.",
         "failingChecksTitle": "Seiceálacha riachtanacha ag teipeadh",
-        "failingChecksDetail": "Tá seiceálacha stádais riachtanacha ag teipeadh.",
         "unstableTitle": "Tá roinnt seiceálacha ag teipeadh",
         "unstableDetail": "Tá seiceálacha neamhriachtanacha ag teipeadh. Ní chuirfidh siad bac ar an gcumasc.",
         "draftTitle": "Dréacht d'iarratas tarraingthe",

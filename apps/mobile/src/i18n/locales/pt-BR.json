@@ -3036,7 +3036,6 @@
         "squash": "Agrupar"
       },
       "terminal": {
-        "alreadyMerged": "Já mesclado",
         "closed": "Este pull request está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -3053,7 +3052,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "Ainda faltam aprovações dos revisores exigidos.",
         "failingChecksTitle": "Verificações obrigatórias com falha",
-        "failingChecksDetail": "As verificações de status obrigatórias estão falhando.",
         "unstableTitle": "Algumas verificações estão falhando",
         "unstableDetail": "Algumas verificações opcionais estão falhando, mas não impedem a mesclagem.",
         "draftTitle": "PR em rascunho",

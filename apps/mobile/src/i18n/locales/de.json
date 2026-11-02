@@ -2986,7 +2986,6 @@
         "squash": "Bündeln"
       },
       "terminal": {
-        "alreadyMerged": "Bereits zusammengeführt",
         "closed": "Dieser Pull-Request ist geschlossen",
         "closedMergeRequest": "Dieser Merge-Request ist geschlossen"
       },
@@ -3003,7 +3002,6 @@
         "requiredReviewsTitle": "Erforderliche Reviews fehlen",
         "requiredReviewsDetail": "Die erforderlichen Freigaben der Reviewer fehlen oder stehen noch aus.",
         "failingChecksTitle": "Erforderliche Prüfungen fehlgeschlagen",
-        "failingChecksDetail": "Erforderliche Statusprüfungen sind fehlgeschlagen.",
         "unstableTitle": "Einige Prüfungen sind fehlgeschlagen",
         "unstableDetail": "Optionale Prüfungen sind fehlgeschlagen. Sie verhindern das Zusammenführen nicht.",
         "draftTitle": "Pull-Request-Entwurf",

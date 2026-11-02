@@ -441,7 +441,6 @@
         "rebase": "Bazanı dəyişmə"
       },
       "terminal": {
-        "alreadyMerged": "Artıq birləşdirilib",
         "closed": "Bu birləşdirmə sorğusu bağlanıb",
         "closedMergeRequest": "Bu merge sorğusu bağlanıb"
       },
@@ -458,7 +457,6 @@
         "requiredReviewsTitle": "Məcburi kod baxışları tamamlanmayıb",
         "requiredReviewsDetail": "Kodu nəzərdən keçirməli olan şəxslərin təsdiqləri yoxdur və ya hələ gözlənilir.",
         "failingChecksTitle": "Məcburi yoxlamalar uğursuzdur",
-        "failingChecksDetail": "Məcburi status yoxlamaları uğursuzdur.",
         "unstableTitle": "Bəzi yoxlamalar uğursuzdur",
         "unstableDetail": "Məcburi olmayan yoxlamalar uğursuzdur. Bunlar birləşdirməyə mane olmayacaq.",
         "draftTitle": "Qaralama birləşdirmə sorğusu",

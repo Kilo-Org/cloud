@@ -34,9 +34,9 @@ import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
+  ClosedChip,
   MergeabilityCheckingRow,
   MergeabilityTimedOutRow,
-  TerminalChip,
 } from '@/components/pr-review/merge/pr-merge-section-parts';
 
 type PrMergeSectionProps = Readonly<{
@@ -168,9 +168,10 @@ export function PrMergeSection({
   const updateBranch = useUpdateBranchMutation(prRef);
   const disableAutoMerge = useDisableAutoMergeMutation(prRef);
 
-  // Terminal state.
+  // Terminal state. A merged review says so in the state chip and the
+  // merged-by line above, so only a closed one renders here.
   if (status === 'terminal') {
-    return <TerminalChip state={overview.state} />;
+    return overview.state === 'merged' ? null : <ClosedChip />;
   }
 
   // Unknown mergeability — poll until it resolves or the timer expires.

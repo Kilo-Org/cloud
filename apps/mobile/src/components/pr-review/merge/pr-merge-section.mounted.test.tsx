@@ -43,7 +43,7 @@ vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   BlockedPanel: 'BlockedPanel',
   MergeabilityCheckingRow: 'MergeabilityCheckingRow',
   MergeabilityTimedOutRow: 'MergeabilityTimedOutRow',
-  TerminalChip: 'TerminalChip',
+  ClosedChip: 'ClosedChip',
 }));
 
 const POLL_INTERVAL_MS = 3000;
@@ -194,5 +194,23 @@ describe('PrMergeSection mergeability poll', () => {
 
     advance(POLL_INTERVAL_MS * (POLL_MAX_TICKS + 5));
     expect(onRefetch).toHaveBeenCalledOnce();
+  });
+
+  it('renders the closed sentence and nothing for a merged review', () => {
+    const onRefetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    act(() => {
+      renderer = TestRenderer.create(sectionElement(overview({ state: 'closed' }), onRefetch));
+    });
+    const mounted = renderer;
+    if (!mounted) {
+      throw new Error('the merge section did not mount');
+    }
+    expect(countOf(mounted, 'ClosedChip')).toBe(1);
+
+    act(() => {
+      mounted.update(sectionElement(overview({ state: 'merged' }), onRefetch));
+    });
+    expect(countOf(mounted, 'ClosedChip')).toBe(0);
+    expect(countOf(mounted, 'Button')).toBe(0);
   });
 });

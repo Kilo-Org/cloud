@@ -508,7 +508,6 @@
         "rebase": "Rebase"
       },
       "terminal": {
-        "alreadyMerged": "Already merged",
         "closed": "This pull request is closed",
         "closedMergeRequest": "This merge request is closed"
       },
@@ -525,7 +524,6 @@
         "requiredReviewsTitle": "Required reviews missing",
         "requiredReviewsDetail": "Approvals from the required reviewers are missing or pending.",
         "failingChecksTitle": "Failing required checks",
-        "failingChecksDetail": "Required status checks are failing.",
         "unstableTitle": "Some checks are failing",
         "unstableDetail": "Non-required checks are failing. They will not block the merge.",
         "draftTitle": "Draft pull request",

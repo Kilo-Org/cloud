@@ -416,17 +416,17 @@ describe('PrReviewChecksSection view-on-provider link', () => {
 // carried `bg-muted` inside a `bg-secondary` card, and `--muted` equals
 // `--secondary` in BOTH themes (apps/mobile/src/global.css), so the bars
 // painted the card's own colour. This suite pins the fixed render path: the
-// placeholder mirrors the card that settles here, the compact "no checks
-// reported" body — one `p-4` card, a copy-line bar and a bar at the button's
-// 44 dp floor — so the Review button and the merge section below keep their
-// place at the swap; and every bar keeps `bg-muted-soft`, the one gray that
-// differs from the card in both themes. The CSS guard below proves the
-// collision is real (`--muted` == `--secondary`) and that the token the bars
-// now use is not the collision token, so a future theme change that
-// reintroduces the collision fails here instead of shipping another empty gray
-// block. The design review at a36db10 measured what the previous four-row
-// reservation cost: a head with no checks pulled the two actions ~100 dp up
-// when the read answered.
+// placeholder reserves the card a reviewed head settles into — the count line
+// over one collapsed status group, row for row — so the Review button and the
+// merge section below it keep their place at the swap (the empty card's box
+// grew the card by one group row, measured 30.9 dp); and every bar keeps
+// `bg-muted-soft`, the one gray that differs from the card in both themes. The
+// CSS guard below proves the collision is real (`--muted` == `--secondary`) and
+// that the token the bars now use is not the collision token, so a future theme
+// change that reintroduces the collision fails here instead of shipping another
+// empty gray block. The design review at a36db10 measured what the previous
+// four-row reservation cost: a head with no checks pulled the two actions
+// ~100 dp up when the read answered.
 describe('PrReviewChecksSection loading state mirrors the settled card', () => {
   const previous = { isLoading: false };
 
@@ -439,36 +439,6 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
   });
 
   function mountLoading(serverWebUrl: string | null = 'https://github.com/group/sub/repo/pull/12') {
-    const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
-      current: undefined,
-    };
-    act(() => {
-      renderer.current = TestRenderer.create(
-        <ProviderPrWebUrlProvider value={serverWebUrl}>
-          {createElement(PrReviewChecksSection, {
-            owner: 'group/sub',
-            repo: 'repo',
-            number: 12,
-            headSha: 'head',
-          })}
-        </ProviderPrWebUrlProvider>
-      );
-    });
-    const created = renderer.current;
-    if (!created) {
-      throw new Error('renderer was not created');
-    }
-    return created;
-  }
-
-  function mountSettledEmpty(
-    serverWebUrl: string | null = 'https://github.com/group/sub/repo/pull/12'
-  ) {
-    query.isLoading = false;
-    query.data = {
-      checkRuns: [],
-      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
-    };
     const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -536,29 +506,36 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
     });
   });
 
-  it('mirrors the settled card: one padded card with a copy bar and the button bar', () => {
+  it('mirrors the settled card: a count header over one status group', () => {
     const loadingRenderer = mountLoading();
     const loadingCard = findCard(loadingRenderer);
 
-    // The card that settles for a head with no runs is the compact one, so its
-    // shell — padding and the gap between the copy line and the button — is
-    // what the placeholder has to reproduce to keep the page still.
-    const settledRenderer = mountSettledEmpty();
+    // The card settles for a head that reports runs — what a review screen
+    // opens — as a count line over one collapsed status group, so the
+    // placeholder reserves that box: the same header row and the same row
+    // shell as the settled group row, not the empty card's `p-4` box.
+    query.isLoading = false;
+    const settledRenderer = mountSection();
     const settledCard = findCard(settledRenderer);
-    expect(settledCard.findAllByType('Button' as never)).toHaveLength(1);
-    for (const token of ['rounded-lg', 'bg-secondary', 'p-4', 'gap-3']) {
-      expect(tokens(settledCard)).toContain(token);
-      expect(tokens(loadingCard)).toContain(token);
+    const headerTokens = ['border-b-[0.5px]', 'border-hair-soft', 'px-4', 'py-2'];
+    expect(
+      settledCard.findAll(node => headerTokens.every(one => tokens(node).includes(one)))
+    ).toHaveLength(1);
+    expect(
+      loadingCard.findAll(node => headerTokens.every(one => tokens(node).includes(one)))
+    ).toHaveLength(1);
+
+    const settledRow = groupRows(settledRenderer)[0];
+    const loadingRow = rowShells(loadingCard)[0];
+    if (!settledRow || !loadingRow) {
+      throw new Error('the row shell did not render');
     }
-
-    // One bar per line of that card: the copy line, then the view-on-provider
-    // button at its default 44 dp floor. A bar taller than its line — or an
-    // extra row — is what moved the Review button and the merge section below.
-    const bars = loadingCard.findAll(node => String(node.type) === 'Skeleton');
-    expect(bars.map(bar => tokens(bar))).toEqual([
-      expect.arrayContaining(['h-[18px]', 'w-2/3', 'bg-muted-soft']),
-      expect.arrayContaining(['h-[44px]', 'w-full', 'bg-muted-soft']),
-    ]);
+    // The pressable carries its press feedback on top of the shell classes.
+    expect(tokens(loadingRow).sort()).toEqual(
+      tokens(settledRow)
+        .filter(one => one !== 'active:opacity-70')
+        .sort()
+    );
 
     act(() => {
       loadingRenderer.unmount();
@@ -566,32 +543,35 @@ describe('PrReviewChecksSection loading state mirrors the settled card', () => {
     });
   });
 
-  it('reserves no button bar for a card whose provider URL never arrived', () => {
-    // `useProviderPrWebUrl()` is null when the screen publishes no URL, and the
-    // settled card then renders only its copy line. A reserved control there
-    // would leave a 56 dp gap the settled card collapses.
-    const loadingRenderer = mountLoading(null);
-    const settledRenderer = mountSettledEmpty(null);
+  it('reserves the same box whether or not the screen published a provider URL', () => {
+    // The reserved box is the settled list card, which carries no control, so
+    // a provider URL that never arrives cannot leave a control-sized gap.
+    const withUrl = mountLoading();
+    const withoutUrl = mountLoading(null);
+    const barsOf = (card: TestRenderer.ReactTestInstance) =>
+      card.findAll(node => String(node.type) === 'Skeleton').map(bar => tokens(bar));
 
-    expect(findCard(settledRenderer).findAllByType('Button' as never)).toHaveLength(0);
-    const bars = findCard(loadingRenderer).findAll(node => String(node.type) === 'Skeleton');
-    expect(bars.map(bar => tokens(bar))).toEqual([
-      expect.arrayContaining(['h-[18px]', 'w-2/3', 'bg-muted-soft']),
+    expect(barsOf(findCard(withoutUrl))).toEqual(barsOf(findCard(withUrl)));
+    expect(barsOf(findCard(withoutUrl))).toEqual([
+      expect.arrayContaining(['h-4', 'w-2/5', 'bg-muted-soft']),
+      expect.arrayContaining(['h-4', 'w-4', 'bg-muted-soft']),
+      expect.arrayContaining(['h-4', 'w-1/3', 'bg-muted-soft']),
     ]);
 
     act(() => {
-      loadingRenderer.unmount();
-      settledRenderer.unmount();
+      withUrl.unmount();
+      withoutUrl.unmount();
     });
   });
 
-  it('renders no placeholder rows or hairlines, so it cannot outgrow the settled card', () => {
+  it('reserves exactly one status group, so only further groups can grow the card', () => {
     const renderer = mountLoading();
     const card = findCard(renderer);
 
-    expect(rowShells(card)).toHaveLength(0);
-    expect(card.findAll(node => tokens(node).includes('border-b-[0.5px]'))).toHaveLength(0);
-    expect(card.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
+    expect(rowShells(card)).toHaveLength(1);
+    expect(card.findAll(node => tokens(node).includes('border-b-[0.5px]'))).toHaveLength(1);
+    expect(card.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
+    expect(tokens(card)).not.toContain('p-4');
 
     act(() => {
       renderer.unmount();

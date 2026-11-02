@@ -53,6 +53,7 @@ export {
 };
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Alert: { alert: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',

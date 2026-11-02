@@ -1,6 +1,7 @@
 import { getShareExtensionKey } from 'expo-share-intent';
 
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
+import { handleArtifactMirrorFixturePath } from '@/lib/artifacts/artifact-mirror-fixture';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
@@ -37,6 +38,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
   if (__DEV__ && handleHomeFixturePath(path)) {
+    return null;
+  }
+  // Dev-only artifact mirror fixture links
+  // (`kiloapp:///dev/artifact-mirror-fixture/seed|release`).
+  if (__DEV__ && handleArtifactMirrorFixturePath(path)) {
     return null;
   }
   if (__DEV__) {

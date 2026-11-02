@@ -1846,7 +1846,6 @@
       "defaultProfileResolvesTo": "目前對應 {{name}}",
       "defaultProfileResolvesToAccessibility": "預設設定檔：{{name}}",
       "manageProfiles": "管理個人資料",
-      "noProfiles": "還沒有個人資料。建立一個以新增環境變數、MCP 伺服器和技能。",
       "advancedConfig": "進階配置",
       "advancedConfigDescription": "僅對本次工作階段生效。另存為設定檔可供下次使用。",
       "saveAsProfile": "另存為設定檔",

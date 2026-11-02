@@ -319,9 +319,13 @@ export default async function spawnCloudAgentSession(
     cloudAgentSessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
-    // No session holds these uploads, so hand the rows back for run-level
-    // cleanup instead of leaving the objects behind.
-    await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    // The worker registers or starts the session before it answers, so only an
+    // answer that proves it refused this prepare leaves no session behind. A
+    // timeout, a request the caller closed, or a 5xx proves nothing: the session
+    // may exist and still reference these rows, so those keep them linked.
+    if (refusedBeforeAdmission(workerRefusalStatus(error))) {
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    }
     if (error instanceof InsufficientCreditsError) {
       return { response: INSUFFICIENT_CREDITS_RESPONSE };
     }

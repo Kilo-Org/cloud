@@ -635,6 +635,33 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
+  it.each([
+    [400, true],
+    [408, false],
+    [499, false],
+    [503, false],
+  ] as const)(
+    'returns the linked attachments for a prepare rejection of %s only when it proves a refusal',
+    async (status, releases) => {
+      mockPrepareSession.mockRejectedValueOnce(
+        Object.assign(new Error('prepare failed'), { httpStatus: status })
+      );
+
+      const result = await spawnCloudAgentSession(
+        { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        userIntegration,
+        'auth-token',
+        `request-prepare-${String(status)}-link`,
+        undefined,
+        { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+      );
+
+      expect(result.response).toContain('Error preparing Cloud Agent');
+      expect(mockReleaseRefusedAttachmentsFn).toHaveBeenCalledTimes(releases ? 1 : 0);
+    }
+  );
+
   it('releases the linked attachments when initiate is rejected for insufficient credits', async () => {
     const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
     mockInitiateFromPreparedSession.mockRejectedValueOnce(new InsufficientCreditsError());

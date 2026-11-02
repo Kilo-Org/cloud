@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "ไม่สามารถตรวจสอบการเชื่อมต่อ Bitbucket ได้",
       "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
+      "reconnectTitleGitLab": "เชื่อมต่อ GitLab ใหม่",
+      "reconnectTitleBitbucket": "เชื่อมต่อ Bitbucket ใหม่",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน",
       "gitlabDescription": "ตรวจสอบ merge request บนมือถือ",
       "gitlabInstanceMismatchTitle": "การเชื่อมต่อ GitLab เป็นของอินสแตนซ์อื่น",
@@ -1614,6 +1616,8 @@
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_one": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_other": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
     "decision": {

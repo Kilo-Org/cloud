@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "লোড হওয়া পর্যন্ত সংযোগের অবস্থা উপলব্ধ নয়।",
       "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
@@ -1614,6 +1616,8 @@
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_one": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_other": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {

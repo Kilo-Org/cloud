@@ -121,6 +121,15 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
+  // Enterprise SSO is foundational to auth, so the WorkOS directory-event
+  // poller runs with the core stack. It has no local dependencies: it reaches
+  // the WorkOS API directly and keeps its cursor in its own Durable Object
+  // SQLite, so it needs neither Postgres nor the web app.
+  'cloudflare-scim-sync': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'services/scim-sync',
+  },
   'user-data-export': {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
@@ -278,13 +287,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'observability',
     dependsOn: [],
     dir: 'services/ai-attribution',
-  },
-  // Polls the WorkOS Events API; no local dependencies — it needs only a
-  // WorkOS API key and reaches the upstream API directly.
-  'cloudflare-scim-sync': {
-    group: 'observability',
-    dependsOn: [],
-    dir: 'services/scim-sync',
   },
   grafana: { group: 'observability', dependsOn: [] },
   // The app POSTs its client-observed latency batches to the latency-ingest

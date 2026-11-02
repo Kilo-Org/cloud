@@ -561,11 +561,9 @@ function sameAttempt(kept: Displaced, asked: Asked): boolean {
     kept.text === asked.text &&
     kept.model === asked.model &&
     kept.effort === asked.effort &&
-    kept.images.length === asked.images.length &&
-    kept.images.every(
-      (image, index) =>
-        image.data === asked.images[index].data && image.media === asked.images[index].media
-    )
+    /* The pictures are compared as they were stored: the same image is the same
+       base64, and a comparison per part would only re-index what this folds. */
+    JSON.stringify(kept.images) === JSON.stringify(asked.images)
   );
 }
 
@@ -737,23 +735,25 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
       { text: displaced.text, images: displaced.images },
       { model: displaced.model, effort: displaced.effort }
     );
-    /* The question is the slot's now, or waiting behind the answer arriving.
-       It is written down there before the kept list drops it, so a record of
-       the words exists at every moment; a write that refuses leaves the kept
-       entry in place, and a reopen draws that one attempt once. The chat may
-       have moved onto another session while it was asked, so both writes name
-       the session it is on now. */
-    const at = snapshotOf(current).sessionId;
-    try {
-      await rememberAsked(at, {
-        text: displaced.text,
-        images: displaced.images,
-        model: displaced.model,
-        effort: displaced.effort,
-      });
-      await rememberKept(at, snapshotOf(at).displaced);
-    } catch {
-      /* The kept entry stays written down, which is the words' copy. */
+    /* The chat may have moved onto another session while it was asked, so both
+       writes name the session it is on now. */
+    const at = snapshotOf(current);
+    /* A question that joined the waiting line is not in the slot, and it is
+       held in memory only, as every queued question is: writing it down here
+       would put it over the slot's record and claim it was asked. The kept
+       entry stays written down instead, so the words survive a restart. */
+    if (at.asked !== null) {
+      try {
+        await rememberAsked(at.sessionId, {
+          text: displaced.text,
+          images: displaced.images,
+          model: displaced.model,
+          effort: displaced.effort,
+        });
+        await rememberKept(at.sessionId, at.displaced);
+      } catch {
+        /* The kept entry stays written down, which is the words' copy. */
+      }
     }
     return;
   }

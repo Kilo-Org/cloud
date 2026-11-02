@@ -20,6 +20,7 @@ import {
   change,
   CHAT_UNAVAILABLE_KEY,
   type ChatTarget,
+  type Displaced,
   forgetState,
   moveState,
   NOTHING,
@@ -38,7 +39,16 @@ import {
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
-import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
+import {
+  askedIn,
+  forgetAsked,
+  keptIn,
+  migrateAsked,
+  moveQuestions,
+  rememberAsked,
+  rememberFirstQuestion,
+  rememberKept,
+} from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
   moveWebSearchEnabled,
@@ -480,7 +490,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
     });
     const database = await open();
-    const asked = await askedIn(current);
+    const [asked, kept] = await Promise.all([askedIn(current), keptIn(current)]);
     change(current, {
       model: modelOfSession(database, current) ?? '',
       effort: effortOfSession(database, current),
@@ -488,6 +498,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
+      displaced: kept,
       status: 'idle',
       failed: null,
       failureKey: null,
@@ -498,7 +509,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const { handle, scope } = opened;
   try {
     const turns = await runtime.runPromise(handle.history);
-    const asked = await askedIn(sessionId);
+    const [asked, kept] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
     const database = await open();
     chats.set(sessionId, {
       handle,
@@ -519,6 +530,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
+      displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
@@ -530,6 +542,42 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
   }
+}
+
+/**
+ * Keeps the question that has no answer in the transcript when a later one takes
+ * its slot: the words, the images, the model it was asked of, and how many turns
+ * came before it, so it is drawn where it was said rather than at the top.
+ *
+ * Its bubble carries the same failure footer and Copy to composer it had in the
+ * slot, and a Retry that asks it again.
+ */
+async function keepAsked(sessionId: string): Promise<void> {
+  const held = snapshotOf(sessionId);
+  /* A question that is still being answered has not failed yet: the slot holds
+     the attempt in progress, and only a question the chat has stopped working
+     on has a bubble to keep. */
+  if (held.asked === null || held.status !== 'idle') {
+    return;
+  }
+  const kept: Displaced = {
+    id: Math.max(0, ...held.displaced.map(one => one.id)) + 1,
+    text: held.asked,
+    images: held.askedImages,
+    model: held.askedModel ?? held.model,
+    effort: held.askedEffort,
+    afterTurns: held.turns.length,
+    outcome: held.failureKey === null ? 'stopped' : 'failed',
+  };
+  const displaced = [...held.displaced, kept];
+  change(sessionId, {
+    displaced,
+    asked: null,
+    askedImages: [],
+    askedModel: null,
+    askedEffort: null,
+  });
+  await rememberKept(sessionId, displaced);
 }
 
 /**
@@ -571,6 +619,17 @@ export async function say(
        the one the switches name at this moment. */
     if (held === undefined) {
       throw new Error('the chat is not open');
+    }
+    /* A question with no answer keeps its place in the transcript. It is done
+       before the slot is written, so the words this send takes the place of are
+       already safe if the send itself fails. */
+    const before = snapshotOf(current);
+    await keepAsked(current);
+    /* Nothing said in it yet, so this question is the one the chat is named for
+       while no answer is stored. A question asked again after another one took
+       its place is not the first: the name is already written. */
+    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+      await rememberFirstQuestion(current, text);
     }
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
@@ -623,10 +682,33 @@ const reason = (error: unknown): string =>
 const openReason = (error: unknown): string =>
   error instanceof Error ? error.message : 'the chat could not be opened';
 
-/** Asks again what was asked and never answered. */
-export async function retryChat(sessionId: string): Promise<void> {
+/**
+ * Asks again what was asked and never answered: the question in the slot, or one
+ * an earlier failure kept in the transcript.
+ *
+ * A kept question leaves the transcript to be asked, because it is on screen as
+ * the current attempt instead: one bubble per attempt, wherever it was started
+ * from. Whatever the slot holds is kept in turn, so asking an older one cannot
+ * take a newer failure with it.
+ */
+export async function retryChat(sessionId: string, displaced?: Displaced): Promise<void> {
+  if (displaced !== undefined) {
+    const current = snapshotOf(sessionId).sessionId;
+    const kept = snapshotOf(current).displaced.filter(one => one.id !== displaced.id);
+    change(current, { displaced: kept });
+    await rememberKept(current, kept);
+    await say(
+      current,
+      { text: displaced.text, images: displaced.images },
+      { model: displaced.model, effort: displaced.effort }
+    );
+    return;
+  }
   const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
+    /* The slot already holds it, so asking it again takes its place back rather
+       than leaving a second copy of itself in the transcript. */
+    change(current, { asked: null, askedImages: [], askedModel: null, askedEffort: null });
     await say(
       current,
       { text: asked, images: askedImages },
@@ -911,7 +993,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   });
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
-  await moveAsked(sessionId, handle.id);
+  await moveQuestions(sessionId, handle.id);
   await moveMcpEnabled(sessionId, handle.id);
   await moveWebSearchEnabled(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);

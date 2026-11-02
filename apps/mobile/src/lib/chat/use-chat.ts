@@ -16,8 +16,15 @@ import {
   startChat,
   stopChat,
 } from './registry';
-import { type ChatState, type ChatTarget, snapshotOf, watch, watchChats } from './state';
-import { forgetAsked, titledByAsked } from './pending';
+import {
+  type ChatState,
+  type ChatTarget,
+  type Displaced,
+  snapshotOf,
+  watch,
+  watchChats,
+} from './state';
+import { forgetQuestions, titledByAsked } from './pending';
 import { type ChatSummary, deleteChat, listChats, renameChat } from './store';
 
 /**
@@ -86,7 +93,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
     async (sessionId: string) => {
       const current = snapshotOf(sessionId).sessionId;
       await releaseChat(current);
-      await forgetAsked(current);
+      await forgetQuestions(current);
       deleteChat(await encryptedDatabase(), current);
       await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
     },
@@ -127,7 +134,8 @@ export type OpenChat = {
     images?: readonly LocalImage[]
   ) => Promise<void>;
   readonly stop: () => Promise<void>;
-  readonly retry: () => Promise<void>;
+  /** Asks again the question in the slot, or one a later send kept in the transcript. */
+  readonly retry: (displaced?: Displaced) => Promise<void>;
 };
 
 export function useChat(place: ChatPlace | null, opened: string): OpenChat {
@@ -162,13 +170,13 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
     stop: async () => {
       await stopChat(sessionId);
     },
-    retry: async () => {
+    retry: async displaced => {
       // A chat whose open failed is not held: entering it again is the retry.
       // Entering an open chat does nothing, so the order is safe either way.
       if (place !== null) {
         await enterChat(place, sessionId);
       }
-      await retryChat(sessionId);
+      await retryChat(sessionId, displaced);
     },
   };
 }

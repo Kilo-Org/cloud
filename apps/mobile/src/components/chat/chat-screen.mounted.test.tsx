@@ -23,6 +23,15 @@ const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
+  displaced: [] as {
+    id: number;
+    text: string;
+    images: { media: string; data: string }[];
+    model: string;
+    effort: 'low' | 'medium' | 'high' | null;
+    afterTurns: number;
+    outcome: 'failed' | 'stopped';
+  }[],
   failed: null as string | null,
   failureKey: null as string | null,
   retry: vi.fn(),
@@ -99,6 +108,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       answering: [],
       status: state.status,
       asked: state.asked,
+      displaced: state.displaced,
       waiting: [],
       failed: state.failed,
       failureKey: state.failureKey,
@@ -113,6 +123,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
+  displacedMessageId: (sessionId: string, id: number) => `${sessionId}:displaced:${id}`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -222,6 +233,7 @@ beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
   state.asked = null;
+  state.displaced = [];
   state.failed = null;
   state.failureKey = null;
   state.retry.mockClear();
@@ -769,6 +781,67 @@ describe('message actions', () => {
       failed.onLongPressDetails?.(state.messages[1]);
     });
     expect(sheetOf(tree).deliveryState).toEqual(failed.deliveryState);
+  });
+
+  it('keeps a failed question below the one that took its place, with its recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 1,
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    // In the order the registry draws them: the failure, then the question that
+    // took its place.
+    state.messages = [
+      { info: { id: 's1:displaced:1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:1');
+
+    // It keeps the footer and the recovery it had in the slot.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+
+    act(() => {
+      kept.onRetryMessage?.(state.messages[0]);
+    });
+    // Its own Retry asks that question, not the one in the slot.
+    expect(state.retry).toHaveBeenCalledWith(state.displaced[0]);
+
+    act(() => {
+      kept.onLongPressDetails?.(state.messages[0]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
+  });
+
+  it('reads a kept question the person stopped as interrupted', async () => {
+    state.status = 'idle';
+    state.displaced = [
+      {
+        id: 1,
+        text: 'stopped question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'stopped',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:1', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:displaced:1').deliveryState).toMatchObject({
+      reason: 'interrupted',
+    });
   });
 
   it('reads a question with no failure as stopped, with no row under the transcript', async () => {

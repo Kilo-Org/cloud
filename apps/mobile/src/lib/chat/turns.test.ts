@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getMessageDetailsContent } from '@/components/agents/message-details-content';
 
-import { askedMessageId, asMessages } from './turns';
+import { askedMessageId, asMessages, displacedMessageId } from './turns';
 import { answerParts } from './answer-parts';
 
 const turn = (id: string, role: Turn['role'], parts: Turn['parts']): Turn => ({
@@ -161,6 +161,38 @@ describe('asMessages', () => {
     expect(messages.map(message => message.info.id)).toEqual([
       askedMessageId('s1'),
       's1:waiting:0',
+    ]);
+  });
+
+  it('draws a kept question among the turns it was said between, and one past the end last', () => {
+    const question = (id: number, afterTurns: number) => ({
+      id,
+      text: `question ${id}`,
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns,
+      outcome: 'failed' as const,
+    });
+    const messages = asMessages({
+      sessionId: 's1',
+      turns: [
+        turn('t1', 'user', [text('p1', 'first')]),
+        turn('t2', 'assistant', [text('p2', 'an answer')]),
+      ],
+      answering: [],
+      asked: null,
+      askedImages: [],
+      // The second was displaced after more turns than the store now holds.
+      displaced: [question(1, 0), question(2, 7)],
+      waiting: [],
+    });
+
+    expect(messages.map(message => message.info.id)).toEqual([
+      displacedMessageId('s1', 1),
+      't1',
+      't2',
+      displacedMessageId('s1', 2),
     ]);
   });
 

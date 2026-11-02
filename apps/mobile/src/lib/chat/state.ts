@@ -22,6 +22,28 @@ export type Question = {
 /** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
 export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
 
+/**
+ * A question that was asked and never answered, and one asked later took its
+ * place in the one slot a chat keeps.
+ *
+ * It stays in the transcript where it was said rather than going with the slot:
+ * the words may be all that is left of what the person pasted, so they keep
+ * their bubble, their Retry and their Copy to composer.
+ */
+export type Displaced = Question &
+  ChatTarget & {
+    /** Names its bubble, so its Retry finds it after another failure moved the list. */
+    readonly id: number;
+    /**
+     * How many stored turns came before it. The store appends a turn per
+     * answered question, so this places the bubble among the turns that were
+     * said after it and keeps the conversation in the order it happened.
+     */
+    readonly afterTurns: number;
+    /** Why it has no answer: the answer failed, or the person stopped it. */
+    readonly outcome: 'failed' | 'stopped';
+  };
+
 /** What a chat screen draws. */
 export type ChatState = {
   readonly sessionId: string;
@@ -41,6 +63,11 @@ export type ChatState = {
   readonly asked: string | null;
   /** The images that question carries. Empty when it carries none. */
   readonly askedImages: readonly LocalImage[];
+  /**
+   * The questions asked before that one and never answered, oldest first. A
+   * later send takes the one slot, and what it took the place of is kept here.
+   */
+  readonly displaced: readonly Displaced[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
   /** The effort that question was asked with. */
@@ -135,6 +162,7 @@ export const NOTHING = {
   answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
+  displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,
   waiting: [] as readonly Question[],

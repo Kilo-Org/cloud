@@ -1,7 +1,7 @@
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { clearChatBackends } from './backend-store';
 import { forgetKiloMcp, forgetMcpEnabled } from './kilo-mcp';
-import { forgetAsked } from './pending';
+import { forgetQuestions } from './pending';
 import { releaseEveryChat } from './registry';
 import { forgetRemoteMcp } from './remote-mcp';
 import { clearRemoteMcpServers } from './remote-mcp-store';
@@ -48,7 +48,7 @@ export async function clearChatsForSignOut(userId: string | null): Promise<void>
     forgetMcpEnabled(sessionIds),
     forgetWebSearchEnabled(sessionIds),
     ...sessionIds.map(async id => {
-      await forgetAsked(id);
+      await forgetQuestions(id);
     }),
   ]);
 }

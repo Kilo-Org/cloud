@@ -442,7 +442,7 @@ const {
 } = await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./scope');
-const { askedIn, forgetAsked } = await import('./pending');
+const { askedIn, firstQuestionIn, forgetAsked, keptIn } = await import('./pending');
 
 /** The words of the line that is waiting, which is what most of these read. */
 const waitingWords = (sessionId: string) => snapshotOf(sessionId).waiting.map(one => one.text);
@@ -502,6 +502,7 @@ beforeEach(async () => {
   failHistoryFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
+  creditsFailureFor = undefined;
   storedQuestions.clear();
   clonedWith = undefined;
   storedEffort = null;
@@ -978,6 +979,148 @@ describe('a send the account cannot pay for', () => {
     finish?.();
     await settled();
     expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
+  });
+});
+
+describe('a question a later send took the slot from', () => {
+  it('keeps the failed words in the transcript, before the question that replaced them', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(
+      opened,
+      { text: 'the long question', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* It keeps everything needed to ask it again, and where it was said: no
+       turn was stored for it, so it goes before every one of them. */
+    expect(held.displaced).toEqual([
+      {
+        id: 1,
+        text: 'the long question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ]);
+    expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:1`,
+      `${held.sessionId}:asked`,
+    ]);
+    // Written down with the chat, so reopening it keeps the bubble.
+    expect(await keptIn(held.sessionId)).toEqual(held.displaced);
+  });
+
+  it('is on screen above the answer that came after it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    /* The next question moves the chat onto another model, which is a session
+       the gateway answers for, so an answer lands after the failure. */
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    storedHistory = [TURN];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    // Said before the turn the store now holds, so it stays above it.
+    expect(held.turns).toEqual([TURN]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:1`,
+      TURN.id,
+    ]);
+  });
+
+  it('is asked again from its own Retry, on the model it was asked of', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+    clonedWith = undefined;
+    creditsFailureFor = undefined;
+
+    await retryChat(opened, kept);
+    await settled();
+
+    // One bubble per attempt: it left the transcript to be asked.
+    expect(snapshotOf(opened).displaced).toEqual([]);
+    expect(asked.map(one => one.text)).toEqual(['first']);
+    // Asked on the model it was asked of, not the one the chat is on now.
+    expect(clonedWith).toEqual({ model: 'kilo/one' });
+    expect(snapshotOf(opened).askedModel).toBe('kilo/one');
+
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).asked).toBeNull();
+  });
+
+  it('is still named for the question that opened the chat after it is asked again', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The first question stays the chat's name even though the second one is the
+    // question the kept list holds after the retry.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['second']);
+    expect(await firstQuestionIn(opened)).toBe('first');
+  });
+
+  it('is kept when what took its slot was the person stopping the answer', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    // The second question waits; stopping the first lets it be asked.
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).asked).toBe('second');
+  });
+
+  it('opens again with what a later send kept', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
   });
 });
 

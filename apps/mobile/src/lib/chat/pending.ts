@@ -90,16 +90,12 @@ export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
   return kept === null ? [] : keptSchema.parse(JSON.parse(kept));
 }
 
-export async function forgetKept(sessionId: string): Promise<void> {
-  await removeItem(KEPT_SCOPE, sessionId);
-}
-
 /** Remembers the words a chat is named for, which are the first ones said in it. */
 export async function rememberFirstQuestion(sessionId: string, text: string): Promise<void> {
   await setItem(NAME_SCOPE, sessionId, text);
 }
 
-export async function firstQuestionIn(sessionId: string): Promise<string | null> {
+export function firstQuestionIn(sessionId: string): Promise<string | null> {
   return getItem(NAME_SCOPE, sessionId);
 }
 
@@ -112,7 +108,7 @@ export async function firstQuestionIn(sessionId: string): Promise<string | null>
 export async function forgetQuestions(sessionId: string): Promise<void> {
   await Promise.all([
     forgetAsked(sessionId),
-    forgetKept(sessionId),
+    removeItem(KEPT_SCOPE, sessionId),
     removeItem(NAME_SCOPE, sessionId),
   ]);
 }

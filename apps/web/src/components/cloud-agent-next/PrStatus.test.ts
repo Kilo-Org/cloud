@@ -55,12 +55,14 @@ describe('passive PR status', () => {
     ).toContain('>0</span>');
   });
   it('marks bounded observations as partial', () => {
-    expect(
-      hoverCard({
-        ...pr,
-        observations: { checks: { total: 8, failed: 2 }, unresolvedThreads: 3, truncated: true },
-      })
-    ).toContain('8+ total / 2+ failed');
+    const html = hoverCard({
+      ...pr,
+      observations: { checks: { total: 8, failed: 2 }, unresolvedThreads: 3, truncated: true },
+    });
+    expect(html).toContain('Partial observations; some evidence is missing.');
+    expect(html).toContain('8 total / 2 failed');
+    expect(html).toContain('>3</span>');
+    expect(html).not.toContain('+');
   });
   it('does not change badge color for failures whose requiredness is unknown', () => {
     const badge = (value: AssociatedPr) =>

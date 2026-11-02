@@ -112,7 +112,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
             </span>
             <span className="tabular-nums">
               {pr.observations?.checks
-                ? `${pr.observations.checks.total}${pr.observations.truncated ? '+' : ''} total / ${pr.observations.checks.failed}${pr.observations.truncated ? '+' : ''} failed`
+                ? `${pr.observations.checks.total} total / ${pr.observations.checks.failed} failed`
                 : 'Unknown'}
             </span>
             <span
@@ -124,7 +124,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
             <span className="tabular-nums">
               {pr.observations?.unresolvedThreads == null
                 ? 'Unknown'
-                : `${pr.observations.unresolvedThreads}${pr.observations.truncated ? '+' : ''}`}
+                : pr.observations.unresolvedThreads}
             </span>
           </>
         )}
@@ -151,6 +151,12 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <span className="text-muted-foreground">Synced</span>
         <span>{formatRelativeSync(pr.lastSyncedAt)}</span>
       </div>
+
+      {pr.platform === 'github' && pr.observations?.truncated && (
+        <p className="text-muted-foreground text-xs">
+          Partial observations; some evidence is missing.
+        </p>
+      )}
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
         {(awaitingSync || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (

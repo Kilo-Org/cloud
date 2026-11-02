@@ -603,7 +603,20 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Missing installation ID' }, { status: 400 });
     }
 
-    await observePrWebhook({ eventType, payload, appType });
+    try {
+      await observePrWebhook({ eventType, payload, appType });
+    } catch (error) {
+      logExceptInTest(`Error observing PR webhook${logSuffix}:`, error);
+      captureException(error, {
+        tags: {
+          source: `${sentryPrefix}pr_observation`,
+          ...(eventType ? { event: eventType } : {}),
+          ...(deliveryId ? { delivery: deliveryId } : {}),
+          ...(deliveryInstallationId ? { installation: deliveryInstallationId } : {}),
+          ...(deliveryAction ? { action: deliveryAction } : {}),
+        },
+      });
+    }
 
     const integration = await findIntegrationByInstallationId(
       PLATFORM.GITHUB,

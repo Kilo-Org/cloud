@@ -149,6 +149,7 @@ export type WatchPrEvent = EventIdentity &
         actorId: string;
         body: string;
         state: string;
+        reviewAction?: 'submitted' | 'edited' | 'dismissed';
       }
     | WatchPrCiEvent
     | { kind: 'push'; ref: string; before: string; after: string; deleted: boolean }
@@ -212,6 +213,7 @@ export function normalizeWatchPrEvent(eventType: string, payload: unknown): Watc
       actorId: data.review.user.id,
       body: data.review.body,
       state: data.review.state.toLowerCase(),
+      reviewAction: data.review.submitted_at ? data.action : undefined,
     };
   }
   if (eventType === 'check_run') {
@@ -279,6 +281,7 @@ const evidenceSchema = z.object({
   actorId: id.optional(),
   body: z.string().max(4000).optional(),
   removed: z.boolean().optional(),
+  reviewAction: z.enum(['submitted', 'edited', 'dismissed']).optional(),
 });
 const pendingSchema = z.object({
   key: z.string().max(1200),
@@ -351,6 +354,18 @@ export function watchPrEventMatches(watch: WatchPrObservationState, event: Watch
 
 function compareEvidence(next: Evidence, previous: Evidence): number | null {
   if (JSON.stringify(next) === JSON.stringify(previous)) return 0;
+  if (next.kind === 'feedback' && next.key.startsWith('review:')) {
+    if (next.actorId !== previous.actorId || next.sha !== previous.sha) return null;
+    if (next.state === 'dismissed' && previous.state !== 'dismissed') return 1;
+    if (previous.state === 'dismissed' && next.state !== 'dismissed') return -1;
+    if (
+      next.state === previous.state &&
+      ['approved', 'changes_requested', 'commented'].includes(next.state)
+    ) {
+      if (next.reviewAction === 'edited' && previous.reviewAction === 'submitted') return 1;
+      if (next.reviewAction === 'submitted' && previous.reviewAction === 'edited') return -1;
+    }
+  }
   if (next.kind === 'check') {
     if (next.objectId === previous.objectId) {
       if ((next.attempt ?? 1) !== (previous.attempt ?? 1))
@@ -498,7 +513,11 @@ export function projectWatchPrEvent(
       state: event.state,
       actorId: event.actorId,
       body: event.body,
-      removed: event.action === 'deleted' || event.action === 'dismissed',
+      removed:
+        event.action === 'deleted' ||
+        event.action === 'dismissed' ||
+        (event.key.startsWith('review:') && event.state === 'dismissed'),
+      ...(event.reviewAction ? { reviewAction: event.reviewAction } : {}),
     };
   } else if (event.kind === 'check') {
     evidence = {

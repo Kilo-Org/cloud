@@ -340,15 +340,40 @@ describe('handleGitHubWebhook', () => {
     });
   });
 
-  it('returns a retryable error when passive observation persistence fails', async () => {
-    mockObservePrWebhook.mockRejectedValueOnce(new Error('database unavailable'));
-    const response = await handleGitHubWebhook(
-      signedGitHubRequest('check_run', { installation: { id: 98765 } }),
-      'standard'
-    );
-    expect(response.status).toBe(500);
-    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
-  });
+  it.each(['standard', 'lite'] as const)(
+    'reports passive observation failures and continues core handling for the %s app',
+    async appType => {
+      const error = new Error('database unavailable');
+      const payload = pullRequestPayload();
+      mockObservePrWebhook.mockRejectedValueOnce(error);
+
+      const response = await handleGitHubWebhook(
+        signedGitHubRequest('pull_request', payload),
+        appType
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'review queued' });
+      expect(mockObservePrWebhook).toHaveBeenCalledWith({
+        eventType: 'pull_request',
+        payload,
+        appType,
+      });
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(error, {
+        tags: {
+          source: appType === 'lite' ? 'github_lite_pr_observation' : 'github_pr_observation',
+          event: 'pull_request',
+          delivery: 'delivery-pull_request',
+          installation: '98765',
+          action: 'opened',
+        },
+      });
+      expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', appType);
+      expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+      expect(mockHandlePullRequest).toHaveBeenCalledWith(payload, integration);
+    }
+  );
 
   it('passes the signed raw PR payload to watch normalization before legacy schema stripping', async () => {
     const headSha = 'a'.repeat(40);

@@ -275,6 +275,7 @@ describe('ChatSidebar row rendering', () => {
         reviewDecision: null,
         reviewDecisionPending: false,
         platform: 'github',
+        observations: null,
       },
     });
     const title = 'Cloud Agent sidebar session titles should remain readable when truncated';

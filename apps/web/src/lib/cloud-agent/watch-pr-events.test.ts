@@ -66,6 +66,34 @@ function feedback(
     ...overrides,
   };
 }
+function review(
+  action: 'submitted' | 'edited' | 'dismissed',
+  overrides: Partial<{
+    body: string;
+    state: string;
+    submitted_at: string | null;
+    updated_at: string;
+    commit_id: string;
+    user: { id: number };
+  }> = {}
+): WatchPrEvent {
+  const event = normalizeWatchPrEvent('pull_request_review', {
+    ...envelope,
+    action,
+    pull_request: { number: 42 },
+    review: {
+      id: 9,
+      body: 'Please fix this',
+      user: { id: 99 },
+      state: 'CHANGES_REQUESTED',
+      commit_id: head,
+      submitted_at: earlier,
+      ...overrides,
+    },
+  });
+  if (!event) throw new Error('missing review');
+  return event;
+}
 function pr(
   overrides: Partial<Extract<WatchPrEvent, { kind: 'pull_request' }>> = {}
 ): WatchPrEvent {
@@ -546,6 +574,126 @@ describe('watch PR observation projection', () => {
     expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
     expect(projection(uncertain).evidence[0]?.body).toBe('Please fix this');
   });
+
+  it('supersedes submitted feedback with an untimestamped edit and ignores stale submission replay', () => {
+    const submitted = review('submitted');
+    const first = project(watch(), submitted);
+    const edit = review('edited', { body: 'Updated feedback' });
+    const edited = project(first, edit);
+    expect(projection(edited)).toMatchObject({
+      ambiguous: false,
+      needsAttention: true,
+      evidence: [{ body: 'Updated feedback', updatedAt: null }],
+      pending: [{ key: 'review:9', reason: 'reviewer_verification_required' }],
+    });
+    expect(edited.pending_revision).toBe(2);
+    expect(project(edited, submitted)).toBe(edited);
+    expect(project(edited, edit)).toBe(edited);
+    const deliveredFirst = project(watch(), edit);
+    expect(project(deliveredFirst, submitted)).toBe(deliveredFirst);
+  });
+
+  it.each(['submitted', 'edited'] as const)(
+    'clears %s feedback on untimestamped dismissal and cannot resurrect it on stale replay',
+    action => {
+      const active = review(action);
+      const first = project(watch(), active);
+      const dismissal = review('dismissed', { state: 'DISMISSED' });
+      const dismissed = project(first, dismissal);
+      expect(projection(dismissed)).toMatchObject({
+        ambiguous: false,
+        needsAttention: false,
+        evidence: [{ removed: true, state: 'dismissed', updatedAt: null }],
+        pending: [],
+      });
+      expect(dismissed.pending_revision).toBe(2);
+      expect(project(dismissed, active)).toBe(dismissed);
+      expect(project(dismissed, dismissal)).toBe(dismissed);
+      const deliveredFirst = project(watch(), dismissal);
+      expect(project(deliveredFirst, active)).toBe(deliveredFirst);
+    }
+  );
+
+  it('clears feedback when an untimestamped edit removes a nonblocking review body', () => {
+    const submitted = review('submitted', { state: 'COMMENTED' });
+    const edited = project(
+      project(watch(), submitted),
+      review('edited', { state: 'COMMENTED', body: '' })
+    );
+    expect(projection(edited)).toMatchObject({
+      ambiguous: false,
+      needsAttention: false,
+      evidence: [{ body: '' }],
+      pending: [],
+    });
+    expect(project(edited, submitted)).toBe(edited);
+  });
+
+  it('dismisses existing review evidence without action provenance but does not guess its edit order', () => {
+    const existing = project(watch(), feedback({ key: 'review:9', state: 'changes_requested' }));
+    const dismissed = project(existing, review('dismissed', { state: 'DISMISSED' }));
+    expect(projection(dismissed)).toMatchObject({
+      ambiguous: false,
+      needsAttention: false,
+      pending: [],
+    });
+    const uncertain = project(existing, review('edited', { body: 'Updated feedback' }));
+    expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+    expect(projection(uncertain).evidence).toEqual(projection(existing).evidence);
+  });
+
+  it('keeps edits of dismissed reviews removed', () => {
+    const dismissed = project(watch(), review('dismissed', { state: 'DISMISSED' }));
+    const edit = review('edited', {
+      state: 'DISMISSED',
+      body: 'Edited dismissed review',
+      updated_at: later,
+    });
+    for (const state of [watch(), dismissed]) {
+      const edited = project(state, edit);
+      expect(projection(edited).pending).toEqual([]);
+      expect(projection(edited).evidence[0]?.removed).toBe(true);
+    }
+  });
+
+  it.each([false, true])(
+    'does not guess ordering between untimestamped edits (reversed: %s)',
+    reversed => {
+      const edits = [
+        review('edited', { body: 'First edit' }),
+        review('edited', { body: 'Second edit' }),
+      ];
+      if (reversed) edits.reverse();
+      const first = project(watch(), edits[0]);
+      const uncertain = project(first, edits[1]);
+      expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+      expect(projection(uncertain).evidence).toEqual(projection(first).evidence);
+      expect(uncertain.pending_revision).toBe(first.pending_revision);
+    }
+  );
+
+  it('does not mistake draft edits for revisions after submission', () => {
+    const submitted = project(watch(), review('submitted'));
+    const uncertain = project(
+      submitted,
+      review('edited', { state: 'PENDING', submitted_at: null, body: 'Draft feedback' })
+    );
+    expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+    expect(projection(uncertain).evidence).toEqual(projection(submitted).evidence);
+  });
+
+  it.each([{ user: { id: 100 } }, { commit_id: newer }])(
+    'does not apply review lifecycle ordering across conflicting immutable identity: %j',
+    overrides => {
+      const submitted = project(watch(), review('submitted'));
+      const uncertain = project(
+        submitted,
+        review('dismissed', { state: 'DISMISSED', ...overrides })
+      );
+      expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+      expect(projection(uncertain).evidence).toEqual(projection(submitted).evidence);
+    }
+  );
 
   it('suppresses self feedback by immutable actor ID, not association', () => {
     const current = watch();

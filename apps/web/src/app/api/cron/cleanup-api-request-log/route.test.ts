@@ -145,6 +145,22 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(remaining[0].id).toBe(recent.id);
   });
 
+  it('still enforces log retention when persisted opt-in state cannot be parsed', async () => {
+    await insertApiRequestLogRecord(daysAgo(45));
+    const recent = await insertApiRequestLogRecord(daysAgo(1));
+    await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: [{ id: 'invalid' }] });
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow();
+
+    const remaining = await db.select({ id: api_request_log.id }).from(api_request_log);
+    expect(remaining).toEqual([{ id: recent.id }]);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledTimes(1);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'failed',
+      exception_name: 'ZodError',
+    });
+  });
+
   it('deletes at most one batch per request', async () => {
     await insertApiRequestLogRecords(BATCH_SIZE + 5, daysAgo(45));
     const recent1 = await insertApiRequestLogRecord(daysAgo(1), 'recent-1');

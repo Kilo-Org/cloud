@@ -31,7 +31,6 @@ export async function GET(request: Request) {
   });
 
   try {
-    const deletedOptInCount = await deleteExpiredRequestLoggingOptIns();
     const cutoffDate = getDaysAgo(RETENTION_DAYS).toISOString();
     const expiredRows = await db
       .select({ id: api_request_log.id })
@@ -46,6 +45,7 @@ export async function GET(request: Request) {
         ? await db.delete(api_request_log).where(inArray(api_request_log.id, batchIds))
         : null;
 
+    const deletedOptInCount = await deleteExpiredRequestLoggingOptIns();
     const deletedApiRequestLogCount = result?.rowCount ?? 0;
     const hasMore = expiredRows.length > BATCH_SIZE;
     emitScheduledJobEvent(

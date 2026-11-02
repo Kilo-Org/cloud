@@ -174,7 +174,7 @@ function escapeLikePattern(value: string) {
 }
 
 function auditIdentifier(value: string | null): string | null {
-  return value && value.length <= 255 && /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(value)
+  return value && value.length <= 255 && /^[a-zA-Z0-9_.:|-]+(?:\/[a-zA-Z0-9_.:|-]+)*$/.test(value)
     ? value
     : null;
 }

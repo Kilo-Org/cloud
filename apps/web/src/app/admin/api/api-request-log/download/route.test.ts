@@ -1,11 +1,12 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
 import { api_request_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
@@ -94,7 +95,10 @@ describe('GET /admin/api/api-request-log/download', () => {
   });
 
   it('does not audit an export when authentication fails', async () => {
-    const authFailedResponse = new Response('Unauthorized', { status: 401 });
+    const authFailedResponse = NextResponse.json<FailureResult<string>>(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
     mockedGetUserFromAuth.mockResolvedValue({ user: null, authFailedResponse });
 
     const response = await GET(createRequest());
@@ -223,6 +227,40 @@ describe('GET /admin/api/api-request-log/download', () => {
     );
     await response.arrayBuffer();
   });
+
+  it.each(['oauth/google:114000741928328149731', 'oauth/github|owner'])(
+    'retains user attribution for OAuth ID %s and email filters',
+    async userId => {
+      const owner = await insertTestUser({ id: userId });
+      const organizationId = 'e6ac973c-5536-466a-b6d2-a966e1ce7521';
+      await db
+        .insert(api_request_log)
+        .values({ ...baseRow, kilo_user_id: owner.id, organization_id: organizationId });
+
+      try {
+        for (const filter of [owner.id, owner.google_user_email]) {
+          mockedRecordAdminAction.mockClear();
+          const response = await GET(createRequest({ userId: filter, organizationId }));
+
+          expect(response.status).toBe(200);
+          await response.arrayBuffer();
+          expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+              target: { type: 'user', id: owner.id },
+              metadata: expect.objectContaining({ userId: owner.id, organizationId }),
+            })
+          );
+          expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(
+            owner.google_user_email
+          );
+        }
+      } finally {
+        await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, owner.id));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, owner.id));
+      }
+    }
+  );
 
   it('does not copy free-form user or organization filters into the audit entry', async () => {
     const sensitiveText = 'https://customer.example/private?email=customer@example.com';

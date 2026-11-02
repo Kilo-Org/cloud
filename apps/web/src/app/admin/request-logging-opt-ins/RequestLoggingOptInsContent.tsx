@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useNowTicker } from '@/app/(app)/claw/kilo-chat/components/BotStatus';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,8 +37,9 @@ export default function RequestLoggingOptInsContent() {
   const [reason, setReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const now = useNowTicker(10_000);
   const activeOptInCount =
-    optIns?.filter(entry => !entry.expires_at || new Date(entry.expires_at).getTime() > Date.now())
+    optIns?.filter(entry => !entry.expires_at || new Date(entry.expires_at).getTime() > now)
       .length ?? 0;
   const isAtLimit = activeOptInCount >= 10;
 

@@ -121,10 +121,12 @@ describe('worktree deletion PostgreSQL membership boundary', () => {
     const before = await readState();
 
     await expect(
-      client.db.execute(sql`
-        DELETE FROM pg_temp.cli_sessions_v2
-        WHERE kilo_user_id = ${userId} AND cloud_agent_worktree_id = ${worktreeId}
-      `)
+      client.db.transaction(tx =>
+        tx.execute(sql`
+          DELETE FROM pg_temp.cli_sessions_v2
+          WHERE kilo_user_id = ${userId} AND cloud_agent_worktree_id = ${worktreeId}
+        `)
+      )
     ).rejects.toMatchObject({
       cause: {
         code: '23503',

@@ -16,7 +16,12 @@ import type * as ReactI18next from 'react-i18next';
 
 import { lightColors } from '@/lib/hooks/use-theme-colors';
 
-import { describePrState, PrRefsRow, PrStateChip } from './pr-review-overview-parts';
+import {
+  describePrState,
+  formatPrCounts,
+  PrRefsRow,
+  PrStateChip,
+} from './pr-review-overview-parts';
 
 const { compile: compileNative } = createRequire(import.meta.url)(
   'react-native-css/compiler'
@@ -242,5 +247,23 @@ describe('PrRefsRow truncation', () => {
     expect(base.props.className).toContain('shrink-0');
 
     renderer.unmount();
+  });
+});
+
+describe('formatPrCounts', () => {
+  it('keeps each sign before its number inside one isolated left-to-right run', () => {
+    // Bidi on a right-to-left screen moves a sign behind its number unless the
+    // counts are isolated, so the line read "3+ / 1-" there.
+    const line = formatPrCounts(3, 1);
+    expect(line.startsWith('\u2066')).toBe(true);
+    expect(line.endsWith('\u2069')).toBe(true);
+
+    const counts = line.slice(1, -1);
+    const added = counts.indexOf('+');
+    const removed = counts.indexOf('\u2212');
+    expect(added).toBeGreaterThanOrEqual(0);
+    expect(removed).toBeGreaterThan(added);
+    expect(counts.indexOf('3')).toBe(added + 1);
+    expect(counts.indexOf('1')).toBe(removed + 1);
   });
 });

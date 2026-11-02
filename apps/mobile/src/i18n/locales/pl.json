@@ -2782,6 +2782,8 @@
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
       "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
+      "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
+      "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",
       "reconnectDescription": "Cofnięto dostęp do konta GitHub.",
       "gitlabDescription": "Przeglądaj merge requesty na telefonie",
       "gitlabInstanceMismatchTitle": "Połączenie z GitLabem dotyczy innej instancji",

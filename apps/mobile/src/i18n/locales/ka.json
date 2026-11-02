@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
+      "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
+      "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა.",
       "gitlabDescription": "შერწყმის მოთხოვნების შემოწმება მობილურზე",
       "gitlabInstanceMismatchTitle": "GitLab-ის დაკავშირება სხვა ინსტანციისთვისაა",

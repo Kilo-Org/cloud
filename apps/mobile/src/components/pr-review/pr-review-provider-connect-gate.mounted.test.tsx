@@ -217,8 +217,11 @@ describe('organization GitLab reconnect state', () => {
     // The title above already names the provider, so the description never
     // restates the expiry.
     expect(renderedText(renderer)).not.toContain('no longer valid');
-    // The CTA is the integration-page action, not a second connect attempt.
-    expect(renderedText(renderer)).toContain('Connect GitLab');
+    // The CTA is the integration-page action and names the reconnection: the
+    // account already authorized this provider once, so the button does not
+    // ask for a first-time connect.
+    expect(renderedText(renderer)).toContain('Reconnect GitLab');
+    expect(renderedText(renderer)).not.toContain('Connect GitLab');
   });
 
   it('names the roles that can reconnect instead of offering a refused action', () => {

@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Nuk u kontrollua lidhja me Bitbucket.",
       "providerCheckFailedMessage": "Gjendja e lidhjes nuk është e disponueshme derisa të ngarkohet.",
       "reconnectTitle": "Rilidhu me GitHub",
+      "reconnectTitleGitLab": "Rilidhu me GitLab",
+      "reconnectTitleBitbucket": "Rilidhu me Bitbucket",
       "reconnectDescription": "Lidhja jote me GitHub është revokuar.",
       "gitlabDescription": "Rishiko kërkesat e integrimit në telefon",
       "gitlabInstanceMismatchTitle": "Lidhja me GitLab është për një instancë tjetër",

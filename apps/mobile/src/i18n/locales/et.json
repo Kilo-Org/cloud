@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Bitbucketi ühendust ei õnnestunud kontrollida.",
       "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
+      "reconnectTitleGitLab": "Ühenda GitLab uuesti",
+      "reconnectTitleBitbucket": "Ühenda Bitbucket uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud.",
       "gitlabDescription": "Vaata liitmistaotlused mobiilis üle",
       "gitlabInstanceMismatchTitle": "GitLabi ühendus on teise instantsi jaoks",

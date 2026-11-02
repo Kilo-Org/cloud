@@ -696,6 +696,8 @@
       "checkFailedTitleBitbucket": "Provjera veze s Bitbucketom nije uspjela.",
       "providerCheckFailedMessage": "Status povezave dostupan je nakon učitavanja.",
       "reconnectTitle": "Ponovo poveži GitHub",
+      "reconnectTitleGitLab": "Ponovo poveži GitLab",
+      "reconnectTitleBitbucket": "Ponovo poveži Bitbucket",
       "reconnectDescription": "Pristup tvom GitHub računu je opozvan.",
       "gitlabDescription": "Pregledaj merge requeste na mobitelu",
       "gitlabInstanceMismatchTitle": "GitLab konekcija je za drugu instancu",

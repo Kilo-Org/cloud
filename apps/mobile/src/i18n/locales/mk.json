@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Статусот на врската е недостапен додека не се вчита.",
       "reconnectTitle": "Повторно поврзување со GitHub",
+      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
+      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",

@@ -681,6 +681,8 @@
       "checkFailedTitleBitbucket": "Tsy voamarina ny fifandraisana amin'ny Bitbucket.",
       "providerCheckFailedMessage": "Tsy azo ny satan'ny fifandraisana raha tsy tafiditra izao.",
       "reconnectTitle": "Fampifandraisana indray amin'ny GitHub",
+      "reconnectTitleGitLab": "Fampifandraisana indray amin'ny GitLab",
+      "reconnectTitleBitbucket": "Fampifandraisana indray amin'ny Bitbucket",
       "reconnectDescription": "Nofoanana ny fifandraisanao amin'ny GitHub.",
       "gitlabDescription": "Diniho amin'ny finday ny fangatahana fampiraisana",
       "gitlabInstanceMismatchTitle": "Ny fampifandraisana amin'ny GitLab dia ho an'ny instance hafa",

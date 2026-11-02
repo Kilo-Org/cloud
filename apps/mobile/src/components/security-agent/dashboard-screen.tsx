@@ -10,7 +10,7 @@ import {
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -379,6 +379,27 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // only option would be "All repositories" — stays shut for the same reason
   // the loading and failed cases keep it shut.
   const repoFilterOff = repoFilterUnavailable || repositoryScopeEmpty;
+  // A chosen repository can leave the scope after the filter was applied: the
+  // grant is narrowed out of band and the next refresh answers with a list that
+  // no longer holds it. The row would name a repository this dashboard cannot
+  // show, and the sheet that clears the filter is the one control that state
+  // closes, so the filter drops with it.
+  const inScopeRepoNames = useMemo(
+    () =>
+      getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
+        repo => repo.fullName
+      ),
+    [repositories.data, config.data]
+  );
+  useEffect(() => {
+    if (repoFilterUnavailable || repoFullName === undefined) {
+      return;
+    }
+    if (inScopeRepoNames.includes(repoFullName)) {
+      return;
+    }
+    setRepoFullName(undefined);
+  }, [inScopeRepoNames, repoFilterUnavailable, repoFullName]);
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
@@ -457,17 +478,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     if (repoFilterOff) {
       return;
     }
-    const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
-      repo => repo.fullName
-    );
-    const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
+    const options = [t('common.allRepositories'), ...inScopeRepoNames, t('common.cancel')];
     showActionSheetWithOptions(
       { ...themedSheet, options, cancelButtonIndex: options.length - 1 },
       index => {
         if (index === undefined || index === options.length - 1) {
           return;
         }
-        setRepoFullName(index === 0 ? undefined : repoNames[index - 1]);
+        setRepoFullName(index === 0 ? undefined : inScopeRepoNames[index - 1]);
       }
     );
   };

@@ -73,6 +73,9 @@ const repositories = vi.hoisted(() => ({
   data: [] as unknown[],
   refetch: vi.fn(),
 }));
+// The repositories the shipped scope helper keeps for the current mode. A case
+// narrows this to model a grant that no longer holds the chosen repository.
+const inScopeRepos = vi.hoisted(() => ({ repos: [] as { fullName: string }[] }));
 const capability = vi.hoisted(() => ({
   canManage: false,
   status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
@@ -249,7 +252,7 @@ vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
       notAnalyzed: number;
       failed: number;
     }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
-    getSecurityRepositoriesInScope: () => [],
+    getSecurityRepositoriesInScope: () => inScopeRepos.repos,
     isPersonalSecurityScope: (scope: string) => scope === 'personal',
   };
 });
@@ -904,6 +907,7 @@ describe('DashboardScreen repository filter sheet', () => {
     lastSync.refetch.mockReset();
     lastSync.refetch.mockResolvedValue({ isError: false });
     config.data = { slaEnabled: true };
+    inScopeRepos.repos = [];
     sheet.show.mockClear();
     retryCards.cards = [];
   });
@@ -966,6 +970,37 @@ describe('DashboardScreen repository filter sheet', () => {
 
     expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
     expect(findFilterControl(root.root).props.disabled).toBe(false);
+  });
+
+  // A filter applied while the repository was in scope outlives the grant that
+  // allowed it. The row would name a repository this dashboard can no longer
+  // show, and the sheet that clears the filter is the control the empty scope
+  // closes, so the filter has to drop by itself.
+  it('drops a filter whose repository left the settled scope', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    inScopeRepos.repos = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    act(() => {
+      (findFilterControl(root.root).props.onPress as () => void)();
+    });
+    const chooseRepository = sheet.show.mock.calls.at(-1)?.[1] as (index?: number) => void;
+    act(() => {
+      chooseRepository(1);
+    });
+    expect(renderedTexts(root.root)).toContain('kilo/repo');
+
+    // The grant narrows out of band: the settled answer no longer holds it.
+    repositories.data = [];
+    inScopeRepos.repos = [];
+    act(() => {
+      root.update(dashboardTree('org_123'));
+    });
+
+    expect(renderedTexts(root.root)).not.toContain('kilo/repo');
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(true);
   });
 
   it('renders a retryable card for a failed repositories fetch and retries on tap', () => {

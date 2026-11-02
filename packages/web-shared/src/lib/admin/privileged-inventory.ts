@@ -473,6 +473,13 @@ const workerEntries: PrivilegedInventoryEntry[] = [
     target: 'service',
   },
   {
+    id: 'worker.gastown.debugAgentMetadata',
+    surface: 'worker',
+    route: 'gastown.debugAgentMetadata',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
     id: 'worker.wasteland.admin',
     surface: 'worker',
     route: 'wasteland.admin*',
@@ -503,6 +510,13 @@ export type InternalElevationSite = {
 };
 
 export const internalElevationSites: readonly InternalElevationSite[] = [
+  {
+    id: 'internal.components.organizationByPageLayout',
+    file: 'apps/web/src/components/organizations/OrganizationByPageLayout.tsx',
+    actionClass: 'support_read',
+    surface: 'server-component',
+    occurrences: 2,
+  },
   {
     id: 'internal.app.admin.creditCategories',
     file: 'apps/web/src/app/admin/api/credit-categories/[key]/route.ts',
@@ -571,7 +585,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/auth/resource-delegation.ts',
     actionClass: 'worker_admin',
     surface: 'rest',
-    occurrences: 4,
+    occurrences: 3,
   },
   {
     id: 'internal.botUsers.botUserService',

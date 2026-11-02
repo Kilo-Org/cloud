@@ -113,7 +113,7 @@ function workerAdminProcedureNames(worker: 'gastown' | 'wasteland'): string[] {
 }
 
 function workerAdminRoute(worker: 'gastown' | 'wasteland', name: string): string {
-  return `${worker}.admin${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  return `${worker}.${name}`;
 }
 
 const procedures = rootRouter._def.procedures as Record<string, ProcedureDef>;
@@ -370,6 +370,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
     'apps/web/src/lib',
     'apps/web/src/routers',
     'apps/web/src/app',
+    'apps/web/src/components',
   ];
   const excluded = new Set([
     'packages/web-shared/src/lib/admin/admin-access-log.ts',

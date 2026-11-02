@@ -2,19 +2,19 @@
 
 exports[`privileged inventory covers Worker admin gates the Worker admin procedure list is reviewed as a snapshot: worker-admin-procedures 1`] = `
 [
-  "gastown.adminAdminBulkDeleteBeads -> worker.gastown.admin",
-  "gastown.adminAdminDeleteBeadsByStatus -> worker.gastown.admin",
-  "gastown.adminAdminForceCloseBead -> worker.gastown.admin",
-  "gastown.adminAdminForceFailBead -> worker.gastown.admin",
-  "gastown.adminAdminForceResetAgent -> worker.gastown.admin",
-  "gastown.adminAdminForceRestartContainer -> worker.gastown.admin",
-  "gastown.adminAdminGetAlarmStatus -> worker.gastown.admin",
-  "gastown.adminAdminGetBead -> worker.gastown.admin",
-  "gastown.adminAdminGetTownEvents -> worker.gastown.admin",
-  "gastown.adminAdminListAgents -> worker.gastown.admin",
-  "gastown.adminAdminListBeads -> worker.gastown.admin",
-  "gastown.adminDebugAgentMetadata -> worker.gastown.admin",
-  "wasteland.adminAdminListWastelands -> worker.wasteland.admin",
+  "gastown.adminBulkDeleteBeads -> worker.gastown.admin",
+  "gastown.adminDeleteBeadsByStatus -> worker.gastown.admin",
+  "gastown.adminForceCloseBead -> worker.gastown.admin",
+  "gastown.adminForceFailBead -> worker.gastown.admin",
+  "gastown.adminForceResetAgent -> worker.gastown.admin",
+  "gastown.adminForceRestartContainer -> worker.gastown.admin",
+  "gastown.adminGetAlarmStatus -> worker.gastown.admin",
+  "gastown.adminGetBead -> worker.gastown.admin",
+  "gastown.adminGetTownEvents -> worker.gastown.admin",
+  "gastown.adminListAgents -> worker.gastown.admin",
+  "gastown.adminListBeads -> worker.gastown.admin",
+  "gastown.debugAgentMetadata -> worker.gastown.debugAgentMetadata",
+  "wasteland.adminListWastelands -> worker.wasteland.admin",
 ]
 `;
 

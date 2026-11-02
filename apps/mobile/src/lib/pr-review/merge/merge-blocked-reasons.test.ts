@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { CATALOG_LOADERS } from '@/i18n/catalogs';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { i18n } from '@/i18n';
 
 import {
@@ -10,6 +12,18 @@ import {
   type MergeBlockedReasonsArgs,
   prMergeMethodName,
 } from './merge-blocked-reasons';
+
+/** The merge copy a catalog must carry for this helper to name a method. */
+type MergeCatalog = {
+  prReview: {
+    merge: {
+      autoMergeDescription: string;
+      methods: Record<'merge' | 'squash' | 'rebase', string>;
+    };
+  };
+};
+
+const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;
 
 function repo(overrides: Partial<MergeBlockedReasonsArgs> = {}): MergeBlockedReasonsArgs {
   return {
@@ -300,5 +314,27 @@ describe('prMergeMethodName', () => {
 
   it('keeps a value this build does not know as the provider sent it', () => {
     expect(prMergeMethodName('FastForward')).toBe('fastforward');
+  });
+
+  // The sentence exists in every catalog and the label is what fills it, so a
+  // catalog that kept the wire code would still read as Latin text.
+  it('has a name of its own in every catalog', () => {
+    const untranslated: string[] = [];
+    const leftoverPlaceholders: string[] = [];
+    for (const language of SUPPORTED_LANGUAGES) {
+      const { prReview } = CATALOG_LOADERS[language]() as unknown as MergeCatalog;
+      for (const method of MERGE_METHODS) {
+        const name = prReview.merge.methods[method];
+        if (name.trim() === '' || (language !== 'en' && name.toLowerCase() === method)) {
+          untranslated.push(`${language}:${method}`);
+        }
+        const sentence = prReview.merge.autoMergeDescription.replace('{{method}}', name);
+        if (sentence.includes('{{') || sentence.includes('}}')) {
+          leftoverPlaceholders.push(language);
+        }
+      }
+    }
+    expect(untranslated).toEqual([]);
+    expect(leftoverPlaceholders).toEqual([]);
   });
 });

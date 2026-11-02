@@ -199,7 +199,7 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     );
   });
 
-  it.each([302, 401, 403, 404, 503])(
+  it.each([302, 403, 404, 503])(
     'rejects and cancels attachment authorization probes returning %s',
     async status => {
       const cancel = vi.fn().mockResolvedValue(undefined);
@@ -215,6 +215,33 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
           strictRepositoryLookup: true,
         })
       ).resolves.toEqual({ selected: false, reason: 'insufficient_user_access' });
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([false, true])(
+    'revokes a GitHub-rejected attachment token even when body cancellation rejects=%s',
+    async cancellationRejects => {
+      const cancel = vi.fn(() =>
+        cancellationRejects ? Promise.reject(new Error('cancellation failed')) : Promise.resolve()
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response(new ReadableStream({ cancel }), { status: 401 }))
+      );
+
+      await expect(
+        makeService().selectUserAuthorization({
+          userId: 'user_1',
+          githubRepo: 'acme/repo',
+          strictRepositoryLookup: true,
+        })
+      ).resolves.toEqual({ selected: false, reason: 'revoked' });
+      expect(database.updates).toHaveLength(1);
+      expect(database.updates[0]).toMatchObject({
+        revoked_at: expect.any(String),
+        revocation_reason: 'github_token_rejected',
+      });
       expect(cancel).toHaveBeenCalledOnce();
     }
   );

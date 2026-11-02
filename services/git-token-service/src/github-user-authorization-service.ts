@@ -184,6 +184,13 @@ export class GitHubUserAuthorizationService {
       } catch {
         return { selected: false, reason: 'insufficient_user_access' };
       }
+      if (response.status === 401) {
+        await this.revokeCurrentGeneration(db, authorization, 'github_token_rejected');
+        if (params.strictRepositoryLookup) {
+          await response.body?.cancel().catch(() => undefined);
+        }
+        return { selected: false, reason: 'revoked' };
+      }
       if (params.strictRepositoryLookup && response.status !== 200) {
         try {
           await response.body?.cancel();
@@ -191,10 +198,6 @@ export class GitHubUserAuthorizationService {
           return { selected: false, reason: 'insufficient_user_access' };
         }
         return { selected: false, reason: 'insufficient_user_access' };
-      }
-      if (response.status === 401) {
-        await this.revokeCurrentGeneration(db, authorization, 'github_token_rejected');
-        return { selected: false, reason: 'revoked' };
       }
       if (!response.ok) return { selected: false, reason: 'insufficient_user_access' };
 

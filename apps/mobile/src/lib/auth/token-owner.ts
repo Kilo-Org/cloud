@@ -1,5 +1,6 @@
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 
 export type ActiveToken = {
@@ -83,12 +84,23 @@ export function clearActiveToken(): void {
  * still returns what it read (one-shot request), but never warms the owner,
  * and an owner published during the read wins over the stored value. During
  * sign-out teardown the cold path returns no token and never warms: the
- * stored credentials are scheduled for deletion.
+ * stored credentials are scheduled for deletion. While iOS protected data is
+ * unavailable the cold path returns no token too: a locked keychain refuses
+ * every read, that refusal is the documented unreported state (see
+ * `lib/protected-data`), and it must not become a rejected request. A held
+ * token keeps serving, and the next unlocked read resolves the stored one.
  */
 export async function getAuthTokenForRequest(): Promise<string | null> {
   const active = getActiveToken();
   if (active) {
     return active.token;
+  }
+  // The lock cannot supply a token and must not fail the caller: skip the
+  // keychain read (it would throw `ProtectedDataUnavailableError`) and warm
+  // nothing. The request goes out without a token and the next unlocked read
+  // resolves the stored one.
+  if (!isProtectedDataAvailable()) {
+    return null;
   }
   const epoch = currentAuthEpoch();
   // Sign-out teardown is active: the stored credentials are queued for

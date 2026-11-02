@@ -17,7 +17,21 @@ export const COMPACT_WIDTH_DP = 360;
 const COMPACT_HEIGHT_DP = 640;
 const WIDTH_TOLERANCE_DP = 2;
 export const TAP_TARGET = { min: 28, touch: 44 } as const;
-const RTL_LANGUAGES: Record<string, true> = { ar: true, fa: true, he: true, iw: true, ur: true };
+// Every right-to-left language the mobile app ships (`RTL_LANGUAGES` in
+// `apps/mobile/src/i18n/languages.ts`), plus `iw`, the legacy tag a device may
+// still report for Hebrew. A language missing here reads as left-to-right: the
+// rtl cell then captures it unmirrored, and a run against an app already set to
+// that language reports `env-mismatch` on every left-to-right cell because the
+// language it keeps is not recognized as needing the fallback.
+const RTL_LANGUAGES: Record<string, true> = {
+  ar: true,
+  ckb: true,
+  fa: true,
+  he: true,
+  iw: true,
+  ps: true,
+  ur: true,
+};
 
 export function isRtlLanguage(language: string): boolean {
   return RTL_LANGUAGES[language.toLowerCase().split(/[-_]/)[0] ?? ''] === true;

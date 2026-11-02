@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { compactSize, envMismatches, matrixCells, mirrorReference } from './matrix';
+import { compactSize, envMismatches, isRtlLanguage, matrixCells, mirrorReference } from './matrix';
 import type { ProbeEnv } from './tree';
 
 const env: ProbeEnv = {
@@ -81,4 +81,24 @@ test('landscape expects the base height as width', () => {
     []
   );
   assert.equal(envMismatches(landscape, env, env.window).length, 1);
+});
+
+test('every right-to-left language the app ships is classified as right-to-left', () => {
+  // `RTL_LANGUAGES` in apps/mobile/src/i18n/languages.ts: a language missing from
+  // this tool's list captures the rtl cell unmirrored and, when the app is already
+  // set to it, fails every left-to-right cell with env-mismatch.
+  for (const language of ['ar', 'he', 'fa', 'ur', 'ckb', 'ps']) {
+    assert.equal(isRtlLanguage(language), true, language);
+  }
+  // Legacy Hebrew tag a device can still report, and the LTR languages the cells
+  // depend on for the fallback.
+  assert.equal(isRtlLanguage('iw'), true);
+  for (const language of ['en', 'de', 'zh-Hans', 'pt-BR']) {
+    assert.equal(isRtlLanguage(language), false, language);
+  }
+});
+
+test('a region-tagged right-to-left language is classified by its primary tag', () => {
+  assert.equal(isRtlLanguage('ps-AF'), true);
+  assert.equal(isRtlLanguage('ckb_IR'), true);
 });

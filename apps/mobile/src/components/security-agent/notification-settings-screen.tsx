@@ -306,6 +306,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       !canManage && 'opacity-50'
                     )}
                     editable={canManage}
+                    accessibilityState={{ disabled: !canManage }}
                     keyboardType="number-pad"
                     defaultValue={warningDaysRef.current}
                     placeholderTextColor={colors.mutedForeground}

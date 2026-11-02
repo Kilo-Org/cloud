@@ -86,17 +86,20 @@ export function SessionReadOnlyFooterPlaceholder() {
  * composer pops in on resolve and shoves the transcript up by its own height.
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
- * `p-2.5 px-3`, the field's 44 dp box at `rounded-[20px]`, and the two trailing
- * controls at their own tap-target size — `ms-3` is the row's
- * COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module owns it.
+ * `p-2.5 px-3`, the field's own 44 pt box at `rounded-[20px]`, and the two
+ * trailing controls at `CONTROL_HIT_TARGET`'s 48 pt on Android and 44 pt on
+ * iOS — `ms-3` is the row's COMPOSER_CONTROL_GAP_CLASS, repeated here because
+ * the row module owns it. Sizes are written in points, not scale steps: this
+ * app's rem is 14 pt, so `h-11` paints 38.5 pt and would leave the slot 6 pt
+ * short of the composer that replaces it.
  */
 export function SessionComposerSkeleton() {
-  const control = Platform.OS === 'android' ? 'h-12 w-12' : 'h-11 w-11';
+  const control = Platform.OS === 'android' ? 'h-[48px] w-[48px]' : 'h-[44px] w-[44px]';
   return (
     <BlurBar>
       <View className="p-2.5 px-3">
         <View className="flex-row items-center">
-          <Skeleton className="h-11 flex-1 rounded-[20px]" />
+          <Skeleton className="h-[44px] flex-1 rounded-[20px]" />
           <Skeleton className={`ms-3 rounded-full ${control}`} />
           <Skeleton className={`ms-3 rounded-full ${control}`} />
         </View>

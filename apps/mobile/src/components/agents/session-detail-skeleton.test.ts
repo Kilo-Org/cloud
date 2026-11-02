@@ -1,11 +1,23 @@
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SessionReadOnlyFooterPlaceholder } from './session-detail-skeleton';
+import {
+  SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
+} from './session-detail-skeleton';
+
+const platform = vi.hoisted(() => ({ os: 'android' }));
 
 // Vitest hoists these above the component import, which is what keeps the real
 // skeleton and blur bar out of this suite.
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
+}));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
@@ -66,6 +78,47 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
       expect(tokens).toContain('bg-muted-soft');
       // The collision: bare `bg-muted` is the fill this footer already paints.
       expect(tokens).not.toContain('bg-muted');
+    }
+  });
+});
+
+// The composer's own row, in points. This app's rem is 14 pt, so a scale step
+// like `h-11` paints 38.5 pt and leaves the slot short of the composer that
+// replaces it — the slot moved the transcript when it resolved. The controls
+// keep ChatComposerInputRow's CONTROL_HIT_TARGET: 48 on Android, 44 on iOS.
+describe('SessionComposerSkeleton', () => {
+  function skeletonBars(platformOs: 'android' | 'ios'): string[] {
+    platform.os = platformOs;
+    // eslint-disable-next-line new-cap
+    const root = SessionComposerSkeleton() as React.ReactElement;
+    const bars: string[] = [];
+    walk(root, el => {
+      if (el.type === 'Skeleton') {
+        bars.push(classNameOf(el));
+      }
+    });
+    return bars;
+  }
+
+  it('stands the row on the composer field and both controls', () => {
+    for (const [platformOs, control] of [
+      ['android', 'h-[48px] w-[48px]'],
+      ['ios', 'h-[44px] w-[44px]'],
+    ] as const) {
+      const bars = skeletonBars(platformOs);
+      expect(bars).toHaveLength(3);
+      const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
+      expect(field).toEqual(expect.arrayContaining(['h-[44px]', 'flex-1', 'rounded-[20px]']));
+      for (const trailing of [voice, send]) {
+        expect(trailing).toEqual(expect.arrayContaining(control.split(' ')));
+        expect(trailing).toContain('ms-3');
+        expect(trailing).toContain('rounded-full');
+      }
+      // No scale steps: `h-11` is 38.5 pt and `h-12` 42 pt at this rem.
+      for (const tokens of [field, voice, send]) {
+        expect(tokens.filter(token => /^h-\d+$/.test(token))).toEqual([]);
+        expect(tokens.filter(token => /^w-\d+$/.test(token))).toEqual([]);
+      }
     }
   });
 });

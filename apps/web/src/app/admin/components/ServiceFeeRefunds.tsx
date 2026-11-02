@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { useTRPC } from '@/lib/trpc/utils';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -108,6 +109,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 export function ServiceFeeRefunds() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { isSuperadmin, isPermissionResolved } = useAdminPermissions();
   const [batchSizeInput, setBatchSizeInput] = useState(String(DEFAULT_BATCH_SIZE));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const batchSize = /^\d+$/.test(batchSizeInput.trim())
@@ -182,6 +184,7 @@ export function ServiceFeeRefunds() {
     claim => claim.status !== 'succeeded' || claim.awaitingWebhook
   );
   const busy = executeBatch.isPending || reconcile.isPending;
+  const canAct = isPermissionResolved && isSuperadmin;
 
   return (
     <div className="flex flex-col gap-y-6">
@@ -215,6 +218,14 @@ export function ServiceFeeRefunds() {
             />
           </div>
 
+          {isPermissionResolved && !isSuperadmin && (
+            <Alert>
+              <AlertDescription>
+                Superadmin access is required to refund fees or reconcile pending claims.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label htmlFor="batch-size">Batch size (max {MAX_BATCH_SIZE})</Label>
@@ -229,7 +240,7 @@ export function ServiceFeeRefunds() {
                 aria-invalid={!validBatchSize}
                 value={batchSizeInput}
                 onChange={event => setBatchSizeInput(event.target.value)}
-                disabled={busy}
+                disabled={busy || !canAct}
               />
               {!validBatchSize && (
                 <p className="text-destructive text-xs">
@@ -239,7 +250,7 @@ export function ServiceFeeRefunds() {
             </div>
             <Button
               variant="destructive"
-              disabled={busy || !validBatchSize || data.remaining.count === 0}
+              disabled={busy || !canAct || !validBatchSize || data.remaining.count === 0}
               onClick={() => setConfirmOpen(true)}
             >
               {executeBatch.isPending
@@ -250,7 +261,7 @@ export function ServiceFeeRefunds() {
             </Button>
             <Button
               variant="outline"
-              disabled={busy || staleCount === 0}
+              disabled={busy || !canAct || staleCount === 0}
               onClick={() => reconcile.mutate()}
             >
               {reconcile.isPending ? 'Reconciling…' : `Reconcile stale pending (${staleCount})`}

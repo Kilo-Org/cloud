@@ -243,6 +243,32 @@ export function parseServiceFeeRefundAllocationMetadata(
 }
 
 /**
+ * True when every counted refund on the charge carries allocation metadata
+ * that returns only service fee and no product. Such a refund leaves the
+ * purchase intact, so it must not trigger adverse-payment handling.
+ */
+export async function isServiceFeeOnlyRefundedCharge(params: {
+  chargeId: string;
+  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>;
+}): Promise<boolean> {
+  const refunds = await listAllPages(startingAfter =>
+    params.stripe.refunds.list({
+      charge: params.chargeId,
+      limit: PAGE_SIZE,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    })
+  );
+  const counted = refunds.filter(refund => COUNTED_REFUND_STATUSES.has(refund.status ?? ''));
+  return (
+    counted.length > 0 &&
+    counted.every(refund => {
+      const allocation = parseServiceFeeRefundAllocationMetadata(refund.metadata);
+      return allocation !== null && allocation.productMinor === 0 && allocation.feeMinor > 0;
+    })
+  );
+}
+
+/**
  * Observe `charge.refunded`. Never creates a Stripe refund. Full remaining
  * no-amount Kilo refunds are treated as full product+fee once cumulative gross
  * equals the charge amount.

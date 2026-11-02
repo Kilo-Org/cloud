@@ -20,6 +20,7 @@ import {
   buildServiceFeeRefundAllocationMetadata,
   buildUnresolvedServiceFeeRefundAllocationAlertText,
   calculateServiceFeeRefundIncrement,
+  isServiceFeeOnlyRefundedCharge,
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,
   parseServiceFeeRefundAllocationMetadata,
@@ -1034,5 +1035,62 @@ describe('observeServiceFeeChargeRefunded', () => {
       refundedProductMinor: 10_000,
       refundedFeeMinor: 500,
     });
+  });
+});
+
+describe('isServiceFeeOnlyRefundedCharge', () => {
+  const feeOnly = (id: string, feeMinor: number) =>
+    refund({
+      id,
+      amount: feeMinor,
+      metadata: buildServiceFeeRefundAllocationMetadata({ productMinor: 0, feeMinor }),
+    });
+
+  test('is true when every active refund returns only fee', async () => {
+    const stripe = createStripeMock({
+      refundPages: [
+        { data: [feeOnly('re_fee_1', 100)], has_more: true },
+        {
+          data: [
+            feeOnly('re_fee_2', 50),
+            refund({ id: 're_failed', amount: 900, status: 'failed' }),
+          ],
+          has_more: false,
+        },
+      ],
+    });
+
+    await expect(isServiceFeeOnlyRefundedCharge({ chargeId: CHARGE_ID, stripe })).resolves.toBe(
+      true
+    );
+    expect(stripe.refunds.list).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['a refund without allocation metadata', refund({ id: 're_plain', amount: 100 })],
+    [
+      'a refund that returns product',
+      refund({
+        id: 're_product',
+        amount: 2_100,
+        metadata: buildServiceFeeRefundAllocationMetadata({ productMinor: 2_000, feeMinor: 100 }),
+      }),
+    ],
+  ])('is false with %s', async (_label, other) => {
+    const stripe = createStripeMock({
+      refundPages: [{ data: [feeOnly('re_fee', 100), other], has_more: false }],
+    });
+
+    await expect(isServiceFeeOnlyRefundedCharge({ chargeId: CHARGE_ID, stripe })).resolves.toBe(
+      false
+    );
+  });
+
+  test('is false when the charge has no active refunds', async () => {
+    const stripe = createStripeMock({ refundPages: [{ data: [], has_more: false }] });
+
+    await expect(isServiceFeeOnlyRefundedCharge({ chargeId: CHARGE_ID, stripe })).resolves.toBe(
+      false
+    );
   });
 });

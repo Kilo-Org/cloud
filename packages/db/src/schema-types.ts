@@ -900,6 +900,7 @@ export const AdminActionAuditAction = z.enum([
   'credit_campaign.create',
   'credit_campaign.update',
   'credit_campaign.set_active',
+  'service_fee.rollback_refund',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

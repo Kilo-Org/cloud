@@ -1,5 +1,9 @@
 'use server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import {
+  getAuthorizedOrgContext,
+  getAuthorizedOrgContextOrSupport,
+} from '@/lib/organizations/organization-auth';
+import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { Organization } from '@kilocode/db/schema';
@@ -12,6 +16,7 @@ export async function OrganizationByPageLayout({
   render,
   fullBleed = false,
   roles,
+  supportRead = false,
 }: {
   params: Promise<{ id: string }>;
   render: ({
@@ -24,25 +29,40 @@ export async function OrganizationByPageLayout({
     isGlobalAdmin: boolean;
   }) => JSX.Element;
   roles?: OrganizationRole[];
+  /**
+   * The organization dashboard is an allowlisted support read surface; other
+   * pages require membership.
+   */
+  supportRead?: boolean;
   /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
   fullBleed?: boolean;
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const result = await getAuthorizedOrgContext(organizationId, roles, {
-    surface: 'server-component',
-  });
+  const result = supportRead
+    ? await getAuthorizedOrgContextOrSupport(organizationId, '/organizations/[id]', roles, {
+        surface: 'server-component',
+      })
+    : await getAuthorizedOrgContext(organizationId, roles, {
+        surface: 'server-component',
+      });
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());
     }
     redirect('/profile');
   }
-  const { user, organization } = result.data;
-  const role = user.is_admin ? 'owner' : user.role;
+  const { user, organization, access } = result.data;
+  const isSupport = access.kind === 'support';
+  const role =
+    getSupportAccessMode() === 'enforce' || isSupport
+      ? user.role
+      : user.is_admin
+        ? 'owner'
+        : user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
-      {render({ role, organization, isGlobalAdmin: user.is_admin })}
+      {render({ role, organization, isGlobalAdmin: user.is_admin && !isSupport })}
     </OrganizationTrialWrapper>
   );
 }

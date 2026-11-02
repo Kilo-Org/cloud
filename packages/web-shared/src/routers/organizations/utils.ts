@@ -20,6 +20,7 @@ import {
 import {
   findSupportAllowEntry,
   getSupportAccessMode,
+  observeOnlyStepUp,
   supportStandInRole,
   type OrganizationAccess,
   type SupportAccessMode,
@@ -32,6 +33,7 @@ import {
   evaluateSupportAccess,
   isLiveOrganization,
   latestSupportGrantStatus,
+  recordSupportWriteUse,
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
@@ -306,6 +308,18 @@ export async function resolveOrganizationAccess(
 
   if (mode === 'enforce') {
     if (evaluation.access) {
+      if (evaluation.access.actionClass === 'support_write') {
+        await observeOnlyStepUp.requireFresh({
+          userId: ctx.user.id,
+          action: 'support_write_request',
+        });
+        await recordSupportWriteUse({
+          grantId: evaluation.access.grantId,
+          actorKiloUserId: ctx.user.id,
+          organizationId,
+          supportActionId: evaluation.access.supportActionId,
+        });
+      }
       await recordKiloAdminElevation(ctx, {
         reason: elevationReason,
         target: organizationTarget(organizationId),
@@ -390,10 +404,34 @@ export async function ensureOrganizationAccess(
   const access = await resolveOrganizationAccess(ctx, organizationId, { roles });
   if (access.kind === 'member') return access.role;
   if (access.kind === 'legacy_admin') return access.role;
-  throw new TRPCError({
-    code: 'UNAUTHORIZED',
-    message: 'You do not have the required organizational role to access this feature',
+  return supportRoleForCurrentSurface(ctx, access);
+}
+
+/**
+ * Re-checks the exact current procedure against the allowlist before treating a
+ * support grant as a role. A resolver that calls `ensureOrganizationAccess`
+ * after the organization middleware therefore keeps least privilege: the
+ * middleware may admit a read, but a later `manage` assertion still fails.
+ */
+function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext): OrganizationRole {
+  if (ctx.trpcPath === undefined) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Explicit support access requires an identified surface',
+    });
+  }
+  const entry = findSupportAllowEntry({
+    surface: 'trpc',
+    key: ctx.trpcPath,
+    actionClass: access.actionClass,
   });
+  if (!entry) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have the required organizational role to access this feature',
+    });
+  }
+  return supportStandInRole(entry);
 }
 
 /**

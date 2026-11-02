@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   kilocode_users,
   organizations,
+  support_access_grant_events,
   support_access_grants,
   type SupportAccessActionClass,
 } from '@kilocode/db/schema';
@@ -167,4 +168,28 @@ export async function isLiveOrganization(organizationId: string): Promise<boolea
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
   return organization !== undefined;
+}
+
+/**
+ * Usage evidence for an admitted write. Best-effort: an evidence insert must
+ * never turn an otherwise authorized write into a failure.
+ */
+export async function recordSupportWriteUse(params: {
+  grantId: string;
+  actorKiloUserId: string;
+  organizationId: string;
+  supportActionId: string;
+}): Promise<void> {
+  try {
+    await db.insert(support_access_grant_events).values({
+      grant_id: params.grantId,
+      event_type: 'used_write',
+      performed_by_kilo_user_id: params.actorKiloUserId,
+      organization_id: params.organizationId,
+      action_class: 'support_write',
+      metadata: { supportActionId: params.supportActionId },
+    });
+  } catch {
+    // Evidence is not a gate.
+  }
 }

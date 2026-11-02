@@ -14,10 +14,9 @@ import { getUserFromSessionForStepUp } from '@kilocode/web-shared/lib/user/serve
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 
 /**
- * Firewall rate-limit rule ids. Both rules are ops prerequisites: create them
- * in the Vercel project with these exact ids. `checkFirewallRateLimit` reports
- * an unconfigured rule to Sentry and resolves it as "not limited", so the
- * application still works before they exist.
+ * Firewall rate-limit rule ids, created in the Vercel project. Until a rule
+ * exists, `checkFirewallRateLimit` reports it and returns `unavailable`; the
+ * route fails closed with 503 RATE_LIMIT_UNAVAILABLE.
  */
 const STEP_UP_OPTIONS_RATE_LIMIT_ID = 'admin-step-up-options';
 const STEP_UP_VERIFY_RATE_LIMIT_ID = 'admin-step-up-verify';

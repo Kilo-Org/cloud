@@ -442,7 +442,6 @@
         "rebase": "Pag-rebase"
       },
       "terminal": {
-        "alreadyMerged": "Na-merge na",
         "closed": "Nakasara ang pull request na ito",
         "closedMergeRequest": "Nakasara ang merge request na ito"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Kulang ang mga kinakailangang pagsusuri",
         "requiredReviewsDetail": "Kulang o hinihintay pa ang pag-apruba ng mga kinakailangang tagasuri.",
         "failingChecksTitle": "Hindi pumasa ang mga kinakailangang pagsusuri",
-        "failingChecksDetail": "Hindi pumasa ang mga kinakailangang pagsusuri ng status.",
         "unstableTitle": "May mga pagsusuring hindi pumasa",
         "unstableDetail": "Hindi pumasa ang ilang opsyonal na pagsusuri. Hindi nito pipigilan ang pag-merge.",
         "draftTitle": "Burador na PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Hindi masuri ang koneksyon sa Bitbucket.",
       "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
+      "reconnectTitleGitLab": "Kumonekta muli sa GitLab",
+      "reconnectTitleBitbucket": "Kumonekta muli sa Bitbucket",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub.",
       "gitlabDescription": "Suriin ang mga merge request sa mobile",
       "gitlabInstanceMismatchTitle": "Ang koneksyon sa GitLab ay para sa ibang instance",
@@ -1614,6 +1614,8 @@
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
+      "nSelected_one": "{{displayCount}} napili",
+      "nSelected_other": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },
     "decision": {
@@ -2612,9 +2614,9 @@
       "detailRetryingClone": "Sumusubok ulit i-clone (pagsubok {{attempt}} sa {{total}})",
       "detailSetupCommandFailed": "Nabigo ang utos sa paghahanda {{index}}",
       "detailSetupCommandTimedOut": "Nag-time out ang utos sa paghahanda {{index}}",
-      "detailColdRestore": "Cold restore, nailapat ang snapshot, {{applied}} sa {{total}} files ang nabalik",
+      "detailColdRestore": "Cold restore, nailapat ang snapshot, nabalik na files: {{applied}} sa {{total}}",
       "detailProgressPercent": "{{percent}}% kumpleto",
-      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session: {{skipped}} sa {{total}} files ang hindi naibalik ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session, hindi naibalik na files: {{skipped}} sa {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Nawawala: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} at {{omitted}} pa",
       "detailReasonPatchFailed": "hindi naaplay ang patch",

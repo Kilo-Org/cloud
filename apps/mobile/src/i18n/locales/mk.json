@@ -442,7 +442,6 @@
         "rebase": "Пребазирање"
       },
       "terminal": {
-        "alreadyMerged": "Веќе споено",
         "closed": "Ова барање за спојување е затворено",
         "closedMergeRequest": "Ова merge барање е затворено"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Недостигаат задолжителните прегледи",
         "requiredReviewsDetail": "Недостигаат одобренија од задолжителните рецензенти или сè уште се чекаат.",
         "failingChecksTitle": "Задолжителните проверки не поминуваат",
-        "failingChecksDetail": "Задолжителните проверки на статусот не поминуваат.",
         "unstableTitle": "Некои проверки не поминуваат",
         "unstableDetail": "Незадолжителните проверки не поминуваат. Тие нема да го блокираат спојувањето.",
         "draftTitle": "PR во нацрт",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Статусот на врската е недостапен додека не се вчита.",
       "reconnectTitle": "Повторно поврзување со GitHub",
+      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
+      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",
@@ -1614,6 +1614,8 @@
       "set": "Поставено",
       "notSet": "Не е поставено",
       "nSelected": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Повторен обид за клонирање (обид {{attempt}} од {{total}})",
       "detailSetupCommandFailed": "Командата за подготовка {{index}} не успеа",
       "detailSetupCommandTimedOut": "Командата за подготовка {{index}} истече",
-      "detailColdRestore": "Студено обновување, снимката е применета, обновени се {{applied}} од {{total}} датотеки",
+      "detailColdRestore": "Студено обновување, снимката е применета, обновени датотеки: {{applied}} од {{total}}",
       "detailProgressPercent": "{{percent}}% завршено",
-      "detailRestoreIncompleteReport": "Обновувањето на сесијата е нецелосно: {{skipped}} од {{total}} датотеки не беа обновени ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Обновувањето на сесијата е нецелосно, необновени датотеки: {{skipped}} од {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Недостасуваат: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и уште {{omitted}}",
       "detailReasonPatchFailed": "патчот не беше применет",

@@ -22,6 +22,11 @@ export function DirectionalChevronRight(props: IconProps) {
   return <Icon {...props} />;
 }
 
+export function DirectionalArrowLeft(props: IconProps) {
+  const Icon = I18nManager.isRTL ? ArrowRight : ArrowLeft;
+  return <Icon {...props} />;
+}
+
 export function DirectionalArrowRight(props: IconProps) {
   const Icon = I18nManager.isRTL ? ArrowLeft : ArrowRight;
   return <Icon {...props} />;

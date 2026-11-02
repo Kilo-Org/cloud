@@ -442,7 +442,6 @@
         "rebase": "Негізін ауыстыру"
       },
       "terminal": {
-        "alreadyMerged": "Бұрын біріктірілген",
         "closed": "Бұл біріктіру сұрауы жабылған",
         "closedMergeRequest": "Бұл біріктіру сұрауы жабылған"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Міндетті код тексерулері жоқ",
         "requiredReviewsDetail": "Міндетті тексерушілердің мақұлдауы жоқ немесе әлі күтілуде.",
         "failingChecksTitle": "Міндетті тексерулер сәтсіз аяқталды",
-        "failingChecksDetail": "Міндетті күй тексерулері сәтсіз аяқталды.",
         "unstableTitle": "Кейбір тексерулер сәтсіз аяқталды",
         "unstableDetail": "Міндетті емес тексерулер сәтсіз аяқталды. Олар біріктіруге кедергі болмайды.",
         "draftTitle": "Біріктіру сұрауының нобайы",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
       "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
+      "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
+      "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды.",
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
       "gitlabInstanceMismatchTitle": "GitLab қосылымы басқа инстанцияға арналған",
@@ -1614,6 +1614,8 @@
       "set": "Белгіленген",
       "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
+      "nSelected_one": "{{displayCount}} таңдалды",
+      "nSelected_other": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
       "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
-      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, қалпына келтірілген файлдар: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады — қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",

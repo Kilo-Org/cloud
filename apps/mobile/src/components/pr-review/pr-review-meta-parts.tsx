@@ -30,6 +30,7 @@ import {
   reviewerStateLabelKey,
   reviewerStateTone,
   type ReviewerTone,
+  visibleReviewers,
 } from '@/lib/pr-review/overview-meta';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -191,6 +192,7 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
  */
 export function PrOverviewMeta({ overview }: Readonly<{ overview: PrOverviewDto }>) {
   const { t } = useTranslation();
+  const reviewers = visibleReviewers(overview.state, overview.reviewers);
   return (
     <View className="gap-4">
       <PrTimelineLine overview={overview} />
@@ -200,7 +202,7 @@ export function PrOverviewMeta({ overview }: Readonly<{ overview: PrOverviewDto 
           <PrLabelChips labels={overview.labels} />
         </View>
       ) : null}
-      {overview.reviewers.length > 0 ? <PrReviewersSection reviewers={overview.reviewers} /> : null}
+      {reviewers.length > 0 ? <PrReviewersSection reviewers={reviewers} /> : null}
       {overview.assignees.length > 0 ? <PrAssigneesRow assignees={overview.assignees} /> : null}
       {overview.linkedIssues.length > 0 ? <PrLinkedIssues issues={overview.linkedIssues} /> : null}
     </View>

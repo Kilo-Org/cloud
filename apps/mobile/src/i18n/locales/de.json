@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "Alle Bereiche",
       "nSelected": "{{displayCount}} ausgewählt",
+      "nSelected_one": "{{displayCount}} ausgewählt",
+      "nSelected_other": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
@@ -2072,9 +2074,9 @@
       "detailRetryingClone": "Klonen wird wiederholt (Versuch {{attempt}} von {{total}})",
       "detailSetupCommandFailed": "Einrichtungsbefehl {{index}} fehlgeschlagen",
       "detailSetupCommandTimedOut": "Zeitüberschreitung bei Einrichtungsbefehl {{index}}",
-      "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, {{applied}} von {{total}} Dateien wiederhergestellt",
+      "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, wiederhergestellte Dateien: {{applied}} von {{total}}",
       "detailProgressPercent": "{{percent}}% abgeschlossen",
-      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig: {{skipped}} von {{total}} Dateien wurden nicht wiederhergestellt ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig, nicht wiederhergestellte Dateien: {{skipped}} von {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Fehlend: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} und {{omitted}} weitere",
       "detailReasonPatchFailed": "der Patch konnte nicht angewendet werden",
@@ -2714,6 +2716,8 @@
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
+      "reconnectTitleGitLab": "GitLab erneut verbinden",
+      "reconnectTitleBitbucket": "Bitbucket erneut verbinden",
       "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
       "gitlabDescription": "Merge-Requests mobil prüfen",
       "gitlabInstanceMismatchTitle": "GitLab-Verbindung gehört zu einer anderen Instanz",
@@ -2993,7 +2997,6 @@
         "squash": "Bündeln"
       },
       "terminal": {
-        "alreadyMerged": "Bereits zusammengeführt",
         "closed": "Dieser Pull-Request ist geschlossen",
         "closedMergeRequest": "Dieser Merge-Request ist geschlossen"
       },
@@ -3010,7 +3013,6 @@
         "requiredReviewsTitle": "Erforderliche Reviews fehlen",
         "requiredReviewsDetail": "Die erforderlichen Freigaben der Reviewer fehlen oder stehen noch aus.",
         "failingChecksTitle": "Erforderliche Prüfungen fehlgeschlagen",
-        "failingChecksDetail": "Erforderliche Statusprüfungen sind fehlgeschlagen.",
         "unstableTitle": "Einige Prüfungen sind fehlgeschlagen",
         "unstableDetail": "Optionale Prüfungen sind fehlgeschlagen. Sie verhindern das Zusammenführen nicht.",
         "draftTitle": "Pull-Request-Entwurf",

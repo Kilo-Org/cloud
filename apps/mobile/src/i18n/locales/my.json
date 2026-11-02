@@ -442,7 +442,6 @@
         "rebase": "အခြေခံပြောင်း"
       },
       "terminal": {
-        "alreadyMerged": "ပေါင်းစည်းပြီးပါပြီ",
         "closed": "ဒီ PR ကို ပိတ်ထားသည်",
         "closedMergeRequest": "ဒီ merge request ကို ပိတ်ထားသည်"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "လိုအပ်သော သုံးသပ်မှုများ မရသေးပါ",
         "requiredReviewsDetail": "သတ်မှတ်ထားသော သုံးသပ်သူများထံမှ အတည်ပြုချက်များ မရသေးပါ သို့မဟုတ် စောင့်ဆိုင်းနေရဆဲဖြစ်ပါသည်။",
         "failingChecksTitle": "လိုအပ်သော စစ်ဆေးမှုများ မအောင်မြင်ပါ",
-        "failingChecksDetail": "လိုအပ်သော အခြေအနေစစ်ဆေးမှုများ မအောင်မြင်နေပါ။",
         "unstableTitle": "စစ်ဆေးမှုအချို့ မအောင်မြင်ပါ",
         "unstableDetail": "မဖြစ်မနေ မလိုအပ်သော စစ်ဆေးမှုများ မအောင်မြင်ပါ။ ဒါကြောင့် ပေါင်းစည်းမှုကို တားဆီးမည်မဟုတ်ပါ။",
         "draftTitle": "PR မူကြမ်း",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
       "gitlabDescription": "မိုဘိုင်းတွင် merge request များကို သုံးသပ်ပါ",
       "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",
@@ -1614,6 +1614,8 @@
       "set": "သတ်မှတ်ထား",
       "notSet": "သတ်မှတ်ထားခြင်း မရှိ",
       "nSelected": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_one": "{{displayCount}} ခု ရွေးထား",
+      "nSelected_other": "{{displayCount}} ခု ရွေးထား",
       "proposedReviewMdGuidance": "အဆိုပြုထားသော REVIEW.md လမ်းညွှန်ချက်များ"
     },
     "decision": {

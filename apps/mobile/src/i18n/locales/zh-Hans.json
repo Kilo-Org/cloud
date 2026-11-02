@@ -1084,6 +1084,8 @@
     "overview": {
       "allAreas": "所有方面",
       "nSelected": "已选 {{displayCount}} 项",
+      "nSelected_one": "已选 {{displayCount}} 项",
+      "nSelected_other": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "set": "已设置",
       "notSet": "未设置"
@@ -2714,6 +2716,8 @@
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
+      "reconnectTitleGitLab": "重新连接 GitLab",
+      "reconnectTitleBitbucket": "重新连接 Bitbucket",
       "reconnectDescription": "你的 GitHub 连接授权已被撤销。",
       "gitlabDescription": "在手机上审查合并请求",
       "gitlabInstanceMismatchTitle": "GitLab 连接指向其他实例",
@@ -2993,7 +2997,6 @@
         "squash": "压缩合并"
       },
       "terminal": {
-        "alreadyMerged": "已合并",
         "closed": "此拉取请求已关闭",
         "closedMergeRequest": "此合并请求已关闭"
       },
@@ -3010,7 +3013,6 @@
         "requiredReviewsTitle": "尚未获得所需的审查批准",
         "requiredReviewsDetail": "尚未获得必需审查者的批准，或仍在等待批准。",
         "failingChecksTitle": "必需检查未通过",
-        "failingChecksDetail": "必需的状态检查未通过。",
         "unstableTitle": "部分检查未通过",
         "unstableDetail": "部分非必需检查未通过，但不影响合并。",
         "draftTitle": "拉取请求草稿",

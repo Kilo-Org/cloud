@@ -442,7 +442,6 @@
         "rebase": "Суурь солих"
       },
       "terminal": {
-        "alreadyMerged": "Аль хэдийн нэгтгэсэн",
         "closed": "Энэ нэгтгэх хүсэлт хаагдсан",
         "closedMergeRequest": "Энэ нэгтгэх хүсэлт хаагдсан"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Шаардлагатай хяналт дутуу",
         "requiredReviewsDetail": "Заавал хянах хүмүүсийн зөвшөөрөл дутуу эсвэл хүлээгдэж байна.",
         "failingChecksTitle": "Шаардлагатай шалгалтууд амжилтгүй",
-        "failingChecksDetail": "Шаардлагатай төлөвийн шалгалтууд амжилтгүй болж байна.",
         "unstableTitle": "Зарим шалгалт амжилтгүй болж байна",
         "unstableDetail": "Заавал амжилттай байх шаардлагагүй шалгалтууд амжилтгүй болж байна. Энэ нь нэгтгэхэд саад болохгүй.",
         "draftTitle": "Ноорог нэгтгэх хүсэлт",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
       "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
+      "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
+      "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
       "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна.",
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "gitlabInstanceMismatchTitle": "GitLab холболт нь өөр инстанцад хамаарна",
@@ -1614,6 +1614,8 @@
       "set": "Тохируулсан",
       "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
+      "nSelected_one": "{{displayCount}} сонгогдсон",
+      "nSelected_other": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
     "decision": {

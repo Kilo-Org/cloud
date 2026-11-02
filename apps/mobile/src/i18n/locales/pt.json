@@ -449,7 +449,6 @@
         "rebase": "Reaplicar"
       },
       "terminal": {
-        "alreadyMerged": "Já integrado",
         "closed": "Este PR está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "As aprovações dos revisores obrigatórios estão em falta ou pendentes.",
         "failingChecksTitle": "Verificações obrigatórias com falhas",
-        "failingChecksDetail": "As verificações de estado obrigatórias estão a falhar.",
         "unstableTitle": "Algumas verificações estão a falhar",
         "unstableDetail": "Algumas verificações não obrigatórias estão a falhar, mas não impedem a integração.",
         "draftTitle": "PR em rascunho",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Não foi possível verificar a ligação ao Bitbucket.",
       "providerCheckFailedMessage": "O estado da ligação só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Voltar a ligar o GitHub",
+      "reconnectTitleGitLab": "Voltar a ligar o GitLab",
+      "reconnectTitleBitbucket": "Voltar a ligar o Bitbucket",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada.",
       "gitlabDescription": "Rever merge requests no telemóvel",
       "gitlabInstanceMismatchTitle": "A ligação ao GitLab é de outra instância",
@@ -1636,6 +1636,9 @@
       "set": "Definido",
       "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",
+      "nSelected_one": "{{displayCount}} selecionados",
+      "nSelected_other": "{{displayCount}} selecionados",
+      "nSelected_many": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o ficheiro REVIEW.md"
     },
     "decision": {
@@ -2653,9 +2656,9 @@
       "detailRetryingClone": "A tentar novamente a clonagem (tentativa {{attempt}} de {{total}})",
       "detailSetupCommandFailed": "O comando de configuração {{index}} falhou",
       "detailSetupCommandTimedOut": "O comando de configuração {{index}} excedeu o tempo limite",
-      "detailColdRestore": "Restauro a frio, snapshot aplicado, {{applied}} de {{total}} ficheiros restaurados",
+      "detailColdRestore": "Restauro a frio, snapshot aplicado, ficheiros restaurados: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% concluído",
-      "detailRestoreIncompleteReport": "Restauro da sessão incompleto: {{skipped}} de {{total}} ficheiros não foram restaurados ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauro da sessão incompleto, ficheiros não restaurados: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Em falta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e mais {{omitted}}",
       "detailReasonPatchFailed": "a correção não foi aplicada",

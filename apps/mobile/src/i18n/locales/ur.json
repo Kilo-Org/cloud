@@ -442,7 +442,6 @@
         "rebase": "ریبیس"
       },
       "terminal": {
-        "alreadyMerged": "پہلے ہی مرج شدہ",
         "closed": "یہ پل ریکویسٹ بند ہے",
         "closedMergeRequest": "یہ مرج ریکویسٹ بند ہے"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ضروری جائزے باقی ہیں",
         "requiredReviewsDetail": "ضروری جائزہ لینے والوں کی منظوری ابھی نہیں ملی یا زیر التوا ہے۔",
         "failingChecksTitle": "ضروری جانچیں ناکام ہیں",
-        "failingChecksDetail": "حالت کی ضروری جانچیں ناکام ہو رہی ہیں۔",
         "unstableTitle": "کچھ جانچیں ناکام ہیں",
         "unstableDetail": "اختیاری جانچیں ناکام ہو رہی ہیں۔ ان کی ناکامی مرج میں رکاوٹ نہیں بنے گی۔",
         "draftTitle": "پل ریکویسٹ کا مسودہ",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
       "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
+      "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
+      "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "gitlabInstanceMismatchTitle": "GitLab کنکشن کسی دوسرے انسٹینس کے لیے ہے",
@@ -1614,6 +1614,8 @@
       "set": "مقرر ہے",
       "notSet": "مقرر نہیں",
       "nSelected": "{{displayCount}} منتخب",
+      "nSelected_one": "{{displayCount}} منتخب",
+      "nSelected_other": "{{displayCount}} منتخب",
       "proposedReviewMdGuidance": "REVIEW.md کے لیے تجویز کردہ ہدایات"
     },
     "decision": {
@@ -2606,9 +2608,9 @@
       "detailRetryingClone": "کلون کی دوبارہ کوشش (کوشش {{attempt}} از {{total}})",
       "detailSetupCommandFailed": "سیٹ اپ کمانڈ {{index}} ناکام رہی",
       "detailSetupCommandTimedOut": "سیٹ اپ کمانڈ {{index}} کا وقت ختم ہو گیا",
-      "detailColdRestore": "کول بحالی، اسنیپ شاٹ لاگو، {{total}} میں سے {{applied}} فائلیں بحال ہوئیں",
+      "detailColdRestore": "کول بحالی، اسنیپ شاٹ لاگو، بحال شدہ فائلیں: {{total}} میں سے {{applied}}",
       "detailProgressPercent": "{{percent}}% مکمل",
-      "detailRestoreIncompleteReport": "سیشن بحالی نامکمل: {{total}} میں سے {{skipped}} فائلیں بحال نہیں ہوئیں ({{reasons}})۔",
+      "detailRestoreIncompleteReport": "سیشن بحالی نامکمل، غیر بحال شدہ فائلیں: {{total}} میں سے {{skipped}} ({{reasons}})۔",
       "detailRestoreIncompleteMissing": "غیر موجود: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} اور {{omitted}} مزید",
       "detailReasonPatchFailed": "پیچ لاگو نہیں ہو سکا",

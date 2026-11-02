@@ -442,7 +442,6 @@
         "rebase": "Famindrana fototra"
       },
       "terminal": {
-        "alreadyMerged": "Efa nampiraisina",
         "closed": "Nakatona ity fangatahana fampiraisana ity",
         "closedMergeRequest": "Nakatona ity fangatahana fampiraisana ity"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Tsy ampy ny fandinihana takina",
         "requiredReviewsDetail": "Mbola tsy azo na mbola andrasana ny fankatoavan'ireo mpandinika voatendry.",
         "failingChecksTitle": "Tsy mahomby ny fanamarinana takina",
-        "failingChecksDetail": "Tsy mahomby ny fanamarinana sata takina.",
         "unstableTitle": "Misy fanamarinana tsy mahomby",
         "unstableDetail": "Tsy mahomby ny fanamarinana tsy takina. Tsy hanakana ny fampiraisana izany.",
         "draftTitle": "PR mbola volavola",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Tsy voamarina ny fifandraisana amin'ny Bitbucket.",
       "providerCheckFailedMessage": "Tsy azo ny satan'ny fifandraisana raha tsy tafiditra izao.",
       "reconnectTitle": "Fampifandraisana indray amin'ny GitHub",
+      "reconnectTitleGitLab": "Fampifandraisana indray amin'ny GitLab",
+      "reconnectTitleBitbucket": "Fampifandraisana indray amin'ny Bitbucket",
       "reconnectDescription": "Nofoanana ny fifandraisanao amin'ny GitHub.",
       "gitlabDescription": "Diniho amin'ny finday ny fangatahana fampiraisana",
       "gitlabInstanceMismatchTitle": "Ny fampifandraisana amin'ny GitLab dia ho an'ny instance hafa",
@@ -1614,6 +1614,8 @@
       "set": "Voafaritra",
       "notSet": "Tsy voafaritra",
       "nSelected": "{{displayCount}} voafidy",
+      "nSelected_one": "{{displayCount}} voafidy",
+      "nSelected_other": "{{displayCount}} voafidy",
       "proposedReviewMdGuidance": "Torolalana naroso ho an'ny REVIEW.md"
     },
     "decision": {

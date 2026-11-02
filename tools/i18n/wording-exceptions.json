@@ -736,6 +736,7 @@
   ],
   "ps": [
     "analysis failed",
+    "block",
     "cancelled",
     "commit",
     "deleted",

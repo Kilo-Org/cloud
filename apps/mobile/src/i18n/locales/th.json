@@ -442,7 +442,6 @@
         "rebase": "รีเบส"
       },
       "terminal": {
-        "alreadyMerged": "รวมแล้ว",
         "closed": "PR นี้ปิดแล้ว",
         "closedMergeRequest": "Merge request นี้ปิดแล้ว"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ยังไม่ได้รับรีวิวครบตามที่กำหนด",
         "requiredReviewsDetail": "ยังไม่ได้รับการอนุมัติครบจากผู้รีวิวที่กำหนด หรือยังรอการอนุมัติอยู่",
         "failingChecksTitle": "ไม่ผ่านการตรวจสอบที่บังคับ",
-        "failingChecksDetail": "การตรวจสอบสถานะที่บังคับยังไม่ผ่าน",
         "unstableTitle": "การตรวจสอบบางรายการไม่ผ่าน",
         "unstableDetail": "การตรวจสอบที่ไม่บังคับบางรายการไม่ผ่าน แต่ยังรวมได้",
         "draftTitle": "PR ฉบับร่าง",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "ไม่สามารถตรวจสอบการเชื่อมต่อ Bitbucket ได้",
       "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
+      "reconnectTitleGitLab": "เชื่อมต่อ GitLab ใหม่",
+      "reconnectTitleBitbucket": "เชื่อมต่อ Bitbucket ใหม่",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน",
       "gitlabDescription": "ตรวจสอบ merge request บนมือถือ",
       "gitlabInstanceMismatchTitle": "การเชื่อมต่อ GitLab เป็นของอินสแตนซ์อื่น",
@@ -1614,6 +1614,8 @@
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_one": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_other": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
     "decision": {

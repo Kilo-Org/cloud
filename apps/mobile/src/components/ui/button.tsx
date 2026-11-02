@@ -1,8 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text, TextClassContext } from '@/components/ui/text';
 import { COMPACT_BUTTON_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -82,6 +82,13 @@ const buttonGapVariants = cva('', {
 // accessibility tree, because the button carries its own busy name.
 export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center';
 export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
+/** The busy mark draws at the label's own line height, so it replaces its ink. */
+const BUTTON_BUSY_MARK_SIZE = 20;
+/**
+ * The platform's small indicator strokes a ring centred on a 7.5 dp radius; a
+ * 17 dp box with a 2 dp border paints the same ring behind it as a track.
+ */
+const BUSY_TRACK_SIZE = 17;
 
 /**
  * The visible text of the button's children, for a label a loading button can
@@ -219,9 +226,29 @@ function Button({
   // The children sit one level deeper in that layout, so their spacing moves
   // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
-  const busyIndicator = loading ? (
-    <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
-  ) : null;
+  // A busy mark has to read in a still capture as well as on screen. The
+  // platform indicator's indeterminate arc sweeps from near-zero on Android, so
+  // a still can land on a speck of ink where the label used to be. A faint
+  // track at the arc's own radius and stroke keeps the mark a ring in every
+  // frame, at the label's line height, without adding motion of its own.
+  const busyInk = spinnerColor(variant, colors);
+  const busyMark = (
+    <View
+      className="items-center justify-center"
+      // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+      style={{ width: BUTTON_BUSY_MARK_SIZE, height: BUTTON_BUSY_MARK_SIZE }}
+    >
+      <View className="absolute inset-0 items-center justify-center">
+        <View
+          className="rounded-full border-2 opacity-40"
+          // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+          style={{ width: BUSY_TRACK_SIZE, height: BUSY_TRACK_SIZE, borderColor: busyInk }}
+        />
+      </View>
+      <ActivityIndicator accessible={false} size="small" color={busyInk} />
+    </View>
+  );
+  const busyIndicator = loading ? busyMark : null;
   // A bare string or number child has no host to draw on: Pressable is a View,
   // and a View draws no text, so the button collapses to its padding and the
   // label disappears while the accessibility tree still names it. Wrap scalars
@@ -284,18 +311,14 @@ function Button({
         )}
         {loading && size !== 'icon' ? (
           // The button already carries the busy state and its name, so the
-          // indicator inside it stays out of the accessibility tree instead of
+          // mark inside it stays out of the accessibility tree instead of
           // adding a second stop that reads only the wait.
           <View
             className={BUTTON_BUSY_OVERLAY_CLASS}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <ActivityIndicator
-              accessible={false}
-              size="small"
-              color={spinnerColor(variant, colors)}
-            />
+            {busyMark}
           </View>
         ) : null}
         {size === 'icon' ? busyIndicator : null}

@@ -432,6 +432,38 @@ describe('session card layout: states', () => {
   });
 });
 
+describe('session card layout: locale word order', () => {
+  // The two templates decide where their values sit, so a language that writes
+  // the total first, or the duration inside a circumposition, reads correctly.
+  // Pashto writes "3 of 7" with a circumposition around the total, and names
+  // the run time inside another.
+  const PASHTU = {
+    planProgress: 'له {{total}} څخه {{done}}',
+    finishedIn: 'په {{duration}} کې بشپړ شو',
+  };
+
+  it('places the plan counts in the order the language wrote them', () => {
+    const shown = texts(
+      renderWithCopy(PASHTU)({ ...BASE, plan: { done: 3, total: 7, current: null } }).banner
+    );
+    expect(shown.slice(shown.indexOf('له'))).toEqual(['له', '7', 'څخه', '3']);
+  });
+
+  it('fills the finished-in template instead of prefixing the duration', () => {
+    const shown = texts(
+      renderWithCopy(PASHTU)({
+        ...BASE,
+        statusKind: 'idle',
+        statusSince: new Date(NOW).toISOString(),
+        outcome: { kind: 'none' },
+      }).banner
+    );
+    expect(shown).toContain('په 38 min کې بشپړ شو');
+    // No unresolved placeholder reaches the screen in any locale.
+    expect(shown.every(value => !value.includes('{{'))).toBe(true);
+  });
+});
+
 // The Lock Screen card is at most 160 pt tall, and ActivityKit draws nothing
 // at all when its banner fails to lay out. The banner therefore keeps a hard
 // budget: three single-line rows (the header with the title, the status line

@@ -3452,9 +3452,9 @@
       "searching": "گەڕان لە وێب",
       "thinking": "بیرکردنەوە لەسەری"
     },
-    "planOf": "لە",
+    "planProgress": "{{done}} لە {{total}}",
     "filesChanged": "فایل گۆڕدرا",
-    "finishedIn": "تەواو بوو لە",
+    "finishedIn": "تەواو بوو لە {{duration}}",
     "noActivityFor": "چالاکی نییە بۆ",
     "prOpened": "داواکاری هێنان کرایەوە",
     "permissionWants": "دەیەوێت جێبەجێی بکات",

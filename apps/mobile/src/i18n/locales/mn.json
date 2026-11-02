@@ -3452,9 +3452,9 @@
       "searching": "Веб хайлт",
       "thinking": "Бодож байна"
     },
-    "planOf": "ийн",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өөрчлөгдсөн",
-    "finishedIn": "Дууссан",
+    "finishedIn": "{{duration}} хугацаанд дууссан",
     "noActivityFor": "Үйл ажиллагаагүй",
     "prOpened": "Татах хүсэлт нээгдсэн",
     "permissionWants": "Ажиллуулахыг хүсэж байна",

@@ -18,6 +18,7 @@ import {
   securityAgentAuditReportSerializedByteLength,
   securityAgentAuditReportEventCountBucket,
   SecurityAgentAuditReportQueryError,
+  type SecurityAgentAuditReport,
   withSecurityAgentAuditReportTimeout,
 } from './security-audit-report';
 
@@ -493,6 +494,7 @@ describe('getSecurityAgentAuditReport', () => {
 
       const lockClient = await pool.connect();
       const monitor = await pool.connect();
+      let reportPromise: Promise<SecurityAgentAuditReport> | null = null;
       try {
         await lockClient.query('BEGIN');
         await lockClient.query('LOCK TABLE security_audit_log IN ACCESS EXCLUSIVE MODE');
@@ -503,7 +505,7 @@ describe('getSecurityAgentAuditReport', () => {
         }
 
         const startedAt = Date.now();
-        const reportPromise = getSecurityAgentAuditReport({
+        reportPromise = getSecurityAgentAuditReport({
           owner,
           input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
           isRequestingUserKiloAdmin: false,
@@ -528,6 +530,7 @@ describe('getSecurityAgentAuditReport', () => {
           xactOpen: false,
         });
       } finally {
+        if (reportPromise) await reportPromise.catch(() => undefined);
         monitor.release();
         await lockClient.query('ROLLBACK').catch(() => undefined);
         lockClient.release();
@@ -535,6 +538,23 @@ describe('getSecurityAgentAuditReport', () => {
     },
     20_000
   );
+
+  it('reports the request stage when the request budget is spent before a statement starts', async () => {
+    const owner = await createIntegrationOwner();
+    const occurredAt = new Date(Date.now() - 1_000).toISOString();
+
+    await expect(
+      getSecurityAgentAuditReport({
+        owner,
+        input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
+        isRequestingUserKiloAdmin: false,
+        timeouts: { requestMs: 400, queryMs: 60_000 },
+      })
+    ).rejects.toMatchObject({
+      name: 'SecurityAgentAuditReportQueryError',
+      stage: 'request',
+    });
+  });
 });
 
 describe('buildSecurityAgentAuditReportFromRows', () => {

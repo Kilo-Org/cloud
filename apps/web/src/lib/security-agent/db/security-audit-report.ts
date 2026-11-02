@@ -62,10 +62,10 @@ export type SecurityAgentAuditReportTimeouts = {
 };
 
 /**
- * One report call's time budget. `requestDeadlineAt` bounds the whole assembly -
- * every statement gets at most the time left before it - and `queryTimeoutMs`
- * bounds a single statement. Tests pass a shorter budget; production uses the
- * exported constants.
+ * One report call's time budget. `requestDeadlineAt` bounds the whole assembly - every
+ * statement gets at most the time left before it, and a statement that cannot start in
+ * that window fails with stage `request` - and `queryTimeoutMs` bounds a single
+ * statement. Tests pass a shorter budget; production uses the exported constants.
  */
 type AuditReportBudget = {
   readonly requestDeadlineAt: number;
@@ -650,7 +650,9 @@ async function runAuditReportQuery<T>(
     budget.requestDeadlineAt - Date.now() - SECURITY_AGENT_AUDIT_REPORT_BACKSTOP_GRACE_MS
   );
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
-    throw new SecurityAgentAuditReportQueryError('Report query did not finish', stage);
+    // The request deadline passed before this statement could be dispatched, so the
+    // failure belongs to the request budget, not to the stage of the skipped statement.
+    throw new SecurityAgentAuditReportQueryError('Report query did not finish', 'request');
   }
 
   try {

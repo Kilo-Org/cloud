@@ -37,22 +37,13 @@ export function isManagedGatewayDisabled(
   );
 }
 
-// https://openrouter.ai/docs/guides/features/in-region-routing
-const OPENROUTER_REGIONAL_API_URLS = {
-  eu: 'https://eu.openrouter.ai/api/v1',
-  us: 'https://us.openrouter.ai/api/v1',
-} as const satisfies Record<OrganizationDataRegion, string>;
-
 /**
- * Pins inference to the data region. OpenRouter selects the region by base URL;
- * the Vercel AI Gateway selects it with `providerOptions.gateway.inferenceRegion`
- * (https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference).
- * Both fail the request instead of leaving the region. Other providers are unchanged.
+ * Pins Vercel AI Gateway inference to the data region with
+ * `providerOptions.gateway.inferenceRegion`, which fails the request instead of leaving the region
+ * (https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference). OpenRouter's
+ * regional hosts need a Business plan we do not have, so OpenRouter and other providers are unchanged.
  */
 export function withDataRegion(provider: Provider, dataRegion: OrganizationDataRegion): Provider {
-  if (provider.id === 'openrouter') {
-    return { ...provider, apiUrl: OPENROUTER_REGIONAL_API_URLS[dataRegion] };
-  }
   if (provider.id === 'vercel') {
     return {
       ...provider,

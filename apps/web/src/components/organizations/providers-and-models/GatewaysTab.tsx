@@ -92,8 +92,9 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
           <CardHeader>
             <CardTitle>Data region</CardTitle>
             <CardDescription>
-              Pins chat requests routed through OpenRouter or the Vercel AI Gateway to the selected
-              region. Requests for a model that is not available in the region fail with an error.
+              Pins chat requests routed through the Vercel AI Gateway to the selected region.
+              Requests for a model that is not available in the region fail with an error. Requests
+              routed through OpenRouter are not pinned to a region.
             </CardDescription>
           </CardHeader>
           <CardContent>

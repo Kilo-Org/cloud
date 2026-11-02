@@ -92,7 +92,7 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   data_region: {
     label: 'Data region',
     description:
-      'Lets the organization pin OpenRouter and Vercel AI Gateway requests to the EU or the US on its Providers & Models page.',
+      'Lets the organization pin Vercel AI Gateway requests to the EU or the US on its Providers & Models page.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 

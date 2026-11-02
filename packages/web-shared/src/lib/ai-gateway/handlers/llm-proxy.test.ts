@@ -1452,20 +1452,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).toHaveBeenCalled();
     });
 
-    it('sends OpenRouter requests to the regional base URL', async () => {
+    it('keeps OpenRouter requests on the global base URL when a data region is set', async () => {
       setOrganization({ data_region: 'eu' }, { data_region: ['org-1'] });
-
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-
-      expect(response.status).toBe(200);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
-        'https://eu.openrouter.ai/api/v1'
-      );
-    });
-
-    it('keeps the global base URL while the data region feature is off', async () => {
-      setOrganization({ data_region: 'eu' }, {});
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);

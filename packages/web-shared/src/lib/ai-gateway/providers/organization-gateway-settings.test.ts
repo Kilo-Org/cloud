@@ -73,13 +73,6 @@ describe('getOrganizationGatewaySettings', () => {
 });
 
 describe('withDataRegion', () => {
-  it.each([
-    ['eu', 'https://eu.openrouter.ai/api/v1'],
-    ['us', 'https://us.openrouter.ai/api/v1'],
-  ] as const)('sends %s OpenRouter requests to the regional base URL', (region, apiUrl) => {
-    expect(withDataRegion(makeProvider('openrouter'), region).apiUrl).toBe(apiUrl);
-  });
-
   it('pins Vercel AI Gateway inference to the region and keeps the gateway options', async () => {
     const vercel = makeProvider('vercel');
     const regional = withDataRegion(vercel, 'eu');
@@ -101,8 +94,8 @@ describe('withDataRegion', () => {
     });
   });
 
-  it('leaves other providers unchanged', () => {
-    const custom = makeProvider('custom');
-    expect(withDataRegion(custom, 'eu')).toBe(custom);
+  it.each(['openrouter', 'custom'] as const)('leaves %s providers unchanged', providerId => {
+    const provider = makeProvider(providerId);
+    expect(withDataRegion(provider, 'eu')).toBe(provider);
   });
 });

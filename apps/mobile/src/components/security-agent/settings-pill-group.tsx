@@ -16,13 +16,13 @@ import { cn } from '@/lib/utils';
  * instead of being squeezed into a horizontal pill row.
  *
  * A read-only group dims its labels once, by token, never by row opacity: the
- * unselected labels already sit on `text-muted-foreground`, and the selected
- * one and the check join them while the group is disabled. Halving the row on
- * top of that muted ink lands the label near 2:1 on the row's `secondary`
- * surface in both schemes — under the 4.5:1 text floor, so a member who cannot
- * manage the settings could not read which option is set. The muted token keeps
- * 4.5:1 and the palette's accent leaves the check, so the group still reads as
- * unavailable.
+ * unselected labels sit on `text-muted-foreground`, the selected row keeps the
+ * full `foreground` ink in both states, and only the check leaves the palette's
+ * accent. Halving the row on top of that muted ink lands the unselected label
+ * near 2:1 on the row's `secondary` surface in both schemes — under the 4.5:1
+ * text floor, so a member who cannot manage the settings could not read which
+ * options exist. The muted token keeps 4.5:1, and the one full-strength line in
+ * the list still says which option is set.
  */
 export function PillGroup<T extends string>({
   label,
@@ -68,8 +68,9 @@ export function PillGroup<T extends string>({
                   'flex-1 text-sm',
                   active && 'font-medium',
                   // The selected option is the only one that carries the full
-                  // `foreground` tone, and only while the group can be changed.
-                  active && !disabled ? 'text-foreground' : 'text-muted-foreground'
+                  // `foreground` tone, so a read-only list still shows which
+                  // option is set; every other label stays on the muted token.
+                  active ? 'text-foreground' : 'text-muted-foreground'
                 )}
               >
                 {option.label}

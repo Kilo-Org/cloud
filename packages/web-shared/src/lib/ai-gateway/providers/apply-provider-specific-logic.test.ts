@@ -62,7 +62,7 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'openrouter',
+    type: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -905,7 +905,7 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
   });
 
   it('leaves upstreams without verified support untouched', async () => {
-    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), id: 'custom' });
+    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), type: 'custom' });
 
     expect(thinking).toEqual({ type: 'adaptive', display: 'summarized' });
     expect(extraHeaders['anthropic-beta']).toBe('fine-grained-tool-streaming-2025-05-14');

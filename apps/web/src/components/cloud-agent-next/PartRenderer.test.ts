@@ -8,21 +8,10 @@ jest.mock('remark-gfm', () =>
   process.getBuiltinModule('module').createRequire(__filename)('remark-gfm')
 );
 
-import type { FilePart, TextPart } from './types';
-import { PartRenderer } from './PartRenderer';
+import type { FilePart } from './types';
+import { TextPartRenderer, FilePartRenderer } from './part-content';
 
 Object.assign(globalThis, { React });
-
-function textPart(text: string): TextPart {
-  return {
-    id: 'text-1',
-    sessionID: 'ses-1',
-    messageID: 'msg-1',
-    type: 'text',
-    text,
-    time: { start: 1, end: 2 },
-  };
-}
 
 function imageFilePart(url: string): FilePart {
   return {
@@ -37,9 +26,7 @@ function imageFilePart(url: string): FilePart {
 }
 
 function renderText(text: string): string {
-  return renderToStaticMarkup(
-    React.createElement(PartRenderer, { part: textPart(text), isStreaming: false })
-  );
+  return renderToStaticMarkup(React.createElement(TextPartRenderer, { text, isStreaming: false }));
 }
 
 describe('TextPartRenderer markdown images', () => {
@@ -95,9 +82,8 @@ describe('TextPartRenderer markdown images', () => {
 describe('FilePartRenderer images', () => {
   it('renders an image attachment as an img element', () => {
     const markup = renderToStaticMarkup(
-      React.createElement(PartRenderer, {
+      React.createElement(FilePartRenderer, {
         part: imageFilePart('https://files.example.com/screenshot.png'),
-        isStreaming: false,
       })
     );
 

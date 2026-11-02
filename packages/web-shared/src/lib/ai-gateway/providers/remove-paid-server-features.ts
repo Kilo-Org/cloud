@@ -54,7 +54,7 @@ export function removePaidServerFeatures(
   const removedPlugins = requestedPlugins.filter(plugin => !isFreePlugin(plugin));
   const keptPlugins: OpenRouterPlugin[] = [
     ...requestedPlugins.filter(isFreePlugin),
-    ...(provider.id === 'openrouter' ? [FREE_PDF_PARSER_PLUGIN] : []),
+    ...(provider.type === 'openrouter' ? [FREE_PDF_PARSER_PLUGIN] : []),
   ];
   if (keptPlugins.length > 0) {
     requestToMutate.body.plugins = keptPlugins;

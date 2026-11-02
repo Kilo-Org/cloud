@@ -3,6 +3,7 @@ import {
   classifyAssistantFailure,
   executionStoppedMessage,
   isAssistantInterrupt,
+  missingAgentSlug,
   type AssistantFailureClassification,
 } from '../../../src/shared/assistant-failure.js';
 import {
@@ -1279,7 +1280,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       // A previous execution's cancellation can arrive after abort's HTTP reply
       // and after the next prompt was dispatched. Wait for evidence of that prompt.
-      if (turn.prompts.every(entry => !entry.nativeObserved)) return;
+      if (turn.prompts.every(entry => !entry.nativeObserved)) {
+        // Missing agents fail in Kilo's preprocessing, before a message or turn can be observed.
+        const missingAgent =
+          event.type === 'session.error' ? missingAgentSlug(event.properties.error) : undefined;
+        if (
+          missingAgent !== undefined &&
+          turn.prompts.some(entry => entry.dispatched && entry.payload.agent.mode === missingAgent)
+        ) {
+          onKiloError(turn, event.properties);
+        }
+        return;
+      }
       turn.publication?.observe(event.type, event.properties);
       if (event.type === 'session.turn.close') {
         const nativeState = deps.runtimes.get(route.runtimeKey)?.sessionState(root);

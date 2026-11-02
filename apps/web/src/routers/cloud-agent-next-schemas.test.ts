@@ -278,6 +278,20 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(response).not.toHaveProperty('parentSessionId');
     expect(response).not.toHaveProperty('cloudAgentSessionScopeId');
   });
+
+  it('preserves runtime agent visibility metadata for the chat picker', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    expect(
+      baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
+    ).toEqual(runtimeAgents);
+  });
 });
 
 describe('baseWorktreeChangesNextSchema', () => {

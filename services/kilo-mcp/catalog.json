@@ -3807,6 +3807,7 @@
                     "anthropic",
                     "azure",
                     "bedrock",
+                    "cohere",
                     "deepseek",
                     "fireworks",
                     "gmicloud",
@@ -35718,13 +35719,9 @@
         },
         "mode": {
           "type": "string",
-          "enum": [
-            "architect",
-            "code",
-            "ask",
-            "debug",
-            "orchestrator"
-          ]
+          "minLength": 1,
+          "maxLength": 50,
+          "pattern": "^(?!custom$)[a-z][a-z0-9-]*$"
         },
         "model": {
           "type": "string",
@@ -36078,13 +36075,9 @@
         },
         "mode": {
           "type": "string",
-          "enum": [
-            "architect",
-            "code",
-            "ask",
-            "debug",
-            "orchestrator"
-          ]
+          "minLength": 1,
+          "maxLength": 50,
+          "pattern": "^(?!custom$)[a-z][a-z0-9-]*$"
         },
         "model": {
           "type": "string",

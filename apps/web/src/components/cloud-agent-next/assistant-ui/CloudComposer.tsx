@@ -1,5 +1,12 @@
 'use client';
 
+import { ComposerPrimitive, useAui, useAuiState } from '@assistant-ui/react';
+import {
+  ownsSubmittedDraft,
+  canRestoreSubmittedDraft,
+  canRestoreFailedPrompt,
+  type SubmittedDraft,
+} from './composer-bridge';
 import type { KeyboardEvent } from 'react';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -11,7 +18,7 @@ import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
-import { BrowseCommandsDialog } from './BrowseCommandsDialog';
+import { BrowseCommandsDialog } from '../BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
@@ -19,8 +26,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Brain } from 'lucide-react';
-import { MobileToolbarPopover } from './MobileToolbarPopover';
-import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
+import { MobileToolbarPopover } from '../MobileToolbarPopover';
+import { AttachmentPreviewStrip } from '../AttachmentPreviewStrip';
 import {
   useCloudAgentAttachmentUpload,
   type CloudAgentAttachmentFile,
@@ -31,19 +38,20 @@ import {
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
   type CloudAgentAttachments,
 } from '@/lib/cloud-agent/constants';
-import type { AgentMode } from './types';
+import type { AgentMode } from '../types';
 import {
   acceptedSubmissionAttachmentIdsToRemove,
   getChatInputPresentationCommands,
   isWorktreeNewChatCommand,
   shouldRejectAttachedSlashCommand,
-} from './chat-input-attachments';
+} from '../chat-input-attachments';
 import {
   revokeComposerSnapshotPreviews,
   saveComposerSnapshot,
   takeComposerSnapshot,
+  COMPOSER_SNAPSHOT_LIMIT,
   type ComposerSnapshot,
-} from './composer-snapshots';
+} from '../composer-snapshots';
 
 const DEFAULT_CONVERSATION_KEY = 'default';
 
@@ -64,7 +72,7 @@ function normalizeRestoredAttachments(
   );
 }
 
-type ChatInputProps = {
+type CloudComposerProps = {
   onSend: (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>;
   /**
    * Invoked when the user submits a slash command (input starts with `/<name>`
@@ -114,7 +122,7 @@ type ChatInputProps = {
   availableVariants?: string[];
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
-  /** Pre-populate the textarea (e.g. to restore text after a failed send) */
+  /** Restore a failed prompt only when this composer owns the submitted draft. */
   initialValue?: string;
   /** Custom modes exposed by the session's profile stack (shown in picker) */
   customModeOptions?: ModeOption<AgentMode>[];
@@ -134,7 +142,7 @@ type ChatInputProps = {
   conversationKey?: string;
 };
 
-export function ChatInput({
+export function CloudComposer({
   onSend,
   onSendCommand,
   onNewChat,
@@ -167,8 +175,11 @@ export function ChatInput({
   variantPickerDisabled,
   variantPickerTooltip,
   conversationKey,
-}: ChatInputProps) {
-  const [value, setValue] = useState('');
+}: CloudComposerProps) {
+  const aui = useAui();
+  const value = useAuiState(state => state.composer.text);
+  const revisionsRef = useRef(new Map<string, number>());
+  const submissionsRef = useRef(new Map<string, SubmittedDraft>());
   const [pendingSubmissionKeys, setPendingSubmissionKeys] = useState<ReadonlySet<string>>(
     new Set()
   );
@@ -185,10 +196,23 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
 
-  const setInputValue = useCallback((nextValue: string) => {
-    valueRef.current = nextValue;
-    setValue(nextValue);
-  }, []);
+  const writeInputValue = useCallback(
+    (nextValue: string) => {
+      valueRef.current = nextValue;
+      aui.composer().setText(nextValue);
+    },
+    [aui]
+  );
+  const setInputValue = useCallback(
+    (nextValue: string) => {
+      const key = conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY;
+      const revision = (revisionsRef.current.get(key) ?? 0) + 1;
+      revisionsRef.current.delete(key);
+      revisionsRef.current.set(key, revision);
+      writeInputValue(nextValue);
+    },
+    [writeInputValue]
+  );
 
   const setAttachmentSubmissionPending = useCallback((pending: boolean, key: string) => {
     const next = new Set(attachmentSubmissionPendingRef.current);
@@ -224,6 +248,17 @@ export function ChatInput({
       candidate => candidate === shownKey || attachmentSubmissionPendingRef.current.has(candidate)
     );
     revokeComposerSnapshotPreviews(evicted);
+    for (const candidate of revisionsRef.current.keys()) {
+      if (
+        revisionsRef.current.size > COMPOSER_SNAPSHOT_LIMIT &&
+        candidate !== shownKey &&
+        !composerSnapshotsRef.current.has(candidate) &&
+        !attachmentSubmissionPendingRef.current.has(candidate)
+      ) {
+        revisionsRef.current.delete(candidate);
+        submissionsRef.current.delete(candidate);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -245,19 +280,27 @@ export function ChatInput({
       attachments: liveAttachmentsRef.current,
     });
     const snapshot = takeComposerSnapshot(composerSnapshotsRef.current, next);
-    setInputValue(snapshot?.text ?? '');
+    writeInputValue(snapshot?.text ?? '');
     replaceAttachments(normalizeRestoredAttachments(snapshot?.attachments ?? []));
-  }, [conversationKey, replaceAttachments, setInputValue, storeComposerSnapshot]);
+  }, [conversationKey, replaceAttachments, writeInputValue, storeComposerSnapshot]);
 
-  // Restore text into the textarea when initialValue changes (e.g. after a failed send).
-  // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
+  // SDK failure notifications and send settlement share the same revision owner.
   useEffect(() => {
     if (initialValue === undefined) return;
-    if (initialValue !== '' && valueRef.current !== '') return;
-
-    setInputValue(initialValue);
+    const key = conversationKey ?? DEFAULT_CONVERSATION_KEY;
+    if (
+      !canRestoreFailedPrompt(
+        submissionsRef.current.get(key),
+        key,
+        revisionsRef.current.get(key) ?? 0,
+        valueRef.current,
+        initialValue
+      )
+    )
+      return;
+    writeInputValue(initialValue);
     textareaRef.current?.focus();
-  }, [initialValue, setInputValue]);
+  }, [initialValue, conversationKey, writeInputValue]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls
@@ -300,6 +343,14 @@ export function ChatInput({
       if (!trimmed) return false;
 
       const conversationAtSend = conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY;
+      const submission: SubmittedDraft = {
+        conversationKey: conversationAtSend,
+        revision: revisionsRef.current.get(conversationAtSend) ?? 0,
+        text: message,
+        attachmentIds: attachmentUpload.attachments.map(attachment => attachment.id),
+      };
+      submissionsRef.current.set(conversationAtSend, submission);
+      const submittedAttachments = attachmentsEnabled ? [...attachmentUpload.attachments] : [];
       const createsWorktreeChat = isWorktreeNewChatCommand(trimmed, onNewChat !== undefined);
 
       // `/new` is navigation, not an ordinary send: a temporary send
@@ -361,9 +412,19 @@ export function ChatInput({
           return false;
         }
       }
-      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
-
-      setInputValue('');
+      // Upload finalization may finish after navigation. Never send into the newly selected session.
+      if ((conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY) !== conversationAtSend) {
+        setAttachmentSubmissionPending(false, conversationAtSend);
+        return false;
+      }
+      if (
+        ownsSubmittedDraft(
+          submission,
+          conversationAtSend,
+          revisionsRef.current.get(conversationAtSend) ?? 0
+        )
+      )
+        writeInputValue('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -406,12 +467,33 @@ export function ChatInput({
         } else {
           // The failed submission's inputs belong to its own conversation: keep
           // them there so returning recovers the original text and files.
-          storeComposerSnapshot(conversationAtSend, {
-            text: trimmed,
-            attachments: submittedAttachments,
-          });
-          if (currentKey === conversationAtSend && valueRef.current === '') {
-            setInputValue(trimmed);
+          const existing = composerSnapshotsRef.current.get(conversationAtSend);
+          const currentText =
+            currentKey === conversationAtSend ? valueRef.current : (existing?.text ?? '');
+          if (
+            canRestoreSubmittedDraft(
+              submission,
+              revisionsRef.current.get(conversationAtSend) ?? 0,
+              currentText
+            )
+          ) {
+            storeComposerSnapshot(conversationAtSend, {
+              text: submission.text,
+              attachments:
+                currentKey === conversationAtSend
+                  ? liveAttachmentsRef.current
+                  : (existing?.attachments ?? submittedAttachments),
+            });
+          }
+          if (
+            currentKey === conversationAtSend &&
+            canRestoreSubmittedDraft(
+              submission,
+              revisionsRef.current.get(conversationAtSend) ?? 0,
+              valueRef.current
+            )
+          ) {
+            writeInputValue(submission.text);
             textareaRef.current?.focus();
           }
         }
@@ -425,7 +507,7 @@ export function ChatInput({
       onSendCommand,
       onNewChat,
       setAttachmentSubmissionPending,
-      setInputValue,
+      writeInputValue,
       slashCommands,
       storeComposerSnapshot,
     ]
@@ -558,7 +640,13 @@ export function ChatInput({
     (modelOptions.length > 0 || pinnedModelOption || isLoadingModels);
 
   return (
-    <div className="px-[max(1rem,calc(50%_-_27rem))] py-2">
+    <ComposerPrimitive.Root
+      onSubmit={event => {
+        event.preventDefault();
+        handleSend();
+      }}
+      className="px-[max(1rem,calc(50%_-_27rem))] py-2"
+    >
       <div
         className={cn(
           'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
@@ -610,22 +698,31 @@ export function ChatInput({
         {/* Textarea with slash command autocomplete */}
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
-            <textarea
-              ref={textareaRef}
-              value={value}
-              onChange={e => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={placeholder}
-              disabled={textareaDisabled}
-              maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-              className="min-h-10 max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
-              rows={1}
-              role="combobox"
-              aria-expanded={showAutocomplete}
-              aria-autocomplete="list"
-              aria-controls="slash-command-list"
-            />
+            <ComposerPrimitive.Input
+              asChild
+              submitMode="none"
+              addAttachmentOnPaste={false}
+              cancelOnEscape={false}
+              unstable_focusOnRunStart={false}
+              unstable_focusOnScrollToBottom={false}
+              unstable_focusOnThreadSwitched={false}
+            >
+              <textarea
+                ref={textareaRef}
+                onChange={e => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={placeholder}
+                disabled={textareaDisabled}
+                maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
+                className="min-h-10 max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
+                rows={1}
+                role="combobox"
+                aria-expanded={showAutocomplete}
+                aria-autocomplete="list"
+                aria-controls="slash-command-list"
+              />
+            </ComposerPrimitive.Input>
           </PopoverAnchor>
           <PopoverContent
             className="w-[var(--radix-popover-trigger-width)] min-w-[min(300px,calc(100vw-2rem))] p-0"
@@ -863,6 +960,6 @@ export function ChatInput({
           </Tooltip>
         </div>
       </div>
-    </div>
+    </ComposerPrimitive.Root>
   );
 }

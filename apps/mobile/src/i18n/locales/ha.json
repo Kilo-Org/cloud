@@ -2362,7 +2362,7 @@
       "discardDraftMessage": "Za a rasa umarnin aikinka.",
       "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
-      "remoteHint": "Gudanar da `kilo remote` a kwamfutarka, ko `/remote` a zaman CLI da ke gudana, don sarrafa aikin kilo a kwamfutarka.",
+      "remoteHint": "Don gudanar da aiki a kwamfutarka, fara Kilo a can ka bar shi yana aiki.",
       "continueFrom": "Ana ci gaba da {{title}}.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",

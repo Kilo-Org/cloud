@@ -107,13 +107,18 @@ describe('getProvider with public custom LLMs', () => {
     ['another country', 'US'],
     ['an unknown country', null],
   ])('serves a country-restricted custom LLM to %s', async (_name, countryCode) => {
-    for (const [model, caller, organizationId] of [
-      ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
-      ['acme/country-denied-private-model', user, ORG_ID],
+    for (const [model, caller, organizationId, providerId] of [
+      [
+        'acme/country-denied-public-model',
+        createAnonymousContext('127.0.0.1'),
+        undefined,
+        'custom-public',
+      ],
+      ['acme/country-denied-private-model', user, ORG_ID, 'custom'],
     ] as const) {
       await expect(
         getProvider({ ...providerInput(model, caller, organizationId), countryCode })
-      ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+      ).resolves.toMatchObject({ kind: 'provider', provider: { type: providerId } });
     }
   });
 
@@ -129,7 +134,11 @@ describe('getProvider with public custom LLMs', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
-      provider: { id: 'custom', apiUrl: 'https://upstream.example.com/v1', apiKey: 'sk-upstream' },
+      provider: {
+        type: 'custom-public',
+        apiUrl: 'https://upstream.example.com/v1',
+        apiKey: 'sk-upstream',
+      },
       bypassAccessCheck: false,
     });
   });
@@ -150,7 +159,7 @@ describe('getProvider with public custom LLMs', () => {
     );
 
     expect(result.kind).toBe('provider');
-    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.id);
+    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.type);
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {
@@ -158,7 +167,7 @@ describe('getProvider with public custom LLMs', () => {
       getProvider(providerInput('acme/private-model', user, ORG_ID))
     ).resolves.toMatchObject({
       kind: 'provider',
-      provider: { id: 'custom' },
+      provider: { type: 'custom' },
       bypassAccessCheck: true,
     });
     await expect(

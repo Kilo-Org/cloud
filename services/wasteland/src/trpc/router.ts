@@ -14,6 +14,7 @@ import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
+import { bindCredentialToken } from '../util/credential-binding.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
@@ -388,6 +389,24 @@ export const wastelandRouter = router({
         token = await decryptToken(credential.encrypted_token, cryptoKey);
       }
 
+      // The credential row is one unit: the token this flow acts with and
+      // the org it acts for are written together. When the row already
+      // names the same org its ciphertext stays; otherwise this flow's
+      // token is recorded for that org, which needs the encryption key.
+      // Resolved here so a call that cannot write a coherent row stops
+      // before the bootstrap creates anything.
+      const binding = await bindCredentialToken(ctx.env, {
+        existing: credential,
+        org: dolthubOrg,
+        token,
+      });
+      if (binding.status === 'key-unavailable') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
+      }
+
       const config = await doStub.getConfig();
       const handle = input.rigHandle ?? credential.rig_handle ?? dolthubOrg;
       // A handle the caller picked becomes the credential's identity right
@@ -434,8 +453,8 @@ export const wastelandRouter = router({
       const orgProven = isSameDolthubOrg(result.upstreamOwner, dolthubOrg);
       await doStub.storeCredential({
         userId: ctx.userId,
-        encryptedToken: credential.encrypted_token,
-        dolthubOrg,
+        encryptedToken: binding.encryptedToken,
+        dolthubOrg: binding.dolthubOrg,
         rigHandle: orgProven ? handle : undefined,
         provenOrg: orgProven ? result.upstreamOwner : undefined,
         isUpstreamAdmin: credential.is_upstream_admin,

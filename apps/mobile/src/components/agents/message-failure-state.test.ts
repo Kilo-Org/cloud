@@ -24,7 +24,7 @@ function assistantInfo(errorName: string): MessageInfo {
     role: 'assistant',
     time: { created: 1_761_000_000_000 },
     // Deliberately carries raw provider text; the helper must never surface it.
-    error: { name: errorName, data: { message: 'RAW_PROVIDER_TEXT' } } as unknown as AssistantError,
+    error: { name: errorName, data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true } } as unknown as AssistantError,
     parentID: 'u1',
     modelID: 'anthropic/claude-sonnet-4',
     providerID: 'kilo',
@@ -154,6 +154,29 @@ describe('selectMessageFailure', () => {
     it('sets canRetry true for an assistant error outside the non-retryable set', () => {
       const result = selectMessageFailure({ info: assistantInfo('APIError') });
       expect(result?.canRetry).toBe(true);
+    });
+
+    it('does not offer Retry when the gateway marked the failure non-retryable', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+      };
+
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(false);
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('keeps Retry when the gateway marked the failure retryable', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      };
+
+      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
     });
 
     it('never sets canCopy true for an assistant row', () => {

@@ -11,6 +11,7 @@ import {
   type PartDraft,
   type SessionHandle,
   ToolMissingError,
+  type Turn,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
@@ -40,6 +41,7 @@ import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
+  type Asked,
   askedIn,
   forgetAsked,
   keptIn,
@@ -532,7 +534,24 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const { handle, scope } = opened;
   try {
     const turns = await runtime.runPromise(handle.history);
-    const [asked, kept] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
+    const [stored, written] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
+    /* A question asked again can leave either of its two records behind when a
+       write is refused; the stored turns say which of them the conversation has
+       already answered. */
+    const { asked, kept } = settledRecords(turns, stored, written);
+    if (asked !== stored || kept !== written) {
+      try {
+        if (asked === null) {
+          await forgetAsked(sessionId);
+        }
+        if (kept !== written) {
+          await replaceKept(sessionId, kept);
+        }
+      } catch {
+        /* The records stay as they were; the open below already draws them as
+           the conversation holds them. */
+      }
+    }
     const database = await open();
     chats.set(sessionId, {
       handle,
@@ -974,6 +993,44 @@ function withoutAnswered(
         : one,
     ];
   });
+}
+
+/**
+ * The kept questions and the slot record an open should draw, given what the
+ * store actually holds.
+ *
+ * A question asked again leaves two records while its answer is on its way: the
+ * slot's, and the kept one its bubble is drawn from. When the answer lands the
+ * kept record goes first and the slot's second, so a write that was refused — or
+ * a process that stopped between them — can leave either record behind. A stored
+ * user turn with that question's words is what says the answer landed, so both
+ * records are stale and the open drops them rather than drawing a failed bubble
+ * beside the answer.
+ */
+function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: readonly Displaced[]) {
+  const from = asked?.from;
+  if (from == null) {
+    return { asked, kept };
+  }
+  const askedText = asked?.text ?? '';
+  const answered = turns.some(
+    turn => turn.role === 'user' && turnText(turn) === askedText && askedText !== ''
+  );
+  const named = kept.find(one => one.id === from);
+  if (named === undefined) {
+    /* Its kept bubble is gone while the slot still names it: the answer landed
+       before the slot's own record was cleared. */
+    return answered ? { asked: null, kept } : { asked, kept };
+  }
+  if (!answered) {
+    return { asked, kept };
+  }
+  return { asked: null, kept: kept.filter(one => one.id !== from) };
+}
+
+/** What a stored turn says, which is how one of them is matched to a question. */
+function turnText(turn: Turn): string {
+  return turn.parts.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join('');
 }
 
 /**

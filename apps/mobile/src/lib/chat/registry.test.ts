@@ -1347,6 +1347,113 @@ describe('a question a later send took the slot from', () => {
     expect(written.map(one => one.id)).toEqual(['a', 'b']);
   });
 
+  it('drops both records of a question whose answer landed before the slot was cleared', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('answered', place);
+    /* The answer landed, the kept record was dropped, and the process stopped
+       before the slot's record was cleared. */
+    storedHistory = [
+      {
+        id: 'trn_9',
+        sessionId: 'answered',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'the question asked again' }],
+      },
+      {
+        id: 'trn_10',
+        sessionId: 'answered',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:answered',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'answered');
+    await settled();
+
+    const held = snapshotOf('answered');
+    // The answer is the transcript; no failed bubble stands beside it.
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['trn_9', 'trn_10']);
+    expect(await askedIn('answered')).toBeNull();
+  });
+
+  it('drops the kept record a stored answer already answered', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('half', place);
+    /* The kept record survived a refused write while the answer landed, and the
+       slot still names it. */
+    const words = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_11',
+        sessionId: 'half',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_12',
+        sessionId: 'half',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:half', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:half', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'half');
+    await settled();
+
+    const held = snapshotOf('half');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    const written = await keptIn('half');
+    expect(written.map(one => one.id)).toEqual([]);
+  });
+
+  it('keeps the slot question whose kept copy was never written', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('unwritten', place);
+    storedQuestions.set(
+      'chat-asked-target:unwritten',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'unwritten');
+    await settled();
+
+    // Nothing was answered, so the question is still the one its Retry hangs off.
+    const held = snapshotOf('unwritten');
+    expect(held.asked).toBe('the question asked again');
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['unwritten:asked']);
+  });
+
   it('draws two questions that say the same words with different pictures', async () => {
     storedHistory = [];
     await releaseChat(opened);

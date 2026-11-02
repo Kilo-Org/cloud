@@ -419,7 +419,7 @@ describe('useTextHeight long-draft measurement', () => {
     });
     // The unfrozen draft is measured again, now twenty mirror lines deep.
     layoutMirror(renderer, 400);
-    // The cap stays snapped to the eighteen native lines that fit in 300 points.
+    // The cap stays snapped to the fourteen native lines that fit in 300 points.
     expect(published.maxHeight).toBeCloseTo(24 + 14 * 18.667, 2);
     expect(published.height).toBeCloseTo(24 + 14 * 18.667, 2);
     renderer.unmount();

@@ -530,6 +530,14 @@ export const kilocode_users = pgTable(
     normalized_email: text(),
     email_domain: text(),
 
+    /**
+     * The user's id in an external identity provider. Prep for SCIM over
+     * WorkOS event sync: directory events arrive for users who have never
+     * signed in, so no `user_auth_provider` row exists to resolve them
+     * against. Null for everyone except directory-provisioned users.
+     */
+    external_id: text().default(sql`null`),
+
     personal_account_disabled: boolean().default(false).notNull(),
   },
   table => [
@@ -541,6 +549,10 @@ export const kilocode_users = pgTable(
       .concurrently(),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
+    index('IDX_kilocode_users_external_id')
+      .on(table.external_id)
+      .where(sql`${table.external_id} IS NOT NULL`)
+      .concurrently(),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     check(

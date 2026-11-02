@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness owns every pitch, clamp and freeze case. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -393,6 +394,34 @@ describe('useTextHeight long-draft measurement', () => {
     expect(findMirrorText(renderer)).toBe(`${draft}y`);
     layoutMirror(renderer, 160);
     expect(published.height).toBe(184);
+    renderer.unmount();
+  });
+
+  it('keeps the snapped cap when a re-measured draft grows the mirror line count', async () => {
+    // A cap change re-measures the live draft, which lifts the mirror's line
+    // count. The recorded native report was measured over the frozen prefix's
+    // count, so dividing its height by the new count would decay the estimated
+    // pitch and drop the line-aligned cap; the pair stays anchored to the count
+    // it was recorded at.
+    const renderer = await mount();
+    layoutMirror(renderer, 6 * 20);
+    reportNativeContentSize(24 + 6 * 18.667);
+    expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
+
+    const draft = 'x'.repeat(200);
+    // The draft already fills the cap, so the append keeps the frozen prefix.
+    expect(typeText(draft)).toBe(0);
+
+    cap = 300;
+    await act(async () => {
+      renderer.update(createElement(Harness));
+      await Promise.resolve();
+    });
+    // The unfrozen draft is measured again, now twenty mirror lines deep.
+    layoutMirror(renderer, 400);
+    // The cap stays snapped to the eighteen native lines that fit in 300 points.
+    expect(published.maxHeight).toBeCloseTo(24 + 14 * 18.667, 2);
+    expect(published.height).toBeCloseTo(24 + 14 * 18.667, 2);
     renderer.unmount();
   });
 

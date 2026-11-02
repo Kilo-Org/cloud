@@ -97,6 +97,10 @@ export function useTextHeight({
   // input on each one.
   const acceptedPitchRef = useRef<number | null>(null);
   const acceptedLineCountRef = useRef<number | null>(null);
+  // The mirror text the recorded report described. While the mirror still holds
+  // that text, its current line count is the denominator the pitch is derived
+  // over; once the mirror holds other text, the recorded count is.
+  const acceptedTextRef = useRef(initialText);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
   // Pre-scale only when the caller opted in (the agent composers). The
@@ -108,17 +112,34 @@ export function useTextHeight({
   const maxFontSizeMultiplier = fontScale == null ? undefined : 1;
   // The mirror and the native input wrap the same text at the same width into
   // the same number of lines, so the input's rendered pitch is its reported
-  // content height (minus the padding it carries) over the mirror's line
-  // count. The count grows with the draft, so the estimate sharpens exactly
-  // where it matters: the cap below only bites once the content is tall enough
-  // to scroll, and by then the report is several lines deep.
+  // content height (minus the padding it carries) over the line count it was
+  // measured at. `setNativeContentHeight` records that count with every report,
+  // so a move of the mirror's own height — an unfrozen draft measured again, or
+  // the cap changing — cannot decay the estimate before the input reports
+  // again. A report that follows a line growth is recorded at the new count, so
+  // the estimate still sharpens exactly where it matters: the cap below only
+  // bites once the content is tall enough to scroll, and by then the report is
+  // several lines deep.
   const mirrorLineCount = Math.max(
     1,
     Math.round((contentHeight - verticalPadding) / scaledLineHeight)
   );
+  const recordedLineCount = acceptedLineCountRef.current;
+  // The report describes the mirror's text at the moment it was recorded. While
+  // the mirror still holds that text its current count is the right
+  // denominator, so a report that arrives before the mirror lays the text out
+  // sharpens once it does. Once the mirror holds other text — an unfrozen draft
+  // measured again, or the cap moving — the recorded height belongs to the
+  // earlier text, and dividing it by the new count would decay the estimated
+  // pitch and unsnap the cap.
+  const pitchLineCount =
+    acceptedTextRef.current === mirrorTextRef.current ? mirrorLineCount : recordedLineCount;
   const nativePitch =
-    nativeContentHeight != null && nativeContentHeight > verticalPadding
-      ? (nativeContentHeight - verticalPadding) / mirrorLineCount
+    nativeContentHeight != null &&
+    nativeContentHeight > verticalPadding &&
+    pitchLineCount !== null &&
+    pitchLineCount > 0
+      ? (nativeContentHeight - verticalPadding) / pitchLineCount
       : null;
   /**
    * The caller's `onContentSizeChange` report. Records the height only when the
@@ -127,11 +148,10 @@ export function useTextHeight({
    * line count than the last recorded one; a report that keeps the pitch where
    * it was, at the count it was measured over, does not schedule an update at
    * all, so the caller does not re-render its input on every native
-   * content-size event. The line count is part of the key because the snap
-   * divides the recorded height by the *current* count: a height left behind at
-   * an earlier count would decay the estimated pitch and unsnap the cap as the
-   * draft grows, so a report that follows a line growth must be recorded even
-   * when the pitch it implies is unchanged.
+   * content-size event. The line count is recorded with the height because the
+   * pitch is derived over it: a report that follows a line growth must be
+   * recorded even when the pitch it implies is unchanged, or the recorded pair
+   * would describe the earlier, shorter draft.
    */
   function setNativeContentHeight(nextContentHeight: number): void {
     // The report describes the live input's own draft. While the mirror is
@@ -157,6 +177,7 @@ export function useTextHeight({
     }
     acceptedPitchRef.current = nextPitch;
     acceptedLineCountRef.current = mirrorLineCount;
+    acceptedTextRef.current = mirrorTextRef.current;
     setNativeContentHeightInState(nextContentHeight);
   }
   // `minHeight` is the caller's one-line floor in the requested line box

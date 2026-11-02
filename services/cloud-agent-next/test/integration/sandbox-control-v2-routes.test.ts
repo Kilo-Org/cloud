@@ -26,6 +26,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  CONTROL_PLANE_IDLE_HEARTBEAT_FRAME,
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneRouteSpec,
 } from '../../src/shared/control-plane-protocol.js';
@@ -279,7 +280,10 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean } = {}
+  options: {
+    workspaceConfiguration?: boolean;
+    capabilities?: { heartbeatAck?: true; idleHeartbeats?: true; outcomeAcks?: true };
+  } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -287,9 +291,17 @@ async function connectAndHello(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, ...options });
-  const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    workspaceConfiguration: options.workspaceConfiguration,
+  });
+  const reply = await wrapper.hello({ wrapperId, allocationId, ...options.capabilities });
+  expect(reply).toEqual({
+    type: 'welcome',
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    ...options.capabilities,
+  });
   return { wrapper, credential, allocationId };
 }
 
@@ -2444,5 +2456,226 @@ describe('SandboxControlV2 routes and forwarding', () => {
 
     expect(elapsed).toBeLessThan(4_000);
     expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+  });
+});
+
+describe('SandboxControlV2 deferred-update readiness', () => {
+  const IDLE_CAPABILITIES = { heartbeatAck: true, idleHeartbeats: true } as const;
+
+  async function readyIdleWrapper(
+    provider: FakeProvider,
+    origin?: string,
+    capabilities: {
+      heartbeatAck?: true;
+      idleHeartbeats?: true;
+      outcomeAcks?: true;
+    } = IDLE_CAPABILITIES
+  ) {
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, origin));
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { capabilities });
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    return { stub, peer, wrapper };
+  }
+
+  async function idleHeartbeat(wrapper: FakeWrapper): Promise<number> {
+    const sentAt = Date.now();
+    wrapper.sendRaw(CONTROL_PLANE_IDLE_HEARTBEAT_FRAME);
+    expect(await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary'])).toEqual({
+      type: 'heartbeat_ack',
+    });
+    return sentAt;
+  }
+
+  it('answers an idle heartbeat by auto-response and applies it on the next alarm', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider);
+    await setAllocationField(stub, { last_frame_at: Date.now() - 10_000 });
+    const before = await readState(stub);
+
+    const sentAt = await idleHeartbeat(wrapper);
+    expect((await readState(stub)).lastFrameAt).toBe(before.lastFrameAt);
+
+    await runAlarm(stub);
+    const after = await readState(stub);
+    expect(after.kind).toBe('connected');
+    expect(after.lastFrameAt).toBeGreaterThanOrEqual(sentAt);
+    expect(await readAlarm(stub)).toBeLessThanOrEqual(
+      (after.lastFrameAt ?? 0) + TIMERS.heartbeatMs
+    );
+    wrapper.close();
+  });
+
+  it('applies an auto-answered idle heartbeat once, so a silent wrapper still expires', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider);
+    await setAllocationField(stub, { last_frame_at: Date.now() - 10_000 });
+    await idleHeartbeat(wrapper);
+    await runAlarm(stub);
+    const applied = await readState(stub);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    await runAlarm(stub);
+    expect((await readState(stub)).lastFrameAt).toBe(applied.lastFrameAt);
+    wrapper.close();
+  });
+
+  it('stops unattended work on the alarm only after an idle heartbeat proves it idle', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider, 'code-review');
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    expect(await readAlarm(stub)).toBeGreaterThan(Date.now());
+
+    await idleHeartbeat(wrapper);
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+    wrapper.close();
+  });
+
+  it('arms the alarm at the unattended idle deadline', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider, 'code-review');
+    const lastActivityAt = Date.now() - 30_000;
+    await setAllocationField(stub, { last_activity_at: lastActivityAt });
+    await runAlarm(stub);
+    expect(await readAlarm(stub)).toBe(lastActivityAt + 60_000);
+    wrapper.close();
+  });
+
+  it('starts the reconnect window at the last auto-answered idle heartbeat', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider);
+    await setAllocationField(stub, { last_frame_at: Date.now() - 30_000 });
+    const sentAt = await idleHeartbeat(wrapper);
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(sentAt);
+  });
+
+  it('closes an idle-heartbeat socket once the allocation stops', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub, wrapper } = await readyIdleWrapper(provider, 'cloud-agent-web');
+    await setAllocationField(stub, { last_activity_at: Date.now() - (TIMERS.idleMs + 1_000) });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('stopping');
+    expect(await wrapper.waitForClose()).toBe(1000);
+  });
+
+  it('keeps only the current idle-heartbeat connection open after a second hello', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper: first } = await readyIdleWrapper(provider);
+    const launchEnv = provider.launchEnvs[0];
+    const second = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: launchEnv?.SANDBOX_CONTROL_CREDENTIAL ?? '',
+    });
+    expect(
+      await second.hello({
+        wrapperId: 'wr_1',
+        allocationId: launchEnv?.CONTROL_PLANE_ALLOCATION_ID ?? '',
+        ...IDLE_CAPABILITIES,
+      })
+    ).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      ...IDLE_CAPABILITIES,
+    });
+    expect(await first.waitForClose()).toBe(1000);
+    await runAlarm(stub);
+    expect(await second.waitForClose(200)).toBe(-1);
+    expect((await readState(stub)).kind).toBe('connected');
+    second.close();
+  });
+
+  it('enforces billing for an idle wrapper from the alarm', async () => {
+    const provider = createFakeProvider();
+    const { stub, wrapper } = await readyIdleWrapper(provider);
+    provider.adapter.isBillingBlocked = async () => true;
+    await runInDurableObject(stub, (_instance, state) => {
+      for (const ws of state.getWebSockets()) {
+        const attachment = ws.deserializeAttachment() as Record<string, unknown> | null;
+        if (attachment?.connectionId)
+          ws.serializeAttachment({ ...attachment, billingCheckedAt: 0 });
+      }
+    });
+    await idleHeartbeat(wrapper);
+    await runAlarm(stub);
+    expect(await wrapper.waitForClose()).toBe(4402);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+  });
+
+  it('leaves a superseded socket without idle heartbeats to its acknowledgement deadline', async () => {
+    const provider = createFakeProvider({ gateStop: true });
+    const { stub, wrapper } = await readyIdleWrapper(provider, 'cloud-agent-web', {
+      heartbeatAck: true,
+    });
+    await setAllocationField(stub, { last_activity_at: Date.now() - (TIMERS.idleMs + 1_000) });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('stopping');
+    expect(await wrapper.waitForClose(200)).toBe(-1);
+    wrapper.close();
+  });
+
+  it('acknowledges an outcome only after the session accepted it', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer, wrapper } = await readyIdleWrapper(provider, undefined, {
+      outcomeAcks: true,
+    });
+    const acks: unknown[] = [];
+    wrapper.onFrame(frame => {
+      if (frame.type === 'session.outcome_ack') acks.push(frame);
+    });
+    let release = (): void => undefined;
+    peer.beforeOutcome = () => new Promise<void>(resolve => (release = resolve));
+
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'm1',
+      outcomeId: 'outcome-1',
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(acks).toEqual([]);
+
+    await releaseGate(stub, release);
+    await waitFor(() =>
+      expect(acks).toEqual([{ type: 'session.outcome_ack', outcomeId: 'outcome-1' }])
+    );
+    expect(peer.outcomes).toEqual([
+      { sessionId: SESSION, status: 'completed', lastMessageId: 'm1' },
+    ]);
+    wrapper.close();
+  });
+
+  it('does not acknowledge an outcome the session rejected', async () => {
+    const provider = createFakeProvider();
+    const { peer, wrapper } = await readyIdleWrapper(provider, undefined, { outcomeAcks: true });
+    const acks: unknown[] = [];
+    wrapper.onFrame(frame => {
+      if (frame.type === 'session.outcome_ack') acks.push(frame);
+    });
+    let attempts = 0;
+    peer.beforeOutcome = async () => {
+      attempts += 1;
+      throw new Error('session unavailable');
+    };
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'm1',
+      outcomeId: 'outcome-1',
+    });
+    await waitFor(() => expect(attempts).toBeGreaterThan(0));
+    await new Promise(resolve => setTimeout(resolve, 200));
+    expect(acks).toEqual([]);
+    wrapper.close();
   });
 });

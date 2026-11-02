@@ -5,6 +5,7 @@ import {
   WORKSPACE_CONFIGURATION_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
+  CONTROL_PLANE_IDLE_HEARTBEAT_FRAME,
   CONTROL_PLANE_PROTOCOL_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
@@ -20,14 +21,31 @@ export const CONTROL_PLANE_OUTBOX_MAX_FRAMES = 1_000;
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many bytes. */
 export const CONTROL_PLANE_OUTBOX_MAX_BYTES = 8 * 1024 * 1024;
 
+/** An outcome the Sandbox DO has not acknowledged is resent after this long. */
+export const CONTROL_PLANE_OUTCOME_RESEND_MS = 15_000;
+/** An outcome unacknowledged this long is dropped; the Session DO backstop settles its turn. */
+export const CONTROL_PLANE_OUTCOME_RETENTION_MS = 10 * 60_000;
+/** At most this many outcomes await acknowledgement; the oldest is dropped beyond it. */
+export const CONTROL_PLANE_PENDING_OUTCOMES_MAX = 256;
+
 const RECONNECT_JITTER_DIVISOR = 4;
+
+const HELLO_CAPABILITIES = {
+  heartbeatAck: true,
+  idleHeartbeats: true,
+  outcomeAcks: true,
+  sessionSnapshots: true,
+  redactsNamedSecrets: true,
+  installsSkillsSh: true,
+} as const;
 
 /**
  * Older Workers reject unknown hello fields with their strict frame schema, so a
- * capability-bearing hello is retried with the previous capability set first, then
- * with the original hello that every supported Worker accepts.
+ * capability-bearing hello is retried with each previous capability set in turn,
+ * then with the original hello that every supported Worker accepts.
  */
 const FALLBACK_HELLO_CAPABILITIES = [
+  { heartbeatAck: true, sessionSnapshots: true, redactsNamedSecrets: true, installsSkillsSh: true },
   { heartbeatAck: true, redactsNamedSecrets: true, installsSkillsSh: true },
   {},
 ] as const;
@@ -81,8 +99,13 @@ export type ControlPlaneConnectionOptions = {
   random?: () => number;
   outboxMaxFrames?: number;
   outboxMaxBytes?: number;
+  outcomeResendMs?: number;
+  outcomeRetentionMs?: number;
+  now?: () => number;
   onNativeDiagnostic?: ControlDiagnosticReporter;
 };
+
+type OutcomeFrame = Extract<ControlPlaneWrapperFrame, { type: 'session.outcome' }>;
 
 export type ControlPlaneConnection = {
   /** The wrapper identity advertised in `hello` (B10 terminal records). */
@@ -130,10 +153,20 @@ export function createControlPlaneConnection(
   const wrapperId = options.wrapperId ?? crypto.randomUUID();
   const maxFrames = options.outboxMaxFrames ?? CONTROL_PLANE_OUTBOX_MAX_FRAMES;
   const maxBytes = options.outboxMaxBytes ?? CONTROL_PLANE_OUTBOX_MAX_BYTES;
+  const outcomeResendMs = options.outcomeResendMs ?? CONTROL_PLANE_OUTCOME_RESEND_MS;
+  const outcomeRetentionMs = options.outcomeRetentionMs ?? CONTROL_PLANE_OUTCOME_RETENTION_MS;
+  const now = options.now ?? Date.now;
   const WebSocketWithHeaders = WebSocket as unknown as WebSocketWithHeadersCtor;
 
   type Phase = ControlPlaneConnectionPhase;
-  type OutboxEntry = { serialized: string; bytes: number; kind: OutboxKind };
+  type OutboxEntry = {
+    serialized: string;
+    bytes: number;
+    kind: OutboxKind;
+    outcome?: { id: string; frame: OutcomeFrame };
+  };
+  /** A written outcome the Sandbox DO has not acknowledged. */
+  type PendingOutcome = { frame: OutcomeFrame; firstSentAt: number; lastSentAt: number };
 
   let phase: Phase = 'idle';
   let socket: WebSocket | null = null;
@@ -144,6 +177,12 @@ export function createControlPlaneConnection(
   let negotiationTimer: ReturnType<typeof setTimeout> | undefined;
   let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatAck = false;
+  // Negotiated in `welcome` for the current connection.
+  let idleHeartbeats = false;
+  let outcomeAcks = false;
+  // Whether the Sandbox DO has seen a full idle heartbeat since the last non-idle one.
+  let idleReported = false;
+  const pendingOutcomes = new Map<string, PendingOutcome>();
   const outbox: OutboxEntry[] = [];
   let outboxBytes = 0;
   let droppedEvents = 0;
@@ -173,9 +212,8 @@ export function createControlPlaneConnection(
     return frames > maxFrames || bytes > maxBytes;
   }
 
-  function enqueue(frame: ControlPlaneWrapperFrame, serialized: string): void {
-    const kind = outboxKindOf(frame);
-    const bytes = Buffer.byteLength(serialized);
+  function enqueue(entry: OutboxEntry, type: ControlPlaneWrapperFrame['type']): void {
+    const { kind, bytes } = entry;
     const evictable = OUTBOX_EVICTABLE_BY[kind];
     let keptFrames = 1;
     let keptBytes = bytes;
@@ -186,7 +224,7 @@ export function createControlPlaneConnection(
     }
     if (exceedsCapacity(keptFrames, keptBytes)) {
       if (kind === 'event') droppedEvents += 1;
-      log(`control-plane outbox rejected the newest ${frame.type} frame at capacity`);
+      log(`control-plane outbox rejected the newest ${type} frame at capacity`);
       return;
     }
     for (const victim of evictable) {
@@ -199,7 +237,7 @@ export function createControlPlaneConnection(
         if (removed.kind === 'event') droppedEvents += 1;
       }
     }
-    outbox.push({ serialized, bytes, kind });
+    outbox.push(entry);
     outboxBytes += bytes;
   }
 
@@ -221,6 +259,53 @@ export function createControlPlaneConnection(
     return write(target, JSON.stringify(frame));
   }
 
+  function serializeOutcome(id: string, frame: OutcomeFrame): string {
+    return JSON.stringify({ ...frame, outcomeId: id });
+  }
+
+  function trackOutcome(id: string, frame: OutcomeFrame): void {
+    const at = now();
+    const previous = pendingOutcomes.get(id);
+    pendingOutcomes.set(id, {
+      frame,
+      firstSentAt: previous?.firstSentAt ?? at,
+      lastSentAt: at,
+    });
+    if (pendingOutcomes.size <= CONTROL_PLANE_PENDING_OUTCOMES_MAX) return;
+    const oldest = pendingOutcomes.keys().next().value;
+    if (oldest !== undefined) pendingOutcomes.delete(oldest);
+    log('control-plane dropped the oldest unacknowledged outcome at capacity');
+  }
+
+  /** Writes one outbox entry; an outcome carries its id only where acknowledged. */
+  function writeEntry(target: WebSocket, entry: OutboxEntry): boolean {
+    const outcome = outcomeAcks ? entry.outcome : undefined;
+    if (!write(target, outcome ? serializeOutcome(outcome.id, outcome.frame) : entry.serialized))
+      return false;
+    if (outcome) trackOutcome(outcome.id, outcome.frame);
+    return true;
+  }
+
+  /** Resends each unacknowledged outcome `due` selects; false when the socket failed. */
+  function resendOutcomes(target: WebSocket, due: (pending: PendingOutcome) => boolean): boolean {
+    for (const [id, pending] of pendingOutcomes) {
+      if (now() - pending.firstSentAt >= outcomeRetentionMs) {
+        pendingOutcomes.delete(id);
+        log(`control-plane gave up on unacknowledged outcome for ${pending.frame.sessionId}`);
+        continue;
+      }
+      if (!due(pending)) continue;
+      // A peer without acknowledgements (a rolled-back Worker) rejects the id.
+      if (!outcomeAcks) {
+        if (!writeRaw(target, pending.frame)) return false;
+        continue;
+      }
+      if (!write(target, serializeOutcome(id, pending.frame))) return false;
+      trackOutcome(id, pending.frame);
+    }
+    return true;
+  }
+
   function flushOutbox(target: WebSocket): boolean {
     if (droppedEvents > 0) {
       if (!writeRaw(target, { type: 'events_dropped', dropped: droppedEvents })) return false;
@@ -229,7 +314,7 @@ export function createControlPlaneConnection(
     while (outbox.length > 0) {
       const entry = outbox[0];
       if (!entry) break;
-      if (!write(target, entry.serialized)) return false;
+      if (!writeEntry(target, entry)) return false;
       outbox.shift();
       outboxBytes -= entry.bytes;
     }
@@ -284,15 +369,28 @@ export function createControlPlaneConnection(
   function startHeartbeat(target: WebSocket, acknowledged: boolean): void {
     stopHeartbeat();
     heartbeatAck = acknowledged;
+    idleReported = false;
     if (heartbeatAck) armAckDeadline(target);
     heartbeatTimer = setInterval(() => {
       if (socket !== target || phase !== 'connected') return;
       const heartbeat = options.getHeartbeat?.() ?? { active: false, degraded: false };
-      writeRaw(target, {
-        type: 'heartbeat',
-        active: heartbeat.active,
-        degraded: heartbeat.degraded,
-      });
+      const idle = !heartbeat.active && !heartbeat.degraded;
+      // The first idle heartbeat is a full frame so the Sandbox DO observes the
+      // transition; the rest are auto-answered without waking it.
+      if (idle && idleHeartbeats && idleReported) {
+        if (!write(target, CONTROL_PLANE_IDLE_HEARTBEAT_FRAME)) return;
+      } else {
+        if (
+          !writeRaw(target, {
+            type: 'heartbeat',
+            active: heartbeat.active,
+            degraded: heartbeat.degraded,
+          })
+        )
+          return;
+        idleReported = idle;
+      }
+      resendOutcomes(target, pending => now() - pending.lastSentAt >= outcomeResendMs);
     }, options.timers.wrapper.heartbeatIntervalMs);
   }
 
@@ -373,6 +471,11 @@ export function createControlPlaneConnection(
     if (frame.type === 'welcome') {
       if (phase !== 'awaiting_welcome') return;
       stopHandshake();
+      idleHeartbeats = frame.idleHeartbeats === true;
+      outcomeAcks = frame.outcomeAcks === true;
+      // Outcomes written on an earlier connection precede everything queued since.
+      if (!resendOutcomes(target, () => true)) return;
+      if (!outcomeAcks) pendingOutcomes.clear();
       if (!flushOutbox(target)) return;
       phase = 'connected';
       disconnectEpisodeReported = false;
@@ -383,6 +486,10 @@ export function createControlPlaneConnection(
     }
     if (frame.type === 'heartbeat_ack') {
       if (phase === 'connected' && heartbeatAck) armAckDeadline(target);
+      return;
+    }
+    if (frame.type === 'session.outcome_ack') {
+      pendingOutcomes.delete(frame.outcomeId);
       return;
     }
     if (frame.type === 'shutdown') {
@@ -433,10 +540,7 @@ export function createControlPlaneConnection(
           wrapperId,
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-          heartbeatAck: true,
-          sessionSnapshots: true,
-          redactsNamedSecrets: true,
-          installsSkillsSh: true,
+          ...HELLO_CAPABILITIES,
         })
       )
         return;
@@ -454,14 +558,22 @@ export function createControlPlaneConnection(
 
   function send(frame: ControlPlaneWrapperFrame): void {
     if (phase === 'closed') return;
-    let serialized: string;
+    let entry: OutboxEntry;
     try {
-      serialized = JSON.stringify(frame);
+      const serialized = JSON.stringify(frame);
+      const outcome =
+        frame.type === 'session.outcome' ? { id: crypto.randomUUID(), frame } : undefined;
+      entry = {
+        serialized,
+        bytes: Buffer.byteLength(serialized),
+        kind: outboxKindOf(frame),
+        ...(outcome ? { outcome } : {}),
+      };
     } catch {
       return;
     }
-    if (phase === 'connected' && socket && write(socket, serialized)) return;
-    enqueue(frame, serialized);
+    if (phase === 'connected' && socket && writeEntry(socket, entry)) return;
+    enqueue(entry, frame.type);
   }
 
   function recycle(): void {
@@ -476,6 +588,7 @@ export function createControlPlaneConnection(
   function close(): void {
     if (phase === 'closed') return;
     phase = 'closed';
+    pendingOutcomes.clear();
     if (reconnectTimer !== undefined) {
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;

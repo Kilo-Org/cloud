@@ -78,6 +78,37 @@ afterEach(() => {
 const pump = () => vi.advanceTimersByTimeAsync(0);
 
 describe('Sandbox notification buffering', () => {
+  it('reports delivery only after the peer accepted the notification', async () => {
+    const { dispatcher, releases } = harness();
+    const delivered: string[] = [];
+    dispatcher.enqueue(SESSION, outcome(SESSION), () => delivered.push('outcome'));
+    await pump();
+    expect(delivered).toEqual([]);
+    releases[0]?.();
+    await pump();
+    expect(delivered).toEqual(['outcome']);
+  });
+
+  it('does not report delivery for a notification that expired, failed or was retired', async () => {
+    const { dispatcher } = harness();
+    const delivered: string[] = [];
+    dispatcher.enqueue(SESSION, outcome(SESSION), () => delivered.push('retired'));
+    await pump();
+    dispatcher.retire(SESSION);
+    await vi.advanceTimersByTimeAsync(2_000);
+    const failing = createSandboxNotificationDispatcher({
+      budgetMs: () => 2_000,
+      diagnostic: () => undefined,
+      waitUntil: work => void work,
+      send: async () => {
+        throw new Error('peer unavailable');
+      },
+    });
+    failing.enqueue(SESSION, outcome(SESSION), () => delivered.push('failed'));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(delivered).toEqual([]);
+  });
+
   it('delivers worktree changes through bounded per-session lanes', async () => {
     const { dispatcher, calls } = harness(false);
     const notification: SandboxNotification = {

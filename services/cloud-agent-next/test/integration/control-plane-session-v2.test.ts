@@ -525,6 +525,21 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await messageStatus(stub, 'm2')).toBe('running');
   });
 
+  it('ignores a resent outcome after a later message was accepted', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm1' });
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('completed'));
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+
+    await stub.onOutcome({ sessionId, status: 'failed', reason: 'stale', lastMessageId: 'm1' });
+    expect(await messageStatus(stub, 'm1')).toBe('completed');
+    expect(await messageStatus(stub, 'm2')).toBe('running');
+  });
+
   it('fails queued and accepted messages on a failed route', async () => {
     const { stub, peer } = await setup();
     peer.prepareView = peer.view('ready');

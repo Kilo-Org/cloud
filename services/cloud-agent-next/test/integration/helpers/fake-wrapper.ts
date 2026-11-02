@@ -26,6 +26,9 @@ export type FakeWrapperHelloInput = {
   redactsNamedSecrets?: boolean;
   installsSkillsSh?: boolean;
   sessionSnapshots?: boolean;
+  heartbeatAck?: boolean;
+  idleHeartbeats?: boolean;
+  outcomeAcks?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -171,6 +174,9 @@ export class FakeWrapper {
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
+      ...(input.heartbeatAck ? { heartbeatAck: true } : {}),
+      ...(input.idleHeartbeats ? { idleHeartbeats: true } : {}),
+      ...(input.outcomeAcks ? { outcomeAcks: true } : {}),
     });
     return this.next();
   }

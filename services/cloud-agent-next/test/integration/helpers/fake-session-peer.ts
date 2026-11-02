@@ -37,6 +37,8 @@ export class FakeSessionPeer {
   /** Delegation expiry this peer reports, so handoff selection is controllable. */
   delegationExpiresAt: number | null = null;
   runtimeProxyForSession?: ReturnType<typeof createRuntimeProxyMintingPeer>;
+  /** Runs before an outcome is accepted, so a test can hold or fail it. */
+  beforeOutcome?: () => Promise<void>;
 
   forSession(sessionId: string): ControlPlaneSessionPeer {
     return {
@@ -49,6 +51,7 @@ export class FakeSessionPeer {
         this.events.push({ sessionId, notification });
       },
       onOutcome: async outcome => {
+        await this.beforeOutcome?.();
         this.received.push({ kind: 'outcome', sessionId });
         this.outcomes.push(outcome);
       },

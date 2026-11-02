@@ -829,6 +829,14 @@ const controlPlaneHelloFrameSchema = z
      * sent to a wrapper that did not advertise it.
      */
     installsSkillsSh: z.literal(true).optional(),
+    /**
+     * Optional capability: while idle the wrapper sends the compact
+     * {@link CONTROL_PLANE_IDLE_HEARTBEAT_FRAME}, which the Sandbox DO answers by
+     * WebSocket auto-response so an idle sandbox does not keep the DO awake.
+     */
+    idleHeartbeats: z.literal(true).optional(),
+    /** Optional capability: outcomes carry an `outcomeId` the Sandbox DO acknowledges. */
+    outcomeAcks: z.literal(true).optional(),
   })
   .strict();
 
@@ -837,6 +845,8 @@ const controlPlaneWelcomeFrameSchema = z
     type: z.literal('welcome'),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    idleHeartbeats: z.literal(true).optional(),
+    outcomeAcks: z.literal(true).optional(),
   })
   .strict();
 
@@ -854,6 +864,24 @@ const controlPlaneHeartbeatFrameSchema = z
     degraded: z.boolean(),
   })
   .strict();
+
+/** Equivalent to `{ type: 'heartbeat', active: false, degraded: false }`. */
+const controlPlaneIdleHeartbeatFrameSchema = z
+  .object({ type: z.literal('idle_heartbeat') })
+  .strict();
+
+const controlPlaneHeartbeatAckFrameSchema = z.object({ type: z.literal('heartbeat_ack') }).strict();
+
+/**
+ * The exact bytes of the idle heartbeat and its acknowledgement. WebSocket
+ * auto-response matches the request string exactly, so both sides use these.
+ */
+export const CONTROL_PLANE_IDLE_HEARTBEAT_FRAME = JSON.stringify({
+  type: 'idle_heartbeat',
+} satisfies z.infer<typeof controlPlaneIdleHeartbeatFrameSchema>);
+export const CONTROL_PLANE_HEARTBEAT_ACK_FRAME = JSON.stringify({
+  type: 'heartbeat_ack',
+} satisfies z.infer<typeof controlPlaneHeartbeatAckFrameSchema>);
 
 const controlPlaneSessionPrepareFrameSchema = z
   .object({
@@ -964,9 +992,22 @@ const controlPlaneSessionEventsFrameSchema = z
   })
   .strict();
 
+/**
+ * `outcomeId` is present only on a connection that negotiated `outcomeAcks`: the
+ * wrapper keeps the outcome until a `session.outcome_ack` names it and resends it
+ * after a reconnect, so a Sandbox DO reset cannot drop a finished turn.
+ */
 const controlPlaneSessionOutcomeFrameSchema = controlPlaneOutcomeSchema.safeExtend({
   type: z.literal('session.outcome'),
+  outcomeId: z.string().min(1).max(128).optional(),
 });
+
+const controlPlaneSessionOutcomeAckFrameSchema = z
+  .object({
+    type: z.literal('session.outcome_ack'),
+    outcomeId: z.string().min(1).max(128),
+  })
+  .strict();
 
 const controlPlaneEventsDroppedFrameSchema = z
   .object({
@@ -1256,7 +1297,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneWelcomeFrameSchema,
   controlPlaneShutdownFrameSchema,
   controlPlaneHeartbeatFrameSchema,
-  z.object({ type: z.literal('heartbeat_ack') }).strict(),
+  controlPlaneIdleHeartbeatFrameSchema,
+  controlPlaneHeartbeatAckFrameSchema,
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionAttachFrameSchema,
   controlPlaneSessionProgressFrameSchema,
@@ -1271,6 +1313,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionReleaseFrameSchema,
   controlPlaneSessionEventsFrameSchema,
   controlPlaneSessionOutcomeFrameSchema,
+  controlPlaneSessionOutcomeAckFrameSchema,
   controlPlaneEventsDroppedFrameSchema,
   controlPlaneWorktreeSnapshotFrameSchema,
   controlPlaneWorktreeSummaryFrameSchema,

@@ -32,6 +32,7 @@ type Entry = {
   count: number;
   enqueuedAt: number;
   deadlineAt: number;
+  delivered?: () => void;
 };
 
 export function createSandboxNotificationDispatcher(options: {
@@ -160,6 +161,7 @@ export function createSandboxNotificationDispatcher(options: {
                   entry.deadlineAt,
                   controller.signal
                 );
+                if (!controller.signal.aborted) entry.delivered?.();
               } catch {
                 if (!controller.signal.aborted) {
                   recordLoss(
@@ -190,7 +192,8 @@ export function createSandboxNotificationDispatcher(options: {
   }
 
   return {
-    enqueue(sessionId: string, notification: SandboxNotification) {
+    /** `delivered` runs once the peer accepted the notification. Merged events take none. */
+    enqueue(sessionId: string, notification: SandboxNotification, delivered?: () => void) {
       expire();
       const now = Date.now();
       const entry: Entry = {
@@ -200,6 +203,7 @@ export function createSandboxNotificationDispatcher(options: {
         count: 1,
         enqueuedAt: now,
         deadlineAt: now + options.budgetMs(),
+        ...(delivered === undefined ? {} : { delivered }),
       };
       if (entry.bytes > SANDBOX_NOTIFICATION_LIMITS.bytes) {
         recordLoss('capacity', 1, entry.bytes, 0, sessionId);

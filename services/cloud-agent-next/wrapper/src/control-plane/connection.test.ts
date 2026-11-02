@@ -25,6 +25,20 @@ import {
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
 
+// The hello accepted by the Worker before idleHeartbeats and outcomeAcks were added.
+const sessionSnapshotsWorkerHelloSchema = z
+  .object({
+    type: z.literal('hello'),
+    wrapperId: z.string(),
+    allocationId: z.string(),
+    protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+    heartbeatAck: z.literal(true).optional(),
+    sessionSnapshots: z.literal(true).optional(),
+    redactsNamedSecrets: z.literal(true).optional(),
+    installsSkillsSh: z.literal(true).optional(),
+  })
+  .strict();
+
 // The hello accepted by the Worker before sessionSnapshots was added. Its schema is strict,
 // so the extra field is rejected and the wrapper must retry without it.
 const previousWorkerHelloSchema = z
@@ -141,7 +155,8 @@ async function withTestSocket(
     connection: ControlPlaneConnection,
     socket: TestSocket,
     disconnected: string[]
-  ) => Promise<void>
+  ) => Promise<void>,
+  overrides: Partial<ControlPlaneConnectionOptions> = {}
 ): Promise<void> {
   const original = globalThis.WebSocket;
   Object.assign(globalThis, { WebSocket: TestSocket });
@@ -160,6 +175,7 @@ async function withTestSocket(
     }),
     random: () => 0,
     onDisconnected: reason => disconnected.push(reason),
+    ...overrides,
   });
   try {
     connection.start();
@@ -187,6 +203,8 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
+      idleHeartbeats: true,
+      outcomeAcks: true,
       sessionSnapshots: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
@@ -245,19 +263,22 @@ describe('acknowledged heartbeat', () => {
     expect(scaled.sandbox.heartbeatMs).toBe(450);
     expect(scaled.sandbox.reconnectMs).toBe(900);
   });
-  it('falls back through the capability hello before the bare legacy hello', async () => {
+  it('falls back through the capability hellos before the bare legacy hello', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(false);
+      expect(sessionSnapshotsWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(false);
       await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      expect(sessionSnapshotsWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(false);
       await waitFor(() => socket.frames.length === 3);
-      expect(socket.frames[2]).toEqual({
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      await waitFor(() => socket.frames.length === 4);
+      expect(socket.frames[3]).toEqual({
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
-      expect(legacyWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(legacyWorkerHelloSchema.safeParse(socket.frames[3]).success).toBe(true);
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
@@ -266,20 +287,40 @@ describe('acknowledged heartbeat', () => {
     });
   });
 
-  it('keeps prior capabilities when the peer only predates sessionSnapshots', async () => {
+  it('keeps sessionSnapshots when the peer only predates idle heartbeats and outcome acks', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
       await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
       expect(socket.frames[1]).toMatchObject({
         heartbeatAck: true,
+        sessionSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });
-      expect(socket.frames[1]).not.toHaveProperty('sessionSnapshots');
+      expect(socket.frames[1]).not.toHaveProperty('idleHeartbeats');
+      expect(socket.frames[1]).not.toHaveProperty('outcomeAcks');
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
       expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(2);
+      expect(disconnected).toEqual([]);
+      expect(TestSocket.instances).toHaveLength(1);
+    });
+  });
+
+  it('keeps prior capabilities when the peer only predates sessionSnapshots', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      await waitFor(() => socket.frames.length === 3);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(socket.frames[2]).toMatchObject({
+        heartbeatAck: true,
+        redactsNamedSecrets: true,
+        installsSkillsSh: true,
+      });
+      expect(socket.frames[2]).not.toHaveProperty('sessionSnapshots');
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await Bun.sleep(120);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(3);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -934,6 +975,8 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        idleHeartbeats: true,
+        outcomeAcks: true,
         sessionSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
@@ -1054,5 +1097,188 @@ describe('createControlPlaneConnection', () => {
       connection.close();
       sandbox.stop();
     }
+  });
+});
+
+const OUTCOME: ControlPlaneWrapperFrame = {
+  type: 'session.outcome',
+  sessionId: 'session-1',
+  status: 'completed',
+  lastMessageId: 'message-1',
+};
+
+function welcome(capabilities: { idleHeartbeats?: true; outcomeAcks?: true } = {}) {
+  return {
+    type: 'welcome',
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    heartbeatAck: true,
+    ...capabilities,
+  };
+}
+
+function outcomeFrames(socket: TestSocket) {
+  return socket.frames.filter(frame => frame.type === 'session.outcome');
+}
+
+describe('idle heartbeats', () => {
+  it('reports the idle transition in full, then sends the auto-answered frame', async () => {
+    let heartbeat = { active: true, degraded: false };
+    await withTestSocket(
+      async (_connection, socket) => {
+        socket.receive(welcome({ idleHeartbeats: true }));
+        await waitFor(() => socket.frames.some(frame => frame.type === 'heartbeat'));
+        heartbeat = { active: false, degraded: false };
+        await waitFor(
+          () => socket.frames.filter(frame => frame.type === 'idle_heartbeat').length >= 2
+        );
+        heartbeat = { active: true, degraded: false };
+        const resumed = socket.frames.length;
+        await waitFor(() =>
+          socket.frames.slice(resumed).some(frame => frame.type === 'heartbeat' && frame.active)
+        );
+        heartbeat = { active: false, degraded: false };
+        const idleAgain = socket.frames.length;
+        await waitFor(() =>
+          socket.frames.slice(idleAgain).some(frame => frame.type === 'idle_heartbeat')
+        );
+        const beats = socket.frames
+          .filter(frame => frame.type === 'heartbeat' || frame.type === 'idle_heartbeat')
+          .map(frame =>
+            frame.type === 'heartbeat' ? (frame.active ? 'active' : 'idle') : 'compact'
+          );
+        const firstIdle = beats.indexOf('idle');
+        expect(firstIdle).toBeGreaterThan(0);
+        expect(beats[firstIdle + 1]).toBe('compact');
+        const reactivated = beats.indexOf('active', firstIdle);
+        const secondIdle = beats.indexOf('idle', reactivated);
+        expect(secondIdle).toBeGreaterThan(reactivated);
+        expect(beats.slice(reactivated, secondIdle)).not.toContain('compact');
+        expect(beats[secondIdle + 1]).toBe('compact');
+      },
+      { getHeartbeat: () => heartbeat }
+    );
+  });
+
+  it('keeps full idle heartbeats for a peer that did not negotiate them', async () => {
+    await withTestSocket(async (_connection, socket) => {
+      socket.receive(welcome());
+      await waitFor(() => socket.frames.filter(frame => frame.type === 'heartbeat').length >= 3);
+      expect(socket.frames.some(frame => frame.type === 'idle_heartbeat')).toBe(false);
+    });
+  });
+
+  it('sends a degraded idle wrapper as a full heartbeat', async () => {
+    await withTestSocket(
+      async (_connection, socket) => {
+        socket.receive(welcome({ idleHeartbeats: true }));
+        await waitFor(() => socket.frames.filter(frame => frame.type === 'heartbeat').length >= 3);
+        expect(socket.frames.some(frame => frame.type === 'idle_heartbeat')).toBe(false);
+      },
+      { getHeartbeat: () => ({ active: false, degraded: true }) }
+    );
+  });
+});
+
+describe('acknowledged outcomes', () => {
+  it('stops resending an outcome once the Sandbox DO acknowledges it', async () => {
+    await withTestSocket(
+      async (connection, socket) => {
+        socket.receive(welcome({ outcomeAcks: true }));
+        connection.send(OUTCOME);
+        const [sent] = outcomeFrames(socket);
+        const outcomeId = sent?.type === 'session.outcome' ? sent.outcomeId : undefined;
+        expect(typeof outcomeId).toBe('string');
+        await waitFor(() => outcomeFrames(socket).length >= 2);
+        expect(outcomeFrames(socket).map(frame => JSON.stringify(frame))).toEqual(
+          outcomeFrames(socket).map(() => JSON.stringify({ ...OUTCOME, outcomeId }))
+        );
+        socket.receive({ type: 'session.outcome_ack', outcomeId });
+        const settled = outcomeFrames(socket).length;
+        await Bun.sleep(80);
+        expect(outcomeFrames(socket)).toHaveLength(settled);
+      },
+      { outcomeResendMs: 20 }
+    );
+  });
+
+  it('resends an unacknowledged outcome first on the next connection', async () => {
+    await withTestSocket(async (connection, socket) => {
+      socket.receive(welcome({ outcomeAcks: true }));
+      connection.send(OUTCOME);
+      const [sent] = outcomeFrames(socket);
+      connection.recycle();
+      connection.send({
+        type: 'session.events',
+        sessionId: 'session-1',
+        events: [{ type: 'later', properties: {} }],
+      });
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive(welcome({ outcomeAcks: true }));
+      const afterHello = replacement.frames.filter(frame => frame.type !== 'hello');
+      expect(afterHello.map(frame => frame.type)).toEqual(['session.outcome', 'session.events']);
+      expect(afterHello[0]).toEqual(sent);
+    });
+  });
+
+  it('gives up on an outcome after the retention window', async () => {
+    let clock = 0;
+    await withTestSocket(
+      async (connection, socket) => {
+        socket.receive(welcome({ outcomeAcks: true }));
+        connection.send(OUTCOME);
+        clock = 1_000;
+        connection.recycle();
+        const replacement = TestSocket.instances[1];
+        replacement.onopen?.();
+        replacement.receive(welcome({ outcomeAcks: true }));
+        expect(outcomeFrames(replacement)).toEqual([]);
+      },
+      { now: () => clock, outcomeRetentionMs: 500 }
+    );
+  });
+
+  it('sends outcomes without an id and keeps none for a peer without acknowledgements', async () => {
+    await withTestSocket(
+      async (connection, socket) => {
+        socket.receive(welcome());
+        connection.send(OUTCOME);
+        await Bun.sleep(60);
+        expect(outcomeFrames(socket)).toEqual([OUTCOME]);
+        connection.recycle();
+        const replacement = TestSocket.instances[1];
+        replacement.onopen?.();
+        replacement.receive(welcome({ outcomeAcks: true }));
+        expect(outcomeFrames(replacement)).toEqual([]);
+      },
+      { outcomeResendMs: 10 }
+    );
+  });
+
+  it('adds the id to an outcome queued before an acknowledging welcome', async () => {
+    await withTestSocket(async (connection, socket) => {
+      connection.send(OUTCOME);
+      socket.receive(welcome({ outcomeAcks: true }));
+      const [sent] = outcomeFrames(socket);
+      expect(outcomeFrames(socket)).toHaveLength(1);
+      expect(sent?.type === 'session.outcome' ? typeof sent.outcomeId : undefined).toBe('string');
+    });
+  });
+});
+
+it('resends pending outcomes without an id once to a peer that lost acknowledgements', async () => {
+  await withTestSocket(async (connection, socket) => {
+    socket.receive(welcome({ outcomeAcks: true }));
+    connection.send(OUTCOME);
+    connection.recycle();
+    const downgraded = TestSocket.instances[1];
+    downgraded.onopen?.();
+    downgraded.receive(welcome());
+    expect(outcomeFrames(downgraded)).toEqual([OUTCOME]);
+    connection.recycle();
+    const next = TestSocket.instances[2];
+    next.onopen?.();
+    next.receive(welcome({ outcomeAcks: true }));
+    expect(outcomeFrames(next)).toEqual([]);
   });
 });

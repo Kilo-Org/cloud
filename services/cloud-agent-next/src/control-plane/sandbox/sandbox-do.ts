@@ -189,6 +189,8 @@ import {
 } from '../../shared/workspace-config.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
+  CONTROL_PLANE_HEARTBEAT_ACK_FRAME,
+  CONTROL_PLANE_IDLE_HEARTBEAT_FRAME,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
@@ -391,6 +393,8 @@ const wrapperSocketAttachmentSchema = z.object({
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
+  idleHeartbeats: z.literal(true).optional(),
+  outcomeAcks: z.literal(true).optional(),
   sessionSnapshots: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
@@ -739,6 +743,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
     this.db = drizzle(ctx.storage, { logger: false });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
+    // An idle wrapper's liveness is answered without waking the DO, so it can
+    // hibernate between turns and adopt deferred code updates before their
+    // deadline. The alarm reads the auto-response timestamp instead.
+    ctx.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair(
+        CONTROL_PLANE_IDLE_HEARTBEAT_FRAME,
+        CONTROL_PLANE_HEARTBEAT_ACK_FRAME
+      )
+    );
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -2014,6 +2027,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await this.armAlarm(await this.readAllocation());
         return;
       }
+      // The reconnect window runs from the last liveness, including idle
+      // heartbeats the auto-response answered without waking the DO.
+      const unseen = this.unseenIdleHeartbeat(await this.readAllocation(), ws);
+      if (unseen !== null) {
+        await this.applyEvent({
+          type: 'heartbeat',
+          at: unseen.at,
+          ...unseen.connection,
+          active: false,
+        });
+      }
       await this.applyEvent({
         type: 'socket-closed',
         at: Date.now(),
@@ -2032,6 +2056,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
+      await this.syncIdleHeartbeats();
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
@@ -2354,6 +2379,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const effect of effects) {
       await this.runEffect(effect, state);
     }
+    this.closeSupersededIdleHeartbeatSockets(await this.readAllocation());
   }
 
   /**
@@ -3530,9 +3556,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
   }
 
+  /**
+   * With `ackSocket`, the outcome is acknowledged only after the Session DO has
+   * accepted it. An unacknowledged outcome is resent by the wrapper, so a DO
+   * reset while it was queued here does not lose it.
+   */
   private forwardOutcome(
     frame: Extract<ControlPlaneWrapperFrame, { type: 'session.outcome' }>,
-    current: boolean
+    current: boolean,
+    ackSocket: WebSocket | null
   ): void {
     if (!current) return;
     const outcome: ControlPlaneOutcome = {
@@ -3545,7 +3577,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         : { providerOwnership: frame.providerOwnership }),
       lastMessageId: frame.lastMessageId,
     };
-    this.notifications.enqueue(outcome.sessionId, { kind: 'outcome', payload: outcome });
+    const { outcomeId } = frame;
+    this.notifications.enqueue(
+      outcome.sessionId,
+      { kind: 'outcome', payload: outcome },
+      ackSocket === null || outcomeId === undefined
+        ? undefined
+        : () => {
+            this.trySendFrame(ackSocket, { type: 'session.outcome_ack', outcomeId });
+          }
+    );
   }
 
   /**
@@ -5040,6 +5081,133 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
   }
 
+  /** Re-reads billing on its cadence; true when it stopped the sandbox and closed the socket. */
+  private async enforceWrapperBilling(
+    ws: WebSocket,
+    attachment: WrapperSocketAttachment,
+    state: AllocationState
+  ): Promise<boolean> {
+    const now = Date.now();
+    if (now - (attachment.billingCheckedAt ?? 0) < WRAPPER_BILLING_CHECK_MS) return false;
+    const blocked = await withTimeout(
+      this.readWrapperBillingBlock(state),
+      this.billingReadTimeoutMs(),
+      'Sandbox billing state read timed out'
+    ).catch(() => false);
+    if (blocked) {
+      this.settlePendingForSocket(
+        ws,
+        controlRequestFailure('not_ready', 'Wrapper disconnected', true)
+      );
+      ws.close(4402, 'Container billing blocked');
+      await this.applyEvent({ type: 'stop-requested', at: now, reason: 'billing_blocked' });
+      return true;
+    }
+    ws.serializeAttachment({ ...attachment, billingCheckedAt: now });
+    return false;
+  }
+
+  private async applyHeartbeat(
+    state: AllocationState,
+    connection: { allocationId: string; connectionId: string },
+    at: number,
+    active: boolean,
+    idleCheckAt = at
+  ): Promise<void> {
+    await this.applyEvent({ type: 'heartbeat', at, ...connection, active });
+    if (active) this.invalidateSessionSnapshot(true);
+    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
+    if (!active && disk?.allocationId === state.allocationId && state.connectionId !== null) {
+      this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
+        ...disk,
+        idleConnectionId: state.connectionId,
+      });
+    }
+    await this.armAlarm(await this.readAllocation());
+    // Only an idle heartbeat proves the wrapper idle, so only its handling stops an idle sandbox.
+    if (
+      !active &&
+      state.lastActivityAt !== null &&
+      idleCheckAt >= state.lastActivityAt + this.sandboxIdleTimeoutMs(state)
+    ) {
+      await this.applyEvent({ type: 'stop-requested', at: idleCheckAt, reason: 'sandbox_stopped' });
+    }
+  }
+
+  /** The connection of a socket whose idle heartbeats are auto-answered. */
+  private idleHeartbeatConnection(
+    attachment: WrapperSocketAttachment | null
+  ): { allocationId: string; connectionId: string } | null {
+    if (
+      attachment?.idleHeartbeats !== true ||
+      attachment.allocationId === undefined ||
+      attachment.connectionId === undefined
+    )
+      return null;
+    return { allocationId: attachment.allocationId, connectionId: attachment.connectionId };
+  }
+
+  /** The current connection's last auto-answered idle heartbeat, when the DO has not applied it. */
+  private unseenIdleHeartbeat(
+    state: AllocationState,
+    socket: WebSocket | null
+  ): {
+    at: number;
+    attachment: WrapperSocketAttachment;
+    connection: { allocationId: string; connectionId: string };
+  } | null {
+    if (socket === null) return null;
+    const attachment = this.readAttachment(socket);
+    const connection = this.idleHeartbeatConnection(attachment);
+    if (
+      attachment === null ||
+      connection === null ||
+      !connectionMatches(state, connection.allocationId, connection.connectionId)
+    )
+      return null;
+    const at = this.ctx.getWebSocketAutoResponseTimestamp(socket)?.getTime();
+    if (at === undefined || at <= (state.lastFrameAt ?? 0)) return null;
+    return { at, attachment, connection };
+  }
+
+  /**
+   * Applies the auto-answered idle heartbeats as one at the latest, and keeps the
+   * billing cadence they no longer drive. No active heartbeat followed it, so the
+   * wrapper is idle to within one heartbeat interval and the idle stop uses now.
+   */
+  private async syncIdleHeartbeats(): Promise<void> {
+    const state = await this.readAllocation();
+    const socket = this.boundWrapperSocket(state);
+    const unseen = this.unseenIdleHeartbeat(state, socket);
+    if (socket === null || unseen === null) return;
+    if (await this.enforceWrapperBilling(socket, unseen.attachment, state)) return;
+    await this.applyHeartbeat(state, unseen.connection, unseen.at, false, Date.now());
+  }
+
+  /**
+   * Auto-response answers every socket, so a superseded one would never miss an
+   * acknowledgement and reconnect into the shutdown it is owed.
+   */
+  private closeSupersededIdleHeartbeatSockets(state: AllocationState): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      const connection = this.idleHeartbeatConnection(this.readAttachment(ws));
+      if (
+        connection === null ||
+        connectionMatches(state, connection.allocationId, connection.connectionId)
+      )
+        continue;
+      this.settlePendingForSocket(
+        ws,
+        controlRequestFailure('not_ready', 'Wrapper disconnected', true)
+      );
+      try {
+        ws.close(1000, 'superseded');
+      } catch {
+        // Socket already closed.
+      }
+    }
+  }
+
   private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (ws.readyState !== WebSocket.OPEN) return;
     const deadline = this.readAttachment(ws)?.helloDeadlineAt;
@@ -5115,6 +5283,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ? { runtimeCapability: attachment.runtimeCapability }
           : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+        ...(frame.idleHeartbeats ? { idleHeartbeats: true } : {}),
+        ...(frame.outcomeAcks ? { outcomeAcks: true } : {}),
         ...(frame.sessionSnapshots ? { sessionSnapshots: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
@@ -5126,6 +5296,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         type: 'welcome',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+        ...(frame.idleHeartbeats ? { idleHeartbeats: true } : {}),
+        ...(frame.outcomeAcks ? { outcomeAcks: true } : {}),
       });
       await this.applyEvent({
         type: 'hello-accepted',
@@ -5155,56 +5327,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       attachment.allocationId,
       attachment.connectionId
     );
-    const now = Date.now();
-    if (current && now - (attachment.billingCheckedAt ?? 0) >= WRAPPER_BILLING_CHECK_MS) {
-      const blocked = await withTimeout(
-        this.readWrapperBillingBlock(currentState),
-        this.billingReadTimeoutMs(),
-        'Sandbox billing state read timed out'
-      ).catch(() => false);
-      if (blocked) {
-        await this.applyEvent({ type: 'stop-requested', at: now, reason: 'billing_blocked' });
-        this.settlePendingForSocket(
-          ws,
-          controlRequestFailure('not_ready', 'Wrapper disconnected', true)
-        );
-        ws.close(4402, 'Container billing blocked');
-        return;
-      }
-      ws.serializeAttachment({ ...attachment, billingCheckedAt: now });
-    }
+    if (current && (await this.enforceWrapperBilling(ws, attachment, currentState))) return;
 
-    if (frame.type === 'heartbeat') {
+    // Normally answered by auto-response; one that reaches the DO counts as idle.
+    if (frame.type === 'heartbeat' || frame.type === 'idle_heartbeat') {
       const state = currentState;
       if (!connectionMatches(state, attachment.allocationId, attachment.connectionId)) return;
-      const at = Date.now();
-      await this.applyEvent({
-        type: 'heartbeat',
-        at,
-        allocationId: attachment.allocationId,
-        connectionId: attachment.connectionId,
-        active: frame.active,
-      });
-      if (frame.active) this.invalidateSessionSnapshot(true);
-      const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-      if (
-        !frame.active &&
-        disk?.allocationId === state.allocationId &&
-        state.connectionId !== null
-      ) {
-        this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-          ...disk,
-          idleConnectionId: state.connectionId,
-        });
-      }
-      await this.armAlarm(await this.readAllocation());
-      if (
-        !frame.active &&
-        state.lastActivityAt !== null &&
-        at >= state.lastActivityAt + this.sandboxIdleTimeoutMs(state)
-      ) {
-        await this.applyEvent({ type: 'stop-requested', at, reason: 'sandbox_stopped' });
-      }
+      await this.applyHeartbeat(
+        state,
+        { allocationId: attachment.allocationId, connectionId: attachment.connectionId },
+        Date.now(),
+        frame.type === 'heartbeat' && frame.active
+      );
       if (
         attachment.heartbeatAck &&
         connectionMatches(
@@ -5289,7 +5423,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.forwardEvents(frame, current);
         return;
       case 'session.outcome':
-        this.forwardOutcome(frame, current);
+        this.forwardOutcome(frame, current, attachment.outcomeAcks === true ? ws : null);
         return;
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
@@ -5633,8 +5767,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
       disk.attemptedIdleAt !== state.lastActivityAt
         ? state.lastActivityAt + this.sessionSnapshotIdleMs
         : null;
+    // Auto-answered idle heartbeats reach the idle stop only through the alarm.
+    // Past the deadline, wait for the next idle heartbeat to prove the wrapper idle.
+    const idleDeadlineAt =
+      state.lastActivityAt !== null &&
+      this.idleHeartbeatConnection(snapshotSocket && this.readAttachment(snapshotSocket)) !== null
+        ? state.lastActivityAt + this.sandboxIdleTimeoutMs(state)
+        : null;
+    const idleStopAt =
+      idleDeadlineAt === null
+        ? null
+        : Math.max(idleDeadlineAt, Date.now() + this.wrapperHeartbeatIntervalMs());
     const candidates = [
       allocationAt,
+      idleStopAt,
       routeAt,
       retryAt,
       snapshotAt,
@@ -5650,6 +5796,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private sandboxTimers(): SandboxTimers {
     return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
       .sandbox;
+  }
+
+  private wrapperHeartbeatIntervalMs(): number {
+    return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
+      .wrapper.heartbeatIntervalMs;
   }
 
   /**

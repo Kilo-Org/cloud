@@ -419,7 +419,9 @@ or missing origins are unattended. The Sandbox DO derives this policy from its r
 without a cache.
 
 The 1-minute rule is checked only on an inactive heartbeat, never on a disconnect or
-reconnect. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),
+reconnect. An auto-answered idle heartbeat (see "Connection" in section 7) counts as inactive
+when the alarm applies it; the alarm is armed at the idle deadline for such a connection and
+then checks against the alarm time. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),
 reconnect window (90 s), and provider lease (11 min) are unchanged. Active heartbeats
 refresh `lastActivityAt` and renew that provider lease (`ensureLeaseAtLeast`). Accepted `hello`
 and heartbeat frames still update `lastFrameAt` for liveness; inactive heartbeats do not refresh
@@ -616,16 +618,35 @@ providers retain their current recovery behavior.
 - A new wrapper advertises optional `heartbeatAck: true` in `hello`; the Sandbox DO echoes it
   in `welcome` only when offered. It sends `{ type: 'heartbeat_ack' }` after applying each valid
   heartbeat from the current bound allocation/connection. Invalid, unbound, stale and terminal
-  allocation frames are not acknowledged. Negotiation lives in the socket attachment across hibernation.
+  allocation frames are not acknowledged, except the auto-answered idle heartbeat below.
+  Negotiation lives in the socket attachment across hibernation.
 - Only a negotiated welcome starts the wrapper's 15 s acknowledgement deadline. Each acknowledgement
   resets it; other frames do not. Expiry detaches/fences the socket and schedules the existing
   reconnect backoff independently of close delivery. Old socket messages and callbacks cannot affect
   the replacement. Explicit recycle clears timers, detaches the old socket and reconnects immediately
   without waiting for close. Shutdown cancels all timers permanently. This does not restart Kilo or change billing.
 - Older v2 DOs strictly reject the capability-bearing hello. If still awaiting welcome after 1 s,
-  the wrapper sends the original hello on the same socket. A legacy welcome enables periodic
+  the wrapper sends the previous capability set, then the original hello, on the same socket, 1 s
+  apart. A legacy welcome enables periodic
   heartbeats without an acknowledgement deadline; old wrappers receive neither the optional field
   nor acknowledgement frames. Duplicate hello on a bound socket is ignored.
+- Idle heartbeats (`idleHeartbeats: true`, echoed like `heartbeatAck`) let the Sandbox DO hibernate
+  between turns, so a deployment's deferred Durable Object code update can apply before its
+  deadline. While inactive and not degraded, the wrapper sends one full inactive heartbeat, then
+  the exact frame `{"type":"idle_heartbeat"}`. The Sandbox DO answers it by WebSocket
+  auto-response with `{"type":"heartbeat_ack"}` without waking. Its alarm, and a socket close,
+  apply the latest auto-response time as one inactive heartbeat from the current connection
+  (liveness, idle snapshot eligibility, idle stop) and keep the 30-second billing reconciliation.
+  Auto-response also answers superseded and terminal sockets, so the Sandbox DO closes every
+  negotiated socket that is not the current connection whenever the allocation changes.
+- Acknowledged outcomes (`outcomeAcks: true`, echoed like `heartbeatAck`) make a Sandbox DO reset
+  harmless to a finished turn. Each `session.outcome` carries an `outcomeId`. The Sandbox DO sends
+  `{ type: 'session.outcome_ack', outcomeId }` only after the Session DO accepted the outcome; a
+  failed or expired notification is not acknowledged. The wrapper keeps up to 256 written,
+  unacknowledged outcomes, resends them after each `welcome` before the buffer and every 15 s on
+  the same connection, and drops one after 10 minutes, leaving the accepted backstop to settle it.
+  A welcome without the capability receives them once without `outcomeId`. A resent outcome is
+  harmless: its named message is already terminal.
 - A wrapper that redacts named secrets advertises optional `redactsNamedSecrets: true` in `hello`; the
   Sandbox DO stores it on the socket attachment like `heartbeatAck`. Encrypted secrets ride only the
   DO-private credential source (`encryptedSecrets`) and are decrypted into the frame. A secret-bearing

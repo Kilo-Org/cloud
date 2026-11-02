@@ -399,7 +399,7 @@
       "oldNew": "زوړ: {{old}} | نوی: {{new}}",
       "oldOnly": "یوازې زوړ: {{text}}",
       "newOnly": "یوازې نوی: {{text}}",
-      "emptyDiffRow": "د توپیر تشه کرښه"
+      "emptyDiffRow": "د توپیر تش قطار"
     },
     "connectionExpired": "له GitHub سره د اړیکې موده پای ته ورسېده.",
     "merge": {
@@ -431,8 +431,8 @@
       "confirmMessage": "دا به ستاسو بدلونونه په بنسټیزه څانګه کې یوځای کړي.",
       "enableAutoMergeConfirmTitle": "خپلکار یوځای کول فعال شي؟",
       "enableAutoMergeConfirmMessage": "کله چې ټولې اړینې ازموینې بریالۍ شي، GitHub به دا پل ریکویسټ په خپلکار ډول یوځای کړي.",
-      "enableAutoMergeConfirmMessageTerm": "کله چې پایپ‌لاین بریالی شي، {{term}} به په اتوماتیک ډول یوځای شي.",
-      "enableAutoMergeDescriptionTerm": "کله چې پایپ‌لاین بریالی شي، GitLab به دا {{term}} په اتوماتیک ډول یوځای کړي.",
+      "enableAutoMergeConfirmMessageTerm": "کله چې پایپ‌لاین بریالی شي، {{term}} به په خپلکار ډول یوځای شي.",
+      "enableAutoMergeDescriptionTerm": "کله چې پایپ‌لاین بریالی شي، GitLab به دا {{term}} په خپلکار ډول یوځای کړي.",
       "forbidden": "تاسو د دې پل ریکویسټ د یوځای کولو اجازه نه لرئ.",
       "cannotMerge": "دا پل ریکویسټ په اوسني حالت کې نه شي یوځای کېدای.",
       "couldNotMerge": "پل ریکویسټ یوځای نه شو.",
@@ -444,15 +444,15 @@
       "terminal": {
         "alreadyMerged": "مخکې یوځای شوی",
         "closed": "دا پل ریکویسټ تړل شوی",
-        "closedMergeRequest": "دا د یوځای کولو غوښتنه تړل شوی"
+        "closedMergeRequest": "دا د یوځای کولو غوښتنه تړل شوې ده"
       },
       "partialSuccessBanner": {
-        "body": "څانګه ړنګه نه شوه: {{reason}}.",
+        "body": "څانګه ړنګه نه شوه: {{reason}}",
         "accessibility": "یوځای شو. څانګه ړنګه نه شوه: {{reason}}"
       },
       "loadFailedTitle": "د یوځای کولو غوراوي بار نه شول.",
       "blocked": {
-        "unknownStateTitle": "GitHub لا نه دي ښودلي چې یوځای کول ممکن دي",
+        "unknownStateTitle": "GitHub لا تر اوسه د یوځای کولو حالت نه دی ښودلی",
         "unknownStateDetail": "لږ وروسته د عمومي کتنې د تازه کولو هڅه وکړئ.",
         "conflictsTitle": "د یوځای کولو ټکرونه",
         "conflictsDetail": "له یوځای کولو مخکې په دې څانګه کې د یوځای کولو ټکرونه حل کړئ.",
@@ -598,8 +598,8 @@
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
     "checkConnection": "اړیکه وګورئ",
     "couldNotLoadPullRequest": "پل ریکویسټ بار نه شو.",
-    "reviewServiceUnavailable": "خدمة نه شته",
-    "reviewServiceUnavailableDescription": "خدمه لنډ مهال لپاره نه شته. بیا هڅه وکړه.",
+    "reviewServiceUnavailable": "د بیاکتنې خدمه نه شته",
+    "reviewServiceUnavailableDescription": "د بیاکتنې خدمه لنډ مهال لپاره نه شته. بیا هڅه وکړئ.",
     "description": "تشریح",
     "noDescriptionProvided": "هېڅ تشریح نه ده ورکړل شوې.",
     "review": "بیاکتنه",
@@ -706,8 +706,8 @@
       "deletePendingMessage": "دا تبصره به د بیاکتنې له کتار څخه لرې شي.",
       "summaryOptional": "لنډیز (اختیاري)",
       "pendingComment_one": "په تمه تبصره",
-      "pendingComment": "نااستول شوې تبصرې",
-      "pendingComment_other": "نااستول شوې تبصرې",
+      "pendingComment": "په تمه تبصرې",
+      "pendingComment_other": "په تمه تبصرې",
       "submitCountOfTotal": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
       "partialPostedMessage": "{{displayFreshCount}} تبصرې خپرې شوې. {{displayStaleCount}} تبصرې یوه پخواني کمېټ ته اشاره کوي او ستاسو په کتار کې پاتې شوې.",
@@ -715,10 +715,10 @@
       "blockedComment": "د تبصرې په توګه د بیاکتنې د خپرولو لپاره لنډیز یا لږ تر لږه یوه تبصره ورزیاته کړئ."
     },
     "reconnectNotice": {
-      "title": "له GitHub سره د اړیکې موده پای ته ورسېده.",
+      "title": "له GitHub سره د اړیکې موده پای ته ورسېده",
       "message": "خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
-      "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده.",
-      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده."
+      "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده",
+      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده"
     },
     "eventChips": {
       "comment": "تبصره",
@@ -730,7 +730,7 @@
       "stateOpenApproved": "پرانیستی · تایید شوی",
       "stateOpenChangesRequested": "پرانیستی · بدلونونه غوښتل شوي",
       "stateOpenReviewRequired": "پرانیستی · بیاکتنه اړینه ده",
-      "stateOpen": "خلاص",
+      "stateOpen": "پرانیستی",
       "unknownAuthor": "نامعلوم لیکوال",
       "commit_one": "کمېټ",
       "commit": "کمېټونه",
@@ -799,8 +799,8 @@
     },
     "mutationError": {
       "commentNotPosted": "دا تبصره نه شي خپرېدای. کېدای شي ټاکل شوې کرښه بدله شوې وي، یا PR تازه شوی وي.",
-      "reviewNotSubmitted": "دا بیاکتنه په اوسني حالت کې نه شي سپارل کېدای. کېدای شي PR بدل شوی وي، یا تاسو د خپل پل ریکویسټ د بیاکتنې اجازه نه لرئ.",
-      "reviewNotSubmittedTerm": "دا بیاکتنه په همدې بڼه نه شي کولای وسپارل شي. کېدای شي {{term}} بدل شوی وي، یا تاسو خپله {{term}} نشئ کولای وبيایۍ.",
+      "reviewNotSubmitted": "دا بیاکتنه په همدې بڼه نه شي سپارل کېدای. کېدای شي PR بدل شوی وي، یا تاسو نشئ کولای چې خپل پل ریکویسټ بیاکتنه کړئ.",
+      "reviewNotSubmittedTerm": "دا بیاکتنه په همدې بڼه نه شي سپارل کېدای. کېدای شي {{term}} بدل شوی وي، یا تاسو نشئ کولای چې خپله {{term}} بیاکتنه کړئ.",
       "couldNotPostComment": "تبصره خپره نه شوه.",
       "couldNotSubmitReview": "بیاکتنه ونه سپارل شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "rateLimited": "ډېرې غوښتنې. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
@@ -829,9 +829,9 @@
       "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",
       "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی ونه لرئ.",
       "accessDeniedMergeRequest": "تاسو د دې د یوځای کولو غوښتنه د لیدلو اجازه نه لرئ.",
-      "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو.",
+      "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو",
       "discussionAccessDenied": "تاسو د دې د یوځای کولو غوښتنه د بحث د لیدلو اجازه نه لرئ.",
-      "discussionUnavailableMessage": "کېدای شي دا د یوځای کولو غوښتنه لرې شوی وي.",
+      "discussionUnavailableMessage": "کېدای شي دا د یوځای کولو غوښتنه لرې شوې وي.",
       "noDiscussionDescription": "په دې د یوځای کولو غوښتنه کې نه د بیاکتنې د بحث لړۍ شته او نه د خبرو تبصرې.",
       "noFilesChangedDescription": "په دې د یوځای کولو غوښتنه کې هېڅ فایل نه دی بدل شوی."
     }

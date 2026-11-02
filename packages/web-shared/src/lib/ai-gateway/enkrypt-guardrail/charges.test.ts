@@ -1,8 +1,10 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import {
-  enkrypt_guardrail_charges,
+  api_kind,
+  enkrypt_usage,
+  enkrypt_usage_decision,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
@@ -72,9 +74,22 @@ describe('recordEnkryptGuardrailCharge', () => {
     await recordEnkryptGuardrailCharge(charge(organization.id, user.id));
 
     const rows = await db
-      .select()
-      .from(enkrypt_guardrail_charges)
-      .where(eq(enkrypt_guardrail_charges.organization_id, organization.id));
+      .select({
+        kilo_user_id: enkrypt_usage.kilo_user_id,
+        session_id: enkrypt_usage.session_id,
+        api_kind: api_kind.api_kind,
+        decision: enkrypt_usage_decision.decision,
+        enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
+        charged_microdollars: enkrypt_usage.charged_microdollars,
+        added_latency_ms: enkrypt_usage.added_latency_ms,
+      })
+      .from(enkrypt_usage)
+      .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+      .innerJoin(
+        enkrypt_usage_decision,
+        eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+      )
+      .where(eq(enkrypt_usage.organization_id, organization.id));
     expect(rows).toEqual([
       expect.objectContaining({
         kilo_user_id: user.id,
@@ -97,20 +112,88 @@ describe('recordEnkryptGuardrailCharge', () => {
     expect(memberUsage?.microdollarUsage).toBe(7 * MICRODOLLARS_PER_ENKRYPT_CREDIT);
   });
 
-  it('sums concurrent charges without losing a debit', async () => {
+  it('creates and reuses lookup values during concurrent charges without losing a debit', async () => {
     const { user, organization } = await organizationWithMember();
+    const apiKind = `test-api-${randomUUID()}` as EnkryptGuardrailCharge['apiKind'];
+    const decision = `test-decision-${randomUUID()}` as EnkryptGuardrailCharge['decision'];
 
     await Promise.all(
       Array.from({ length: 5 }, () =>
-        recordEnkryptGuardrailCharge(charge(organization.id, user.id))
+        recordEnkryptGuardrailCharge(charge(organization.id, user.id, { apiKind, decision }))
       )
     );
 
+    const apiKinds = await db.select().from(api_kind).where(eq(api_kind.api_kind, apiKind));
+    const decisions = await db
+      .select()
+      .from(enkrypt_usage_decision)
+      .where(eq(enkrypt_usage_decision.decision, decision));
+    expect(apiKinds).toHaveLength(1);
+    expect(decisions).toHaveLength(1);
+    const rows = await db
+      .select({ api_kind_id: enkrypt_usage.api_kind_id, decision_id: enkrypt_usage.decision_id })
+      .from(enkrypt_usage)
+      .where(eq(enkrypt_usage.organization_id, organization.id));
+    expect(rows).toHaveLength(5);
+    expect(rows).toEqual(
+      Array.from({ length: 5 }, () => ({
+        api_kind_id: apiKinds[0].api_kind_id,
+        decision_id: decisions[0].decision_id,
+      }))
+    );
     expect(await organizationBalance(organization.id)).toEqual({
       microdollarsUsed: 5 * 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
       microdollarsBalance: 10_000_000 - 5 * 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
     });
   });
+
+  it('does not block another organization sharing lookups while a debit transaction is held open', async () => {
+    const first = await organizationWithMember();
+    const second = await organizationWithMember();
+    await db.insert(api_kind).values({ api_kind: 'messages' }).onConflictDoNothing();
+    await db.insert(enkrypt_usage_decision).values({ decision: 'blocked' }).onConflictDoNothing();
+
+    const debitHeld = Promise.withResolvers<void>();
+    const releaseDebit = Promise.withResolvers<void>();
+    const deadline = Promise.withResolvers<never>();
+    const timeout = setTimeout(
+      () => deadline.reject(new Error('Another organization was blocked by the held debit')),
+      5_000
+    );
+    const transaction = db.transaction.bind(db);
+    const holdDebit = jest.spyOn(db, 'transaction').mockImplementationOnce(callback =>
+      transaction(async tx => {
+        const result = await callback(tx);
+        debitHeld.resolve();
+        await releaseDebit.promise;
+        return result;
+      })
+    );
+    const firstCharge = recordEnkryptGuardrailCharge(charge(first.organization.id, first.user.id));
+    let secondCharge: Promise<void> | undefined;
+
+    try {
+      await Promise.race([debitHeld.promise, firstCharge, deadline.promise]);
+      secondCharge = recordEnkryptGuardrailCharge(charge(second.organization.id, second.user.id));
+      await Promise.race([secondCharge, deadline.promise]);
+
+      expect(await organizationBalance(second.organization.id)).toEqual({
+        microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+        microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      });
+      const rows = await db
+        .select()
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, second.organization.id));
+      expect(rows).toHaveLength(1);
+    } finally {
+      releaseDebit.resolve();
+      clearTimeout(timeout);
+      holdDebit.mockRestore();
+      await Promise.allSettled([firstCharge, secondCharge]);
+    }
+    await firstCharge;
+  }, 15_000);
 
   it('records a failed call without debiting the organization', async () => {
     const { user, organization } = await organizationWithMember();
@@ -124,9 +207,18 @@ describe('recordEnkryptGuardrailCharge', () => {
     );
 
     const rows = await db
-      .select()
-      .from(enkrypt_guardrail_charges)
-      .where(eq(enkrypt_guardrail_charges.organization_id, organization.id));
+      .select({
+        decision: enkrypt_usage_decision.decision,
+        enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
+        charged_microdollars: enkrypt_usage.charged_microdollars,
+        added_latency_ms: enkrypt_usage.added_latency_ms,
+      })
+      .from(enkrypt_usage)
+      .innerJoin(
+        enkrypt_usage_decision,
+        eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+      )
+      .where(eq(enkrypt_usage.organization_id, organization.id));
     expect(rows).toEqual([
       expect.objectContaining({
         decision: 'error',
@@ -139,5 +231,50 @@ describe('recordEnkryptGuardrailCharge', () => {
       microdollarsUsed: 0,
       microdollarsBalance: 10_000_000,
     });
+  });
+
+  it('rolls back lookup values, usage, and financial changes when the transaction fails', async () => {
+    const { user, organization } = await organizationWithMember();
+    const apiKind = `test-api-${randomUUID()}` as EnkryptGuardrailCharge['apiKind'];
+    const decision = `test-decision-${randomUUID()}` as EnkryptGuardrailCharge['decision'];
+    const transaction = db.transaction.bind(db);
+    const failure = jest.spyOn(db, 'transaction').mockImplementationOnce(callback =>
+      transaction(async tx => {
+        await callback(tx);
+        throw new Error('transaction failed after debit');
+      })
+    );
+
+    try {
+      await expect(
+        recordEnkryptGuardrailCharge(charge(organization.id, user.id, { apiKind, decision }))
+      ).rejects.toThrow('transaction failed after debit');
+    } finally {
+      failure.mockRestore();
+    }
+
+    expect(
+      await db
+        .select()
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, organization.id))
+    ).toEqual([]);
+    expect(await db.select().from(api_kind).where(eq(api_kind.api_kind, apiKind))).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(enkrypt_usage_decision)
+        .where(eq(enkrypt_usage_decision.decision, decision))
+    ).toEqual([]);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 0,
+      microdollarsBalance: 10_000_000,
+    });
+    expect(
+      await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id))
+    ).toEqual([]);
   });
 });

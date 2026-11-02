@@ -17,9 +17,11 @@ import {
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -91,7 +93,7 @@ export async function sendUpstreamAttempt({
       request.body,
       costLimit.availableBalanceMicrodollars,
       {
-        id: providerContext.provider.id,
+        id: providerContext.provider.type,
         userFunded: providerContext.userByok !== null,
       }
     );
@@ -103,11 +105,15 @@ export async function sendUpstreamAttempt({
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
   }
 
-  if (providerContext.provider.id === 'openrouter') {
-    const transformedModel = request.body.model;
-    if (!transformedModel || !(await isValidOpenRouterModelId(transformedModel))) {
-      return { type: 'invalid-openrouter-model' };
-    }
+  if (
+    (providerContext.provider.type === 'openrouter' ||
+      providerContext.provider.type === 'vercel') &&
+    !isKiloExclusiveModel(requestedModel) &&
+    !(await isValidOpenRouterModelId(requestedModel)) &&
+    // Models only Vercel serves are listed under ids that OpenRouter does not know.
+    !(providerContext.provider.type === 'vercel' && (await isVercelModel(requestedModel)))
+  ) {
+    return { type: 'invalid-openrouter-model' };
   }
 
   const result = await upstreamRequest({
@@ -123,7 +129,7 @@ export async function sendUpstreamAttempt({
   });
   if (result.type === 'error') return result;
 
-  if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
+  if (providerContext.provider.type === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
     await syncChatGptUsageLimit(result.response, owner);
     await recordChatGptNotEligible(

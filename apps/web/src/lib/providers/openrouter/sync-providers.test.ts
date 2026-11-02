@@ -3,7 +3,7 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { fetchGatewayModels } from './sync-providers';
 
 const gateway = {
-  id: 'vercel',
+  type: 'vercel',
   apiUrl: 'https://gateway.test/v1',
   apiUrlOverrides: {},
   disableUrlSuffix: false,

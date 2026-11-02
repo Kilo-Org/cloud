@@ -40,7 +40,7 @@ export type RewriteResponseParams = {
 
 export type ResponseUsageContext = Pick<
   MicrodollarUsageContext,
-  'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
+  'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind' | 'custom_llm_pricing'
 > & { custom_pricing_config: CustomPricingConfig };
 
 export type ResponseUsage = {

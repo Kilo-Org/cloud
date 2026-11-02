@@ -10,6 +10,7 @@ function makeBridge(sessionId: string): ModelPickerBridge {
     options: [],
     currentValue: '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope: {
       sessionId,
       ownerConnectionId: null,

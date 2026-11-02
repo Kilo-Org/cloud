@@ -116,6 +116,7 @@ export function ModelAccessPolicyEditor({
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
+        byokOnly: provider.byokOnly,
       }))
       .filter(provider => provider.modelCount > 0)
       .sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
@@ -277,7 +278,8 @@ export function ModelAccessPolicyEditor({
           </Tabs>
         )}
         <p className="type-label text-muted-foreground">
-          Direct BYOK models remain available organization-wide.
+          Direct BYOK models with a provider prefix remain available organization-wide. Keys that
+          use Kilo catalog model IDs follow this policy.
         </p>
       </div>
       <PolicyEditorFooter

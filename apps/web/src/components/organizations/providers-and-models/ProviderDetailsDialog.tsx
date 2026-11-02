@@ -15,6 +15,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  BYOK_ONLY_DESCRIPTION,
+  ByokOnlyPriceCell,
+  ByokOnlyTag,
   PolicyPill,
   ProviderPolicyTag,
 } from '@/components/organizations/providers-and-models/PolicyPills';
@@ -90,9 +93,14 @@ export function ProviderDetailsDialog({
           {infoProvider ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
+                <ByokOnlyTag value={infoProvider.byokOnly} />
                 <ProviderPolicyTag value={infoProvider.trains} variant="trains" />
                 <ProviderPolicyTag value={infoProvider.retainsPrompts} variant="retainsPrompts" />
               </div>
+
+              {infoProvider.byokOnly ? (
+                <div className="text-muted-foreground text-xs">{BYOK_ONLY_DESCRIPTION}</div>
+              ) : null}
 
               {infoProvider.headquarters ? (
                 <div className="text-muted-foreground text-xs">
@@ -143,20 +151,28 @@ export function ProviderDetailsDialog({
                       <div className="font-medium">{model.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{model.modelId}</div>
                     </TableCell>
-                    <TableCell>
-                      <DiscountedPrice
-                        price={model.promptPrice}
-                        originalPrice={model.originalPromptPrice}
-                        formatPrice={formatPriceCompact}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <DiscountedPrice
-                        price={model.completionPrice}
-                        originalPrice={model.originalCompletionPrice}
-                        formatPrice={formatPriceCompact}
-                      />
-                    </TableCell>
+                    {infoProvider?.byokOnly ? (
+                      <TableCell colSpan={2}>
+                        <ByokOnlyPriceCell />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <DiscountedPrice
+                            price={model.promptPrice}
+                            originalPrice={model.originalPromptPrice}
+                            formatPrice={formatPriceCompact}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <DiscountedPrice
+                            price={model.completionPrice}
+                            originalPrice={model.originalCompletionPrice}
+                            formatPrice={formatPriceCompact}
+                          />
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <PolicyPill value={model.trains} variant="trains" />
                     </TableCell>

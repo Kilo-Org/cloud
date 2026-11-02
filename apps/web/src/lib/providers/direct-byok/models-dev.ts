@@ -45,6 +45,20 @@ export const ModelsDevProviderSchema = z.object({
 
 export type ModelsDevProvider = z.infer<typeof ModelsDevProviderSchema>;
 
+export const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
+
+export type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
+
+export async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
+  const response = await fetch('https://models.dev/api.json');
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+    );
+  }
+  return ModelsDevCatalogSchema.parse(await response.json());
+}
+
 export type RawModel = {
   id: string;
   name?: string;

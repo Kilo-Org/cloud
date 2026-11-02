@@ -186,6 +186,53 @@ describe('FormField errors known from elsewhere', () => {
   });
 });
 
+describe('FormField accessible name of a multiline field', () => {
+  const label = i18n.t('profiles.mcp.headers');
+  const placeholder = i18n.t('profiles.mcp.jsonPlaceholder');
+  const requiredWord = i18n.t('common.required');
+  const error = i18n.t('profiles.mcp.jsonInvalid');
+
+  function mountMultiline(props: { required?: boolean; error?: string } = {}) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, { label, placeholder, multiline: true, ...props })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer.root.findByType('TextInput').props as {
+      accessibilityLabel: string;
+      placeholder?: string;
+    };
+  }
+
+  it('names the field by its label and state, never by the example placeholder', () => {
+    // The example text the field displays before anyone types must stay out of
+    // the name a screen reader announces, which is the label plus the field's
+    // state, so the name of an empty field and of a filled one agree.
+    const input = mountMultiline();
+
+    expect(input.accessibilityLabel).toBe(label);
+    expect(input.accessibilityLabel).not.toContain(placeholder);
+  });
+
+  it('keeps the example visible to the native field after leaving the name', () => {
+    // The example is still the placeholder the platform paints; only the name
+    // drops it.
+    expect(mountMultiline().placeholder).toBe(placeholder);
+  });
+
+  it('appends the required word and the error after the label only', () => {
+    const input = mountMultiline({ required: true, error });
+
+    expect(input.accessibilityLabel).toBe(
+      [label, requiredWord, i18n.t('common.error', { error })].join(', ')
+    );
+    expect(input.accessibilityLabel).not.toContain(placeholder);
+  });
+});
+
 describe('FormField direction-aware content alignment', () => {
   function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
     act(() => {

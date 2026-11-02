@@ -1,7 +1,26 @@
 diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+index a803387b98bfb68e0c9bbb783e25bc649566e6a3..399f12b67f54d8ba5b82cee21c55f8e6990e7f5b 100644
 --- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 +++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
-@@ -133,7 +133,29 @@
+@@ -93,10 +93,13 @@ static UIColor *defaultPlaceholderColor(void)
+     [accessibilityLabel appendString:superAccessibilityLabel];
+   }
+ 
+-  if (self.placeholder.length > 0 && self.attributedText.string.length == 0) {
+-    if (accessibilityLabel.length > 0) {
+-      [accessibilityLabel appendString:@" "];
+-    }
++  // An explicit label already names the field; the placeholder is example copy,
++  // and appending it made the field read as its label followed by a JSON sample,
++  // which a screen-reader user cannot tell from a saved value. Single-line
++  // fields never compose the two. The placeholder stays the fallback name for a
++  // field that carries no label of its own.
++  if (superAccessibilityLabel.length == 0 && self.placeholder.length > 0 &&
++      self.attributedText.string.length == 0) {
+     [accessibilityLabel appendString:self.placeholder];
+   }
+ 
+@@ -133,7 +136,29 @@ static UIColor *defaultPlaceholderColor(void)
      return;
    }
  
@@ -32,9 +51,10 @@ diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Tex
    [self _updatePlaceholder];
  }
 diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
+index cc081964b1f3810bc525ae1c2dd55ce3a6afe7e8..e9f0cccb852b59188f6c4098a2e64350e30b45e4 100644
 --- a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
 +++ b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
-@@ -121,26 +121,28 @@
+@@ -121,26 +121,28 @@ static NSString *const kRCTLegacyInteropChildIndexKey = @"index";
  
    // Step 3: check if the module has been registered
    // TODO(T174674274): Implement lazy loading of legacy view managers in the new architecture.
@@ -44,35 +64,33 @@ diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLe
 -  if (supportedLegacyViewComponents[componentName] != NULL) {
 -    return YES;
 -  }
--
++  @synchronized(supportedLegacyViewComponents) {
++    NSArray<Class> *registeredModules = RCTGetModuleClasses();
++    if (supportedLegacyViewComponents[componentName] != NULL) {
++      return YES;
++    }
+ 
 -  for (Class moduleClass in registeredModules) {
 -    id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
 -    NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
 -        ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
 -        : [bridgeModule moduleName];
--
--    if (supportedLegacyViewComponents[moduleName] == NULL) {
--      supportedLegacyViewComponents[moduleName] = moduleClass;
--    }
--
--    if ([moduleName isEqualToString:componentName] ||
--        [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
-+  @synchronized(supportedLegacyViewComponents) {
-+    NSArray<Class> *registeredModules = RCTGetModuleClasses();
-+    if (supportedLegacyViewComponents[componentName] != NULL) {
-       return YES;
-+    }
-+
 +    for (Class moduleClass in registeredModules) {
 +      id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
 +      NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
 +          ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
 +          : [bridgeModule moduleName];
-+
+ 
+-    if (supportedLegacyViewComponents[moduleName] == NULL) {
+-      supportedLegacyViewComponents[moduleName] = moduleClass;
+-    }
 +      if (supportedLegacyViewComponents[moduleName] == NULL) {
 +        supportedLegacyViewComponents[moduleName] = moduleClass;
 +      }
-+
+ 
+-    if ([moduleName isEqualToString:componentName] ||
+-        [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
+-      return YES;
 +      if ([moduleName isEqualToString:componentName] ||
 +          [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
 +        return YES;
@@ -81,9 +99,10 @@ diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLe
    }
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
+index ddf36b229594affee29be9da22c51cbd4641834f..4bc08852b47fe2483f944ec14dbb4cb2a61705fc 100644
 --- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-@@ -50,6 +50,7 @@
+@@ -50,6 +50,7 @@ using namespace facebook::react;
  @interface RCTComponentViewFactory ()
  - (void)_registerComponentIfPossible:(const std::string &)name;
  - (BOOL)_wasComponentRegistered:(const std::string &)name;
@@ -91,7 +110,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mou
  @end
  
  // Allow JS runtime to register native components as needed. For static view configs.
-@@ -117,12 +118,14 @@
+@@ -117,12 +118,14 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
  
  - (BOOL)_wasComponentRegistered:(const std::string &)name
  {
@@ -106,7 +125,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mou
    if (_registrationStatusMap.find(name) != _registrationStatusMap.end()) {
      return;
    }
-@@ -130,7 +133,7 @@
+@@ -130,7 +133,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
    // Fallback 1: Call provider function for component view class.
    Class<RCTComponentViewProtocol> klass = RCTComponentViewClassWithName(name.c_str());
    if (klass != nullptr) {
@@ -115,7 +134,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mou
      return;
    }
  
-@@ -141,7 +144,7 @@
+@@ -141,7 +144,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
      NSString *objcName = [NSString stringWithCString:name.c_str() encoding:NSUTF8StringEncoding];
      klass = self.thirdPartyFabricComponentsProvider.thirdPartyFabricComponents[objcName];
      if (klass != nullptr) {
@@ -124,20 +143,19 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mou
        return;
      }
    }
-@@ -189,7 +192,11 @@
+@@ -189,7 +192,11 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
  {
    RCTAssert(componentViewClass, @"RCTComponentViewFactory: Provided `componentViewClass` is `nil`.");
    std::unique_lock lock(_mutex);
--
 +  [self _registerComponentViewClassLocked:componentViewClass];
 +}
-+
+ 
 +- (void)_registerComponentViewClassLocked:(Class<RCTComponentViewProtocol>)componentViewClass
 +{
    auto provider = [componentViewClass componentDescriptorProvider];
    _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
    _providerRegistry.add(provider);
-@@ -213,6 +220,17 @@
+@@ -213,6 +220,17 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
        @"ComponentView with componentHandle `%lli` (`%s`) not found.",
        componentHandle,
        (char *)componentHandle);
@@ -156,6 +174,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mou
    Class viewClass = componentViewClassDescriptor.viewClass;
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
+index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39368b41da 100644
 --- a/React/Fabric/Mounting/RCTComponentViewRegistry.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
 @@ -10,6 +10,7 @@
@@ -166,7 +185,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mo
  
  #import <React/RCTImageComponentView.h>
  #import <React/RCTParagraphComponentView.h>
-@@ -74,6 +75,16 @@
+@@ -74,6 +75,16 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
    RCTAssertMainQueue();
    auto iterator = _registry.find(tag);
    RCTAssert(iterator != _registry.end(), @"RCTComponentViewRegistry: Attempt to query unregistered component.");
@@ -183,7 +202,7 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mo
    return iterator->second;
  }
  
-@@ -107,7 +118,8 @@
+@@ -107,7 +118,8 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
    RCTAssertMainQueue();
    auto &recycledViews = _recyclePool[componentHandle];
  
@@ -194,9 +213,10 @@ diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mo
      return;
    }
 diff --git a/React/Fabric/Mounting/RCTMountingManager.mm b/React/Fabric/Mounting/RCTMountingManager.mm
+index 68662f06d59bd4b1827510da747931fb223452b1..a37baa2983c34e88c86fcb45aca40c5fd84f7a87 100644
 --- a/React/Fabric/Mounting/RCTMountingManager.mm
 +++ b/React/Fabric/Mounting/RCTMountingManager.mm
-@@ -78,6 +78,12 @@
+@@ -78,6 +78,12 @@ static void RCTPerformMountInstructions(
  
          UIView<RCTComponentViewProtocol> *newChildComponentView = newChildViewDescriptor.view;
  
@@ -209,7 +229,7 @@ diff --git a/React/Fabric/Mounting/RCTMountingManager.mm b/React/Fabric/Mounting
          RCTAssert(newChildShadowView.props, @"`newChildShadowView.props` must not be null.");
  
          [newChildComponentView updateProps:newChildShadowView.props oldProps:nullptr];
-@@ -95,6 +101,18 @@
+@@ -95,6 +101,18 @@ static void RCTPerformMountInstructions(
          auto &oldChildShadowView = mutation.oldChildShadowView;
          auto &oldChildViewDescriptor = [registry componentViewDescriptorWithTag:oldChildShadowView.tag];
          auto &parentViewDescriptor = [registry componentViewDescriptorWithTag:mutation.parentTag];
@@ -229,9 +249,10 @@ diff --git a/React/Fabric/Mounting/RCTMountingManager.mm b/React/Fabric/Mounting
          break;
        }
 diff --git a/types_generated/Libraries/Components/TextInput/TextInput.d.ts b/types_generated/Libraries/Components/TextInput/TextInput.d.ts
+index cff52891ae4143fa22c1a115ced11a760630208a..d4a94291da20d2ec837c8307f3f687b1cafe09a6 100644
 --- a/types_generated/Libraries/Components/TextInput/TextInput.d.ts
 +++ b/types_generated/Libraries/Components/TextInput/TextInput.d.ts
-@@ -158,5 +158,5 @@
+@@ -158,5 +158,5 @@ export type TextInputComponentStatics = Readonly<{
   * @see https://reactnative.dev/docs/textinput
   */
  declare const $$TextInput: TextInputType;

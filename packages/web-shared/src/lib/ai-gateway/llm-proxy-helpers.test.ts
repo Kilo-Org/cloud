@@ -3,6 +3,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -1320,6 +1321,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
 describe('captureProxyError', () => {
   beforeEach(() => {
     mockedErrorExceptInTest.mockClear();
+    jest.mocked(captureMessage).mockClear();
+    jest.mocked(captureException).mockClear();
   });
 
   async function capturedErrorData() {
@@ -1333,6 +1336,40 @@ describe('captureProxyError', () => {
     expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
     return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
   }
+
+  it.each(
+    [500, 502, 503, 504].flatMap(status =>
+      [false, true].map(isUserByok => ({ status, isUserByok }))
+    )
+  )(
+    'keeps upstream $status diagnostics in logs without Sentry events with BYOK=$isUserByok',
+    async ({ status, isUserByok }) => {
+      const response = Response.json({ error: 'upstream unavailable' }, { status });
+      const replacement = await applyUpstreamErrorPolicy({
+        response,
+        providerId: 'openrouter',
+        isUserByok,
+        user: { id: 'user-1' },
+        request: { model: 'vendor/model' },
+        organizationId: undefined,
+        model: 'vendor/model',
+      });
+
+      expect(await capturedErrorData()).toMatchObject({
+        status,
+        model: 'vendor/model',
+        first4kOfResponse: '{"error":"upstream unavailable"}',
+      });
+      expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
+        `openrouter returned error ${status}`,
+        expect.anything()
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+      expect(replacement).toBeUndefined();
+      expect(await response.json()).toEqual({ error: 'upstream unavailable' });
+    }
+  );
 
   it('logs the gateway model, BYOK providers, and request field names', async () => {
     await captureProxyError({

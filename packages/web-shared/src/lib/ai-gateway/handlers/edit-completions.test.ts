@@ -258,7 +258,7 @@ describe('POST /api/edit/completions', () => {
     });
   });
 
-  it.each([400, 401, 403, 404, 422, 429])(
+  it.each([400, 401, 403, 404, 422, 429, 500, 502, 503, 504])(
     'passes upstream %s through without Sentry',
     async status => {
       setOrganizationAuth();
@@ -276,24 +276,6 @@ describe('POST /api/edit/completions', () => {
       expect(captureException).not.toHaveBeenCalled();
     }
   );
-
-  it.each([500, 503])('reports upstream %s to Sentry and preserves the response', async status => {
-    setOrganizationAuth();
-    mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(status));
-
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
-
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
-    await flushAfter();
-    expect(captureMessage).toHaveBeenCalledWith(
-      `inception returned error ${status}`,
-      expect.objectContaining({ extra: expect.objectContaining({ status }) })
-    );
-  });
 
   it.each([null, [], [{ providerId: 'mistral', decryptedAPIKey: 'unused-key' }]])(
     'masks a platform-funded 402 with BYOK entries %j and preserves upstream accounting',

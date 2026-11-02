@@ -76,7 +76,8 @@ test('renderReport lists the summary table and one line per finding', () => {
       finishedAt: 'F',
     },
     cells,
-    collapseFindings(findings)
+    collapseFindings(findings),
+    fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-render-'))
   );
   assert.match(report, /\| base \| 1 \| 1 \| 0 \|/);
   assert.ok(report.includes('| base | sessions | `/login` | 1 | 0 |'));
@@ -316,7 +317,7 @@ test('skippedRules lists the safe-area gap a presented surface leaves', () => {
 
   // The sheet's frames are surface-local, so the window's insets cannot be
   // checked there; the report names the rule it skipped instead of staying quiet.
-  assert.deepEqual(skippedRules(cells), [
+  assert.deepEqual(skippedRules(cells, out), [
     {
       cell: 'base',
       target: 'sheet',

@@ -172,7 +172,7 @@ export function summarize(findings: readonly Finding[]): { errors: number; warni
   return { errors, warnings: findings.length - errors };
 }
 
-export function skippedRules(cells: readonly CellRun[]) {
+export function skippedRules(cells: readonly CellRun[], out: string) {
   return cells.flatMap(cell =>
     cell.screens.flatMap(screen => {
       const entries: { cell: string; target: string; rule: string; reason: string }[] = [];
@@ -188,7 +188,7 @@ export function skippedRules(cells: readonly CellRun[]) {
       // safe-area check: the probe reports those frames from the surface's own
       // origin, so the window's insets do not describe them. The gap is listed
       // rather than hidden, so the rule it silenced is visible in the report.
-      if (hasPresentedSurface(screen.dump)) {
+      if (hasPresentedSurface(path.resolve(out, screen.dump))) {
         entries.push({
           cell: cell.id,
           target: screen.target,
@@ -213,7 +213,8 @@ function hasPresentedSurface(dump: string): boolean {
 export function renderReport(
   meta: RunMeta,
   cells: readonly CellRun[],
-  groups: readonly FindingGroup[]
+  groups: readonly FindingGroup[],
+  out: string
 ): string {
   const findings = groups.map(group => group.finding);
   const lines = [
@@ -247,7 +248,7 @@ export function renderReport(
       );
     }
   }
-  const skipped = skippedRules(cells);
+  const skipped = skippedRules(cells, out);
   if (skipped.length > 0) {
     lines.push('', '## Skipped rules', '');
     for (const entry of skipped) {
@@ -319,7 +320,7 @@ export function writeArtifacts(args: {
   }
   writeJson(path.join(out, 'findings.json'), {
     version: 1,
-    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells) },
+    run: { ...meta, sheets, skippedRules: skippedRules(outcome.cells, out) },
     cells: outcome.cells.map(cell => ({
       id: cell.id,
       config: cell.config,
@@ -329,6 +330,6 @@ export function writeArtifacts(args: {
     findings: groups.map(group => group.finding),
   });
   const reportPath = path.join(out, 'report.md');
-  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups));
+  fs.writeFileSync(reportPath, renderReport(meta, outcome.cells, groups, out));
   return reportPath;
 }

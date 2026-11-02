@@ -14,7 +14,7 @@ import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { HEADER_TITLE_TARGET_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -419,7 +419,7 @@ export function ScreenHeader({
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityHint={titlePressHint}
-        className="min-h-[48px] justify-center active:opacity-70"
+        className={cn(HEADER_TITLE_TARGET_CLASS, 'justify-center active:opacity-70')}
       >
         {titleText}
       </Pressable>

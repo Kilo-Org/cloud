@@ -61,6 +61,18 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
 
 /**
+ * The frame a screen header's titled control renders on its own pressable
+ * node — the pressable title and a header title composed of its own content.
+ * A title sized by its text reports that line's height (`text-lg` is 24.8dp),
+ * and `hitSlop` widens the touch region without moving the rect a control-size
+ * audit reads, so the floor has to be the control's own class. 48 keeps the
+ * measured box on Android's button minimum and clears iOS's 44pt on the same
+ * node; the header row is already this tall, so the header height does not
+ * change.
+ */
+export const HEADER_TITLE_TARGET_CLASS = 'min-h-[48px]';
+
+/**
  * The box a profile row's identity block renders: the item's name and what
  * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
  * height of the controls beside it, so its frame is the row's leading top

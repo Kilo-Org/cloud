@@ -13,10 +13,11 @@ import {
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
-import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { CHIP_BOX_CLASS, CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { cn } from '@/lib/utils';
 
 export type { AgentMode };
 
@@ -64,13 +65,16 @@ export function ModeSelector({
     <Pressable
       onPress={handlePress}
       disabled={disabled}
-      // The pill's own 28.3pt frame is the visual; the vertical slop carries
-      // its touch region to the 44pt design target without growing the row.
+      // The pill's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}
-      className="shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
+      className={cn(
+        CHIP_BOX_CLASS,
+        'shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70'
+      )}
     >
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * icon so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}

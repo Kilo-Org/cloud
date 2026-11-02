@@ -450,7 +450,7 @@ describe('ModelSelector pill touch target', () => {
     const slop = pill.props.hitSlop as { top?: number; bottom?: number };
     const reach = CHIP_FRAME_DP + (slop.top ?? 0) + (slop.bottom ?? 0);
 
-    expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(reach).toBeGreaterThan(TOUCH_TARGET_DP);
     expect(slop).not.toHaveProperty('left');
     expect(slop).not.toHaveProperty('right');
 

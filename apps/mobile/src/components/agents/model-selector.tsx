@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
-import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { CHIP_BOX_CLASS, CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -208,13 +208,16 @@ export function ModelSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
-      // The chip's own 28.3pt frame is the visual; the vertical slop carries
-      // its touch region to the 44pt design target without growing the row.
+      // The chip's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
-      className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
+      className={cn(
+        CHIP_BOX_CLASS,
+        'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70'
+      )}
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
         <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>

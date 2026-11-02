@@ -166,22 +166,30 @@ export function compactControlTargetDp(): number {
 /**
  * The frame the composer's model and mode chips render at `px-3 py-1.5` with
  * `text-sm`, in pt: NativeWind's rem is 14pt here, so the 17.5pt line box plus
- * 2 × 5.25pt of padding. Measured at 28.3pt on device. It clears the
- * {@link MIN_TAP_TARGET_DP} floor a control-size audit accepts, so the chip
- * keeps its compact shape and its slop carries the touch region instead.
+ * 2 × 5.25pt of padding. Android lays the row out in whole physical pixels, so
+ * those classes alone measure 27.81pt there (28.3pt on iOS), which only clears
+ * the {@link MIN_TAP_TARGET_DP} floor the audit accepts within its pixel
+ * rounding. {@link CHIP_BOX_CLASS} holds the floor on the chip's own node, so
+ * the slop below starts from a real 28pt.
  */
-export const CHIP_FRAME_DP = 28.3;
+export const CHIP_FRAME_DP = 28;
+
+/** The box a composer chip renders, holding {@link CHIP_FRAME_DP} on its own node. */
+export const CHIP_BOX_CLASS = 'min-h-[28px]';
 
 /**
  * Per-side vertical `hitSlop` of a {@link CHIP_FRAME_DP} chip:
- * `28.3 + 8 + 8 = 44.3pt`, past `DESIGN.md:364`'s 44pt target. Vertical only:
- * the chip's own padding and chevron already make it wider than
- * {@link TOUCH_TARGET_DP}, and a horizontal reach would run into the mode chip
- * beside it in `chat-toolbar.tsx` and into the paste button's own slop. The
- * composer toolbar row's `py-2.5` (8.75pt) is taller than this slop, so the
- * reach stays inside the row and reaches no neighbour's control.
+ * `28 + 8.25 + 8.25 = 44.5pt`, past `DESIGN.md:364`'s 44pt target. 8.25, not 8:
+ * the same whole-pixel Android layout renders the chip's line at 27.81pt before
+ * {@link CHIP_BOX_CLASS}, and a reach that lands on 44.0pt leaves no margin on
+ * the shorter platform. Vertical only: the chip's own padding and chevron
+ * already make it wider than {@link TOUCH_TARGET_DP}, and a horizontal reach
+ * would run into the mode chip beside it in `chat-toolbar.tsx` and into the
+ * paste button's own slop. The composer toolbar row's `py-2.5` (8.75pt) is
+ * taller than this slop, so the reach stays inside the row and reaches no
+ * neighbour's control.
  */
-export const CHIP_HIT_SLOP_DP = 8;
+export const CHIP_HIT_SLOP_DP = 8.25;
 
 /** The `hitSlop` a {@link CHIP_FRAME_DP} chip renders, as {@link CHIP_HIT_SLOP_DP}. */
 export const CHIP_HIT_SLOP = {

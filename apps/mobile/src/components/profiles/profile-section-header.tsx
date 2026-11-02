@@ -1,4 +1,5 @@
 import { ScreenHeader } from '@/components/screen-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 
 /**
@@ -34,7 +35,9 @@ export function ProfileSectionHeader({
     <ScreenHeader
       title={title}
       subtitle={overview.data?.name}
-      subtitleLoading={overview.isPending}
+      subtitlePlaceholder={
+        overview.isPending ? <Skeleton className="h-3.5 w-24 rounded-full" /> : undefined
+      }
       reserveSubtitle
       onBack={onBack}
     />

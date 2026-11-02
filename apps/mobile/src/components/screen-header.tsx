@@ -8,7 +8,6 @@ import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'rea
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useHeaderBack } from '@/lib/hooks/use-header-back';
@@ -128,13 +127,13 @@ type ScreenHeaderProps = {
    */
   reserveSubtitle?: boolean;
   /**
-   * The caller's subtitle is on its way. The reserved line then paints a
-   * placeholder bar the size of the name it will hold, so a loading header
-   * reads complete instead of showing an empty slot. The bar sits over the
-   * reserved text, which keeps the line's height at every font size, so
-   * neither the placeholder nor the name moves the body.
+   * What the reserved subtitle line paints while the caller's text is not
+   * available yet, such as a placeholder bar the size of the name to come. It
+   * is drawn over the reserved text, which still holds the line's height, so
+   * neither the placeholder nor the arriving text moves the body. The caller
+   * supplies the node, so the header itself pulls in no loading surface.
    */
-  subtitleLoading?: boolean;
+  subtitlePlaceholder?: React.ReactNode;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -289,7 +288,7 @@ export function ScreenHeader({
   titleNumberOfLines = 1,
   subtitle,
   reserveSubtitle = false,
-  subtitleLoading = false,
+  subtitlePlaceholder,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -457,11 +456,11 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {subtitle || reserveSubtitle || subtitleLoading ? (
+      {subtitle || reserveSubtitle || subtitlePlaceholder ? (
         <View className={cn('mt-0.5', centerTitle && 'items-center')}>
-          {subtitleLoading && !subtitle ? (
-            // The reserved text below still holds the line's height, so the bar
-            // is painted over it rather than sizing the slot itself.
+          {subtitle === undefined && subtitlePlaceholder ? (
+            // The reserved text below still holds the line's height, so the
+            // placeholder is painted over it rather than sizing the slot.
             <View
               className={cn(
                 'absolute inset-0 justify-center',
@@ -469,7 +468,7 @@ export function ScreenHeader({
               )}
               pointerEvents="none"
             >
-              <Skeleton className="h-3.5 w-24 rounded-full" />
+              {subtitlePlaceholder}
             </View>
           ) : null}
           <Text

@@ -1161,6 +1161,8 @@ export async function handleLlmProxyRequest(
     guardrailVerdict
   );
   if (guardrailRejection) {
+    // The disconnect was already logged; nobody reads this rejection.
+    if (request.signal.aborted) return guardrailRejection;
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,

@@ -16,7 +16,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * `invalid`: the organization enabled the guardrail but its saved detectors do not match the
- * schema, so every scanned turn is rejected as if Enkrypt were unavailable rather than falling
+ * schema, so every scanned request is rejected as if Enkrypt were unavailable rather than falling
  * back to a weaker policy.
  */
 export type EnkryptInputGuardrailConfig = { scanToolResults: boolean } & (

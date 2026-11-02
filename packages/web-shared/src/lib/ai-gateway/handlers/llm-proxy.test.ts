@@ -4115,6 +4115,7 @@ describe('Enkrypt input guardrail', () => {
       const response = await handleLlmProxyRequest(request);
 
       expect(response.status).toBe(503);
+      expect(response.headers.get('x-should-retry')).toBe('false');
       expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
       expect(errorLog).toHaveBeenCalledWith(
         '[enkrypt-guardrail] scan failed unexpectedly; request rejected',
@@ -4148,6 +4149,7 @@ describe('Enkrypt input guardrail', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][1]?.signal?.aborted).toBe(true);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
   });
 
   it('applies the saved detectors, blocking on a keyword the organization set to block', async () => {
@@ -4203,6 +4205,7 @@ describe('Enkrypt input guardrail', () => {
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
     expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

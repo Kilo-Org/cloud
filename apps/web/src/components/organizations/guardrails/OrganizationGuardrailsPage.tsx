@@ -41,7 +41,7 @@ const SCAN_SCOPE_OPTIONS = [
     value: 'conversation_without_tool_results',
     label: 'Conversation without tool results',
     description:
-      'Checks the full conversation and system instructions on every request, including earlier user and assistant messages. Excludes tool results.',
+      'Checks the full conversation, system instructions, and tool definitions on every request, including earlier user and assistant messages. Excludes tool results.',
   },
   {
     value: 'every_input',

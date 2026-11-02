@@ -56,12 +56,15 @@ export type EnkryptGuardrailScan = {
   config: EnkryptInputGuardrailConfig;
 };
 
-/** `skip`: the organization has no guardrail, so nothing was scanned. */
+/**
+ * `skip`: the organization has no guardrail, so nothing was scanned. `retryable` is false when an
+ * immediate automatic retry would most likely fail the same way.
+ */
 export type EnkryptGuardrailVerdict =
   | { action: 'skip' }
   | { action: 'allow' }
   | { action: 'block'; message: string }
-  | { action: 'unavailable' };
+  | { action: 'unavailable'; retryable: boolean };
 
 export type EnkryptGuardrailScanResult = {
   verdict: EnkryptGuardrailVerdict;
@@ -75,6 +78,16 @@ export type EnkryptDetectDependencies = {
   signal: AbortSignal;
 };
 
+type DetectError =
+  | 'client_aborted'
+  | 'timeout'
+  | 'network'
+  | 'invalid_response'
+  | `http_${number}`
+  | `detector_error:${string}`;
+
+type ScanError = DetectError | 'invalid_config' | 'missing_api_key' | 'request_too_large';
+
 type DetectAttempt =
   | {
       kind: 'detected';
@@ -82,7 +95,7 @@ type DetectAttempt =
       resultMessage: string | null;
       creditsCost: number | null;
     }
-  | { kind: 'failed'; error: string; retryable: boolean; creditsCost: number | null };
+  | { kind: 'failed'; error: DetectError; retryable: boolean; creditsCost: number | null };
 
 function hasFired(value: unknown): boolean {
   if (typeof value === 'number') return value > 0;
@@ -133,8 +146,10 @@ function parseCreditsCost(response: Response): number | null {
   return value;
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+/** The scan signal combines the client's disconnect signal with the shared deadline. */
+function abortError(signal: AbortSignal, deps: EnkryptDetectDependencies): DetectError | null {
+  if (deps.signal.aborted) return 'client_aborted';
+  return signal.aborted ? 'timeout' : null;
 }
 
 async function detectOnce(
@@ -150,12 +165,10 @@ async function detectOnce(
       body,
       signal,
     });
-  } catch (error) {
-    if (deps.signal.aborted) {
-      return { kind: 'failed', error: 'client_aborted', retryable: false, creditsCost: null };
-    }
-    return isAbortError(error)
-      ? { kind: 'failed', error: 'timeout', retryable: false, creditsCost: null }
+  } catch {
+    const aborted = abortError(signal, deps);
+    return aborted
+      ? { kind: 'failed', error: aborted, retryable: false, creditsCost: null }
       : { kind: 'failed', error: 'network', retryable: true, creditsCost: null };
   }
   const creditsCost = parseCreditsCost(response);
@@ -172,14 +185,10 @@ async function detectOnce(
   let json: unknown;
   try {
     json = await response.json();
-  } catch (error) {
+  } catch {
     return {
       kind: 'failed',
-      error: deps.signal.aborted
-        ? 'client_aborted'
-        : isAbortError(error)
-          ? 'timeout'
-          : 'invalid_response',
+      error: abortError(signal, deps) ?? 'invalid_response',
       retryable: false,
       creditsCost,
     };
@@ -345,18 +354,44 @@ function totalCredits(charges: EnkryptGuardrailCall[]): number | null {
   return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0);
 }
 
+/**
+ * Whether a later automatic retry by the client could succeed. A timed-out scan already waited the
+ * full deadline, and the other failures would repeat on the same request.
+ */
+function isTransient(error: ScanError): boolean {
+  return error === 'network' || error === 'http_429' || /^http_5\d\d$/.test(error);
+}
+
+/**
+ * A client disconnect is not an Enkrypt failure: it is logged at debug level, and only calls that
+ * reported a cost are charged, so cancelled requests do not inflate the guardrail error rate.
+ */
 function failedVerdict(
   charges: EnkryptGuardrailCall[],
   logFields: Record<string, unknown>,
-  failure: { error: string; latencyMs: number; closedVerdict?: EnkryptGuardrailVerdict }
+  failure: {
+    error: ScanError;
+    latencyMs: number;
+    closedVerdict?: EnkryptGuardrailVerdict;
+  }
 ): EnkryptGuardrailScanResult {
-  warnExceptInTest('[enkrypt-guardrail] decision', {
+  const clientAborted = failure.error === 'client_aborted';
+  const recorded = clientAborted ? charges.filter(charge => charge.creditsCost !== null) : charges;
+  const fields = {
     ...logFields,
-    decision: 'error_fail_closed',
+    decision: clientAborted ? 'client_aborted' : 'error_fail_closed',
     error: failure.error,
     latency_ms: failure.latencyMs,
     attempts: charges.length,
     credits_cost: totalCredits(charges),
-  });
-  return { verdict: failure.closedVerdict ?? { action: 'unavailable' }, charges };
+  };
+  if (clientAborted) console.debug('[enkrypt-guardrail] decision', fields);
+  else warnExceptInTest('[enkrypt-guardrail] decision', fields);
+  return {
+    verdict: failure.closedVerdict ?? {
+      action: 'unavailable',
+      retryable: isTransient(failure.error),
+    },
+    charges: recorded,
+  };
 }

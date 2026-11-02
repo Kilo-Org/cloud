@@ -3,7 +3,8 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { extractRequestText as extractWithScope } from './request-text';
 
 function request(kind: GatewayRequest['kind'], body: Record<string, unknown>): GatewayRequest {
-  return { kind, body: { model: 'test/model', ...body } } as GatewayRequest;
+  const defaults = kind === 'responses' ? {} : { messages: [] };
+  return { kind, body: { model: 'test/model', ...defaults, ...body } } as GatewayRequest;
 }
 
 function extractRequestText(gatewayRequest: GatewayRequest) {
@@ -571,13 +572,6 @@ describe('large request arrays', () => {
 
   it.each([
     {
-      name: 'document metadata',
-      block: { type: 'document', title: entries, context: 'context', text: 'text' },
-      prefix: '',
-      suffix: '\n\ncontext\n\ntext',
-      toolResult: false,
-    },
-    {
       name: 'document source content',
       block: {
         type: 'document',
@@ -589,10 +583,15 @@ describe('large request arrays', () => {
       toolResult: false,
     },
     {
-      name: 'search result titles',
-      block: { type: 'search_result', title: entries, content: 'result' },
-      prefix: '',
-      suffix: '\n\nresult',
+      name: 'search result content',
+      block: {
+        type: 'search_result',
+        title: 'title',
+        source: 'https://example.com',
+        content: entries.map(text => ({ type: 'text', text })),
+      },
+      prefix: 'title\n\n',
+      suffix: '',
       toolResult: true,
     },
     {
@@ -717,14 +716,36 @@ describe('tool definitions and output formats', () => {
     }
   );
 
-  it('scans legacy functions, custom grammars, nested namespaces, and Anthropic examples', () => {
+  it('scans chat custom grammars and legacy functions', () => {
     const text = extractWithoutToolResults(
       request('chat_completions', {
         functions: [{ name: 'legacy', parameters: schema }],
         tools: [
           {
             type: 'custom',
-            custom: { name: 'custom', format: { type: 'grammar', definition: 'edited grammar' } },
+            custom: {
+              name: 'custom',
+              format: {
+                type: 'grammar',
+                grammar: { syntax: 'lark', definition: 'edited grammar' },
+              },
+            },
+          },
+        ],
+      })
+    );
+
+    expect(text).toBe(['custom', 'edited grammar', 'legacy', JSON.stringify(schema)].join('\n\n'));
+  });
+
+  it('scans Responses custom grammars and nested namespace tools', () => {
+    const text = extractWithoutToolResults(
+      request('responses', {
+        tools: [
+          {
+            type: 'custom',
+            name: 'custom',
+            format: { type: 'grammar', syntax: 'lark', definition: 'edited grammar' },
           },
           {
             type: 'namespace',
@@ -734,7 +755,6 @@ describe('tool definitions and output formats', () => {
               { type: 'function', name: 'nested', parameters: schema, output_schema: schema },
             ],
           },
-          { name: 'example', input_examples: [{ text: 'edited example' }] },
         ],
       })
     );
@@ -748,20 +768,39 @@ describe('tool definitions and output formats', () => {
         'nested',
         JSON.stringify(schema),
         JSON.stringify(schema),
-        'example',
-        '[{"text":"edited example"}]',
-        'legacy',
-        JSON.stringify(schema),
       ].join('\n\n')
     );
   });
 
+  it('scans Anthropic tool input examples', () => {
+    const text = extractWithoutToolResults(
+      request('messages', {
+        tools: [{ name: 'example', input_schema: schema, input_examples: [{ text: 'edited' }] }],
+      })
+    );
+
+    expect(text).toBe(['example', JSON.stringify(schema), '[{"text":"edited"}]'].join('\n\n'));
+  });
+
   it('classifies discovered definitions as tool results but keeps additional developer tools', () => {
-    const tool = { name: 'discovered', description: 'edited description', input_schema: schema };
     const gatewayRequest = request('responses', {
       input: [
-        { type: 'mcp_list_tools', tools: [tool], error: 'edited discovery error' },
-        { type: 'tool_search_output', tools: [tool] },
+        {
+          type: 'mcp_list_tools',
+          tools: [{ name: 'discovered', description: 'edited description', input_schema: schema }],
+          error: 'edited discovery error',
+        },
+        {
+          type: 'tool_search_output',
+          tools: [
+            {
+              type: 'function',
+              name: 'discovered',
+              description: 'edited description',
+              parameters: schema,
+            },
+          ],
+        },
         {
           type: 'additional_tools',
           tools: [{ type: 'function', name: 'developer_tool', parameters: schema }],
@@ -830,5 +869,72 @@ describe('tool definitions and output formats', () => {
     );
 
     expect(text).toBe('visible text\n\nvisible server description');
+  });
+});
+
+describe('typed block and item coverage', () => {
+  it('scans Anthropic compaction, mid-conversation system, web search, and advisor blocks', () => {
+    const gatewayRequest = request('messages', {
+      messages: [
+        {
+          role: 'assistant',
+          content: [
+            { type: 'compaction', content: 'compacted history' },
+            { type: 'mid_conv_system', content: [{ type: 'text', text: 'mid system' }] },
+            {
+              type: 'web_search_tool_result',
+              tool_use_id: 'srvtoolu_1',
+              content: [
+                { type: 'web_search_result', title: 'result title', encrypted_content: 'secret' },
+              ],
+            },
+            {
+              type: 'advisor_tool_result',
+              tool_use_id: 'srvtoolu_2',
+              content: { type: 'advisor_result', text: 'advice' },
+            },
+            {
+              type: 'advisor_tool_result',
+              tool_use_id: 'srvtoolu_3',
+              content: { type: 'advisor_redacted_result', encrypted_content: 'secret' },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(extractRequestText(gatewayRequest)).toBe(
+      'compacted history\n\nmid system\n\nresult title\n\nadvice'
+    );
+    expect(extractWithoutToolResults(gatewayRequest)).toBe('compacted history\n\nmid system');
+  });
+
+  it('scans Responses web search queries and typed computer input', () => {
+    expect(
+      extractRequestText(
+        request('responses', {
+          input: [
+            { type: 'web_search_call', action: { type: 'search', query: 'q1', queries: ['q2'] } },
+            { type: 'web_search_call', action: { type: 'open_page', url: 'https://example.com' } },
+            { type: 'computer_call', action: { type: 'type', text: 'typed text' } },
+            { type: 'computer_call', actions: [{ type: 'click', x: 1, y: 2 }] },
+          ],
+        })
+      )
+    ).toBe('q1\n\nq2\n\ntyped text');
+  });
+
+  it.each([
+    [
+      'chat_completions',
+      { messages: [{ role: 'user', content: [{ type: 'future', text: 'a' }] }] },
+    ],
+    [
+      'messages',
+      { messages: [{ role: 'user', content: [{ type: 'future', content: [{ text: 'a' }] }] }] },
+    ],
+    ['responses', { input: [{ type: 'future_item', name: 'a' }] }],
+  ] as const)('scans text fields of unrecognized %s types as input', (kind, body) => {
+    expect(extractWithoutToolResults(request(kind, body))).toBe('a');
   });
 });

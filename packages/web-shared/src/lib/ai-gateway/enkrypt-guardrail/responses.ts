@@ -35,7 +35,8 @@ function apiErrorBody(
 
 /**
  * Maps a guardrail verdict to the gateway's rejection, or null to send the request upstream. A
- * block is final, so clients are told not to retry; an unavailable guardrail is transient.
+ * block is final, so clients are told not to retry, and an unavailable guardrail is retried
+ * automatically only after a transient failure.
  */
 export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
@@ -68,6 +69,9 @@ export function enkryptGuardrailRejectionResponse(
       },
       ProxyErrorType.guardrail_unavailable
     ),
-    { status: 503, headers: { 'retry-after': '1' } }
+    {
+      status: 503,
+      headers: verdict.retryable ? { 'retry-after': '1' } : { 'x-should-retry': 'false' },
+    }
   );
 }

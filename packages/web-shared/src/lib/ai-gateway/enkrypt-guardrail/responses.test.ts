@@ -63,10 +63,25 @@ describe('enkryptGuardrailRejectionResponse', () => {
       },
     ],
   ] as const)('returns a retryable error when failing closed on %s', async (kind, body) => {
-    const response = enkryptGuardrailRejectionResponse(kind, { action: 'unavailable' });
+    const response = enkryptGuardrailRejectionResponse(kind, {
+      action: 'unavailable',
+      retryable: true,
+    });
 
     expect(response?.status).toBe(503);
     expect(response?.headers.get('retry-after')).toBe('1');
+    expect(response?.headers.get('x-should-retry')).toBeNull();
     expect(await response?.json()).toEqual(body);
+  });
+
+  it('tells clients not to retry automatically after a non-transient failure', () => {
+    const response = enkryptGuardrailRejectionResponse('chat_completions', {
+      action: 'unavailable',
+      retryable: false,
+    });
+
+    expect(response?.status).toBe(503);
+    expect(response?.headers.get('retry-after')).toBeNull();
+    expect(response?.headers.get('x-should-retry')).toBe('false');
   });
 });

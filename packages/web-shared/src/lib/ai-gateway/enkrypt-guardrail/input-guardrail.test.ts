@@ -85,7 +85,7 @@ describe('startEnkryptInputGuardrail', () => {
         signal
       );
 
-      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable' });
+      expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', retryable: false });
       await runAfterTasks();
       expect(mockedRecordCharge).not.toHaveBeenCalled();
     }

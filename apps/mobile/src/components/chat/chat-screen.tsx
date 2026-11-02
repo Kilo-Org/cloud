@@ -302,28 +302,32 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       <>
         <View className="flex-1">{renderTranscript()}</View>
 
-        <ChatComposerArea
-          status={state.status}
-          messages={messages}
-          // The transcript area draws a settled failure with no transcript, so
-          // the composer must not say the same thing a second time below it.
-          failureKey={transcriptFailure === null ? state.failureKey : null}
-          retryable={retryable}
-          onRetry={() => void retry()}
-          onAddCredits={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-          onSend={handleSend}
-          composerControlRef={actions.composerControlRef}
-          onStop={handleStop}
-          model={model}
-          variant={variant}
-          onModelSelect={selectModel}
-          modelOptions={availableOptions}
-          attachmentsEnabled={imagesSupported}
-          organizationId={organizationId ?? undefined}
-          disabled={modelsFailed && availableOptions.length === 0}
-        />
+        {/* A failure with no transcript owns the screen: there is no chat to
+            type into, so the composer would offer a question the state cannot
+            take, and sit beside the state's own way out as a second answer to
+            the same screen. It returns as soon as the chat has a transcript. */}
+        {transcriptFailure === null ? (
+          <ChatComposerArea
+            status={state.status}
+            messages={messages}
+            failureKey={state.failureKey}
+            retryable={retryable}
+            onRetry={() => void retry()}
+            onAddCredits={() => {
+              router.push('/(app)/credits' as Href);
+            }}
+            onSend={handleSend}
+            composerControlRef={actions.composerControlRef}
+            onStop={handleStop}
+            model={model}
+            variant={variant}
+            onModelSelect={selectModel}
+            modelOptions={availableOptions}
+            attachmentsEnabled={imagesSupported}
+            organizationId={organizationId ?? undefined}
+            disabled={modelsFailed && availableOptions.length === 0}
+          />
+        ) : null}
       </>
     );
   }

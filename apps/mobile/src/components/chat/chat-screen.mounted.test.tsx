@@ -329,6 +329,8 @@ describe('the chat transcript while it opens', () => {
     ]);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
     expect(messagesOf(tree)).toEqual([]);
+    /* Nothing failed, so the chat takes a first message. */
+    expect(count(tree, 'ChatComposer')).toBe(1);
   });
 
   it.each([
@@ -686,8 +688,9 @@ describe('a chat that settled without a transcript', () => {
     const tree = await mount();
 
     /* One state, not two: the area says what is true — in the empty state's
-       place — and the composer says nothing below it. */
+       place — and the composer is not drawn at all below it. */
     expect(count(tree, 'EmptyState')).toBe(1);
+    expect(count(tree, 'ChatComposer')).toBe(0);
     const [failure] = emptyStatesOf(tree);
     expect(failure?.title).toBe(i18n.t('common.notFound'));
     expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.notFoundDescription'));
@@ -705,6 +708,8 @@ describe('a chat that settled without a transcript', () => {
     state.failureKey = 'common.somethingWentWrong';
     const tree = await mount();
 
+    /* No transcript means nothing to send into, whichever failure it was. */
+    expect(count(tree, 'ChatComposer')).toBe(0);
     const [failure] = emptyStatesOf(tree);
     expect(failure?.title).toBe(i18n.t('common.somethingWentWrong'));
     /* The title already says it, so the state does not repeat the sentence;
@@ -725,6 +730,7 @@ describe('a chat that settled without a transcript', () => {
     state.failureKey = 'modelChat.backends.deletedBackend';
     const tree = await mount();
 
+    expect(count(tree, 'ChatComposer')).toBe(0);
     const [failure] = emptyStatesOf(tree);
     expect(descriptionMessageOf(failure ?? {})).toBe(
       'This chat backend was deleted. Choose another backend to continue.'

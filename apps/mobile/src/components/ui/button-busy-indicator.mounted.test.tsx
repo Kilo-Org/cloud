@@ -66,10 +66,12 @@ describe('Button busy mark', () => {
     }
   });
 
-  it('paints a full ring track so the mark never shrinks to the arc sweep', () => {
+  it('paints a full ring track in the label ink, so the mark never shrinks to the arc sweep', () => {
     // Android's indeterminate arc sweeps from near-zero, so a still capture of
     // the platform control can show a speck of ink. The track holds the mark at
-    // the label's line height in every frame while the arc keeps moving.
+    // the label's line height in every frame, and it paints the same ink the
+    // label does: a diluted track reads as a faint gray ring on the pale
+    // accent-soft fill instead of the olive the label carries.
     const root = render({ variant: 'accent-soft', loading: true });
     const overlay = root.find(n => n.props.className === BUTTON_BUSY_OVERLAY_CLASS);
     const track = overlay.find(
@@ -78,6 +80,7 @@ describe('Button busy mark', () => {
 
     expect(track.props.style).toMatchObject({ width: 17, height: 17, borderColor: '#1a1a10' });
     expect(`${track.props.className ?? ''}`).toContain('border-2');
+    expect(`${track.props.className ?? ''}`).not.toMatch(/\bopacity-/);
   });
 
   it('keeps the busy state and name on the button, not on the mark', () => {

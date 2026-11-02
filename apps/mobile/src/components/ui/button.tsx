@@ -86,7 +86,8 @@ export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-
 const BUTTON_BUSY_MARK_SIZE = 20;
 /**
  * The platform's small indicator strokes a ring centred on a 7.5 dp radius; a
- * 17 dp box with a 2 dp border paints the same ring behind it as a track.
+ * 17 dp box with a 2 dp border paints the same ring behind it as a track, in
+ * the indicator's own ink rather than a washed-out version of it.
  */
 const BUSY_TRACK_SIZE = 17;
 
@@ -228,9 +229,9 @@ function Button({
   const busyLabelGap = buttonGapVariants({ size });
   // A busy mark has to read in a still capture as well as on screen. The
   // platform indicator's indeterminate arc sweeps from near-zero on Android, so
-  // a still can land on a speck of ink where the label used to be. A faint
-  // track at the arc's own radius and stroke keeps the mark a ring in every
-  // frame, at the label's line height, without adding motion of its own.
+  // a still can land on a speck of ink where the label used to be. A track at
+  // the arc's own radius and stroke, painted in the label's own ink, keeps the
+  // mark a ring in every frame without diluting the ink the label used.
   const busyInk = spinnerColor(variant, colors);
   const busyMark = (
     <View
@@ -240,7 +241,7 @@ function Button({
     >
       <View className="absolute inset-0 items-center justify-center">
         <View
-          className="rounded-full border-2 opacity-40"
+          className="rounded-full border-2"
           // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
           style={{ width: BUSY_TRACK_SIZE, height: BUSY_TRACK_SIZE, borderColor: busyInk }}
         />

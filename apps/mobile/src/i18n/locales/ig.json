@@ -442,7 +442,6 @@
         "rebase": "Mgbanwe ntọala"
       },
       "terminal": {
-        "alreadyMerged": "Ejikọtala ya",
         "closed": "Emechiela arịrịọ njikọta a",
         "closedMergeRequest": "Emechiela arịrịọ njikọta a"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Nyocha achọrọ adịghị",
         "requiredReviewsDetail": "Ndị nyocha achọrọ enyeghị nkwado ha ma ọ bụ ha ka na-enyocha.",
         "failingChecksTitle": "Nnwale achọrọ na-ada",
-        "failingChecksDetail": "Nnwale ọnọdụ achọrọ na-ada.",
         "unstableTitle": "Ụfọdụ nnwale na-ada",
         "unstableDetail": "Nnwale ndị na-abụghị iwu na-ada. Ha agaghị egbochi njikọta.",
         "draftTitle": "Arịrịọ ijikọ koodu nke mbido",

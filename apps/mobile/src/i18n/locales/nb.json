@@ -442,7 +442,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne PR-en er lukket",
         "closedMergeRequest": "Denne merge request-en er lukket"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Påkrevde kodegjennomganger mangler",
         "requiredReviewsDetail": "Godkjenninger fra de påkrevde kodegranskerne mangler eller avventes.",
         "failingChecksTitle": "Påkrevde sjekker feiler",
-        "failingChecksDetail": "Påkrevde statussjekker feiler.",
         "unstableTitle": "Noen sjekker feiler",
         "unstableDetail": "Valgfrie sjekker feiler. De blokkerer ikke flettingen.",
         "draftTitle": "PR-utkast",

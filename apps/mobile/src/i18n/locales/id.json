@@ -2997,7 +2997,6 @@
         "squash": "Ringkas"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "PR ini sudah ditutup",
         "closedMergeRequest": "Merge request ini sudah ditutup"
       },
@@ -3014,7 +3013,6 @@
         "requiredReviewsTitle": "Tinjauan wajib belum lengkap",
         "requiredReviewsDetail": "Persetujuan dari peninjau wajib belum ada atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan opsional gagal. Kegagalan ini tidak menghalangi penggabungan.",
         "draftTitle": "Draf PR",

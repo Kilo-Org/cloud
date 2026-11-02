@@ -449,7 +449,6 @@
         "rebase": "Canvi de base"
       },
       "terminal": {
-        "alreadyMerged": "Ja fusionada",
         "closed": "Sol·licitud d'integració tancada",
         "closedMergeRequest": "Sol·licitud de fusió tancada"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Falten revisions obligatòries",
         "requiredReviewsDetail": "Encara no s'han rebut totes les aprovacions dels revisors obligatoris.",
         "failingChecksTitle": "Comprovacions obligatòries fallides",
-        "failingChecksDetail": "Les comprovacions d'estat obligatòries fallen.",
         "unstableTitle": "Algunes comprovacions fallen",
         "unstableDetail": "Les comprovacions opcionals fallen. No bloquejaran la fusió.",
         "draftTitle": "PR en esborrany",

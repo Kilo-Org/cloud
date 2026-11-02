@@ -449,7 +449,6 @@
         "rebase": "Rebazare"
       },
       "terminal": {
-        "alreadyMerged": "Deja îmbinat",
         "closed": "PR închis",
         "closedMergeRequest": "Merge request închis"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Lipsesc revizuirile obligatorii",
         "requiredReviewsDetail": "Lipsesc aprobările persoanelor desemnate să revizuiască modificările sau acestea sunt încă în așteptare.",
         "failingChecksTitle": "Verificări obligatorii eșuate",
-        "failingChecksDetail": "Verificările de stare obligatorii au eșuat.",
         "unstableTitle": "Unele verificări au eșuat",
         "unstableDetail": "Unele verificări opționale au eșuat. Acestea nu vor bloca îmbinarea.",
         "draftTitle": "PR în stadiu de ciornă",

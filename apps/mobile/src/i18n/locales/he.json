@@ -3042,7 +3042,6 @@
         "squash": "איחוד קומיטים"
       },
       "terminal": {
-        "alreadyMerged": "כבר מוזגה",
         "closed": "בקשת המשיכה הזו סגורה",
         "closedMergeRequest": "בקשת המיזוג הזו סגורה"
       },
@@ -3059,7 +3058,6 @@
         "requiredReviewsTitle": "חסרות סקירות נדרשות",
         "requiredReviewsDetail": "חסרים אישורים מהסוקרים הנדרשים, או שעדיין ממתינים להם.",
         "failingChecksTitle": "בדיקות חובה נכשלו",
-        "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלו.",
         "unstableTitle": "חלק מהבדיקות נכשלו",
         "unstableDetail": "בדיקות שאינן חובה נכשלו. הן לא יחסמו את המיזוג.",
         "draftTitle": "טיוטת PR",

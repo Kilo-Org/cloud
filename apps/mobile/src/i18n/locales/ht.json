@@ -442,7 +442,6 @@
         "rebase": "Chanjman baz"
       },
       "terminal": {
-        "alreadyMerged": "Deja fizyonnen",
         "closed": "Demann fizyon sa a fèmen",
         "closedMergeRequest": "Merge request sa a fèmen"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Gen revizyon obligatwa ki manke",
         "requiredReviewsDetail": "Moun ki dwe revize yo poko bay tout apwobasyon ki nesesè yo.",
         "failingChecksTitle": "Verifikasyon obligatwa ki echwe",
-        "failingChecksDetail": "Verifikasyon estati obligatwa yo ap echwe.",
         "unstableTitle": "Kèk verifikasyon ap echwe",
         "unstableDetail": "Verifikasyon ki pa obligatwa yo ap echwe. Yo p ap bloke fizyon an.",
         "draftTitle": "Demann fizyon an bwouyon",

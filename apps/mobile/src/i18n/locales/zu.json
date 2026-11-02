@@ -442,7 +442,6 @@
         "rebase": "Isisekelo esisha"
       },
       "terminal": {
-        "alreadyMerged": "Sekuhlanganisiwe",
         "closed": "Lesi sicelo sokuhlanganisa sivaliwe",
         "closedMergeRequest": "Lesi sicelo sokuhlanganisa sivaliwe"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Ukubuyekezwa okudingekayo akukho",
         "requiredReviewsDetail": "Izimvume zababuyekezi abadingekayo azikho noma zisalindwe.",
         "failingChecksTitle": "Izihlolo ezidingekayo ziyehluleka",
-        "failingChecksDetail": "Izihlolo zesimo ezidingekayo ziyehluleka.",
         "unstableTitle": "Ezinye izihlolo ziyehluleka",
         "unstableDetail": "Izihlolo ezingaphoqelekile ziyehluleka. Ngeke zivimbe ukuhlanganisa.",
         "draftTitle": "I-PR esalungiswa",

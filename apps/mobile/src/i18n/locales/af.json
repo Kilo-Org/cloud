@@ -442,7 +442,6 @@
         "rebase": "Herbasering"
       },
       "terminal": {
-        "alreadyMerged": "Reeds saamgevoeg",
         "closed": "Hierdie trekversoek is gesluit",
         "closedMergeRequest": "Hierdie merge request is gesluit"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Vereiste hersienings ontbreek",
         "requiredReviewsDetail": "Goedkeurings van die vereiste hersieners ontbreek of is nog uitstaande.",
         "failingChecksTitle": "Vereiste kontroles misluk",
-        "failingChecksDetail": "Vereiste statuskontroles misluk.",
         "unstableTitle": "Sommige kontroles misluk",
         "unstableDetail": "Sommige opsionele kontroles misluk. Dit sal nie die samevoeging blokkeer nie.",
         "draftTitle": "Konseptrekversoek",

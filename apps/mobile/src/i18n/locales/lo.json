@@ -442,7 +442,6 @@
         "rebase": "ປ່ຽນຖານ"
       },
       "terminal": {
-        "alreadyMerged": "ລວມແລ້ວ",
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
         "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ຍັງຂາດການກວດທານທີ່ບັງຄັບ",
         "requiredReviewsDetail": "ຍັງບໍ່ໄດ້ຮັບການອະນຸມັດຈາກຜູ້ກວດທານທີ່ກຳນົດ ຫຼື ຍັງລໍຖ້າການອະນຸມັດຢູ່.",
         "failingChecksTitle": "ການກວດສອບທີ່ບັງຄັບບໍ່ຜ່ານ",
-        "failingChecksDetail": "ການກວດສອບສະຖານະທີ່ບັງຄັບບໍ່ຜ່ານ.",
         "unstableTitle": "ການກວດສອບບາງລາຍການບໍ່ຜ່ານ",
         "unstableDetail": "ການກວດສອບທີ່ບໍ່ບັງຄັບບໍ່ຜ່ານ. ຜົນນີ້ບໍ່ຂັດຂວາງການລວມ.",
         "draftTitle": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",

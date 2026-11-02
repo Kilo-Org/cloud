@@ -7,7 +7,10 @@ import {
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
-import { workerRefusalStatus } from '@/lib/cloud-agent-next/release-refused-send';
+import {
+  refusedBeforeAdmission,
+  workerRefusalStatus,
+} from '@/lib/cloud-agent-next/release-refused-send';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
@@ -331,13 +334,12 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
-    // A 4xx answer is the worker refusing this initiate before it admits the
-    // turn, so no session consumes these uploads and the rows go back to
+    // An answer that proves the worker refused this initiate before it admitted
+    // the turn means no session consumes these uploads, so the rows go back to
     // 'pending' for a retried tool call and the run-level cleanup. A transport
     // failure, a timeout or a 5xx proves nothing, because the worker may have
     // accepted the turn, so those keep the rows linked and their objects intact.
-    const refusalStatus = workerRefusalStatus(error);
-    if (refusalStatus !== undefined && refusalStatus >= 400 && refusalStatus < 500) {
+    if (refusedBeforeAdmission(workerRefusalStatus(error))) {
       await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
     }
     if (error instanceof InsufficientCreditsError) {

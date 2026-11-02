@@ -678,6 +678,30 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockReleaseRefusedAttachmentsFn).not.toHaveBeenCalled();
   });
 
+  it.each([408, 499])(
+    'keeps the linked attachments when the initiate answer %s proves nothing about admission',
+    async status => {
+      // The worker may have accepted the turn and only the answer was lost, so
+      // the session may still reference these rows.
+      mockInitiateFromPreparedSession.mockRejectedValueOnce(
+        Object.assign(new Error('no answer'), { httpStatus: status })
+      );
+
+      const result = await spawnCloudAgentSession(
+        { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        userIntegration,
+        'auth-token',
+        `request-initiate-${String(status)}-link`,
+        undefined,
+        { chatPlatform: 'slack', attachments, payerUserId: 'user-9' }
+      );
+
+      expect(result.response).toContain('Error initiating Cloud Agent');
+      expect(mockReleaseRefusedAttachmentsFn).not.toHaveBeenCalled();
+    }
+  );
+
   it('releases the linked attachments when the worker refuses the initiate with a 4xx', async () => {
     mockInitiateFromPreparedSession.mockRejectedValueOnce(
       Object.assign(new Error('initiate rejected'), { httpStatus: 400 })

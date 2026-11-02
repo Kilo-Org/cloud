@@ -148,24 +148,137 @@ export function isBriefingVisible(report: BriefingReport, now = Date.now()): boo
     briefingHasActivity(report.scorecard)
   );
 }
+// A key name is a credential key when one of its tokens is a credential word, or
+// when a credential word inside a token is preceded immediately by a qualifier.
+// Tokens split at separators, digits, and camelCase humps, so ordinary words that
+// merely contain those letters stay intact. This policy matches
+// packages/auto-routing-contracts/src/normalize.ts, which screens provider-hint
+// keys the same way; it is repeated here because this package is bundled into the
+// mobile app and must not depend on the server routing package.
+const CREDENTIAL_KEY_WORDS = [
+  'apikey',
+  'authorization',
+  'cookie',
+  'credential',
+  'key',
+  'passwd',
+  'password',
+  'secret',
+  'token',
+];
+const CREDENTIAL_KEY_QUALIFIERS = [
+  'access',
+  'account',
+  'api',
+  'app',
+  'auth',
+  'client',
+  'encryption',
+  'master',
+  'private',
+  'public',
+  'root',
+  'secret',
+  'service',
+  'session',
+  'signing',
+  'subscription',
+];
+const CREDENTIAL_QUALIFIER_WINDOW = Math.max(
+  ...CREDENTIAL_KEY_QUALIFIERS.map(qualifier => qualifier.length)
+);
+const PRIVATE_KEY_BLOCK = /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g;
+const BEARER_VALUE = /\bbearer\s+[^\s,;"}]+/gi;
+// A credential key name followed by an assignment, quoted or not. `(?![=>])` keeps
+// comparison operators and arrows from being read as an assignment.
+const CREDENTIAL_ASSIGNMENT =
+  /([A-Za-z_$][\w$.-]{0,63})\s*((?::=|[:=]))(?![=>])\s*("[^"\n]*"|'[^'\n]*'|[^\s,;"'\]})]+)/g;
+// Credential value shapes that carry no key name of their own. Opaque runs must be
+// at least 32 characters and mix letters with digits, so file paths, words, and
+// short identifiers in evidence survive.
+const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    /\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b/g,
+    '[redacted credential]',
+  ],
+  [/\bAIza[0-9A-Za-z_-]{35}\b/g, '[redacted credential]'],
+  [/\b(?:sk-|ghp_|github_pat_|glpat-|xox[baprs]-)[A-Za-z0-9_-]+/g, '[redacted token]'],
+  [/\bnpm_[A-Za-z0-9]{36}\b/g, '[redacted token]'],
+  [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted token]'],
+  [/\b(?=[A-Za-z0-9_]*[0-9])(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]{32,}\b/g, '[redacted value]'],
+];
+const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
+const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
+const CREDENTIAL_KEY_SCAN = /([A-Za-z_$][\w$.-]{0,63})\s*(?::=|[:=])(?![=>])\s*([^\n]*)/g;
+const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
+
+function splitCredentialKeyTokens(key: string): string[] {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(token => token.length > 0);
+}
+
+function isCredentialToken(token: string): boolean {
+  const singular = token.endsWith('s') ? token.slice(0, -1) : token;
+  if (CREDENTIAL_KEY_WORDS.some(word => word === token || word === singular)) return true;
+  for (const word of CREDENTIAL_KEY_WORDS) {
+    for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
+      if (index === 0) return true;
+      const window = token.slice(Math.max(0, index - CREDENTIAL_QUALIFIER_WINDOW), index);
+      if (CREDENTIAL_KEY_QUALIFIERS.some(qualifier => window.endsWith(qualifier))) return true;
+    }
+  }
+  return false;
+}
+
+function isCredentialKeyName(key: string): boolean {
+  return splitCredentialKeyTokens(key).some(isCredentialToken);
+}
+
+/** True when screened text still carries credential material after redaction. */
+function briefingExcerptCarriesCredential(text: string): boolean {
+  for (const match of text.matchAll(CREDENTIAL_KEY_SCAN)) {
+    const key = match[1];
+    const assigned = match[2] ?? '';
+    if (!key || !assigned.trim() || !isCredentialKeyName(key)) continue;
+    if (!REDACTION_PLACEHOLDER.test(assigned)) return true;
+  }
+  return CREDENTIAL_VALUE_SHAPES.some(([shape]) => text.match(shape) !== null);
+}
+
 export function redactBriefingExcerpt(
   value: string,
   maxBytes = BRIEFING_MAX_EXCERPT_BYTES
 ): string {
-  const redacted = value
-    .replace(
-      /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g,
-      '[redacted key]'
-    )
-    .replace(
-      /(?:bearer\s+|(?:api[_-]?key|token|password|secret)\s*[:=]\s*)[^\s,;"}]+/gi,
-      '[redacted credential]'
-    )
-    .replace(/\b(?:sk-|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]+/g, '[redacted token]')
-    .replace(/\b[A-Za-z0-9_-]{48,}\b/g, '[redacted value]')
-    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted email]')
-    .replace(/(https?:\/\/[^\s?]+)\?[^\s]+/g, '$1');
+  let redacted = value
+    .replace(PRIVATE_KEY_BLOCK, '[redacted key]')
+    .replace(BEARER_VALUE, '[redacted credential]')
+    .replace(CREDENTIAL_ASSIGNMENT, (match, key: string, _separator: string, value: string) =>
+      isCredentialKeyName(key) && !REDACTION_PLACEHOLDER.test(value)
+        ? '[redacted credential]'
+        : match
+    );
+  for (const [shape, replacement] of CREDENTIAL_VALUE_SHAPES) {
+    redacted = redacted.replace(shape, replacement);
+  }
+  redacted = redacted.replace(EMAIL_ADDRESS, '[redacted email]').replace(URL_QUERY, '$1');
   return truncateBriefingUtf8(redacted, maxBytes);
+}
+
+/**
+ * Excerpt evidence for a prompt sent beyond Kilo. Returns the screened text, or
+ * `undefined` when screening still finds credential material, so the caller
+ * withholds the field instead of sending it.
+ */
+export function redactBriefingExcerptOrDrop(
+  value: string,
+  maxBytes = BRIEFING_MAX_EXCERPT_BYTES
+): string | undefined {
+  const redacted = redactBriefingExcerpt(value, maxBytes);
+  return briefingExcerptCarriesCredential(redacted) ? undefined : redacted;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {

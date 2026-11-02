@@ -114,6 +114,24 @@ it('includes bounded plan, changes and failure metadata without duplicating fina
   expect(metadata?.excerpt).not.toMatch(/private-value|thinking/);
 });
 
+it('withholds an excerpt that screening cannot clear and keeps a cleared one', () => {
+  const unsafe = buildBriefingSnapshot([
+    {
+      ...session(0),
+      briefing_excerpt: {
+        messageId: 'done',
+        completedAt: '2026-10-28T07:00:00.000Z',
+        text: 'Stopped after ' + 'client_' + `secret: "` + 'wJalrXUtnFEMI/K7MDENG',
+      },
+    },
+  ]);
+  expect(unsafe.sources.find(source => source.kind === 'activity')?.excerpt).toBeUndefined();
+  const safe = buildBriefingSnapshot([session(1)]);
+  expect(safe.sources.find(source => source.kind === 'activity')?.excerpt).toBe(
+    'Completed response'
+  );
+});
+
 it('counts a verified pull request once across selected sessions', () => {
   const facts = buildBriefingSnapshot(
     [0, 1].map(index => ({

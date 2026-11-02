@@ -10,6 +10,7 @@ import {
   BRIEFING_MAX_URL_LENGTH,
   briefingReportSchema,
   redactBriefingExcerpt,
+  redactBriefingExcerptOrDrop,
   type BriefingSource,
 } from '@kilocode/app-shared/agent-briefing';
 
@@ -51,6 +52,9 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
     const url = `/cloud/sessions/${encodeURIComponent(row.session_id)}`;
     const occurredAt = new Date(row.last_activity_at).toISOString();
     const excerpt = completedExcerptSchema.safeParse(row.briefing_excerpt);
+    const excerptText = excerpt.success
+      ? redactBriefingExcerptOrDrop(excerpt.data.text)
+      : undefined;
     const activity: BriefingSource = {
       id: `activity:${row.session_id}`,
       sessionId: row.session_id,
@@ -58,7 +62,7 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
       title,
       url,
       occurredAt: excerpt.success ? new Date(excerpt.data.completedAt).toISOString() : occurredAt,
-      ...(excerpt.success ? { excerpt: redactBriefingExcerpt(excerpt.data.text) } : {}),
+      ...(excerptText ? { excerpt: excerptText } : {}),
     };
     const sources: BriefingSource[] = [activity];
     const live = sessionLiveSummarySchema.safeParse(row.live_summary);
@@ -89,15 +93,17 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
         );
       }
       if (live.data.failure) metadata.push(`Last turn failure: ${live.data.failure.kind}.`);
-      sources.push({
-        id: `metadata:${row.session_id}`,
-        sessionId: row.session_id,
-        kind: 'artifact',
-        title: 'Captured session metadata',
-        url,
-        occurredAt,
-        excerpt: redactBriefingExcerpt(metadata.join('\n')),
-      });
+      const metadataExcerpt = redactBriefingExcerptOrDrop(metadata.join('\n'));
+      if (metadataExcerpt)
+        sources.push({
+          id: `metadata:${row.session_id}`,
+          sessionId: row.session_id,
+          kind: 'artifact',
+          title: 'Captured session metadata',
+          url,
+          occurredAt,
+          excerpt: metadataExcerpt,
+        });
     }
     if (row.pr_url && row.pr_link_verified_at && row.pr_url.length <= BRIEFING_MAX_URL_LENGTH) {
       try {

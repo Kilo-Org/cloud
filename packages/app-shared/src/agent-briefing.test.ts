@@ -5,6 +5,7 @@ import {
   briefingSourceSchema,
   briefingSummarySchema,
   redactBriefingExcerpt,
+  redactBriefingExcerptOrDrop,
   truncateBriefingUtf8,
 } from './agent-briefing';
 
@@ -37,5 +38,56 @@ describe('scheduled briefing contracts', () => {
     ).toBe(false);
     expect(briefingSummarySchema.shape.status.safeParse('outdated').success).toBe(false);
     expect(briefingHasActivity({ sessions: 0, pullRequests: 0, blockers: 0 })).toBe(false);
+  });
+});
+
+describe('briefing evidence screening', () => {
+  const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+  const accessKeyId = 'AKIA' + 'IOSFODNN7EXAMPL3';
+  const googleKey = 'AIza' + 'SyA1234567890abcdefghijklmnopqrstuv';
+  const hexKey = '8f7a3b2c' + '1d4e5f60' + '718293a4' + 'b5c6d7e8';
+  const signedValue = [
+    'eyJ' + 'hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+    'eyJ' + 'zdWIiOiIxMjM0NTY3ODkwIn0',
+    'dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
+  ].join('.');
+
+  it('screens an assigned value whose key name joins credential words with separators', () => {
+    const text = redactBriefingExcerpt('AWS_SECRET_' + `ACCESS_KEY=${secretKey}`);
+    expect(text).not.toContain(secretKey);
+    expect(text).toContain('[redacted credential]');
+  });
+
+  it('screens quoted values and hyphenated key names', () => {
+    const quoted = redactBriefingExcerpt(`client_secret: "${'abc' + '123' + 'xyz'}"`);
+    expect(quoted).toContain('[redacted credential]');
+    expect(quoted).not.toContain('abc123xyz');
+    const header = redactBriefingExcerpt(`X-API-KEY: ${'header' + 'value'}`);
+    expect(header).toContain('[redacted credential]');
+    expect(header).not.toContain('headervalue');
+    expect(
+      redactBriefingExcerpt('curl -H "Authorization: Bearer ' + 'abc.def' + '" https://x.test/a')
+    ).toBe('curl -H "Authorization: [redacted credential]" https://x.test/a');
+  });
+
+  it('screens credential value shapes that appear without a key name', () => {
+    for (const value of [accessKeyId, googleKey, hexKey, signedValue]) {
+      const text = redactBriefingExcerpt(`Observed ${value} in the transcript.`);
+      expect(text).not.toContain(value);
+    }
+  });
+
+  it('keeps evidence that carries no credential material', () => {
+    const evidence =
+      'Plan: 2 of 3 steps done; agent_briefing_snapshots updated after commit 9f2c1a8.';
+    expect(redactBriefingExcerpt(evidence)).toBe(evidence);
+    expect(redactBriefingExcerpt('Turnkey: 4 files changed.')).toBe('Turnkey: 4 files changed.');
+  });
+
+  it('withholds an excerpt when screening still finds credential material', () => {
+    expect(redactBriefingExcerptOrDrop('client_secret: "' + secretKey)).toBeUndefined();
+    expect(redactBriefingExcerptOrDrop('Completed response with no credentials.')).toBe(
+      'Completed response with no credentials.'
+    );
   });
 });

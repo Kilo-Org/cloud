@@ -138,6 +138,37 @@ it('claims paid generation once across simultaneous workers and never refreshes 
   await runBriefingSummary(row.id);
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it('sends screened evidence to the model provider', async () => {
+  const { user, now } = await scheduled();
+  const secret = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+  await db
+    .update(cli_sessions_v2)
+    .set({
+      briefing_excerpt: {
+        messageId: 'completed',
+        completedAt: new Date(now.getTime() - 3600_000).toISOString(),
+        text: 'Deploy ran with AWS_SECRET_' + `ACCESS_KEY=${secret} in the shell.`,
+      },
+    })
+    .where(eq(cli_sessions_v2.kilo_user_id, user.id));
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  expect(JSON.stringify(row.facts)).not.toContain(secret);
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Summary' } }] }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const posted = fetcher.mock.calls[0];
+  const body = JSON.parse(String(posted?.[1]?.body)) as {
+    messages: Array<{ content: string }>;
+  };
+  const prompt = body.messages.map(message => message.content).join('\n');
+  expect(prompt).not.toContain(secret);
+  expect(prompt).toContain('[redacted credential]');
+});
+
 it('publishes failure while preserving facts and refuses automatic paid retries', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);

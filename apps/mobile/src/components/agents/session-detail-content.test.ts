@@ -1917,7 +1917,7 @@ describe('session detail assistant response retry', () => {
       promptRow('msg-prompt', prompt),
       failedResponse('msg-response', 'msg-prompt', {
         name: 'APIError',
-        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       }),
     ];
     const view = await mountDetails(messages);
@@ -1962,7 +1962,7 @@ describe('session detail assistant response retry', () => {
       promptRow('msg-prompt', prompt),
       failedResponse('msg-response', 'msg-prompt', {
         name: 'APIError',
-        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       }),
     ];
     const view = await mountDetails(messages);
@@ -4313,7 +4313,7 @@ describe('session detail duplicate failure state', () => {
     message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
     (message.info as { error?: { name: string; data: unknown } }).error = {
       name: 'APIError',
-      data: { message: 'raw provider text' },
+      data: { message: 'raw provider text', isRetryable: true },
     };
     return {
       info: message.info,

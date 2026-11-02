@@ -260,11 +260,23 @@ async function renderBubbleWithHandlers(
   return MessageBubble.type({ message, ...props });
 }
 
-function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+function assistantMessageWithText(id: string): StoredMessage {
   const message = assistantMessage(id);
+  message.parts = [
+    { id: `${id}-text`, sessionID: 'ses_1', messageID: id, type: 'text', text: 'answer' },
+  ];
+  return message;
+}
+
+function assistantMessageWithError(
+  id: string,
+  errorName: string,
+  options: { content?: boolean } = {}
+): StoredMessage {
+  const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
   (message.info as { error?: { name: string; data: unknown } }).error = {
     name: errorName,
-    data: { message: 'raw' },
+    data: { message: 'raw', isRetryable: true },
   };
   return message;
 }
@@ -348,6 +360,16 @@ describe('MessageBubble failure footer', () => {
     );
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('renders no pressable host for an assistant row with nothing to show', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-empty', 'APIError', { content: false }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findElementByType(tree, 'Pressable', () => true)).toBeNull();
   });
 
   it('states a generic assistant failure once, without a detail line repeating the title', async () => {
@@ -750,7 +772,7 @@ describe('MessageBubble assistant treatment', () => {
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
-    const tree = await renderBubble(assistantMessage('m6'));
+    const tree = await renderBubble(assistantMessageWithText('m6'));
 
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
@@ -770,7 +792,7 @@ describe('MessageBubble in-bubble text selection context', () => {
 describe('MessageBubble part-row long-press context', () => {
   it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
     const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
-    const message = assistantMessage('m-long-press');
+    const message = assistantMessageWithText('m-long-press');
     const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
 
     const { MessageLongPressProvider } = await import('./message-long-press-context');
@@ -781,7 +803,7 @@ describe('MessageBubble part-row long-press context', () => {
   });
 
   it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
-    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+    const tree = await renderBubble(assistantMessageWithText('m-long-press-plain'));
 
     const { MessageLongPressProvider } = await import('./message-long-press-context');
     const provider = findElementByTypeFn(tree, MessageLongPressProvider);
@@ -796,7 +818,7 @@ describe('MessageBubble row rhythm', () => {
   // user wrapper carries the same py-1, so user/assistant boundaries keep the
   // rhythm. One value, three class assertions.
   it('applies the uniform row-rhythm class contract', async () => {
-    const assistantTree = await renderBubble(assistantMessage('rhythm-a'));
+    const assistantTree = await renderBubble(assistantMessageWithText('rhythm-a'));
     const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
     expect(parts).not.toBeNull();
 

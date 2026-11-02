@@ -5,6 +5,7 @@ import postcss from 'postcss';
 import { createElement, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -116,9 +117,14 @@ describe('Button native target contract', () => {
     expect(button.props.hitSlop).toEqual({ top: 5, bottom: 5, left: 5, right: 5 });
   });
 
-  it('keeps an icon target 44 points wide and tall without requiring label content', async () => {
+  it('gives the icon size the shared 48dp icon target without requiring label content', async () => {
     const button = renderButton({ size: 'icon', children: null, accessibilityLabel: 'Close' });
-    expect(await nativeDimensions(button)).toEqual([{ height: 44, width: 44 }]);
+    // The audit reads the pressable's own view rect, so the frame itself must
+    // carry Android's 48dp minimum; a hitSlop would not lift a smaller box.
+    expect(await nativeDimensions(button)).toEqual([{ height: 48, width: 48 }]);
+    expect(button.props.className).toContain(ICON_TARGET_BOX_CLASS);
+    expect(ICON_TARGET_DP).toBeGreaterThanOrEqual(48);
+    expect(button.props.hitSlop).toBeUndefined();
     expect(button.props.role).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Close');
   });

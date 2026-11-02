@@ -127,9 +127,9 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   }
 
   if (!finding) {
-    // The all-clear row still opens the findings list: a scope can hold findings
-    // that are fixed, ignored or waiting on analysis, and the list is where a
-    // reader checks that. Its whole row is the target, so the card it opens
+    // The all-clear row still opens the scope's open-findings list — the same
+    // list its own count describes — so it stays a destination on the screen
+    // even when that list is empty. Its whole row is the target, so the row
     // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>

@@ -6326,7 +6326,7 @@ describe('User', () => {
       expect(scans[0].findings_critical).toBe(1);
     });
 
-    it('should anonymize enkrypt_usage user and session identifiers while retaining billing and audit fields', async () => {
+    it('should retain enkrypt_usage billing rows and attribution when the user is soft-deleted', async () => {
       const user = await insertTestUser({ id: `oauth/${randomUUID()}` });
       const otherUser = await insertTestUser();
       const organization = await createTestOrganization('Enkrypt usage retention', otherUser.id, 0);
@@ -6382,11 +6382,7 @@ describe('User', () => {
         );
       expect(retainedRows).toHaveLength(originalRows.length);
       for (const originalRow of originalRows) {
-        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(
-          originalRow.kilo_user_id === user.id
-            ? { ...originalRow, kilo_user_id: 'deleted', session_id: null }
-            : originalRow
-        );
+        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(originalRow);
       }
     });
 

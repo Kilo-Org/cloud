@@ -590,12 +590,11 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
-  it('indexes Enkrypt usage anonymization by user across monthly partitions', async () => {
+  it('indexes Enkrypt usage lookups by user across monthly partitions', async () => {
     await schemaTestDb.db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL enable_seqscan = off`);
       const plan = await tx.execute(sql`
-        EXPLAIN UPDATE ${schema.enkrypt_usage}
-        SET kilo_user_id = 'deleted', session_id = NULL
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
         WHERE ${schema.enkrypt_usage.kilo_user_id} = 'oauth/enkrypt-index-test'
       `);
       expect(JSON.stringify(plan.rows)).toContain('Index Cond: (kilo_user_id =');

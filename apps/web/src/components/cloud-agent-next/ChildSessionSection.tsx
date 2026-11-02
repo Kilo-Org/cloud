@@ -10,9 +10,8 @@ import { cn } from '@/lib/utils';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { formatModelRefName } from '@/lib/format-model-name';
 import { useOptionalManager } from './CloudAgentProvider';
-import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
-import { isMessageStreaming, isToolPart } from './types';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
+import type { SubtaskPart, StoredMessage, ToolPart } from './types';
+import { isToolPart } from './types';
 
 const MAX_NESTING_DEPTH = 5;
 
@@ -25,14 +24,6 @@ export type ChildSessionDrawerEntry = {
 
 export type OpenChildSession = (entry: ChildSessionDrawerEntry) => void;
 
-export type RenderPartFn = (props: {
-  part: Part;
-  isStreaming?: boolean;
-  childSessionMessages?: Map<string, StoredMessage[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-}) => ReactNode;
-
 type ChildSessionSectionProps = {
   subtaskPart?: SubtaskPart;
   taskToolPart?: ToolPart;
@@ -40,7 +31,11 @@ type ChildSessionSectionProps = {
   childMessages?: StoredMessage[];
   depth?: number;
   getChildMessages?: (sessionId: string) => StoredMessage[];
-  renderPart?: RenderPartFn;
+  renderChildTranscript?: (
+    messages: StoredMessage[],
+    depth: number,
+    getChildMessages?: (sessionId: string) => StoredMessage[]
+  ) => ReactNode;
   onOpenChildSession?: OpenChildSession;
 };
 
@@ -85,7 +80,7 @@ function ChildSessionSectionBody({
   childMessages = [],
   depth = 0,
   getChildMessages,
-  renderPart,
+  renderChildTranscript,
   onOpenChildSession,
 }: ChildSessionSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -107,8 +102,7 @@ function ChildSessionSectionBody({
     0
   );
   const canOpenDrawer = Boolean(sessionId && onOpenChildSession);
-  const inlineRenderPart = sessionId && !canOpenDrawer ? renderPart : undefined;
-  const canExpandInline = Boolean(inlineRenderPart);
+  const canExpandInline = Boolean(sessionId && !canOpenDrawer && renderChildTranscript);
   const isInteractive = canOpenDrawer || canExpandInline;
 
   const handleOpen = () => {
@@ -117,7 +111,7 @@ function ChildSessionSectionBody({
       onOpenChildSession({ sessionId, description, agent, model });
       return;
     }
-    if (inlineRenderPart) {
+    if (canExpandInline) {
       setIsExpanded(expanded => !expanded);
     }
   };
@@ -222,20 +216,13 @@ function ChildSessionSectionBody({
         </div>
       )}
 
-      {isExpanded && inlineRenderPart && (
+      {isExpanded && canExpandInline && (
         <div className="space-y-2 px-4 pt-1 pb-3">
           {childMessages.length > 0 ? (
             depth < MAX_NESTING_DEPTH ? (
-              childMessages.map(message => (
-                <MessageErrorBoundary key={message.info.id}>
-                  <ChildSessionMessage
-                    message={message}
-                    depth={depth}
-                    getChildMessages={getChildMessages}
-                    renderPart={inlineRenderPart}
-                  />
-                </MessageErrorBoundary>
-              ))
+              renderChildTranscript ? (
+                renderChildTranscript(childMessages, depth + 1, getChildMessages)
+              ) : null
             ) : (
               <div className="text-muted-foreground text-xs italic">
                 Maximum nesting depth reached. Unable to display nested sessions.
@@ -248,59 +235,6 @@ function ChildSessionSectionBody({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function ChildSessionMessage({
-  message,
-  depth,
-  getChildMessages,
-  renderPart,
-}: {
-  message: StoredMessage;
-  depth: number;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  renderPart: RenderPartFn;
-}) {
-  const isStreaming = isMessageStreaming(message);
-
-  return (
-    <div className="bg-muted/30 rounded-md p-2">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge variant="outline" className="text-xs">
-          {message.info.role}
-        </Badge>
-        {isStreaming && (
-          <span className="text-muted-foreground animate-pulse text-xs">streaming...</span>
-        )}
-      </div>
-      <div className="mt-2 space-y-1">
-        {message.parts.map((part, index) => {
-          if (isToolPart(part) && part.tool === 'task') {
-            const nestedSessionId = getTaskToolSessionId(part);
-            const nestedChildMessages = nestedSessionId ? getChildMessages?.(nestedSessionId) : [];
-
-            return (
-              <ChildSessionSection
-                key={part.id || index}
-                taskToolPart={part}
-                sessionId={nestedSessionId}
-                childMessages={nestedChildMessages || []}
-                depth={depth + 1}
-                getChildMessages={getChildMessages}
-                renderPart={renderPart}
-              />
-            );
-          }
-
-          return (
-            <MessageErrorBoundary key={part.id || index}>
-              {renderPart({ part, isStreaming, getChildMessages })}
-            </MessageErrorBoundary>
-          );
-        })}
-      </div>
     </div>
   );
 }

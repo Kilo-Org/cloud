@@ -58,6 +58,7 @@ import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { formatSessionCostBadge } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import {
+  SessionComposerSkeleton,
   SessionReadOnlyFooterPlaceholder,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
@@ -328,6 +329,7 @@ vi.mock('@/components/agents/session-status-indicator', () => ({
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
   SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
+  SessionComposerSkeleton: 'SessionComposerSkeleton',
 }));
 vi.mock('@/components/agents/transcript-time-marker', () => ({
   TranscriptTimeMarker: 'TranscriptTimeMarker',
@@ -2101,12 +2103,19 @@ describe('session detail slow load', () => {
     expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
   });
 
-  it('holds the read-only footer area, not a composer, while the open has nothing to show', async () => {
+  it('holds the read-only footer area, not a composer, while a read-only open has nothing to show', async () => {
     const view = await mountDetails(null);
+    // The session resolves to a kind with no writer while its transcript is
+    // still stalled, so its bottom slot is the footer's.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
     // The skeleton owns the body and the session's transport has not answered:
     // no composer, and the footer's area is held instead.
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
     expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
       0
     );
@@ -2114,15 +2123,33 @@ describe('session detail slow load', () => {
     // The read-only footer takes the held area, so the transcript never moves
     // under it when the transport turns out to have no writer.
     await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
-    act(() => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
-      view.store.set(view.manager.atoms.isReadOnly, true);
-    });
     expect(renderedText(view.renderer.root)).toContain('read-only row');
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
     expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
     expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
       0
+    );
+  });
+
+  it('holds the composer area, not the read-only footer, while a writable open has nothing to show', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails(null);
+    // The session resolved to a kind that reads and writes, so its bottom slot
+    // is the composer's: the reserve is the composer's own placeholder, and no
+    // read-only footer area is painted for it.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The composer takes the held area, so the transcript never moves under it.
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'writable row')]);
+    expect(renderedText(view.renderer.root)).toContain('writable row');
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      1
     );
   });
 

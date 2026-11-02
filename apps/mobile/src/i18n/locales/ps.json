@@ -1679,7 +1679,7 @@
       "outcome": "پایله",
       "slaStatus": "د SLA حالت",
       "sortBy": "د ترتیب معیار",
-      "statusOpen": "پرانیستې",
+      "statusOpen": "پرانیستی",
       "fixed": "سم شوی",
       "statusIgnored": "له پامه غورځول شوی",
       "severityHigh": "لوړ",
@@ -1867,7 +1867,7 @@
       "source": "سرچینه",
       "sourceId": "د سرچینې ID",
       "viewAdvisory": "په GitHub کې امنیتي خبرتیا وګورئ",
-      "statusOpen": "پرانیستې",
+      "statusOpen": "پرانیستی",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "له بیاکتنې وروسته"
     },

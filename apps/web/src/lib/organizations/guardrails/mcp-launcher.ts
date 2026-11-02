@@ -11,7 +11,7 @@ export type LauncherParseResult =
   | { eligible: false; reason: string };
 
 const NPM_SPEC = /^(@[^/@:\s]+\/[^/@:\s]+|[^/@:\s]+)(?:@(.+))?$/;
-const NPM_VERSION_OR_TAG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const NPM_VERSION_OR_TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 const PYPI_SPEC =
   /^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[A-Za-z0-9,._-]+\])?(?:(?:==|>=|@)([0-9][^\s,;]*)|@latest)?$/;
 
@@ -21,13 +21,20 @@ function ineligible(reason: string): LauncherParseResult {
   return { eligible: false, reason };
 }
 
+// npm reads a suffix such as `1.x`, `1.2.x` or `x` as a range over versions and refuses to use one
+// as a dist-tag name, so a wildcard in the release segments is neither a version nor a tag.
+function isNpmRange(suffix: string): boolean {
+  const release = suffix.replace(/^v/, '').split(/[-+]/, 1)[0];
+  return release.split('.').some(segment => segment === 'x' || segment === 'X' || segment === '*');
+}
+
 function parseNpmSpec(spec: string): LauncherParseResult {
   const match = NPM_SPEC.exec(spec);
   if (!match) return ineligible('The package isn’t a plain npm package name.');
   const suffix = match[2];
-  if (suffix !== undefined && !NPM_VERSION_OR_TAG.test(suffix)) {
+  if (suffix !== undefined && (!NPM_VERSION_OR_TAG.test(suffix) || isNpmRange(suffix))) {
     return ineligible(
-      'The package can only be pinned to a version or a dist-tag, such as 1.2.3 or latest.'
+      'The package can only be pinned to one version or a dist-tag, such as 1.2.3 or latest.'
     );
   }
   const identifier = normalizePackageIdentifier('npm', match[1]);

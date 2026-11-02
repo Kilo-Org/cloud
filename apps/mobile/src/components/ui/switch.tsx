@@ -31,12 +31,20 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * sets `isEnabled`, so the platform draws no unavailable appearance of its own;
  * without this pair a row whose title dims for "not available" keeps a
  * full-strength accent track beside it and reads as both unavailable and on.
- * On keeps the grip but takes the palette's disabled primary fill, which is
- * built to hold `primaryForeground` at text contrast (5.4:1 light, 4.8:1 dark);
- * off drops to the dimmer neutral track and the mid-neutral grip. Both muted
- * tracks clear a visible step on the row's `secondary` surface (4.6:1 light,
- * 4.5:1 dark for on; 2.2:1 for off) and stay apart from each other (2.2:1
- * light, 2.1:1 dark), so a disabled switch still says which way it points.
+ * On takes the palette's disabled primary fill and keeps the on grip; off drops
+ * to the dimmer neutral track and the mid-neutral grip. Both muted tracks clear
+ * a visible step on the row's `secondary` surface (4.6:1 light, 4.5:1 dark for
+ * on; 2.2:1 for off) and stay apart from each other (2.2:1 light, 2.1:1 dark),
+ * so a disabled switch still says which way it points.
+ *
+ * The disabled on grip is the on grip of its own scheme, not
+ * `primaryForeground`: dark's `primaryForeground` is near-black, the dark card's
+ * own colour, and Android's thumb is wider than the track, so its outer arc
+ * sits on the row rather than on the fill. A near-black thumb there is 1.1:1 on
+ * the row and the dark scheme draws no shadow to outline it, so the right end
+ * of the pill dissolves and what is left reads as a blank grey bar. The scheme's
+ * light ink keeps it 14:1 on the row and 3.2:1 on the muted fill, and the fill
+ * alone carries "unavailable".
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that
@@ -79,10 +87,12 @@ export function Switch({
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
   // The off grip sits on the off track; the grip and track lose their strength
   // when the control is unavailable, and the on track takes the disabled fill.
+  // The on grip stays the scheme's on grip, which is light ink in both schemes:
+  // a disabled control's thumb still overhangs its track onto the row, so the
+  // grip has to stay off the row's own colour.
   const offGrip = inactive ? colors.mutedForeground : enabledOffGrip;
   const offTrack = inactive ? colors.mutedSoft : enabledOffTrack;
   const onTrack = inactive ? colors.primaryDisabled : enabledOnTrack;
-  const onGrip = inactive ? colors.primaryForeground : enabledOnGrip;
 
   return (
     <NativeSwitch
@@ -90,7 +100,7 @@ export function Switch({
       style={[{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
       value={value}
       trackColor={trackColor ?? { false: offTrack, true: onTrack }}
-      thumbColor={thumbColor ?? (value ? onGrip : offGrip)}
+      thumbColor={thumbColor ?? (value ? enabledOnGrip : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

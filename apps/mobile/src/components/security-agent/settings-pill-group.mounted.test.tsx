@@ -18,7 +18,7 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primary: '#111111' }),
+  useThemeColors: () => ({ primary: '#111111', mutedForeground: '#222222' }),
 }));
 
 const OPTIONS = [
@@ -30,13 +30,13 @@ const OPTIONS = [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderGroup() {
+function renderGroup(disabled = false) {
   act(() => {
     const element = createElement(PillGroup, {
       label: 'Minimum severity',
       options: OPTIONS,
       value: 'high',
-      disabled: false,
+      disabled,
       onChange: () => undefined,
     });
     if (renderer) {
@@ -54,6 +54,50 @@ function renderGroup() {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+});
+
+describe('PillGroup disabled cue', () => {
+  // Regression: a disabled group halved the whole option row on top of the
+  // muted label, which lands the text near 2:1 on the row's `secondary` surface
+  // in both schemes — under the 4.5:1 text floor, so a member who cannot manage
+  // the setting could not read which option was set. The cue is the muted
+  // token, applied once; no row carries a second dim on top of it.
+  it('dims a read-only group by token, never by row opacity', () => {
+    const rows = renderGroup(true).findAll(node => Object.is(node.type, 'Pressable'));
+
+    expect(rows).toHaveLength(OPTIONS.length);
+    for (const row of rows) {
+      const tokens = String(row.props.className).split(/\s+/);
+      expect(tokens).toContain('active:opacity-70');
+      expect(tokens).not.toContain('opacity-50');
+    }
+  });
+
+  it('keeps the read-only selected label on the muted token', () => {
+    const [label] = renderGroup(true).findAll(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'High')
+    );
+
+    expect(label).toBeDefined();
+    expect(String(label?.props.className).split(/\s+/)).toContain('text-muted-foreground');
+    expect(String(label?.props.className)).not.toContain('text-foreground');
+  });
+
+  it('mutes the check of a read-only group off the accent', () => {
+    const [check] = renderGroup(true).findAll(node => Object.is(node.type, 'Check'));
+
+    expect(check?.props.color).toBe('#222222');
+  });
+
+  it('keeps an editable group on the full-strength selected label and accent', () => {
+    const [label] = renderGroup(false).findAll(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'High')
+    );
+    const [check] = renderGroup(false).findAll(node => Object.is(node.type, 'Check'));
+
+    expect(String(label?.props.className).split(/\s+/)).toContain('text-foreground');
+    expect(check?.props.color).toBe('#111111');
+  });
 });
 
 describe('PillGroup touch target', () => {

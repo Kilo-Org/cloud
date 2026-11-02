@@ -1,6 +1,32 @@
 import { decodeProtectedHeader, importJWK, jwtVerify, type JWK } from 'jose';
 import { z } from 'zod';
 import { bytesToBase64url } from './base64url';
+import {
+  WORKER_ADMIN_ACTIONS,
+  WORKER_ADMIN_AUDIENCES,
+  WORKER_ADMIN_TARGET_KINDS,
+  capabilityActionAccess,
+  findWorkerAdminAction,
+  workerAdminServiceTarget,
+  type WorkerAdminAudience,
+} from './worker-admin-actions';
+
+export {
+  GASTOWN_ADMIN_AUDIENCE,
+  WASTELAND_ADMIN_AUDIENCE,
+  WORKER_ADMIN_ACTIONS,
+  WORKER_ADMIN_AUDIENCES,
+  WORKER_ADMIN_TARGET_KINDS,
+  capabilityActionAccess,
+  findWorkerAdminAction,
+  workerAdminServiceTarget,
+} from './worker-admin-actions';
+export type {
+  WorkerAdminAction,
+  WorkerAdminActionAccess,
+  WorkerAdminAudience,
+  WorkerAdminTargetKind,
+} from './worker-admin-actions';
 
 /**
  * Worker admin capability tokens.
@@ -15,13 +41,6 @@ export const WORKER_ADMIN_CAPABILITY_HEADER = 'X-Kilo-Worker-Capability';
 export const WORKER_ADMIN_CAPABILITY_TYP = 'kilo-worker-cap+jwt';
 export const WORKER_ADMIN_CAPABILITY_ISSUER = 'kilo-web';
 export const WORKER_ADMIN_CAPABILITY_VERSION = 1;
-export const GASTOWN_ADMIN_AUDIENCE = 'gastown-admin';
-export const WASTELAND_ADMIN_AUDIENCE = 'wasteland-admin';
-
-export const WORKER_ADMIN_AUDIENCES = [GASTOWN_ADMIN_AUDIENCE, WASTELAND_ADMIN_AUDIENCE] as const;
-
-export type WorkerAdminAudience = (typeof WORKER_ADMIN_AUDIENCES)[number];
-
 export const BROWSER_CAPABILITY_TTL_SECONDS = 300;
 export const SERVER_CAPABILITY_TTL_SECONDS = 60;
 export const WORKER_ADMIN_CAPABILITY_MAX_TTL_SECONDS = 300;
@@ -37,8 +56,7 @@ export function parseLegacyAdminClaimMode(value: unknown): LegacyAdminClaimMode 
   return z.enum(LEGACY_ADMIN_CLAIM_MODES).safeParse(value).data ?? DEFAULT_LEGACY_ADMIN_CLAIM_MODE;
 }
 
-export const WorkerAdminTargetKindSchema = z.enum(['town', 'user', 'wasteland', 'service']);
-export type WorkerAdminTargetKind = z.infer<typeof WorkerAdminTargetKindSchema>;
+export const WorkerAdminTargetKindSchema = z.enum(WORKER_ADMIN_TARGET_KINDS);
 
 export const WorkerAdminTargetSchema = z
   .object({ kind: WorkerAdminTargetKindSchema, id: z.string().min(1).max(200) })
@@ -74,99 +92,6 @@ export const WorkerAdminCapabilityClaimsSchema = z
 
 export type WorkerAdminCapabilityClaims = z.infer<typeof WorkerAdminCapabilityClaimsSchema>;
 
-export type WorkerAdminActionAccess = 'read' | 'write';
-
-export type WorkerAdminAction = {
-  targetKind: WorkerAdminTargetKind;
-  access: WorkerAdminActionAccess;
-};
-
-function action(
-  targetKind: WorkerAdminTargetKind,
-  access: WorkerAdminActionAccess
-): WorkerAdminAction {
-  return { targetKind, access };
-}
-
-const gastownActions: Record<string, WorkerAdminAction> = {
-  'trpc:gastown.getTown': action('town', 'read'),
-  'trpc:gastown.getDrainStatus': action('town', 'read'),
-  'trpc:gastown.checkAdminAccess': action('town', 'read'),
-  'trpc:gastown.listRigs': action('town', 'read'),
-  'trpc:gastown.getRig': action('town', 'read'),
-  'trpc:gastown.listBeads': action('town', 'read'),
-  'trpc:gastown.listAgents': action('town', 'read'),
-  'trpc:gastown.getMayorStatus': action('town', 'read'),
-  'trpc:gastown.getAlarmStatus': action('town', 'read'),
-  'trpc:gastown.getBillingStatus': action('town', 'read'),
-  'trpc:gastown.getTownConfig': action('town', 'read'),
-  'trpc:gastown.getBeadEvents': action('town', 'read'),
-  'trpc:gastown.getTownEvents': action('town', 'read'),
-  'trpc:gastown.getMergeQueueData': action('town', 'read'),
-  'trpc:gastown.listConvoys': action('town', 'read'),
-  'trpc:gastown.getConvoy': action('town', 'read'),
-  'trpc:gastown.getTownWastelandConnection': action('town', 'read'),
-  'trpc:gastown.adminListBeads': action('town', 'read'),
-  'trpc:gastown.adminListAgents': action('town', 'read'),
-  'trpc:gastown.adminGetAlarmStatus': action('town', 'read'),
-  'trpc:gastown.adminGetTownEvents': action('town', 'read'),
-  'trpc:gastown.adminGetBead': action('town', 'read'),
-  'trpc:gastown.debugAgentMetadata': action('town', 'read'),
-  'trpc:gastown.adminForceResetAgent': action('town', 'write'),
-  'trpc:gastown.adminForceCloseBead': action('town', 'write'),
-  'trpc:gastown.adminForceFailBead': action('town', 'write'),
-  'trpc:gastown.adminForceRestartContainer': action('town', 'write'),
-  'trpc:gastown.adminBulkDeleteBeads': action('town', 'write'),
-  'trpc:gastown.adminDeleteBeadsByStatus': action('town', 'write'),
-  'rest:GET /api/towns/:townId/config': action('town', 'read'),
-  'rest:GET /api/towns/:townId/cloudflare-debug': action('town', 'read'),
-  'rest:GET /api/towns/:townId/escalations': action('town', 'read'),
-  'rest:PATCH /api/towns/:townId/config': action('town', 'write'),
-  'rest:GET /api/users/:userId/towns': action('user', 'read'),
-  'rest:GET /api/users/:userId/towns/:townId': action('user', 'read'),
-  'rest:GET /api/users/:userId/towns/:townId/rigs': action('user', 'read'),
-  'rest:GET /api/users/:userId/towns/:townId/events': action('user', 'read'),
-  'rest:GET /api/users/:userId/rigs/:rigId': action('user', 'read'),
-};
-
-const wastelandActions: Record<string, WorkerAdminAction> = {
-  'trpc:wasteland.getWasteland': action('wasteland', 'read'),
-  'trpc:wasteland.listMembers': action('wasteland', 'read'),
-  'trpc:wasteland.listConnectedTowns': action('wasteland', 'read'),
-  'trpc:wasteland.browseWantedBoard': action('wasteland', 'read'),
-  'trpc:wasteland.getWantedBoardCounts': action('wasteland', 'read'),
-  'trpc:wasteland.getRig': action('wasteland', 'read'),
-  'trpc:wasteland.getWantedItem': action('wasteland', 'read'),
-  'trpc:wasteland.listRigActivity': action('wasteland', 'read'),
-  'trpc:wasteland.listUpstreamRigs': action('wasteland', 'read'),
-  'trpc:wasteland.listInboxItems': action('wasteland', 'read'),
-  'trpc:wasteland.adminListWastelands': action('service', 'read'),
-};
-
-export const WORKER_ADMIN_ACTIONS: Record<
-  WorkerAdminAudience,
-  Readonly<Record<string, WorkerAdminAction>>
-> = {
-  [GASTOWN_ADMIN_AUDIENCE]: gastownActions,
-  [WASTELAND_ADMIN_AUDIENCE]: wastelandActions,
-};
-
-export function workerAdminServiceTarget(
-  audience: WorkerAdminAudience
-): Required<WorkerAdminTarget> {
-  return {
-    kind: 'service',
-    id: audience === GASTOWN_ADMIN_AUDIENCE ? 'gastown' : 'wasteland',
-  };
-}
-
-export function findWorkerAdminAction(
-  audience: WorkerAdminAudience,
-  actionId: string
-): WorkerAdminAction | undefined {
-  return WORKER_ADMIN_ACTIONS[audience][actionId];
-}
-
 export type WorkerAdminCapabilityActionCheck =
   | { allowed: true }
   | {
@@ -201,20 +126,6 @@ export function capabilityAllowsAction(
   return candidates.some(candidate => candidate.id === target.id)
     ? { allowed: true }
     : { allowed: false, reason: 'target_mismatch' };
-}
-
-export function capabilityTargetKind(
-  audience: WorkerAdminAudience,
-  actionId: string
-): WorkerAdminTargetKind | undefined {
-  return findWorkerAdminAction(audience, actionId)?.targetKind;
-}
-
-export function capabilityActionAccess(
-  audience: WorkerAdminAudience,
-  actionId: string
-): WorkerAdminActionAccess | undefined {
-  return findWorkerAdminAction(audience, actionId)?.access;
 }
 
 function matchesRoutePattern(pattern: string, pathname: string): boolean {

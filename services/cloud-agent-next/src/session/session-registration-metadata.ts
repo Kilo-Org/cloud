@@ -4,6 +4,7 @@ import { serializeSessionMetadata, type SessionMetadata } from '../persistence/s
 import { deriveSharedSandboxId } from '../sandbox-id.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { BUILTIN_AGENT_MODES } from '../schema.js';
+import { isRepositoryAgentOrigin } from '../shared/agent-modes.js';
 import type {
   AgentSelection,
   ExecutionTurnSubmission,
@@ -125,7 +126,14 @@ export function validateModeAgainstRuntimeAgents(
   metadata: SessionMetadata,
   mode = metadata.agent?.mode
 ): string | null {
-  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
+  // Only internal automation can stamp the Worker-owned billing origin.
+  const { billingOrigin, createdOnPlatform } = metadata.identity;
+  if (
+    !mode ||
+    BUILTIN_AGENT_MODES.has(mode) ||
+    (billingOrigin === createdOnPlatform && isRepositoryAgentOrigin(billingOrigin))
+  )
+    return null;
 
   const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
   if (knownSlugs.has(mode)) return null;

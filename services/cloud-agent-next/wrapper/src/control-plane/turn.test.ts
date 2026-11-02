@@ -53,6 +53,7 @@ const SESSION_TIMERS = {
 
 type PromptCall = {
   sessionId: string;
+  agent?: string;
   messageId: string;
   prompt?: string;
   parts?: unknown[];
@@ -381,6 +382,76 @@ function eventFrames(frames: ControlPlaneWrapperFrame[]) {
 }
 
 describe('turn manager submission', () => {
+  it('passes a repository agent unchanged to the SDK without runtimeAgents', async () => {
+    const h = createHarness();
+    const spec = routeSpec({ createdOnPlatform: 'webhook' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    expect(h.client(spec).prompts).toMatchObject([
+      { agent: 'foreman', messageId: 'm1', sessionId: KILO_SESSION },
+    ]);
+  });
+
+  it('fails visibly and releases a turn when the SDK reports a missing agent', async () => {
+    const h = createHarness();
+    h.setDispatchObservation(false);
+    const spec = routeSpec({ createdOnPlatform: 'scheduled' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', {
+        sessionID: KILO_SESSION,
+        error: {
+          name: 'UnknownError',
+          data: { message: 'Agent not found: "foreman". Available agents: code, plan' },
+        },
+      })
+    );
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      {
+        status: 'failed',
+        reason: 'Agent "foreman" was not found in the repository or profile',
+        assistantReason: 'invalid_request',
+        lastMessageId: 'm1',
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+    expect(h.manager.activeTurnCount()).toBe(0);
+    expect(h.client(spec).prompts).toHaveLength(1);
+  });
+
+  it('does not fail an unobserved prompt for an unrelated missing-agent event', async () => {
+    const h = createHarness();
+    h.setDispatchObservation(false);
+    const spec = routeSpec({ createdOnPlatform: 'webhook' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', {
+        sessionID: KILO_SESSION,
+        error: {
+          name: 'UnknownError',
+          data: { message: 'Agent not found: "previous-agent". Available agents: code' },
+        },
+      })
+    );
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(true);
+    h.manager.shutdown();
+  });
+
   it('bounds attachment delivery and fences late materialization without calling it native inactivity', async () => {
     const materialized = Promise.withResolvers<{ prompt: string }>();
     const h = createHarness({ materializeAttachments: () => materialized.promise });

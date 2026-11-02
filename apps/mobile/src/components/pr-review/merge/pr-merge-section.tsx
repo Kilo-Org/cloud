@@ -226,29 +226,30 @@ export function PrMergeSection({
   // Blocked.
   if (status === 'blocked') {
     // The panel's checks row is read from `listChecks`; until that answers the
-    // section holds the panel's place in its own shape, so it never paints a
-    // cause the read replaces, never appends a row after the first paint, and
-    // the panel that arrives does not move what is below it.
-    if (isChecksPending) {
-      return <BlockedPanelPending />;
-    }
+    // panel keeps its own shape and the actions below it stay where they are,
+    // so it never paints a cause the read replaces, never appends a row after
+    // the first paint, and never moves what is below it.
     return (
       <View className="gap-3">
-        <BlockedPanel
-          reasons={reasons}
-          allowUpdateBranch={overview.repo.allowUpdateBranch}
-          isUpdatePending={updateBranch.isPending}
-          onUpdateBranch={() => {
-            ignoreRejection(
-              updateBranch.mutateAsync({
-                owner,
-                repo,
-                number: overview.number,
-                expectedHeadSha: overview.headSha,
-              })
-            );
-          }}
-        />
+        {isChecksPending ? (
+          <BlockedPanelPending />
+        ) : (
+          <BlockedPanel
+            reasons={reasons}
+            allowUpdateBranch={overview.repo.allowUpdateBranch}
+            isUpdatePending={updateBranch.isPending}
+            onUpdateBranch={() => {
+              ignoreRejection(
+                updateBranch.mutateAsync({
+                  owner,
+                  repo,
+                  number: overview.number,
+                  expectedHeadSha: overview.headSha,
+                })
+              );
+            }}
+          />
+        )}
         {overview.repo.allowAutoMerge ? (
           <Button
             variant="outline"

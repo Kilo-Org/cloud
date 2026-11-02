@@ -1086,3 +1086,92 @@ describe('CreditsCard credits header', () => {
     unmount();
   });
 });
+
+describe('CreditsCard balance row', () => {
+  /** The card's outer box: the only View the card gives `gap-3` and a layout reader. */
+  function cardBox(renderer: ReactTestRenderer) {
+    return renderer.root.find(
+      node => Object.is(node.type, 'View') && node.props.className === 'gap-3'
+    );
+  }
+
+  /** The balance shell's classes: the card's only `min-h-16 gap-2` box. */
+  function balanceClasses(renderer: ReactTestRenderer): string[] {
+    const balance = renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') && String(node.props.className).includes('min-h-16 gap-2')
+    );
+    return String(balance.props.className).split(' ');
+  }
+
+  /** The row the amount and the visibility toggle share in both layouts. */
+  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        node.props.className === 'min-w-0 flex-row items-center gap-1'
+    );
+  }
+
+  /** Whether `node` or one of its descendants renders the given string. */
+  function renders(node: ReactTestInstance, text: string): boolean {
+    return (
+      node.findAll(
+        candidate =>
+          candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
+          // A mock child rendered as a bare component name, such as the
+          // purchase action, is its own text.
+          (typeof candidate.type === 'string' && candidate.type === text)
+      ).length > 0
+    );
+  }
+
+  async function mountAtCardWidth(width: number) {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const mounted = await mountCard();
+    const box = cardBox(mounted.renderer);
+    await act(() => {
+      (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+        nativeEvent: { layout: { width } },
+      });
+    });
+    return mounted;
+  }
+
+  it('keeps the amount, note and controls on one line on a wide card', async () => {
+    const { renderer, unmount } = await mountAtCardWidth(383);
+
+    const classes = balanceClasses(renderer);
+    expect(classes).toContain('flex-row');
+    expect(classes).not.toContain('items-stretch');
+    // The note stays in the amount's column; the purchase action sits outside
+    // that row, in the trailing control column.
+    const row = amountRow(renderer);
+    expect(renders(row, 'No expiring credits.')).toBe(true);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    unmount();
+  });
+
+  it.each<[string, number]>([
+    // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:
+    // in the one-line row the note's column there wrapped the sentence to three
+    // lines, so both stack instead.
+    ['the compact cell', 332],
+    ['a 390 dp screen', 362],
+  ])('stacks the balance on %s so the note keeps its two lines', async (_name, width) => {
+    const { renderer, unmount } = await mountAtCardWidth(width);
+
+    const classes = balanceClasses(renderer);
+    expect(classes).toContain('items-stretch');
+    expect(classes).not.toContain('flex-row');
+    // The amount, the toggle and the purchase action share the first row; the
+    // note sits on its own row beneath it, at the card's full width instead of
+    // in the squeezed column that wrapped it to three lines.
+    const row = amountRow(renderer);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
+    expect(renders(row, 'No expiring credits.')).toBe(false);
+    unmount();
+  });
+});

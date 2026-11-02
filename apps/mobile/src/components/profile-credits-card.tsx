@@ -42,9 +42,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
-  // Reserve room for the amount, visibility toggle and purchase action in
-  // scaled text units, using the card's width rather than the display's.
-  const stackBalance = availableWidth === null || availableWidth / fontScale < 320;
+  // Stack the balance row unless the expiry note keeps its two lines beside the
+  // amount, the visibility toggle and the purchase action. Measured on the
+  // standard matrix's compact cell (Android, 2026-11-02): the note needs about
+  // 215 dp of column for two lines, and its siblings take about 157 dp of the
+  // card, so the one-row layout holds from 370 dp of card in scaled text units,
+  // using the card's width rather than the display's.
+  const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
   // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
@@ -160,6 +164,44 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
+  // The expiry note's slot: under the amount on a wide card, on its own row
+  // when the card stacks. No entrance fade — the caption holds a row of this
+  // block, so a fade that paints it late leaves that row empty.
+  const expirySlot = (
+    <>
+      {creditsFailed && (
+        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+      )}
+      {!creditsFailed && creditsPending && (
+        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+      )}
+      {!creditsFailed && !creditsPending && (
+        <CreditExpiryNote
+          creditBlocks={creditData.creditBlocks}
+          hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+          emptyMessage={t('credits.noExpiringCredits')}
+        />
+      )}
+    </>
+  );
+
+  // The purchase action: beside the amount and toggle on a stacked card, in the
+  // trailing control column on a wide one. No in-progress indicator sits beside
+  // it, because this row paints a balance that belongs to the selected account
+  // and a background refresh may legitimately take a while or never finish. The
+  // first load and a context switch own the skeleton above; a refresh that fails
+  // owns the retry surface. An indicator tied to every in-flight refresh spun
+  // for as long as a stalled one lasted (and announced itself as "In progress").
+  const addCreditsAction =
+    selectedOrgId == null ? (
+      <AddCreditsButton
+        className="h-auto min-h-11 max-w-full py-2"
+        onPress={() => {
+          router.push('/(app)/credits' as Href);
+        }}
+      />
+    ) : null;
+
   return (
     <View
       className="gap-3"
@@ -259,70 +301,50 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           )}
         >
           <Animated.View
-            className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}
+            className={cn('min-w-0 gap-1', stackBalance ? 'items-stretch' : 'flex-1 flex-row')}
             layout={LinearTransition.duration(200)}
           >
-            <View className="min-w-0 flex-1 gap-1">
-              <ScrollView horizontal className="min-w-0">
-                <Text
-                  className="text-2xl font-bold tabular-nums"
-                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
-                >
-                  {hideBalance ? HIDDEN_BALANCE : balanceText}
-                </Text>
-              </ScrollView>
-              {/* One line, swapped without an entrance fade: the caption holds
-                  the second row of this block, so a fade that paints it late
-                  leaves the reserved row empty under the amount. */}
-              {creditsFailed && (
-                <Text className="text-xs text-muted-foreground">
-                  {t('credits.expiryUnavailable')}
-                </Text>
-              )}
-              {!creditsFailed && creditsPending && (
-                <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
-              )}
-              {!creditsFailed && !creditsPending && (
-                <CreditExpiryNote
-                  creditBlocks={creditData.creditBlocks}
-                  hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
-                  emptyMessage={t('credits.noExpiringCredits')}
-                />
-              )}
-            </View>
-            <Pressable
-              className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
-              onPress={() => {
-                selectionHaptic();
-                setHideBalance(!hideBalance);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
-            >
-              {hideBalance ? (
-                <Eye size={18} color={colors.mutedForeground} />
-              ) : (
-                <EyeOff size={18} color={colors.mutedForeground} />
-              )}
-            </Pressable>
-          </Animated.View>
-          <View className="max-w-full flex-row flex-wrap items-center gap-2">
-            {/* No in-progress indicator here: this row paints a balance that
-                belongs to the selected account, and a background refresh may
-                legitimately take a while or never finish. The first load and a
-                context switch own the skeleton above; a refresh that fails owns
-                the retry surface. An indicator tied to every in-flight refresh
-                spun for as long as a stalled one lasted (and announced itself
-                as "In progress"). */}
-            {selectedOrgId == null && (
-              <AddCreditsButton
-                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
+            <View className="min-w-0 flex-row items-center gap-1">
+              <View className="min-w-0 flex-1 gap-1">
+                <ScrollView horizontal className="min-w-0">
+                  <Text
+                    className="text-2xl font-bold tabular-nums"
+                    accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
+                  >
+                    {hideBalance ? HIDDEN_BALANCE : balanceText}
+                  </Text>
+                </ScrollView>
+                {!stackBalance && expirySlot}
+              </View>
+              <Pressable
+                className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
                 onPress={() => {
-                  router.push('/(app)/credits' as Href);
+                  selectionHaptic();
+                  setHideBalance(!hideBalance);
                 }}
-              />
-            )}
-          </View>
+                accessibilityRole="button"
+                accessibilityLabel={
+                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
+                }
+              >
+                {hideBalance ? (
+                  <Eye size={18} color={colors.mutedForeground} />
+                ) : (
+                  <EyeOff size={18} color={colors.mutedForeground} />
+                )}
+              </Pressable>
+              {stackBalance && addCreditsAction}
+            </View>
+            {/* The note keeps the card's full width in the stacked layout:
+                beside the visibility toggle and the purchase action it wrapped
+                to three lines on a compact phone. */}
+            {stackBalance && expirySlot}
+          </Animated.View>
+          {!stackBalance && (
+            <View className="max-w-full flex-row flex-wrap items-center gap-2">
+              {addCreditsAction}
+            </View>
+          )}
         </View>
       )}
       {selectedOrgId != null &&

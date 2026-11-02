@@ -142,12 +142,18 @@ export function PrReviewEntryScreen() {
   if (recent === null) {
     recentsBody = <PrReviewRecentsPending />;
   } else if (recent.length === 0) {
+    // The recents state is the last body of the inbox scroll, so it shares the
+    // screen with the INBOX section above it and never owns a clear region
+    // either: the full-size stack is what fell under the tab bar on a compact
+    // phone, and the footer's own gap already separates it from the RECENT
+    // eyebrow.
     recentsBody = (
       <EmptyState
         icon={SearchX}
         title={t('prReview.entry.noRecentPrs')}
         description={t('prReview.entry.noRecentPrsDescription')}
         placement="top"
+        compact
       />
     );
   } else {

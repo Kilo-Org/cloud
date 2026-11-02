@@ -179,18 +179,36 @@ describe('Magic Link Tokens', () => {
       expect(row?.purpose).toBe('sign_in_code');
     });
 
-    it('uses one live code and attempt budget for aliases of the same mailbox', async () => {
+    it('binds the code to the address it was delivered to', async () => {
       const { code: firstCode, challengeId: firstChallenge } =
         await createSignInCode('te.st+first@gmail.com');
       const { code: secondCode, challengeId: secondChallenge } =
         await createSignInCode('test@gmail.com');
 
+      // Both codes are live: a plus suffix and Gmail dots are part of the
+      // identity, so neither verifies against the other address.
+      expect(await verifyAndConsumeSignInCode('test@gmail.com', firstCode, firstChallenge)).toBe(
+        'invalid'
+      );
       expect(
-        await verifyAndConsumeSignInCode('te.st+first@gmail.com', firstCode, firstChallenge)
+        await verifyAndConsumeSignInCode('te.st+first@gmail.com', secondCode, secondChallenge)
       ).toBe('invalid');
       expect(
-        await verifyAndConsumeSignInCode('test+second@googlemail.com', secondCode, secondChallenge)
+        await verifyAndConsumeSignInCode('te.st+first@gmail.com', firstCode, firstChallenge)
       ).toBe('ok');
+    });
+
+    it('keeps a plus suffix and dots on the stored address', async () => {
+      const { code, challengeId } = await createSignInCode('Alias+News@Example.com');
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, 'alias+news@example.com'));
+
+      expect(rows).toHaveLength(1);
+      expect(await verifyAndConsumeSignInCode('alias+news@example.com', code, challengeId)).toBe(
+        'ok'
+      );
     });
 
     it('sets an expiry approximately 10 minutes out', async () => {

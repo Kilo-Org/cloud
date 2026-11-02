@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { View } from 'react-native';
 
 import { PrReviewEntryScreen } from '@/components/pr-review/pr-review-entry-screen';
 import { QueryError } from '@/components/query-error';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { API_BASE_URL } from '@/lib/config';
 import { clearRecentPrs, type RecentPr, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { useTRPC } from '@/lib/trpc';
@@ -87,12 +85,10 @@ export function PrReviewEntryFixture() {
       />
     );
   }
-  if (!allowed || status !== 'ready') {
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-  return <PrReviewEntryScreen />;
+  // The screen renders from the first frame, exactly as it does in the app:
+  // its header, link form and section skeletons are the loading state of this
+  // surface, so the fixture must not replace them with a spinner of its own.
+  // The key remounts it once the seeded history is on disk, which is the only
+  // reason this fixture waits at all — the screen reads recents on focus.
+  return <PrReviewEntryScreen key={status} />;
 }

@@ -16,8 +16,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * The olive is `primary` in light and `selection` in dark: dark's `primary`
  * is the brand yellow (#ffdd00), which glares on the near-black page and pulls
  * the eye harder than the row title it sits beside, so dark takes the muted
- * olive the palette keeps for the same theme (`selection`, #4f5a10 — the light
- * primary's own hue) rather than the accent.
+ * olive the palette keeps for the same theme (`selection` — the light primary's
+ * hue, lifted for the dark page) rather than the accent.
  *
  * The off pair follows the scheme as well, because a grip that always takes
  * `primaryForeground` is near-black in dark mode and vanishes into the off

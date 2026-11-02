@@ -130,7 +130,7 @@ describe('webhook body validation', () => {
     const root = webhookBodySchema.safeParse({ type: 'string', pattern: unsupported });
     expect(root.success).toBe(false);
     expect(root.error?.issues.map(issue => issue.message)).toEqual([
-      'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+      'Pattern must not combine quantifiers that exceed 64 combined repetitions',
     ]);
     expect(webhookBodySchema.safeParse({ pattern: '(a)\\1' }).error?.issues[0]?.message).toBe(
       'Pattern must not use backreferences'

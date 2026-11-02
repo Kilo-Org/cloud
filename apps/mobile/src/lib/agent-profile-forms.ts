@@ -9,11 +9,11 @@
 
 import { foldForSearch } from '@/i18n/fold-for-search';
 
-/** Server bound: `ProfileNameSchema`'s `z.string().min(1).max(100)`. */
-const PROFILE_NAME_MAX_LENGTH = 100;
+/** Server bound: `agent-profiles-router.ts`'s `name: z.string().min(1).max(100)`. */
+export const PROFILE_NAME_MAX_LENGTH = 100;
 
-/** Server bound: `ProfileDescriptionSchema`'s `z.string().max(500)`. */
-const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
+/** Server bound: `agent-profiles-router.ts`'s `description: z.string().max(500)`. */
+export const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
 
 /** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
 export const VARIABLE_KEY_MAX_LENGTH = 256;

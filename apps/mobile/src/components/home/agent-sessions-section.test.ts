@@ -307,6 +307,41 @@ describe('Home live section', () => {
     expect(node('SectionHeader').props.actionHidden).toBe(true);
   });
 
+  it('does not reuse the previous session node when the card settles into the zero state', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    const live = newestButton();
+    expect(live.props.accessibilityLabel).toContain('live-1');
+
+    await render();
+    const zero = nodes('Pressable').find(
+      pressable =>
+        pressable.findAll(
+          child =>
+            Object.is(child.type, 'Text') && child.children.includes(i18n.t('home.noLiveSessions'))
+        ).length > 0
+    );
+    if (!zero) {
+      throw new Error('Missing the zero-state newest block');
+    }
+    // The zero state must be its own native view: React Native keeps a prop it
+    // stops receiving, so the reused Android view would go on announcing the
+    // previous session and its button role.
+    expect(zero).not.toBe(live);
+    expect(zero.props.accessibilityLabel).toBeUndefined();
+    expect(zero.props.accessibilityRole).toBeUndefined();
+    expect(
+      nodes('Pressable').some(pressable =>
+        String(pressable.props.accessibilityLabel ?? '').includes('live-1')
+      )
+    ).toBe(false);
+
+    // Returning to a session mounts a labelled control again.
+    await render({ ...settled, activeSessions: [session('live-2', 'busy')] });
+    const revived = newestButton();
+    expect(revived).not.toBe(zero);
+    expect(revived.props.accessibilityLabel).toContain('live-2');
+  });
+
   it('moves the offline notice into the header and keeps the card in place', async () => {
     const sessions = {
       ...settled,

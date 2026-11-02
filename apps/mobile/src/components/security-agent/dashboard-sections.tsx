@@ -13,7 +13,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -132,10 +132,24 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
     // to act on.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <View className="flex-row items-center gap-2 py-3">
-          <ShieldCheck size={16} color={colors.good} />
-          <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-        </View>
+        <Pressable
+          className={cn(
+            // The row's own node carries the touch target: its `py-3` frame
+            // alone renders under the design target, and `hitSlop` would not
+            // move the rect a control-size audit measures.
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between gap-2 py-3 active:opacity-70'
+          )}
+          onPress={() => {
+            pushOnce(findingsHref(scope, { status: 'open' }));
+          }}
+        >
+          <View className="flex-row items-center gap-2">
+            <ShieldCheck size={16} color={colors.good} />
+            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+          </View>
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
+        </Pressable>
       </SectionCard>
     );
   }
@@ -146,7 +160,7 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   return (
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
       <Pressable
-        className="gap-1 py-3 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'gap-1 py-3 active:opacity-70')}
         onPress={() => {
           pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
@@ -315,6 +329,13 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
         <Pressable
           key={repo.repoFullName}
           className={cn(
+            // The row's own node carries the touch target. A row sized by its
+            // content reports only what its lines need, so a repository row
+            // that paints its name line alone measures under the design
+            // target, and `hitSlop` would not move the rect a control-size
+            // audit reads. `py-3` keeps the card's row rhythm and
+            // `items-center` centres the block in the taller box.
+            ROW_TARGET_CLASS,
             'flex-row items-center justify-between gap-2 py-3 active:opacity-70',
             index < data.repoHealth.length - 1 && 'border-b-[0.5px] border-hair-soft'
           )}

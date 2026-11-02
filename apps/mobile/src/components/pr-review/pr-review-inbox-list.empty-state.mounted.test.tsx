@@ -1,5 +1,5 @@
-// The empty slot has two jobs: it must never speak another state's
-// accessibility label, and it must not resize under the sections below it.
+// The empty slot has one job: it must never speak another state's accessibility
+// label.
 //
 // The explorer opened PR Review on Android and TalkBack announced "Loading
 // inbox" over the reconnecting provider's error card. Both states drew a plain
@@ -7,9 +7,9 @@
 // into ONE host view and the loading state's label stayed on it while its
 // children became the notice and its button. Each state renders under its own
 // element identity now; this suite pins that on the loading -> reconnect edge.
-// The same settling also shrank the slot by ~69 dp and pulled the RECENT
-// section up (design-gate layout shift), so the slot keeps the height of the
-// skeleton it replaced.
+// The RECENT section no longer sits below the loading slot at all: the list
+// leaves it out until the inbox settles, so the section can appear at the
+// height the settled body leaves it instead of reserving the placeholder's.
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -142,20 +142,36 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     );
   });
 
-  // A label one level below the slot never reaches Android's accessibility tree:
+  // A label one level below the body never reaches Android's accessibility tree:
   // the outer node has to carry it, or the announcement is lost entirely.
-  it('announces the loading state on the slot node itself', () => {
+  it('announces the loading state on the state container itself', () => {
     const renderer = mountInboxList();
     const [slot] = renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL);
 
     expect(slot).toBeDefined();
-    expect(typeof slot?.props.onLayout).toBe('function');
-    expect(slot?.props.style).toBeUndefined();
+    // The container carries the label and the skeletons sit inside it.
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
 
     settleOnReconnect(renderer);
     expect(
       renderer.root.findAll(node => node.props.accessibilityLabel === LOADING_LABEL)
     ).toHaveLength(0);
+  });
+
+  it('paints the empty section body in the compact form, off its eyebrow', () => {
+    // The INBOX state always has the RECENT section below it, so it never owns
+    // a clear region: the full-size `top` form put a 56 dp bubble over a 64 dp
+    // pin, holding its title 133 dp under the eyebrow and pushing the RECENT
+    // state under the tab bar on a compact phone. Compact drops both, and the
+    // caller's `pt-4` is the separation the dropped pin used to give.
+    inboxState.isPending = false;
+    const renderer = mountInboxList();
+    const [empty] = renderer.root.findAll(node => String(node.type) === 'EmptyState');
+    expect(empty?.props.compact).toBe(true);
+    expect(empty?.props.className).toBe('pt-4');
+    expect(empty?.props.placement).toBe('top');
   });
 
   it('gives the reconnect notice its own container instead of the loading one', () => {
@@ -178,26 +194,14 @@ describe('PrReviewInboxList empty-state accessibility identity', () => {
     ).toHaveLength(0);
     const notices = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
     expect(notices).toHaveLength(1);
-    // ...because the card is not rendered inside the slot the skeletons owned.
+    // ...because the card is not rendered inside the container the skeletons owned.
     expect(String(notices[0]?.parent?.type)).toBe('View');
     expect(notices[0]?.parent).not.toBe(loading[0]);
-    expect(slotOf(notices[0])).not.toBe(loading[0]);
     // The card carries no container label of its own: its title, message and
     // button are read as themselves.
     expect(notices[0]?.parent?.props.accessibilityLabel).toBeUndefined();
   });
 });
-
-// The slot IS the labelled node while loading; a settled body sits inside a
-// fresh slot, so the walk starts at the node and then goes up.
-function slotOf(node: TestRenderer.ReactTestInstance | undefined): TestRenderer.ReactTestInstance {
-  for (let current = node ?? null; current; current = current.parent) {
-    if (typeof current.props.onLayout === 'function') {
-      return current;
-    }
-  }
-  throw new Error('the empty body has no slot container');
-}
 
 function settleOnReconnect(renderer: TestRenderer.ReactTestRenderer): void {
   inboxState.isPending = false;
@@ -208,12 +212,11 @@ function settleOnReconnect(renderer: TestRenderer.ReactTestRenderer): void {
   });
 }
 
-// The skeletons are five rows; the reconnect card is shorter. Letting the slot
-// shrink moved the RECENT section below it by 68.6 dp after the screen had
-// settled, which the design gate reports as a layout shift. The slot therefore
-// remembers the height it had while loading and keeps it for every settled
-// body, so nothing below it moves.
-describe('PrReviewInboxList empty-slot reservation', () => {
+// RECENT is left out while the inbox paints its skeletons. Below them it would
+// either reserve their height for a shorter settled body (which put the RECENT
+// state under the tab bar on a compact phone) or move up when the inbox
+// settled; left out, it appears at the height the settled body leaves it.
+describe('PrReviewInboxList RECENT section', () => {
   beforeEach(() => {
     inboxState.isPending = true;
     inboxState.items = [];
@@ -223,36 +226,20 @@ describe('PrReviewInboxList empty-slot reservation', () => {
     inboxState.laterPageError = false;
   });
 
-  it('keeps the settled body in the height the skeletons measured', () => {
+  it('holds the RECENT section back until the inbox settles', () => {
     const renderer = mountInboxList();
-    const [loading] = renderer.root.findAll(
-      node => node.props.accessibilityLabel === LOADING_LABEL
-    );
-    const slot = slotOf(loading);
-    // While the skeletons are up the slot is exactly as tall as they are.
-    expect(slot.props.style).toBeUndefined();
-    expect(typeof slot.props.onLayout).toBe('function');
-    const reportLayout = slot.props.onLayout as (event: {
-      nativeEvent: { layout: { height: number } };
-    }) => void;
-    act(() => {
-      reportLayout({ nativeEvent: { layout: { height: 253.75 } } });
-    });
-    expect(slot.props.style).toBeUndefined();
+    const eyebrow = () => renderer.root.findAll(node => node.props.children === 'common.recent');
+    expect(eyebrow()).toHaveLength(0);
 
     settleOnReconnect(renderer);
-
-    const [notice] = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
-    expect(slotOf(notice).props.style).toEqual({ minHeight: 253.75 });
+    expect(eyebrow()).toHaveLength(1);
   });
 
-  it('leaves the slot to its own content when nothing was measured', () => {
+  it('draws RECENT under a settled empty body with no reserved air', () => {
     inboxState.isPending = false;
-    inboxState.firstPageErrorState = { kind: 'reconnect' };
-    inboxState.firstPageErrorPlatform = 'bitbucket';
     const renderer = mountInboxList();
-
-    const [notice] = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
-    expect(slotOf(notice).props.style).toBeUndefined();
+    const [empty] = renderer.root.findAll(node => String(node.type) === 'EmptyState');
+    expect(empty).toBeDefined();
+    expect(renderer.root.findAll(node => node.props.children === 'common.recent')).toHaveLength(1);
   });
 });

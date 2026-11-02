@@ -15,6 +15,7 @@ import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
@@ -269,9 +270,7 @@ export function PrReviewOverview({
       <PrOverviewMeta overview={data} />
 
       <View className="gap-2">
-        <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.description')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.description')} />
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
           <View className="rounded-lg bg-card p-4">
             <MarkdownText value={data.bodyMarkdown} variant="assistant" />
@@ -286,25 +285,20 @@ export function PrReviewOverview({
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
 
       {isGitHub ? (
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.review')}
-          </Text>
-          {/* The ScreenHeader already carries the primary Submit-review CTA
-              (same route). This section is its secondary re-entry, so it must
-              not be a second olive primary: the merge section below owns the
-              overview body's single primary action. */}
-          <Button
-            variant="outline"
-            onPress={handleOpenReviewSubmit}
-            accessibilityLabel={t('prReview.reviewPullRequest')}
-          >
-            <View className="flex-row items-center gap-2">
-              <CheckCheck size={14} color={colors.foreground} />
-              <Text>{t('prReview.review')}</Text>
-            </View>
-          </Button>
-        </View>
+        // The ScreenHeader already carries the primary Submit-review CTA
+        // (same route). This section is its secondary re-entry, so it must
+        // not be a second olive primary: the merge section below owns the
+        // overview body's single primary action.
+        <Button
+          variant="outline"
+          onPress={handleOpenReviewSubmit}
+          accessibilityLabel={t('prReview.reviewPullRequest')}
+        >
+          <View className="flex-row items-center gap-2">
+            <CheckCheck size={14} color={colors.foreground} />
+            <Text>{t('prReview.review')}</Text>
+          </View>
+        </Button>
       ) : null}
 
       {isGitHub ? (

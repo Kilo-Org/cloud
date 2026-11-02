@@ -119,7 +119,14 @@ export function GlanceableActiveCard({
         })}
       </View>
       <View className={DIVIDER_CLASS} />
+      {/* Keyed by the newest session: the zero state has to be its own host
+          view. React Native copies the previous props and applies only the keys
+          it receives, so a label this component stops passing keeps its old
+          value on the native view, and Android keeps announcing the previous
+          account's session from the reused node. A new node per session and
+          per zero state is the same remedy the PR-review inbox slot uses. */}
       <Pressable
+        key={newestSession?.id ?? 'no-session'}
         disabled={newestSession === null}
         onPress={() => {
           if (newestSession !== null) {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one contrast guard per shipped surface shares this file's colour-math helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ROW_PALETTE } from '@/lib/agent-color';

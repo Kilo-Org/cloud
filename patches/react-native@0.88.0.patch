@@ -1,7 +1,36 @@
 diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 --- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
 +++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
-@@ -133,7 +133,29 @@
+@@ -86,21 +86,20 @@ static UIColor *defaultPlaceholderColor(void)
+ 
+ - (NSString *)accessibilityLabel
+ {
+-  NSMutableString *accessibilityLabel = [NSMutableString new];
+-
+   NSString *superAccessibilityLabel = [super accessibilityLabel];
++  // An explicit label names the field. The placeholder is example copy drawn
++  // inside an empty field, so appending it to a name that already exists made a
++  // multiline field read as its label followed by its whole example document.
++  // Only a field with no name of its own falls back to the example it shows.
+   if (superAccessibilityLabel.length > 0) {
+-    [accessibilityLabel appendString:superAccessibilityLabel];
++    return superAccessibilityLabel;
+   }
+ 
+   if (self.placeholder.length > 0 && self.attributedText.string.length == 0) {
+-    if (accessibilityLabel.length > 0) {
+-      [accessibilityLabel appendString:@" "];
+-    }
+-    [accessibilityLabel appendString:self.placeholder];
++    return self.placeholder;
+   }
+ 
+-  return accessibilityLabel;
++  return @"";
+ }
+ 
+ #pragma mark - Properties
+@@ -133,7 +132,29 @@ static UIColor *defaultPlaceholderColor(void)
      return;
    }
  

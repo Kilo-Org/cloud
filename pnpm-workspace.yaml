@@ -345,6 +345,11 @@ patchedDependencies:
   # KILO-APP-6H; react/react-native#58299). Also synchronizes the
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
+  # iOS accessibility: a multiline text view appended its placeholder to an
+  # explicit accessibility label, so a field with example copy was announced as
+  # its label followed by the whole example (MCP headers/environment JSON). The
+  # label now wins; a view with no label of its own still falls back to the
+  # placeholder.
   react-native@0.88.0: patches/react-native@0.88.0.patch
   # Android: read the live entry of the unique work chain, not the first one.
   # A finished first entry made a cold start re-enqueue with REPLACE, which

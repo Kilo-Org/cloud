@@ -19,6 +19,11 @@ vi.mock('react-native', () => ({
   },
   useWindowDimensions: () => ({ fontScale: platform.fontScale }),
 }));
+// The skeleton reads the live font scale, which prefers the app's own module
+// and only falls back to the window's; the suite keeps the fallback path.
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
+  useLiveFontScale: () => platform.fontScale,
+}));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
@@ -139,9 +144,10 @@ describe('SessionComposerSkeleton', () => {
   });
 
   it('keeps the field on the composer font-scaled height', () => {
-    // ChatComposer: the input's line box times the system font scale, plus its
-    // own vertical padding. The slot must follow it or the row clips its text.
-    expect(fieldBoxHeight(1)).toBe(44);
-    expect(fieldBoxHeight(1.3)).toBeCloseTo(20 * 1.3 + 24);
+    // ChatComposer: the input's line box times the live system font scale, plus
+    // its own vertical padding and the field's 1 pt border on each side. The
+    // slot must follow it or the row clips its text.
+    expect(fieldBoxHeight(1)).toBe(46);
+    expect(fieldBoxHeight(1.3)).toBeCloseTo(20 * 1.3 + 24 + 2);
   });
 });

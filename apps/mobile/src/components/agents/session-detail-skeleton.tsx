@@ -1,6 +1,7 @@
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { BlurBar } from '@/components/ui/blur-bar';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -79,9 +80,10 @@ export function SessionReadOnlyFooterPlaceholder() {
   );
 }
 
-/** ChatComposer's input line box and vertical padding, in points. */
+/** ChatComposer's input line box, vertical padding and field border, in points. */
 const COMPOSER_FIELD_LINE = 20;
 const COMPOSER_FIELD_PADDING = 24;
+const COMPOSER_FIELD_BORDER = 2;
 
 /**
  * Holds the composer's place while the session loads: the route paints it
@@ -98,11 +100,13 @@ const COMPOSER_FIELD_PADDING = 24;
  * Sizes are written in points, not scale steps: this app's rem is 14 pt, so
  * `h-11` paints 38.5 pt and would leave the slot 6 pt short of the composer that
  * replaces it. The field keeps the composer's own height rule — its line's box
- * plus the input's vertical padding, both times the system font scale — so the
- * chip neither clips its own row nor leaves a gap at any text size.
+ * times the live system font scale, plus the input's vertical padding and the
+ * field's own 1 pt border on each side — so the box neither clips its row nor
+ * leaves a gap at any text size, and it follows a text-size change without a
+ * remount, the way the composer does.
  */
 export function SessionComposerSkeleton() {
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const control = Platform.OS === 'android' ? 'h-[48px] w-[48px]' : 'h-[44px] w-[44px]';
   return (
     <BlurBar>
@@ -110,7 +114,10 @@ export function SessionComposerSkeleton() {
         <View className="flex-row items-center">
           <View
             className="flex-1 justify-center"
-            style={{ height: COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING }}
+            style={{
+              height:
+                COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
+            }}
           >
             <Skeleton className="h-full w-full rounded-[20px]" />
           </View>

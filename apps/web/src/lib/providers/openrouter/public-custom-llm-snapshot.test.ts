@@ -59,6 +59,56 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
     });
   });
 
+  test('prices a public custom LLM from its first pricing tier and keeps the data policy', () => {
+    const models = buildPublicCustomLlmSnapshotModels(
+      [
+        {
+          ...publicCustomLlm,
+          definition: {
+            ...publicCustomLlm.definition,
+            pricing: [
+              {
+                start_context_length: 0,
+                pricing: {
+                  prompt_per_million: 2,
+                  completion_per_million: 8,
+                  input_cache_read_per_million: null,
+                  input_cache_write_per_million: null,
+                },
+              },
+              {
+                start_context_length: 128_000,
+                pricing: {
+                  prompt_per_million: 4,
+                  completion_per_million: 16,
+                  input_cache_read_per_million: null,
+                  input_cache_write_per_million: null,
+                },
+              },
+            ],
+          },
+        },
+      ],
+      new Set(),
+      '2026-10-08T00:00:00.000Z'
+    );
+
+    expect(models.map(entry => entry.model.endpoint)).toEqual([
+      {
+        provider_display_name: 'Other',
+        is_free: false,
+        pricing: { prompt: '0.000002000000', completion: '0.000008000000' },
+        data_policy: { training: true, retainsPrompts: true },
+      },
+      {
+        provider_display_name: 'Other',
+        is_free: false,
+        pricing: { prompt: '0.000002000000', completion: '0.000008000000' },
+        data_policy: { training: true, retainsPrompts: true },
+      },
+    ]);
+  });
+
   test('omits a public custom LLM listed as unavailable', () => {
     const models = buildPublicCustomLlmSnapshotModels(
       [{ ...publicCustomLlm, public_id: 'Acme/Model' }],

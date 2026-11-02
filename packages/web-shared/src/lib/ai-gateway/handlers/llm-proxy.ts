@@ -665,7 +665,7 @@ export async function handleLlmProxyRequest(
   // Anonymous callers cannot use private custom LLMs, so for them a private
   // custom LLM id must behave exactly like an unknown id.
   const isPubliclyFreeModel =
-    (customLlm !== null && !isPrivateCustomLlm) ||
+    (customLlm !== null && !isPrivateCustomLlm && !customLlm.definition.pricing) ||
     isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
@@ -997,23 +997,14 @@ export async function handleLlmProxyRequest(
   }
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
-    const {
-      allowedProviders,
-      balance,
-      balanceLimitedByUserAllowance,
-      effectiveProviderConfig,
-      groupModelAllowed,
-      groupModelAllowedForInferenceProviderUserByok,
-      groupProvidersAllowed,
-    } = await accessCheckResolver.get();
-
-    if (
-      !canSpendPaidUsage(balance) &&
-      !effectiveProviderContext.isFree &&
-      !effectiveProviderContext.userByok &&
-      !effectiveProviderContext.skipBalanceCheck
-    ) {
+  if (
+    !isAnonymousContext(user) &&
+    !effectiveProviderContext.isFree &&
+    !effectiveProviderContext.userByok &&
+    !effectiveProviderContext.skipBalanceCheck
+  ) {
+    const { balance, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
+    if (!canSpendPaidUsage(balance)) {
       return await creditsBlockedResponse({
         user,
         balance,
@@ -1021,6 +1012,16 @@ export async function handleLlmProxyRequest(
         balanceLimitedByUserAllowance,
       });
     }
+  }
+
+  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
+    const {
+      allowedProviders,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
+      groupProvidersAllowed,
+    } = await accessCheckResolver.get();
 
     const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
       ? groupModelAllowedForInferenceProviderUserByok
@@ -1053,6 +1054,7 @@ export async function handleLlmProxyRequest(
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
+    custom_llm_pricing: customLlm?.definition.pricing,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -1299,6 +1301,7 @@ export async function handleLlmProxyRequest(
     kind: requestBodyParsed.kind,
     isFree: usageContext.is_free,
     userByok: usageContext.user_byok,
+    customLlmPricing: usageContext.custom_llm_pricing,
     logging: requestLogging,
     responseTransforms: effectiveProviderContext.provider.responseTransforms,
   });

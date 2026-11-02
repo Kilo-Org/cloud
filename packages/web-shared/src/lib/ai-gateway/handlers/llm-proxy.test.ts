@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import type { OrganizationSettings } from '@kilocode/db/schema-types';
+import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
@@ -3418,6 +3418,127 @@ describe('custom LLM requests', () => {
     expect(await privateResponse.json()).toEqual(await unknownResponse.json());
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  const pricing: CustomPricingTiers = [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 1,
+        completion_per_million: 2,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ];
+
+  function pricedCustomLlm(publicId: string, isPublic: boolean): CustomLlm {
+    const unpriced = customLlm(publicId, isPublic);
+    return { ...unpriced, definition: { ...unpriced.definition, pricing } };
+  }
+
+  function setBalance(balance: number) {
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+  }
+
+  function resolveCustomProvider(isFree: boolean, bypassAccessCheck: boolean) {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: customProvider,
+      userByok: null,
+      isFree,
+      bypassAccessCheck,
+    });
+  }
+
+  it('blocks a user without balance from a private custom LLM with pricing', async () => {
+    setBalance(0);
+    mockCustomLlm(pricedCustomLlm('acme/private-model', false));
+    resolveCustomProvider(false, true);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(402);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('bills a user with balance for a private custom LLM with pricing', async () => {
+    setBalance(1000);
+    mockCustomLlm(pricedCustomLlm('acme/private-model', false));
+    resolveCustomProvider(false, true);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      provider: 'custom',
+      is_free: false,
+      custom_llm_pricing: pricing,
+    });
+    expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ isFree: false, customLlmPricing: pricing })
+    );
+  });
+
+  it('serves a private custom LLM without pricing to a user without balance', async () => {
+    setBalance(0);
+    mockCustomLlm(customLlm('acme/private-model', false));
+    resolveCustomProvider(true, true);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      is_free: true,
+      custom_llm_pricing: undefined,
+    });
+  });
+
+  it('requires an anonymous caller to sign in for a public custom LLM with pricing', async () => {
+    setAnonymousAuth();
+    mockCustomLlm(pricedCustomLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model')) as never
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'paid_model_auth_required',
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not apply free-model rate limiting to a public custom LLM with pricing', async () => {
+    mockCustomLlm(pricedCustomLlm('acme/public-model', true));
+    resolveCustomProvider(false, false);
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    try {
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('acme/public-model')) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    }
   });
 
   it('returns model not found instead of falling back when the caller is not eligible', async () => {

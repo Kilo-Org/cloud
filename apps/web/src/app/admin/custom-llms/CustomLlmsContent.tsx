@@ -131,6 +131,7 @@ type EditorState = {
 type CopyState = {
   sourcePublicId: string;
   sourceIsPublic: boolean;
+  sourceIsPriced: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -169,7 +170,10 @@ type CopyInput = {
 };
 
 /** A save that makes a custom LLM public, which needs confirmation. */
-type PendingChange = { kind: 'upsert'; input: UpsertInput } | { kind: 'copy'; input: CopyInput };
+type PendingChange = { priced: boolean } & (
+  | { kind: 'upsert'; input: UpsertInput }
+  | { kind: 'copy'; input: CopyInput }
+);
 
 const initialEditorState: EditorState = {
   open: false,
@@ -222,6 +226,7 @@ export function CustomLlmsContent() {
     setCopy({
       sourcePublicId,
       sourceIsPublic: source.public !== undefined,
+      sourceIsPriced: source.pricing !== undefined,
       publicId: sourcePublicId,
       displayName: source.display_name,
       internalId: source.internal_id ?? '',
@@ -317,7 +322,7 @@ export function CustomLlmsContent() {
       internal_id: internalId || undefined,
     };
     if (copy.sourceIsPublic) {
-      setPendingChange({ kind: 'copy', input });
+      setPendingChange({ kind: 'copy', input, priced: copy.sourceIsPriced });
       return;
     }
     await submitCopy(input);
@@ -393,7 +398,7 @@ export function CustomLlmsContent() {
       credentials: parsedCredentials,
     };
     if (input.definition.public !== undefined && !editor.wasPublic) {
-      setPendingChange({ kind: 'upsert', input });
+      setPendingChange({ kind: 'upsert', input, priced: input.definition.pricing !== undefined });
       return;
     }
     await submitUpsert(input);
@@ -635,7 +640,10 @@ export function CustomLlmsContent() {
                 otherwise. Without it, only that API is served.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Custom LLMs are always free for users. To make the model available to every user,
+                Custom LLMs are free for users unless the definition sets <code>pricing</code>, a
+                list of tiers in the same format as a custom pricing entry&apos;s{' '}
+                <code>pricing</code>. Priced custom LLMs bill users like other paid models and are
+                not available to signed-out users. To make the model available to every user,
                 replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
@@ -678,11 +686,19 @@ export function CustomLlmsContent() {
             <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
-                <p>
-                  Every Kilo user, including signed-out users, will be able to use{' '}
-                  <code className="font-mono">{pendingChange?.input.public_id}</code> for free. Kilo
-                  pays for all usage.
-                </p>
+                {pendingChange?.priced ? (
+                  <p>
+                    Every signed-in Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing.
+                  </p>
+                ) : (
+                  <p>
+                    Every Kilo user, including signed-out users, will be able to use{' '}
+                    <code className="font-mono">{pendingChange?.input.public_id}</code> for free.
+                    Kilo pays for all usage.
+                  </p>
+                )}
                 <p>
                   Test this definition with a local web app before saving it. A broken definition
                   fails requests for everyone who can use it.

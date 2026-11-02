@@ -2,6 +2,7 @@ import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { MicrodollarUsage, Organization } from '@kilocode/db';
+import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { GatewayApiKind } from '@kilocode/usage-contracts';
 import type { OpenAI } from 'openai';
 
@@ -129,6 +130,8 @@ export type MicrodollarUsageContext = {
   provider: ProviderId;
   requested_model: string;
   readonly is_free: boolean;
+  /** The requested custom LLM's pricing, which takes precedence over custom pricing. */
+  custom_llm_pricing?: CustomPricingTiers;
   promptInfo: PromptInfo;
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;

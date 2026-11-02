@@ -94,9 +94,10 @@ export type GetProviderProviderResult = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
-  /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
-   *  require explicit admin opt-in. */
+  /** Skip paid-auth and organization policy checks. Used by bespoke direct-byok
+   *  ids and non-public custom_llm2 because both already require explicit admin
+   *  opt-in. A request that is neither free nor user funded still needs a
+   *  balance. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -264,8 +265,11 @@ async function isEligibleForCustomLlm(
   user: User | AnonymousUserContext,
   organizationId: string | undefined
 ) {
+  // An anonymous caller has no balance to bill.
+  if (isAnonymousContext(user))
+    return isPublicCustomLlm(customLlm.definition) && !customLlm.definition.pricing;
   if (isPublicCustomLlm(customLlm.definition)) return true;
-  if (isAnonymousContext(user) || !organizationId) return false;
+  if (!organizationId) return false;
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
@@ -337,15 +341,15 @@ async function resolveCustomLlmProvider(
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
-    isFree: true,
+    isFree: definition.pricing === undefined,
     bypassAccessCheck: !isPublic,
   };
 }
 
 /**
- * A public custom LLM serves anyone for free on Kilo's credential, so like other
- * free models it drops paid server features before the definition's own
- * `extra_body` applies. Private custom LLMs keep them.
+ * A public custom LLM serves anyone on Kilo's credential, so like free models it
+ * drops paid server features before the definition's own `extra_body` applies,
+ * even when it sets pricing. Private custom LLMs keep them.
  */
 function withoutPaidServerFeatures(provider: Provider): Provider {
   return {

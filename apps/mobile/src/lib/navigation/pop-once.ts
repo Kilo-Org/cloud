@@ -1,38 +1,44 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { BackHandler } from 'react-native';
 
-import { armLeaveSettle, BACK_COMMIT_MS, insideLeaveSettle, insideWindow } from './leave-settle';
+import {
+  armLeaveSettle,
+  backAcceptedBy,
+  clearAcceptedBack,
+  insideLeaveSettle,
+  noteAcceptedBack,
+} from './leave-settle';
 
 /**
  * A `router.back()` that dismisses the calling route at most once, and never
  * once that route is already on its way out.
  *
  * A save the screen awaits can resolve after the user left (header Back,
- * Android Back, the iOS swipe), and it can also resolve before the navigator
- * has finished applying the user's own Back. Both screens of that pair must not
- * pop: a single Back closes one screen, never the one beneath it.
+ * Android Back, the iOS swipe), and it can also resolve after the user's Back
+ * but before the navigator applied it. Both screens of that pair must not pop:
+ * a single Back closes one screen, never the one beneath it.
  *
- * Two marks say the route is leaving, and both expire instead of latching. A
- * Back this route accepts marks the route for the navigator's commit turnaround
- * (`BACK_COMMIT_MS`), which is the only span in which the save could dispatch a
- * competing pop. `isFocused()` stays as the backstop for the header control and
- * the swipe, which no Back listener sees; a route the navigator already removed
- * reports itself unfocused.
+ * The two marks that say so end differently on purpose. A Back this route
+ * accepted belongs to this route and is forgotten when the route blurs — the
+ * navigator applying it — or when it leaves at all, so a slow device only
+ * lengthens the interval and a cancelled leave clears it explicitly. A
+ * dismissal keeps a bounded window because the route it describes is already
+ * gone; `LEAVE_SETTLE_MS` carries the exit-animation measurement that bounds it.
  *
  * The other direction lives in `LeaveSettleMount`: once this route is removed,
- * a Back still inside the exit animation is spent by the app shell instead, and
- * this hook's own dismissal opens that window.
+ * a Back still inside that window is spent by the app shell instead, and this
+ * hook's own dismissal opens it.
  */
 export function usePopOnce(): () => void {
   const navigation = useNavigation();
   const router = useRouter();
-  const acceptedBackAtRef = useRef(0);
+  const routeId = useId();
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (navigation.isFocused()) {
-        acceptedBackAtRef.current = Date.now();
+        noteAcceptedBack(routeId, Date.now());
       }
       // The press takes its usual path: the navigator pops this screen, and a
       // dismissal that resolves meanwhile is suppressed by the mark above.
@@ -41,18 +47,28 @@ export function usePopOnce(): () => void {
     return () => {
       subscription.remove();
     };
-  }, [navigation]);
+  }, [navigation, routeId]);
+
+  // The route blurring is the navigator having applied the Back, however long
+  // that took. A leave the reader cancels never blurs, so the guard that
+  // cancelled it clears the mark instead. Unmounting ends it too: this route is
+  // gone, so nothing of its Back can be pending any more.
+  useEffect(() => {
+    const forget = () => {
+      clearAcceptedBack(routeId);
+    };
+    const unsubscribe = navigation.addListener('blur', forget);
+    return () => {
+      unsubscribe();
+      forget();
+    };
+  }, [navigation, routeId]);
 
   return useCallback(() => {
-    const now = Date.now();
-    if (
-      !navigation.isFocused() ||
-      insideLeaveSettle(now) ||
-      insideWindow(acceptedBackAtRef.current, now, BACK_COMMIT_MS)
-    ) {
+    if (!navigation.isFocused() || insideLeaveSettle(Date.now()) || backAcceptedBy(routeId)) {
       return;
     }
-    armLeaveSettle(now);
+    armLeaveSettle(Date.now());
     router.back();
-  }, [navigation, router]);
+  }, [navigation, routeId, router]);
 }

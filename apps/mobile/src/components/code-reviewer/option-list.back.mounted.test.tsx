@@ -11,7 +11,7 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BACK_COMMIT_MS, resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import { clearAcceptedBack, resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { OptionList } from './option-list';
 
@@ -33,6 +33,8 @@ const backPress = vi.hoisted(() => {
 const routerBack = vi.hoisted(() => vi.fn());
 // Route focus as the navigator reports it.
 const focus = vi.hoisted(() => ({ focused: true }));
+// The navigator's blur event: what applying a Back emits.
+const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
 
 vi.mock('react-native', () => ({
   BackHandler: {
@@ -43,7 +45,17 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
-  useNavigation: () => ({ isFocused: () => focus.focused }),
+  useNavigation: () => ({
+    isFocused: () => focus.focused,
+    addListener: (event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set();
+      set.add(listener);
+      listeners.set(event, set);
+      return () => {
+        set.delete(listener);
+      };
+    },
+  }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -198,11 +210,13 @@ describe('OptionList hardware Back during a save', () => {
     const renderer = await mount(() => gate.promise);
     await press(row(renderer, 'All'));
 
-    // The navigator has not committed the pop yet, so the route still reports
+    // The navigator has not applied the pop yet, so the route still reports
     // itself focused; only the Back this screen just accepted keeps the save
-    // from dispatching a competing pop.
+    // from dispatching a competing pop. No clock is involved: a slow device
+    // that takes seconds to apply it must behave the same.
     expect(backPress.press()).toBe(false);
     expect(focus.focused).toBe(true);
+    now += 10_000;
     await settleSave(gate);
 
     expect(routerBack).not.toHaveBeenCalled();
@@ -215,10 +229,45 @@ describe('OptionList hardware Back during a save', () => {
 
     // A Back this screen accepts, then the leave is cancelled (a guard asking
     // about unsaved edits, answered Keep editing): the route stays focused and
-    // mounted. The mark must not outlive that press.
+    // mounted, and the guard reports the cancellation.
     expect(backPress.press()).toBe(false);
-    now += BACK_COMMIT_MS;
+    clearAcceptedBack();
     await settleSave(gate);
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets the accepted Back when the navigator applies it', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const renderer = await mount(() => gate.promise);
+    await press(row(renderer, 'All'));
+    expect(backPress.press()).toBe(false);
+
+    // The navigator applying the Back blurs this route.
+    focus.focused = false;
+    for (const listener of listeners.get('blur') ?? []) {
+      listener();
+    }
+    await settleSave(gate);
+
+    expect(routerBack).not.toHaveBeenCalled();
+  });
+
+  it('does not let a Back on one screen suppress the next screen’s save', async () => {
+    const first = Promise.withResolvers<boolean>();
+    const firstRenderer = await mount(() => first.promise);
+    await press(row(firstRenderer, 'All'));
+    expect(backPress.press()).toBe(false);
+    await act(async () => {
+      firstRenderer.unmount();
+    });
+
+    // A new screen: its own save must dismiss it even though the previous
+    // screen left with a Back the navigator was still applying.
+    const second = Promise.withResolvers<boolean>();
+    const secondRenderer = await mount(() => second.promise);
+    await press(row(secondRenderer, 'All'));
+    await settleSave(second);
 
     expect(routerBack).toHaveBeenCalledTimes(1);
   });

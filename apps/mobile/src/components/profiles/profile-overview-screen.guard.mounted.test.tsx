@@ -12,6 +12,7 @@ import {
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
 import { act } from '@/test/renderer';
+import { backAcceptedBy, noteAcceptedBack, resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
@@ -158,6 +159,7 @@ function pressBack(handler = h.guard.handler) {
 describe('ProfileOverviewScreen unsaved metadata guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetLeaveSettle();
     h.repeatSawEnabled = [];
     h.guard.enabled = false;
     h.guard.handler = undefined;
@@ -197,6 +199,22 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
     expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
       'Unsaved description'
     );
+  });
+
+  it('Keep editing frees the Back it was asked about', async () => {
+    const { renderer } = await mountScreen();
+
+    changeText(renderer.root, 'Profile description', 'Unsaved description');
+    // The Back that opened the prompt is recorded before this guard answers.
+    noteAcceptedBack('profile-overview-route', Date.now());
+    pressBack();
+
+    act(() => {
+      discardRequest().onCancel?.();
+    });
+
+    // Nothing is leaving, so a save that resolves now must still pop.
+    expect(backAcceptedBy('profile-overview-route')).toBe(false);
   });
 
   it('Discard replays the leave and disarms the guard', async () => {

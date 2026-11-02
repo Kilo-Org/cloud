@@ -33,7 +33,10 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
-  useNavigation: () => ({ isFocused: () => focus.focused }),
+  useNavigation: () => ({
+    isFocused: () => focus.focused,
+    addListener: () => () => undefined,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),

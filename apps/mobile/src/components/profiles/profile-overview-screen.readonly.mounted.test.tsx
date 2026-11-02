@@ -55,7 +55,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ isFocused: () => true }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   usePreventRemove: (enabled: boolean) => {
     h.guard.enabled = enabled;
   },

@@ -471,7 +471,7 @@ describe('session step-up ceremony', () => {
     );
   });
 
-  it('binds a sensitive operation proof to its action and keeps it unconsumed', async () => {
+  it('uses the same session proof for a sensitive write', async () => {
     const user = await createAdmin();
     const authenticator = createTestAuthenticator();
     await insertCredential(user.id, authenticator);
@@ -497,26 +497,16 @@ describe('session step-up ceremony', () => {
         { actionClass: 'sensitive_write', actionBinding }
       )
     );
-    expect(proof.purpose).toBe('operation');
-    expect(proof.action_binding_hash).not.toBeNull();
-    expect(proof.consumed_at).toBeNull();
-    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeLessThanOrEqual(5.1);
+    expect(proof.purpose).toBe('session');
+    expect(proof.action_binding_hash).toBeNull();
+    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(14.9);
 
     const fresh = await evaluateStepUp({
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
-      actionBinding,
     });
     expect(fresh.state.status).toBe('fresh');
-
-    const otherAction = await evaluateStepUp({
-      userId: user.id,
-      webSessionId,
-      actionClass: 'sensitive_write',
-      actionBinding: { ...actionBinding, inventoryId: 'trpc.admin.other' },
-    });
-    expect(otherAction.state.status).toBe('required');
   });
 
   it('supersedes the previous session proof', async () => {

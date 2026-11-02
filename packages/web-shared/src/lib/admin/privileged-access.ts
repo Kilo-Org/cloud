@@ -160,7 +160,8 @@ export type StepUpErrorCode =
   | 'NOT_ENROLLED'
   | 'SESSION_UNBOUND'
   | 'BEARER_NOT_ALLOWED'
-  | 'REAUTH_REQUIRED';
+  | 'REAUTH_REQUIRED'
+  | 'STEP_UP_UNAVAILABLE';
 
 /**
  * Cause attached to a FORBIDDEN tRPC error when enforcement refuses a request

@@ -27,7 +27,7 @@ import {
   markPrivilegedGuard,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
-import { getAdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
 import {
@@ -380,13 +380,13 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
 
 const adminGuardMiddleware = t.middleware(adminGuardFn);
 
-// Observe-only measurement for every admin procedure. In `off` it performs no
-// reads; in `observe` it records whether enforcement would block; `enforce` is
-// clamped by config during PR2. Specialized guards chained on adminProcedure
-// reuse `adminStepUpState` instead of evaluating again.
-const adminStepUpObserveMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
-  const mode = getAdminStepUpMode();
-  if (mode === 'off' || path.startsWith('stepUp.')) return next();
+// Enforcement for every admin procedure when the switch is on. When it is off
+// this performs no reads. `stepUp.*` is exempt so the dialog can read status and
+// the user can lock a session; both still require an admin browser session.
+// Specialized guards chained on adminProcedure reuse `adminStepUpState`.
+const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
+  const enabled = isAdminStepUpEnabled();
+  if (!enabled || path.startsWith('stepUp.')) return next();
 
   const credential =
     ctx.credential ??
@@ -402,7 +402,7 @@ const adminStepUpObserveMiddleware = t.middleware(async ({ ctx, path, type, next
     credential,
     webSessionId: ctx.webSessionId,
     actionClass,
-    mode,
+    enabled,
     route: path,
     method: type,
     surface: 'trpc',
@@ -413,4 +413,4 @@ const adminStepUpObserveMiddleware = t.middleware(async ({ ctx, path, type, next
 
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)
-  .use(adminStepUpObserveMiddleware);
+  .use(adminStepUpEnforcementMiddleware);

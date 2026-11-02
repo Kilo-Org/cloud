@@ -209,28 +209,6 @@ export async function revokeStepUpProofs(
   return revoked.length;
 }
 
-/** Revoke the live proofs bound to one browser session ("Lock now"). */
-export async function revokeCurrentSessionStepUpProofs(
-  userId: string,
-  webSessionId: string,
-  reason: string,
-  now: Date = new Date()
-): Promise<number> {
-  const revoked = await db
-    .update(session_step_up_proofs)
-    .set({ revoked_at: now.toISOString(), revoked_reason: reason })
-    .where(
-      and(
-        eq(session_step_up_proofs.kilo_user_id, userId),
-        eq(session_step_up_proofs.session_id_hash, hashWebSessionId(webSessionId)),
-        isNull(session_step_up_proofs.revoked_at)
-      )
-    )
-    .returning({ id: session_step_up_proofs.id });
-
-  return revoked.length;
-}
-
 /** Remove all step-up rows for a user as part of hard deletion/anonymization. */
 export async function deleteStepUpRowsForUser(
   tx: DrizzleTransaction,

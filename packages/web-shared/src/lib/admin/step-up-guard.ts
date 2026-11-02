@@ -8,29 +8,21 @@ import {
   type StepUpErrorCode,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { stepUpPolicyFor } from '@kilocode/web-shared/lib/admin/step-up-policy';
-import {
-  evaluateStepUp,
-  type StepUpActionBinding,
-} from '@kilocode/web-shared/lib/admin/step-up-store';
-import {
-  emitStepUpObservation,
-  reportStepUpFailure,
-} from '@kilocode/web-shared/lib/admin/step-up-observation';
-import type { AdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
+import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 
 export type RunStepUpGuardParams = {
   userId: string;
   credential: PrivilegedCredentialKind;
   webSessionId?: string | null;
   actionClass: PrivilegedActionClass;
-  actionBinding?: StepUpActionBinding | null;
-  mode: AdminStepUpMode;
+  enabled: boolean;
   route: string | null;
   method: string | null;
   surface: 'rest' | 'trpc' | 'server-component';
 };
 
-function codeForState(state: AdminStepUpState): StepUpErrorCode {
+export function stepUpErrorCodeForState(state: AdminStepUpState): StepUpErrorCode {
   switch (state.status) {
     case 'session_unbound':
       return 'SESSION_UNBOUND';
@@ -47,64 +39,66 @@ function codeForState(state: AdminStepUpState): StepUpErrorCode {
   }
 }
 
+function deny(params: {
+  code: StepUpErrorCode;
+  actionClass: PrivilegedActionClass;
+  message: string;
+}): never {
+  const policy = stepUpPolicyFor(params.actionClass);
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: params.message,
+    cause: new StepUpRequiredError({
+      code: params.code,
+      actionClass: params.actionClass,
+      purpose: policy.purpose,
+      maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
+    }),
+  });
+}
+
 /**
- * Observe or enforce session step-up for one request.
+ * Enforce session step-up for one request when the switch is on. With the
+ * switch off this performs no reads and changes nothing.
  *
- * `off` performs no database read and no telemetry. `observe` measures and
- * emits, and never denies. `enforce` throws FORBIDDEN with a
- * {@link StepUpRequiredError} cause; PR2 clamps config to `observe`, so only an
- * internal test seam can reach it.
+ * Failures:
+ * - non-session credential → BEARER_NOT_ALLOWED
+ * - no live proof → MFA_REQUIRED / MFA_EXPIRED / NOT_ENROLLED / SESSION_UNBOUND
+ * - evaluation or persistence error → STEP_UP_UNAVAILABLE (fail closed)
  */
 export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<AdminStepUpState> {
-  if (params.mode === 'off') return { status: 'absent' };
+  if (!params.enabled) return { status: 'absent' };
 
-  let state: AdminStepUpState;
-  let errored = false;
   if (params.credential !== 'session') {
-    state = { status: 'session_unbound' };
-  } else {
-    try {
-      const evaluation = await evaluateStepUp({
-        userId: params.userId,
-        webSessionId: params.webSessionId,
-        actionClass: params.actionClass,
-        actionBinding: params.actionBinding,
-      });
-      state = evaluation.state;
-    } catch (error) {
-      // A measurement must never change the request's outcome. Observe mode
-      // continues as if no step-up state were known; enforce mode still does
-      // not deny on an infrastructure error, because only a deliberate
-      // StepUpRequiredError below may refuse a request.
-      reportStepUpFailure('admin_step_up_evaluate', error);
-      errored = true;
-      state = { status: 'absent' };
-    }
+    deny({
+      code: 'BEARER_NOT_ALLOWED',
+      actionClass: params.actionClass,
+      message: 'MFA requires a browser session',
+    });
   }
 
-  emitStepUpObservation({
-    surface: params.surface,
-    kiloUserId: params.userId,
-    credential: params.credential,
-    actionClass: params.actionClass,
-    state,
-    mode: params.mode,
-    route: params.route,
-    method: params.method,
-    errored,
-  });
+  let state: AdminStepUpState;
+  try {
+    const evaluation = await evaluateStepUp({
+      userId: params.userId,
+      webSessionId: params.webSessionId,
+      actionClass: params.actionClass,
+    });
+    state = evaluation.state;
+  } catch (error) {
+    reportStepUpFailure('admin_step_up_evaluate', error);
+    deny({
+      code: 'STEP_UP_UNAVAILABLE',
+      actionClass: params.actionClass,
+      message: 'MFA verification is temporarily unavailable',
+    });
+  }
 
-  if (params.mode === 'enforce' && !errored && state.status !== 'fresh') {
-    const policy = stepUpPolicyFor(params.actionClass);
-    throw new TRPCError({
-      code: 'FORBIDDEN',
+  if (state.status !== 'fresh') {
+    deny({
+      code: stepUpErrorCodeForState(state),
+      actionClass: params.actionClass,
       message: 'MFA is required for this action',
-      cause: new StepUpRequiredError({
-        code: params.credential !== 'session' ? 'BEARER_NOT_ALLOWED' : codeForState(state),
-        actionClass: params.actionClass,
-        purpose: policy.purpose,
-        maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
-      }),
     });
   }
 

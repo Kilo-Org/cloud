@@ -12,7 +12,7 @@ import {
   type PrivilegedTarget,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
-import { getAdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import {
   userCanExportApiRequestLogs,
@@ -121,7 +121,6 @@ export async function requirePrivilegedActor(
   }
 
   const target = params.target ?? { kind: 'none', id: null };
-  const mode = getAdminStepUpMode();
   const stepUp =
     ctx.adminStepUpState ??
     (await runStepUpGuard({
@@ -129,8 +128,7 @@ export async function requirePrivilegedActor(
       credential,
       webSessionId: ctx.webSessionId,
       actionClass: params.actionClass,
-      actionBinding: { inventoryId: params.inventoryId ?? null, target },
-      mode,
+      enabled: isAdminStepUpEnabled(),
       route: ctx.trpcPath ?? null,
       method: ctx.trpcType ?? null,
       surface: 'trpc',

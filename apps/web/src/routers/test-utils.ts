@@ -13,6 +13,8 @@ export async function createCallerForUser(userId: string, opts?: { deviceSession
   }
   return createCaller({
     user,
+    credential: 'human_bearer',
+    authViaToken: true,
     deviceSessionId: opts?.deviceSessionId,
     headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
   });

@@ -30,7 +30,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { getAdminStepUpMode, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -49,6 +49,7 @@ import {
 import {
   deriveCredentialKind,
   StepUpRequiredError,
+  type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
@@ -165,6 +166,12 @@ export type RequiredPermissions = {
   requestHeaders?: Headers;
   /** How this admin read arrived; server components are not REST routes. */
   stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * Layout-only escape hatch: authenticate the admin but let the caller render
+   * the verification interstitial instead of returning a 403. Never use on a
+   * data route.
+   */
+  skipStepUpGuard?: boolean;
 };
 
 type GetAuthResponse =
@@ -188,6 +195,7 @@ type GetAuthResponse =
       tokenSource?: undefined;
       deviceSessionId?: undefined;
       cloudAgentAuthority?: undefined;
+      credential?: undefined;
       webSessionId?: undefined;
       webSessionPepper?: undefined;
       authenticatedAt?: undefined;
@@ -203,6 +211,7 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: PrivilegedCredentialKind;
       /** Server-only per-session id for MFA step-up; never sent to the browser. */
       webSessionId?: string;
       /** Server-only pepper the session was minted with, for primary re-reads. */
@@ -245,8 +254,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       internalApiUse: result.internalApiUse,
       delegatedWorkload: result.cloudAgentAuthority !== undefined,
     });
-    const mode = getAdminStepUpMode();
-    if (mode !== 'off') {
+    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
       const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
@@ -261,19 +269,19 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           credential,
           webSessionId: result.webSessionId,
           actionClass,
-          mode,
+          enabled: true,
           route,
           method,
           surface,
         });
       } catch (error) {
-        // Only a deliberate step-up refusal may deny. An infrastructure error
-        // (DB unavailable, migration missing) is reported and the request
-        // continues, so observe mode can never lock admins out.
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
-          return authError(403, 'MFA required', result.user.id);
+          return authError(403, error.cause.code, result.user.id);
         }
+        // Fail closed. The guard normally converts evaluation failures itself;
+        // this covers anything unexpected around it.
         reportStepUpFailure('admin_step_up_rest', error);
+        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }
     }
   }
@@ -309,6 +317,17 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     });
   }
 
+  if (result.user) {
+    return {
+      ...result,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
+    };
+  }
   return result;
 }
 

@@ -566,24 +566,24 @@ async function keepAsked(sessionId: string): Promise<void> {
   if (held.asked === null || held.status !== 'idle') {
     return;
   }
-  const kept: Displaced = {
-    id: Math.max(0, ...held.displaced.map(one => one.id)) + 1,
+  /* The entry is written first, and the one it answers with is what the chat
+     draws: its identifier comes from the written list, so a question waiting in
+     the queue that only storage knows about keeps its own. */
+  const stored = await addKept(sessionId, {
     text: held.asked,
     images: held.askedImages,
     model: held.askedModel ?? held.model,
     effort: held.askedEffort,
     afterTurns: held.turns.length,
     outcome: held.failureKey === null ? 'stopped' : 'failed',
-  };
-  const displaced = [...held.displaced, kept];
+  });
   change(sessionId, {
-    displaced,
+    displaced: [...snapshotOf(sessionId).displaced, stored],
     asked: null,
     askedImages: [],
     askedModel: null,
     askedEffort: null,
   });
-  await addKept(sessionId, kept);
 }
 
 /**

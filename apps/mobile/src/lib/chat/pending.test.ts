@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addKept, rememberAsked, rememberFirstQuestion, titledByAsked } from './pending';
+import { addKept, keptIn, rememberAsked, rememberFirstQuestion, titledByAsked } from './pending';
 import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
 const stored = vi.hoisted(() => new Map<string, string>());
@@ -65,7 +65,6 @@ describe('titledByAsked', () => {
   it('names the chat for the first question a later send kept, not the one that replaced it', async () => {
     await rememberFirstQuestion('kept', 'the question it was opened for');
     await addKept('kept', {
-      id: 1,
       text: 'the question it was opened for',
       images: [],
       model: 'kilo/one',
@@ -89,7 +88,6 @@ describe('titledByAsked', () => {
     await rememberFirstQuestion('retried', 'the question it was opened for');
     // The first question was asked again, so the only kept question is the later one.
     await addKept('retried', {
-      id: 1,
       text: 'the question asked after it',
       images: [],
       model: 'kilo/one',
@@ -107,6 +105,30 @@ describe('titledByAsked', () => {
     expect(await titledByAsked([row('retried', '')])).toEqual([
       row('retried', 'the question it was opened for'),
     ]);
+  });
+
+  it('gives a kept question an identifier no written question holds', async () => {
+    const first = await addKept('ids', {
+      text: 'first',
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns: 0,
+      outcome: 'failed',
+    });
+    const second = await addKept('ids', {
+      text: 'second',
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns: 0,
+      outcome: 'failed',
+    });
+
+    expect([first.id, second.id]).toEqual([1, 2]);
+    // Both are written, in the order they were asked.
+    const written = await keptIn('ids');
+    expect(written.map(one => one.text)).toEqual(['first', 'second']);
   });
 
   it('leaves a chat with no question untitled', async () => {

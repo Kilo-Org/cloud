@@ -108,14 +108,23 @@ export function sameQuestion(one: Question & ChatTarget, other: Question & ChatT
 }
 
 /**
- * Adds a kept question to the ones already written down. It reads the list
- * first, because a question can have a copy here that nothing in memory knows
- * about: a retry waiting in the queue is held in memory alone, and only this
- * entry would survive a restart.
+ * Adds a kept question to the ones already written down and answers with the
+ * entry it wrote. It reads the list first, because a question can have a copy
+ * here that nothing in memory knows about: a retry waiting in the queue is held
+ * in memory alone, and only this entry would survive a restart. The identifier
+ * is taken from the same read, so it cannot land on one of those copies.
  */
-export async function addKept(sessionId: string, question: Displaced): Promise<void> {
+export async function addKept(
+  sessionId: string,
+  question: Omit<Displaced, 'id'>
+): Promise<Displaced> {
   const kept = await keptIn(sessionId);
-  await writeKept(sessionId, [...kept.filter(one => one.id !== question.id), question]);
+  const stored: Displaced = {
+    id: Math.max(0, ...kept.map(one => one.id)) + 1,
+    ...question,
+  };
+  await writeKept(sessionId, [...kept.filter(one => !sameQuestion(one, question)), stored]);
+  return stored;
 }
 
 /**

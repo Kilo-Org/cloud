@@ -98,7 +98,7 @@ function oauthSentryContext(searchParams: URLSearchParams): {
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (verifiedState.owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, verifiedState.owner.id);
+      await ensureOrganizationAccess({ user, tokenSource }, verifiedState.owner.id);
     } else if (verifiedState.owner.id !== user.id) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }

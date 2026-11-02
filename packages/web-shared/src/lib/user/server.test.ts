@@ -1456,19 +1456,29 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect(result.user?.id).toBe(admin.id);
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({
       event: 'admin_access',
       surface: 'rest',
       kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'super_admin',
+      credential: 'human_bearer',
+      wouldBlock: true,
       kiloUserId: admin.id,
       email: admin.google_user_email,
       route: '/admin/api/safety-identifiers',
       method: null,
       ip: '203.0.113.7',
       tokenSource: null,
+    });
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'sensitive_write',
+      route: '/admin/api/safety-identifiers',
+      kiloUserId: admin.id,
     });
   });
 
@@ -1483,7 +1493,13 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect(result.authFailedResponse).not.toBeNull();
-    expect(events).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      kiloUserId: null,
+    });
   });
 
   test('does not emit for adminOnly:false calls even for an admin', async () => {

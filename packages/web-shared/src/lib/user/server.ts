@@ -40,8 +40,13 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
+  emitPrivilegedAccessEvent,
+  methodFromHeaders,
   routeFromHeaders,
+  userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -148,6 +153,8 @@ export type RequiredPermissions = {
   expectedAudience?: string;
   // Derive from an actual Request URL or fixed route path, never a request header.
   requestPathname?: string;
+  /** The actual Request method when the caller has one; preferred over headers. */
+  requestMethod?: string;
   requestHeaders?: Headers;
 };
 
@@ -200,9 +207,44 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
       tokenSource: result.tokenSource ?? null,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+      }),
       route: routeFromHeaders(headersList),
-      // No reliable HTTP method header is available here; do not fabricate one.
-      method: null,
+      method: methodFromHeaders(headersList, opts.requestMethod),
+      userAgentProduct: userAgentProductFromHeaders(headersList),
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
+    const credential = deriveCredentialKind({
+      authViaToken: true,
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+    });
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
+    const { actionClass, inventoryId } = actionClassForRoute({
+      surface: 'rest',
+      route: route ?? '',
+      method,
+    });
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      user: result.user ?? undefined,
+      credential,
+      outcome: result.user ? 'succeeded' : 'denied',
+      actionClass,
+      actionId: inventoryId,
+      target: null,
+      wouldBlock: credential !== 'session',
+      userAgentProduct: userAgentProductFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route,
+      method,
       ip: clientIpFromHeaders(headersList),
     });
   }

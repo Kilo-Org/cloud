@@ -15,6 +15,7 @@ export default async function WelcomeLayout({
   const organizationId = decodeURIComponent(id);
   const result = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES, {
     surface: 'server-component',
+    requestMethod: 'GET',
   });
   if (!result.success) {
     const href =

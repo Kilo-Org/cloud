@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Disconnect revokes stored OAuth credentials, so authenticated owners can perform it after billing access expires.
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL), 303);
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         );
       }
       organizationId = parsedOrgId.data;
-      await ensureOrganizationAccess({ user }, organizationId);
+      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
     }
 
     const instance = organizationId

@@ -51,7 +51,7 @@ function handleTRPCError(error: unknown): NextResponse {
  */
 export async function POST(request: Request) {
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
     if (authFailedResponse) {
       return authFailedResponse;
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     if (organizationId) {
       // Organization context
-      await ensureOrganizationAccess({ user }, organizationId);
+      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
 
       const sessionOwnership = await verifyOrgOwnsSessionByCloudAgentId(
         db,

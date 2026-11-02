@@ -28,7 +28,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<DefaultsResponse | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: _request.method,
+  });
   if (!success) {
     return nextResponse;
   }

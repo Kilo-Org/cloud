@@ -43,7 +43,7 @@ function jsonError(message: string, status: number, code?: string): Response {
 export async function POST(request: NextRequest): Promise<Response> {
   await connection();
 
-  const { user, authFailedResponse } = await getUserFromAuth({
+  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({
     adminOnly: false,
   });
   if (authFailedResponse) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   let instance: Awaited<ReturnType<typeof getActiveInstance>>;
   try {
     if (organizationId) {
-      await ensureOrganizationAccess({ user } as TRPCContext, organizationId);
+      await ensureOrganizationAccess({ user, tokenSource } as TRPCContext, organizationId);
       await requireActiveSubscriptionOrTrial(organizationId);
       instance = await getActiveOrgInstance(user.id, organizationId);
     } else {

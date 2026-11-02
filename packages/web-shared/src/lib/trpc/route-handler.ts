@@ -24,8 +24,7 @@ export function createTRPCRouteHandler<TCaller>(createCaller: (ctx: TRPCContext)
     handler: (caller: TCaller) => Promise<TResult>
   ): Promise<NextResponse<ErrorResponse | TResult>> {
     try {
-      // Create tRPC context and caller
-      const ctx = await createTRPCContext();
+      const ctx = await createTRPCContext({ req: request });
       const caller = createCaller(ctx);
 
       // Execute the handler and return the result

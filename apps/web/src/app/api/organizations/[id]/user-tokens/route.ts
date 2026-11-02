@@ -46,7 +46,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const organizationId = (await params).id;
 
   // Verify user has access to the organization (any member role is sufficient)
-  const result = await getAuthorizedOrgContext(organizationId);
+  const result = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: request.method,
+  });
 
   if (!result.success) {
     return result.nextResponse;

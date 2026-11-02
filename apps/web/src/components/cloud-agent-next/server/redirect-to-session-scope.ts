@@ -36,6 +36,7 @@ export async function redirectToSessionScope({
   if (session?.organization_id) {
     const target = await getAuthorizedOrgContext(session.organization_id, undefined, {
       surface: 'server-component',
+      requestMethod: 'GET',
     });
     if (!target.success) return;
   }

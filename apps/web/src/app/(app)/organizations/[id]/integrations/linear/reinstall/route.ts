@@ -13,7 +13,7 @@ type RouteContext = {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse || !user) {
     const signInUrl = new URL('/users/sign_in', request.url);
     signInUrl.searchParams.set('callbackPath', request.nextUrl.pathname);
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    await ensureOrganizationAccess({ user }, id, ORGANIZATION_BILLING_ROLES);
+    await ensureOrganizationAccess({ user, tokenSource }, id, ORGANIZATION_BILLING_ROLES);
     await requireActiveSubscriptionOrTrial(id);
   } catch {
     return NextResponse.redirect(new URL('/integrations?error=unauthorized', request.url));

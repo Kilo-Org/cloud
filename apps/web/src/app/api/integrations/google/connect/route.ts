@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
       }
       organizationId = parsedOrgId.data;
-      await ensureOrganizationAccess({ user }, organizationId);
+      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
       await requireOrganizationKiloClawComputeEntitlement(organizationId);
     } else {
       await requireKiloClawAccess(user.id);

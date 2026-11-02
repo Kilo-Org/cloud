@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import {
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
@@ -76,8 +76,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
       // The fetch helper attributes the attempt before resolving it; the
       // access helper records nothing because no elevation was granted.
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({ reason: 'organization_fetch' });
+      const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+      expect(elevationEvents).toHaveLength(1);
+      expect(elevationEvents[0]).toMatchObject({ reason: 'organization_fetch' });
     });
 
     test('a batched admin resolution elevates only live organizations', async () => {
@@ -96,8 +97,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       expect(roles.get(active.id)).toBe('owner');
       expect(roles.get(alsoActive.id)).toBe('owner');
       expect(roles.has(deleted.id)).toBe(false);
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
+      const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+      expect(elevationEvents).toHaveLength(1);
+      expect(elevationEvents[0]).toMatchObject({
         reason: 'organization_access_batch',
         target: 'organizations:2',
       });
@@ -133,8 +135,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
     await expect(ensureOrganizationAccess(ctxFor(admin), organization.id)).resolves.toBe('owner');
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+    expect(elevationEvents).toHaveLength(1);
+    expect(elevationEvents[0]).toMatchObject({
       event: 'admin_access',
       surface: 'trpc',
       kind: 'kilo_admin_elevation',
@@ -160,8 +163,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
     await expect(ensureOrganizationAccess({ user: admin }, organization.id)).resolves.toBe('owner');
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+    expect(elevationEvents).toHaveLength(1);
+    expect(elevationEvents[0]).toMatchObject({
       surface: 'rest',
       kind: 'kilo_admin_elevation',
       kiloUserId: admin.id,
@@ -169,6 +173,31 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       method: null,
       reason: 'organization_access',
       target: `organization:${organization.id}`,
+    });
+  });
+
+  test('a membership observation failure never fails the admin request', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+
+    const originalSelect = db.select.bind(db);
+    let selectCalls = 0;
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      selectCalls += 1;
+      if (selectCalls === 2) throw new Error('membership observation failed');
+      return originalSelect(...args);
+    });
+
+    try {
+      await expect(ensureOrganizationAccess(ctxFor(admin), organization.id)).resolves.toBe('owner');
+    } finally {
+      selectSpy.mockRestore();
+    }
+
+    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+      kind: 'kilo_admin_elevation',
+      membershipRole: null,
+      wouldPassWithoutAdmin: null,
     });
   });
 
@@ -198,8 +227,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
 
     expect(roles.get(first.id)).toBe('owner');
     expect(roles.get(second.id)).toBe('owner');
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+    expect(elevationEvents).toHaveLength(1);
+    expect(elevationEvents[0]).toMatchObject({
       kind: 'kilo_admin_elevation',
       reason: 'organization_access_batch',
       target: 'organizations:2',
@@ -213,8 +243,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     const fetched = await ensureOrganizationAccessAndFetchOrg(ctxFor(admin), organization.id);
 
     expect(fetched.id).toBe(organization.id);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+    expect(elevationEvents).toHaveLength(1);
+    expect(elevationEvents[0]).toMatchObject({
       kind: 'kilo_admin_elevation',
       reason: 'organization_fetch',
       target: `organization:${organization.id}`,
@@ -229,8 +260,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       /Organization not found/
     );
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
+    expect(elevationEvents).toHaveLength(1);
+    expect(elevationEvents[0]).toMatchObject({
       reason: 'organization_fetch',
       target: `organization:${missingId}`,
     });

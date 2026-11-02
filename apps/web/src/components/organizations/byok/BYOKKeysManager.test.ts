@@ -6,6 +6,10 @@ import { getStructuredCredentialKind, VERCEL_BYOK_PROVIDER_NAMES } from './BYOKK
 // OpenAI key therefore names the credential it holds; nothing here may read as
 // the same 'OpenAI' as the ChatGPT connection card.
 describe('BYOKKeysManager provider names', () => {
+  it('offers Cohere as a Vercel BYOK provider', () => {
+    expect(VERCEL_BYOK_PROVIDER_NAMES.cohere).toBe('Cohere');
+  });
+
   it('names the pasted OpenAI entry for the credential it holds', () => {
     expect(VERCEL_BYOK_PROVIDER_NAMES.openai).toBe('OpenAI API key');
   });
@@ -26,7 +30,10 @@ describe('getStructuredCredentialKind', () => {
     expect(getStructuredCredentialKind(providerId)).toBe(kind);
   });
 
-  it.each(['anthropic', 'openai', 'codestral', ''])('uses a single API key for %j', providerId => {
-    expect(getStructuredCredentialKind(providerId)).toBeNull();
-  });
+  it.each(['anthropic', 'cohere', 'openai', 'codestral', ''])(
+    'uses a single API key for %j',
+    providerId => {
+      expect(getStructuredCredentialKind(providerId)).toBeNull();
+    }
+  );
 });

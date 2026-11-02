@@ -3807,6 +3807,7 @@
                     "anthropic",
                     "azure",
                     "bedrock",
+                    "cohere",
                     "deepseek",
                     "fireworks",
                     "gmicloud",

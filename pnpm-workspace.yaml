@@ -69,21 +69,6 @@ catalogs:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
-  - '@cloudflare/sandbox@0.12.12'
-  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
-  # wrangler 4.134.0 is the first release with local development support for
-  # DO-managed Containers (named-image selection via ctx.container.images).
-  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
-  # are exempted with it. Approved early-access exception; remove all eight entries
-  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
-  - wrangler@4.135.0
-  - workerd@1.20260918.1
-  - miniflare@5.20260918.0-alpha
-  - '@cloudflare/workerd-darwin-64@1.20260918.1'
-  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
-  - '@cloudflare/workerd-linux-64@1.20260918.1'
-  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
-  - '@cloudflare/workerd-windows-64@1.20260918.1'
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu

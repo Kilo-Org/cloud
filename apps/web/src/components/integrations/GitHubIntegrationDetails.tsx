@@ -1206,9 +1206,7 @@ function GitHubIntegrationDetailsContent({
                     </Link>
                   </Button>
                 </>
-              ) : error === 'not_installation_admin' ||
-                error === 'installation_already_claimed' ||
-                error === 'installation_unavailable' ? (
+              ) : error === 'not_installation_admin' || error === 'installation_already_claimed' ? (
                 <>
                   <XCircle className="h-8 w-8 text-destructive" />
                   <div className="space-y-1">
@@ -1216,9 +1214,7 @@ function GitHubIntegrationDetailsContent({
                     <p className="text-muted-foreground text-sm">
                       {error === 'not_installation_admin'
                         ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
-                        : error === 'installation_unavailable'
-                          ? INSTALLATION_UNAVAILABLE_MESSAGE
-                          : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
+                        : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">

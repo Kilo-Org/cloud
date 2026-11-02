@@ -195,6 +195,9 @@ export function BriefingContextSettings({
         options={catalog.models}
         isLoading={catalog.isLoading}
         disabled={offline || update.isPending}
+        // The brief's context stores a model slug only, so the picker must not
+        // offer a thinking effort it would have to drop.
+        acceptsVariant={false}
         onSelect={id => {
           setModel(id);
         }}

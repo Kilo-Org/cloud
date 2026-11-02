@@ -152,3 +152,37 @@ export function createAdminAssurance(params: {
     supportGrant: params.supportGrant ?? null,
   };
 }
+
+export type StepUpErrorCode =
+  | 'MFA_REQUIRED'
+  | 'MFA_EXPIRED'
+  | 'NOT_ENROLLED'
+  | 'SESSION_UNBOUND'
+  | 'BEARER_NOT_ALLOWED'
+  | 'REAUTH_REQUIRED';
+
+/**
+ * Cause attached to a FORBIDDEN tRPC error when enforcement refuses a request
+ * for missing or stale step-up. The error formatter exposes only these fields
+ * as `data.stepUp`, never the underlying session or proof.
+ */
+export class StepUpRequiredError extends Error {
+  readonly code: StepUpErrorCode;
+  readonly actionClass: PrivilegedActionClass;
+  readonly purpose: 'session' | 'operation';
+  readonly maxAgeSeconds: number;
+
+  constructor(params: {
+    code: StepUpErrorCode;
+    actionClass: PrivilegedActionClass;
+    purpose: 'session' | 'operation';
+    maxAgeSeconds: number;
+  }) {
+    super(params.code);
+    this.name = 'StepUpRequiredError';
+    this.code = params.code;
+    this.actionClass = params.actionClass;
+    this.purpose = params.purpose;
+    this.maxAgeSeconds = params.maxAgeSeconds;
+  }
+}

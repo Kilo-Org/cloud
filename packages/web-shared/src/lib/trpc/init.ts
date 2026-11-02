@@ -19,12 +19,15 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   deriveCredentialKind,
+  type AdminStepUpState,
   type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { getAdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
 import {
@@ -72,6 +75,11 @@ export type TRPCContext = {
    */
   webSessionId?: string;
   webSessionPepper?: string | null;
+  /**
+   * Step-up state measured by `adminProcedure` so a specialized guard chained
+   * on it can reuse the result instead of evaluating twice.
+   */
+  adminStepUpState?: AdminStepUpState;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -372,4 +380,37 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
 
 const adminGuardMiddleware = t.middleware(adminGuardFn);
 
-export const adminProcedure = baseProcedure.use(adminGuardMiddleware);
+// Observe-only measurement for every admin procedure. In `off` it performs no
+// reads; in `observe` it records whether enforcement would block; `enforce` is
+// clamped by config during PR2. Specialized guards chained on adminProcedure
+// reuse `adminStepUpState` instead of evaluating again.
+const adminStepUpObserveMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
+  const mode = getAdminStepUpMode();
+  if (mode === 'off' || path.startsWith('stepUp.')) return next();
+
+  const credential =
+    ctx.credential ??
+    deriveCredentialKind({
+      authViaToken: ctx.authViaToken ?? false,
+      tokenSource: ctx.tokenSource ?? null,
+      internalApiUse: ctx.internalApiUse,
+    });
+  const { actionClass } = actionClassForAdminProcedure(path, type);
+
+  const adminStepUpState = await runStepUpGuard({
+    userId: ctx.user.id,
+    credential,
+    webSessionId: ctx.webSessionId,
+    actionClass,
+    mode,
+    route: path,
+    method: type,
+    surface: 'trpc',
+  });
+
+  return next({ ctx: { adminStepUpState } });
+});
+
+export const adminProcedure = baseProcedure
+  .use(adminGuardMiddleware)
+  .use(adminStepUpObserveMiddleware);

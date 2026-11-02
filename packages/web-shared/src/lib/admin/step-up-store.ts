@@ -135,8 +135,8 @@ export async function evaluateStepUp(
         status: 'fresh',
         proofId: liveProof.id,
         method: 'webauthn_uv',
-        verifiedAt: liveProof.verified_at,
-        expiresAt: liveProof.expires_at,
+        verifiedAt: new Date(liveProof.verified_at).toISOString(),
+        expiresAt: new Date(liveProof.expires_at).toISOString(),
       },
       proof: liveProof,
       passkeyCount,
@@ -161,7 +161,7 @@ export async function evaluateStepUp(
 
   if (latestProof) {
     return {
-      state: { status: 'expired', verifiedAt: latestProof.verified_at },
+      state: { status: 'expired', verifiedAt: new Date(latestProof.verified_at).toISOString() },
       proof: null,
       passkeyCount,
     };

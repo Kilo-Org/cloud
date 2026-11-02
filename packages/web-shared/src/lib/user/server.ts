@@ -29,7 +29,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { getAdminStepUpMode, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -47,6 +47,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -228,6 +229,41 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       userAgentProduct: userAgentProductFromHeaders(headersList),
       ip: clientIpFromHeaders(headersList),
     });
+  }
+
+  if (opts.adminOnly === true && result.user) {
+    const credential = deriveCredentialKind({
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    const mode = getAdminStepUpMode();
+    if (mode !== 'off') {
+      const route = routeFromHeaders(headersList);
+      const method = methodFromHeaders(headersList, opts.requestMethod);
+      const { actionClass } = actionClassForRoute({
+        surface: 'rest',
+        route: route ?? '',
+        method,
+      });
+      try {
+        await runStepUpGuard({
+          userId: result.user.id,
+          credential,
+          webSessionId: result.webSessionId,
+          actionClass,
+          mode,
+          route,
+          method,
+          surface: 'rest',
+        });
+      } catch {
+        // Enforcement is clamped off in PR2. If a future mode enables it, a
+        // refused REST request becomes a normal 403 rather than a thrown 500.
+        return authError(403, 'MFA required', result.user.id);
+      }
+    }
   }
 
   if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {

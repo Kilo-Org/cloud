@@ -623,6 +623,20 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.app.auth.passkeyRegister',
+    file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
+    occurrences: 3,
+  },
+  {
+    id: 'internal.lib.admin.requirePrivilegedActor',
+    file: 'apps/web/src/lib/admin/require-privileged-actor.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    occurrences: 2,
+  },
+  {
     id: 'internal.lib.auth.sessionStepUp',
     file: 'apps/web/src/lib/auth/session-step-up.ts',
     actionClass: 'sensitive_write',

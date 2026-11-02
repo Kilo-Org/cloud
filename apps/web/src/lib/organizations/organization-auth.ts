@@ -8,7 +8,11 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { resolveOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  effectiveMembershipRole,
+  loadEffectiveMembershipRowsWithOrganization,
+  resolveOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   findSupportAllowEntry,
   supportStandInRole,
@@ -71,10 +75,11 @@ export async function getAuthorizedOrgContext(
       ? getUserFromAuthOverride
       : getUserFromAuth;
 
-  const { authFailedResponse, user, tokenSource, internalApiUse } = await getUserFromAuthFn({
-    adminOnly: false,
-    requestMethod,
-  });
+  const { authFailedResponse, user, tokenSource, internalApiUse, cloudAgentAuthority } =
+    await getUserFromAuthFn({
+      adminOnly: false,
+      requestMethod,
+    });
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
   }
@@ -87,6 +92,26 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
+  let memberRows: Awaited<ReturnType<typeof loadEffectiveMembershipRowsWithOrganization>> = [];
+  try {
+    memberRows = await loadEffectiveMembershipRowsWithOrganization(user.id, organizationId);
+  } catch (membershipError) {
+    if (!user.is_admin) throw membershipError;
+  }
+  const memberRole = effectiveMembershipRole(memberRows, roles);
+  if (memberRole) {
+    const organization = memberRows.find(row => row.role === memberRole)?.organization;
+    if (organization) {
+      return successResult({
+        data: {
+          user: { ...user, role: memberRole },
+          organization,
+          access: { kind: 'member', role: memberRole },
+        },
+      });
+    }
+  }
+
   let access: OrganizationAccess;
   try {
     access = await resolveOrganizationAccess(
@@ -97,6 +122,7 @@ export async function getAuthorizedOrgContext(
         trpcType: requestMethod,
         auditSurface: surface ?? 'rest',
         auditMethod: requestMethod,
+        delegatedWorkload: cloudAgentAuthority !== undefined,
       },
       organizationId,
       {

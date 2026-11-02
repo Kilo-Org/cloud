@@ -36,6 +36,26 @@ async function orgWithOwner() {
   return { owner, organization };
 }
 
+function constraintName(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5; depth++) {
+    if (current === null || typeof current !== 'object') return null;
+    const candidate = current as { constraint?: unknown; cause?: unknown };
+    if (typeof candidate.constraint === 'string') return candidate.constraint;
+    current = candidate.cause;
+  }
+  return null;
+}
+
+async function expectConstraint(promise: Promise<unknown>, name: string) {
+  try {
+    await promise;
+    throw new Error('Expected the query to violate a check constraint');
+  } catch (error) {
+    expect(constraintName(error)).toBe(name);
+  }
+}
+
 function eventsFor(grantId: string) {
   return db.query.support_access_grant_events.findMany({
     where: eq(support_access_grant_events.grant_id, grantId),
@@ -146,7 +166,11 @@ describe('admin.supportAccess request', () => {
     ]);
 
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ code: 'CONFLICT' });
     const open = await db.query.support_access_grants.findMany({
       where: and(
         eq(support_access_grants.actor_kilo_user_id, requester.id),
@@ -241,17 +265,18 @@ describe('support grant database invariants', () => {
       requested_duration_seconds: 1800,
     };
 
-    await expect(
+    await expectConstraint(
       db.insert(support_access_grants).values({
         ...base,
         action_class: 'support_read',
         status: 'active',
         issued_at: now.toISOString(),
         expires_at: new Date(now.getTime() + 61 * 60 * 1000).toISOString(),
-      })
-    ).rejects.toThrow();
+      }),
+      'support_access_grants_duration_cap_check'
+    );
 
-    await expect(
+    await expectConstraint(
       db.insert(support_access_grants).values({
         ...base,
         action_class: 'support_write',
@@ -259,10 +284,11 @@ describe('support grant database invariants', () => {
         approved_by_kilo_user_id: requester.id,
         issued_at: now.toISOString(),
         expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
-      })
-    ).rejects.toThrow();
+      }),
+      'support_access_grants_approver_not_actor_check'
+    );
 
-    await expect(
+    await expectConstraint(
       db.insert(support_access_grants).values({
         ...base,
         action_class: 'support_read',
@@ -271,8 +297,9 @@ describe('support grant database invariants', () => {
         expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
         reviewed_by_kilo_user_id: requester.id,
         review_required: true,
-      })
-    ).rejects.toThrow();
+      }),
+      'support_access_grants_reviewer_not_actor_check'
+    );
   });
 
   test('grant events have no update or delete call sites', () => {

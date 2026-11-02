@@ -5,8 +5,7 @@ import { z } from 'zod';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 const SECRET_COMPARE_HMAC_KEY = Buffer.from('glanceable-agents-snapshot-secret-compare');
 
@@ -48,10 +47,7 @@ export async function POST(req: NextRequest) {
 
   if (typeof organizationId === 'string') {
     try {
-      await ensureOrganizationAccess(
-        { user: { id: userId, is_admin: false } } as unknown as TRPCContext,
-        organizationId
-      );
+      await ensureMemberOrganizationAccess({ id: userId }, organizationId);
     } catch (error) {
       // The worker reads 403 as a lost scope and ends every session card in
       // it, so only a real access denial may answer 403. A database failure is

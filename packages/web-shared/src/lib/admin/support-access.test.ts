@@ -95,6 +95,14 @@ describe('support access allowlists', () => {
     expect(read && supportEntrySatisfiesRoles(read, ['owner'])).toBe(false);
     expect(billing && supportEntrySatisfiesRoles(billing, ['billing_manager'])).toBe(true);
     expect(billing && supportEntrySatisfiesRoles(billing, ['member'])).toBe(false);
+    const manage = findSupportAllowEntry({
+      surface: 'trpc',
+      key: 'organizations.guardrails.get',
+      actionClass: 'support_read',
+    });
+    // A manage stand-in is `admin`; it must not satisfy an owner-only set.
+    expect(manage && supportEntrySatisfiesRoles(manage, ['owner'])).toBe(false);
+    expect(manage && supportEntrySatisfiesRoles(manage, ['admin'])).toBe(true);
   });
 });
 

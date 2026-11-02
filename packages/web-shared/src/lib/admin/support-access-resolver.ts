@@ -22,7 +22,8 @@ import {
 
 export type SupportResolution = {
   access: SupportContext | null;
-  decision: SupportDecision;
+  /** Null in `off` mode, where support access is not evaluated at all. */
+  decision: SupportDecision | null;
   grantId: string | null;
 };
 
@@ -35,6 +36,7 @@ type GrantLookup = {
 async function findUsableGrant(params: {
   actorKiloUserId: string;
   organizationId: string;
+  requiredActionClass: SupportAccessActionClass;
 }): Promise<GrantLookup | null> {
   const [row] = await db
     .select({
@@ -51,6 +53,9 @@ async function findUsableGrant(params: {
         eq(support_access_grants.organization_id, params.organizationId),
         eq(support_access_grants.status, 'active'),
         sql`${support_access_grants.expires_at} > now()`,
+        params.requiredActionClass === 'support_write'
+          ? eq(support_access_grants.action_class, 'support_write')
+          : inArray(support_access_grants.action_class, ['support_read', 'support_write']),
         eq(kilocode_users.is_admin, true),
         eq(kilocode_users.can_request_support_org_access, true),
         isNull(kilocode_users.blocked_reason),
@@ -105,19 +110,19 @@ export async function evaluateSupportAccess(params: {
   supportActionId: string | null;
 }): Promise<SupportResolution> {
   const mode = getSupportAccessMode();
+  if (mode === 'off') {
+    return { access: null, decision: null, grantId: null };
+  }
   if (params.key === null) {
     return { access: null, decision: 'deny_not_allowlisted', grantId: null };
   }
   if (isSupportNeverKey(params.key)) {
     return { access: null, decision: 'deny_never_list', grantId: null };
   }
-  if (mode === 'off') {
-    return { access: null, decision: 'deny_no_grant', grantId: null };
-  }
-
   const grant = await findUsableGrant({
     actorKiloUserId: params.actorKiloUserId,
     organizationId: params.organizationId,
+    requiredActionClass: params.requiredActionClass,
   });
   if (!grant) {
     return { access: null, decision: 'deny_no_grant', grantId: null };

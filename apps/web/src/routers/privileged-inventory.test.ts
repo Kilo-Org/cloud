@@ -85,6 +85,7 @@ function discoverRESTRoutes(): DiscoveredRoute[] {
           source.includes('getAuthorizedOrgContext(') ||
           source.includes('getAuthorizedOrgContextOrSupport(') ||
           source.includes('ensureOrganizationAccess(') ||
+          source.includes('ensureMemberOrganizationAccess(') ||
           source.includes('ensureOrganizationAccessAndFetchOrg('),
       };
     });
@@ -496,5 +497,28 @@ describe('support access allowlists agree with the privileged inventory', () => 
   test('the never list is disjoint from both allowlists', () => {
     const keys = new Set(allowlist.map(entry => entry.key));
     expect(SUPPORT_NEVER_KEYS.filter(key => keys.has(key))).toEqual([]);
+  });
+});
+
+describe('support never-list keys resolve to real surfaces', () => {
+  test('tRPC never keys are real procedures', () => {
+    const missing = SUPPORT_NEVER_KEYS.filter(
+      key => key.startsWith('organizations.') && !procedures[key]
+    );
+    expect(missing).toEqual([]);
+  });
+
+  test('path never keys are real app routes', () => {
+    const routes = new Set(
+      walkFiles(APP_ROOT).map(file => {
+        const relative = path.relative(APP_ROOT, path.resolve(file));
+        const segments = relative.split(path.sep).filter(segment => !/^\(.+\)$/.test(segment));
+        return `/${segments.join('/')}`;
+      })
+    );
+    const missing = SUPPORT_NEVER_KEYS.filter(
+      key => key.startsWith('/') && !routes.has(`${key}/page.tsx`) && !routes.has(`${key}/route.ts`)
+    );
+    expect(missing).toEqual([]);
   });
 });

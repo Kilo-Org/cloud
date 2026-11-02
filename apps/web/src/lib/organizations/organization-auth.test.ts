@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organization_memberships,
   organizations,
+  support_access_grant_events,
   support_access_grants,
 } from '@kilocode/db/schema';
 import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
@@ -33,6 +34,8 @@ describe('getAuthorizedOrgContext', () => {
 
   afterEach(async () => {
     setSupportAccessModeForTest(null);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(support_access_grant_events);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(support_access_grants);
     // eslint-disable-next-line drizzle/enforce-delete-with-where

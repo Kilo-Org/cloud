@@ -630,13 +630,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 2,
   },
   {
-    id: 'internal.app.glanceableAgentsSnapshot',
-    file: 'apps/web/src/app/api/internal/glanceable-agents-snapshot/route.ts',
-    actionClass: 'support_read',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
     id: 'internal.app.wastelandToken',
     file: 'apps/web/src/app/api/wasteland/token/route.ts',
     actionClass: 'worker_admin',
@@ -668,13 +661,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     id: 'internal.admin.supportAccessResolver',
     file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
     actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.admin.supportAccessService',
-    file: 'apps/web/src/lib/admin/support-access-service.ts',
-    actionClass: 'support_write',
     surface: 'trpc',
     occurrences: 1,
   },
@@ -768,13 +754,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'support_read',
     surface: 'rest',
     occurrences: 2,
-  },
-  {
-    id: 'internal.routers.activeSessions',
-    file: 'apps/web/src/routers/active-sessions-router.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
   },
   {
     id: 'internal.routers.adminKiloclawInstances',
@@ -875,11 +854,18 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.organizations.organizationAuth',
+    file: 'apps/web/src/lib/organizations/organization-auth.ts',
+    actionClass: 'support_read',
+    surface: 'rest',
+    occurrences: 1,
+  },
+  {
     id: 'internal.webShared.organizationsUtils',
     file: 'packages/web-shared/src/routers/organizations/utils.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 5,
+    occurrences: 7,
   },
 ];
 

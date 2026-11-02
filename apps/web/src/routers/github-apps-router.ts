@@ -1,4 +1,5 @@
 import 'server-only';
+import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
@@ -247,7 +248,7 @@ export const githubAppsRouter = createTRPCRouter({
                     : 'needs_attention';
             const canCancel =
               status === 'pending' &&
-              (ctx.user.is_admin ||
+              ((ctx.user.is_admin && getSupportAccessMode() !== 'enforce') ||
                 role === 'owner' ||
                 role === 'admin' ||
                 integration.kilo_requester_user_id === ctx.user.id);
@@ -270,7 +271,9 @@ export const githubAppsRouter = createTRPCRouter({
               canDisconnect:
                 canManageConnections && status !== 'disconnected' && status !== 'pending',
               canUninstall:
-                (ctx.user.is_admin || role === 'owner' || role === 'admin') &&
+                ((ctx.user.is_admin && getSupportAccessMode() !== 'enforce') ||
+                  role === 'owner' ||
+                  role === 'admin') &&
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
               modelSlug: (metadata?.model_slug as string) || null,
@@ -571,7 +574,7 @@ export const githubAppsRouter = createTRPCRouter({
       }
       const canCancel =
         !input.organizationId ||
-        ctx.user.is_admin ||
+        (ctx.user.is_admin && getSupportAccessMode() !== 'enforce') ||
         role === 'owner' ||
         role === 'admin' ||
         integration.kilo_requester_user_id === ctx.user.id;

@@ -55,7 +55,7 @@ describe('allowlisted support read call sites', () => {
 
     await expect(
       caller.organizations.bitbucket.getStatus({ organizationId: organization.id })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   test('observe mode leaves the same non-allowlisted read available to an admin', async () => {

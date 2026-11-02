@@ -53,7 +53,8 @@ export type MemberAccess = {
 export type LegacyAdminAccess = {
   kind: 'legacy_admin';
   role: 'owner';
-  wouldBe: SupportDecision;
+  /** Null when support access is off and no decision is evaluated. */
+  wouldBe: SupportDecision | null;
 };
 
 export type OrganizationAccess = MemberAccess | SupportContext | LegacyAdminAccess;
@@ -221,31 +222,35 @@ export const SUPPORT_NEVER_KEYS: readonly string[] = [
   '/api/auth/resource-token',
   '/api/cloud-agent/sessions/stream-ticket',
   '/api/claw/openclaw-export',
-  '/api/user/exports',
+  '/data-exports',
   '/payments/topup',
   '/payments/topup/success',
-  'organizations.autoTopUp.setEnabled',
-  'organizations.autoTopUp.setPaymentMethod',
+  'organizations.autoTopUp.toggle',
+  'organizations.autoTopUp.changePaymentMethod',
+  'organizations.autoTopUp.updateAmount',
+  'organizations.autoTopUp.updateThreshold',
+  'organizations.autoTopUp.removePaymentMethod',
   'organizations.subscription.cancel',
   'organizations.subscription.updateSeatCount',
   'organizations.subscription.changeBillingCycle',
-  'organizations.subscription.createPortalSession',
-  'organizations.subscription.createStripeUrl',
-  'organizations.kiloPass.purchase',
+  'organizations.subscription.getCustomerPortalUrl',
+  'organizations.subscription.getSubscriptionStripeUrl',
+  'organizations.kiloPass.createCheckout',
   'organizations.kiloPass.cancel',
-  'organizations.delete',
+  'organizations.admin.delete',
   'organizations.bitbucket.connect',
   'organizations.bitbucket.replaceToken',
-  'organizations.gitlab.rotateWebhookSecret',
   'organizations.sso.createConfig',
-  'organizations.sso.updateConfig',
+  'organizations.sso.updateSsoDomain',
   'organizations.sso.deleteConfig',
   'organizations.members.invite',
-  'organizations.members.updateRole',
+  'organizations.members.update',
   'organizations.members.remove',
   'organizations.members.setChildMemberships',
-  'organizations.cloudAgentNext.createSession',
-  'organizations.kiloclaw.createInstance',
+  'organizations.cloudAgentNext.createWorktreeChat',
+  'organizations.kiloclaw.createAgent',
+  'organizations.kiloclaw.destroy',
+  'organizations.kiloclaw.deleteAgent',
 ];
 
 const ALLOWLIST_BY_KEY = new Map(
@@ -289,9 +294,9 @@ export function supportEntrySatisfiesRoles(
   roles: readonly string[] | undefined
 ): boolean {
   if (!roles || roles.length === 0) return true;
-  if (entry.standsInFor === 'member') return roles.includes('member');
-  if (entry.standsInFor === 'manage') return roles.includes('owner') || roles.includes('admin');
-  return roles.includes('owner') || roles.includes('admin') || roles.includes('billing_manager');
+  // The stand-in is one concrete role; it must itself be allowed. A manage
+  // stand-in is `admin`, so it never satisfies an owner-only set.
+  return roles.includes(supportStandInRole(entry));
 }
 
 export function supportDecisionDenialReason(entry: SupportAllowEntry | undefined): SupportDecision {
@@ -322,6 +327,9 @@ export function getSupportAccessMode(): SupportAccessMode {
  * the environment variable is always clamped.
  */
 export function setSupportAccessModeForTest(mode: SupportAccessMode | null): void {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('setSupportAccessModeForTest is only available in tests');
+  }
   testMode = mode;
 }
 

@@ -668,7 +668,28 @@ describe('organizations members trpc router', () => {
             memberId: memberUser.id,
             childOrganizationIds: [child.id],
           })
-        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        setSupportAccessModeForTest(null);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('enforce uses a real billing-manager role for an admin', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Billing Child', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'billing_manager');
+      setSupportAccessModeForTest('enforce');
+      try {
+        const result = await (
+          await createCallerForUser(kiloAdmin.id)
+        ).organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [child.id],
+        });
+        expect(result.added).toEqual([child.id]);
       } finally {
         setSupportAccessModeForTest(null);
         await cleanupChildOrganizations([child.id]);

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 import {
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
-  ensureOrganizationAccessOrSupport,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
   resolveOrganizationAccess,
@@ -18,6 +17,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import {
   organization_memberships,
   organizations,
+  support_access_grant_events,
   support_access_grants,
   type User,
 } from '@kilocode/db/schema';
@@ -411,6 +411,8 @@ describe('mode-aware support organization access', () => {
     setSupportAccessModeForTest(null);
     setAdminAccessSinkForTest(null);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(support_access_grant_events);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(support_access_grants);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_memberships);
@@ -509,13 +511,109 @@ describe('mode-aware support organization access', () => {
     expect(event).toMatchObject({ supportDecision: 'deny_not_allowlisted' });
   });
 
+  test('observe records a real owner as passing without the admin shortcut', async () => {
+    setSupportAccessModeForTest('observe');
+    const { organization, admin } = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'owner',
+      invited_by: 'test',
+    });
+
+    await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe('owner');
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      membershipRole: 'owner',
+      wouldPassWithoutAdmin: true,
+      supportDecision: 'member',
+    });
+  });
+
+  test('observe records a real member without the required role as a denial', async () => {
+    setSupportAccessModeForTest('observe');
+    const { organization, admin } = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'member',
+      invited_by: 'test',
+    });
+
+    await expect(
+      ensureOrganizationAccess(readCtx(admin), organization.id, ['owner'])
+    ).resolves.toBe('owner');
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      membershipRole: 'member',
+      wouldPassWithoutAdmin: false,
+      supportDecision: 'deny_actor_permission',
+    });
+  });
+
+  test('member-only admits an admin who really holds the role', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'owner',
+      invited_by: 'test',
+    });
+
+    for (const mode of ['off', 'observe', 'enforce'] as const) {
+      setSupportAccessModeForTest(mode);
+      await expect(
+        resolveOrganizationAccess(readCtx(admin), organization.id, { member: 'only' })
+      ).resolves.toMatchObject({ kind: 'member', role: 'owner' });
+    }
+  });
+
+  test('enforce picks the write grant even when a longer read grant exists', async () => {
+    setSupportAccessModeForTest('enforce');
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    const now = new Date();
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: admin.id,
+      organization_id: organization.id,
+      action_class: 'support_read',
+      status: 'active',
+      reason: 'investigating a customer report',
+      requested_duration_seconds: 3600,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+    });
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: admin.id,
+      organization_id: organization.id,
+      action_class: 'support_write',
+      status: 'active',
+      reason: 'investigating a customer report',
+      requested_duration_seconds: 600,
+      approved_by_kilo_user_id: approver.id,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).resolves.toBe('admin');
+  });
+
   test('enforce denies an admin without a grant', async () => {
     setSupportAccessModeForTest('enforce');
     const { organization, admin } = await orgAndAdmin();
 
     await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toMatchObject({
-      code: 'UNAUTHORIZED',
-      cause: expect.objectContaining({ code: 'support_access_deny_no_grant' }),
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
     });
   });
 
@@ -528,9 +626,7 @@ describe('mode-aware support organization access', () => {
       actionClass: 'support_read',
     });
 
-    await expect(
-      ensureOrganizationAccessOrSupport(readCtx(admin), organization.id)
-    ).resolves.toMatchObject({ role: 'member', access: { kind: 'support' } });
+    await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe('member');
     const event = events.find(event => event.kind === 'kilo_admin_elevation');
     expect(event).toMatchObject({ supportDecision: 'support_grant' });
   });
@@ -551,9 +647,7 @@ describe('mode-aware support organization access', () => {
       trpcType: 'mutation',
     };
 
-    await expect(
-      ensureOrganizationAccessOrSupport(writeCtx, organization.id)
-    ).resolves.toMatchObject({ role: 'admin', access: { kind: 'support' } });
+    await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
   });
 
   test('enforce denies a support read grant on a write procedure', async () => {
@@ -574,7 +668,7 @@ describe('mode-aware support organization access', () => {
         },
         organization.id
       )
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   test('enforce never admits a grant for a real member-only surface', async () => {
@@ -621,8 +715,8 @@ describe('mode-aware support organization access', () => {
     });
 
     await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toMatchObject({
-      code: 'UNAUTHORIZED',
-      cause: expect.objectContaining({ code: 'support_grant_expired' }),
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_expired' }),
     });
   });
 });

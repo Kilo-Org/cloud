@@ -6,7 +6,10 @@ import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.serve
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   activeSessionSchema,
   listActiveSessions,
@@ -182,11 +185,9 @@ export const activeSessionsRouter = createTRPCRouter({
     .output(homeWidgetResponseSchema)
     .query(async ({ ctx, input }) => {
       if (input.organizationId !== null) {
-        // A personal widget never uses the platform-admin elevation bypass.
-        await ensureOrganizationAccess(
-          { ...ctx, user: { ...ctx.user, is_admin: false } },
-          input.organizationId
-        );
+        // A personal widget never uses the platform-admin elevation bypass and
+        // never accepts a support grant.
+        await ensureMemberOrganizationAccess(ctx.user, input.organizationId);
       }
       return buildHomeWidgetResponseForUser({
         userId: ctx.user.id,

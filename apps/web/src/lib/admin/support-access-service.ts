@@ -19,6 +19,7 @@ import {
   SUPPORT_WRITE_REQUEST_TTL_SECONDS,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { userCanRequestSupportOrgAccess, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 
 const OPEN_STATUSES: SupportAccessGrantStatus[] = ['pending', 'active'];
 
@@ -290,27 +291,35 @@ export async function approveSupportGrant(params: {
   durationSeconds?: number;
 }): Promise<SupportAccessGrant> {
   return db.transaction(async tx => {
+    const [unlocked] = await tx
+      .select()
+      .from(support_access_grants)
+      .where(eq(support_access_grants.id, params.grantId))
+      .limit(1);
+    if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+    if (unlocked.actor_kilo_user_id === params.approverKiloUserId) {
+      throw badRequest('A request cannot be approved by its requester');
+    }
+
+    // Advisory lock before any row lock: request() takes advisory first, and a
+    // reverse order here would deadlock.
+    await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
+    await expireStaleGrants(tx, {
+      actorKiloUserId: unlocked.actor_kilo_user_id,
+      organizationId: unlocked.organization_id,
+    });
     const [pending] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!pending) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (pending.actor_kilo_user_id === params.approverKiloUserId) {
-      throw badRequest('A request cannot be approved by its requester');
-    }
     if (pending.status !== 'pending') {
       throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
     }
     if (pending.action_class !== 'support_write') {
       throw badRequest('Only write grants require approval');
     }
-
-    await lockGrantScope(tx, pending.actor_kilo_user_id, pending.organization_id);
-    await expireStaleGrants(tx, {
-      actorKiloUserId: pending.actor_kilo_user_id,
-      organizationId: pending.organization_id,
-    });
     const actors = await lockActors(tx, [pending.actor_kilo_user_id, params.approverKiloUserId]);
     assertRequesterPermission(actors.get(pending.actor_kilo_user_id));
     const approver = actors.get(params.approverKiloUserId);
@@ -339,7 +348,7 @@ export async function approveSupportGrant(params: {
         request_expires_at: null,
       })
       .where(
-        and(eq(support_access_grants.id, pending.id), eq(support_access_grants.status, 'pending'))
+        and(eq(support_access_grants.id, unlocked.id), eq(support_access_grants.status, 'pending'))
       )
       .returning();
     if (!grant) throw new TRPCError({ code: 'CONFLICT', message: 'Grant is no longer pending' });
@@ -355,15 +364,16 @@ export async function denySupportGrant(params: {
   grantId: string;
 }): Promise<SupportAccessGrant> {
   return db.transaction(async tx => {
-    const [pending] = await tx
+    const [unlocked] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
-      .for('update');
-    if (!pending) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (pending.actor_kilo_user_id === params.approverKiloUserId) {
+      .limit(1);
+    if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+    if (unlocked.actor_kilo_user_id === params.approverKiloUserId) {
       throw badRequest('A request cannot be denied by its requester');
     }
+    await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const actors = await lockActors(tx, [params.approverKiloUserId]);
     const approver = actors.get(params.approverKiloUserId);
     if (
@@ -381,7 +391,7 @@ export async function denySupportGrant(params: {
         request_expires_at: null,
       })
       .where(
-        and(eq(support_access_grants.id, pending.id), eq(support_access_grants.status, 'pending'))
+        and(eq(support_access_grants.id, unlocked.id), eq(support_access_grants.status, 'pending'))
       )
       .returning();
     if (!grant) throw new TRPCError({ code: 'CONFLICT', message: 'Grant is no longer pending' });
@@ -395,15 +405,16 @@ export async function cancelSupportGrant(params: {
   grantId: string;
 }): Promise<SupportAccessGrant> {
   return db.transaction(async tx => {
-    const [pending] = await tx
+    const [unlocked] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
-      .for('update');
-    if (!pending) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (pending.actor_kilo_user_id !== params.actorKiloUserId) {
+      .limit(1);
+    if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+    if (unlocked.actor_kilo_user_id !== params.actorKiloUserId) {
       throw forbidden('Only the requester can cancel a support access request');
     }
+    await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const [grant] = await tx
       .update(support_access_grants)
       .set({
@@ -412,7 +423,7 @@ export async function cancelSupportGrant(params: {
         request_expires_at: null,
       })
       .where(
-        and(eq(support_access_grants.id, pending.id), eq(support_access_grants.status, 'pending'))
+        and(eq(support_access_grants.id, unlocked.id), eq(support_access_grants.status, 'pending'))
       )
       .returning();
     if (!grant) throw new TRPCError({ code: 'CONFLICT', message: 'Grant is no longer pending' });
@@ -428,6 +439,13 @@ export async function revokeSupportGrant(params: {
 }): Promise<SupportAccessGrant> {
   const reason = assertReason(params.reason);
   return db.transaction(async tx => {
+    const [unlocked] = await tx
+      .select()
+      .from(support_access_grants)
+      .where(eq(support_access_grants.id, params.grantId))
+      .limit(1);
+    if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+    await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const [existing] = await tx
       .select()
       .from(support_access_grants)
@@ -478,36 +496,50 @@ export async function emergencyIssueSupportGrant(params: {
   const ticketReference = assertTicketReference(params.ticketReference);
   const durationSeconds = clampDuration('support_write', params.durationSeconds);
 
-  return db.transaction(async tx => {
-    await lockGrantScope(tx, params.superadminKiloUserId, params.organizationId);
-    const actors = await lockActors(tx, [params.superadminKiloUserId]);
-    const actor = actors.get(params.superadminKiloUserId);
-    if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
-      throw forbidden('Superadmin access required');
+  try {
+    return await db.transaction(async tx => {
+      await lockGrantScope(tx, params.superadminKiloUserId, params.organizationId);
+      await expireStaleGrants(tx, {
+        actorKiloUserId: params.superadminKiloUserId,
+        organizationId: params.organizationId,
+      });
+      const actors = await lockActors(tx, [params.superadminKiloUserId]);
+      const actor = actors.get(params.superadminKiloUserId);
+      if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+        throw forbidden('Superadmin access required');
+      }
+      await assertLiveOrganization(tx, params.organizationId);
+      const issue = issueWindow('support_write', durationSeconds);
+      const [grant] = await tx
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: actor.id,
+          organization_id: params.organizationId,
+          action_class: 'support_write',
+          grant_kind: 'emergency',
+          status: 'active',
+          reason,
+          ticket_reference: ticketReference,
+          requested_duration_seconds: durationSeconds,
+          requested_at: issue.issuedAt.toISOString(),
+          decided_at: issue.issuedAt.toISOString(),
+          issued_at: issue.issuedAt.toISOString(),
+          expires_at: issue.expiresAt.toISOString(),
+          review_required: true,
+        })
+        .returning();
+      await writeEvent(tx, grant, 'emergency_issued', actor.id, { durationSeconds });
+      return grant;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'An open support access grant already exists for this organization and class',
+      });
     }
-    await assertLiveOrganization(tx, params.organizationId);
-    const issue = issueWindow('support_write', durationSeconds);
-    const [grant] = await tx
-      .insert(support_access_grants)
-      .values({
-        actor_kilo_user_id: actor.id,
-        organization_id: params.organizationId,
-        action_class: 'support_write',
-        grant_kind: 'emergency',
-        status: 'active',
-        reason,
-        ticket_reference: ticketReference,
-        requested_duration_seconds: durationSeconds,
-        requested_at: issue.issuedAt.toISOString(),
-        decided_at: issue.issuedAt.toISOString(),
-        issued_at: issue.issuedAt.toISOString(),
-        expires_at: issue.expiresAt.toISOString(),
-        review_required: true,
-      })
-      .returning();
-    await writeEvent(tx, grant, 'emergency_issued', actor.id, { durationSeconds });
-    return grant;
-  });
+    throw error;
+  }
 }
 
 export async function reviewSupportGrant(params: {
@@ -515,15 +547,22 @@ export async function reviewSupportGrant(params: {
   grantId: string;
 }): Promise<SupportAccessGrant> {
   return db.transaction(async tx => {
+    const [unlocked] = await tx
+      .select()
+      .from(support_access_grants)
+      .where(eq(support_access_grants.id, params.grantId))
+      .limit(1);
+    if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+    if (unlocked.actor_kilo_user_id === params.reviewerKiloUserId) {
+      throw badRequest('A grant cannot be reviewed by its requester');
+    }
+    await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const [existing] = await tx
       .select()
       .from(support_access_grants)
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (existing.actor_kilo_user_id === params.reviewerKiloUserId) {
-      throw badRequest('A grant cannot be reviewed by its requester');
-    }
     const actors = await lockActors(tx, [params.reviewerKiloUserId]);
     const reviewer = actors.get(params.reviewerKiloUserId);
     if (!reviewer || reviewer.blocked_reason !== null || !userIsSuperadmin(reviewer)) {
@@ -603,10 +642,5 @@ export async function getActiveSupportGrantsForOrganization(
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '23505'
-  );
+  return getPostgresErrorCode(error) === '23505';
 }

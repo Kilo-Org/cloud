@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,9 @@ function formatDate(value: string | null): string {
 export function SupportAccessContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
+  const [revokeReasons, setRevokeReasons] = useState<Record<string, string>>({});
   const [organizationId, setOrganizationId] = useState('');
   const [actionClass, setActionClass] = useState<ActionClass>('support_read');
   const [durationMinutes, setDurationMinutes] = useState('');
@@ -251,19 +255,36 @@ export function SupportAccessContent() {
                           </Button>
                         )}
                         {grant.status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={revoke.isPending}
-                            onClick={() =>
-                              revoke.mutate({
-                                grantId: grant.id,
-                                reason: 'revoked from support access console',
-                              })
-                            }
-                          >
-                            Revoke
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              aria-label="Revocation reason"
+                              className="h-8 w-56"
+                              value={revokeReasons[grant.id] ?? ''}
+                              onChange={event =>
+                                setRevokeReasons(values => ({
+                                  ...values,
+                                  [grant.id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Revocation reason"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                revoke.isPending ||
+                                (revokeReasons[grant.id] ?? '').trim().length < 10
+                              }
+                              onClick={() =>
+                                revoke.mutate({
+                                  grantId: grant.id,
+                                  reason: (revokeReasons[grant.id] ?? '').trim(),
+                                })
+                              }
+                            >
+                              Revoke
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </TableCell>
@@ -314,7 +335,7 @@ export function SupportAccessContent() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          disabled={approve.isPending}
+                          disabled={approve.isPending || grant.actorKiloUserId === currentUserId}
                           onClick={() => approve.mutate({ grantId: grant.id })}
                         >
                           Approve

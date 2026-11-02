@@ -180,9 +180,13 @@ function text() {
     .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
     .join('\n');
 }
-async function render(sessions = settled, contextOverride = context) {
+async function render(sessions = settled, contextOverride = context, briefing?: Props['briefing']) {
   await act(async () => {
-    const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
+    const tree = createElement(AgentSessionsSection, {
+      context: contextOverride,
+      sessions,
+      briefing,
+    });
     if (renderer) {
       renderer.update(tree);
     } else {
@@ -305,6 +309,21 @@ describe('Home live section', () => {
     // The header keeps See all's box but hides it.
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     expect(node('SectionHeader').props.actionHidden).toBe(true);
+  });
+
+  it('leaves the live card without a single pressable while the briefing holds the frame', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    expect(typeof newestButton().props.onPress).toBe('function');
+
+    // The briefing layer is drawn; the live card stays mounted underneath only
+    // to reserve the frame's height, so it renders no press target at all: a
+    // mounted Pressable is a touch area even without its onPress.
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] }, context, {
+      visible: true,
+      card: createElement('BriefingCard'),
+    });
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(text()).toContain('live-1');
   });
 
   it('does not reuse the previous session node when the card settles into the zero state', async () => {

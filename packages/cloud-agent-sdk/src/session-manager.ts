@@ -1542,6 +1542,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storedMessageMemo.clear();
       store.set(rootSessionIdAtom, null);
       store.set(chatUIAtom, { shouldAutoScroll: true });
+      // The composer's picks are session-scoped, so they leave with the
+      // session. A retry that keeps the transcript is still the same session
+      // and must keep them: the pick states what the next prompt sends.
+      store.set(remoteModelOverrideAtom, null);
+      store.set(cloudAgentModelOverrideAtom, null);
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -1558,8 +1563,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     transcriptRows.reset();
     postInterruptUnlock = false;
     interruptAwaitingIdleSession = null;
-    store.set(remoteModelOverrideAtom, null);
-    store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -1982,7 +1985,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     if (previousOwnerConnectionId !== state.ownerConnectionId) {
       store.set(remoteModelOverrideAtom, null);
-      if (observedModelSource === 'catalog') {
+      // An owner that replaces another owner did not produce what we observed
+      // under the one it replaced, whichever event reported it (a message it
+      // ran, or the session metadata it wrote): discard it so the new owner's
+      // catalog currentModel becomes the observation below. The first owner to
+      // attach is exempt — what it races with came from this session's own
+      // snapshot or replayed history, and describes the session, not an owner.
+      if (previousOwnerConnectionId !== null) {
         observedModelSource = null;
         store.set(observedModelAtom, null);
       }

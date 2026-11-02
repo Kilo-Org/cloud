@@ -1126,6 +1126,60 @@ describe('createSessionManager', () => {
         );
       });
 
+      it('keeps the composer model picks through a same-session retry', async () => {
+        let metadataReads = 0;
+        const config = createMockConfig({
+          fetchSession: jest.fn(async (id: KiloSessionId) => {
+            metadataReads += 1;
+            if (metadataReads === 1) throw new Error('offline');
+            return { ...defaultFetchedSession, kiloSessionId: id };
+          }),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
+        });
+        const mgr = createSessionManager(config);
+        const remoteOverride = {
+          source: 'cli-catalog',
+          selection: {
+            model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+            variant: 'high',
+          },
+        } as const;
+        const cloudAgentOverride = { model: 'openai/gpt-5', variant: 'high' };
+
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        mgr.setRemoteModelOverride(remoteOverride);
+        mgr.setCloudAgentModelOverride(cloudAgentOverride);
+
+        const retry = mgr.switchSession(kiloId('ses-1'));
+        // The retry runs the preserve path: the rows stay, and the picks belong
+        // to the session those rows are the transcript of.
+        expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(true);
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(remoteOverride);
+        expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(
+          cloudAgentOverride
+        );
+
+        await retry;
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(remoteOverride);
+        expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(
+          cloudAgentOverride
+        );
+
+        // A real switch still drops them: they never apply to another session.
+        await mgr.switchSession(kiloId('ses-2'));
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+        expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
+
+        mgr.setRemoteModelOverride(remoteOverride);
+        mgr.setCloudAgentModelOverride(cloudAgentOverride);
+        mgr.destroy();
+        expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+        expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
+      });
+
       it('never advertises a refresh without a cached-page reader', async () => {
         const config = createMockConfig();
         const mgr = createSessionManager(config);
@@ -2001,6 +2055,113 @@ describe('createSessionManager', () => {
         ownerConnectionId: 'owner-b',
         protocol: 'unknown',
         refresh: 'loading',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toBeNull();
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-b', modelID: 'model-b' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-b', modelID: 'model-b' },
+      });
+    });
+
+    it('replaces a message-sourced observation when the session owner changes', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-a', modelID: 'model-a' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      // A message the first owner ran is the freshest model it reported.
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-owner-a', 'ses-1', {
+          providerID: 'provider-message',
+          modelID: 'model-from-message',
+        }).info,
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-message', modelID: 'model-from-message' },
+      });
+
+      // The replacement owner has no catalog yet: the replaced owner's
+      // observation must not stand in for it.
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'unknown',
+        refresh: 'loading',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toBeNull();
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-b', modelID: 'model-b' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-b', modelID: 'model-b' },
+      });
+    });
+
+    it('drops the replaced owner observation when a disconnect separates the two owners', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-message', modelID: 'model-a' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-owner-a', 'ses-1', {
+          providerID: 'provider-message',
+          modelID: 'model-a',
+        }).info,
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-message', modelID: 'model-a' },
+      });
+
+      // The replaced CLI leaves before its successor attaches, as it does when
+      // a session is taken over: the observation leaves with it.
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
       });
       expect(atomValue(config.store, mgr.atoms.observedModel)).toBeNull();
 

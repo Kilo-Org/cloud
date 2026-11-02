@@ -882,6 +882,12 @@ app.use(
       userId: c.get('kiloUserId') ?? '',
       workerAdmin: c.get('workerAdmin'),
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
+      legacyClaimLifetimeSeconds: (() => {
+        const claims = c.get('kiloTokenClaims');
+        return typeof claims?.exp === 'number' && typeof claims?.iat === 'number'
+          ? claims.exp - claims.iat
+          : null;
+      })(),
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {

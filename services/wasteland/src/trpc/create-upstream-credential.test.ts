@@ -114,6 +114,7 @@ function makeCaller(env: Env) {
       }),
     } as never,
     procedurePath: '',
+    legacyClaimLifetimeSeconds: null,
     apiTokenPepper: null,
     orgMemberships: [],
   });

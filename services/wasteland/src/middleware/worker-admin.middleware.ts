@@ -71,6 +71,7 @@ export function emitWorkerAdminDecision(
     userId: string | null;
     wastelandId?: string | null;
     jti?: string | null;
+    lifetimeSeconds?: number | null;
     delivery?: 'http' | 'trpc';
   }
 ): void {
@@ -84,6 +85,7 @@ export function emitWorkerAdminDecision(
     wastelandId: params.wastelandId ?? undefined,
     reason: decision.reason ?? undefined,
     label: params.jti ?? undefined,
+    value: params.lifetimeSeconds ?? undefined,
   });
   console.log(
     JSON.stringify({

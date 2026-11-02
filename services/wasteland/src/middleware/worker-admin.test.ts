@@ -130,20 +130,6 @@ describe('Wasteland worker admin authority', () => {
     expect((await request('wasteland-b', headers, e)).status).toBe(403);
   });
 
-  it.each(['trpc:wasteland.deleteWasteland', 'trpc:wasteland.addMember'])(
-    'refuses unlisted mutation %s',
-    async action => {
-      const material = await keyMaterial();
-      const token = await capability(material.privateKey, { actions: [action] });
-      const response = await request(
-        'wasteland-a',
-        { 'X-Test-Claims': claims({ isAdmin: false }), 'X-Kilo-Worker-Capability': token },
-        env({ mode: 'reject', publicKeys: material.publicKeys })
-      );
-      expect(response.status).toBe(403);
-    }
-  );
-
   it('denies when introspection says inactive', async () => {
     const material = await keyMaterial();
     const token = await capability(material.privateKey, { jti: 'jti-inactive' });

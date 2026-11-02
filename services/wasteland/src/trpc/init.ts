@@ -17,6 +17,7 @@ export type TRPCContext = {
   workerAdmin: WorkerAdminAuthority;
   procedurePath: string;
   apiTokenPepper: string | null;
+  legacyClaimLifetimeSeconds: number | null;
   orgMemberships: JwtOrgMembership[];
 };
 
@@ -127,6 +128,7 @@ export const adminProcedure = procedure.use(async ({ ctx, path, getRawInput, nex
       userId: ctx.userId || null,
       wastelandId: target.kind === 'wasteland' ? target.id : null,
       jti: decision.allowed ? decision.jti : null,
+      lifetimeSeconds: ctx.legacyClaimLifetimeSeconds,
       delivery: 'trpc',
     });
   }

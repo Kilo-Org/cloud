@@ -24,6 +24,7 @@ async function workerAdminAllows(ctx: TRPCContext, wastelandId: string): Promise
       userId: ctx.userId || null,
       wastelandId,
       jti: decision.allowed ? decision.jti : null,
+      lifetimeSeconds: ctx.legacyClaimLifetimeSeconds,
       delivery: 'trpc',
     });
   }

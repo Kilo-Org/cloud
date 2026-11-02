@@ -18,5 +18,14 @@ if (!src.includes('SENTRY_DSN')) {
   );
 }
 
+src = src.replaceAll(
+  'LEGACY_ADMIN_CLAIM_MODE: "honor"',
+  'LEGACY_ADMIN_CLAIM_MODE: "honor" | "observe" | "reject"'
+);
+src = src.replaceAll(
+  'WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: ""',
+  'WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS: string'
+);
+
 writeFileSync(FILE, src);
 console.log('[patch-worker-types] patched', FILE);

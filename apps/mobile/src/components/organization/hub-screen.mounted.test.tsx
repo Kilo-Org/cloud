@@ -17,6 +17,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
 
 /** The smallest box the control-size audit accepts on a control's own node. */
@@ -120,11 +121,17 @@ const kiloPassRowState = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/organization/org-kilo-pass-row-state', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/components/organization/org-kilo-pass-row-state')>();
+  const actual = (await importOriginal()) as {
+    getOrgKiloPassRowState: (params: {
+      data: OrgKiloPassSummary | undefined;
+      isError: boolean;
+    }) => OrgKiloPassRowState;
+  };
   return {
-    getOrgKiloPassRowState: (input: Parameters<typeof actual.getOrgKiloPassRowState>[0]) =>
-      kiloPassRowState.current ?? actual.getOrgKiloPassRowState(input),
+    getOrgKiloPassRowState: (params: {
+      data: OrgKiloPassSummary | undefined;
+      isError: boolean;
+    }): OrgKiloPassRowState => kiloPassRowState.current ?? actual.getOrgKiloPassRowState(params),
   };
 });
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));

@@ -37,8 +37,13 @@ export function usePopOnce(): () => void {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (navigation.isFocused()) {
-        noteAcceptedBack(routeId, Date.now());
+      const now = Date.now();
+      // A press inside the window a dismissed screen opened is spent by
+      // `LeaveSettleMount`, not applied here, so this route stays focused and
+      // would keep the mark forever. Only a press this route can leave for is
+      // remembered.
+      if (navigation.isFocused() && !insideLeaveSettle(now)) {
+        noteAcceptedBack(routeId, now);
       }
       // The press takes its usual path: the navigator pops this screen, and a
       // dismissal that resolves meanwhile is suppressed by the mark above.

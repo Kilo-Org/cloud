@@ -11,7 +11,12 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearAcceptedBack, resetLeaveSettle } from '@/lib/navigation/leave-settle';
+import {
+  armLeaveSettle,
+  clearAcceptedBack,
+  LEAVE_SETTLE_MS,
+  resetLeaveSettle,
+} from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { OptionList } from './option-list';
 
@@ -253,12 +258,31 @@ describe('OptionList hardware Back during a save', () => {
     expect(routerBack).not.toHaveBeenCalled();
   });
 
+  it('does not remember a Back the app shell spends', async () => {
+    // A screen above dismissed itself, so its window is open. A press now is
+    // spent by the app shell, not applied here: this screen stays focused and
+    // mounted, so remembering it would suppress every later dismissal.
+    armLeaveSettle(now);
+    const gate = Promise.withResolvers<boolean>();
+    const renderer = await mount(() => gate.promise);
+    await press(row(renderer, 'All'));
+
+    expect(backPress.press()).toBe(true);
+
+    // The save confirms after that window has closed, as it does when the
+    // delete finishes. Nothing about this screen is leaving any more.
+    now += LEAVE_SETTLE_MS;
+    await settleSave(gate);
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
   it('does not let a Back on one screen suppress the next screen’s save', async () => {
     const first = Promise.withResolvers<boolean>();
     const firstRenderer = await mount(() => first.promise);
     await press(row(firstRenderer, 'All'));
     expect(backPress.press()).toBe(false);
-    await act(async () => {
+    act(() => {
       firstRenderer.unmount();
     });
 

@@ -7,7 +7,6 @@ import {
   rememberAsked,
   rememberFirstQuestion,
   titledByAsked,
-  withoutKeptCopy,
 } from './pending';
 import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
@@ -181,23 +180,6 @@ describe('titledByAsked', () => {
     // A record nothing can read is answered empty rather than thrown out of the open.
     expect(await keptIn('garbled')).toEqual([]);
     expect(await keptIn('shapeless')).toEqual([]);
-  });
-
-  it('drops only the newest copy of the slot question, keeping an earlier identical attempt', () => {
-    const words = {
-      text: 'the same words',
-      images: [],
-      model: 'kilo/one',
-      effort: null,
-      afterTurns: 0,
-      outcome: 'failed' as const,
-    };
-    const kept = [
-      { id: 'a', ...words },
-      { id: 'b', ...words },
-    ];
-
-    expect(withoutKeptCopy(kept, words).map(one => one.id)).toEqual(['a']);
   });
 
   it('leaves a chat with no question untitled', async () => {

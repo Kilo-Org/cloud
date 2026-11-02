@@ -50,8 +50,6 @@ import {
   newKeptId,
   rememberAsked,
   rememberFirstQuestion,
-  sameQuestion,
-  withoutKeptCopy,
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -502,10 +500,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
-      /* A kept question that repeats the slot's is the copy an interrupted
-         retry left: the newest one goes, and an earlier attempt that asked the
-         same thing stays. */
-      displaced: asked === null ? kept : withoutKeptCopy(kept, asked),
+      /* The slot's question names the kept record it was asked from, when it is
+         a retry: an interrupted one left that record written, and it is the same
+         attempt rather than a second question. */
+      displaced: asked?.from == null ? kept : kept.filter(one => one.id !== asked.from),
       status: 'idle',
       failed: null,
       failureKey: null,
@@ -537,10 +535,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
-      /* A kept question that repeats the slot's is the copy an interrupted
-         retry left: the newest one goes, and an earlier attempt that asked the
-         same thing stays. */
-      displaced: asked === null ? kept : withoutKeptCopy(kept, asked),
+      /* The slot's question names the kept record it was asked from, when it is
+         a retry: an interrupted one left that record written, and it is the same
+         attempt rather than a second question. */
+      displaced: asked?.from == null ? kept : kept.filter(one => one.id !== asked.from),
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
@@ -627,7 +625,13 @@ export async function say(
          while it works. So a second question joins the line rather than racing
          the first, and it is on screen while it waits. It is held in memory
          only: an answer that is still arriving is not written down either. */
-      held.waiting.push({ text, images, model, effort });
+      held.waiting.push({
+        text,
+        images,
+        model,
+        effort,
+        ...(question.from === undefined ? {} : { from: question.from }),
+      });
       change(current, { waiting: questionsIn(held.waiting) });
       return;
     }
@@ -652,18 +656,23 @@ export async function say(
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
     change(current, { asked: text, askedImages: images, askedModel: model, askedEffort: effort });
-    await rememberAsked(current, { text, model, effort, images });
-    /* The slot holds this question now, so a kept copy of it is one attempt
-       written twice: a retry that waited for the answer arriving before it, or
-       one whose list write was interrupted. The list written here drops it, and
-       an empty one still writes, because what is being dropped may be only in
-       storage. */
-    const keptNow = snapshotOf(current).displaced;
-    const keptNext = withoutKeptCopy(keptNow, { text, images, model, effort });
-    if (keptNext.length !== keptNow.length) {
-      change(current, { displaced: keptNext });
+    await rememberAsked(current, {
+      text,
+      model,
+      effort,
+      images,
+      ...(question.from == null ? {} : { from: question.from }),
+    });
+    /* The slot holds this question now, so the kept record it was asked from
+       goes: it names itself, which is how two attempts that say the same words
+       stay apart. A question asked for the first time has no such record. */
+    if (question.from != null) {
+      const askedFrom = question.from;
+      change(current, {
+        displaced: snapshotOf(current).displaced.filter(one => one.id !== askedFrom),
+      });
+      await dropKept(current, [askedFrom]);
     }
-    await dropKept(current, { text, images, model, effort });
     current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -730,45 +739,17 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
       return;
     }
     /* Off the screen before it is asked, so there is no second bubble while the
-       answer is on its way. What is written down is trimmed after the ask has
-       recorded the question in the slot, so a record of it always exists: the
-       kept one first, then the slot's. */
+       answer is on its way. Its written record goes with the ask that reaches
+       the slot, and until then it is the words' copy: one that only waits in
+       the queue keeps it, and the ask that finally takes it out drops it. */
     change(current, {
       displaced: held.filter(one => one !== displaced),
     });
     await say(
       current,
-      { text: displaced.text, images: displaced.images },
+      { text: displaced.text, images: displaced.images, from: displaced.id },
       { model: displaced.model, effort: displaced.effort }
     );
-    /* The ask writes the slot's record itself, and with it trims the kept list.
-       One that failed before reaching that point left the kept entry written
-       down, which is the words' copy; if the slot does hold this question, the
-       record is written here too. A retry that found an answer still arriving
-       joined the waiting line, and its question waits in memory like every
-       queued one. */
-    const at = snapshotOf(current);
-    const slot =
-      at.asked === null
-        ? null
-        : {
-            text: at.asked,
-            images: at.askedImages,
-            model: at.askedModel ?? at.model,
-            effort: at.askedEffort,
-          };
-    if (slot !== null && sameQuestion(displaced, slot)) {
-      try {
-        await rememberAsked(at.sessionId, {
-          text: displaced.text,
-          images: displaced.images,
-          model: displaced.model,
-          effort: displaced.effort,
-        });
-      } catch {
-        /* The kept entry stays written down, which is the words' copy. */
-      }
-    }
     return;
   }
   const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);
@@ -1008,7 +989,11 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
   change(current, { waiting: questionsIn(chat.waiting) });
   await say(
     current,
-    { text: next.text, images: next.images },
+    {
+      text: next.text,
+      images: next.images,
+      ...(next.from === undefined ? {} : { from: next.from }),
+    },
     { model: next.model, effort: next.effort }
   );
 }

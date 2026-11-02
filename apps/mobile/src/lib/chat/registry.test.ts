@@ -1166,6 +1166,20 @@ describe('a question a later send took the slot from', () => {
     expect(written.map(one => one.text)).toContain('second');
   });
 
+  it('keeps the earlier failed bubble when the same question is sent again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    // The first failure is a bubble of its own, and the second is the slot's.
+    expect(held.displaced.map(one => one.text)).toEqual(['the same words']);
+    expect(asMessages(held)).toHaveLength(2);
+  });
+
   it('opens with one bubble for a retry that was interrupted between its two records', async () => {
     storedHistory = [];
     await releaseChat(opened);
@@ -1179,7 +1193,10 @@ describe('a question a later send took the slot from', () => {
       effort: null,
       images: [],
     };
-    storedQuestions.set(`chat-asked-target:interrupted`, JSON.stringify(question));
+    storedQuestions.set(
+      `chat-asked-target:interrupted`,
+      JSON.stringify({ ...question, from: 'a' })
+    );
     storedQuestions.set(
       'chat-kept-questions:interrupted',
       JSON.stringify([
@@ -1271,7 +1288,7 @@ describe('a question a later send took the slot from', () => {
     await settled();
 
     expect(snapshotOf(opened).waiting).toEqual([]);
-    expect(await askedIn(opened)).toEqual({
+    expect(await askedIn(opened)).toMatchObject({
       text: 'first',
       model: 'kilo/one',
       effort: null,

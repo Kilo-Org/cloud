@@ -17,6 +17,12 @@ import { type ChatRecord, NO_RECORD } from './store';
 export type Question = {
   readonly text: string;
   readonly images: readonly LocalImage[];
+  /**
+   * The kept question this asks again, when it is a retry of one: its record is
+   * the one the ask drops once the slot holds the question, so two attempts that
+   * say the same words never take each other's place.
+   */
+  readonly from?: string | null;
 };
 
 /** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */

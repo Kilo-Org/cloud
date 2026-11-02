@@ -44,6 +44,8 @@ const imagesSchema = z.array(z.object({ media: z.string(), data: z.string() })).
 const askedSchema = z.object({
   text: z.string(),
   model: z.string(),
+  // The kept question this one asks again, when it is a retry of one.
+  from: z.union([z.string(), z.number()]).transform(String).nullable().optional(),
   // A question remembered before efforts existed asked with the model's default.
   effort: z.enum(EFFORTS).nullable().default(null),
   // A question remembered before images existed carries none.
@@ -78,7 +80,7 @@ export function newKeptId(): string {
 }
 
 /** A question with no answer, the target and effort it was asked of, and its images. */
-export type Asked = Question & ChatTarget;
+export type Asked = Question & ChatTarget & { readonly from?: string | null };
 
 export async function rememberAsked(sessionId: string, asked: Asked): Promise<void> {
   await setItem(SCOPE, sessionId, JSON.stringify(asked));
@@ -121,37 +123,6 @@ export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
 }
 
 /**
- * Whether two questions are one attempt: the same words, the same model and
- * effort, and the same pictures. A question can be written twice — in the slot
- * being asked and in the kept list it came from — and this is what tells those
- * two records apart from two questions.
- */
-export function sameQuestion(one: Question & ChatTarget, other: Question & ChatTarget): boolean {
-  return (
-    one.text === other.text &&
-    one.model === other.model &&
-    one.effort === other.effort &&
-    /* The pictures are compared as they were stored: the same image is the same
-       base64, and a comparison per part would only re-index what this folds. */
-    JSON.stringify(one.images) === JSON.stringify(other.images)
-  );
-}
-
-/**
- * The list without the newest copy of `question`. Only the newest one goes: an
- * interrupted retry leaves its copy behind the slot's record of the same
- * attempt, and an earlier attempt that happened to ask the same thing is a
- * question of its own.
- */
-export function withoutKeptCopy(
-  kept: readonly Displaced[],
-  question: Question & ChatTarget
-): readonly Displaced[] {
-  const last = kept.findLastIndex(one => sameQuestion(one, question));
-  return last === -1 ? kept : kept.filter((_, index) => index !== last);
-}
-
-/**
  * Adds a question to the written list under the identifier it carries.
  *
  * It reads first and appends, rather than rewriting a list built in memory: a
@@ -165,13 +136,17 @@ export async function addKept(sessionId: string, question: Displaced): Promise<v
 }
 
 /**
- * Drops the written copy of one question, which is what a question that reached
- * the slot leaves behind. Only its newest copy goes, for the reason
- * {@link withoutKeptCopy} gives.
+ * Drops the written copies with these identifiers, which is what a question
+ * that reached the slot leaves behind. The identifiers come from the caller
+ * because a question's words cannot tell one attempt from another: this drops
+ * exactly the records it was given.
  */
-export async function dropKept(sessionId: string, question: Question & ChatTarget): Promise<void> {
+export async function dropKept(sessionId: string, ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
   const kept = await keptIn(sessionId);
-  const next = withoutKeptCopy(kept, question);
+  const next = kept.filter(one => !ids.includes(one.id));
   if (next.length !== kept.length) {
     await writeKept(sessionId, next);
   }

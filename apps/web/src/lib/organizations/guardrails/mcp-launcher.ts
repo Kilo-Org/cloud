@@ -1,4 +1,6 @@
 import { normalizePackageIdentifier, type McpPackageEcosystem } from './mcp-identity';
+import { packageVersionHint } from './package-version-hint';
+
 
 export type LauncherParseResult =
   | {
@@ -20,9 +22,6 @@ function ineligible(reason: string): LauncherParseResult {
   return { eligible: false, reason };
 }
 
-function versionHint(version: string | undefined): string | null {
-  return version !== undefined && /^[0-9]/.test(version) ? version : null;
-}
 
 function parseNpmSpec(spec: string): LauncherParseResult {
   const match = NPM_SPEC.exec(spec);
@@ -39,7 +38,7 @@ function parseNpmSpec(spec: string): LauncherParseResult {
     eligible: true,
     ecosystem: 'npm',
     identifier: identifier.value,
-    versionHint: versionHint(suffix),
+    versionHint: packageVersionHint('npm', suffix),
   };
 }
 
@@ -52,7 +51,7 @@ function parsePypiSpec(spec: string): LauncherParseResult {
     eligible: true,
     ecosystem: 'pypi',
     identifier: identifier.value,
-    versionHint: versionHint(match[2]),
+    versionHint: packageVersionHint('pypi', match[2]),
   };
 }
 

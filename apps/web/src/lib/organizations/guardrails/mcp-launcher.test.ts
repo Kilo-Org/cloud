@@ -10,6 +10,9 @@ describe('parseLauncherCommand', () => {
       '1.4.0',
     ],
     [['npx', '-y', 'pkg@latest', '--flag'], 'npm', 'pkg', null],
+    [['npx', '-y', 'pkg@next'], 'npm', 'pkg', null],
+    [['npx', '-y', 'pkg@2nightly'], 'npm', 'pkg', null],
+    [['npx', '-y', 'pkg@v1.2.3'], 'npm', 'pkg', '1.2.3'],
     [['npx', '-y', '@azure/mcp@3.0.0-beta.21'], 'npm', '@azure/mcp', '3.0.0-beta.21'],
     [['bunx', 'pkg'], 'npm', 'pkg', null],
     [['pnpm', 'dlx', 'pkg@2.0.0'], 'npm', 'pkg', '2.0.0'],
@@ -24,6 +27,8 @@ describe('parseLauncherCommand', () => {
     [['uvx', 'pkg@latest'], 'pypi', 'pkg', null],
     [['uvx', '--from', 'mcp-server-foo', 'foo-cmd'], 'pypi', 'mcp-server-foo', null],
     [['uvx', '--from=mcp-server-foo>=1.2', 'foo-cmd'], 'pypi', 'mcp-server-foo', '1.2'],
+    [['uvx', '--from=mcp-server-foo==1.2.0rc1', 'foo-cmd'], 'pypi', 'mcp-server-foo', '1.2.0rc1'],
+    [['uvx', '--from=mcp-server-foo==1.2.*', 'foo-cmd'], 'pypi', 'mcp-server-foo', null],
     [['uv', 'tool', 'run', 'pkg'], 'pypi', 'pkg', null],
   ])('parses %j', (argv, ecosystem, identifier, versionHint) => {
     expect(parseLauncherCommand(argv)).toEqual({

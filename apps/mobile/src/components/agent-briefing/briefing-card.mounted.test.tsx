@@ -3,9 +3,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
-import { BriefingScorecard } from './briefing-card';
+import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+import { BriefingCard, BriefingScorecard } from './briefing-card';
+
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  Platform: { OS: 'android' },
+  I18nManager: { isRTL: false, getConstants: () => ({ isRTL: false }) },
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ X: 'X' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
@@ -20,7 +27,12 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/lib/agent-briefing', () => ({
   BRIEFING_PATH: '/(app)/agent-briefing',
   useBriefings: () => ({ reports: [] }),
-  useBriefingDismissals: () => ({ isSuccess: true, data: [] }),
+  useBriefingDismissals: () => ({
+    isSuccess: true,
+    data: [],
+    save: { isPending: false },
+    dismiss: vi.fn<() => void>(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => Date.now() }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
@@ -76,5 +88,49 @@ describe('BriefingScorecard', () => {
     expect(
       renderedScorecard(renderScorecard({ sessions: 3, pullRequests: 1, blockers: 0 })).values
     ).toEqual(['3', '1', '0']);
+  });
+});
+
+// Only the fields BriefingCard reads: the summary line and the scorecard counts.
+const briefingReport = {
+  id: 'report-1',
+  localDate: '2026-11-02',
+  summary: { status: 'ready', text: 'Overnight work' },
+  scorecard: { sessions: 2, pullRequests: 1, blockers: 1 },
+} as unknown as Parameters<typeof BriefingCard>[0]['report'];
+
+function renderCardInFrame(layer: 'drawn' | 'reserved'): ReactTestRenderer {
+  const card = <BriefingCard report={briefingReport} />;
+  const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      layer === 'drawn' ? (
+        <AdaptiveHomeCardFrame live={card} showBriefing={false} />
+      ) : (
+        <AdaptiveHomeCardFrame live={null} briefing={card} showBriefing={false} />
+      )
+    );
+  });
+  if (!ref.current) {
+    throw new Error('BriefingCard did not mount in the frame');
+  }
+  return ref.current;
+}
+
+function pressablesIn(renderer: ReactTestRenderer) {
+  return renderer.root.findAllByType('Pressable' as ElementType);
+}
+
+describe('BriefingCard in the Home card frame', () => {
+  it('keeps every control pressable in the layer the frame draws', () => {
+    const pressables = pressablesIn(renderCardInFrame('drawn'));
+    expect(pressables).toHaveLength(3);
+    for (const pressable of pressables) {
+      expect(typeof pressable.props.onPress).toBe('function');
+    }
+  });
+
+  it('renders no pressable at all in the layer that only reserves height', () => {
+    expect(pressablesIn(renderCardInFrame('reserved'))).toHaveLength(0);
   });
 });

@@ -1,10 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { CardControl } from '@/components/home/adaptive-home-card-frame';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { X } from '@/components/ui/icons';
-import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
@@ -16,6 +16,7 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, formatNumber } from '@/lib/format';
@@ -93,6 +94,7 @@ export function BriefingCard({
   ]
     .filter(Boolean)
     .join(' · ');
+  const previewLabel = hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview;
   return (
     <View
       className={cn(
@@ -100,24 +102,21 @@ export function BriefingCard({
         embedded && 'rounded-none border-0 bg-transparent'
       )}
     >
-      <Pressable
+      <CardControl
         accessibilityRole="button"
         accessibilityLabel={t('agentBriefing.view')}
-        className="active:opacity-70"
         onPress={() => {
           router.push(`${BRIEFING_PATH}/${report.id}` as Href);
         }}
       >
         <BriefingScorecard report={report} />
-      </Pressable>
+      </CardControl>
       <View className="h-px bg-border" />
       <View className="min-h-[68px] flex-row items-center gap-2 px-4 py-3">
-        <Pressable
+        <CardControl
           accessibilityRole="button"
-          accessibilityLabel={
-            hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview
-          }
-          className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2 active:opacity-70"
+          accessibilityLabel={previewLabel}
+          className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2"
           onPress={() => {
             router.push(`${BRIEFING_PATH}/${report.id}` as Href);
           }}
@@ -126,17 +125,21 @@ export function BriefingCard({
             {preview}
           </Text>
           <DirectionalChevronRight size={18} color={colors.foreground} />
-        </Pressable>
-        <IconButton
+        </CardControl>
+        <CardControl
+          accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className="shrink-0 rounded-full border border-border bg-secondary"
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'shrink-0 rounded-full border border-border bg-secondary'
+          )}
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
           }}
         >
           <X size={18} color={colors.foreground} />
-        </IconButton>
+        </CardControl>
       </View>
     </View>
   );

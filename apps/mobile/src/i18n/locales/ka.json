@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
     "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
     "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს.",
+    "translateSummaries": "შეჯამებების თარგმნა",
     "autoExpandThinkingInactiveSubtitle": "მსჯელობის დეტალების დამალვისას ეფექტს არ მოახდენს."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა.",
       "gitlabDescription": "შერწყმის მოთხოვნების შემოწმება მობილურზე",
+      "gitlabInstanceMismatchTitle": "GitLab-ის დაკავშირება სხვა ინსტანციისთვისაა",
+      "gitlabInstanceMismatchDescription": "თქვენი GitLab-თან დაკავშირება განკუთვნილია {{connected}}-ისთვის, თუმცა ეს შერწყმის მოთხოვნა {{requested}}-ზეა. დააკავშირეთ GitLab იმ ინსტანციაზე მისი განსახილველად.",
+      "checkActiveConnection": "დაკავშირება აქტიურია, მაგრამ ეს ელემენტი ჯერ კიდევ ვერ იტვირთება.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ამ ანგარიშს ჯერ არ ჰყავს ორგანიზაციები. შექმენით ორგანიზაცია ან შეუერთდით მას, Bitbucket-ის PR-ების განსახილველად.",
       "gitlabReconnectAdminOnlyDescription": "სთხოვეთ ორგანიზაციის მფლობელს, ადმინისტრატორს ან ანგარიშსწორების მენეჯერს, რომ დააკავშიროს ის.",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "პრიორიტეტული მიგნებები პირველი სინქრონიზაციის შემდეგ გამოჩნდება.",
       "refreshFailed": "განახლება ვერ მოხერხდა — ნაჩვენებია ბოლო სინქრონიზებული მონაცემები.",
       "settings": "პარამეტრები",
+      "syncing": "სინქრონიზაცია მიმდინარეობს…",
       "syncNow": "ახლავე სინქრონიზაცია",
       "syncQueued": "სინქრონიზაცია რიგშია",
       "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია.",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "დააყენე Kilo-ს GitHub აპი, რათა ავტომატურად დაასინქრონიზო Dependabot-ის გაფრთხილებები და მართო უსაფრთხოების მიგნებები შენს რეპოზიტორებში.",
+      "connectOwnerOnly": "სთხოვე ორგანიზაციის მფლობელს ან ადმინისტრატორს {{platform}}-ის დაკავშირება.",
       "connectTitle": "დასაწყებად დააკავშირე GitHub",
       "couldNotLoad": "უსაფრთხოების აგენტის ჩატვირთვა ვერ მოხერხდა.",
       "installApp": "GitHub აპის დაყენება",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "დაყენების დასრულება შეუძლებელია",
       "notAdminMessage": "ამ ანგარიშის დაკავშირება მხოლოდ მის GitHub ადმინისტრატორს შეუძლია. სთხოვე ორგანიზაციის ადმინისტრატორს Kilo-ს დაყენება.",
       "alreadyClaimedMessage": "GitHub-ის ეს დაყენებული აპი უკვე სხვა Kilo ანგარიშთან არის დაკავშირებული. ჯერ იმ ანგარიშიდან გათიშე.",
+      "installationUnavailableMessage": "GitHub App-ის ეს დაყენება შეჩერებულია ან აღარ არის ხელმისაწვდომი. აღადგინე ან ხელახლა დააყენე ის GitHub-ში, შემდეგ თავიდან დაიწყე.",
+      "multipleInstallationsMessage": "ამ Kilo ორგანიზაციას ამჟამად მხოლოდ ერთი GitHub ორგანიზაციის დაკავშირება შეუძლია.",
       "didNotCompleteTitle": "დაყენება არ დასრულდა",
       "didNotCompleteMessage": "GitHub აპის დაყენება არ დასრულდა. აპიდან ხელახლა სცადე."
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "ახლა {{name}}-ია",
       "defaultProfileResolvesToAccessibility": "ნაგულისხმევი პროფილი: {{name}}",
       "manageProfiles": "პროფილების მართვა",
-      "noProfiles": "ჯერ არ არის პროფილები. შექმენით ერთი გარემოს ცვლადების, MCP სერვერების და უნარების დასამატებლად.",
       "advancedConfig": "გაფართოებული კონფიგურაცია",
       "advancedConfigDescription": "ვრცელდება ამ სესიაზე. პროფილად შენახვისას ის შემდეგ ჯერზეც დარჩება.",
       "saveAsProfile": "პროფილად შენახვა",

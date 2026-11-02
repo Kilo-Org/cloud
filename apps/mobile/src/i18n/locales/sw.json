@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tafsiri muhtasari wa zana",
     "toolSummaryTranslationSubtitle": "Tuma muhtasari wa kila zana kwa modeli ili kuutafsiri katika lugha ya programu yako. Ikiwa tafsiri itashindwa, asili itaonyeshwa.",
     "toolSummaryTranslationModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(common.model) kuchagua nyingine.",
+    "translateSummaries": "Tafsiri muhtasari",
     "autoExpandThinkingInactiveSubtitle": "Hakuna athari wakati maelezo ya mawazo yamefichwa."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "Unganisha GitHub tena",
       "reconnectDescription": "Ruhusa ya muunganisho wako wa GitHub imebatilishwa.",
       "gitlabDescription": "Kagua maombi ya kuunganisha kwenye simu",
+      "gitlabInstanceMismatchTitle": "Muunganisho wa GitLab ni wa mfumo mwingine",
+      "gitlabInstanceMismatchDescription": "Muunganisho wako wa GitLab ni wa {{connected}}, lakini ombi hili la kuunganisha liko kwenye {{requested}}. Unganisha GitLab kwenye mfumo huo ili kulikagua.",
+      "checkActiveConnection": "Muunganisho uko hai, lakini kipengee hiki bado hakiwezi kupakiwa.",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "Vipaumbele vitaonekana baada ya usawazishaji wa kwanza.",
       "refreshFailed": "Imeshindikana kuonyesha upya data — data iliyosawazishwa mara ya mwisho ndiyo inayoonyeshwa.",
       "settings": "Mipangilio",
+      "syncing": "Inasawazisha…",
       "syncNow": "Sawazisha sasa",
       "syncQueued": "Usawazishaji umeongezwa kwenye foleni.",
       "syncStatusUnavailable": "Hali ya usawazishaji haipatikani.",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Sakinisha programu ya Kilo ya GitHub ili kusawazisha arifa za Dependabot kiotomatiki na kusimamia matatizo ya usalama katika hazina zako.",
+      "connectOwnerOnly": "Mwombe mmiliki au msimamizi wa shirika aiunganishe {{platform}}.",
       "connectTitle": "Unganisha GitHub ili kuanza",
       "couldNotLoad": "Imeshindikana kupakia wakala wa usalama.",
       "installApp": "Sakinisha programu ya GitHub",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "Imeshindikana kukamilisha usakinishaji",
       "notAdminMessage": "Ni msimamizi wa GitHub wa akaunti hiyo pekee anayeweza kuiunganisha. Mwombe msimamizi wa shirika asakinishe Kilo.",
       "alreadyClaimedMessage": "Usakinishaji huo wa GitHub tayari umeunganishwa na akaunti nyingine ya Kilo. Katisha muunganisho kwenye akaunti hiyo kwanza.",
+      "installationUnavailableMessage": "Usakinishaji huu wa GitHub App umesimamishwa au haupatikani tena. Urejeshe au usakinishe upya kwenye GitHub, kisha anza tena.",
+      "multipleInstallationsMessage": "Shirika hili la Kilo kwa sasa linaweza kuunganisha shirika moja tu la GitHub.",
       "didNotCompleteTitle": "Usakinishaji haukukamilika",
       "didNotCompleteMessage": "Usakinishaji wa programu ya GitHub haukukamilika. Jaribu tena kwenye programu."
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "Imewekwa kwa {{name}}",
       "defaultProfileResolvesToAccessibility": "Wasifu chaguomsingi: {{name}}",
       "manageProfiles": "Dhibiti wasifu",
-      "noProfiles": "Bado hakuna wasifu. Unda moja ili kuongeza vigezo vya mazingira, seva za MCP na ujuzi.",
       "advancedConfig": "Usanidi wa hali ya juu",
       "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
       "saveAsProfile": "Hifadhi kama Wasifu",

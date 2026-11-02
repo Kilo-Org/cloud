@@ -67,39 +67,41 @@ const baseRow = {
 };
 
 describe('GET /admin/api/api-request-log/download', () => {
-  let viewer: User;
-  let otherAdmin: User;
+  let exporter: User;
+  let sessionViewer: User;
 
   beforeEach(async () => {
     fakeR2.objects.clear();
-    viewer = await insertTestUser({ is_admin: true, can_view_sessions: true });
-    otherAdmin = await insertTestUser({ is_admin: true });
-    mockedGetUserFromAuth.mockResolvedValue({ user: viewer, authFailedResponse: null });
+    exporter = await insertTestUser({ is_admin: true, can_export_api_request_logs: true });
+    sessionViewer = await insertTestUser({ is_admin: true, can_view_sessions: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: exporter, authFailedResponse: null });
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, TEST_USER_ID));
-    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [viewer.id, otherAdmin.id]));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [exporter.id, sessionViewer.id]));
   });
 
-  it('requires session viewing access before reading rows or stored bodies', async () => {
+  it('requires export access, not session viewing, before reading rows or bodies', async () => {
     const request_r2_key = '2026-08-01/access/request.json';
     fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ access: true }));
     await db.insert(api_request_log).values({ ...baseRow, request_r2_key });
     const send = jest.spyOn(fakeR2, 'send');
-    mockedGetUserFromAuth.mockResolvedValue({ user: otherAdmin, authFailedResponse: null });
+    mockedGetUserFromAuth.mockResolvedValue({ user: sessionViewer, authFailedResponse: null });
 
     const response = await GET(createRequest());
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'Session viewing access required' });
+    expect(await response.json()).toEqual({ error: 'API request log export access required' });
     expect(send).not.toHaveBeenCalled();
   });
 
   it('applies a permission change to a session that is already signed in', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
-      user: { ...otherAdmin, can_view_sessions: true },
+      user: { ...sessionViewer, can_export_api_request_logs: true },
       authFailedResponse: null,
     });
 

@@ -1,9 +1,8 @@
 // In a development build, the PR review copy fixture mounts the real overview
-// against isolated fake reads, so the Review section, the reviewers block, the
-// merge section in each of its states and the provider error states can be read
-// in the app's selected language without a forge connection. Every read is
-// answered below over the usual tRPC boundary; writes are rejected before any
-// mutation function runs.
+// against isolated fake reads, so the Review section, the reviewers block and
+// the provider error states can be read in the app's selected language without
+// a forge connection. Every read is answered below over the usual tRPC
+// boundary; writes are rejected before any mutation function runs.
 
 import {
   type ProviderPrChecksResult,
@@ -16,25 +15,45 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
-import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrScope,
+  ProviderPrScopeProvider,
+  providerPrWebUrl,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { TRPCProvider } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type PrReviewOverviewFixtureSurface =
   | 'overview'
+  | 'overview-no-checks'
+  | 'overview-multi-group'
   | 'overview-blocked'
   | 'overview-merged'
   | 'merge-request'
   | 'merge-request-missing'
   | 'merge-request-error';
 
-/** The surfaces the overview reads under a provider (GitLab) scope. */
-const PROVIDER_SURFACES: readonly PrReviewOverviewFixtureSurface[] = [
-  'merge-request',
-  'merge-request-missing',
-  'merge-request-error',
-];
+/**
+ * What each overview surface reads. The GitHub surfaces differ only in the
+ * shape of the checks answer — one run, no runs, and one run per status group —
+ * because the Review button and the merge section below that card must keep one
+ * position after the first settled frame in all three.
+ */
+const SURFACE_READS = {
+  overview: { scope: 'github', checks: 'one-run' },
+  'overview-no-checks': { scope: 'github', checks: 'no-runs' },
+  'overview-multi-group': { scope: 'github', checks: 'multi-group' },
+  'overview-blocked': { scope: 'github', checks: 'one-run' },
+  'overview-merged': { scope: 'github', checks: 'one-run' },
+  'merge-request': { scope: 'gitlab', checks: 'one-run' },
+  'merge-request-missing': { scope: 'gitlab', checks: 'one-run' },
+  'merge-request-error': { scope: 'gitlab', checks: 'one-run' },
+} as const satisfies Record<
+  PrReviewOverviewFixtureSurface,
+  { readonly scope: 'github' | 'gitlab'; readonly checks: 'one-run' | 'no-runs' | 'multi-group' }
+>;
 
 const headSha = '0123456789abcdef0123456789abcdef01234567';
 const triple = { owner: 'sample', repo: 'review-copy', number: 1 } as const;
@@ -87,19 +106,6 @@ export const reviewOverviewFixture = {
   },
 } satisfies RouterOutputs['githubPrReview']['getPullRequest'];
 
-const reviewChecksFixture = {
-  checkRuns: [
-    {
-      name: 'Formatting',
-      status: 'completed',
-      conclusion: 'success',
-      detailsUrl: null,
-      appName: null,
-    },
-  ],
-  rollup: { total: 1, success: 1, failure: 0, pending: 0, skipped: 0 },
-} satisfies RouterOutputs['githubPrReview']['listChecks'];
-
 /** The overview a review decision holds back: the merge section's blocked arm. */
 const blockedOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
   ...reviewOverviewFixture,
@@ -127,6 +133,60 @@ function githubOverviewFixture(
   }
   return reviewOverviewFixture;
 }
+
+const reviewChecksFixture = {
+  checkRuns: [
+    {
+      name: 'Formatting',
+      status: 'completed',
+      conclusion: 'success',
+      detailsUrl: null,
+      appName: null,
+    },
+  ],
+  rollup: { total: 1, success: 1, failure: 0, pending: 0, skipped: 0 },
+} satisfies RouterOutputs['githubPrReview']['listChecks'];
+
+/** A head commit right after a push: the card is one copy line. */
+const reviewChecksNoRunsFixture = {
+  checkRuns: [],
+  rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+} satisfies RouterOutputs['githubPrReview']['listChecks'];
+
+/** Every status group present: the card is a count header plus four rows. */
+const reviewChecksMultiGroupFixture = {
+  checkRuns: [
+    {
+      name: 'Formatting',
+      status: 'completed',
+      conclusion: 'success',
+      detailsUrl: null,
+      appName: null,
+    },
+    {
+      name: 'Unit tests',
+      status: 'completed',
+      conclusion: 'failure',
+      detailsUrl: null,
+      appName: null,
+    },
+    {
+      name: 'Integration',
+      status: 'in_progress',
+      conclusion: null,
+      detailsUrl: null,
+      appName: null,
+    },
+    {
+      name: 'Lint',
+      status: 'completed',
+      conclusion: 'skipped',
+      detailsUrl: null,
+      appName: null,
+    },
+  ],
+  rollup: { total: 4, success: 1, failure: 1, pending: 1, skipped: 1 },
+} satisfies RouterOutputs['githubPrReview']['listChecks'];
 
 /**
  * The GitLab merge request the provider surfaces read: the same review the
@@ -161,6 +221,12 @@ const providerChecksFixture = {
     },
   ],
 } satisfies ProviderPrChecksResult;
+
+const CHECKS_BY_SHAPE = {
+  'one-run': reviewChecksFixture,
+  'no-runs': reviewChecksNoRunsFixture,
+  'multi-group': reviewChecksMultiGroupFixture,
+} satisfies Record<(typeof SURFACE_READS)[PrReviewOverviewFixtureSurface]['checks'], unknown>;
 
 function fixtureResponse(data: unknown): Response {
   // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
@@ -200,7 +266,7 @@ function createFixtureClient(surface: PrReviewOverviewFixtureSurface) {
             return fixtureResponse(githubOverviewFixture(surface));
           }
           if (url.includes('/githubPrReview.listChecks')) {
-            return fixtureResponse(reviewChecksFixture);
+            return fixtureResponse(CHECKS_BY_SHAPE[SURFACE_READS[surface].checks]);
           }
           if (url.includes('/providerReview.getPullRequest')) {
             if (surface === 'merge-request') {
@@ -235,6 +301,17 @@ export function PrReviewOverviewCopyFixture({
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
+  const isGitHub = SURFACE_READS[surface].scope === 'github';
+  // The screen publishes the loaded PR/MR's own URL to the body (see
+  // `pr-review-screen.tsx`), and the no-checks card renders its
+  // view-on-provider button from it. A GitHub read always has one, so the
+  // fixture publishes it too; a provider surface whose read failed has none.
+  const webUrl = isGitHub
+    ? providerPrWebUrl({
+        ref: { platform: 'github', ...triple },
+        serverWebUrl: null,
+      })
+    : null;
   const body = (
     <View className="flex-1 bg-background">
       <PrReviewOverview {...triple} isActive />
@@ -243,11 +320,13 @@ export function PrReviewOverviewCopyFixture({
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
-        {PROVIDER_SURFACES.some(candidate => candidate === surface) ? (
-          <ProviderPrScopeProvider value={gitlabScope}>{body}</ProviderPrScopeProvider>
-        ) : (
-          body
-        )}
+        <ProviderPrWebUrlProvider value={webUrl}>
+          {isGitHub ? (
+            body
+          ) : (
+            <ProviderPrScopeProvider value={gitlabScope}>{body}</ProviderPrScopeProvider>
+          )}
+        </ProviderPrWebUrlProvider>
       </TRPCProvider>
     </QueryClientProvider>
   );

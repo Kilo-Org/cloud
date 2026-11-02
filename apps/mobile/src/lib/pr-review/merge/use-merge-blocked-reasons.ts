@@ -32,7 +32,7 @@ export function useMergeBlockedReasons(
   triple: { owner: string; repo: string; number: number }
 ): MergeBlockedReasonsModel {
   const queries = useProviderPrQueries(triple);
-  const checks = useQuery(queries.checksOptions(overview.headSha));
+  const checks = useQuery(queries.checksOptions(overview.headSha, true));
   const isChecksPending = checks.isLoading;
   const failedCheckCount = checks.data ? checks.data.rollup.failure : null;
   const reasons = useMemo(

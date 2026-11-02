@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "उपकरण सारांश अनुवाद गर्नुहोस्",
     "toolSummaryTranslationSubtitle": "प्रत्येक उपकरण सारांशलाई तपाईंको एपको भाषामा अनुवाद गर्न मोडेलमा पठाउनुहोस्। अनुवाद असफल भएमा मूल देखाइन्छ।",
     "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।",
+    "translateSummaries": "सारांश अनुवाद गर्नुहोस्",
     "autoExpandThinkingInactiveSubtitle": "सोचको विवरण लुकाइएको बेला कुनै प्रभाव हुँदैन।"
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "GitHub मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
+      "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",
+      "gitlabInstanceMismatchDescription": "तपाईंको GitLab जडान {{connected}} का लागि हो, तर यो मर्ज रिक्वेस्ट {{requested}} मा छ। यसको समीक्षा गर्न त्यो इन्स्टेन्समा GitLab जडान गर्नुहोस्।",
+      "checkActiveConnection": "जडान सक्रिय छ, तर यो आइटम अझै लोड गर्न सकिँदैन।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
       "bitbucketOrgOnlyNoOrganizationDescription": "यो खातामा हालसम्म कुनै संस्था छैन। तपाईंले संस्था सिर्जना गर्नुभएको वा सामेल हुनुभएपछि Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न सकिन्छ।",
       "gitlabReconnectAdminOnlyDescription": "यसलाई फेरि जडान गर्न संस्थाको मालिक, प्रशासक वा बिलिङ व्यवस्थापकलाई अनुरोध गर्नुहोस्।",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "पहिलो सिंक भएपछि प्राथमिकताका सुरक्षा समस्याहरू देखिनेछन्।",
       "refreshFailed": "रिफ्रेस गर्न सकिएन — पछिल्लो पटक सिंक भएको डेटा देखाइएको छ।",
       "settings": "सेटिङ",
+      "syncing": "सिंक हुँदैछ…",
       "syncNow": "अहिले सिंक गर्नुहोस्",
       "syncQueued": "सिंक पालोमा राखियो",
       "syncStatusUnavailable": "सिंकको स्थिति उपलब्ध छैन।",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot का चेतावनीहरू स्वचालित रूपमा सिंक गर्न र तपाईंका रिपोजिटरीहरूमा सुरक्षा समस्याहरू व्यवस्थापन गर्न Kilo GitHub एप स्थापना गर्नुहोस्।",
+      "connectOwnerOnly": "संस्थाका मालिक वा प्रशासकलाई {{platform}} जडान गर्न अनुरोध गर्नुहोस्।",
       "connectTitle": "सुरु गर्न GitHub जडान गर्नुहोस्",
       "couldNotLoad": "सुरक्षा एजेन्ट लोड गर्न सकिएन।",
       "installApp": "GitHub एप स्थापना गर्नुहोस्",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "स्थापना पूरा गर्न सकिएन",
       "notAdminMessage": "त्यो खाताका GitHub प्रशासकले मात्र खाता जडान गर्न सक्छन्। संस्थाका प्रशासकलाई Kilo स्थापना गर्न अनुरोध गर्नुहोस्।",
       "alreadyClaimedMessage": "त्यो GitHub स्थापना अर्को Kilo खातासँग पहिले नै जडान भएको छ। पहिले त्यहाँको जडान हटाउनुहोस्।",
+      "installationUnavailableMessage": "यो GitHub App स्थापना निलम्बित भएको छ वा अब उपलब्ध छैन। यसलाई GitHub मा पुनर्स्थापना गर्नुहोस् वा पुनः स्थापना गर्नुहोस्, त्यसपछि फेरि सुरु गर्नुहोस्।",
+      "multipleInstallationsMessage": "यो Kilo संगठनले हाल एउटा GitHub संगठन मात्र जडान गर्न सक्छ।",
       "didNotCompleteTitle": "स्थापना पूरा भएन",
       "didNotCompleteMessage": "GitHub एपको स्थापना पूरा भएन। एपबाट फेरि प्रयास गर्नुहोस्।"
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "अहिले {{name}} मा सेट छ",
       "defaultProfileResolvesToAccessibility": "पूर्वनिर्धारित प्रोफाइल: {{name}}",
       "manageProfiles": "प्रोफाइलहरू प्रबन्ध गर्नुहोस्",
-      "noProfiles": "अहिलेसम्म कुनै प्रोफाइल छैन। वातावरणीय चरहरू, MCP सर्भरहरू, र सीपहरू थप्न एउटा सिर्जना गर्नुहोस्।",
       "advancedConfig": "उन्नत कन्फिगरेसन",
       "advancedConfigDescription": "यो सत्रमा लागू हुन्छ। प्रोफाइलको रूपमा बचत गर्दा यो अर्को पटकका लागि रहन्छ।",
       "saveAsProfile": "प्रोफाइलको रूपमा बचत गर्नुहोस्",

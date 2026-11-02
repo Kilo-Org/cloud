@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ಸಾಧನ ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
     "toolSummaryTranslationSubtitle": "ಪ್ರತಿ ಸಾಧನ ಸಾರಾಂಶವನ್ನು ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಗೆ ಅನುವಾದಿಸಲು ಮಾದರಿಗೆ ಕಳುಹಿಸಿ. ಅನುವಾದ ವಿಫಲವಾದರೆ ಮೂಲವನ್ನು ತೋರಿಸಲಾಗುತ್ತದೆ.",
     "toolSummaryTranslationModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(common.model) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "translateSummaries": "ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
     "autoExpandThinkingInactiveSubtitle": "ಯೋಚನೆಯ ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿದಾಗ ಯಾವುದೇ ಪರಿಣಾಮ ಇರುವುದಿಲ್ಲ."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "GitHubಗೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ",
       "reconnectDescription": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕವನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.",
       "gitlabDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ",
+      "gitlabInstanceMismatchTitle": "GitLab ಸಂಪರ್ಕವು ಇನ್ನೊಂದು ಇನ್ಸ್ಟಾನ್ಸ್‌ಗಾಗಿದೆ",
+      "gitlabInstanceMismatchDescription": "ನಿಮ್ಮ GitLab ಸಂಪರ್ಕವು {{connected}} ಗಾಗಿದೆ, ಆದರೆ ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ {{requested}} ನಲ್ಲಿದೆ. ಅದನ್ನು ಪರಿಶೀಲಿಸಲು ಆ ಇನ್ಸ್ಟಾನ್ಸ್‌ನಲ್ಲಿ GitLab ಸಂಪರ್ಕಿಸಿ.",
+      "checkActiveConnection": "ಸಂಪರ್ಕ ಸಕ್ರಿಯವಾಗಿದೆ, ಆದರೆ ಈ ಐಟಂ ಅನ್ನು ಇನ್ನೂ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮೇಲಿನ ಖಾತೆಯನ್ನು ಒಂದು ಸಂಸ್ಥೆಗೆ ಬದಲಾಯಿಸಿ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ಈ ಖಾತೆಯಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂಸ್ಥೆಗಳಿಲ್ಲ. ನೀವು ಒಂದು ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿದಾಗ ಅಥವಾ ಸೇರಿದಾಗ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.",
       "gitlabReconnectAdminOnlyDescription": "ಅದನ್ನು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರಲ್ಲಿ ಒಬ್ಬರನ್ನು ಕೇಳಿ.",
@@ -1792,6 +1796,7 @@
       "priorityFindingsPending": "ಆದ್ಯತೆಯ ಸಮಸ್ಯೆಗಳು ಮೊದಲ ಸಿಂಕ್ ಆದ ನಂತರ ಕಾಣಿಸುತ್ತವೆ.",
       "refreshFailed": "ರಿಫ್ರೆಶ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಕೊನೆಯದಾಗಿ ಸಿಂಕ್ ಮಾಡಿದ ಡೇಟಾವನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
       "settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+      "syncing": "ಸಿಂಕ್ ಆಗುತ್ತಿದೆ…",
       "syncNow": "ಈಗ ಸಿಂಕ್ ಮಾಡಿ",
       "syncQueued": "ಸಿಂಕ್ ಅನ್ನು ಸರದಿಗೆ ಸೇರಿಸಲಾಗಿದೆ",
       "syncStatusUnavailable": "ಸಿಂಕ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
@@ -2036,6 +2041,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ಎಚ್ಚರಿಕೆಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಸಿಂಕ್ ಮಾಡಲು ಮತ್ತು ನಿಮ್ಮ ರೆಪೊಸಿಟರಿಗಳಲ್ಲಿ ಪತ್ತೆಯಾದ ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳನ್ನು ನಿರ್ವಹಿಸಲು Kilo GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ.",
+      "connectOwnerOnly": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಅಥವಾ ನಿರ್ವಾಹಕರನ್ನು {{platform}} ಅನ್ನು ಸಂಪರ್ಕಿಸಲು ಕೇಳಿ.",
       "connectTitle": "ಪ್ರಾರಂಭಿಸಲು GitHub ಅನ್ನು ಸಂಪರ್ಕಿಸಿ",
       "couldNotLoad": "ಭದ್ರತಾ ಏಜೆಂಟ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "installApp": "GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
@@ -2224,6 +2230,8 @@
       "cannotCompleteTitle": "ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
       "notAdminMessage": "ಆ ಖಾತೆಯ GitHub ನಿರ್ವಾಹಕ ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು. Kilo ಸ್ಥಾಪಿಸಲು ಸಂಸ್ಥೆಯ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
       "alreadyClaimedMessage": "ಆ GitHub ಸ್ಥಾಪನೆ ಈಗಾಗಲೇ ಮತ್ತೊಂದು Kilo ಖಾತೆಗೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ. ಮೊದಲು ಆ ಖಾತೆಯಲ್ಲಿ ಅದರ ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ.",
+      "installationUnavailableMessage": "ಈ GitHub App ಸ್ಥಾಪನೆ ಅಮಾನತುಗೊಂಡಿದೆ ಅಥವಾ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. GitHub ನಲ್ಲಿ ಅದನ್ನು ಮರುಸ್ಥಾಪಿಸಿ ಅಥವಾ ಮತ್ತೆ ಸ್ಥಾಪಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+      "multipleInstallationsMessage": "ಈ Kilo ಸಂಘಟನೆಯು ಪ್ರಸ್ತುತ ಕೇವಲ ಒಂದು GitHub ಸಂಘಟನೆಯನ್ನು ಮಾತ್ರ ಸಂಪರ್ಕಗೊಳಿಸಬಲ್ಲದು.",
       "didNotCompleteTitle": "ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ",
       "didNotCompleteMessage": "GitHub ಆ್ಯಪ್ ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಆ್ಯಪ್‌ನಿಂದ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
@@ -2380,7 +2388,6 @@
       "defaultProfileResolvesTo": "ಪ್ರಸ್ತುತ {{name}} ಆಗಿದೆ",
       "defaultProfileResolvesToAccessibility": "ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್: {{name}}",
       "manageProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
-      "noProfiles": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ. ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, MCP ಸರ್ವರ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ರಚಿಸಿ.",
       "advancedConfig": "ಸುಧಾರಿತ ಸಂರಚನೆ",
       "advancedConfigDescription": "ಇದು ಈ ಅಧಿವೇಶನಕ್ಕೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿದರೆ ಅದು ಮುಂದಿನ ಬಾರಿಗೂ ಉಳಿಯುತ್ತದೆ.",
       "saveAsProfile": "ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿ",

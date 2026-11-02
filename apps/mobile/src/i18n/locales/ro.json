@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tradu rezumatele instrumentelor",
     "toolSummaryTranslationSubtitle": "Trimite fiecare rezumat de instrument unui model pentru a-l traduce în limba aplicației tale. Originalul este afișat dacă traducerea eșuează.",
     "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul.",
+    "translateSummaries": "Tradu rezumatele",
     "autoExpandThinkingInactiveSubtitle": "Nu are efect cât timp detaliile raționamentului sunt ascunse."
   },
   "prReview": {
@@ -695,6 +696,9 @@
       "reconnectTitle": "Reconectare la GitHub",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat.",
       "gitlabDescription": "Revizuiește merge requesturi pe mobil",
+      "gitlabInstanceMismatchTitle": "Conexiunea la GitLab este pentru o altă instanță",
+      "gitlabInstanceMismatchDescription": "Conexiunea ta la GitLab este pentru {{connected}}, dar acest merge request este pe {{requested}}. Conectează GitLab pe acea instanță pentru a-l revizui.",
+      "checkActiveConnection": "Conexiunea este activă, dar acest element tot nu poate fi încărcat.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
@@ -1815,6 +1819,7 @@
       "priorityFindingsPending": "Constatările prioritare vor apărea după prima sincronizare.",
       "refreshFailed": "Nu s-au putut actualiza datele. Se afișează ultimele date sincronizate.",
       "settings": "Setări",
+      "syncing": "Se sincronizează…",
       "syncNow": "Sincronizează acum",
       "syncQueued": "Sincronizare în așteptare",
       "syncStatusUnavailable": "Starea sincronizării nu este disponibilă.",
@@ -2063,6 +2068,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalează aplicația Kilo pentru GitHub ca să sincronizezi automat alertele Dependabot și să gestionezi constatările de securitate din depozitele tale.",
+      "connectOwnerOnly": "Roagă un proprietar sau un administrator al organizației să conecteze {{platform}}.",
       "connectTitle": "Conectează GitHub pentru a începe",
       "couldNotLoad": "Nu s-a putut încărca agentul de securitate.",
       "installApp": "Instalează aplicația GitHub",
@@ -2255,6 +2261,8 @@
       "cannotCompleteTitle": "Instalarea nu poate fi finalizată",
       "notAdminMessage": "Doar un administrator GitHub al acelui cont îl poate conecta. Cere unui administrator al organizației să instaleze Kilo.",
       "alreadyClaimedMessage": "Acea instalare GitHub este deja conectată la un alt cont Kilo. Deconecteaz-o mai întâi acolo.",
+      "installationUnavailableMessage": "Această instalare GitHub App este suspendată sau nu mai este disponibilă. Restaureaz-o sau reinstaleaz-o în GitHub, apoi începe din nou.",
+      "multipleInstallationsMessage": "Această organizație Kilo se poate conecta momentan doar la o singură organizație GitHub.",
       "didNotCompleteTitle": "Instalarea nu s-a finalizat",
       "didNotCompleteMessage": "Instalarea aplicației pentru GitHub nu a fost finalizată. Încearcă din nou din aplicație."
     },
@@ -2411,7 +2419,6 @@
       "defaultProfileResolvesTo": "Corespunde la {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil implicit: {{name}}",
       "manageProfiles": "Gestionați profilurile",
-      "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
       "advancedConfig": "Configurare avansată",
       "advancedConfigDescription": "Se aplică acestei sesiuni. Salvarea ca profil îl păstrează pentru data viitoare.",
       "saveAsProfile": "Salvați ca profil",

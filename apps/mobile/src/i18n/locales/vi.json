@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Dịch tóm tắt công cụ",
     "toolSummaryTranslationSubtitle": "Gửi từng tóm tắt công cụ đến một mô hình để dịch sang ngôn ngữ ứng dụng của bạn. Bản gốc sẽ hiển thị nếu dịch thất bại.",
     "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác.",
+    "translateSummaries": "Dịch tóm tắt",
     "autoExpandThinkingInactiveSubtitle": "Không có tác dụng khi chi tiết suy luận đang bị ẩn."
   },
   "notifications": {
@@ -1310,6 +1311,7 @@
       "repoSummaryHigh_other": "{{displayCount}} cao",
       "repositoryActionPlan": "Kế hoạch xử lý cho từng kho lưu trữ",
       "settings": "Cài đặt",
+      "syncing": "Đang đồng bộ…",
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",
@@ -1458,6 +1460,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Cài đặt ứng dụng Kilo trên GitHub để tự động đồng bộ cảnh báo Dependabot và quản lý vấn đề bảo mật trong các kho lưu trữ của bạn.",
+      "connectOwnerOnly": "Hãy đề nghị chủ sở hữu tổ chức hoặc quản trị viên kết nối {{platform}}.",
       "connectTitle": "Kết nối GitHub để bắt đầu",
       "couldNotLoad": "Không thể tải Trợ lý bảo mật.",
       "installApp": "Cài đặt ứng dụng GitHub",
@@ -1689,6 +1692,8 @@
       "cannotCompleteTitle": "Không thể hoàn tất cài đặt",
       "notAdminMessage": "Chỉ quản trị viên GitHub của tài khoản đó mới có thể kết nối. Hãy nhờ quản trị viên tổ chức cài đặt Kilo.",
       "alreadyClaimedMessage": "Ứng dụng GitHub đã cài đặt này đang kết nối với một tài khoản Kilo khác. Hãy ngắt kết nối trong tài khoản đó trước.",
+      "installationUnavailableMessage": "Bản cài đặt GitHub App này đã bị tạm ngưng hoặc không còn khả dụng. Hãy khôi phục hoặc cài đặt lại trong GitHub, sau đó bắt đầu lại.",
+      "multipleInstallationsMessage": "Tổ chức Kilo này hiện tại chỉ có thể kết nối với một tổ chức GitHub.",
       "didNotCompleteTitle": "Cài đặt chưa hoàn tất",
       "didNotCompleteMessage": "Quá trình cài đặt ứng dụng GitHub chưa hoàn tất. Hãy thử lại từ ứng dụng."
     },
@@ -1845,7 +1850,6 @@
       "defaultProfileResolvesTo": "Hiện là {{name}}",
       "defaultProfileResolvesToAccessibility": "Hồ sơ mặc định: {{name}}",
       "manageProfiles": "Quản lý hồ sơ",
-      "noProfiles": "Chưa có hồ sơ nào. Tạo một cái để thêm các biến môi trường, máy chủ MCP và kỹ năng.",
       "advancedConfig": "Cấu hình nâng cao",
       "advancedConfigDescription": "Áp dụng cho phiên này. Lưu làm hồ sơ sẽ giữ lại cho lần sau.",
       "saveAsProfile": "Lưu làm hồ sơ",
@@ -2712,6 +2716,9 @@
       "reconnectTitle": "Kết nối lại GitHub",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi.",
       "gitlabDescription": "Rà soát merge request trên điện thoại",
+      "gitlabInstanceMismatchTitle": "Kết nối GitLab dành cho một máy chủ khác",
+      "gitlabInstanceMismatchDescription": "Kết nối GitLab của bạn dành cho {{connected}}, nhưng merge request này nằm trên {{requested}}. Hãy kết nối GitLab trên máy chủ đó để rà soát.",
+      "checkActiveConnection": "Kết nối đang hoạt động, nhưng vẫn không thể tải mục này.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
       "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Hiiki cuunfaa meeshaalee",
     "toolSummaryTranslationSubtitle": "Cuunfaa meeshaa tokkoon tokkoon isaa gara moodelaatti ergi akka inni afaan appii keetiitti hiiku. Yoo hiikkaan hin milkoofne kan jalqabaa ni mul'ata.",
     "toolSummaryTranslationModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(common.model) tuqi.",
+    "translateSummaries": "Hiiki cuunfaa",
     "autoExpandThinkingInactiveSubtitle": "Bal'ina xiinxala dhokatee yeroo jiru dhiibbaa hin qabu."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
       "reconnectDescription": "Hayyamni walqunnamtii GitHub kee haqameera.",
       "gitlabDescription": "Gaaffiiwwan walitti makuu mobaayilaan sakatta'i",
+      "gitlabInstanceMismatchTitle": "Walqunnamtiin GitLab instance biraaf ta'e",
+      "gitlabInstanceMismatchDescription": "Walqunnamtiin GitLab kee {{connected}}iif ta'e, garuu gaaffiin walitti makuu kun {{requested}} irra jira. Isa sakatta'uuf GitLab instance sana irratti walqabsiisi.",
+      "checkActiveConnection": "Walqunnamtiin socho'aa jira, garuu wanti kun ammayyuu fe'amuu hin danda'u.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "Argamoonni dursaa qaban erga yeroo jalqabaatti walsimsiifamanii booda ni mul'ata.",
       "refreshFailed": "Haaromsuun hin danda'amne — daataan yeroo dhumaaf walsimsiifame mul'achaa jira.",
       "settings": "Qindaa'ina",
+      "syncing": "Walsimsiisaa jira…",
       "syncNow": "Amma walsimsiisi",
       "syncQueued": "Walsimsiisuun tarree eegumsaatti dabalameera",
       "syncStatusUnavailable": "Haala walsimsiisuu argachuun hin danda'amne.",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Akeekkachiisa Dependabot ofumaan walsimsiisuuf fi argamoota nageenyaa kuusaawwan koodii kee keessatti bulchuuf aplikeeshinii GitHub kan Kilo fe'i.",
+      "connectOwnerOnly": "Abbaa dhaabbataa ykn bulchitaa tokko {{platform}} walqabsiisuuf gaafadhu.",
       "connectTitle": "Jalqabuuf GitHub walqabsiisi",
       "couldNotLoad": "Eejentii nageenyaa fe'uun hin danda'amne.",
       "installApp": "Aplikeeshinii GitHub fe'i",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "Fe'uu xumuruun hin danda'amu",
       "notAdminMessage": "Bulchaa GitHub herrega sanaa qofatu isa walqabsiisuu danda'a. Bulchaa dhaabbataa Kilo akka fe'u gaafadhu.",
       "alreadyClaimedMessage": "Appiin GitHub fe'ame sun duraan herrega Kilo biraatti walqabateera. Jalqaba achitti walqunnamtii isaa kuti.",
+      "installationUnavailableMessage": "Fe'iinsi GitHub App kanaa dhaabbateera yookaan ammas hin argamu. GitHub keessatti deebisi yookaan irra deebi'ii fe'i, ergasii irra deebi'ii jalqabi.",
+      "multipleInstallationsMessage": "Waldaan Kilo kana yeroo ammaa waldaa GitHub tokko qofa walqabachuu danda'a.",
       "didNotCompleteTitle": "Fe'uun hin xumuramne",
       "didNotCompleteMessage": "Appii GitHub fe'uun hin xumuramne. Appii irraa irra deebi'ii yaali."
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "Amma {{name}} ti",
       "defaultProfileResolvesToAccessibility": "Profaayilii durtii: {{name}}",
       "manageProfiles": "Profaayilii bulchuu",
-      "noProfiles": "Ammatti piroofaayilii hin jiru. Jijjiiramoota naannoo, sarvaroota MCP, fi dandeettiiwwan dabaluudhaaf tokko uumi.",
       "advancedConfig": "Qindeessituu Ol'aanaa",
       "advancedConfigDescription": "Kutaa kanaaf ni hojjeta. Akka Profile tti yoo saagte yeroo itti aanuuf ni tura.",
       "saveAsProfile": "Akka Profile tti saagi",

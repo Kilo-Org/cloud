@@ -1785,29 +1785,32 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
     }
   );
 
-  it('does not forward GitHub attachment bytes when repository redemption is rejected', async () => {
-    const { env, resolveCredential, redemptions, forward } = fixture();
-    const credential = createControlPlaneCredential('sbx_1', 'github');
-    resolveCredential.mockResolvedValue({ credential: CAPABILITY });
-    redemptions.github.mockResolvedValue({ success: false, reason: 'repository_mismatch' });
+  it.each(['repository_mismatch', 'source_unavailable'])(
+    'does not forward GitHub attachment bytes when redemption fails with %s',
+    async reason => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'github');
+      resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+      redemptions.github.mockResolvedValue({ success: false, reason });
 
-    const response = await handleOutbound(
-      new Request('https://uploads.github.com/user-attachments/assets?repository_id=42', {
-        method: 'POST',
-        headers: { Authorization: `token ${credential}` },
-        body: 'attachment-bytes',
-      }),
-      env
-    );
+      const response = await handleOutbound(
+        new Request('https://uploads.github.com/user-attachments/assets?repository_id=42', {
+          method: 'POST',
+          headers: { Authorization: `token ${credential}` },
+          body: 'attachment-bytes',
+        }),
+        env
+      );
 
-    expect(response.status).toBe(502);
-    expect(await response.text()).toBe('GitHub authorization unavailable');
-    expect(redemptions.github).toHaveBeenCalledOnce();
-    expect(forward).not.toHaveBeenCalled();
-    expect(logging.logger.withFields).toHaveBeenCalledWith(
-      expect.objectContaining({ failureStage: 'redemption-policy', reason: 'repository_mismatch' })
-    );
-  });
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('GitHub authorization unavailable');
+      expect(redemptions.github).toHaveBeenCalledOnce();
+      expect(forward).not.toHaveBeenCalled();
+      expect(logging.logger.withFields).toHaveBeenCalledWith(
+        expect.objectContaining({ failureStage: 'redemption-policy', reason })
+      );
+    }
+  );
 
   it.each([false, true])(
     'resolves GitLab PRIVATE-TOKEN aliases once with duplicate bearer=%s',

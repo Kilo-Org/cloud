@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tumọ̀ àwọn àkópọ̀ irinṣẹ́",
     "toolSummaryTranslationSubtitle": "Fi àkópọ̀ irinṣẹ́ kọ̀ọ̀kan ránṣẹ́ sí àwòṣe kan láti tumọ̀ rẹ̀ sí èdè áàpù rẹ. A ó fi èyí tí ó wà níbẹ̀rẹ̀ hàn tí ìtumọ̀ bá kùnà.",
     "toolSummaryTranslationModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(common.model) láti yan òmíràn.",
+    "translateSummaries": "Tumọ̀ àwọn àkópọ̀",
     "autoExpandThinkingInactiveSubtitle": "Kò ní ipa nígbà tí àwọn kúlẹ̀kúlẹ̀ ìrònú bá wà ní pamọ́."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "Àtúnsopọ̀ GitHub",
       "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ.",
       "gitlabDescription": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù",
+      "gitlabInstanceMismatchTitle": "Ìsopọ̀ GitLab jẹ́ fún ẹ̀yà mìíràn",
+      "gitlabInstanceMismatchDescription": "Ìsopọ̀ GitLab rẹ jẹ́ fún {{connected}}, ṣùgbọ́n ìbéèrè ìṣọ̀kan yìí wà lórí {{requested}}. Sopọ̀ GitLab lórí ẹ̀yà yẹn láti ṣàtúnyẹ̀wò rẹ̀.",
+      "checkActiveConnection": "Ìsopọ̀ ń ṣiṣẹ́, ṣùgbọ́n a kò lè gbé nkan yìí wọlé síbẹ̀.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "Àwọn àbùkù pàtàkì yóò hàn lẹ́yìn tí a bá ti mú wọn ṣiṣẹ́pọ̀ lẹ́kẹ̀kọ̀",
       "refreshFailed": "A kò lè sọ dátà di tuntun — dátà ìmúṣiṣẹ́pọ̀ tó kẹ́yìn ni a ń fi hàn.",
       "settings": "Àwọn ètò",
+      "syncing": "Ń mú ṣiṣẹ́pọ̀…",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
       "syncQueued": "Ìmúṣiṣẹ́pọ̀ wà ní ìlà ìdúró",
       "syncStatusUnavailable": "A kò lè rí ipò ìmúṣiṣẹ́pọ̀.",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Fi ohun èlò Kilo fún GitHub sí ẹ̀rọ láti mú àwọn ìkìlọ̀ Dependabot ṣiṣẹ́pọ̀ láìfọwọ́ṣe àti láti ṣàkóso àwọn àbùkù ààbò nínú àwọn ibi ìpamọ́ rẹ.",
+      "connectOwnerOnly": "Bẹ̀ ẹni tó ni àjọ tàbí alákòóso kan láti so {{platform}} pọ̀.",
       "connectTitle": "So GitHub pọ̀ láti bẹ̀rẹ̀",
       "couldNotLoad": "A kò lè gbé Aṣojú ààbò wọlé.",
       "installApp": "Fi ohun èlò GitHub sí ẹ̀rọ",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "A kò lè parí ìfìsórí",
       "notAdminMessage": "Alábòójútó GitHub ti àkọọ́lẹ̀ yẹn nìkan ló lè so ó pọ̀. Béèrè lọ́wọ́ alábòójútó àjọ láti fi Kilo sórí rẹ̀.",
       "alreadyClaimedMessage": "Ìfìsórí GitHub yẹn ti sopọ̀ mọ́ àkọọ́lẹ̀ Kilo mìíràn tẹ́lẹ̀. Kọ́kọ́ gé àsopọ̀ rẹ̀ níbẹ̀.",
+      "installationUnavailableMessage": "Ìfìsórí GitHub App yìí ti daduro tàbí kò sí mọ́. Mú un padà bọ̀ sípò tàbí tún un ṣe ìfìsórí ní GitHub, kí o sì tún bẹ̀rẹ̀.",
+      "multipleInstallationsMessage": "Àjọ Kilo yìí lè sopọ̀ mọ́ àjọ GitHub kan péré ṣo fún ìgbà yìí.",
       "didNotCompleteTitle": "Ìfìsórí kò parí",
       "didNotCompleteMessage": "A kò parí ìfìsórí ìṣàfilọ́lẹ̀ GitHub náà. Tún gbìyànjú láti inú ìṣàfilọ́lẹ̀."
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "O da sí {{name}}",
       "defaultProfileResolvesToAccessibility": "profaili aiyipada: {{name}}",
       "manageProfiles": "Ṣakoso awọn profaili",
-      "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",
       "advancedConfigDescription": "Ó kan ìpàdé yìí. Fífipamọ́ gẹ́gẹ́ bi profaili yóò pa á mọ́ fún ìgbà tó ń bọ̀.",
       "saveAsProfile": "Fipamọ bi Profaili",

@@ -282,6 +282,37 @@ export function assertModeAvailableForProfile(
   });
 }
 
+/**
+ * Server-owned mode fallback for a continued session. A local mode is kept when
+ * it is a built-in or a runtimeAgents slug of the resolved profile; otherwise
+ * the session registers as `code` and reports `modeFallback`. This never fails
+ * the operation. Only the continuation handler uses it, so a normal create
+ * still rejects an unavailable user-picked mode.
+ */
+export function resolveContinuationMode(
+  requestedMode: string,
+  resolvedProfile: SessionProfileBundle
+): { mode: string; modeFallback: boolean } {
+  if (isBuiltinMode(requestedMode)) return { mode: requestedMode, modeFallback: false };
+  const slugs = new Set((resolvedProfile.runtimeAgents ?? []).map(a => a.slug));
+  if (slugs.has(requestedMode)) return { mode: requestedMode, modeFallback: false };
+  return { mode: 'code', modeFallback: true };
+}
+
+/**
+ * Per-call profile-resolution and mode policy.
+ *
+ * `includeWebDefaults` forces `include-web-defaults` for one create (the
+ * continuation first session), instead of widening the global origin allowlist.
+ * `continuationModeResolution` replaces an unavailable local mode with `code`
+ * after resolution, so the following `assertModeAvailableForProfile` passes.
+ * Only the continuation handler sets these.
+ */
+export type SessionCreationPolicyOptions = {
+  includeWebDefaults?: boolean;
+  continuationModeResolution?: boolean;
+};
+
 type SessionCreationContext = Pick<
   TRPCContext,
   'env' | 'userId' | 'authToken' | 'cloudAgentAuthority'
@@ -293,7 +324,8 @@ export async function preflightSessionCreation(
   request: SessionCreateRequest,
   ctx: SessionCreationContext,
   procedure: string,
-  validateEndpoint?: EndpointValidator
+  validateEndpoint?: EndpointValidator,
+  policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
@@ -351,8 +383,25 @@ export async function preflightSessionCreation(
     repository: request.repository,
   });
 
-  const policy = profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
-  const resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
+    ? { defaultProfileResolution: 'include-web-defaults' }
+    : profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
+  let resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  if (policyOptions?.continuationModeResolution) {
+    // Replace the agent object instead of mutating it: the resolution result
+    // shares the caller's `agent` reference, and the continuation handler derives
+    // its request digest and per-source fallback from the caller's object.
+    resolvedRequest = {
+      ...resolvedRequest,
+      agent: {
+        ...resolvedRequest.agent,
+        mode: resolveContinuationMode(
+          resolvedRequest.agent.mode,
+          resolvedRequest.profile?.resolved ?? {}
+        ).mode,
+      },
+    };
+  }
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
     resolvedRequest.profile?.resolved ?? {},

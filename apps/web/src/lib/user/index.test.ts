@@ -80,6 +80,9 @@ import {
   spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  api_kind,
   credit_campaigns,
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
@@ -340,6 +343,7 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(byoc_connections);
+    await db.delete(enkrypt_usage);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -3394,6 +3398,7 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        external_id: 'ext-abc-123',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
         blocked_reason: 'manual block',
@@ -3403,6 +3408,7 @@ describe('User', () => {
         is_super_admin: true,
         can_view_sessions: true,
         can_manage_credits: true,
+        can_export_api_request_logs: true,
       });
 
       await softDeleteUser(user.id);
@@ -3429,6 +3435,7 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
+      expect(softDeleted!.external_id).toBeNull();
       expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
       expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
       expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
@@ -3443,6 +3450,7 @@ describe('User', () => {
       expect(softDeleted!.is_super_admin).toBe(false);
       expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
+      expect(softDeleted!.can_export_api_request_logs).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
@@ -6320,6 +6328,66 @@ describe('User', () => {
       // Analytics fields preserved
       expect(scans[0].source_platform).toBe('openclaw');
       expect(scans[0].findings_critical).toBe(1);
+    });
+
+    it('should retain enkrypt_usage billing rows and attribution when the user is soft-deleted', async () => {
+      const user = await insertTestUser({ id: `oauth/${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization('Enkrypt usage retention', otherUser.id, 0);
+      const [apiKind] = await db
+        .insert(api_kind)
+        .values({ api_kind: 'chat_completions' })
+        .onConflictDoUpdate({ target: api_kind.api_kind, set: { api_kind: 'chat_completions' } })
+        .returning();
+      const [decision] = await db
+        .insert(enkrypt_usage_decision)
+        .values({ decision: 'allowed' })
+        .onConflictDoUpdate({
+          target: enkrypt_usage_decision.decision,
+          set: { decision: 'allowed' },
+        })
+        .returning();
+      if (!apiKind || !decision) throw new Error('Failed to create Enkrypt usage dimensions');
+
+      const usageFields = {
+        organization_id: organization.id,
+        api_kind_id: apiKind.api_kind_id,
+        decision_id: decision.decision_id,
+        enkrypt_credits_cost: 1.5,
+        charged_microdollars: 15_000,
+        added_latency_ms: 42,
+      };
+      const originalRows = await db
+        .insert(enkrypt_usage)
+        .values([
+          { ...usageFields, kilo_user_id: user.id, session_id: 'deleted-user-session' },
+          {
+            ...usageFields,
+            kilo_user_id: user.id,
+            session_id: null,
+            enkrypt_credits_cost: null,
+            charged_microdollars: 0,
+            added_latency_ms: null,
+          },
+          { ...usageFields, kilo_user_id: otherUser.id, session_id: 'retained-user-session' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const retainedRows = await db
+        .select()
+        .from(enkrypt_usage)
+        .where(
+          inArray(
+            enkrypt_usage.id,
+            originalRows.map(row => row.id)
+          )
+        );
+      expect(retainedRows).toHaveLength(originalRows.length);
+      for (const originalRow of originalRows) {
+        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(originalRow);
+      }
     });
 
     it('should preserve credit transactions and creator attribution', async () => {

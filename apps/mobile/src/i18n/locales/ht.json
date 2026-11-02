@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tradui rezime zouti yo",
     "toolSummaryTranslationSubtitle": "Voye chak rezime zouti bay yon modèl pou tradui li nan lang aplikasyon w lan. Yo montre orijinal la si tradiksyon an echwe.",
     "toolSummaryTranslationModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(common.model) pou chwazi yon lòt.",
+    "translateSummaries": "Tradui rezime",
     "autoExpandThinkingInactiveSubtitle": "Pa gen okenn efè lè detay refleksyon yo kache."
   },
   "prReview": {
@@ -680,6 +681,9 @@
       "reconnectTitle": "Rekonekte GitHub",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a.",
       "gitlabDescription": "Revize merge request yo sou mobil",
+      "gitlabInstanceMismatchTitle": "Koneksyon GitLab la se pou yon lòt enstans",
+      "gitlabInstanceMismatchDescription": "Koneksyon GitLab ou a se pou {{connected}}, men demann fizyon sa a sou {{requested}}. Konekte GitLab sou enstans sa a pou w revize li.",
+      "checkActiveConnection": "Koneksyon an aktif, men eleman sa a pa ka chaje toujou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
@@ -1789,6 +1793,7 @@
       "priorityFindingsPending": "Konsta priyorite yo ap parèt apre premye senkronizasyon an.",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
+      "syncing": "N ap senkronize…",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
       "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",
@@ -2030,6 +2035,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Enstale aplikasyon GitHub Kilo a pou senkronize alèt Dependabot yo otomatikman epi jere konsta sekirite nan tout depo ou yo.",
+      "connectOwnerOnly": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou konekte {{platform}}.",
       "connectTitle": "Konekte GitHub pou kòmanse",
       "couldNotLoad": "Nou pa t ka chaje Ajan sekirite a.",
       "installApp": "Enstale aplikasyon GitHub la",
@@ -2218,6 +2224,8 @@
       "cannotCompleteTitle": "Pa ka fini enstalasyon an",
       "notAdminMessage": "Se sèlman yon administratè GitHub kont sa a ki ka konekte li. Mande yon administratè òganizasyon an pou enstale Kilo.",
       "alreadyClaimedMessage": "Enstalasyon GitHub sa a deja konekte ak yon lòt kont Kilo. Dekonekte li nan kont sa a anvan.",
+      "installationUnavailableMessage": "Enstalasyon GitHub App sa a sispann oswa li pa disponib ankò. Retabli oswa reenstale li nan GitHub, epi rekòmanse.",
+      "multipleInstallationsMessage": "Oganizasyon Kilo sa a ka konekte sèlman yon sèl oganizasyon GitHub pou kounye a.",
       "didNotCompleteTitle": "Enstalasyon an pa fini",
       "didNotCompleteMessage": "Enstalasyon aplikasyon GitHub la pa fini. Eseye ankò nan aplikasyon an."
     },
@@ -2374,7 +2382,6 @@
       "defaultProfileResolvesTo": "Koresponn a {{name}}",
       "defaultProfileResolvesToAccessibility": "Default pwofil: {{name}}",
       "manageProfiles": "Jere pwofil yo",
-      "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
       "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",

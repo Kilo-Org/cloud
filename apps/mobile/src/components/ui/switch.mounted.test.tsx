@@ -188,10 +188,12 @@ describe('Switch', () => {
       false: darkColors.mutedSoft,
       true: darkColors.primaryDisabled,
     });
-    // The on grip is the scheme's on grip. Dark's `primaryForeground` is the
-    // card's own near-black: on the thumb's overhanging arc it is 1.1:1 with the
-    // row and the pill loses its right end.
-    expect(on.thumbColor).toBe(darkColors.selectionForeground);
+    // The disabled on grip is the mid neutral, never the scheme's on ink. A
+    // light grip on the muted fill reads as a working control, and dark's
+    // `primaryForeground` is the card's own near-black: on the thumb's
+    // overhanging arc it is 1.1:1 with the row and the pill loses its right end.
+    expect(on.thumbColor).toBe(darkColors.mutedSoft);
+    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
     expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
     expect(off.trackColor).toEqual(on.trackColor);
     expect(off.thumbColor).toBe(darkColors.mutedForeground);

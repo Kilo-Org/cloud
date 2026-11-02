@@ -73,20 +73,22 @@ describe('PillGroup disabled cue', () => {
     }
   });
 
-  // Regression: removing the row's second dim without restoring the tone
-  // hierarchy left every option at the same muted strength, so on a read-only
-  // list the selected value stood out only by its 16 dp check. The selected
-  // row keeps the full `foreground` ink and the others stay muted.
-  it('keeps the read-only selected label at full strength and the rest muted', () => {
+  // Regression: a read-only list once kept its selected label on the full
+  // `foreground` ink, so the brightest line in a group the member cannot change
+  // was the option itself and the list read as editable. Every label of a
+  // read-only group sits on the muted token; the selected row keeps only its
+  // weight and its check to say which option is set.
+  it('dims every read-only label, the selected one included', () => {
     const labels = renderGroup(true).findAll(node => Object.is(node.type, 'Text'));
     const byText = new Map(labels.map(label => [String(label.props.children), label]));
 
-    expect(String(byText.get('High')?.props.className).split(/\s+/)).toContain('text-foreground');
-    for (const option of ['Severe', 'Medium', 'Low']) {
+    for (const option of ['Severe', 'High', 'Medium', 'Low']) {
       const tokens = String(byText.get(option)?.props.className).split(/\s+/);
       expect(tokens).toContain('text-muted-foreground');
       expect(tokens).not.toContain('text-foreground');
     }
+    const selected = String(byText.get('High')?.props.className).split(/\s+/);
+    expect(selected).toContain('font-medium');
   });
 
   it('mutes the check of a read-only group off the accent', () => {

@@ -15,14 +15,18 @@ import { cn } from '@/lib/utils';
  * reason and finding-filter pickers) so long labels stay fully readable
  * instead of being squeezed into a horizontal pill row.
  *
- * A read-only group dims its labels once, by token, never by row opacity: the
- * unselected labels sit on `text-muted-foreground`, the selected row keeps the
- * full `foreground` ink in both states, and only the check leaves the palette's
- * accent. Halving the row on top of that muted ink lands the unselected label
- * near 2:1 on the row's `secondary` surface in both schemes — under the 4.5:1
- * text floor, so a member who cannot manage the settings could not read which
- * options exist. The muted token keeps 4.5:1, and the one full-strength line in
- * the list still says which option is set.
+ * A read-only group dims once, by token, never by row opacity: every option
+ * label — the selected one included — sits on `text-muted-foreground`, and the
+ * check leaves the palette's accent for that same muted ink, so the whole list
+ * reads as unavailable. The selected row still stands apart by its weight and
+ * its check, which is what a disabled single-select looks like: a control whose
+ * choice is dimmed with everything else. Halving the row on top of that muted
+ * ink lands the label near 2:1 on the row's `secondary` surface in both schemes
+ * — under the 4.5:1 text floor, so a member who cannot manage the settings
+ * could not read which options exist. The muted token keeps 4.5:1.
+ *
+ * An editable group keeps the selected label at full `foreground` ink and the
+ * accent check, so the two states differ by more than the row's tap response.
  */
 export function PillGroup<T extends string>({
   label,
@@ -67,10 +71,11 @@ export function PillGroup<T extends string>({
                 className={cn(
                   'flex-1 text-sm',
                   active && 'font-medium',
-                  // The selected option is the only one that carries the full
-                  // `foreground` tone, so a read-only list still shows which
-                  // option is set; every other label stays on the muted token.
-                  active ? 'text-foreground' : 'text-muted-foreground'
+                  // A read-only group dims every label, the selected one
+                  // included, to the muted token; the selected row still stands
+                  // apart by its weight and its check. An editable group keeps
+                  // the selected label on the full `foreground` ink.
+                  active && !disabled ? 'text-foreground' : 'text-muted-foreground'
                 )}
               >
                 {option.label}

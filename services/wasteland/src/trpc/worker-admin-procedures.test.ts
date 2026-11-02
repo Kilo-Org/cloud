@@ -132,7 +132,7 @@ describe('real wasteland procedures respect the capability action allowlist', ()
   it('requireOwnerAccess rejects a non-owner org member', async () => {
     await expect(
       caller(await noCapabilityAuthority(), {
-        orgMemberships: [{ orgId: 'org-2', role: 'member', name: 'org' }],
+        orgMemberships: [{ orgId: 'org-2', role: 'member' }],
       }).wasteland.addMember({ wastelandId: WASTELAND, userId: 'user-9' })
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',

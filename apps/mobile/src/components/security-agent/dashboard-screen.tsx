@@ -764,10 +764,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         !repositoryPolicyReadOnly &&
         // An empty grant is the reason this empty state has no deadline to
         // show, and the repository card below carries its step out. This link
-        // would repeat that same destination from further away — but only once
-        // that card can render, which waits for the sync-status read: until
-        // then this link is the screen's only way to the repositories.
-        !(repositoryScopeEmpty && !lastSync.isPending) ? (
+        // would repeat that same destination from further away — but only while
+        // that card really holds it: the card renders the step in its empty
+        // state alone, which a scope that already synced findings outgrew when
+        // the grant narrowed afterwards, and the cards wait for the sync-status
+        // read. Until both hold, this link is the screen's only way there.
+        !(repositoryScopeEmpty && data.repoHealth.length === 0 && !lastSync.isPending) ? (
           <View className="flex-row items-center gap-4">
             {/* The refresh control in the filter row above is this screen's one
                 sync affordance; a second "Sync findings" link here repeated it

@@ -468,7 +468,9 @@ describe('DashboardScreen before the first sync', () => {
   beforeEach(() => {
     dashboardStats.isPending = false;
     dashboardStats.isError = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
     sharedMetrics.build.mockReturnValue([]);
   });
 
@@ -888,7 +890,9 @@ describe('DashboardScreen repository card with an empty grant', () => {
     lastSync.data = undefined;
     config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
     dashboardStats.isPending = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
     sharedMetrics.build.mockReturnValue([]);
     sectionsProps.props = [];
     router.push.mockClear();
@@ -986,7 +990,21 @@ describe('DashboardScreen repository card with an empty grant', () => {
     lastSync.isPending = true;
     lastSync.data = undefined;
     dashboardStats.isPending = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // A grant narrowed after a sync leaves the card listing the findings already
+  // stored, where it shows no step. The link is the shortcut a manager keeps.
+  it('keeps the SLA card link when stored findings outlive the emptied grant', () => {
+    dashboardStats.data = {
+      sla: { overall: { total: 0 } },
+      repoHealth: [{ repoFullName: 'kilo/repo' }],
+    };
     const root = renderScreen('org_123');
 
     expect(renderedTexts(root.root)).toContain(

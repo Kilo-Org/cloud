@@ -1550,6 +1550,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storedMessageMemo.clear();
       store.set(rootSessionIdAtom, null);
       store.set(chatUIAtom, { shouldAutoScroll: true });
+      // The composer's settings are session-scoped, so they leave with the
+      // session. A retry that keeps the transcript is still the same session
+      // and must keep them: the selection states what the next prompt sends.
+      store.set(sessionConfigAtom, null);
+      store.set(remoteModelOverrideAtom, null);
+      store.set(cloudAgentModelOverrideAtom, null);
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -1566,8 +1572,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     transcriptRows.reset();
     postInterruptUnlock = false;
     interruptAwaitingIdleSession = null;
-    store.set(remoteModelOverrideAtom, null);
-    store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -1581,7 +1585,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(setupLogAtom, []);
     store.set(preparationAttemptsAtom, []);
     store.set(commitsAtom, []);
-    store.set(sessionConfigAtom, null);
     store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
@@ -2000,45 +2003,67 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  /**
+   * Drops the composer's pick when the catalog the owner reports does not
+   * offer it, and strips a variant that catalog no longer lists.
+   */
+  function validateRemoteModelOverride(state: RemoteModelState): void {
+    const override = store.get(remoteModelOverrideAtom);
+    if (!override) return;
+    const sourceMatchesProtocol =
+      (state.protocol === 'v1' && override.source === 'cli-catalog') ||
+      (state.protocol === 'legacy' && override.source === 'legacy-gateway');
+    const provider = state.catalog?.providers.find(
+      item => item.id === override.selection.model.providerID
+    );
+    const catalogModel = provider?.models.find(
+      item => item.id === override.selection.model.modelID
+    );
+    const modelMatchesProtocol =
+      state.protocol === 'v1'
+        ? catalogModel !== undefined
+        : state.protocol === 'legacy' && override.selection.model.providerID === 'kilo';
+    if (!sourceMatchesProtocol || !modelMatchesProtocol) {
+      store.set(remoteModelOverrideAtom, null);
+      return;
+    }
+    if (
+      override.source === 'cli-catalog' &&
+      override.selection.variant &&
+      catalogModel &&
+      !catalogModel.variants.includes(override.selection.variant)
+    ) {
+      store.set(remoteModelOverrideAtom, {
+        source: 'cli-catalog',
+        selection: { model: override.selection.model },
+      });
+    }
+  }
+
   function handleRemoteModelStateChange(state: RemoteModelState): void {
     const previousOwnerConnectionId = store.get(remoteModelStateAtom).ownerConnectionId;
     store.set(remoteModelStateAtom, state);
 
-    if (previousOwnerConnectionId !== state.ownerConnectionId) {
+    // An owner that replaces another did not produce what this manager holds
+    // from the one it replaced — the composer's pick, a model observed from a
+    // message it ran, or the session metadata it wrote — so all of it goes,
+    // and the new owner's catalog currentModel becomes the observation below.
+    // An owner attaching where none was known is not a replacement: a retried
+    // open keeps the transcript and publishes no owner until its CLI is
+    // rediscovered, so the pick that outlived the retry belongs to this same
+    // session.
+    if (
+      previousOwnerConnectionId !== null &&
+      previousOwnerConnectionId !== state.ownerConnectionId
+    ) {
       store.set(remoteModelOverrideAtom, null);
-      if (observedModelSource === 'catalog') {
-        observedModelSource = null;
-        store.set(observedModelAtom, null);
-      }
-    } else {
-      const override = store.get(remoteModelOverrideAtom);
-      const sourceMatchesProtocol =
-        (state.protocol === 'v1' && override?.source === 'cli-catalog') ||
-        (state.protocol === 'legacy' && override?.source === 'legacy-gateway');
-      const provider = state.catalog?.providers.find(
-        item => item.id === override?.selection.model.providerID
-      );
-      const catalogModel = provider?.models.find(
-        item => item.id === override?.selection.model.modelID
-      );
-      const modelMatchesProtocol =
-        state.protocol === 'v1'
-          ? catalogModel !== undefined
-          : state.protocol === 'legacy' && override?.selection.model.providerID === 'kilo';
-      if (override && (!sourceMatchesProtocol || !modelMatchesProtocol)) {
-        store.set(remoteModelOverrideAtom, null);
-      } else if (
-        override?.source === 'cli-catalog' &&
-        override.selection.variant &&
-        catalogModel &&
-        !catalogModel.variants.includes(override.selection.variant)
-      ) {
-        store.set(remoteModelOverrideAtom, {
-          source: 'cli-catalog',
-          selection: { model: override.selection.model },
-        });
-      }
+      observedModelSource = null;
+      store.set(observedModelAtom, null);
     }
+    // An owner that has not reported a protocol yet cannot judge the pick: it
+    // is still loading its catalog, and dropping the pick there would discard
+    // one this same session just kept.
+    if (state.protocol !== 'unknown') validateRemoteModelOverride(state);
     if (
       (observedModelSource === null || observedModelSource === 'catalog') &&
       state.catalog?.currentModel

@@ -7,6 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { ADMIN_STEP_UP_ENROLLMENT_FLAG } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { getAdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 
 function assertBrowserSession(ctx: { credential?: string }): void {
@@ -24,16 +25,42 @@ export const stepUpRouter = createTRPCRouter({
     assertBrowserSession(ctx);
 
     const mode = getAdminStepUpMode();
-    const evaluation = await evaluateStepUp({
-      userId: ctx.user.id,
-      webSessionId: ctx.webSessionId,
-      actionClass: 'platform_read',
-    });
-
     const enrollmentEnabled = await isReleaseToggleEnabled(
       ADMIN_STEP_UP_ENROLLMENT_FLAG,
       ctx.user.id
     );
+
+    if (mode === 'off' && !enrollmentEnabled) {
+      return {
+        enrolled: false,
+        passkeyCount: 0,
+        sessionBound: Boolean(ctx.webSessionId),
+        fresh: false,
+        status: { status: 'absent' as const },
+        mode,
+        enrollmentEnabled: false,
+      };
+    }
+
+    let evaluation;
+    try {
+      evaluation = await evaluateStepUp({
+        userId: ctx.user.id,
+        webSessionId: ctx.webSessionId,
+        actionClass: 'platform_read',
+      });
+    } catch (error) {
+      reportStepUpFailure('admin_step_up_status', error);
+      return {
+        enrolled: false,
+        passkeyCount: 0,
+        sessionBound: Boolean(ctx.webSessionId),
+        fresh: false,
+        status: { status: 'absent' as const },
+        mode,
+        enrollmentEnabled,
+      };
+    }
 
     return {
       enrolled: evaluation.passkeyCount > 0,

@@ -10,6 +10,7 @@ import {
   verifyRuntimeProxyAttestation,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -45,9 +46,13 @@ import {
   routeFromHeaders,
   userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  deriveCredentialKind,
+  StepUpRequiredError,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -158,6 +163,8 @@ export type RequiredPermissions = {
   /** The actual Request method when the caller has one; preferred over headers. */
   requestMethod?: string;
   requestHeaders?: Headers;
+  /** How this admin read arrived; server components are not REST routes. */
+  stepUpSurface?: 'rest' | 'server-component';
 };
 
 type GetAuthResponse =
@@ -213,7 +220,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: 'rest',
+      surface: opts.stepUpSurface ?? 'rest',
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
@@ -240,10 +247,11 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     });
     const mode = getAdminStepUpMode();
     if (mode !== 'off') {
+      const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
       const { actionClass } = actionClassForRoute({
-        surface: 'rest',
+        surface,
         route: route ?? '',
         method,
       });
@@ -256,12 +264,16 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           mode,
           route,
           method,
-          surface: 'rest',
+          surface,
         });
-      } catch {
-        // Enforcement is clamped off in PR2. If a future mode enables it, a
-        // refused REST request becomes a normal 403 rather than a thrown 500.
-        return authError(403, 'MFA required', result.user.id);
+      } catch (error) {
+        // Only a deliberate step-up refusal may deny. An infrastructure error
+        // (DB unavailable, migration missing) is reported and the request
+        // continues, so observe mode can never lock admins out.
+        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          return authError(403, 'MFA required', result.user.id);
+        }
+        reportStepUpFailure('admin_step_up_rest', error);
       }
     }
   }
@@ -373,18 +385,14 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
-  const result = await validateUserAuthorization(
-    auth.userId,
+  const result = await validateUserAuthorization({
+    kiloUserId: auth.userId,
     user,
-    { adminOnly: false },
-    false,
-    undefined,
-    undefined,
-    db,
-    undefined,
-    undefined,
-    auth.claims.deviceSessionId
-  );
+    opts: { adminOnly: false },
+    isNewUser: false,
+    fromDb: db,
+    deviceSessionId: auth.claims.deviceSessionId,
+  });
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -478,18 +486,18 @@ async function resolveUserFromAuth(
     const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    const result = await validateUserAuthorization(
-      authorizationValidationResult.kiloUserId,
+    const result = await validateUserAuthorization({
+      kiloUserId: authorizationValidationResult.kiloUserId,
       user,
       opts,
-      false,
+      isNewUser: false,
       organizationId,
       internalApiUse,
       fromDb,
       botId,
       tokenSource,
-      deviceSessionId
-    );
+      deviceSessionId,
+    });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
         credentialsRejected: true,
@@ -517,23 +525,18 @@ async function resolveUserFromSession(
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
-  return await validateUserAuthorization(
-    maybeKiloUserId,
+  return await validateUserAuthorization({
+    kiloUserId: maybeKiloUserId,
     user,
     opts,
-    session.isNewUser,
-    undefined,
-    undefined,
+    isNewUser: session.isNewUser,
     fromDb,
-    undefined,
-    undefined,
-    undefined,
-    {
+    webSession: {
       id: session.webSessionId,
       pepper: session.webSessionPepper,
       authenticatedAt: session.authenticatedAt,
-    }
-  );
+    },
+  });
 }
 
 export async function getUserFromAuthOrRedirect(
@@ -582,19 +585,33 @@ function authError(
   };
 }
 
-async function validateUserAuthorization(
-  kiloUserId: string,
-  user: User | undefined,
-  opts: RequiredPermissions,
-  isNewUser?: boolean,
-  organizationId?: Organization['id'],
-  internalApiUse?: boolean,
-  fromDb: typeof db = db,
-  botId?: string,
-  tokenSource?: string,
-  deviceSessionId?: string,
-  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number }
-): Promise<GetAuthResponse> {
+type ValidateUserAuthorizationParams = {
+  kiloUserId: string;
+  user: User | undefined;
+  opts: RequiredPermissions;
+  isNewUser?: boolean;
+  organizationId?: Organization['id'];
+  internalApiUse?: boolean;
+  fromDb?: typeof db;
+  botId?: string;
+  tokenSource?: string;
+  deviceSessionId?: string;
+  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+};
+
+async function validateUserAuthorization({
+  kiloUserId,
+  user,
+  opts,
+  isNewUser,
+  organizationId,
+  internalApiUse,
+  fromDb = db,
+  botId,
+  tokenSource,
+  deviceSessionId,
+  webSession,
+}: ValidateUserAuthorizationParams): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
   } else if (await isUserBlacklistedByDomain(user)) {

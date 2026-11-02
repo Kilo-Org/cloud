@@ -12,7 +12,10 @@ import {
   evaluateStepUp,
   type StepUpActionBinding,
 } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { emitStepUpObservation } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import {
+  emitStepUpObservation,
+  reportStepUpFailure,
+} from '@kilocode/web-shared/lib/admin/step-up-observation';
 import type { AdminStepUpMode } from '@kilocode/web-shared/lib/config.server';
 
 export type RunStepUpGuardParams = {
@@ -34,6 +37,7 @@ function codeForState(state: AdminStepUpState): StepUpErrorCode {
     case 'not_enrolled':
       return 'NOT_ENROLLED';
     case 'expired':
+    case 'revoked':
       return 'MFA_EXPIRED';
     case 'fresh':
       return 'MFA_REQUIRED';
@@ -55,16 +59,27 @@ export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<Admi
   if (params.mode === 'off') return { status: 'absent' };
 
   let state: AdminStepUpState;
+  let errored = false;
   if (params.credential !== 'session') {
     state = { status: 'session_unbound' };
   } else {
-    const evaluation = await evaluateStepUp({
-      userId: params.userId,
-      webSessionId: params.webSessionId,
-      actionClass: params.actionClass,
-      actionBinding: params.actionBinding,
-    });
-    state = evaluation.state;
+    try {
+      const evaluation = await evaluateStepUp({
+        userId: params.userId,
+        webSessionId: params.webSessionId,
+        actionClass: params.actionClass,
+        actionBinding: params.actionBinding,
+      });
+      state = evaluation.state;
+    } catch (error) {
+      // A measurement must never change the request's outcome. Observe mode
+      // continues as if no step-up state were known; enforce mode still does
+      // not deny on an infrastructure error, because only a deliberate
+      // StepUpRequiredError below may refuse a request.
+      reportStepUpFailure('admin_step_up_evaluate', error);
+      errored = true;
+      state = { status: 'absent' };
+    }
   }
 
   emitStepUpObservation({
@@ -76,9 +91,10 @@ export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<Admi
     mode: params.mode,
     route: params.route,
     method: params.method,
+    errored,
   });
 
-  if (params.mode === 'enforce' && state.status !== 'fresh') {
+  if (params.mode === 'enforce' && !errored && state.status !== 'fresh') {
     const policy = stepUpPolicyFor(params.actionClass);
     throw new TRPCError({
       code: 'FORBIDDEN',

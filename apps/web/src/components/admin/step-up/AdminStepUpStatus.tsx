@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
@@ -7,19 +8,21 @@ import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useStepUp } from './StepUpProvider';
 import { formatStepUpRemaining } from './step-up-error';
+import { StepUpSignInAgainButton } from './StepUpSignInAgainButton';
 
 /**
  * Compact admin shell status for observe-mode step-up. It is informative only:
  * PR2 never denies an admin action because of this state.
  */
-export function AdminStepUpStatus() {
+export function AdminStepUpStatus({ visible }: { visible: boolean }) {
   const trpc = useTRPC();
   const { requestStepUp } = useStepUp();
   const statusQuery = useQuery({
     ...trpc.stepUp.getStatus.queryOptions(),
+    enabled: visible,
     staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: visible ? 30_000 : false,
+    refetchOnWindowFocus: visible,
   });
   const revoke = useMutation(
     trpc.stepUp.revokeCurrent.mutationOptions({
@@ -27,6 +30,7 @@ export function AdminStepUpStatus() {
     })
   );
 
+  if (!visible) return null;
   const status = statusQuery.data;
   if (!status) return null;
 
@@ -57,11 +61,10 @@ export function AdminStepUpStatus() {
         <ShieldAlert className="size-4 text-amber-600" aria-hidden="true" />
         <span className="font-medium">MFA needs a fresh sign-in</span>
         <span className="text-muted-foreground">
-          This session predates session-bound verification.
+          This session predates session-bound verification. Signing out signs you out of every
+          browser.
         </span>
-        <Button asChild size="sm" variant="outline" className="ml-auto">
-          <Link href="/users/sign_in">Sign in again</Link>
-        </Button>
+        <StepUpSignInAgainButton className="ml-auto" />
       </div>
     );
   }

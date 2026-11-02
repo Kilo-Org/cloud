@@ -630,6 +630,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 3,
   },
   {
+    id: 'internal.lib.admin.stepUpUi',
+    file: 'apps/web/src/lib/admin/step-up-ui.ts',
+    actionClass: 'platform_read',
+    surface: 'server-component',
+    occurrences: 2,
+  },
+  {
     id: 'internal.lib.admin.requirePrivilegedActor',
     file: 'apps/web/src/lib/admin/require-privileged-actor.ts',
     actionClass: 'platform_read',

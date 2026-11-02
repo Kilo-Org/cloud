@@ -347,8 +347,9 @@ repository.
     refresh and remain scoped to the current user and personal or organization
     context. A closed chat MUST reopen only when the user opens that chat
     itself, for example from the Sessions list or its own link. Selecting its
-    worktree, going back from the closed tab, refreshing or restoring a window,
-    or another window still showing the chat MUST NOT reopen it; a window
+    worktree, closing it while the app is still switching to it, going back
+    from the closed tab, refreshing or restoring a window, or another window
+    still showing the chat MUST NOT reopen it; a window
     showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.

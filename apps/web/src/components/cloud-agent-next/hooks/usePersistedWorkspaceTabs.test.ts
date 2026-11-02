@@ -307,22 +307,6 @@ describe('usePersistedWorkspaceTabs', () => {
       expect(chatProbe?.closedSessionIds).toEqual([]);
     });
 
-    it('tells closures read from storage apart from this window’s own updates', () => {
-      dom.storage.set(
-        STORAGE_KEY,
-        JSON.stringify({ closedSessionIds: ['ses-1'], sessionOrderByWorktree: {} })
-      );
-      renderChats();
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-1']);
-      expect(chatProbe?.loadedFromStorage).toBe(true);
-
-      act(() => chatProbe?.closeChatTab('ses-2'));
-      expect(chatProbe?.loadedFromStorage).toBe(false);
-
-      dispatchStorage();
-      expect(chatProbe?.loadedFromStorage).toBe(true);
-    });
-
     it('resyncs a page restored from the back-forward cache', () => {
       renderChats();
       dom.storage.set(

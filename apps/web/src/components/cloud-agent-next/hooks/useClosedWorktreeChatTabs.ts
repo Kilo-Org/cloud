@@ -11,8 +11,6 @@ import {
 type ScopedClosedWorktreeChatTabs = {
   storageKey: string | null;
   tabs: WorktreeChatTabsState;
-  /** Set when the state was read from storage rather than written by this window. */
-  loadedFromStorage: boolean;
   storageUnavailable?: boolean;
 };
 
@@ -20,19 +18,15 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
   const [state, setState] = useState<ScopedClosedWorktreeChatTabs | null>(null);
   const stateRef = useRef<ScopedClosedWorktreeChatTabs | null>(null);
 
-  const getScopedState = useCallback((): ScopedClosedWorktreeChatTabs => {
+  const getScopedState = useCallback(() => {
     const current = stateRef.current;
     const fallback: ScopedClosedWorktreeChatTabs =
       current?.storageKey === storageKey
         ? current
-        : { storageKey, tabs: parseWorktreeChatTabs(null), loadedFromStorage: false };
+        : { storageKey, tabs: parseWorktreeChatTabs(null) };
     if (storageKey === null || fallback.storageUnavailable) return fallback;
     try {
-      return {
-        storageKey,
-        tabs: parseWorktreeChatTabs(window.localStorage.getItem(storageKey)),
-        loadedFromStorage: true,
-      };
+      return { storageKey, tabs: parseWorktreeChatTabs(window.localStorage.getItem(storageKey)) };
     } catch {
       return fallback;
     }
@@ -67,7 +61,7 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
       const current = getScopedState();
       const tabs = reduceWorktreeChatTabs(current.tabs, action);
       const next: ScopedClosedWorktreeChatTabs =
-        tabs === current.tabs ? current : { ...current, tabs, loadedFromStorage: false };
+        tabs === current.tabs ? current : { ...current, tabs };
       stateRef.current = next;
       setState(next);
       if (storageKey !== null && next !== current) {
@@ -109,7 +103,6 @@ export function useClosedWorktreeChatTabs(storageKey: string | null) {
   return {
     closedSessionIds: scopedState?.tabs.closedSessionIds ?? [],
     sessionOrderByWorktree: scopedState?.tabs.sessionOrderByWorktree ?? {},
-    loadedFromStorage: scopedState?.loadedFromStorage ?? false,
     openChatTab,
     closeChatTab,
     replaceChatTab,

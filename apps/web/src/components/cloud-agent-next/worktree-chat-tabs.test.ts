@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  arriveAtChatAddress,
+  getActiveChatSessionId,
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
   getLatestOpenChatSessionId,
@@ -10,6 +12,7 @@ import {
   isRestoredDocumentNavigation,
   parseWorktreeChatTabs,
   reduceWorktreeChatTabs,
+  requestChatNavigation,
   type WorktreeChatTabsAction,
   type WorktreeChatTabsState,
 } from './worktree-chat-tabs';
@@ -435,6 +438,43 @@ describe('isRestoredDocumentNavigation', () => {
       )
     ).toBe(false);
     expect(isRestoredDocumentNavigation(undefined, url, true)).toBe(false);
+  });
+});
+
+describe('pending chat navigation', () => {
+  it('keeps a tab closed when it closes before the router shows it', () => {
+    let pending = requestChatNavigation(null, 'session-b');
+    expect(getActiveChatSessionId(pending, 'session-a')).toBe('session-b');
+
+    pending = requestChatNavigation(pending, 'session-c');
+    const transient = arriveAtChatAddress(pending, 'session-b');
+    expect(transient.requestedHere).toBe(true);
+    expect(getActiveChatSessionId(transient.pending, 'session-b')).toBe('session-c');
+
+    const arrived = arriveAtChatAddress(transient.pending, 'session-c');
+    expect(arrived).toEqual({ pending: null, requestedHere: true });
+  });
+
+  it('treats an address this window did not request as an explicit open', () => {
+    expect(arriveAtChatAddress(null, 'session-a')).toEqual({
+      pending: null,
+      requestedHere: false,
+    });
+    const pending = requestChatNavigation(null, 'session-b');
+    expect(arriveAtChatAddress(pending, 'session-z')).toEqual({
+      pending: null,
+      requestedHere: false,
+    });
+  });
+
+  it('settles a navigation to the worktree view', () => {
+    const pending = requestChatNavigation(null, null);
+    expect(getActiveChatSessionId(pending, 'session-a')).toBeNull();
+    expect(arriveAtChatAddress(pending, null)).toEqual({ pending: null, requestedHere: true });
+  });
+
+  it('uses the shown chat when nothing is pending', () => {
+    expect(getActiveChatSessionId(null, 'session-a')).toBe('session-a');
   });
 });
 

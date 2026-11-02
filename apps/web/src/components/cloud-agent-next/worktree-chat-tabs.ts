@@ -235,6 +235,47 @@ export function isRestoredDocumentNavigation(
   return wasDiscarded || navigation.type === 'reload' || navigation.type === 'back_forward';
 }
 
+/**
+ * Chat addresses this window asked for that the router has not shown yet. The
+ * router applies them in a transition, so the shown chat lags the request.
+ * Null `target` is the worktree view.
+ */
+export type PendingChatNavigation = {
+  target: string | null;
+  requested: readonly (string | null)[];
+} | null;
+
+export function requestChatNavigation(
+  pending: PendingChatNavigation,
+  target: string | null
+): PendingChatNavigation {
+  return { target, requested: [...(pending?.requested ?? []), target] };
+}
+
+/**
+ * Settles the pending navigation once the window shows `sessionId`. A chat this
+ * window requested had its tab opened by that request, so arriving at it must
+ * not reopen a tab the user closed in the meantime.
+ */
+export function arriveAtChatAddress(
+  pending: PendingChatNavigation,
+  sessionId: string | null
+): { pending: PendingChatNavigation; requestedHere: boolean } {
+  const requestedHere = pending?.requested.includes(sessionId) ?? false;
+  return {
+    pending: pending && requestedHere && pending.target !== sessionId ? pending : null,
+    requestedHere,
+  };
+}
+
+/** The chat the window is showing or about to show. */
+export function getActiveChatSessionId(
+  pending: PendingChatNavigation,
+  currentSessionId: string | null
+): string | null {
+  return pending ? pending.target : currentSessionId;
+}
+
 export function getNextOpenChatSessionId(
   openSessionIds: readonly string[],
   closingSessionId: string

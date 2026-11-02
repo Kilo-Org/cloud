@@ -2221,6 +2221,7 @@
       "notAdminMessage": "Mai kula da wannan asusun a GitHub ne kaɗai zai iya haɗa shi. Nemi mai kula da ƙungiyar ya shigar da Kilo.",
       "alreadyClaimedMessage": "An riga an haɗa wannan shigarwar ta GitHub da wani asusun Kilo. Fara katse haɗin a can.",
       "installationUnavailableMessage": "An dakatar da wannan shigarwar GitHub App ko kuma ba ta samuwa yanzu. Maido da ita ko sake shigar da ita a GitHub, sannan ka sake farawa.",
+      "multipleInstallationsMessage": "Wannan kungiyar Kilo za ta iya haɗawa da kungiya ɗaya ta GitHub kawai a halin yanzu.",
       "didNotCompleteTitle": "Ba a kammala shigarwa ba",
       "didNotCompleteMessage": "Ba a kammala shigar da manhajar GitHub ba. Sake gwadawa daga manhajar."
     },

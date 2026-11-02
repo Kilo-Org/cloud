@@ -1709,6 +1709,7 @@
       "notAdminMessage": "Solo un administrador de GitHub de esa cuenta puede conectarla. Pide a un administrador de la organización que instale Kilo.",
       "alreadyClaimedMessage": "Esa instalación de GitHub ya está conectada a otra cuenta de Kilo. Desconéctala allí primero.",
       "installationUnavailableMessage": "Esta instalación de GitHub App está suspendida o ya no está disponible. Restáurala o vuelve a instalarla en GitHub y, después, empieza de nuevo.",
+      "multipleInstallationsMessage": "Esta organización de Kilo solo puede conectarse actualmente a una organización de GitHub.",
       "didNotCompleteTitle": "La instalación no se completó",
       "didNotCompleteMessage": "La instalación de la aplicación de GitHub no se completó. Inténtalo de nuevo desde la aplicación."
     },

@@ -2221,6 +2221,7 @@
       "notAdminMessage": "صرف اس اکاؤنٹ کا GitHub منتظم اسے منسلک کر سکتا ہے۔ تنظیم کے منتظم سے Kilo انسٹال کرنے کو کہیں۔",
       "alreadyClaimedMessage": "یہ GitHub انسٹالیشن پہلے سے کسی دوسرے Kilo اکاؤنٹ سے منسلک ہے۔ پہلے وہاں سے منقطع کریں۔",
       "installationUnavailableMessage": "یہ GitHub App انسٹالیشن معطل ہے یا اب دستیاب نہیں ہے۔ اسے GitHub میں بحال کریں یا دوبارہ انسٹال کریں، پھر دوبارہ شروع کریں۔",
+      "multipleInstallationsMessage": "یہ Kilo تنظیم فی الحال صرف ایک GitHub تنظیم سے منسلک ہو سکتی ہے۔",
       "didNotCompleteTitle": "انسٹالیشن مکمل نہیں ہوئی",
       "didNotCompleteMessage": "GitHub ایپ کی انسٹالیشن مکمل نہیں ہوئی۔ ایپ سے دوبارہ کوشش کریں۔"
     },

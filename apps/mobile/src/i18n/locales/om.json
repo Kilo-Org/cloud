@@ -2221,6 +2221,7 @@
       "notAdminMessage": "Bulchaa GitHub herrega sanaa qofatu isa walqabsiisuu danda'a. Bulchaa dhaabbataa Kilo akka fe'u gaafadhu.",
       "alreadyClaimedMessage": "Appiin GitHub fe'ame sun duraan herrega Kilo biraatti walqabateera. Jalqaba achitti walqunnamtii isaa kuti.",
       "installationUnavailableMessage": "Fe'iinsi GitHub App kanaa dhaabbateera yookaan ammas hin argamu. GitHub keessatti deebisi yookaan irra deebi'ii fe'i, ergasii irra deebi'ii jalqabi.",
+      "multipleInstallationsMessage": "Waldaan Kilo kana yeroo ammaa waldaa GitHub tokko qofa walqabachuu danda'a.",
       "didNotCompleteTitle": "Fe'uun hin xumuramne",
       "didNotCompleteMessage": "Appii GitHub fe'uun hin xumuramne. Appii irraa irra deebi'ii yaali."
     },

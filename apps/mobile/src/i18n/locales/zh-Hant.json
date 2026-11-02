@@ -1691,6 +1691,7 @@
       "notAdminMessage": "只有該 GitHub 帳戶的管理員能建立連結。請組織管理員安裝 Kilo。",
       "alreadyClaimedMessage": "此 GitHub 安裝項目已連結到另一個 Kilo 帳戶。請先到該帳戶中斷連結。",
       "installationUnavailableMessage": "此 GitHub App 安裝項目已暫停或已無法使用。請在 GitHub 中還原或重新安裝，然後再試一次。",
+      "multipleInstallationsMessage": "此 Kilo 組織目前只能連結一個 GitHub 組織。",
       "didNotCompleteTitle": "安裝未完成",
       "didNotCompleteMessage": "GitHub App 尚未完成安裝。請回到應用程式再試一次。"
     },

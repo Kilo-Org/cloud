@@ -210,6 +210,7 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       'not_installation_admin',
       'installation_already_claimed',
       'installation_unavailable',
+      'multiple_installations_disabled',
     ] as const) {
       const alert = buildGitHubInstallOutcomeAlert({ kind: 'error', code }, () => undefined);
       expect(alert?.buttons).toEqual([{ text: 'Back' }]);
@@ -235,6 +236,16 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
     ).toBe(
       'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
     );
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'multiple_installations_disabled' },
+        () => undefined
+      )
+    ).toEqual({
+      title: 'Cannot complete installation',
+      message: 'This Kilo organization can currently connect only one GitHub organization.',
+      buttons: [{ text: 'Back' }],
+    });
   });
 });
 

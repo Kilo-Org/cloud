@@ -1691,6 +1691,7 @@
       "notAdminMessage": "Chỉ quản trị viên GitHub của tài khoản đó mới có thể kết nối. Hãy nhờ quản trị viên tổ chức cài đặt Kilo.",
       "alreadyClaimedMessage": "Ứng dụng GitHub đã cài đặt này đang kết nối với một tài khoản Kilo khác. Hãy ngắt kết nối trong tài khoản đó trước.",
       "installationUnavailableMessage": "Bản cài đặt GitHub App này đã bị tạm ngưng hoặc không còn khả dụng. Hãy khôi phục hoặc cài đặt lại trong GitHub, sau đó bắt đầu lại.",
+      "multipleInstallationsMessage": "Tổ chức Kilo này hiện tại chỉ có thể kết nối với một tổ chức GitHub.",
       "didNotCompleteTitle": "Cài đặt chưa hoàn tất",
       "didNotCompleteMessage": "Quá trình cài đặt ứng dụng GitHub chưa hoàn tất. Hãy thử lại từ ứng dụng."
     },

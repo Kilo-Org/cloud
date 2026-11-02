@@ -1691,6 +1691,7 @@
       "notAdminMessage": "Bu hesabı yalnızca hesabın GitHub yöneticisi bağlayabilir. Bir kuruluş yöneticisinden Kilo'yu yüklemesini iste.",
       "alreadyClaimedMessage": "Bu GitHub kurulumu zaten başka bir Kilo hesabına bağlı. Önce o hesaptaki bağlantısını kes.",
       "installationUnavailableMessage": "Bu GitHub App kurulumu askıya alınmış veya artık kullanılamıyor. GitHub'da geri yükle veya yeniden yükle, sonra tekrar başla.",
+      "multipleInstallationsMessage": "Bu Kilo organizasyonu şu anda yalnızca bir GitHub organizasyonuna bağlanabilir.",
       "didNotCompleteTitle": "Kurulum tamamlanmadı",
       "didNotCompleteMessage": "GitHub uygulamasının kurulumu tamamlanmadı. Uygulamadan tekrar dene."
     },

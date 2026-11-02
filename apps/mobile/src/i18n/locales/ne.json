@@ -2221,6 +2221,7 @@
       "notAdminMessage": "त्यो खाताका GitHub प्रशासकले मात्र खाता जडान गर्न सक्छन्। संस्थाका प्रशासकलाई Kilo स्थापना गर्न अनुरोध गर्नुहोस्।",
       "alreadyClaimedMessage": "त्यो GitHub स्थापना अर्को Kilo खातासँग पहिले नै जडान भएको छ। पहिले त्यहाँको जडान हटाउनुहोस्।",
       "installationUnavailableMessage": "यो GitHub App स्थापना निलम्बित भएको छ वा अब उपलब्ध छैन। यसलाई GitHub मा पुनर्स्थापना गर्नुहोस् वा पुनः स्थापना गर्नुहोस्, त्यसपछि फेरि सुरु गर्नुहोस्।",
+      "multipleInstallationsMessage": "यो Kilo संगठनले हाल एउटा GitHub संगठन मात्र जडान गर्न सक्छ।",
       "didNotCompleteTitle": "स्थापना पूरा भएन",
       "didNotCompleteMessage": "GitHub एपको स्थापना पूरा भएन। एपबाट फेरि प्रयास गर्नुहोस्।"
     },

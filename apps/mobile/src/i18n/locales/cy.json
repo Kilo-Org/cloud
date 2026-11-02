@@ -2369,6 +2369,7 @@
       "notAdminMessage": "Dim ond gweinyddwr GitHub y cyfrif hwnnw all ei gysylltu. Gofynnwch i weinyddwr y sefydliad osod Kilo.",
       "alreadyClaimedMessage": "Mae'r gosodiad GitHub hwnnw eisoes wedi'i gysylltu â chyfrif Kilo arall. Datgysylltwch ef yno yn gyntaf.",
       "installationUnavailableMessage": "Mae'r gosodiad GitHub App hwn wedi'i atal neu nid yw ar gael mwyach. Adferwch neu ail-osodwch ef yn GitHub, yna dechreuwch eto.",
+      "multipleInstallationsMessage": "Gall sefydliad Kilo hwn gysylltu un sefydliad GitHub yn unig ar hyn o bryd.",
       "didNotCompleteTitle": "Ni chwblhawyd y gosodiad",
       "didNotCompleteMessage": "Ni chwblhawyd gosod yr ap GitHub. Rhowch gynnig eto o'r ap."
     },

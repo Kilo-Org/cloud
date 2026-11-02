@@ -2221,6 +2221,7 @@
       "notAdminMessage": "Bare en GitHub-administrator for den kontoen kan koble den til. Be en organisasjonsadministrator om å installere Kilo.",
       "alreadyClaimedMessage": "Den GitHub-installasjonen er allerede tilkoblet en annen Kilo-konto. Koble den fra der først.",
       "installationUnavailableMessage": "Denne GitHub App-installasjonen er suspendert eller ikke lenger tilgjengelig. Gjenopprett eller installer den på nytt i GitHub, og start deretter på nytt.",
+      "multipleInstallationsMessage": "Denne Kilo-organisasjonen kan for øyeblikket kun koble til én GitHub-organisasjon.",
       "didNotCompleteTitle": "Installasjonen ble ikke fullført",
       "didNotCompleteMessage": "Installasjonen av GitHub-appen ble ikke fullført. Prøv igjen fra appen."
     },

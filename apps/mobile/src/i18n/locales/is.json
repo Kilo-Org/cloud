@@ -2221,6 +2221,7 @@
       "notAdminMessage": "Aðeins stjórnandi viðkomandi GitHub-reiknings getur tengt hann. Biddu stjórnanda fyrirtækisins um að setja upp Kilo.",
       "alreadyClaimedMessage": "Þessi GitHub-uppsetning er þegar tengd öðrum Kilo-reikningi. Aftengdu hana þar fyrst.",
       "installationUnavailableMessage": "Þessi GitHub App-uppsetning er í biðstöðu eða ekki lengur tiltæk. Endurheimtu hana eða settu hana upp aftur á GitHub og byrjaðu svo aftur.",
+      "multipleInstallationsMessage": "Þessi Kilo-stofnun getur sem stendur aðeins tengt eina GitHub-stofnun.",
       "didNotCompleteTitle": "Uppsetningu var ekki lokið",
       "didNotCompleteMessage": "Ekki var lokið við uppsetningu GitHub-forritsins. Reyndu aftur í appinu."
     },

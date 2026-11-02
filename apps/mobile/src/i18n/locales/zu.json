@@ -2227,6 +2227,7 @@
       "notAdminMessage": "Umphathi we-GitHub waleyo akhawunti kuphela ongayixhuma. Cela umphathi wenhlangano afake i-Kilo.",
       "alreadyClaimedMessage": "Lokho kufakwa kwe-GitHub sekuxhumene nenye i-akhawunti ye-Kilo. Kunqamule kuleyo akhawunti kuqala.",
       "installationUnavailableMessage": "Ukufakwa kwe-GitHub App kumisiwe noma akusatholakali. Kubuyisele noma uphinde ukufake ku-GitHub, bese uqala futhi.",
+      "multipleInstallationsMessage": "Le nhlangano ye-Kilo kwamanje ingaxhuma inhlangano eyodwa ye-GitHub kuphela.",
       "didNotCompleteTitle": "Ukufaka akuqedwanga",
       "didNotCompleteMessage": "Ukufakwa kwe-GitHub App akuqedwanga. Zama futhi ohlelweni lokusebenza."
     },

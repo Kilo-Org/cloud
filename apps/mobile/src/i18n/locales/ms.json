@@ -2221,6 +2221,7 @@
       "notAdminMessage": "Hanya pentadbir GitHub bagi akaun itu boleh menyambungkannya. Minta pentadbir organisasi memasang Kilo.",
       "alreadyClaimedMessage": "Pemasangan GitHub itu sudah disambungkan ke akaun Kilo lain. Putuskan sambungannya di sana dahulu.",
       "installationUnavailableMessage": "Pemasangan GitHub App ini digantung atau tidak lagi tersedia. Pulihkan atau pasang semula di GitHub, kemudian mulakan semula.",
+      "multipleInstallationsMessage": "Organisasi Kilo ini pada masa ini hanya boleh menyambungkan satu organisasi GitHub.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan apl GitHub tidak selesai. Cuba lagi daripada apl."
     },

@@ -602,68 +602,6 @@ export async function getActiveSupportGrantsForOrganization(
     .orderBy(asc(support_access_grants.expires_at));
 }
 
-/**
- * The per-request revalidation used by organization access resolution. One
- * primary read joins the grant, the actor, and the organization so a revoked
- * permission, blocked actor, deleted organization, or expired grant takes
- * effect on the next request.
- */
-export async function findActiveSupportGrant(params: {
-  actorKiloUserId: string;
-  organizationId: string;
-  actionClass: SupportAccessActionClass;
-}): Promise<Pick<SupportAccessGrant, 'id' | 'expires_at'> | null> {
-  const [row] = await db
-    .select({
-      id: support_access_grants.id,
-      expiresAt: support_access_grants.expires_at,
-    })
-    .from(support_access_grants)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, support_access_grants.actor_kilo_user_id))
-    .innerJoin(organizations, eq(organizations.id, support_access_grants.organization_id))
-    .where(
-      and(
-        eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        eq(support_access_grants.organization_id, params.organizationId),
-        eq(support_access_grants.status, 'active'),
-        sql`${support_access_grants.expires_at} > now()`,
-        eq(kilocode_users.is_admin, true),
-        eq(kilocode_users.can_request_support_org_access, true),
-        isNull(kilocode_users.blocked_reason),
-        isNull(organizations.deleted_at),
-        params.actionClass === 'support_write'
-          ? eq(support_access_grants.action_class, 'support_write')
-          : inArray(support_access_grants.action_class, ['support_read', 'support_write'])
-      )
-    )
-    .limit(1);
-
-  return row ? { id: row.id, expires_at: row.expiresAt } : null;
-}
-
-export async function recordSupportGrantUse(params: {
-  grantId: string;
-  actorKiloUserId: string;
-  organizationId: string;
-  actionClass: SupportAccessActionClass;
-  supportActionId: string;
-}): Promise<void> {
-  if (params.actionClass !== 'support_write') return;
-  try {
-    await db.insert(support_access_grant_events).values({
-      grant_id: params.grantId,
-      event_type: 'used_write',
-      performed_by_kilo_user_id: params.actorKiloUserId,
-      organization_id: params.organizationId,
-      action_class: 'support_write',
-      metadata: { supportActionId: params.supportActionId },
-    });
-  } catch {
-    // Usage evidence must never turn an otherwise authorized write into a
-    // failure. The request itself is already recorded in admin telemetry.
-  }
-}
-
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === 'object' &&

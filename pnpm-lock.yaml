@@ -2501,9 +2501,6 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
-      '@vitest/ui':
-        specifier: 'catalog:'
-        version: 4.1.12(vitest@4.1.12)
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20

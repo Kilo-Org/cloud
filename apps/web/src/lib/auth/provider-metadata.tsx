@@ -68,14 +68,17 @@ export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id),
 // what it produces.
 const LinkSessionUnavailableProviderIds = ['apple'] as const satisfies readonly AuthProviderId[];
 
-// Subset `/connected-accounts` may start a link for.
+// The providers a person may start an account link for. Every link start reads
+// this list, not only the `/connected-accounts` offer: the organization BYOK
+// card and the shared-services ChatGPT connect start a link through the same
+// predicate.
 export const AccountLinkingProviders = [
   ...LinkableAuthProviders.filter(p => !LinkSessionUnavailableProviderIds.some(id => id === p.id)),
 ] as const;
 
 const AccountLinkingProviderIds = new Set<string>(AccountLinkingProviders.map(p => p.id));
 
-/** Whether `/connected-accounts` may start a link for `provider`. */
+/** Whether a person may start an account link for `provider`. */
 export const isAccountLinkingProvider = (provider: AuthProviderId): boolean =>
   AccountLinkingProviderIds.has(provider);
 

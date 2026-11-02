@@ -129,9 +129,7 @@ export function ConfigureRow({
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
   // and the chevron, the pressed feedback and `accessibilityState` are what
   // still say "unavailable".
-  const iconTint: Tint = disabled
-    ? { ...tint, hueTextClass: 'text-muted-foreground', hueThemeKey: 'mutedForeground' }
-    : tint;
+  const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
 
   const iconTile = <IconTile icon={Icon} tint={iconTint} />;
 

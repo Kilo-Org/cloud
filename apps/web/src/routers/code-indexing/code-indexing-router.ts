@@ -1,3 +1,4 @@
+import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -181,6 +182,12 @@ async function resolveOrganizationIdWithOverride(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Only admins can use overrideUser parameter',
+      });
+    }
+    if (getSupportAccessMode() === 'enforce') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'overrideUser is disabled while support access is enforced',
       });
     }
 

@@ -665,6 +665,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 4,
   },
   {
+    id: 'internal.admin.supportAccessResolver',
+    file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    occurrences: 1,
+  },
+  {
     id: 'internal.admin.supportAccessService',
     file: 'apps/web/src/lib/admin/support-access-service.ts',
     actionClass: 'support_write',
@@ -721,18 +728,11 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
-    id: 'internal.organizations.organizationAuth',
-    file: 'apps/web/src/lib/organizations/organization-auth.ts',
-    actionClass: 'support_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
     id: 'internal.securityAgent.sharedHandlers',
     file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
     actionClass: 'support_read',
     surface: 'trpc',
-    occurrences: 5,
+    occurrences: 3,
   },
   {
     id: 'internal.user.deletionIntake',
@@ -879,7 +879,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'packages/web-shared/src/routers/organizations/utils.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 5,
   },
 ];
 

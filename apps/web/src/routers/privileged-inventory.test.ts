@@ -83,6 +83,7 @@ function discoverRESTRoutes(): DiscoveredRoute[] {
         explicitAdminGuard: source.includes('adminOnly: true'),
         organizationContext:
           source.includes('getAuthorizedOrgContext(') ||
+          source.includes('getAuthorizedOrgContextOrSupport(') ||
           source.includes('ensureOrganizationAccess(') ||
           source.includes('ensureOrganizationAccessAndFetchOrg('),
       };
@@ -105,7 +106,9 @@ function discoverServerComponents(): { file: string; route: string }[] {
       const source = fs.readFileSync(file, 'utf8');
       return (
         (route.startsWith('/admin') || route.startsWith('/organizations')) &&
-        (source.includes('adminOnly: true') || source.includes('getAuthorizedOrgContext('))
+        (source.includes('adminOnly: true') ||
+          source.includes('getAuthorizedOrgContext(') ||
+          source.includes('getAuthorizedOrgContextOrSupport('))
       );
     });
 }

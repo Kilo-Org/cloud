@@ -1,4 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
+import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -265,6 +266,24 @@ describe('organizations members trpc router', () => {
         action: 'organization.member.remove',
         metadata: { previousRole: 'admin', heldRoles: ['admin'] },
       });
+    });
+
+    it('enforce applies the real role and rejects admin self-removal', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Enforced Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      setSupportAccessModeForTest('enforce');
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.remove({
+            organizationId: organization.id,
+            memberId: kiloAdmin.id,
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        setSupportAccessModeForTest(null);
+      }
     });
 
     it('does not record writes by members acting within their own role', async () => {
@@ -636,6 +655,25 @@ describe('organizations members trpc router', () => {
         await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
       }
     }
+
+    it('enforce denies an admin with no parent membership', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Child Members', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      setSupportAccessModeForTest('enforce');
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      } finally {
+        setSupportAccessModeForTest(null);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
 
     it('allows parent owners to assign parent members to child organizations', async () => {
       const childOwner = await insertTestUser({

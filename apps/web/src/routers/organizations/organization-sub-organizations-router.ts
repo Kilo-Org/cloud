@@ -1,3 +1,4 @@
+import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plan_rows,
@@ -414,7 +415,7 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
     .output(SubOrganizationOverviewOutputSchema)
     .query(async ({ input, ctx }) => {
       const canCreateSubOrganizations =
-        ctx.user.is_admin ||
+        (ctx.user.is_admin && getSupportAccessMode() !== 'enforce') ||
         Boolean(
           (
             await db

@@ -1,4 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
+import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -1751,6 +1752,26 @@ describe('cli-sessions-v2-router', () => {
 
         expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
       } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
+    it('enforce removes the platform-admin cross-organization list bypass', async () => {
+      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      setSupportAccessModeForTest('enforce');
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
+      } finally {
+        setSupportAccessModeForTest(null);
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
       }
     });

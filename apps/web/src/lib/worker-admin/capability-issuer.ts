@@ -4,7 +4,6 @@ import { z } from 'zod';
 import type { User } from '@kilocode/db/schema';
 import {
   BROWSER_CAPABILITY_TTL_SECONDS,
-  SERVER_CAPABILITY_TTL_SECONDS,
   WORKER_ADMIN_ACTIONS,
   WORKER_ADMIN_CAPABILITY_ISSUER,
   WORKER_ADMIN_CAPABILITY_TYP,
@@ -163,10 +162,7 @@ export async function issueWorkerAdminCapability(
   const now = params.now ?? new Date();
   const issuedAt = Math.floor(now.getTime() / 1000);
   const requestedTtl = params.ttlSeconds ?? BROWSER_CAPABILITY_TTL_SECONDS;
-  const ttl = Math.max(
-    1,
-    Math.min(requestedTtl, BROWSER_CAPABILITY_TTL_SECONDS, SERVER_CAPABILITY_TTL_SECONDS + 240)
-  );
+  const ttl = Math.max(1, Math.min(requestedTtl, BROWSER_CAPABILITY_TTL_SECONDS));
   const jti = crypto.randomUUID();
   const pepper = await workerAdminBindingDigest(params.user.api_token_pepper);
   const wsp = await workerAdminBindingDigest('');

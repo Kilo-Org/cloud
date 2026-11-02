@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
@@ -327,7 +328,7 @@ describe('filterSessionCustomModeOptions', () => {
   });
 
   it('excludes subagent-only, hidden, and disabled runtime agents', () => {
-    const runtimeAgents: NonNullable<SessionConfig['runtimeAgents']> = [
+    const runtimeAgents: NonNullable<CloudAgentSessionConfig['runtimeAgents']> = [
       { slug: 'primary', name: 'Primary', mode: 'primary' },
       { slug: 'all', name: 'All', mode: 'all' },
       { slug: 'default', name: 'Default' },

@@ -4,6 +4,7 @@
  * Centralized logic for building, validating, and deriving SessionConfig.
  */
 
+import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
@@ -193,7 +194,7 @@ export function ensureSelectedCustomOption(
 
 export function filterSessionCustomModeOptions(
   options: CustomModeOption[],
-  runtimeAgents: SessionConfig['runtimeAgents']
+  runtimeAgents: CloudAgentSessionConfig['runtimeAgents']
 ): CustomModeOption[] {
   const excludedSlugs = new Set(
     (runtimeAgents ?? [])

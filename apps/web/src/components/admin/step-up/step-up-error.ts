@@ -1,0 +1,92 @@
+import type { StepUpErrorCode } from '@kilocode/web-shared/lib/admin/privileged-access';
+
+export type StepUpRequirement = {
+  code: StepUpErrorCode;
+  actionClass?: string;
+  purpose?: 'session' | 'operation';
+  maxAgeSeconds?: number;
+};
+
+export class StepUpCancelledError extends Error {
+  constructor() {
+    super('Step-up cancelled');
+    this.name = 'StepUpCancelledError';
+  }
+}
+
+const STEP_UP_CODES = new Set<string>([
+  'MFA_REQUIRED',
+  'MFA_EXPIRED',
+  'NOT_ENROLLED',
+  'SESSION_UNBOUND',
+  'BEARER_NOT_ALLOWED',
+  'REAUTH_REQUIRED',
+]);
+
+/**
+ * Read the formatter's `data.stepUp` contract without importing a client
+ * error class, so it works for tRPC errors from any link or transport.
+ */
+export function stepUpRequirementFromError(error: unknown): StepUpRequirement | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const data = (error as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null) return null;
+  const stepUp = (data as { stepUp?: unknown }).stepUp;
+  if (typeof stepUp !== 'object' || stepUp === null) return null;
+  const candidate = stepUp as Record<string, unknown>;
+  if (typeof candidate.code !== 'string' || !STEP_UP_CODES.has(candidate.code)) return null;
+
+  return {
+    code: candidate.code as StepUpErrorCode,
+    actionClass: typeof candidate.actionClass === 'string' ? candidate.actionClass : undefined,
+    purpose:
+      candidate.purpose === 'session' || candidate.purpose === 'operation'
+        ? candidate.purpose
+        : undefined,
+    maxAgeSeconds:
+      typeof candidate.maxAgeSeconds === 'number' ? candidate.maxAgeSeconds : undefined,
+  };
+}
+
+export function stepUpDialogTitle(requirement: StepUpRequirement): string {
+  switch (requirement.code) {
+    case 'NOT_ENROLLED':
+      return 'Add a passkey to continue';
+    case 'SESSION_UNBOUND':
+      return 'Sign in again to continue';
+    case 'BEARER_NOT_ALLOWED':
+      return 'Use a browser session';
+    case 'REAUTH_REQUIRED':
+      return 'Verify your sign-in';
+    case 'MFA_EXPIRED':
+      return 'Your verification expired';
+    case 'MFA_REQUIRED':
+      return 'Verify it is you';
+  }
+}
+
+export function stepUpDialogDescription(requirement: StepUpRequirement): string {
+  switch (requirement.code) {
+    case 'NOT_ENROLLED':
+      return 'Admin actions need a passkey. Add one now, then verify it to continue.';
+    case 'SESSION_UNBOUND':
+      return 'This browser session predates session-bound MFA. Sign in again, then retry the action.';
+    case 'BEARER_NOT_ALLOWED':
+      return 'API tokens cannot complete MFA. Use the Kilo web console with a browser session.';
+    case 'REAUTH_REQUIRED':
+      return 'Sign in again, or verify with an existing passkey, before adding another passkey.';
+    case 'MFA_EXPIRED':
+      return 'Confirm it is you with your passkey to continue.';
+    case 'MFA_REQUIRED':
+      return 'Confirm it is you with your passkey to continue.';
+  }
+}
+
+/** Human-readable time left on a fresh proof, rounded down to whole minutes. */
+export function formatStepUpRemaining(expiresAt: string, now: number = Date.now()): string {
+  const remainingMs = new Date(expiresAt).getTime() - now;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 'expired';
+  const minutes = Math.floor(remainingMs / 60_000);
+  if (minutes < 1) return 'less than a minute left';
+  return `${minutes} min left`;
+}

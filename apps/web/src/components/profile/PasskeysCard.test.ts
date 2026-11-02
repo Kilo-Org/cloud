@@ -15,6 +15,14 @@ const mockRefetch = jest.fn<() => Promise<unknown>>(async () => ({}));
 const mockBrowserSupportsWebAuthn = jest.fn<() => boolean>(() => true);
 const mockStartRegistration = jest.fn<() => Promise<unknown>>(async () => ({}));
 const mockFetch = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockUseSession = jest.fn(() => ({
+  status: 'authenticated',
+  data: { isAdmin: true },
+}));
+
+const mockStepUpResult: { data: { enrollmentEnabled: boolean } | undefined } = {
+  data: undefined,
+};
 
 const mockQueryResult: {
   data: { passkeys: unknown[] } | undefined;
@@ -31,6 +39,9 @@ const mockQueryResult: {
 };
 
 const mockTrpc = {
+  stepUp: {
+    getStatus: { queryOptions: () => ({ queryKey: ['step-up-status'] }) },
+  },
   user: {
     getPasskeys: { queryOptions: () => ({ queryKey: ['passkeys'] }) },
     renamePasskey: {
@@ -57,6 +68,10 @@ jest.mock('@simplewebauthn/browser', () => ({
   startRegistration: () => mockStartRegistration(),
 }));
 
+jest.mock('next-auth/react', () => ({
+  useSession: () => mockUseSession(),
+}));
+
 jest.mock('@tanstack/react-query', () => {
   function useMutation(options: any) {
     const [isPending, setIsPending] = React.useState(false);
@@ -78,7 +93,11 @@ jest.mock('@tanstack/react-query', () => {
     return { isPending, mutate };
   }
 
-  return { useMutation, useQuery: () => mockQueryResult };
+  return {
+    useMutation,
+    useQuery: (options: { queryKey?: unknown[] }) =>
+      options.queryKey?.[0] === 'step-up-status' ? mockStepUpResult : mockQueryResult,
+  };
 });
 
 // The real Radix dialog cannot run in the node test harness; this keeps the
@@ -252,6 +271,7 @@ beforeEach(() => {
   mockQueryResult.isLoading = false;
   mockQueryResult.isError = false;
   mockQueryResult.isFetching = false;
+  mockStepUpResult.data = undefined;
   mockBrowserSupportsWebAuthn.mockReturnValue(true);
   mockStartRegistration.mockResolvedValue({ id: 'new-credential' });
   mockFetch.mockReset();
@@ -283,6 +303,20 @@ describe('PasskeysCard', () => {
 
     expect(mounted.container.textContent).toContain('No passkeys yet');
     expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
+  });
+
+  it('shows the admin enrollment note only when the step-up toggle is on', () => {
+    mockQueryResult.data = { passkeys: [] };
+    mockStepUpResult.data = { enrollmentEnabled: true };
+    mounted = mountCard();
+
+    expect(mounted.container.textContent).toContain('Admin passkeys: adding or replacing one');
+
+    mounted.cleanup();
+    mounted = undefined;
+    mockStepUpResult.data = { enrollmentEnabled: false };
+    mounted = mountCard();
+    expect(mounted.container.textContent).not.toContain('Admin passkeys: adding or replacing one');
   });
 
   it('lists a passkey with its name and the date it was added', () => {

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -128,7 +129,13 @@ function passkeyLabel(passkey: PasskeySummary): string {
  */
 export function PasskeysCard() {
   const trpc = useTRPC();
+  const session = useSession();
   const passkeysQuery = useQuery(trpc.user.getPasskeys.queryOptions());
+  const stepUpStatusQuery = useQuery({
+    ...trpc.stepUp.getStatus.queryOptions(),
+    enabled: session.status === 'authenticated' && session.data?.isAdmin === true,
+    staleTime: 60_000,
+  });
 
   // The credential API is a browser global, so support starts unknown (`null`)
   // and is only ever `true`/`false` after the client has read it. The unsupported
@@ -214,6 +221,13 @@ export function PasskeysCard() {
             <KeyRound className="h-4 w-4" />
             <span className="font-medium">Passkeys</span>
           </div>
+
+          {stepUpStatusQuery.data?.enrollmentEnabled ? (
+            <p className="text-sm text-muted-foreground">
+              Admin passkeys: adding or replacing one may ask you to sign in again or verify with an
+              existing passkey.
+            </p>
+          ) : null}
 
           {passkeysQuery.isLoading ? (
             // Sized like the rows it replaces, so loading→content does not move

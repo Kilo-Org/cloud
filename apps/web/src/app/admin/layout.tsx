@@ -5,6 +5,8 @@ import { AppSidebar } from './components/AppSidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { BuildInfo } from '@/app/admin/components/BuildInfo';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
+import { AdminStepUpStatus } from '@/components/admin/step-up/AdminStepUpStatus';
+import { StepUpProvider } from '@/components/admin/step-up/StepUpProvider';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user: currentUser } = await getUserFromAuth({ adminOnly: true });
@@ -22,9 +24,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <BuildInfo />
         </AppSidebar>
         <SidebarInset>
-          <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
-            {children}
-          </main>
+          <StepUpProvider>
+            <AdminStepUpStatus />
+            <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
+              {children}
+            </main>
+          </StepUpProvider>
         </SidebarInset>
       </SidebarProvider>
       <Toaster />

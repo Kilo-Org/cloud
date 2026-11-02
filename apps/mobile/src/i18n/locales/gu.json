@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "કોઈ મેળ ખાતું સત્ર નથી.",
     "onlyFirstFilesAttached": "ફક્ત પહેલી {{displayCount}} ફાઇલો જોડવામાં આવશે.",
     "staleMessage": "શેર કરેલી આ સામગ્રી હવે ઉપલબ્ધ નથી.",
+    "staleTitle": "શેર ઉપલબ્ધ નથી",
     "retryableMessage": "તમારાં સત્રો લોડ કરી શકાયાં નહીં.",
     "emptyMessage": "હજી કોઈ સત્ર નથી — આ મોકલવા માટે નવું સત્ર શરૂ કરો.",
     "cliNotConnectedTitle": "સત્ર કનેક્ટ થયેલું નથી",

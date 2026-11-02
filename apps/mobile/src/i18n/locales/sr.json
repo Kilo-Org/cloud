@@ -3111,6 +3111,7 @@
     "noMatchingSessions": "Nema odgovarajućih sesija.",
     "onlyFirstFilesAttached": "Biće priloženo samo prvih {{displayCount}} datoteka.",
     "staleMessage": "Ovaj sadržaj više nije dostupan za deljenje.",
+    "staleTitle": "Deljenje nije dostupno",
     "retryableMessage": "Nije moguće učitati tvoje sesije.",
     "emptyMessage": "Još nema sesija — pokreni novu da pošalješ ovaj sadržaj.",
     "cliNotConnectedTitle": "Sesija nije povezana",

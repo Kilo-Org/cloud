@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Non hai sesións que coincidan.",
     "onlyFirstFilesAttached": "Só se anexarán os primeiros {{displayCount}} ficheiros.",
     "staleMessage": "Este contido compartido xa non está dispoñible.",
+    "staleTitle": "Compartición non dispoñible",
     "retryableMessage": "Non se puideron cargar as túas sesións.",
     "emptyMessage": "Aínda non hai sesións — inicia unha nova para enviar isto.",
     "cliNotConnectedTitle": "Sesión non conectada",

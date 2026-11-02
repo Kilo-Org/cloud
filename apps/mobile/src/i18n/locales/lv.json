@@ -3111,6 +3111,7 @@
     "noMatchingSessions": "Nav atbilstošu sesiju.",
     "onlyFirstFilesAttached": "Tiks pievienoti tikai pirmie {{displayCount}} faili.",
     "staleMessage": "Kopīgotais saturs vairs nav pieejams.",
+    "staleTitle": "Kopīgošana nav pieejama",
     "retryableMessage": "Neizdevās ielādēt tavas sesijas.",
     "emptyMessage": "Vēl nav sesiju — sāc jaunu, lai nosūtītu šo saturu.",
     "cliNotConnectedTitle": "Sesija nav savienota",

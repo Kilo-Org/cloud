@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Mos keladigan sessiyalar yo'q.",
     "onlyFirstFilesAttached": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi.",
     "staleMessage": "Ulashilayotgan ma'lumot endi mavjud emas.",
+    "staleTitle": "Ulashish imkonsiz",
     "retryableMessage": "Sessiyalaringizni yuklab bo'lmadi.",
     "emptyMessage": "Hali sessiyalar yo'q — buni yuborish uchun yangisini boshlang.",
     "cliNotConnectedTitle": "Sessiya ulanmagan",

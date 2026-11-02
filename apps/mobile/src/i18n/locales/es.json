@@ -2561,6 +2561,7 @@
     "noMatchingSessions": "No hay sesiones que coincidan con la búsqueda.",
     "onlyFirstFilesAttached": "Solo se adjuntarán los primeros {{displayCount}} archivos.",
     "staleMessage": "Este contenido compartido ya no está disponible.",
+    "staleTitle": "Compartición no disponible",
     "retryableMessage": "No se pudieron cargar tus sesiones.",
     "emptyMessage": "Aún no hay sesiones: inicia una nueva para enviar esto.",
     "cliNotConnectedTitle": "Sesión no conectada",

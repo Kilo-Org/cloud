@@ -2590,6 +2590,7 @@
     "noMatchingSessions": "Нет подходящих сеансов.",
     "onlyFirstFilesAttached": "Будут прикреплены только файлы в начале списка: {{displayCount}}.",
     "staleMessage": "Переданные материалы больше недоступны.",
+    "staleTitle": "Отправка недоступна",
     "retryableMessage": "Не удалось загрузить ваши сеансы.",
     "emptyMessage": "Сеансов пока нет. Создайте новый, чтобы отправить материалы.",
     "cliNotConnectedTitle": "Сеанс не подключён",

@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Тохирох сесс олдсонгүй.",
     "onlyFirstFilesAttached": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана.",
     "staleMessage": "Энэ агуулгыг хуваалцах боломжгүй болсон.",
+    "staleTitle": "Хуваалцах боломжгүй",
     "retryableMessage": "Таны сессүүдийг ачаалж чадсангүй.",
     "emptyMessage": "Одоогоор сесс байхгүй. Үүнийг илгээхийн тулд шинэ сесс эхлүүлнэ үү.",
     "cliNotConnectedTitle": "Сесс холбогдоогүй",

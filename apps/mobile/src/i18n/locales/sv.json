@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Inga sessioner matchar sökningen.",
     "onlyFirstFilesAttached": "Endast de första {{displayCount}} filerna bifogas.",
     "staleMessage": "Det delade innehållet är inte längre tillgängligt.",
+    "staleTitle": "Delning inte tillgänglig",
     "retryableMessage": "Kunde inte läsa in dina sessioner.",
     "emptyMessage": "Det finns inga sessioner ännu. Starta en ny för att skicka innehållet.",
     "cliNotConnectedTitle": "Sessionen är inte ansluten",

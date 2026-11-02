@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "Walang tugmang session.",
     "onlyFirstFilesAttached": "Ang unang {{displayCount}} na file lang ang ilalakip.",
     "staleMessage": "Hindi na magagamit ang ibinahaging nilalamang ito.",
+    "staleTitle": "Hindi mababahagi",
     "retryableMessage": "Hindi ma-load ang iyong mga session.",
     "emptyMessage": "Wala pang session — magsimula ng bago para maipadala ito.",
     "cliNotConnectedTitle": "Hindi nakakonekta ang session",

@@ -2532,6 +2532,7 @@
     "noMatchingSessions": "Không có phiên phù hợp.",
     "onlyFirstFilesAttached": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm.",
     "staleMessage": "Nội dung chia sẻ này không còn khả dụng.",
+    "staleTitle": "Không thể chia sẻ",
     "retryableMessage": "Không thể tải các phiên của bạn.",
     "emptyMessage": "Chưa có phiên nào — hãy bắt đầu phiên mới để gửi nội dung này.",
     "cliNotConnectedTitle": "Phiên chưa kết nối",

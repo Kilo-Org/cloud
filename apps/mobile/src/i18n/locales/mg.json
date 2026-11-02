@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "Tsy misy fotoam-piasana mifanaraka.",
     "onlyFirstFilesAttached": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra.",
     "staleMessage": "Tsy azo zaraina intsony ity votoaty ity.",
+    "staleTitle": "Tsy azo zaraina",
     "retryableMessage": "Tsy tafiditra ny fotoam-piasanao.",
     "emptyMessage": "Mbola tsy misy fotoam-piasana — manomboha vaovao handefasana ity.",
     "cliNotConnectedTitle": "Tsy mifandray ny fotoam-piasana",

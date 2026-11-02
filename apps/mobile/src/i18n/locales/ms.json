@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Tiada sesi yang sepadan.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} fail pertama akan dilampirkan.",
     "staleMessage": "Perkongsian ini tidak lagi tersedia.",
+    "staleTitle": "Perkongsian tidak tersedia",
     "retryableMessage": "Tidak dapat memuatkan sesi anda.",
     "emptyMessage": "Belum ada sesi. Mulakan sesi baharu untuk menghantar kandungan ini.",
     "cliNotConnectedTitle": "Sesi tidak bersambung",

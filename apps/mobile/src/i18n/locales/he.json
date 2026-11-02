@@ -2561,6 +2561,7 @@
     "noMatchingSessions": "אין שיחות תואמות.",
     "onlyFirstFilesAttached": "רק {{displayCount}} הקבצים הראשונים יצורפו.",
     "staleMessage": "השיתוף הזה אינו זמין עוד.",
+    "staleTitle": "השיתוף אינו זמין",
     "retryableMessage": "לא ניתן היה לטעון את השיחות שלך.",
     "emptyMessage": "אין עדיין שיחות — התחל שיחה חדשה כדי לשלוח את התוכן הזה.",
     "cliNotConnectedTitle": "השיחה אינה מחוברת",

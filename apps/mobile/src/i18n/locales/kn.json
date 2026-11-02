@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "ಹೊಂದುವ ಸೆಶನ್‌ಗಳಿಲ್ಲ.",
     "onlyFirstFilesAttached": "ಮೊದಲ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಮಾತ್ರ ಲಗತ್ತಿಸಲಾಗುತ್ತದೆ.",
     "staleMessage": "ಈ ಹಂಚಿಕೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ.",
+    "staleTitle": "ಹಂಚಿಕೆ ಲಭ್ಯವಿಲ್ಲ",
     "retryableMessage": "ನಿಮ್ಮ ಸೆಶನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "emptyMessage": "ಇನ್ನೂ ಸೆಶನ್‌ಗಳಿಲ್ಲ — ಇದನ್ನು ಕಳುಹಿಸಲು ಹೊಸ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ.",
     "cliNotConnectedTitle": "ಸೆಶನ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",

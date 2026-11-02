@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Hakua vastaavia istuntoja ei löytynyt.",
     "onlyFirstFilesAttached": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään.",
     "staleMessage": "Jaettava sisältö ei ole enää käytettävissä.",
+    "staleTitle": "Jakaminen ei onnistu",
     "retryableMessage": "Istuntojasi ei voitu ladata.",
     "emptyMessage": "Istuntoja ei vielä ole. Aloita uusi istunto, jotta voit lähettää tämän sisällön.",
     "cliNotConnectedTitle": "Istuntoa ei ole yhdistetty",

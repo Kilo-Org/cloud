@@ -3159,6 +3159,7 @@
     "noMatchingSessions": "Nenašli sa žiadne zodpovedajúce relácie.",
     "onlyFirstFilesAttached": "Priložia sa len prvé súbory ({{displayCount}}).",
     "staleMessage": "Toto zdieľanie už nie je k dispozícii.",
+    "staleTitle": "Zdieľanie je nedostupné",
     "retryableMessage": "Tvoje relácie sa nepodarilo načítať.",
     "emptyMessage": "Zatiaľ nemáš žiadne relácie. Ak chceš odoslať tento obsah, spusti novú reláciu.",
     "cliNotConnectedTitle": "Relácia nie je pripojená",

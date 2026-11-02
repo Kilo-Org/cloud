@@ -2590,6 +2590,7 @@
     "noMatchingSessions": "Nie znaleziono pasujących sesji.",
     "onlyFirstFilesAttached": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}.",
     "staleMessage": "Udostępniana treść nie jest już dostępna.",
+    "staleTitle": "Nie można udostępnić",
     "retryableMessage": "Nie udało się wczytać twoich sesji.",
     "emptyMessage": "Nie masz jeszcze sesji. Rozpocznij nową, aby wysłać tę treść.",
     "cliNotConnectedTitle": "Sesja niepołączona",

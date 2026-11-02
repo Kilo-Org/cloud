@@ -2648,6 +2648,7 @@
     "noMatchingSessions": "لا توجد جلسات مطابقة.",
     "onlyFirstFilesAttached": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
     "staleMessage": "لم تعد هذه المشاركة متاحة.",
+    "staleTitle": "المشاركة غير متاحة",
     "retryableMessage": "تعذّر تحميل جلساتك.",
     "emptyMessage": "لا توجد جلسات بعد. ابدأ جلسة جديدة لإرسال هذا المحتوى.",
     "cliNotConnectedTitle": "الجلسة غير متصلة",

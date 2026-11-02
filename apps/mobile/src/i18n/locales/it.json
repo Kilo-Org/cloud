@@ -2561,6 +2561,7 @@
     "noMatchingSessions": "Nessuna sessione corrisponde alla ricerca.",
     "onlyFirstFilesAttached": "Verranno allegati solo i primi {{displayCount}} file.",
     "staleMessage": "Questa condivisione non è più disponibile.",
+    "staleTitle": "Condivisione non disponibile",
     "retryableMessage": "Impossibile caricare le tue sessioni.",
     "emptyMessage": "Non ci sono ancora sessioni. Avviane una per inviare questo contenuto.",
     "cliNotConnectedTitle": "Sessione non connessa",

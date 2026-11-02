@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "ကိုက်ညီသော စက်ရှင်မရှိပါ။",
     "onlyFirstFilesAttached": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။",
     "staleMessage": "ဒီမျှဝေမှုကို မရနိုင်တော့ပါ။",
+    "staleTitle": "မျှဝေခြင်း မရနိုင်ပါ",
     "retryableMessage": "သင့်စက်ရှင်များကို ရယူ၍မရပါ။",
     "emptyMessage": "စက်ရှင်မရှိသေးပါ။ ဒီအကြောင်းအရာကို ပို့ရန် စက်ရှင်အသစ်တစ်ခု စတင်ပါ။",
     "cliNotConnectedTitle": "စက်ရှင်ကို ချိတ်ဆက်မထားပါ",

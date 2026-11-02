@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Pa gen sesyon ki koresponn.",
     "onlyFirstFilesAttached": "Se sèlman premye {{displayCount}} fichye yo k ap tache.",
     "staleMessage": "Kontni pou pataje a pa disponib ankò.",
+    "staleTitle": "Pataj pa disponib",
     "retryableMessage": "Pa t ka chaje sesyon ou yo.",
     "emptyMessage": "Poko gen sesyon — kòmanse yon nouvo sesyon pou voye sa a.",
     "cliNotConnectedTitle": "Sesyon an pa konekte",

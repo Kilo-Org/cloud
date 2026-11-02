@@ -3111,6 +3111,7 @@
     "noMatchingSessions": "Cap sessió coincideix amb la cerca.",
     "onlyFirstFilesAttached": "Només s'adjuntaran els primers {{displayCount}} fitxers.",
     "staleMessage": "Aquest element compartit ja no està disponible.",
+    "staleTitle": "Compartició no disponible",
     "retryableMessage": "No s'han pogut carregar les teves sessions.",
     "emptyMessage": "Encara no hi ha sessions. Inicia'n una de nova per enviar-ho.",
     "cliNotConnectedTitle": "Sessió no connectada",

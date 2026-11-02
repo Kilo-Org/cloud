@@ -2532,6 +2532,7 @@
     "noMatchingSessions": "Er zijn geen sessies die overeenkomen met je zoekopdracht.",
     "onlyFirstFilesAttached": "Alleen de eerste {{displayCount}} bestanden worden bijgevoegd.",
     "staleMessage": "Deze gedeelde inhoud is niet meer beschikbaar.",
+    "staleTitle": "Delen niet beschikbaar",
     "retryableMessage": "Je sessies konden niet worden geladen.",
     "emptyMessage": "Er zijn nog geen sessies. Start een nieuwe sessie om dit te verzenden.",
     "cliNotConnectedTitle": "Sessie niet verbonden",

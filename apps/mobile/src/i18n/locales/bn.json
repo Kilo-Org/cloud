@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "মিলে যায় এমন কোনো সেশন নেই।",
     "onlyFirstFilesAttached": "শুধুমাত্র প্রথম {{displayCount}}টি ফাইল সংযুক্ত হবে।",
     "staleMessage": "শেয়ার করা বিষয়বস্তু আর পাওয়া যাচ্ছে না।",
+    "staleTitle": "শেয়ার অনুপলব্ধ",
     "retryableMessage": "আপনার সেশনগুলো লোড করা যায়নি।",
     "emptyMessage": "এখনও কোনো সেশন নেই — এটি পাঠাতে একটি নতুন সেশন শুরু করুন।",
     "cliNotConnectedTitle": "সেশন সংযুক্ত নয়",

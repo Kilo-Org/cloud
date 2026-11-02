@@ -3255,6 +3255,7 @@
     "noMatchingSessions": "Nid oes sesiynau'n cyfateb.",
     "onlyFirstFilesAttached": "Dim ond y {{displayCount}} ffeil gyntaf fydd yn cael eu hatodi.",
     "staleMessage": "Nid yw'r cynnwys a rannwyd ar gael mwyach.",
+    "staleTitle": "Methu rhannu",
     "retryableMessage": "Ni lwyddwyd i lwytho'ch sesiynau.",
     "emptyMessage": "Nid oes sesiynau eto — dechreuwch un newydd i anfon hyn.",
     "cliNotConnectedTitle": "Sesiwn heb ei chysylltu",

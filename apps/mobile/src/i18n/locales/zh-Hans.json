@@ -2532,6 +2532,7 @@
     "noMatchingSessions": "暂无匹配的会话。",
     "onlyFirstFilesAttached": "仅附加前 {{displayCount}} 个文件。",
     "staleMessage": "此分享内容已失效。",
+    "staleTitle": "分享不可用",
     "retryableMessage": "无法加载你的会话。",
     "emptyMessage": "暂无会话。请新建会话来发送此内容。",
     "cliNotConnectedTitle": "会话未连接",

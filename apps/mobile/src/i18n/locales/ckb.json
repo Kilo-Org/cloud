@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "هیچ سێشنێک ناگونجێت.",
     "onlyFirstFilesAttached": "تەنها یەکەم {{displayCount}} فایل هاوپێچ دەکرێن.",
     "staleMessage": "ئەم هاوبەشکردنە چیتر بەردەست نییە.",
+    "staleTitle": "هاوبەشکردن بەردەست نییە",
     "retryableMessage": "نەتوانرا سێشنەکانت بار بکرێن.",
     "emptyMessage": "هێشتا هیچ سێشنێک نییە — بۆ ناردنی ئەمە، سێشنێکی نوێ دەست پێ بکە.",
     "cliNotConnectedTitle": "سێشنەکە بەستراوە نییە",

@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Der blev ikke fundet nogen matchende sessioner.",
     "onlyFirstFilesAttached": "Kun de første {{displayCount}} filer vedhæftes.",
     "staleMessage": "Denne deling er ikke længere tilgængelig.",
+    "staleTitle": "Deling utilgængelig",
     "retryableMessage": "Kunne ikke indlæse dine sessioner.",
     "emptyMessage": "Der er ingen sessioner endnu. Start en ny for at sende indholdet.",
     "cliNotConnectedTitle": "Session ikke forbundet",

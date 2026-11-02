@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Няма съвпадащи сесии.",
     "onlyFirstFilesAttached": "Ще бъдат прикачени само първите {{displayCount}} файла.",
     "staleMessage": "Това споделяне вече не е налично.",
+    "staleTitle": "Споделянето не е налично",
     "retryableMessage": "Не можахме да заредим сесиите ти.",
     "emptyMessage": "Все още няма сесии — започни нова, за да изпратиш това съдържание.",
     "cliNotConnectedTitle": "Сесията не е свързана",

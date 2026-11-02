@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Nincs egyező munkamenet.",
     "onlyFirstFilesAttached": "Csak az első {{displayCount}} fájl lesz csatolva.",
     "staleMessage": "Ez a megosztás már nem érhető el.",
+    "staleTitle": "Megosztás nem lehetséges",
     "retryableMessage": "Nem sikerült betölteni a munkameneteidet.",
     "emptyMessage": "Még nincs munkamenet — indíts egy újat ennek elküldéséhez.",
     "cliNotConnectedTitle": "A munkamenet nincs csatlakoztatva",

@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "គ្មានវគ្គដែលត្រូវគ្នាទេ។",
     "onlyFirstFilesAttached": "នឹងភ្ជាប់តែឯកសារ {{displayCount}} ដំបូងប៉ុណ្ណោះ។",
     "staleMessage": "ការចែករំលែកនេះលែងមានទៀតហើយ។",
+    "staleTitle": "ការចែករំលែកមិនអាចធ្វើបានទេ",
     "retryableMessage": "មិនអាចផ្ទុកវគ្គរបស់អ្នកបានទេ។",
     "emptyMessage": "មិនទាន់មានវគ្គទេ។ ចាប់ផ្តើមវគ្គថ្មី ដើម្បីផ្ញើខ្លឹមសារនេះ។",
     "cliNotConnectedTitle": "វគ្គមិនបានភ្ជាប់ទេ",

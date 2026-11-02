@@ -2532,6 +2532,7 @@
     "noMatchingSessions": "Tidak ada sesi yang cocok.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} file pertama yang akan dilampirkan.",
     "staleMessage": "Konten yang dibagikan ini sudah tidak tersedia.",
+    "staleTitle": "Berbagi tidak tersedia",
     "retryableMessage": "Tidak dapat memuat sesimu.",
     "emptyMessage": "Belum ada sesi. Mulai sesi baru untuk mengirim konten ini.",
     "cliNotConnectedTitle": "Sesi tidak terhubung",

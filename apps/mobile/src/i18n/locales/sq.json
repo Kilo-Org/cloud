@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Asnjë seancë nuk përputhet me kërkimin.",
     "onlyFirstFilesAttached": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten.",
     "staleMessage": "Kjo përmbajtje nuk është më e disponueshme për ndarje.",
+    "staleTitle": "Ndarja e pamundur",
     "retryableMessage": "Nuk u ngarkuan seancat e tua.",
     "emptyMessage": "Ende nuk ka seanca. Nis një të re për ta dërguar këtë përmbajtje.",
     "cliNotConnectedTitle": "Seanca nuk është e lidhur",

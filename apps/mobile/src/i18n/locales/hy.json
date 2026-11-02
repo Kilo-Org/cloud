@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "Համապատասխան նիստեր չկան։",
     "onlyFirstFilesAttached": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։",
     "staleMessage": "Ուղարկվող բովանդակությունն այլևս հասանելի չէ։",
+    "staleTitle": "Կիսումն անհասանելի է",
     "retryableMessage": "Չհաջողվեց բեռնել քո նիստերը։",
     "emptyMessage": "Նիստեր դեռ չկան։ Սկսիր նորը՝ սա ուղարկելու համար։",
     "cliNotConnectedTitle": "Նիստը միացված չէ",

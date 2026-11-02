@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Sobivaid seansse pole.",
     "onlyFirstFilesAttached": "Lisatakse ainult esimesed {{displayCount}} faili.",
     "staleMessage": "See jagatud sisu pole enam saadaval.",
+    "staleTitle": "Jagamine pole saadaval",
     "retryableMessage": "Sinu seansse ei õnnestunud laadida.",
     "emptyMessage": "Seansse veel pole — selle saatmiseks alusta uut.",
     "cliNotConnectedTitle": "Seanss pole ühendatud",

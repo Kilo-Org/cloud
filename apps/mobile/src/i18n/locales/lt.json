@@ -3159,6 +3159,7 @@
     "noMatchingSessions": "Nėra atitinkančių sesijų.",
     "onlyFirstFilesAttached": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
     "staleMessage": "Šis bendrinamas turinys nebeprieinamas.",
+    "staleTitle": "Bendrinimas neprieinamas",
     "retryableMessage": "Nepavyko įkelti tavo sesijų.",
     "emptyMessage": "Sesijų dar nėra — pradėk naują, kad galėtum išsiųsti šį turinį.",
     "cliNotConnectedTitle": "Sesija neprijungta",

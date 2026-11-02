@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "பொருந்தும் அமர்வுகள் இல்லை.",
     "onlyFirstFilesAttached": "முதல் {{displayCount}} கோப்புகள் மட்டுமே இணைக்கப்படும்.",
     "staleMessage": "இந்தப் பகிர்வு இனி கிடைக்காது.",
+    "staleTitle": "பகிர்வு கிடைக்கவில்லை",
     "retryableMessage": "உங்கள் அமர்வுகளை ஏற்ற முடியவில்லை.",
     "emptyMessage": "இன்னும் அமர்வுகள் இல்லை — இதை அனுப்பப் புதிய அமர்வைத் தொடங்கவும்.",
     "cliNotConnectedTitle": "அமர்வு இணைக்கப்படவில்லை",

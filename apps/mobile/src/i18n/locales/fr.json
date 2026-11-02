@@ -2497,6 +2497,7 @@
     "noMatchingSessions": "Aucune session correspondante.",
     "onlyFirstFilesAttached": "Seuls les {{displayCount}} premiers fichiers seront joints.",
     "staleMessage": "Ce partage n'est plus disponible.",
+    "staleTitle": "Partage indisponible",
     "retryableMessage": "Impossible de charger vos sessions.",
     "emptyMessage": "Aucune session pour le moment — démarrez-en une nouvelle pour envoyer ceci.",
     "cliNotConnectedTitle": "Session non connectée",

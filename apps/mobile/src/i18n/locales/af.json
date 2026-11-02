@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Geen ooreenstemmende sessies nie.",
     "onlyFirstFilesAttached": "Slegs die eerste {{displayCount}} lêers sal aangeheg word.",
     "staleMessage": "Hierdie gedeelde inhoud is nie meer beskikbaar nie.",
+    "staleTitle": "Deling nie beskikbaar nie",
     "retryableMessage": "Kon nie jou sessies laai nie.",
     "emptyMessage": "Nog geen sessies nie — begin 'n nuwe een om dit te stuur.",
     "cliNotConnectedTitle": "Sessie nie gekoppel nie",

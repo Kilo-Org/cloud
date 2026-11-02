@@ -3111,6 +3111,7 @@
     "noMatchingSessions": "Nicio sesiune nu corespunde căutării.",
     "onlyFirstFilesAttached": "Doar primele {{displayCount}} fișiere vor fi atașate.",
     "staleMessage": "Acest conținut distribuit nu mai este disponibil.",
+    "staleTitle": "Distribuire indisponibilă",
     "retryableMessage": "Sesiunile tale nu au putut fi încărcate.",
     "emptyMessage": "Încă nu există sesiuni. Începe una nouă pentru a trimite acest conținut.",
     "cliNotConnectedTitle": "Sesiune neconectată",

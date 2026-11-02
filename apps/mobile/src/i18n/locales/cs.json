@@ -3159,6 +3159,7 @@
     "noMatchingSessions": "Žádné relace neodpovídají hledání.",
     "onlyFirstFilesAttached": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
     "staleMessage": "Tento sdílený obsah už není dostupný.",
+    "staleTitle": "Sdílení není dostupné",
     "retryableMessage": "Tvé relace se nepodařilo načíst.",
     "emptyMessage": "Zatím nemáš žádné relace. Začni novou a odešli do ní tento obsah.",
     "cliNotConnectedTitle": "Relace není připojena",

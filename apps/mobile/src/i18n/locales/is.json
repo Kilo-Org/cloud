@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Engar lotur samsvara leitinni.",
     "onlyFirstFilesAttached": "Aðeins fyrstu {{displayCount}} skrárnar verða hengdar við.",
     "staleMessage": "Efnið sem átti að deila er ekki lengur tiltækt.",
+    "staleTitle": "Deiling ekki möguleg",
     "retryableMessage": "Ekki tókst að hlaða lotunum þínum.",
     "emptyMessage": "Engar lotur eru til enn — byrjaðu nýja lotu til að senda þetta.",
     "cliNotConnectedTitle": "Lota ekki tengd",

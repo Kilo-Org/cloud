@@ -3069,6 +3069,7 @@
     "noMatchingSessions": "نشستی مطابق با جستجو پیدا نشد.",
     "onlyFirstFilesAttached": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
     "staleMessage": "این محتوای اشتراک‌گذاری‌شده دیگر در دسترس نیست.",
+    "staleTitle": "اشتراک‌گذاری ممکن نیست",
     "retryableMessage": "بارگذاری نشست‌های شما ممکن نشد.",
     "emptyMessage": "هنوز نشستی وجود ندارد. برای ارسال این محتوا، نشست جدیدی شروع کنید.",
     "cliNotConnectedTitle": "نشست متصل نیست",

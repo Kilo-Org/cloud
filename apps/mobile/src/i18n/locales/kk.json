@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Сәйкес сеанстар жоқ.",
     "onlyFirstFilesAttached": "Тек алғашқы {{displayCount}} файл тіркеледі.",
     "staleMessage": "Бөлісуге арналған мазмұн енді қолжетімсіз.",
+    "staleTitle": "Бөлісу мүмкін емес",
     "retryableMessage": "Сеанстарыңызды жүктеу мүмкін болмады.",
     "emptyMessage": "Әзірге сеанстар жоқ — мұны жіберу үшін жаңа сеанс бастаңыз.",
     "cliNotConnectedTitle": "Сеанс қосылмаған",

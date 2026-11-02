@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "Uyğun sessiya yoxdur.",
     "onlyFirstFilesAttached": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək.",
     "staleMessage": "Bu paylaşım artıq mövcud deyil.",
+    "staleTitle": "Paylaşım mövcud deyil",
     "retryableMessage": "Sessiyalarını yükləmək mümkün olmadı.",
     "emptyMessage": "Hələ sessiya yoxdur — bunu göndərmək üçün yeni sessiya başlat.",
     "cliNotConnectedTitle": "Sessiyanın bağlantısı yoxdur",

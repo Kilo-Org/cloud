@@ -3207,6 +3207,7 @@
     "noMatchingSessions": "Ma hemm l-ebda sessjoni li taqbel.",
     "onlyFirstFilesAttached": "Se jinthemżu l-ewwel {{displayCount}} fajls biss.",
     "staleMessage": "Dan il-kontenut maqsum m'għadux disponibbli.",
+    "staleTitle": "Ma tistax taqsam",
     "retryableMessage": "Ma setgħux jitgħabbew is-sessjonijiet tiegħek.",
     "emptyMessage": "Għad m'hemmx sessjonijiet — ibda waħda ġdida biex tibgħat dan.",
     "cliNotConnectedTitle": "Is-sessjoni mhix konnessa",

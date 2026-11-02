@@ -3063,6 +3063,7 @@
     "noMatchingSessions": "هېڅ ناسته سمون نه خوري.",
     "onlyFirstFilesAttached": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
     "staleMessage": "دا شریکه شوې منځپانګه نور نشته.",
+    "staleTitle": "شریکول نشته",
     "retryableMessage": "ستاسو ناستې بار نه شوې.",
     "emptyMessage": "تر اوسه هېڅ ناسته نشته — د دې د لېږلو لپاره نوې ناسته پیل کړئ.",
     "cliNotConnectedTitle": "ناسته نښلول شوې نه ده",

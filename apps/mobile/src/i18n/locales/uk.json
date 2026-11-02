@@ -2590,6 +2590,7 @@
     "noMatchingSessions": "Немає відповідних сеансів.",
     "onlyFirstFilesAttached": "Буде вкладено лише перші файли: {{displayCount}}.",
     "staleMessage": "Цей вміст більше недоступний для надсилання.",
+    "staleTitle": "Надсилання недоступне",
     "retryableMessage": "Не вдалося завантажити ваші сеанси.",
     "emptyMessage": "Сеансів ще немає. Почніть новий, щоб надіслати цей вміст.",
     "cliNotConnectedTitle": "Сеанс не підключено",

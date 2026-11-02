@@ -29,6 +29,9 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
   usePreventRemove: () => undefined,
+  // The screen's disabled-config redirect only runs on focus, and the config
+  // these cases mount is enabled, so it never redirects here.
+  useFocusEffect: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));

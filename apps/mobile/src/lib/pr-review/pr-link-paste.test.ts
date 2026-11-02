@@ -5,6 +5,7 @@ import {
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastPasteDeniedCopy,
+  readPrLinkPasteClipboard,
   selectPrLinkClearButtonVisible,
   selectPrLinkPasteEmptyReason,
 } from './pr-link-paste';
@@ -134,6 +135,63 @@ describe('selectPrLinkPasteEmptyReason', () => {
 
   it('reports empty for a whitespace-only read even when the clipboard has text', () => {
     expect(selectPrLinkPasteEmptyReason('  \n ', true)).toBe('empty');
+  });
+});
+
+describe('readPrLinkPasteClipboard', () => {
+  const reader = (text: string | null, hasString: boolean) => ({
+    getStringAsync: async () => {
+      await Promise.resolve();
+      return text;
+    },
+    hasStringAsync: async () => {
+      await Promise.resolve();
+      return hasString;
+    },
+  });
+
+  it('hands a resolvable read to the paste decision', async () => {
+    const url = 'https://github.com/octocat/hello-world/pull/42';
+    await expect(readPrLinkPasteClipboard(reader(url, true))).resolves.toEqual({
+      kind: 'valid-pr-url',
+      text: url,
+    });
+    await expect(readPrLinkPasteClipboard(reader('  not a link  ', true))).resolves.toEqual({
+      kind: 'non-url-text',
+      text: 'not a link',
+    });
+  });
+
+  it('names an empty clipboard as empty', async () => {
+    await expect(readPrLinkPasteClipboard(reader('', false))).resolves.toEqual({
+      kind: 'empty',
+      reason: 'empty',
+    });
+  });
+
+  it('reports a declined paste prompt as a denial', async () => {
+    await expect(readPrLinkPasteClipboard(reader('', true))).resolves.toEqual({
+      kind: 'empty',
+      reason: 'denied',
+    });
+  });
+
+  it('turns a rejected text read into the denied result instead of rejecting', async () => {
+    await expect(
+      readPrLinkPasteClipboard({
+        getStringAsync: () => Promise.reject(new Error('clipboard unavailable')),
+        hasStringAsync: () => Promise.resolve(false),
+      })
+    ).resolves.toEqual({ kind: 'empty', reason: 'denied' });
+  });
+
+  it('turns a rejected text probe into the denied result instead of rejecting', async () => {
+    await expect(
+      readPrLinkPasteClipboard({
+        getStringAsync: () => Promise.resolve(''),
+        hasStringAsync: () => Promise.reject(new Error('clipboard unavailable')),
+      })
+    ).resolves.toEqual({ kind: 'empty', reason: 'denied' });
   });
 });
 

@@ -126,9 +126,15 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-Scope each PR form header with a native safe-area provider outside the scroll view.
-Apply its top inset with `SafeAreaView`, not the app root inset.
-Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 

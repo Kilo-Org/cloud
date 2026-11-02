@@ -9,6 +9,7 @@
       "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
       "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
+      "securityUpdate": "Eine Sicherheitsprüfung hat ein Update",
       "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Ein Sicherheitsbefund benötigt Aufmerksamkeit"
+      "body": "Eine Sicherheitsprüfung hat ein Update"
     }
   },
   "instanceLifecycle": {

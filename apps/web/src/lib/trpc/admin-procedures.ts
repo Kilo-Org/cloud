@@ -2,7 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import { canCurrentUserViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure } from '@kilocode/web-shared/lib/trpc/init';
@@ -38,9 +38,7 @@ export const superadminProcedure = adminProcedure.use(async ({ ctx, next }) => {
 });
 
 export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanViewSessions(currentUser)) {
+  if (!(await canCurrentUserViewSessions(ctx.user.id))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Session viewing access required',

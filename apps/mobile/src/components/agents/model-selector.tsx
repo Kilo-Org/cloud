@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -207,6 +208,9 @@ export function ModelSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
+      // The chip's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
@@ -251,6 +255,7 @@ export function ModelPickerOptionRow({
   selected,
   selectedVariant,
   isFavorite,
+  showProvider,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -259,6 +264,12 @@ export function ModelPickerOptionRow({
   selected: boolean;
   selectedVariant: string;
   isFavorite: boolean;
+  /**
+   * Whether the row shows its provider line. The list turns it off inside a
+   * provider section, whose header already names the provider; the row's
+   * accessibility label keeps the name either way.
+   */
+  showProvider: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -324,16 +335,14 @@ export function ModelPickerOptionRow({
             >
               {name}
             </Text>
-            {option.modelRef ? (
+            {option.modelRef && showProvider ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
               </Text>
             ) : null}
             {option.displayId ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
-                {option.modelRef
-                  ? t('agentChat.modelSelector.modelId', { id: option.displayId })
-                  : option.displayId}
+                {option.displayId}
               </Text>
             ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}

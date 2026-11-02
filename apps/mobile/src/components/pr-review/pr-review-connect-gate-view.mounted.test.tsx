@@ -9,6 +9,7 @@ import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
+import { PrReviewOverviewSkeleton } from './pr-review-overview-skeleton';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const appState = vi.hoisted(() => ({
@@ -91,6 +92,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: [{ organizationId: 'org-1' }] }),
 }));
+// The role split that decides whether an organization keeps the Connect CTA is
+// covered by pr-review-provider-connect-gate.mounted.test.tsx; this harness
+// pins a billing role so every arm still offers the launch it exercises.
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
+// The layout publishes the restored account selection and the gate reads the
+// same context; this harness is always past that restore.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),
@@ -118,10 +130,15 @@ vi.mock('@/components/pr-review/pr-review-context-line', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The gate's pending body is the detail screen's frame: the real skeleton over a
+// stubbed scroller keeps the assertion on the gate's own choice of body.
+vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 
@@ -315,12 +332,16 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
-  it.each(providers)('%s shows loading, not Connect, for a paused status query', provider => {
-    queryResult.isPending = true;
-    const renderer = mount(provider);
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
-    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
-  });
+  it.each(providers)(
+    '%s shows the review skeleton, not a spinner, for a paused status query',
+    provider => {
+      queryResult.isPending = true;
+      const renderer = mount(provider);
+      expect(renderer.root.findAllByType(PrReviewOverviewSkeleton)).toHaveLength(1);
+      expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+    }
+  );
 
   it.each(providers)('%s offers a working Retry for status failures', async provider => {
     queryResult.isError = true;

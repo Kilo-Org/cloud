@@ -340,11 +340,18 @@ describe('ChatComposer typing render cost', () => {
       }
     }
 
-    // The leaf received every keystroke (the hidden mirror holds the full
-    // draft) even though the composer itself did not commit per frame.
+    // The leaf received every keystroke. The mirror stops re-rendering the
+    // draft once the measured content fills the cap: an append there cannot
+    // change the published height, so the mirror keeps an earlier prefix of the
+    // draft instead of laying the whole draft out again on every keystroke.
     expect(DRAFT).toHaveLength(288);
     expect(lineCountOf(DRAFT)).toBe(8);
-    expect(mirror.children).toEqual([DRAFT]);
+    const mirrored = mirror.children[0];
+    expect(typeof mirrored).toBe('string');
+    // The mirror renders a trailing space for an empty last line, so compare
+    // without it.
+    expect(DRAFT.startsWith((mirrored as string).trimEnd())).toBe(true);
+    expect((mirrored as string).length).toBeLessThan(DRAFT.length);
 
     // The composer must not have committed once per typed frame. A typed frame
     // that changed no rendered value (most of the 288) commits nothing; only
@@ -386,6 +393,94 @@ describe('ChatComposer typing render cost', () => {
     ).toBe(true);
     expect(lastHeight).toBe(previousHeight);
     expect(input.props.scrollEnabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  // The long-draft bound. Every keystroke used to re-render the hidden mirror
+  // with the whole draft, so the platform laid the draft's full text out again
+  // on every typed frame: the per-change cost grew with the message, and a long
+  // message typed or pasted into the composer stalled the app on the device that
+  // reported the freeze. Once the measured content fills the cap the published
+  // height cannot move for a longer draft, so the leaf must stop asking for that
+  // layout — the work per change stays constant however long the draft gets.
+  it('stops laying the whole draft out once a long draft fills the cap', async () => {
+    const holder: { current?: TestRenderer.ReactTestRenderer } = {};
+    await act(async () => {
+      holder.current = TestRenderer.create(createElement(ChatComposer, baseProps()));
+    });
+    const renderer = holder.current;
+    if (renderer === undefined) {
+      throw new Error('renderer was not created');
+    }
+
+    const inputWrapper = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
+    );
+    await act(async () => {
+      (inputWrapper.props.onLayout as (event: unknown) => void)({
+        nativeEvent: { layout: { height: 48, width: 234 } },
+      });
+      await tick();
+    });
+
+    const input = findTextInput(renderer.root);
+    // One long message, typed one character per frame: 2500 characters of the
+    // kind a paste produces, wrapping at this width to roughly 63 lines.
+    const draft = 'x'.repeat(2500);
+    let mirroredText = '';
+    let mirrorLayouts = 0;
+    let lastHeight = (input.props.style as { height: number }).height;
+    for (let index = 1; index <= draft.length; index += 1) {
+      const next = draft.slice(0, index);
+      // eslint-disable-next-line no-await-in-loop -- one typed frame per keystroke is the behavior under test
+      await act(async () => {
+        (input.props.onChangeText as (value: string) => void)(next);
+        await tick();
+      });
+      const mirror = findMirror(renderer.root);
+      const mirrored = mirror.children[0];
+      if (mirrored !== mirroredText) {
+        mirroredText = mirrored as string;
+        mirrorLayouts += 1;
+        // The platform lays the mirror out after its text commits: 20pt per
+        // wrapped line at this width, as the device's `onLayout` reports.
+        const lines = Math.ceil(mirroredText.length / 40);
+        // eslint-disable-next-line no-await-in-loop -- one layout per mirrored text, as on the device
+        await act(async () => {
+          (findMirror(renderer.root).props.onLayout as (event: unknown) => void)({
+            nativeEvent: { layout: { height: lines * 20, width: 200 } },
+          });
+          await tick();
+        });
+      }
+      lastHeight = (input.props.style as { height: number }).height;
+    }
+
+    // The layout work is bounded by the text that fills the cap, not by the
+    // draft: a composer that measured each keystroke would have measured all
+    // 2500 characters one after another, each over the whole draft.
+    expect(mirrorLayouts).toBeLessThan(200);
+    // Positive control: the mirror did measure, otherwise the bound above could
+    // pass with a leaf that never measured anything at all.
+    expect(mirrorLayouts).toBeGreaterThan(1);
+    // The mirrored text stays a prefix of the draft, and the cap holds.
+    expect(draft.startsWith(mirroredText)).toBe(true);
+    expect(lastHeight).toBe(COMPOSER_INPUT_MAX_HEIGHT);
+    // The tail of the draft costs no layout at all: everything typed after the
+    // mirror froze is work-free, whatever the message's length.
+    expect(draft.length - mirroredText.length).toBeGreaterThan(2000);
+
+    // An edit that cuts into the measured text can shrink the layout, so it
+    // re-measures the exact new draft instead of leaving the prefix behind.
+    await act(async () => {
+      (input.props.onChangeText as (value: string) => void)('shorter');
+      await tick();
+    });
+    expect(findMirror(renderer.root).children[0]).toBe('shorter');
 
     renderer.unmount();
   });

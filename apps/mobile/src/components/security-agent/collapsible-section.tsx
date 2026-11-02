@@ -11,6 +11,7 @@ import Animated, {
 
 import { Text } from '@/components/ui/text';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -32,11 +33,28 @@ type CollapsibleSectionProps = {
    * transition it drops.
    */
   animateLayout?: boolean;
+  /**
+   * The surface inset the section supplies around its header and body. The
+   * header's frame is the row, so it has to carry this inset itself; a caller
+   * that wants a wider card picks a preset here instead of padding the card,
+   * which would leave the row's frame short of the card's edges.
+   */
+  inset?: keyof typeof SECTION_INSET_CLASSES;
   className?: string;
   titleClassName?: string;
   contentClassName?: string;
   children: ReactNode;
 };
+
+/**
+ * The insets a section's surface supplies. The header and the body read the
+ * same entry, so the row's frame stays flush with the card's edges and the body
+ * keeps the horizontal and bottom inset whichever preset a caller picks.
+ */
+const SECTION_INSET_CLASSES = {
+  standard: { header: 'px-3 pt-3 pb-3', body: 'px-3 pb-3' },
+  roomy: { header: 'px-4 pt-4 pb-4', body: 'px-4 pb-4' },
+} as const;
 
 /**
  * The rotating disclosure carat, shared so the app animates a carat in one
@@ -135,6 +153,7 @@ export function CollapsibleSection({
   expanded,
   onToggle,
   animateLayout = true,
+  inset = 'standard',
   className,
   titleClassName,
   contentClassName,
@@ -148,19 +167,27 @@ export function CollapsibleSection({
   const { reducedMotion } = useMotionPolicy();
   // This section's carat points up while it is expanded ("collapse me").
   const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
+  const insetClasses = SECTION_INSET_CLASSES[inset];
 
   return (
     <DisclosureLayout
-      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
+      className={cn('rounded-lg bg-secondary', className)}
       animateLayout={animateLayout}
     >
-      {/* The header's only visible content is a text line, so the pressable's
-          own box is what assistive technology and the design gate measure: it
-          must reach the 28 dp floor itself, not lean on hitSlop. Explicit
-          pixels, because native rem is 14 points. */}
+      {/* The card is the surface; this pressable's own box is the row. It
+          carries the section's inset and ROW_TARGET_CLASS — the shared 48 dp
+          row frame, which also clears DESIGN.md's 44 pt — so the whole row a
+          reader sees is the row a tap and the control audit measure, instead of
+          a 28 dp text line leaning on a `hitSlop` the audit cannot read. A
+          title that wraps grows the frame with its own text, and the inset stays
+          a property of this box, so no caller padding can desynchronise the
+          frame from the card's edges. */}
       <Pressable
-        className="min-h-[28px] flex-row items-center justify-between gap-2"
-        hitSlop={12}
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center justify-between gap-2',
+          insetClasses.header
+        )}
         onPress={() => {
           onToggle?.();
           if (expanded === undefined) {
@@ -179,7 +206,7 @@ export function CollapsibleSection({
       {resolvedExpanded && (
         <Animated.View
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          className={cn('gap-2', contentClassName)}
+          className={cn('gap-2', insetClasses.body, contentClassName)}
         >
           {children}
         </Animated.View>

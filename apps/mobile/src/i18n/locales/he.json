@@ -892,7 +892,9 @@
     "instructions": {
       "title": "הוראות מותאמות אישית",
       "deprecation": "התמיכה בהוראות מותאמות אישית צפויה להסתיים. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
-      "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…"
+      "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…",
+      "clearTitle": "להסיר את ההוראות המותאמות אישית?",
+      "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
     },
     "repos": {
       "unavailable": "המאגרים אינם זמינים — השלם את הגדרת Bitbucket ב-kilo.ai.",
@@ -968,7 +970,7 @@
       "bitbucketError": "לא ניתן לפתוח את הגדרות Bitbucket. נסה שוב."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} מאת {{author}}",
+      "byline": "#{{number}} מאת {{author}}",
       "cancelMessage": "הפעולה תעצור את סקירת הקוד שמתבצעת כעת.",
       "cancelReview": "ביטול הסקירה",
       "cancelTitle": "לבטל את הסקירה?",
@@ -1083,12 +1085,10 @@
     },
     "overview": {
       "allAreas": "כל התחומים",
-      "customInstructions": "הוראות מותאמות אישית",
-      "focusAreas": "תחומי מיקוד",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
-      "reviewStyle": "סגנון סקירה",
-      "set": "הוגדר"
+      "set": "הוגדר",
+      "notSet": "לא הוגדר"
     },
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
@@ -1548,7 +1548,8 @@
       "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
       "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
       "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
-      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב."
+      "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב.",
+      "configConflict": "ההגדרות של סוכן האבטחה שונו במקום אחר. בדוק את ההגדרות העדכניות ושמור שוב."
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
@@ -1848,7 +1849,7 @@
       "discardDraftMessage": "ההנחיה שלך תימחק.",
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
-      "remoteHint": "הרץ `kilo remote` במחשב שלך, או `/remote` בסשן CLI פעיל, כדי לשלוט בתהליך kilo מקומי.",
+      "remoteHint": "כדי להריץ במחשב שלך, הפעל את Kilo שם והשאר אותו פעיל.",
       "continueFrom": "ממשיך את הסשן {{title}}.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
@@ -1859,13 +1860,14 @@
       "forkFilesUnchangedOnComputer": "הקבצים במחשב הזה לא משתנים.",
       "pickProfile": "בחר פרופיל",
       "noProfile": "אין פרופיל",
+      "defaultProfileResolvesTo": "מוגדר ל-{{name}}",
+      "defaultProfileResolvesToAccessibility": "פרופיל ברירת מחדל: {{name}}",
       "manageProfiles": "נהל פרופילים",
       "noProfiles": "עדיין אין פרופילים. צור אחד כדי להוסיף משתני סביבה, שרתי MCP ומיומנויות.",
       "advancedConfig": "תצורה מתקדמת",
       "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
       "saveAsProfile": "שמור כפרופיל",
       "saveProfileDescription": "שמור את משתני הסביבה הנוכחיים ואת פקודות ההגדרה כפרופיל לשימוש חוזר.",
-      "profileSummary": "{{vars}} משתני סביבה · {{commands}} פקודות הגדרה",
       "profileSaved": "הפרופיל \"{{name}}\" נשמר",
       "organizationProfiles": "פרופילי ארגון",
       "personalProfiles": "פרופילים אישיים",
@@ -2231,7 +2233,6 @@
     },
     "modelSelector": {
       "provider": "ספק {{id}}",
-      "modelId": "מודל {{id}}",
       "unavailable": "לא זמין",
       "unavailableState": "לא זמין",
       "selectedState": "נבחר",
@@ -2746,6 +2747,9 @@
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
+      "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
+      "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
+      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -2981,12 +2985,13 @@
       "continueInPersonal": "המשך בחשבון האישי",
       "loading": "הבקשות הנכנסות נטענות",
       "noReviewRequests": "אין בקשות לסקירה",
-      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",
+      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך.",
       "title": "בקשות נכנסות"
     },
     "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",
     "merge": {
       "merge": "מיזוג",
+      "mergeTitle": "מיזוג",
       "mergeNow": "מיזוג עכשיו",
       "mergePullRequest": "מיזוג בקשת משיכה",
       "mergeTermTitle": "מיזוג {{term}}",
@@ -3008,6 +3013,7 @@
       "deleteBranchAfterMerge": "מחיקת הענף לאחר המיזוג",
       "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
       "confirmTitle": "למזג את בקשת המשיכה?",
+      "confirmMergeTitle": "למזג?",
       "confirmTitleTerm": "למזג את ה-{{term}}?",
       "confirmMessage": "פעולה זו תמזג את השינויים שלך לענף הבסיס.",
       "enableAutoMergeConfirmTitle": "להפעיל מיזוג אוטומטי?",
@@ -3114,7 +3120,7 @@
       "deletedAnnouncement": "התגובה הממתינה נמחקה",
       "editA11y": "עריכת תגובה שממתינה לשליחה ב-{{location}}",
       "editOutdatedA11y": "עריכת תגובה לא עדכנית שממתינה לשליחה ב-{{location}}",
-      "noCommentsQueued": "אין תגובות שממתינות לשליחה. הסקירה תישלח רק עם סוג הסקירה שנבחר למעלה.",
+      "noCommentsQueued": "הסקירה תישלח רק עם סוג הסקירה שנבחר למעלה.",
       "staleHint": "ה-PR עודכן מאז שכתבת את התגובה הזו.",
       "staleQueueHint": "תגובות שמתייחסות לקומיט ישן יותר לא נשלחות. הן נשארות ברשימת התגובות הממתינות כדי שתוכל לערוך או למחוק אותן.",
       "summaryA11y": "סיכום הסקירה",
@@ -3883,6 +3889,7 @@
     "organizationDefaultDescription": "נטען אוטומטית עבור חברים שאין להם ברירת מחדל אישית.",
     "setAsDefault": "הגדר כברירת מחדל",
     "saveFailed": "לא ניתן לשמור את הפרופיל",
+    "organizationRoleRequired": "רק בעלי הארגון ומנהלים יכולים לשנות פרופילי ארגון.",
     "deleteTitle": "מחק את הפרופיל",
     "deleteMessage": "פעולה זו מסירה לצמיתות את הפרופיל ואת ההגדרות שלו. לא ניתן לבטל זאת.",
     "deleteFailed": "לא ניתן היה למחוק את הפרופיל",
@@ -3891,8 +3898,9 @@
     "variablesTitle": "משתני סביבה",
     "addVariable": "הוסף משתנה",
     "keyLabel": "מַפְתֵחַ",
-    "keyTooLong": "המפתח חייב להכיל 256 תווים או פחות",
+    "keyTooLong": "המפתח חייב להכיל 128 תווים או פחות",
     "keyDuplicate": "המפתח הזה כבר קיים בפרופיל",
+    "keyReserved": "המפתח הזה שמור",
     "keyWillBeSavedAs": "יישמר כ-{{key}}",
     "valueLabel": "עֵרֶך",
     "valueRequired": "הזן ערך",
@@ -3930,6 +3938,7 @@
     "skillDeleteFailed": "לא ניתן היה למחוק את המיומנות. נסה שוב.",
     "skillToggleFailed": "לא ניתן היה לעדכן את המיומנות. נסה שוב.",
     "skillLimitReached": "פרופיל יכול להכיל עד {{max}} מיומנויות. מחק אחת כדי להוסיף אחרת.",
+    "variableLimitReached": "פרופיל יכול להכיל עד {{max}} משתנים. מחק אחד כדי להוסיף אחר.",
     "skillSourceCustom": "מותאם אישית",
     "skillSourceMarketplace": "חנות",
     "skillSourceSkillsSh": "skills.sh",
@@ -4205,7 +4214,8 @@
     "sources": "ראיות ותוצרים",
     "timezone": "אזור זמן לדוח",
     "deviceTimezone": "שימוש באזור הזמן של המכשיר",
-    "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin. שינויים בלוח הזמנים יחולו על דוחות עתידיים.",
+    "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin.",
+    "scheduleHint": "שינויים בלוח הזמנים יחולו על דוחות עתידיים.",
     "nightStart": "תחילת חלון הדוח",
     "morningStart": "הדוח מוכן בשעה",
     "morningEnd": "הדוח זמין עד",

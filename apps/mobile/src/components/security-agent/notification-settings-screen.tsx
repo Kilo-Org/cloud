@@ -149,7 +149,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
@@ -205,11 +210,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         className="flex-1"
         // The personal scope has no section heading between its two switches, so
         // the break between the two groups carries their separation: it has to
-        // read as a group break, not as the 7dp and 5.25dp steps inside a group,
-        // and not as the void a removed heading would leave. The organization
-        // scope keeps the standard gap, next to its headings. The permission
-        // note above the groups only renders for a scope that cannot manage,
-        // which the personal scope never is.
+        // read as a group break, not as the 10dp step down to the severity label
+        // or the 7dp step inside its options, and not as the void a removed
+        // heading would leave. The organization scope keeps the standard gap,
+        // next to its headings. The permission note above the groups only
+        // renders for a scope that cannot manage, which the personal scope
+        // never is.
         contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
       >
         {!canManage && (
@@ -223,7 +229,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               {t('securityAgent.notifications.newFindingSection')}
             </Text>
           )}
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal
@@ -264,7 +270,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               {t('securityAgent.notifications.slaSection')}
             </Text>
           )}
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal

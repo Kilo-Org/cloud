@@ -16,8 +16,8 @@ import { Text } from '@/components/ui/text';
  *
  * The ring is painted as an absolutely positioned overlay, so neither state's
  * size, padding or hit area changes when the selection moves; the unselected
- * chips stay unpainted. `size` stays pinned to `sm` (36pt plus the button's
- * 4pt hitSlop) and the caller owns the entry's role; the caller's
+ * chips stay unpainted. `size` stays pinned to `sm` (its 36pt frame plus
+ * `COMPACT_BUTTON_HIT_SLOP`) and the caller owns the entry's role; the caller's
  * `accessibilityState` is kept, with `selected` set from this component so the
  * announced state always matches the painted one.
  */

@@ -91,8 +91,6 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
     return active.token;
   }
   const epoch = currentAuthEpoch();
-  // Sign-out teardown is active: the stored credentials are queued for
-  // deletion, so return no token and never warm the owner from them.
   if (isSignOutTeardownActive()) {
     return null;
   }

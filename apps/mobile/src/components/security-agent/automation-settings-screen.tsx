@@ -179,7 +179,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   if (config.isError && !config.data) {
@@ -229,7 +234,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoAnalysis')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoAnalysis')}
               subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
@@ -262,7 +267,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoRemediation')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoRemediation')}
               subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
@@ -304,7 +309,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoDismiss')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoDismiss')}
               subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}

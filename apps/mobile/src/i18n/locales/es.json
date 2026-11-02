@@ -892,7 +892,9 @@
     "instructions": {
       "title": "Instrucciones personalizadas",
       "deprecation": "Está previsto retirar las instrucciones personalizadas. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
-      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…"
+      "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…",
+      "clearTitle": "¿Eliminar las instrucciones personalizadas?",
+      "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
     },
     "repos": {
       "unavailable": "Los repositorios no están disponibles. Completa la configuración de Bitbucket en kilo.ai.",
@@ -968,7 +970,7 @@
       "bitbucketError": "No se pudo abrir la configuración de Bitbucket. Inténtalo de nuevo."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "cancelMessage": "Se detendrá la revisión de código en curso.",
       "cancelReview": "Cancelar revisión",
       "cancelTitle": "¿Cancelar la revisión?",
@@ -1083,12 +1085,10 @@
     },
     "overview": {
       "allAreas": "Todas las áreas",
-      "customInstructions": "Instrucciones personalizadas",
-      "focusAreas": "Aspectos de la revisión",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas para REVIEW.md",
-      "reviewStyle": "Estilo de revisión",
-      "set": "Configurado"
+      "set": "Configurado",
+      "notSet": "Sin configurar"
     },
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
@@ -1548,7 +1548,8 @@
       "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
       "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
       "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
-      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo."
+      "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo.",
+      "configConflict": "Los ajustes del agente de seguridad se cambiaron en otro lugar. Revisa los ajustes más recientes y guarda de nuevo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -1848,7 +1849,7 @@
       "discardDraftMessage": "Se perderán tus instrucciones.",
       "discardWithUploadsMessage": "Se eliminarán tus instrucciones y los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
-      "remoteHint": "Ejecuta `kilo remote` en tu ordenador o `/remote` en una sesión activa de la CLI para controlar un proceso local de kilo.",
+      "remoteHint": "Para ejecutarlo en tu ordenador, inicia Kilo allí y déjalo en marcha.",
       "continueFrom": "Se está continuando la sesión {{title}}.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
@@ -1859,13 +1860,14 @@
       "forkFilesUnchangedOnComputer": "Los archivos de este equipo no se modifican.",
       "pickProfile": "Elige un perfil",
       "noProfile": "Sin perfil",
+      "defaultProfileResolvesTo": "Corresponde a {{name}}",
+      "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Administrar perfiles",
       "noProfiles": "Aún no hay perfiles. Cree uno para agregar variables de entorno, servidores MCP y habilidades.",
       "advancedConfig": "Configuración avanzada",
       "advancedConfigDescription": "Se aplica a esta sesión. Guardarlo como perfil lo conserva para la próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde las variables de entorno actuales y los comandos de configuración como un perfil reutilizable.",
-      "profileSummary": "{{vars}} variables de entorno · {{commands}} comandos de configuración",
       "profileSaved": "Perfil \"{{name}}\" guardado",
       "organizationProfiles": "Perfiles de organización",
       "personalProfiles": "Perfiles personales",
@@ -2231,7 +2233,6 @@
     },
     "modelSelector": {
       "provider": "Proveedor {{id}}",
-      "modelId": "Modelo {{id}}",
       "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionado",
@@ -2746,6 +2747,9 @@
       "gitlabDescription": "Revisar merge requests en el móvil",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
+      "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
+      "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
+      "bitbucketAdminOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -2981,12 +2985,13 @@
       "continueInPersonal": "Continuar en la cuenta personal",
       "loading": "Cargando la bandeja de entrada",
       "noReviewRequests": "No hay solicitudes de revisión",
-      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión. También puedes pegar cualquier enlace de PR arriba.",
+      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión.",
       "title": "Bandeja de entrada"
     },
     "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",
     "merge": {
       "merge": "Fusión",
+      "mergeTitle": "Fusión",
       "mergeNow": "Fusionar ahora",
       "mergePullRequest": "Fusionar PR",
       "mergeTermTitle": "Fusionar {{term}}",
@@ -3008,6 +3013,7 @@
       "deleteBranchAfterMerge": "Eliminar la rama después de la fusión",
       "noEnabledMethods": "Este repositorio no tiene ningún método de fusión activado. Pide a un administrador del repositorio que active la fusión, la compactación o la reorganización.",
       "confirmTitle": "¿Fusionar la PR?",
+      "confirmMergeTitle": "¿Fusionar?",
       "confirmTitleTerm": "¿Fusionar {{term}}?",
       "confirmMessage": "Esto fusionará tus cambios en la rama base.",
       "enableAutoMergeConfirmTitle": "¿Activar la fusión automática?",
@@ -3114,7 +3120,7 @@
       "deletedAnnouncement": "Comentario pendiente eliminado",
       "editA11y": "Editar el comentario pendiente en {{location}}",
       "editOutdatedA11y": "Editar el comentario pendiente desactualizado en {{location}}",
-      "noCommentsQueued": "No hay comentarios pendientes de envío. La revisión se enviará solo con el tipo seleccionado arriba.",
+      "noCommentsQueued": "La revisión se enviará solo con el tipo seleccionado arriba.",
       "staleHint": "la PR cambió desde que escribiste esto.",
       "staleQueueHint": "Los comentarios sobre una confirmación anterior no se envían. Quedan pendientes para que puedas editarlos o eliminarlos.",
       "summaryA11y": "Resumen de la revisión",
@@ -3883,6 +3889,7 @@
     "organizationDefaultDescription": "Cargado automáticamente para miembros que no tienen valores predeterminados personales.",
     "setAsDefault": "Establecer como predeterminado",
     "saveFailed": "No se pudo guardar el perfil",
+    "organizationRoleRequired": "Solo los propietarios de la organización y los administradores pueden cambiar los perfiles de la organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Esto elimina permanentemente el perfil y su configuración. Esto no se puede deshacer.",
     "deleteFailed": "No se pudo eliminar el perfil",
@@ -3890,9 +3897,10 @@
     "deletedToast": "Perfil \"{{name}}\" eliminado",
     "variablesTitle": "Variables ambientales",
     "addVariable": "Agregar variable",
-    "keyLabel": "Llave",
-    "keyTooLong": "La clave debe tener 256 caracteres o menos",
+    "keyLabel": "Clave",
+    "keyTooLong": "La clave debe tener 128 caracteres o menos",
     "keyDuplicate": "Esta clave ya existe en el perfil",
+    "keyReserved": "Esta clave está reservada",
     "keyWillBeSavedAs": "Se guardará como {{key}}",
     "valueLabel": "Valor",
     "valueRequired": "Introduzca un valor",
@@ -3930,6 +3938,7 @@
     "skillDeleteFailed": "No se pudo eliminar la habilidad. Inténtalo de nuevo.",
     "skillToggleFailed": "No se pudo actualizar la habilidad. Inténtalo de nuevo.",
     "skillLimitReached": "Un perfil puede tener hasta {{max}} habilidades. Elimina una para agregar otra.",
+    "variableLimitReached": "Un perfil puede tener hasta {{max}} variables. Elimina una para agregar otra.",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",
@@ -4205,7 +4214,8 @@
     "sources": "Evidencias y artefactos",
     "timezone": "Zona horaria del informe",
     "deviceTimezone": "Usar zona horaria del dispositivo",
-    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin. Los cambios de horario se aplican a los próximos informes.",
+    "timezoneHint": "Zona horaria IANA, por ejemplo Europe/Berlin.",
+    "scheduleHint": "Los cambios de horario se aplican a los próximos informes.",
     "nightStart": "Inicio de la ventana del informe",
     "morningStart": "Informe listo a las",
     "morningEnd": "Informe disponible hasta",

@@ -38,10 +38,13 @@ describe('TextPartRenderer code blocks', () => {
       );
 
       expect(markup).toContain('aria-label="Copy code"');
-      expect(markup).toContain('<code>first line\n  &lt;tag&gt; &amp; value</code>');
+      expect(markup).toContain(
+        `<code${language ? ` class="language-${language}"` : ''}>first line\n  &lt;tag&gt; &amp; value\n</code>`
+      );
       expect(markup).toContain('<p>Before</p>');
       expect(markup).toContain('<p>After</p>');
       expect(markup).not.toMatch(/<pre\b[^>]*>(?:(?!<\/pre>)[\s\S])*<button\b/);
+      expect(markup).not.toContain('>Code<');
     }
   );
 
@@ -49,7 +52,7 @@ describe('TextPartRenderer code blocks', () => {
     const content = 'line\n'.repeat(200) + 'last line';
     const markup = renderText(`\`\`\`\n${content}\n\`\`\``);
 
-    expect(markup).toContain(`<code>${content}</code>`);
+    expect(markup).toContain(`<code>${content}\n</code>`);
     expect(markup).not.toContain('max-h-80');
   });
 
@@ -57,15 +60,27 @@ describe('TextPartRenderer code blocks', () => {
     const markup = renderText('```\nfirst\n```\n\n    second\n');
 
     expect(markup.match(/aria-label="Copy code"/g)).toHaveLength(2);
-    expect(markup).toContain('<code>first</code>');
-    expect(markup).toContain('<code>second</code>');
+    expect(markup).toContain('<code>first\n</code>');
+    expect(markup).toContain('<code>second\n</code>');
   });
 
   it('renders a copyable incomplete fence while streaming', () => {
     const markup = renderText('```sh\nprintf hello\n  pwd', true);
 
     expect(markup).toContain('aria-label="Copy code"');
-    expect(markup).toContain('<code>printf hello\n  pwd</code>');
+    expect(markup).toContain('<code class="language-sh">printf hello\n  pwd\n</code>');
+  });
+
+  it('overlays the copy control with hover, keyboard focus, and touch visibility', () => {
+    const markup = renderText('```\nexample\n```');
+
+    expect(markup).toContain('group/code relative');
+    expect(markup).toContain('absolute top-2 right-2 opacity-0');
+    expect(markup).toContain('group-hover/code:opacity-100');
+    expect(markup).toContain('group-focus-within/code:opacity-100');
+    expect(markup).toContain('pointer-coarse:opacity-100');
+    expect(markup).toContain('aria-label="Code block"');
+    expect(markup).toContain('tabindex="0"');
   });
 
   it('leaves inline code and ordinary blockquotes unchanged', () => {

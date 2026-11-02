@@ -5,6 +5,7 @@ import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { createContext, memo, useContext } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { ToolCardShell } from './ToolCardShell';
 import { ReadToolCard } from './ReadToolCard';
 import { EditToolCard } from './EditToolCard';
@@ -15,7 +16,7 @@ import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { ApplyPatchToolCard } from './ApplyPatchToolCard';
 import { WebFetchToolCard } from './WebFetchToolCard';
 import { ToolErrorCard } from './ToolErrorCard';
-import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
+import { ToolMarkdown } from './ToolOutput';
 import { shouldRenderToolPart } from './message-presentation';
 import { getReasoningHeader, getReasoningPresentation } from './reasoning-presentation';
 import { GlobToolCard } from './GlobToolCard';
@@ -105,12 +106,21 @@ const markdownComponents: Components = {
     if (code?.type !== 'element' || code.tagName !== 'code') return <pre>{children}</pre>;
     const content = code.children.map(child => (child.type === 'text' ? child.value : '')).join('');
     return (
-      <ToolCodeBlock
-        content={content.replace(/\n$/, '')}
-        label="Code"
-        className="my-2"
-        maxHeightClassName=""
-      />
+      <div className="group/code relative my-2 [&>pre]:my-0">
+        <pre
+          role="region"
+          tabIndex={0}
+          aria-label="Code block"
+          className="focus-visible:ring-ring min-h-12 pr-12 focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-16 pointer-coarse:pr-16"
+        >
+          {children}
+        </pre>
+        <CopyMessageButton
+          getText={() => content.replace(/\n$/, '')}
+          label="Copy code"
+          className="bg-background absolute top-2 right-2 opacity-0 transition-opacity group-focus-within/code:opacity-100 group-hover/code:opacity-100 pointer-coarse:opacity-100"
+        />
+      </div>
     );
   },
 };

@@ -35,6 +35,8 @@ let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 let clonedWith:
   | { readonly tools?: readonly string[]; readonly model?: string; readonly effort?: string }
   | undefined = undefined;
+/** How many moves this run has made: a clone is always a session of its own. */
+let clonesMade = 0;
 /** The effort the store says a session was opened with. */
 let storedEffort: string | null = null;
 /**
@@ -261,7 +263,8 @@ vi.mock('@kilocode/harness-sdk', () => {
       if (missingCloneFor === id && onto?.tools === undefined) {
         return Effect.fail(new FakeToolMissingError());
       }
-      return Effect.succeed(handleFor('s2'));
+      clonesMade += 1;
+      return Effect.succeed(handleFor(`s${clonesMade + 1}`));
     },
   };
 });
@@ -505,6 +508,7 @@ beforeEach(async () => {
   creditsFailureFor = undefined;
   storedQuestions.clear();
   clonedWith = undefined;
+  clonesMade = 0;
   storedEffort = null;
   openedWith = undefined;
   storedTools = null;
@@ -1066,8 +1070,13 @@ describe('a question a later send took the slot from', () => {
     await retryChat(opened, kept);
     await settled();
 
-    // One bubble per attempt: it left the transcript to be asked.
-    expect(snapshotOf(opened).displaced).toEqual([]);
+    /* It stays in the transcript where it was said, and the slot draws no
+       second bubble for it: the attempt on screen is that one bubble. */
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
+    const drawn = asMessages(snapshotOf(opened)).map(one => one.info.id);
+    expect(drawn[0]).toBe(`${snapshotOf(opened).sessionId}:displaced:${kept.id}`);
+    expect(drawn).not.toContain(`${snapshotOf(opened).sessionId}:asked`);
     expect(asked.map(one => one.text)).toEqual(['first']);
     // Asked on the model it was asked of, not the one the chat is on now.
     expect(clonedWith).toEqual({ model: 'kilo/one' });
@@ -1076,6 +1085,43 @@ describe('a question a later send took the slot from', () => {
     finish?.();
     await settled();
     expect(snapshotOf(opened).asked).toBeNull();
+    // The answer is a stored turn now, so the bubble it was asked at goes.
+    expect(snapshotOf(opened).displaced).toEqual([]);
+  });
+
+  it('stays above the question said after it when it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    expect(snapshotOf(opened).asked).toBe('second');
+
+    await retryChat(opened, first);
+    await settled();
+
+    /* The conversation reads in the order it was said: the question asked
+       again stays where it was, and the one said after it — kept when the slot
+       was taken back — stays under it. */
+    const [askedFirst, second] = snapshotOf(opened).displaced;
+    if (askedFirst === undefined || second === undefined) {
+      throw new TypeError('both failed questions were not kept');
+    }
+    expect(askedFirst.id).toBe(first.id);
+    expect(asMessages(snapshotOf(opened)).map(one => one.info.id)).toEqual([
+      `${opened}:displaced:${first.id}`,
+      `${opened}:displaced:${second.id}`,
+    ]);
+    expect(snapshotOf(opened).askedFrom).toBe(first.id);
+    // Its own copy survives the attempt, because its bubble is on screen.
+    const written = await keptIn(opened);
+    expect(written.map(one => one.id)).toEqual([first.id, second.id]);
   });
 
   it('is asked once when its Retry is pressed twice', async () => {
@@ -1110,12 +1156,12 @@ describe('a question a later send took the slot from', () => {
     if (kept === undefined) {
       throw new TypeError('the failed question was not kept');
     }
-    // The first question stays the chat's name even though the second one is the
-    // question the kept list holds after the retry.
+    // The first question stays the chat's name, and stays where it was said,
+    // while the question said after it is kept under it.
     await retryChat(opened, kept);
     await settled();
 
-    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['second']);
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first', 'second']);
     expect(await firstQuestionIn(opened)).toBe('first');
   });
 
@@ -1161,9 +1207,10 @@ describe('a question a later send took the slot from', () => {
     // away without touching the one still waiting behind it.
     finish?.();
     await settled();
+    /* The first retry is the slot's question now, so its own copy stays while
+       it is asked, and the one waiting behind it keeps its copy too. */
     const written = await keptIn(opened);
-    expect(written.map(one => one.text)).not.toContain('first');
-    expect(written.map(one => one.text)).toContain('second');
+    expect(written.map(one => one.text)).toEqual(['first', 'second', 'third']);
   });
 
   it('keeps the earlier failed bubble when the same question is sent again', async () => {
@@ -1180,13 +1227,13 @@ describe('a question a later send took the slot from', () => {
     expect(asMessages(held)).toHaveLength(2);
   });
 
-  it('opens with one bubble for a retry that was interrupted between its two records', async () => {
+  it('reopens a question it was asked again where it was said', async () => {
     storedHistory = [];
     await releaseChat(opened);
     storedChat('interrupted', place);
-    /* The slot holds the question and the kept list still holds it too: the
-       process died after the slot wrote its record, before the list dropped
-       the entry. It is one attempt and must be drawn once. */
+    /* The slot names the kept question it asks again, and the list holds that
+       question and the one said after it: the open draws both once, in the
+       order they were asked. */
     const question = {
       text: 'the question asked again',
       model: 'kilo/one',
@@ -1217,15 +1264,20 @@ describe('a question a later send took the slot from', () => {
     await settled();
 
     const held = snapshotOf('interrupted');
-    expect(held.displaced.map(one => one.text)).toEqual(['the failure it was slid above']);
-    expect(asMessages(held).map(one => one.info.id)).toEqual([
-      'interrupted:displaced:b',
-      'interrupted:asked',
+    /* Both are kept questions, and the second was said after the first: the
+       attempt is the earlier bubble rather than a copy at the bottom. */
+    expect(held.displaced.map(one => one.text)).toEqual([
+      'the question asked again',
+      'the failure it was slid above',
     ]);
-    // The folded copy is written away too, so it cannot return as a bubble of
-    // its own once the slot's record is cleared.
+    expect(held.askedFrom).toBe('a');
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'interrupted:displaced:a',
+      'interrupted:displaced:b',
+    ]);
+    // Both stay written: each is a bubble the conversation cannot rebuild.
     const written = await keptIn('interrupted');
-    expect(written.map(one => one.id)).toEqual(['b']);
+    expect(written.map(one => one.id)).toEqual(['a', 'b']);
   });
 
   it('draws two questions that say the same words with different pictures', async () => {
@@ -1298,10 +1350,11 @@ describe('a question a later send took the slot from', () => {
       effort: null,
       images: [],
     });
-    // Its kept copy went with the record that replaced it; the failure the ask
-    // pushed out of the slot took its place.
+    /* Its kept copy stays, because that bubble is the attempt on screen; the
+       failure the ask pushed out of the slot took its place after it. */
     const keptAfter = await keptIn(opened);
-    expect(keptAfter.map(one => one.text)).toEqual(['second']);
+    expect(keptAfter.map(one => one.text)).toEqual(['first', 'second']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
   });
 
   it('opens again with what a later send kept', async () => {

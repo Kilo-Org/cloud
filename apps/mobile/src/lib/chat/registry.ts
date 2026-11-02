@@ -41,11 +41,11 @@ import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
   addKept,
-  type Asked,
   askedIn,
   dropKept,
   forgetAsked,
   keptIn,
+  markKept,
   migrateAsked,
   moveQuestions,
   newKeptId,
@@ -136,6 +136,16 @@ type Chat = {
 };
 
 const chats = new Map<string, Chat>();
+
+/**
+ * The kept questions a press is asking right now.
+ *
+ * Asking one is asynchronous before the slot holds it, and two presses in quick
+ * succession would otherwise queue the same question behind itself. It is the
+ * record's identifier rather than its words: two attempts can say the same
+ * thing, and only one of them was pressed.
+ */
+const askingKept = new Set<string>();
 
 /**
  * One operation at a time per chat: opening one, and letting one go.
@@ -501,16 +511,16 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
-      /* The slot's question names the kept record it was asked from, when it is
-         a retry: an interrupted one left that record written, and it is the same
-         attempt rather than a second question. */
-      displaced: asked?.from == null ? kept : kept.filter(one => one.id !== asked.from),
+      /* The slot's question names the kept record it asks again, when it is a
+         retry: that record is the bubble, so it stays in the transcript where
+         it was said and the slot draws no second one. */
+      askedFrom: asked?.from ?? null,
+      displaced: kept,
       status: 'idle',
       failed: null,
       failureKey: null,
       record: recordOfChat(database, current),
     });
-    await dropFoldedKept(current, asked);
     return;
   }
   const { handle, scope } = opened;
@@ -537,14 +547,14 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
-      /* The slot's question names the kept record it was asked from, when it is
-         a retry: an interrupted one left that record written, and it is the same
-         attempt rather than a second question. */
-      displaced: asked?.from == null ? kept : kept.filter(one => one.id !== asked.from),
+      /* The slot's question names the kept record it asks again, when it is a
+         retry: that record is the bubble, so it stays in the transcript where
+         it was said and the slot draws no second one. */
+      askedFrom: asked?.from ?? null,
+      displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
-    await dropFoldedKept(sessionId, asked);
   } catch (error) {
     /* Reading the history or the pending question failed after the session
        opened. The screen settles idle with the reason, so entering the chat
@@ -552,24 +562,6 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
        holds, so its scope is closed here or it leaks. */
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
-  }
-}
-
-/**
- * Drops the kept record the slot's question was asked from, once the open has
- * folded it out of the transcript. Without this the record stays written and
- * comes back as a bubble of its own after the answer lands and the slot's
- * record is cleared. A write that refuses is not the open's failure: the fold
- * holds for this session, and the next open folds it again.
- */
-async function dropFoldedKept(sessionId: string, asked: Asked | null): Promise<void> {
-  if (asked?.from == null) {
-    return;
-  }
-  try {
-    await dropKept(sessionId, [asked.from]);
-  } catch {
-    /* The record stays written; the fold hides it while the slot names it. */
   }
 }
 
@@ -589,6 +581,26 @@ async function keepAsked(sessionId: string): Promise<void> {
   if (held.asked === null || held.status !== 'idle') {
     return;
   }
+  const outcome: Displaced['outcome'] = held.failureKey === null ? 'stopped' : 'failed';
+  const askedFrom = held.askedFrom;
+  if (askedFrom !== null) {
+    /* It is already in the transcript, where it was said. This attempt is the
+       one its bubble stands for now, so only how it ended is written down. */
+    change(sessionId, {
+      displaced: held.displaced.map(one => (one.id === askedFrom ? { ...one, outcome } : one)),
+      asked: null,
+      askedImages: [],
+      askedModel: null,
+      askedEffort: null,
+      askedFrom: null,
+    });
+    try {
+      await markKept(sessionId, askedFrom, outcome);
+    } catch {
+      /* The bubble keeps the ending it had; a refused write costs a restart. */
+    }
+    return;
+  }
   /* The bubble goes on screen first, so a refused write cannot take it away
      from the reader. The identifier is made here rather than read from the
      list: a question the list does not hold yet cannot take one another
@@ -600,7 +612,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     model: held.askedModel ?? held.model,
     effort: held.askedEffort,
     afterTurns: held.turns.length,
-    outcome: held.failureKey === null ? 'stopped' : 'failed',
+    outcome,
   };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],
@@ -608,6 +620,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedImages: [],
     askedModel: null,
     askedEffort: null,
+    askedFrom: null,
   });
   try {
     await addKept(sessionId, stored);
@@ -676,7 +689,13 @@ export async function say(
     }
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
-    change(current, { asked: text, askedImages: images, askedModel: model, askedEffort: effort });
+    change(current, {
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: question.from ?? null,
+    });
     await rememberAsked(current, {
       text,
       model,
@@ -684,16 +703,6 @@ export async function say(
       images,
       ...(question.from == null ? {} : { from: question.from }),
     });
-    /* The slot holds this question now, so the kept record it was asked from
-       goes: it names itself, which is how two attempts that say the same words
-       stay apart. A question asked for the first time has no such record. */
-    if (question.from != null) {
-      const askedFrom = question.from;
-      change(current, {
-        displaced: snapshotOf(current).displaced.filter(one => one.id !== askedFrom),
-      });
-      await dropKept(current, [askedFrom]);
-    }
     current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -709,6 +718,7 @@ export async function say(
       askedImages: images,
       askedModel: model,
       askedEffort: effort,
+      askedFrom: question.from ?? null,
       failed: null,
       failureKey: null,
       record: { ...snapshotOf(current).record, updatedAt: at },
@@ -727,6 +737,7 @@ export async function say(
       askedImages: images,
       askedModel: model,
       askedEffort: effort,
+      askedFrom: question.from ?? null,
       failed: reason(error),
       failureKey: backendFailureKey(error, model),
     });
@@ -745,42 +756,48 @@ const openReason = (error: unknown): string =>
  * Asks again what was asked and never answered: the question in the slot, or one
  * an earlier failure kept in the transcript.
  *
- * A kept question leaves the transcript to be asked, because it is on screen as
- * the current attempt instead: one bubble per attempt, wherever it was started
- * from. Whatever the slot holds is kept in turn, so asking an older one cannot
- * take a newer failure with it.
+ * A kept question stays where it was said and becomes the current attempt
+ * there, rather than moving under everything said since: the transcript reads in
+ * the order the questions were asked, oldest at the top, and one question is one
+ * bubble however often it is asked. Whatever the slot holds is kept in turn, so
+ * asking an older one cannot take a newer failure with it.
  */
 export async function retryChat(sessionId: string, displaced?: Displaced): Promise<void> {
   if (displaced !== undefined) {
     const current = snapshotOf(sessionId).sessionId;
-    const held = snapshotOf(current).displaced;
-    /* A second press of the same bubble finds it gone: the first press is
-       already asking it, and asking it twice would leave two copies. */
-    if (!held.includes(displaced)) {
+    const held = snapshotOf(current);
+    /* It is already being asked, or waiting to be: a second press of the same
+       bubble asks nothing twice. */
+    if (
+      askingKept.has(displaced.id) ||
+      held.askedFrom === displaced.id ||
+      held.waiting.some(one => one.from === displaced.id) ||
+      !held.displaced.includes(displaced)
+    ) {
       return;
     }
-    /* Off the screen before it is asked, so there is no second bubble while the
-       answer is on its way. Its written record goes with the ask that reaches
-       the slot, and until then it is the words' copy: one that only waits in
-       the queue keeps it, and the ask that finally takes it out drops it. */
-    change(current, {
-      displaced: held.filter(one => one !== displaced),
-    });
-    await say(
-      current,
-      { text: displaced.text, images: displaced.images, from: displaced.id },
-      { model: displaced.model, effort: displaced.effort }
-    );
+    askingKept.add(displaced.id);
+    try {
+      await say(
+        current,
+        { text: displaced.text, images: displaced.images, from: displaced.id },
+        { model: displaced.model, effort: displaced.effort }
+      );
+    } finally {
+      askingKept.delete(displaced.id);
+    }
     return;
   }
-  const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);
+  const { sessionId: current, asked, askedImages, askedModel, askedEffort, askedFrom } =
+    snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
     /* The slot already holds it, so asking it again takes its place back rather
-       than leaving a second copy of itself in the transcript. */
+       than leaving a second copy of itself in the transcript. A retry of a kept
+       question stays the retry of it, so its bubble stays where it was said. */
     change(current, { asked: null, askedImages: [], askedModel: null, askedEffort: null });
     await say(
       current,
-      { text: asked, images: askedImages },
+      { text: asked, images: askedImages, ...(askedFrom === null ? {} : { from: askedFrom }) },
       { model: askedModel, effort: askedEffort }
     );
   } else {
@@ -934,8 +951,21 @@ async function settle(
   const turns = await runtime.runPromise(chat.handle.history);
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
+  /* The kept question this attempt asked again, if it was one: an answer to it
+     is now a stored turn, so its kept bubble goes rather than standing beside
+     the answer as a failure that never happened. A failed attempt keeps it, and
+     that bubble is where the failure is shown. */
+  const heldFrom = snapshotOf(sessionId).askedFrom;
+  const answeredFrom = failed === null ? heldFrom : null;
   if (failed === null) {
     await forgetAsked(sessionId);
+    if (answeredFrom !== null) {
+      try {
+        await dropKept(sessionId, [answeredFrom]);
+      } catch {
+        /* The state below still drops it, and the next write replaces the list. */
+      }
+    }
   }
   chat.answering = undefined;
   change(sessionId, {
@@ -945,6 +975,11 @@ async function settle(
     asked: failed === null ? null : snapshotOf(sessionId).asked,
     askedImages: failed === null ? [] : snapshotOf(sessionId).askedImages,
     askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
+    askedFrom: failed === null ? null : snapshotOf(sessionId).askedFrom,
+    displaced:
+      answeredFrom === null
+        ? snapshotOf(sessionId).displaced
+        : snapshotOf(sessionId).displaced.filter(one => one.id !== answeredFrom),
     failed,
     failureKey: failure?.key ?? null,
   });

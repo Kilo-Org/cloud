@@ -136,10 +136,30 @@ export async function addKept(sessionId: string, question: Displaced): Promise<v
 }
 
 /**
- * Drops the written copies with these identifiers, which is what a question
- * that reached the slot leaves behind. The identifiers come from the caller
- * because a question's words cannot tell one attempt from another: this drops
- * exactly the records it was given.
+ * Records how the latest attempt at a written question ended.
+ *
+ * A question asked again is still the same bubble in the transcript, so the
+ * attempt that just ended is what its footer describes: the failure it first
+ * showed, or the way the attempt the person started from it ended.
+ */
+export async function markKept(
+  sessionId: string,
+  id: string,
+  outcome: Displaced['outcome']
+): Promise<void> {
+  const kept = await keptIn(sessionId);
+  const next = kept.map(one => (one.id === id ? { ...one, outcome } : one));
+  const changed = next.some((one, index) => one !== kept[index]);
+  if (changed) {
+    await writeKept(sessionId, next);
+  }
+}
+
+/**
+ * Drops the written copies with these identifiers, which is what a question a
+ * later send kept leaves behind once its answer is in the store. The
+ * identifiers come from the caller because a question's words cannot tell one
+ * attempt from another: this drops exactly the records it was given.
  */
 export async function dropKept(sessionId: string, ids: readonly string[]): Promise<void> {
   if (ids.length === 0) {

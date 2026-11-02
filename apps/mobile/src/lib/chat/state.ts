@@ -70,6 +70,14 @@ export type ChatState = {
   /** The images that question carries. Empty when it carries none. */
   readonly askedImages: readonly LocalImage[];
   /**
+   * The kept question the slot is asking again, when it is a retry of one.
+   *
+   * That question is already in the transcript, so the slot does not draw a
+   * second bubble for it: the bubble where it was said is the current attempt,
+   * and everything said after it stays after it.
+   */
+  readonly askedFrom: string | null;
+  /**
    * The questions asked before that one and never answered, oldest first. A
    * later send takes the one slot, and what it took the place of is kept here.
    */
@@ -168,6 +176,7 @@ export const NOTHING = {
   answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
+  askedFrom: null,
   displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,

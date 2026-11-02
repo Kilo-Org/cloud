@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
+  askedFrom: null as string | null,
   displaced: [] as {
     id: string;
     text: string;
@@ -108,6 +109,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       answering: [],
       status: state.status,
       asked: state.asked,
+      askedFrom: state.askedFrom,
       displaced: state.displaced,
       waiting: [],
       failed: state.failed,
@@ -233,6 +235,7 @@ beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
   state.asked = null;
+  state.askedFrom = null;
   state.displaced = [];
   state.failed = null;
   state.failureKey = null;
@@ -842,6 +845,59 @@ describe('message actions', () => {
     expect(bubbleFor(tree, 's1:displaced:k1').deliveryState).toMatchObject({
       reason: 'interrupted',
     });
+  });
+
+  it('draws a question it was asked again at its own bubble, with the slot recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    // One bubble for one question: the attempt is drawn where it was said.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    act(() => {
+      bubble.onRetryMessage?.(state.messages[0]);
+    });
+    // Its Retry asks the slot's question again, not a kept copy of itself.
+    expect(state.retry).toHaveBeenCalledTimes(1);
+    expect(state.retry.mock.calls[0]).toEqual([]);
+  });
+
+  it('shows no recovery under a question asked again while it is being asked', async () => {
+    state.status = 'working';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    expect(bubble.deliveryState).toBeUndefined();
+    expect(bubble.onRetryMessage).toBeUndefined();
   });
 
   it('reads a question with no failure as stopped, with no row under the transcript', async () => {

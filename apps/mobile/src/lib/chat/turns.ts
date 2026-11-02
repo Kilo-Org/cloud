@@ -175,6 +175,11 @@ function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Questio
  * that came before it, so the conversation reads in the order it happened: a
  * failure can sit above the answer that came after it, rather than being pushed
  * to the bottom under everything said since.
+ *
+ * A kept question asked again is one bubble, not two: the slot names it, and it
+ * stays where it was said while it is being asked, so a later question never
+ * reads above an earlier one. Only a question the transcript does not hold is
+ * drawn from the slot.
  */
 export function asMessages(input: {
   readonly sessionId: string;
@@ -183,6 +188,8 @@ export function asMessages(input: {
   readonly asked: string | null;
   /** The images the pending question carries. */
   readonly askedImages: readonly LocalImage[];
+  /** The kept question the slot is asking again, when it is one. */
+  readonly askedFrom?: string | null;
   /** The questions a later send took the slot from, oldest first. */
   readonly displaced?: readonly Displaced[];
   /** Questions typed while an answer was arriving, in the order they go. */
@@ -218,8 +225,10 @@ export function asMessages(input: {
     }
   }
   const drawn: StoredMessage[] = [];
+  const heldKept = new Set<string>();
   const drawKept = (after: number) => {
     for (const question of keptAfter.get(after) ?? []) {
+      heldKept.add(question.id);
       const id = displacedMessageId(input.sessionId, question.id);
       drawn.push(questionMessage({ id, sessionId: input.sessionId }, question));
     }
@@ -232,7 +241,10 @@ export function asMessages(input: {
     }
   }
   drawKept(input.turns.length);
-  if (input.asked !== null) {
+  /* The slot's question is drawn on its own only when the transcript does not
+     already hold it. A retry of a kept question names it, and that bubble — at
+     the place it was said — is the attempt on screen. */
+  if (input.asked !== null && !(input.askedFrom != null && heldKept.has(input.askedFrom))) {
     const id = askedMessageId(input.sessionId);
     drawn.push(
       questionMessage(

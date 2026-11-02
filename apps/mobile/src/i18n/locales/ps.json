@@ -307,7 +307,7 @@
     "noFilesChanged": "هېڅ فایل نه دی بدل شوی",
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
     "fileList": {
-      "openNavigator": "د فایلونو لړلیک پرانیزئ",
+      "openNavigator": "د فایلونو نیویګیټر پرانیزئ",
       "filesViewed": "فایلونه · له {{total}} څخه {{viewed}} لیدل شوي",
       "listed": "(په لړلیک کې)",
       "layout": "ترتیب",
@@ -338,7 +338,7 @@
       "unmarkViewed": "له {{path}} څخه د لیدل شوي نښه لرې کړئ",
       "collapseFile": "د فایل منځپانګه پټه کړئ",
       "expandFile": "د فایل منځپانګه ښکاره کړئ",
-      "diffTooLarge": "توپیر دومره لوی دی چې نه شي ښودل کېدای.",
+      "diffTooLarge": "توپیر دومره لوی دی چې نه شي ښودل کېدای",
       "noPreview": "د دې فایل لپاره مخکتنه نشته",
       "openOnGitHub": "په GitHub کې پرانیزئ",
       "openDiffOnGitHub": "د دې فایل توپیر په GitHub کې پرانیزئ",
@@ -647,7 +647,7 @@
       "loading": "راغلې غوښتنې بارېږي",
       "noReviewRequests": "د بیاکتنې هېڅ غوښتنه نشته",
       "noReviewRequestsDescription": "هغه پل ریکویسټونه چې ستاسو بیاکتنې ته په تمه دي، دلته ښکاري.",
-      "couldNotLoad": "راغلې غوښتنې بار نه شوې.",
+      "couldNotLoad": "راغلې غوښتنې بار نه شوې",
       "accessLostTitle": "دې سازمان ته لاسرسی نشته",
       "accessLostDescription": "تاسو نور د دې سازمان غړی نه یاست، نو د دې د بیاکتنې غوښتنې بار نه شوې. د بیاکتنې د دوام لپاره په خپل شخصي حساب کې دوام ورکړئ.",
       "organizationUnavailableTitle": "دا سازمان نور شتون نه لري",
@@ -655,7 +655,7 @@
       "continueInPersonal": "په شخصي حساب کې دوام ورکړئ"
     },
     "composer": {
-      "commentBodyPlaceholder": "د تبصرې متن",
+      "commentBodyPlaceholder": "تبصره ولیکئ",
       "commentBody": "د تبصرې متن",
       "commentNow": "همدا اوس تبصره وکړئ",
       "addToReview": "بیاکتنې ته یې ورزیات کړئ",
@@ -688,11 +688,11 @@
       "checkActiveConnection": "نښلون فعال دی، مګر دا توکی لا هم نه شي بارول کېدای.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ بنسټ نه لري. د Bitbucket پول ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو بنسټ جوړ کړئ یا یو بنسټ ته ورشئ.",
-      "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي.",
+      "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
       "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
-      "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
+      "contextLinePersonal": "ستاسو د شخصي حساب لپاره"
     },
     "screen": {
       "title": "#{{number}}",
@@ -772,13 +772,13 @@
       "modified": "بدل شوی",
       "renamed": "نوم بدل شوی",
       "copied": "کاپي شوی",
-      "changed": "بدل شوی"
+      "changed": "تغییر شوی"
     },
     "diff": {
       "selectedTapToChange": "{{label}} ټاکل شوی، د ټاکنې د بدلولو لپاره ټک وکړئ",
       "tapToComment": "{{label}}، د تبصرې لپاره ټک وکړئ",
       "truncationBanner": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی.",
-      "statusContext": "شاوخوا کرښه",
+      "statusContext": "شاوخوا",
       "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} کرښه: {{text}}",
       "emptyLine": "(خالي)",
@@ -3007,10 +3007,10 @@
   },
   "queryError": {
     "neutralDescription": "مهرباني وکړئ بیا هڅه وکړئ.",
-    "offlineTitle": "بارول ناکام شول.",
+    "offlineTitle": "بارول ناکام شول",
     "permissionDescription": "تاسو د دې د لیدلو اجازه نه لرئ.",
     "notFoundDescription": "ښايي دا توکی لرې شوی وي یا نور شتون ونه لري.",
-    "serverTitle": "بار نه شو.",
+    "serverTitle": "بار نه شو",
     "serverDescription": "زموږ په سیسټم کې ستونزه رامنځته شوه. مهرباني وکړئ بیا هڅه وکړئ.",
     "timeoutTitle": "برسېرونکی ډېر وخت نیسي",
     "timeoutDescription": "غوښتنه له بشپړېدو دمخه ودرېده. مهرباني وکړئ بیا هڅه وکړئ."

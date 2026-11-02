@@ -3,6 +3,7 @@ import {
   type VercelModelIdOverride,
 } from '@kilocode/db/schema-types';
 import { mapResolvedModelIdToVercelWithoutOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { LEGACY_OPENROUTER_MODEL_ID_OVERRIDES } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 import {
   ModelsDevProviderSchema,
   type ModelsDevCatalog,
@@ -10,30 +11,6 @@ import {
 
 const MODELS_DEV_OPENROUTER_PROVIDER = 'openrouter';
 const MODELS_DEV_VERCEL_PROVIDER = 'vercel';
-
-/** Legacy OpenRouter IDs that never appear in the OpenRouter or models.dev catalog. */
-export const LEGACY_OPENROUTER_MODEL_ID_OVERRIDES: Readonly<Record<string, string>> = {
-  'anthropic/claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
-  'anthropic/claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
-  'anthropic/claude-sonnet-4-6': 'anthropic/claude-sonnet-4.6',
-  'anthropic/claude-sonnet-5-20260630': 'anthropic/claude-sonnet-5',
-  'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
-  'claude-sonnet-5': 'anthropic/claude-sonnet-5',
-  'deepseek-v4-flash': 'deepseek/deepseek-v4-flash',
-  'deepseek-v4-flash-0731': 'deepseek/deepseek-v4-flash-0731',
-  'deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
-  'gemini-2.5-flash-lite': 'google/gemini-2.5-flash-lite',
-  'gpt-4o': 'openai/gpt-4o',
-  'gpt-4o-mini': 'openai/gpt-4o-mini',
-  'gpt-5.4': 'openai/gpt-5.4',
-  'gpt-5.4-mini': 'openai/gpt-5.4-mini',
-  'gpt-5.5': 'openai/gpt-5.5',
-  'gpt-5.6-luna': 'openai/gpt-5.6-luna',
-  'gpt-5.6-sol': 'openai/gpt-5.6-sol',
-  'gpt-5.6-terra': 'openai/gpt-5.6-terra',
-  'minimax-m3': 'minimax/minimax-m3',
-  'minimax/minimax-m2.5-20260211': 'minimax/minimax-m2.5',
-};
 
 function isFreeVariant(modelId: string) {
   return modelId.endsWith(':free') || modelId.endsWith('-free');
@@ -90,12 +67,16 @@ export function buildVercelModelIdOverrides(params: {
     vercelModelIds
   );
 
-  const legacyOverrides = Object.entries(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES).map(
-    ([openrouter_model_id, vercel_model_id]) => ({ openrouter_model_id, vercel_model_id })
+  const legacyOverrides = Object.entries(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES).flatMap(
+    ([openrouter_model_id, vercel_model_id]) => {
+      if (openrouter_model_id === vercel_model_id) return [];
+      if (mapResolvedModelIdToVercelWithoutOverrides(openrouter_model_id) === vercel_model_id) {
+        return [];
+      }
+      return [{ openrouter_model_id, vercel_model_id }];
+    }
   );
-  const legacyOpenRouterModelIds = new Set(
-    legacyOverrides.map(override => override.openrouter_model_id)
-  );
+  const legacyOpenRouterModelIds = new Set(Object.keys(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES));
 
   const generatedOverrides: VercelModelIdOverride[] = [];
   for (const [canonicalId, openrouterModelId] of openrouterByCanonicalId) {

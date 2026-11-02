@@ -1,11 +1,12 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { VERCEL_MODEL_ID_OVERRIDES_MAX_COUNT } from '@kilocode/db/schema-types';
-import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import type { ModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
+import { mapResolvedModelIdToVercelWithoutOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
-  buildVercelModelIdOverrides,
   LEGACY_OPENROUTER_MODEL_ID_OVERRIDES,
-} from './vercel-model-id-overrides';
+  legacyOpenRouterAliases,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
+import type { ModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
+import { buildVercelModelIdOverrides } from './vercel-model-id-overrides';
 
 type CatalogModel = { id: string; canonical_model_id?: string };
 
@@ -151,15 +152,25 @@ describe('buildVercelModelIdOverrides', () => {
     ).toEqual([]);
   });
 
-  it('includes hardcoded overrides for every legacy OpenRouter alias', () => {
+  it('maps every hardcoded legacy OpenRouter alias that needs an override', () => {
     const overrides = build(catalog({ openrouter: [], vercel: [] }), [], []);
 
-    expect(overrides).toHaveLength(Object.keys(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES).length);
-    for (const alias of legacyOpenRouterAliases) {
-      expect(overrides).toContainEqual({
-        openrouter_model_id: alias,
-        vercel_model_id: LEGACY_OPENROUTER_MODEL_ID_OVERRIDES[alias],
-      });
+    for (const [alias, vercelModelId] of Object.entries(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES)) {
+      expect(legacyOpenRouterAliases.has(alias)).toBe(true);
+      const needsOverride =
+        alias !== vercelModelId &&
+        mapResolvedModelIdToVercelWithoutOverrides(alias) !== vercelModelId;
+      if (needsOverride) {
+        expect(overrides).toContainEqual({
+          openrouter_model_id: alias,
+          vercel_model_id: vercelModelId,
+        });
+      } else {
+        expect(overrides).not.toContainEqual({
+          openrouter_model_id: alias,
+          vercel_model_id: vercelModelId,
+        });
+      }
     }
   });
 

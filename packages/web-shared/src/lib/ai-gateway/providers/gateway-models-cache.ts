@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
@@ -133,38 +134,6 @@ export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<Readon
   new Set<string>(),
   { name: 'openRouterSystemOneModelIds' }
 );
-
-// Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
-export const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
-  'anthropic/claude-haiku-4-5',
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-sonnet-4-6',
-  'arcee-ai/trinity-large-thinking',
-  'claude-sonnet-4.5',
-  'claude-sonnet-5',
-  'deepseek-v4-flash',
-  'deepseek-v4-flash-0731',
-  'deepseek-v4-pro',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gpt-5.4',
-  'gpt-5.5',
-  'gpt-5.6-luna',
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'inclusionai/ling-3.0-flash-fin',
-  'minimax-m3',
-  'minimax/minimax-m2.5-20260211',
-  'minimax/minimax-m2.7-highspeed',
-  'openai/o1',
-  'openai/o3-mini',
-  'openai/o4-mini',
-  'poolside/laguna-s-2.1',
-  'qwen/qwen3-next-80b-a3b-thinking',
-  'qwen/qwen3.8-max',
-  'zai/glm-5.3',
-  'zai/glm-5.3-flash',
-]);
 
 // The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
 // empty snapshot reports an outage once per window instead of once per validated model id.

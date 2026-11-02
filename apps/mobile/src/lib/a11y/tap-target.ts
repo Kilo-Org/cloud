@@ -176,14 +176,14 @@ export const CHIP_FRAME_DP = 27.81;
  * Per-side vertical `hitSlop` of a {@link CHIP_FRAME_DP} chip:
  * `27.81 + 8.75 + 8.75 = 45.31pt` (iOS: 28.3 + 17.5 = 45.8pt), which clears
  * `DESIGN.md:364`'s 44pt target even when Android truncates each fractional
- * inset to 21px, where the reach is 44.57pt. 8.75, not the 8 per side that
- * lands on 43.81pt here, or 8.25 that leaves 0.31pt of margin — inside the half
- * point the control-size audit itself allows for pixel rounding. 8.75 is also
- * the composer toolbar row's `py-2.5`, so the reach fills that row's height
- * exactly instead of extending beyond it. Vertical only: the chip's own padding
- * and chevron already make it wider than {@link TOUCH_TARGET_DP}, and a
- * horizontal reach would run into the mode chip beside it in
- * `chat-toolbar.tsx` and into the paste button's own slop.
+ * inset — 8.75pt is 22.97px at 2.625px/dp, so 22px per side leaves 44.57pt.
+ * 8.75, not the 8 per side that lands on 43.81pt here, or 8.25 that leaves
+ * 0.31pt of margin — inside the half point the control-size audit itself allows
+ * for pixel rounding. 8.75 is also the composer toolbar row's `py-2.5`, so the
+ * reach fills that row's height exactly instead of extending beyond it.
+ * Vertical only: the chip's own padding and chevron already make it wider than
+ * {@link TOUCH_TARGET_DP}, and a horizontal reach would run into the mode chip
+ * beside it in `chat-toolbar.tsx` and into the paste button's own slop.
  */
 export const CHIP_HIT_SLOP_DP = 8.75;
 

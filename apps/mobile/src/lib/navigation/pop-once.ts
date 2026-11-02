@@ -19,12 +19,13 @@ import {
  * but before the navigator applied it. Both screens of that pair must not pop:
  * a single Back closes one screen, never the one beneath it.
  *
- * The two marks that say so end differently on purpose. A Back this route
- * accepted belongs to this route and is forgotten when the route blurs — the
- * navigator applying it — or when it leaves at all, so a slow device only
- * lengthens the interval and a cancelled leave clears it explicitly. A
- * dismissal keeps a bounded window because the route it describes is already
- * gone; `LEAVE_SETTLE_MS` carries the exit-animation measurement that bounds it.
+ * The two marks that say so end on events rather than on a clock, so a slow
+ * device only lengthens the interval they cover. A Back this route accepted
+ * belongs to this route and is forgotten when the route blurs — the navigator
+ * applying it — or when it leaves at all, and a cancelled leave clears it
+ * explicitly. A dismissal keeps a window because the route it describes is
+ * already gone; the scene it revealed ends that window when the leave's
+ * transition ends (see `leave-settle.ts`).
  *
  * The other direction lives in `LeaveSettleMount`: once this route is removed,
  * a Back still inside that window is spent by the app shell instead, and this
@@ -38,11 +39,11 @@ export function usePopOnce(): () => void {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       // Every press this route can see is recorded. Whether it is applied here
-      // or spent by the app shell is decided by the shell's own single clock
-      // read, and the shell clears the mark it spends, so the two listeners can
-      // never disagree about the same press at the window's edge.
+      // or spent by the app shell is decided by the shell, and the shell clears
+      // the mark it spends, so the two listeners can never disagree about the
+      // same press.
       if (navigation.isFocused()) {
-        noteAcceptedBack(routeId, Date.now());
+        noteAcceptedBack(routeId);
       }
       // The press takes its usual path: the navigator pops this screen, and a
       // dismissal that resolves meanwhile is suppressed by the mark above.
@@ -69,10 +70,10 @@ export function usePopOnce(): () => void {
   }, [navigation, routeId]);
 
   return useCallback(() => {
-    if (!navigation.isFocused() || insideLeaveSettle(Date.now()) || backAcceptedBy(routeId)) {
+    if (!navigation.isFocused() || insideLeaveSettle() || backAcceptedBy(routeId)) {
       return;
     }
-    armLeaveSettle(Date.now());
+    armLeaveSettle();
     router.back();
   }, [navigation, routeId, router]);
 }

@@ -206,7 +206,7 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
 
     changeText(renderer.root, 'Profile description', 'Unsaved description');
     // The Back that opened the prompt is recorded before this guard answers.
-    noteAcceptedBack('profile-overview-route', Date.now());
+    noteAcceptedBack('profile-overview-route');
     pressBack();
 
     act(() => {

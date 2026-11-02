@@ -1,7 +1,11 @@
 import { useEffect } from 'react';
 import { BackHandler } from 'react-native';
 
-import { clearAcceptedBack, insideLeaveSettle } from '@/lib/navigation/leave-settle';
+import {
+  clearAcceptedBack,
+  endLeaveSettle,
+  insideLeaveSettle,
+} from '@/lib/navigation/leave-settle';
 
 /**
  * Spends a Back that arrives while a screen that dismissed itself is still
@@ -15,9 +19,11 @@ import { clearAcceptedBack, insideLeaveSettle } from '@/lib/navigation/leave-set
  *
  * React Native asks the newest listener first, so a screen that is still mounted
  * has already recorded this press as one it accepted. Because that screen is not
- * the one leaving, the mark is dropped here for the press spent instead: the
- * same single clock read decides both, so the two listeners cannot disagree
- * about a press at the window's edge.
+ * the one leaving, the mark is dropped here for the press spent instead.
+ *
+ * The spend also ends the window. The revealed scene's transition end normally
+ * does that first; this is the bound when that event never arrives, and it costs
+ * one press rather than every press that follows.
  *
  * Nothing else is affected: outside the window this returns `false` and the
  * press takes its usual path.
@@ -25,9 +31,10 @@ import { clearAcceptedBack, insideLeaveSettle } from '@/lib/navigation/leave-set
 export function LeaveSettleMount(): null {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!insideLeaveSettle(Date.now())) {
+      if (!insideLeaveSettle()) {
         return false;
       }
+      endLeaveSettle();
       clearAcceptedBack();
       return true;
     });

@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   armLeaveSettle,
   clearAcceptedBack,
-  LEAVE_SETTLE_MS,
+  endLeaveSettle,
   resetLeaveSettle,
 } from '@/lib/navigation/leave-settle';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
@@ -85,10 +85,6 @@ const OPTIONS = ['off', 'all'] as const;
 type SelectFn = (value: 'off' | 'all') => Promise<unknown>;
 type RowProps = { label: string; busy: boolean; disabled: boolean; onPress: () => void };
 
-// The dismissal records the window against the clock, so the test drives the
-// clock instead of waiting for it.
-let now = 1_000;
-
 /**
  * The app shell's listener is its own root, mounted first and left mounted:
  * only the screen's route goes away, the shell does not.
@@ -141,8 +137,6 @@ async function settleSave(gate: PromiseWithResolvers<boolean>): Promise<void> {
 }
 
 beforeEach(() => {
-  vi.spyOn(Date, 'now').mockImplementation(() => now);
-  now = 1_000;
   resetLeaveSettle();
   backPress.listeners.clear();
   routerBack.mockReset();
@@ -189,7 +183,6 @@ describe('OptionList hardware Back during a save', () => {
     act(() => {
       renderer.unmount();
     });
-    now += 300;
 
     expect(backPress.press()).toBe(true);
     expect(routerBack).toHaveBeenCalledTimes(1);
@@ -204,7 +197,11 @@ describe('OptionList hardware Back during a save', () => {
       renderer.unmount();
     });
 
-    now += 1_000;
+    // The scene the dismissal revealed reports its appearance transition,
+    // which is the end of the leave this window described.
+    act(() => {
+      endLeaveSettle();
+    });
 
     expect(backPress.press()).toBe(false);
     expect(routerBack).toHaveBeenCalledTimes(1);
@@ -221,7 +218,6 @@ describe('OptionList hardware Back during a save', () => {
     // that takes seconds to apply it must behave the same.
     expect(backPress.press()).toBe(false);
     expect(focus.focused).toBe(true);
-    now += 10_000;
     await settleSave(gate);
 
     expect(routerBack).not.toHaveBeenCalled();
@@ -262,16 +258,15 @@ describe('OptionList hardware Back during a save', () => {
     // A screen above dismissed itself, so its window is open. A press now is
     // spent by the app shell, not applied here: this screen stays focused and
     // mounted, so leaving its mark set would suppress every later dismissal.
-    armLeaveSettle(now);
+    armLeaveSettle();
     const gate = Promise.withResolvers<boolean>();
     const renderer = await mount(() => gate.promise);
     await press(row(renderer, 'All'));
 
     expect(backPress.press()).toBe(true);
 
-    // The save confirms after that window has closed, as it does when the
-    // delete finishes. Nothing about this screen is leaving any more.
-    now += LEAVE_SETTLE_MS;
+    // The save confirms after that press, as it does when the delete finishes.
+    // Nothing about this screen is leaving any more.
     await settleSave(gate);
 
     expect(routerBack).toHaveBeenCalledTimes(1);

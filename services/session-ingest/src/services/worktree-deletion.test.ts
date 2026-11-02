@@ -110,6 +110,7 @@ function database(rootCount = 1, descendantCount = 0) {
   }> = [];
   const events: string[] = [];
   const sqlQueries: { sql: string; params: unknown[] }[] = [];
+  const childQueries: { sql: string; params: unknown[] }[] = [];
   const candidateQueries: { sql: string; params: unknown[] }[] = [];
   const ownershipUpdates: unknown[] = [];
   const ledgerReads: unknown[] = [];
@@ -139,6 +140,18 @@ function database(rootCount = 1, descendantCount = 0) {
       }
       if (table === cli_sessions_v2) {
         const querySql = condition ? new PgDialect().sqlToQuery(condition).sql : '';
+        if (querySql.includes('"parent_session_id" in')) {
+          childQueries.push({ sql: querySql, params: bound });
+          const ids = bound.slice(1, 1 + (bound.length - 1) / 2);
+          return members
+            .filter(
+              row =>
+                row.userId === bound[0] &&
+                ids.includes(row.parentSessionId) &&
+                !ids.includes(row.sessionId)
+            )
+            .slice(0, 1);
+        }
         if (querySql.includes('"cloud_agent_session_id" is null')) {
           candidateQueries.push({ sql: querySql, params: bound });
           throw new Error('Unscoped candidate queries are forbidden');
@@ -223,6 +236,16 @@ function database(rootCount = 1, descendantCount = 0) {
         transactionWrote = true;
         const ids = valuesOf(condition);
         const deleted = members.filter(row => row.userId === userId && ids.includes(row.sessionId));
+        if (
+          members.some(
+            row =>
+              !deleted.includes(row) &&
+              deleted.some(
+                parent => parent.userId === row.userId && parent.sessionId === row.parentSessionId
+              )
+          )
+        )
+          throw new Error('cli_sessions_v2_parent_session_id_kilo_user_id_fk');
         events.push('deleteRows');
         for (let index = members.length - 1; index >= 0; index--)
           if (deleted.includes(members[index])) members.splice(index, 1);
@@ -330,6 +353,7 @@ function database(rootCount = 1, descendantCount = 0) {
     allocations,
     events,
     sqlQueries,
+    childQueries,
     candidateQueries,
     ownershipUpdates,
     ledgerReads,
@@ -597,6 +621,7 @@ describe('durable worktree deletion journal', () => {
     'rejects %s persisted IDs returned by the runtime without changing their ownership',
     async (_name, overrides) => {
       const f = database();
+      await beginWorktreeDeletion(env, params);
       f.members.push({
         sessionId: kiloId(1),
         cloudAgentSessionId: null,
@@ -607,7 +632,6 @@ describe('durable worktree deletion journal', () => {
         ...overrides,
       });
       const before = structuredClone(f.members);
-      await beginWorktreeDeletion(env, params);
       const manifest = structuredClone(f.worktrees[0].deletion_manifest);
       await expect(
         recordWorktreeCleanup(env, {
@@ -775,9 +799,70 @@ describe('durable worktree deletion journal', () => {
     }
   );
 
-  it('does not follow parent or root-scope pointers outside registered worktree membership', async () => {
+  it.each([null, otherWorktreeId])(
+    'rejects a parent-linked child registered to %s before fencing or cleaning the workspace',
+    async childWorktreeId => {
+      const f = database(1, 2);
+      f.members[2].worktreeId = childWorktreeId;
+      f.members[2].cloudAgentSessionScopeId = null;
+      f.members[2].organizationId = organizationId;
+      const members = structuredClone(f.members);
+
+      await expect(beginWorktreeDeletion(env, params)).rejects.toThrow(
+        'worktree_unregistered_child_sessions'
+      );
+      expect(f.worktrees[0].deletion_started_at).toBeNull();
+      expect(f.worktrees[0].deletion_manifest).toBeNull();
+      expect(f.members).toEqual(members);
+      expect(f.cleared.size).toBe(0);
+      expect(f.ownershipUpdates).toEqual([]);
+      expect(f.childQueries).toHaveLength(1);
+      expect(f.childQueries[0].sql).toContain('"parent_session_id" in');
+      expect(f.childQueries[0].sql).toContain('"session_id" not in');
+      expect(f.childQueries[0].params).toEqual([
+        userId,
+        kiloId(0),
+        kiloId(1),
+        kiloId(0),
+        kiloId(1),
+      ]);
+      expect(f.readSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['begin', 'record', 'complete'] as const)(
+    'rechecks parent-linked children during %s of an existing deletion journal',
+    async phase => {
+      const f = database(1, 1);
+      await beginWorktreeDeletion(env, params);
+      const journal = structuredClone(f.worktrees[0]);
+      f.members.push({
+        sessionId: kiloId(2),
+        cloudAgentSessionId: null,
+        cloudAgentSessionScopeId: cloudId(0),
+        worktreeId: null,
+        organizationId: null,
+        userId,
+        parentSessionId: kiloId(1),
+      });
+      const run =
+        phase === 'begin'
+          ? beginWorktreeDeletion
+          : phase === 'record'
+            ? recordWorktreeCleanup
+            : completeWorktreeDeletion;
+      await expect(run(env, params)).rejects.toThrow('worktree_unregistered_child_sessions');
+      expect(f.worktrees[0]).toEqual(journal);
+      expect(f.members).toHaveLength(3);
+      expect(f.cleared.size).toBe(0);
+      expect(f.events).not.toContain('deleteRows');
+    }
+  );
+
+  it('does not follow root-scope pointers outside registered worktree membership', async () => {
     const f = database(1, 3);
     f.members[1].worktreeId = null;
+    f.members[1].parentSessionId = null;
     f.members[2].worktreeId = otherWorktreeId;
     f.members[3].worktreeId = null;
     f.members[3].parentSessionId = null;
@@ -789,6 +874,30 @@ describe('durable worktree deletion journal', () => {
     });
     expect(f.members.map(row => row.sessionId)).toEqual([kiloId(1), kiloId(2), kiloId(3)]);
     expect(f.ownershipUpdates).toEqual([]);
+  });
+
+  it('rechecks the parent FK boundary when an unregistered child appears during ingest cleanup', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    mocks.ingest.mockReturnValue({
+      clearForWorktree: async () => {
+        f.members.push({
+          sessionId: kiloId(1),
+          cloudAgentSessionId: null,
+          cloudAgentSessionScopeId: null,
+          organizationId: null,
+          worktreeId: null,
+          userId,
+          parentSessionId: kiloId(0),
+        });
+      },
+    });
+    await expect(completeWorktreeDeletion(env, params)).rejects.toThrow(
+      'worktree_unregistered_child_sessions'
+    );
+    expect(f.members).toHaveLength(2);
+    expect(f.worktrees[0].deletion_completed_at).toBeNull();
+    expect(f.events).not.toContain('deleteRows');
   });
 
   it.each(['organization', 'scope', 'unscoped'] as const)(

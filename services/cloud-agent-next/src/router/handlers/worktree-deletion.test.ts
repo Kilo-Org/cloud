@@ -386,6 +386,34 @@ describe('deleteWorktree authorization and completion', () => {
     expect(f.getState().manifest.sessions).toHaveLength(1);
   });
 
+  it.each([
+    ['begin', 'worktree_unregistered_child_sessions', 'WORKTREE_UNREGISTERED_CHILD_SESSIONS'],
+    ['record', 'worktree_unregistered_child_sessions', 'WORKTREE_UNREGISTERED_CHILD_SESSIONS'],
+    ['record', 'worktree_child_lineage_conflict', 'WORKTREE_CHILD_LINEAGE_CONFLICT'],
+    ['discovery', 'worktree_child_lineage_conflict', 'WORKTREE_CHILD_LINEAGE_CONFLICT'],
+  ] as const)(
+    'reports a non-retryable %s failure for %s before resource cleanup',
+    async (phase, reason, errorCode) => {
+      const f = fixture();
+      const operation =
+        phase === 'begin' ? f.begin : phase === 'record' ? f.record : f.readChildren;
+      operation.mockRejectedValue(new Error(`remote exception: ${reason}`));
+
+      await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        cause: { error: errorCode, retryable: false },
+      });
+      expect(f.cleanup).not.toHaveBeenCalled();
+      expect(f.finishSession).not.toHaveBeenCalled();
+      expect(f.complete).not.toHaveBeenCalled();
+      expect(mocks.diagnostic).toHaveBeenCalledWith(
+        'worktree_deletion',
+        expect.objectContaining({ result: 'rejected', errorCode, retryable: false }),
+        'info'
+      );
+    }
+  );
+
   it('uses only the authenticated text owner and interprets omitted organization as personal', async () => {
     const f = fixture();
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({

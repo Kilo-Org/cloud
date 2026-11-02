@@ -17,6 +17,8 @@ export const cloudAgentWorktreeLocationSchema = z
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
 export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
+export const WORKTREE_UNREGISTERED_CHILD_SESSIONS = 'worktree_unregistered_child_sessions';
+export const WORKTREE_CHILD_LINEAGE_CONFLICT = 'worktree_child_lineage_conflict';
 
 export const cloudAgentWorktreeDeletionManifestSchema = z
   .object({

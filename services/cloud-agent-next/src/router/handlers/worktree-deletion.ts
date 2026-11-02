@@ -7,6 +7,8 @@ import {
   cloudAgentChildSessionLineageSchema,
   sessionIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
+  WORKTREE_UNREGISTERED_CHILD_SESSIONS,
+  WORKTREE_CHILD_LINEAGE_CONFLICT,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
@@ -245,6 +247,26 @@ export async function deleteWorktreeResources(
       errorCode = 'FORBIDDEN';
       retryable = false;
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_UNREGISTERED_CHILD_SESSIONS)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_UNREGISTERED_CHILD_SESSIONS';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Worktree has child sessions without registered workspace ownership',
+        cause: { error: errorCode, retryable: false },
+      });
+    }
+    if (error instanceof Error && error.message.includes(WORKTREE_CHILD_LINEAGE_CONFLICT)) {
+      outcome = 'rejected';
+      errorCode = 'WORKTREE_CHILD_LINEAGE_CONFLICT';
+      retryable = false;
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Worktree child session ownership or lineage conflicts with persisted state',
+        cause: { error: errorCode, retryable: false },
+      });
     }
     outcome = 'pending';
     errorCode = 'WORKTREE_DELETION_PENDING';

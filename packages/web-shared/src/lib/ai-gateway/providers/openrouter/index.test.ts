@@ -34,6 +34,7 @@ import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/li
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
   const actual = jest.requireActual<typeof UnavailableModelsModule>(
@@ -44,6 +45,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models', () => ({
+  getVercelOnlyCatalogModels: jest.fn(() => Promise.resolve([])),
 }));
 
 jest.mock(
@@ -427,6 +432,54 @@ describe('auto models', () => {
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
+  });
+});
+
+describe('Vercel-only models', () => {
+  const vercelOnlyModel = buildModel({
+    id: 'vendor/vercel-only',
+    name: 'Vendor: Vercel Only',
+    mayTrainOnYourPrompts: false,
+  });
+
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as unknown as typeof fetch;
+    jest
+      .mocked(getVercelOnlyCatalogModels)
+      .mockResolvedValueOnce([
+        { model: vercelOnlyModel, inferenceProviderIds: ['amazon-bedrock', 'vendor'] },
+      ]);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('lists them after the OpenRouter models with their Vercel providers', async () => {
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+      openRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
+    });
+    const ids = models.data.map(model => model.id);
+    expect(ids.indexOf('vendor/vercel-only')).toBe(ids.indexOf('vendor/model') + 1);
+    expect(models.data.find(model => model.id === 'vendor/vercel-only')).toMatchObject({
+      name: 'Vendor: Vercel Only',
+      inference_provider_ids: ['amazon-bedrock', 'vendor'],
+      mayTrainOnYourPrompts: false,
+      isFree: false,
+    });
+  });
+
+  it('hides unavailable ones', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([vercelOnlyModel.id]));
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(models.data.some(model => model.id === vercelOnlyModel.id)).toBe(false);
   });
 });
 

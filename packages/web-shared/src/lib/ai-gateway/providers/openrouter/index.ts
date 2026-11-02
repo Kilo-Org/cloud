@@ -58,6 +58,7 @@ import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gate
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -206,17 +207,28 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
   const publicCustomLlmModels = publicCustomLlms.map(({ public_id, definition }) =>
     convertCustomLlmToCatalogModel(public_id, definition)
   );
+  const isListableGatewayModelId = (modelId: string) =>
+    // OpenRouter may add a model after a custom LLM claimed its id, and
+    // routing serves the custom LLM.
+    !customLlmsById.has(modelId.toLowerCase()) &&
+    !isKiloExclusiveModel(modelId) &&
+    !unavailableModelIds.has(modelId);
+  const [vercelOnlyCatalogModels, summaries] = await Promise.all([
+    getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
+    getTerminalBenchSummaries(),
+  ]);
+  const vercelOnlyModels = vercelOnlyCatalogModels.filter(({ model }) =>
+    isListableGatewayModelId(model.id)
+  );
+  const vercelOnlyProviders = new Map(
+    vercelOnlyModels.map(({ model, inferenceProviderIds }) => [model.id, inferenceProviderIds])
+  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
-  const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        // OpenRouter may add a model after a custom LLM claimed its id, and
-        // routing serves the custom LLM.
-        !customLlmsById.has(model.id.toLowerCase()) &&
-        !isKiloExclusiveModel(model.id) &&
-        !unavailableModelIds.has(model.id) &&
+        isListableGatewayModelId(model.id) &&
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
@@ -232,6 +244,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         alias_target: aliasTarget,
       };
     })
+    .concat(vercelOnlyModels.map(({ model }) => model))
     .concat(
       kiloExclusiveModels
         .filter(m => !unavailableModelIds.has(m.public_id))
@@ -250,6 +263,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       const preferredIndex = preferredModels.indexOf(model.id);
       const providerIds =
         publicCustomLlmProviders.get(model.id) ??
+        vercelOnlyProviders.get(model.id) ??
         indexedProviders.get(providerLookupId(model)) ??
         [];
       const inferenceProviderIds = [

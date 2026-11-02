@@ -77,6 +77,7 @@ import {
   allowedInferenceProviders,
   inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
+  vercelOnlyModelUnavailableResponse,
   chatGptReconnectResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
@@ -85,6 +86,7 @@ import {
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
@@ -1184,7 +1186,9 @@ export async function handleLlmProxyRequest(
         : undefined,
   });
   if (attempt.type === 'invalid-openrouter-model') {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+    return (await isVercelModel(effectiveModelIdLowerCased))
+      ? vercelOnlyModelUnavailableResponse(effectiveModelIdLowerCased)
+      : modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
 

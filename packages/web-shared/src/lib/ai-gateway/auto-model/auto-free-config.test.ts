@@ -94,6 +94,23 @@ describe('isAutoFreeEligibleModelId', () => {
       publicCustomLlmDefinition(['acme'], { country_deny_list: [] }),
       true,
     ],
+    [
+      'a public custom LLM with pricing',
+      publicCustomLlmDefinition(['acme'], {
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 1,
+              completion_per_million: 2,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+      }),
+      false,
+    ],
   ])('%s', (_name, definition, expected) => {
     expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
   });

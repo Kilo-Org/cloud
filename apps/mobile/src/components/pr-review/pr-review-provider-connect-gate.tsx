@@ -8,9 +8,11 @@ import { EmptyState } from '@/components/empty-state';
 import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
 import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
+import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -28,6 +30,7 @@ import {
   usePrReviewGateIconColor,
 } from '@/lib/pr-review/pr-review-gate-illustration';
 import {
+  gitlabInstanceMismatch,
   selectPrReviewConnectAction,
   selectPrReviewGateView,
 } from '@/lib/pr-review/pr-review-connect-gate-view';
@@ -57,34 +60,6 @@ function useInstanceHint(platform: ProviderPrPlatform): string | undefined {
 }
 
 /**
- * The one line under the Bitbucket organization-only explanation. It names the
- * account switch only when the memberships answer says there is somewhere to
- * switch to, and says so plainly when the account belongs to no organization.
- * A failed read gets no line of its own: the context line above already reports
- * the failure with a retry, and neither wording is true of an unknown list.
- */
-function OrgOnlyDescription({
-  membershipsError,
-  organizationCount,
-}: Readonly<{
-  membershipsError: boolean;
-  /** Undefined until the memberships answer lands. */
-  organizationCount: number | undefined;
-}>) {
-  const { t } = useTranslation();
-  if (membershipsError) {
-    return null;
-  }
-  return (
-    <Text variant="muted" className="text-center">
-      {organizationCount === 0
-        ? t('prReview.connect.bitbucketOrgOnlyNoOrganizationDescription')
-        : t('prReview.connect.bitbucketOrgOnlyDescription')}
-    </Text>
-  );
-}
-
-/**
  * GitLab / Bitbucket arm. The status query is the s4 integration status the
  * connect flow updates; a Bitbucket personal scope disables it entirely
  * because there is nothing to check — the selector renders the terminal
@@ -106,7 +81,15 @@ export function ProviderConnectGate({
   const colors = useThemeColors();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
+  const scope = useProviderPrScopeOrNull();
+  // Display-normalized: the hint is worth naming only when it is not the
+  // gitlab.com default the reader assumes.
   const instanceHint = useInstanceHint(platform);
+  // Decision input: the raw hint the query hands the server, which keeps the
+  // gitlab.com origin. Dropping it here would let a gitlab.com link pass a
+  // self-managed connection, which the server then refuses as not-found.
+  const requestedInstanceHint =
+    scope?.ref.platform === 'gitlab' ? scope.ref.instanceHint : undefined;
   // The org-only arm sends a personal reader to the account switch above. That
   // switch is the context line's, and it exists only when the reader has a
   // membership — so the memberships answer decides which copy is true. One
@@ -210,6 +193,18 @@ export function ProviderConnectGate({
     }
   };
 
+  // A GitLab connection serves exactly one instance, and the status read names
+  // it. When the opened merge request lives on another host the server refuses
+  // every read as not-found (its own origin guard), so `connected` alone is not
+  // the answer — the mismatch decides the gate.
+  const instanceMismatch =
+    platform === 'gitlab'
+      ? gitlabInstanceMismatch({
+          instanceHint: requestedInstanceHint,
+          connectedInstanceUrl: gitlabStatus.data?.integration?.instanceUrl,
+        })
+      : null;
+
   const view = selectPrReviewGateView({
     platform,
     isError: status.isError,
@@ -220,6 +215,7 @@ export function ProviderConnectGate({
     // organization status reads each report the marker for their own row.
     reconnectRequired:
       platform === 'gitlab' ? gitlabStatus.data?.reconnectRequired === true : false,
+    instanceMismatch: instanceMismatch !== null,
     organizationId,
     // The layout hands this gate `useOrganization()`'s value, so the two agree
     // on when the stored selection has landed. Reading it here too keeps the
@@ -285,11 +281,17 @@ export function ProviderConnectGate({
     return <PrReviewGateLoading />;
   }
 
-  if (view === 'connect' || view === 'reconnect') {
+  if (view === 'connect' || view === 'reconnect' || view === 'instance-mismatch') {
     const reconnect = view === 'reconnect';
+    // The mismatch arm lists in `instance-mismatch`: the connection is live,
+    // on another instance than the opened merge request, so no read can
+    // succeed and nothing about the item is being claimed.
+    const mismatch = view === 'instance-mismatch' ? instanceMismatch : null;
+    // The mismatch CTA opens the integration page for an owner that already has
+    // a GitLab row, so it answers to the same role rule as a re-authorization.
     const action = selectPrReviewConnectAction({
       platform,
-      view,
+      view: view === 'instance-mismatch' ? 'reconnect' : view,
       organizationId,
       canManageOrganizationBilling: permission.status === 'ready' ? permission.canEdit : null,
     });
@@ -322,7 +324,17 @@ export function ProviderConnectGate({
       // notice, so the two surfaces cannot drift apart.
       description = t('prReview.reconnectNotice.message');
     }
-    if (action === 'organization-admin-only') {
+    if (mismatch) {
+      // The mismatch description names both hosts, because they are the whole
+      // difference the reader has to act on and both are the account's own
+      // data: the status read that supplied one belongs to the same reader.
+      title = t('prReview.connect.gitlabInstanceMismatchTitle');
+      description = t('prReview.connect.gitlabInstanceMismatchDescription', {
+        connected: mismatch.connectedHost,
+        requested: mismatch.requestedHost,
+      });
+    }
+    if (action === 'organization-admin-only' && mismatch === null) {
       // The reader cannot complete the integration page's action from this
       // role, so the state names the roles that can and carries no action. An
       // expired GitLab connection keeps its title and asks for a reconnection;
@@ -339,7 +351,7 @@ export function ProviderConnectGate({
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
         <EmptyState
-          icon={reconnect ? ShieldAlert : PlugZap}
+          icon={reconnect || mismatch ? ShieldAlert : PlugZap}
           iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
           iconColor={iconColor}
           title={title}
@@ -349,26 +361,37 @@ export function ProviderConnectGate({
               <Text variant="muted" className="text-center">
                 {description}
               </Text>
-              <PrReviewContextLine instanceHint={instanceHint} className="mt-3" />
+              {/* An organization member who cannot complete the action still
+                  needs to know whose action it is, under the explanation of
+                  why the connection does not fit. */}
+              {action === 'organization-admin-only' && mismatch !== null ? (
+                <Text variant="muted" className="text-center">
+                  {t('prReview.connect.gitlabReconnectAdminOnlyDescription')}
+                </Text>
+              ) : null}
             </>
           }
           action={
-            action === 'connect' ? (
-              <Button
-                className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
-                disabled={connecting}
-                onPress={() => {
-                  void handleConnect();
-                }}
-              >
-                {connecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <RefreshCcw size={16} color={colors.primaryForeground} />
-                )}
-                <Text>{connectTitle}</Text>
-              </Button>
-            ) : undefined
+            // The mismatch copy already names the requested host, so the
+            // caption keeps naming only the scope.
+            <PrReviewGateActionGroup instanceHint={mismatch === null ? instanceHint : undefined}>
+              {action === 'connect' ? (
+                <Button
+                  className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                  disabled={connecting}
+                  onPress={() => {
+                    void handleConnect();
+                  }}
+                >
+                  {connecting ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <RefreshCcw size={16} color={colors.primaryForeground} />
+                  )}
+                  <Text>{connectTitle}</Text>
+                </Button>
+              ) : null}
+            </PrReviewGateActionGroup>
           }
         />
       </View>

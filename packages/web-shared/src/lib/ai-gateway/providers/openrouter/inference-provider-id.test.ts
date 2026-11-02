@@ -7,6 +7,7 @@ import {
   isGatewayUserByokProviderId,
   isVercelUserByokProviderAllowed,
   UserByokProviderIdSchema,
+  UserByokTestModels,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -133,6 +134,15 @@ describe('inference provider ids', () => {
     expect(openRouterToVercelInferenceProviderId('google-vertex')).toBe('vertex');
   });
 
+  test('promotes Cohere to a user BYOK provider with a Vercel-supported test model', () => {
+    expect(UserByokProviderIdSchema.parse('cohere')).toBe('cohere');
+    expect(VercelUserByokInferenceProviderIdSchema.safeParse('cohere').success).toBe(true);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('cohere').success).toBe(false);
+    expect(getVercelUserByokProviderIdForEndpoint('cohere')).toBe('cohere');
+    expect(openRouterToVercelInferenceProviderId('cohere')).toBe('cohere');
+    expect(UserByokTestModels.cohere).toBe('cohere/command-a');
+  });
+
   test('promotes Azure to a user BYOK provider', () => {
     expect(VercelUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(true);
     expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(false);
@@ -169,6 +179,11 @@ describe('isVercelUserByokProviderAllowed', () => {
         false,
       ]);
     }
+  });
+
+  test('applies the organization provider allow-list to Cohere keys', () => {
+    expect(isVercelUserByokProviderAllowed('cohere', new Set(['cohere']))).toBe(true);
+    expect(isVercelUserByokProviderAllowed('cohere', new Set(['anthropic']))).toBe(false);
   });
 
   test('does not restrict direct BYOK or gateway keys', () => {

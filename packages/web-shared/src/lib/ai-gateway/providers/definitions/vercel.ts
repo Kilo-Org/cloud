@@ -3,7 +3,7 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 export const VERCEL_AI_GATEWAY = {
-  id: 'vercel',
+  type: 'vercel',
   apiUrl: 'https://ai-gateway.vercel.sh/v1',
   apiUrlOverrides: {},
   disableUrlSuffix: false,

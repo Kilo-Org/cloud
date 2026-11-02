@@ -488,7 +488,7 @@ describe('checkOpenAiChatGptByok', () => {
       bypassAccessCheck: false,
       skipBalanceCheck: true,
       provider: {
-        id: 'openai-chatgpt',
+        type: 'openai-chatgpt',
         apiUrl: OPENAI_CHATGPT_API_URL,
         apiKey: PARTNER_KEY,
         // A null apiKeyHeader makes `upstream-request.ts` send the partner key

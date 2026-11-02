@@ -1230,7 +1230,7 @@ describe('makeErrorReadable', () => {
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
-      providerId: 'openrouter',
+      provider: 'openrouter',
       requestedModel: 'anything',
       request,
       response,
@@ -1252,7 +1252,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-4.5',
       request,
       response,
@@ -1276,7 +1276,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-4.5',
       request,
       response,
@@ -1293,7 +1293,7 @@ describe('makeErrorReadable', () => {
     const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response,
@@ -1314,7 +1314,7 @@ describe('makeErrorReadable', () => {
     const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response,
@@ -1331,7 +1331,7 @@ describe('makeErrorReadable', () => {
 
   it.each([
     {
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       userByokProviderIds: ['opencode-go'],
       body: {
         error: { type: 'server_error', message: 'A synthetic region setting blocks this model.' },
@@ -1339,7 +1339,7 @@ describe('makeErrorReadable', () => {
       expectedMessage: 'A synthetic region setting blocks this model.',
     },
     {
-      providerId: 'vercel',
+      provider: 'vercel',
       userByokProviderIds: ['anthropic'],
       body: {
         error: {
@@ -1351,36 +1351,33 @@ describe('makeErrorReadable', () => {
       expectedMessage: 'Synthetic provider account configuration needs attention.',
     },
     {
-      providerId: 'vercel',
+      provider: 'vercel',
       userByokProviderIds: [],
       body: { message: 'Synthetic request option is unsupported.' },
       expectedMessage: 'Synthetic request option is unsupported.',
     },
-  ] as const)(
-    'marks a $providerId BYOK 400 without forwarding upstream metadata',
-    async fixture => {
-      const result = await makeErrorReadable({
-        providerId: fixture.providerId,
-        requestedModel: 'synthetic-model',
-        request,
-        response: Response.json(fixture.body, { status: 400 }),
-        userByokProviderIds: [...fixture.userByokProviderIds],
-      });
+  ] as const)('marks a $provider BYOK 400 without forwarding upstream metadata', async fixture => {
+    const result = await makeErrorReadable({
+      provider: fixture.provider,
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(fixture.body, { status: 400 }),
+      userByokProviderIds: [...fixture.userByokProviderIds],
+    });
 
-      expect(result?.status).toBe(400);
-      await expect(result?.json()).resolves.toEqual({
-        error: `[BYOK] ${fixture.expectedMessage}`,
-        error_type: 'byok_error',
-        message: `[BYOK] ${fixture.expectedMessage}`,
-      });
-    }
-  );
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      error: `[BYOK] ${fixture.expectedMessage}`,
+      error_type: 'byok_error',
+      message: `[BYOK] ${fixture.expectedMessage}`,
+    });
+  });
 
   it.each([400, 404, 405, 408, 409, 422, 499])(
     'preserves the upstream status for a generic BYOK %i',
     async status => {
       const result = await makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         response: Response.json({}, { status }),
@@ -1403,7 +1400,7 @@ describe('makeErrorReadable', () => {
       error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
     };
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(body, { status: 400 }),
@@ -1428,7 +1425,7 @@ describe('makeErrorReadable', () => {
     'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
     async (status, providerIds) => {
       const options = {
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         userByokProviderIds: [...providerIds],
@@ -1457,7 +1454,7 @@ describe('makeErrorReadable', () => {
 
   it('appends the provider explanation to a specific BYOK 401 message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/glm-5.3-flash',
       request,
       response: Response.json(
@@ -1486,7 +1483,7 @@ describe('makeErrorReadable', () => {
 
   it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/mimo-v2.5',
       request,
       response: Response.json(
@@ -1507,7 +1504,7 @@ describe('makeErrorReadable', () => {
 
   it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(
@@ -1531,7 +1528,7 @@ describe('makeErrorReadable', () => {
       for (const userByokProviderIds of status === 400 ? [null] : [null, ['anthropic'] as const]) {
         await expect(
           makeErrorReadable({
-            providerId: 'vercel',
+            provider: 'vercel',
             requestedModel: 'synthetic-model',
             request,
             response: Response.json(
@@ -1547,7 +1544,7 @@ describe('makeErrorReadable', () => {
 
   it('removes control characters and bounds generic BYOK provider text', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(
@@ -1569,7 +1566,7 @@ describe('makeErrorReadable', () => {
     'falls back to fixed BYOK text for an unusable provider body: %s',
     async body => {
       const result = await makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         response: new Response(body, { status: 400 }),
@@ -1593,7 +1590,7 @@ describe('makeErrorReadable', () => {
     [429, ['anthropic']],
   ] as const)('treats a non-null provider set as user BYOK for status %i', async (status, ids) => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response: Response.json({}, { status }),
@@ -1607,7 +1604,7 @@ describe('makeErrorReadable', () => {
 
   it('names the model in a generic BYOK permission error', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response: Response.json({}, { status: 403 }),
@@ -1625,7 +1622,7 @@ describe('makeErrorReadable', () => {
 
   it('mentions OpenCode Go opt-in requirements on a BYOK permission error', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/mimo-v2.5',
       request,
       response: Response.json({ model: 'mimo-v2.5' }, { status: 403 }),
@@ -1644,7 +1641,7 @@ describe('makeErrorReadable', () => {
   it('does not use generic BYOK errors for a null provider set', async () => {
     await expect(
       makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'anthropic/claude-sonnet-5',
         request,
         response: Response.json({}, { status: 401 }),
@@ -1669,7 +1666,7 @@ describe('makeErrorReadable', () => {
       );
 
       const result = await makeErrorReadable({
-        providerId: 'openrouter',
+        provider: 'openrouter',
         requestedModel: 'qwen/qwen3.7-plus',
         request,
         response,
@@ -1702,7 +1699,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'openrouter',
+      provider: 'openrouter',
       requestedModel: 'qwen/qwen3.7-plus',
       request,
       response,
@@ -1730,7 +1727,7 @@ describe('makeErrorReadable', () => {
 
     await expect(
       makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'anything',
         request,
         response,
@@ -1756,7 +1753,7 @@ describe('makeErrorReadable', () => {
     for (const response of responses) {
       await expect(
         makeErrorReadable({
-          providerId: 'openrouter',
+          provider: 'openrouter',
           requestedModel: 'anything',
           request,
           response,
@@ -1773,7 +1770,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'custom',
+      provider: 'custom',
       requestedModel: 'kilo-internal/custom-endpoint',
       request,
       response,
@@ -1790,7 +1787,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'openrouter',
+      provider: 'openrouter',
       requestedModel: kiloExclusiveModelFixture.public_id,
       request,
       response,

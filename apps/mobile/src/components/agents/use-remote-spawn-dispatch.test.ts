@@ -102,6 +102,18 @@ vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
     useRemoteInstanceSpawnMock(organizationId),
 }));
 
+// The membership list is one cache entry the hook reads for the subscription
+// gate's verdict; the tests set it per case.
+const organizationsListMock = vi.hoisted(() => ({
+  data: undefined as
+    | { organizationId: string; isTrialExpiredForEnforcement: boolean }[]
+    | undefined,
+}));
+
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({ data: organizationsListMock.data }),
+}));
+
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;
@@ -323,6 +335,10 @@ function rerenderLastHook() {
   }
   return lastRunResult();
 }
+
+beforeEach(() => {
+  organizationsListMock.data = undefined;
+});
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
   beforeEach(() => {
@@ -558,6 +574,52 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     await captureSpawnCall(onStart);
     expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a start in an organization whose trial has lapsed, before any spawn', () => {
+    organizationsListMock.data = [
+      { organizationId: 'org-xyz', isTrialExpiredForEnforcement: true },
+    ];
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: false,
+      message: i18n.t('common.organizationTrialEnded'),
+    });
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('spawns for an organization the gate keeps entitled', async () => {
+    organizationsListMock.data = [
+      { organizationId: 'org-xyz', isTrialExpiredForEnforcement: false },
+    ];
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    await captureSpawnCall(onStart);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(rerenderLastHook().remoteSpawnFailure).toBeNull();
+  });
+
+  it('never blocks a personal start on another organization lapsed trial', async () => {
+    organizationsListMock.data = [
+      { organizationId: 'org-xyz', isTrialExpiredForEnforcement: true },
+    ];
+    const { onStart } = runHook({ organizationId: undefined });
+
+    await captureSpawnCall(onStart);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not call the admitted callback without a target instance', () => {

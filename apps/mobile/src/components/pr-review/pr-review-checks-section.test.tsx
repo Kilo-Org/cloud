@@ -248,11 +248,25 @@ describe('PrReviewChecksSection status groups', () => {
     expect(textNodes(renderer, 'prReview.checks.checksCount=3/3')).toHaveLength(1);
   });
 
-  it('gives the header the raw total so a one-check PR selects the singular', () => {
+  it('leaves the total out when one status row already states it', () => {
+    // Design review at the PR review overview fixture: the card printed "1
+    // check" directly above "1 passed", so the same number appeared twice.
     setRuns([run('passed', 'completed', 'success')]);
     const renderer = mount();
 
-    expect(textNodes(renderer, 'prReview.checks.checksCount=1/1')).toHaveLength(1);
+    expect(textNodes(renderer, 'prReview.checks.checksCount=1/1')).toHaveLength(0);
+    // The one status row still carries the count the strip used to repeat.
+    expect(statusRows(renderer).map(row => [row.props.status, row.props.count])).toEqual([
+      ['success', 1],
+    ]);
+  });
+
+  it('keeps the total when the listing was cut and one row would claim to be complete', () => {
+    setRuns([run('passed', 'completed', 'success')]);
+    query.data = { ...query.data, truncated: true };
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=1+/1')).toHaveLength(1);
   });
 
   it('marks the header total as a lower bound when the server cut the listing', () => {

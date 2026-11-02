@@ -53,6 +53,11 @@ export function ChatTranscriptFailure({
         // A generic failure's own copy is that same title, so it is not printed
         // again below it: the neutral description carries the retry invitation.
         message={failureKey === 'common.somethingWentWrong' ? undefined : t(failureKey)}
+        // The not-found sentence runs past the width a narrow screen gives it,
+        // which leaves its last word alone on a second line. Capped to this
+        // measure the line breaks after "removed or", so both lines carry whole
+        // phrases instead of a stretched line with a stub beneath it.
+        descriptionClassName="max-w-[205px]"
         action={
           <View className="flex-row flex-wrap items-center justify-center gap-3">
             {retryable ? (

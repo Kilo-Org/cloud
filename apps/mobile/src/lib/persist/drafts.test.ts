@@ -45,6 +45,7 @@ import {
   saveDraft,
   securityDismissDraftKey,
 } from './drafts';
+import { forgetShapeMismatchesForTests } from './draft-read-report';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
 /* eslint-enable import/first */
@@ -94,6 +95,7 @@ beforeEach(() => {
   kvStore.clear();
   nextUpdatedAt = 1;
   resetDraftTimersForTests();
+  forgetShapeMismatchesForTests();
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
@@ -545,7 +547,7 @@ describe('shape validation', () => {
   });
 });
 
-describe('unloadable entry removal', () => {
+describe('unloadable entry handling', () => {
   it('removes a value that is not valid JSON, so the next load reports nothing', async () => {
     seedStoredValue('draft:u1', 'k', 'not-json{{{');
 
@@ -556,14 +558,30 @@ describe('unloadable entry removal', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('removes a value that fails its shape guard', async () => {
+  it('keeps a value that fails its shape guard and reports it once per process', async () => {
     seedStoredValue('draft:u1', 'k', '42');
 
     await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
-    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+    // Valid JSON that another build can read: it may be that build's draft, so
+    // a failed load here must not discard it.
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(true);
 
     await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('reports a mismatch again after a write replaced the stored value', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+
+    saveDraft('u1', 'k', 'repaired');
+    await flushDraft('u1', 'k');
+    seedStoredValue('draft:u1', 'k', '7');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
   });
 
   it('removes a value over the size cap', async () => {

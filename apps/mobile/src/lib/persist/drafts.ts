@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
+import { forgetShapeMismatch, reportShapeMismatch } from '@/lib/persist/draft-read-report';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 
 /**
@@ -25,9 +26,16 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * re-reads its draft (`useFencedDraftLoad`), so an entry this build can never
  * load would otherwise be read, byte-counted and reported again on each mount
  * for the life of the install; removing it makes one entry one event and every
- * later mount start from an absent key. Callers pass a shape validator, so a
- * valid-JSON value that does not match its contract (e.g. a number where
- * composer text is expected) is treated as corrupt and removed the same way.
+ * later mount start from an absent key.
+ *
+ * A valid-JSON value that fails the caller's shape validator is not corrupt:
+ * another build of the app can read it, so it may be that build's draft (a
+ * downgrade, or a field this build has not learned yet) and removing it would
+ * discard the user's text for good. It loads as null and stays stored, and its
+ * report is claimed once per process per key, so the per-mount read does not
+ * file an event each time. A write that replaces the value, an eviction, or an
+ * explicit clear releases the claim, because the next mismatch is new
+ * information.
  *
  * Every asynchronous write (debounced timer, flush, clear) is caught at this
  * boundary: a storage failure is reported to Sentry and swallowed, so the
@@ -232,11 +240,12 @@ function reportDraftFailure(
 /**
  * Loads one draft. Returns the parsed JSON value, or null when the key is
  * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
- * or the parsed value fails the caller's shape validator — all but the absent
- * case load as empty, report corruption to Sentry once, and remove the entry
- * so the next mount reads nothing. The value shape is the caller's contract:
- * composer text stores a JSON string, and pending-review stores a JSON
- * `PendingReviewItem[]`.
+ * or the parsed value fails the caller's shape validator. The corrupt and
+ * oversize cases report once and remove the entry so the next mount reads
+ * nothing; the shape-mismatch case keeps the entry (another build may read it)
+ * and reports at most once per process per key. The value shape is the
+ * caller's contract: composer text stores a JSON string, and pending-review
+ * stores a JSON `PendingReviewItem[]`.
  */
 export async function loadDraft<T>(
   userId: string,
@@ -265,12 +274,7 @@ export async function loadDraft<T>(
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isValid(parsed)) {
-      reportDraftFailure(
-        new Error('stored draft does not match its expected shape'),
-        'read',
-        'draft-read-shape-mismatch'
-      );
-      await clearDraftIfStill(userId, entityKey, raw);
+      reportShapeMismatch(draftScope(userId), entityKey);
       return null;
     }
     return parsed;
@@ -296,6 +300,9 @@ async function writeDraft({ epoch, userId, entityKey, value }: DraftWritePayload
       return;
     }
     await encryptedKv.setItem(draftScope(userId), entityKey, serialized);
+    // A write replaces whatever could not be read, so the next mismatch on
+    // this key is a new value rather than a repeat.
+    forgetShapeMismatch(draftScope(userId), entityKey);
     await evictOldestBeyondCap(draftScope(userId));
   });
 }
@@ -326,6 +333,7 @@ async function evictOldestBeyondCap(scope: string): Promise<void> {
   await Promise.all(
     oldest.map(async entry => {
       await encryptedKv.removeItem(scope, entry.k);
+      forgetShapeMismatch(scope, entry.k);
     })
   );
 }
@@ -431,6 +439,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
     await chainSave(key, async () => {
       await encryptedKv.removeItem(draftScope(userId), entityKey);
     });
+    forgetShapeMismatch(draftScope(userId), entityKey);
     return true;
   } catch (error) {
     reportDraftFailure(error, 'clear');
@@ -465,6 +474,7 @@ export async function clearDraftIfStill(
       const current = await encryptedKv.getItem(draftScope(userId), entityKey);
       if (current === expectedSerialized) {
         await encryptedKv.removeItem(draftScope(userId), entityKey);
+        forgetShapeMismatch(draftScope(userId), entityKey);
       }
     });
   } catch (error) {

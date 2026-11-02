@@ -22,10 +22,10 @@ import {
   type AllowedMergeMethod,
   defaultMergeMethodFor,
   getMergeabilityStatus,
-  getMergeBlockedReasons,
   type PrMergeMethod,
   type PrOverviewDto,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { useMergeBlockedReasons } from '@/lib/pr-review/merge/use-merge-blocked-reasons';
 import {
   useDisableAutoMergeMutation,
   useUpdateBranchMutation,
@@ -94,18 +94,7 @@ export function PrMergeSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const status = getMergeabilityStatus(overview);
-  const reasons = useMemo(
-    () =>
-      getMergeBlockedReasons({
-        state: overview.state,
-        draft: overview.draft,
-        mergeable: overview.mergeable,
-        mergeableState: overview.mergeableState,
-        reviewDecision: overview.reviewDecision,
-        allowUpdateBranch: overview.repo.allowUpdateBranch,
-      }),
-    [overview]
-  );
+  const reasons = useMergeBlockedReasons(overview, { owner, repo, number: overview.number });
 
   // Bounded polling for the brief window after GitHub queues a
   // mergeability re-check. Poll on a fixed interval up to N ticks, then

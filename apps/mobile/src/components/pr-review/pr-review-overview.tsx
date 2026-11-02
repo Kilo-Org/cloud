@@ -284,11 +284,12 @@ export function PrReviewOverview({
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
 
-      {isGitHub ? (
+      {isGitHub && data.state === 'open' ? (
         // The ScreenHeader already carries the primary Submit-review CTA
         // (same route). This section is its secondary re-entry, so it must
         // not be a second olive primary: the merge section below owns the
-        // overview body's single primary action.
+        // overview body's single primary action. A merged or closed review
+        // takes no review, so its body offers none.
         <Button
           variant="outline"
           onPress={handleOpenReviewSubmit}

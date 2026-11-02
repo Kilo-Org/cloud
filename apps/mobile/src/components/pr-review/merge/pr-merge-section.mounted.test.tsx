@@ -38,6 +38,11 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useUpdateBranchMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDisableAutoMergeMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
+// The poll suite owns the timer, not the reasons: the panel's rows come from
+// their own selector tests and the end-to-end run.
+vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
+  useMergeBlockedReasons: () => [],
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   AutoMergeEnabledBanner: 'AutoMergeEnabledBanner',
   BlockedPanel: 'BlockedPanel',

@@ -52,6 +52,13 @@ export type MergeBlockedReasonsArgs = {
   mergeable: PrOverviewDto['mergeable'];
   mergeableState: PrOverviewDto['mergeableState'];
   reviewDecision: PrOverviewDto['reviewDecision'];
+  /**
+   * How many check runs the Checks card counts as failed — the `failure`
+   * rollup of the same `listChecks` read that card renders. A blocked PR
+   * names failing checks only when that number is non-zero, so the panel and
+   * the card above it cannot contradict each other.
+   */
+  failedCheckCount: number;
   allowUpdateBranch: boolean;
 };
 
@@ -153,6 +160,24 @@ function behindReason(allowUpdateBranch: boolean): MergeBlockedReason {
 }
 
 /**
+ * The row for a block whose cause the overview cannot name itself: GitHub says
+ * the PR cannot merge, yet neither the review decision nor the Checks card
+ * shows the gate. Carries the raw state so the row still says where it came
+ * from instead of hiding the block.
+ */
+function genericBlockedReason(mergeableState: string): MergeBlockedReason {
+  return {
+    id: 'unknown-state',
+    iconKind: 'unknown-state',
+    severity: 'warn',
+    title: i18n.t('prReview.merge.blocked.notMergeableTitle'),
+    detail: i18n.t('prReview.merge.blocked.notMergeableDetail', {
+      state: mergeableState,
+    }),
+  };
+}
+
+/**
  * Ordered, deduplicated list of why-this-PR-can't-be-merged-yet reasons.
  * Empty when the PR is mergeable. Order: most specific / most actionable
  * first — GitHub's `mergeable_state` wins as the top reason when it
@@ -179,8 +204,22 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
       break;
     }
     case 'blocked': {
-      push(requiredReviewsReason());
-      push(failingChecksReason());
+      // `blocked` names a branch-protection gate, not which one. Each row
+      // below is read off its own data: the review decision for reviews, and
+      // the Checks card's own failed-run count for checks, so a PR whose only
+      // check passed never claims a failing check.
+      if (
+        args.reviewDecision === 'REVIEW_REQUIRED' ||
+        args.reviewDecision === 'CHANGES_REQUESTED'
+      ) {
+        push(requiredReviewsReason());
+      }
+      if (args.failedCheckCount > 0) {
+        push(failingChecksReason());
+      }
+      if (reasons.length === 0) {
+        push(genericBlockedReason(args.mergeableState));
+      }
       break;
     }
     case 'behind': {
@@ -210,15 +249,7 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
       // GitHub may add new mergeable_state values over time — surface the
       // raw value as a generic blocked reason rather than silently
       // showing nothing.
-      push({
-        id: 'unknown-state',
-        iconKind: 'unknown-state',
-        severity: 'warn',
-        title: i18n.t('prReview.merge.blocked.notMergeableTitle'),
-        detail: i18n.t('prReview.merge.blocked.notMergeableDetail', {
-          state: args.mergeableState,
-        }),
-      });
+      push(genericBlockedReason(args.mergeableState));
     }
   }
 

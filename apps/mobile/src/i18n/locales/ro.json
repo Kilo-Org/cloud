@@ -1821,6 +1821,7 @@
       "priorityFindingsPending": "Constatările prioritare vor apărea după prima sincronizare.",
       "refreshFailed": "Nu s-au putut actualiza datele. Se afișează ultimele date sincronizate.",
       "settings": "Setări",
+      "syncing": "Se sincronizează…",
       "syncNow": "Sincronizează acum",
       "syncQueued": "Sincronizare în așteptare",
       "syncStatusUnavailable": "Starea sincronizării nu este disponibilă.",

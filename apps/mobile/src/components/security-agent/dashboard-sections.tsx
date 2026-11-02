@@ -127,6 +127,10 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   }
 
   if (!finding) {
+    // The all-clear row still opens the scope's open-findings list — the same
+    // list its own count describes — so it stays a destination on the screen
+    // even when that list is empty. Its whole row is the target, so the row
+    // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Pressable
@@ -207,14 +211,14 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'danger')}
+        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'warn')}
+        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
@@ -228,7 +232,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'good')}
+        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
         last
       />
     </SectionCard>
@@ -292,7 +296,7 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
             valueFace="numeric"
-            dotTone={rowTone(neverSynced, row.tone)}
+            dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
             last={index === rows.length - 1}
           />
         </Pressable>

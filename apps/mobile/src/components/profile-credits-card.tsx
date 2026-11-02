@@ -45,9 +45,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // Stack the balance row unless the expiry note keeps its two lines beside the
   // amount, the visibility toggle and the purchase action. Measured on the
   // standard matrix's compact cell (Android, 2026-11-02): the note needs about
-  // 215 dp of column for two lines, and its siblings take about 157 dp of the
-  // card, so the one-row layout holds from 370 dp of card in scaled text units,
-  // using the card's width rather than the display's.
+  // 226 dp of column for two lines, and the one-row layout's siblings take about
+  // 158 dp of the card, so it holds from 370 dp of card in scaled text units,
+  // using the card's width rather than the display's. Below that the controls
+  // move beside the amount-and-note column instead of below it.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
@@ -164,9 +165,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
-  // The expiry note's slot: under the amount on a wide card, on its own row
-  // when the card stacks. No entrance fade — the caption holds a row of this
-  // block, so a fade that paints it late leaves that row empty.
+  // The expiry note's slot: under the amount, in the amount's own column, in
+  // both layouts. No entrance fade — the caption holds a row of this block, so
+  // a fade that paints it late leaves that row empty.
   const expirySlot = (
     <>
       {creditsFailed && (
@@ -185,13 +186,52 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </>
   );
 
-  // The purchase action: beside the amount and toggle on a stacked card, in the
-  // trailing control column on a wide one. No in-progress indicator sits beside
-  // it, because this row paints a balance that belongs to the selected account
-  // and a background refresh may legitimately take a while or never finish. The
-  // first load and a context switch own the skeleton above; a refresh that fails
-  // owns the retry surface. An indicator tied to every in-flight refresh spun
-  // for as long as a stalled one lasted (and announced itself as "In progress").
+  // The amount and the expiry note share one column and one gap, so the note
+  // sits directly under the amount at the same spacing on every card width. A
+  // note on its own row below the control row read as detached from the amount
+  // on a compact card (design review, 2026-11-02).
+  const amountBlock = (
+    <View className="min-w-0 flex-1 gap-1">
+      {/* `grow-0`: a horizontal ScrollView defaults to `flexGrow: 1`, so in a
+          stacked card it would take the control column's spare height and push
+          the note away from the amount. */}
+      <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
+        <Text
+          className="text-2xl font-bold tabular-nums"
+          accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
+        >
+          {hideBalance ? HIDDEN_BALANCE : balanceText}
+        </Text>
+      </ScrollView>
+      {expirySlot}
+    </View>
+  );
+
+  const visibilityToggle = (
+    <Pressable
+      className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
+      onPress={() => {
+        selectionHaptic();
+        setHideBalance(!hideBalance);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
+    >
+      {hideBalance ? (
+        <Eye size={18} color={colors.mutedForeground} />
+      ) : (
+        <EyeOff size={18} color={colors.mutedForeground} />
+      )}
+    </Pressable>
+  );
+
+  // The purchase action: in the trailing control column with the visibility
+  // toggle. No in-progress indicator sits beside it, because this row paints a
+  // balance that belongs to the selected account and a background refresh may
+  // legitimately take a while or never finish. The first load and a context
+  // switch own the skeleton above; a refresh that fails owns the retry surface.
+  // An indicator tied to every in-flight refresh spun for as long as a stalled
+  // one lasted (and announced itself as "In progress").
   const addCreditsAction =
     selectedOrgId == null ? (
       <AddCreditsButton
@@ -301,44 +341,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           )}
         >
           <Animated.View
-            className={cn('min-w-0 gap-1', stackBalance ? 'items-stretch' : 'flex-1 flex-row')}
+            className={cn('min-w-0 flex-row items-start gap-1', !stackBalance && 'flex-1')}
             layout={LinearTransition.duration(200)}
           >
-            <View className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}>
-              <View className="min-w-0 flex-1 gap-1">
-                <ScrollView horizontal className="min-w-0">
-                  <Text
-                    className="text-2xl font-bold tabular-nums"
-                    accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
-                  >
-                    {hideBalance ? HIDDEN_BALANCE : balanceText}
-                  </Text>
-                </ScrollView>
-                {!stackBalance && expirySlot}
+            {amountBlock}
+            {/* A compact card keeps the note directly under the amount and
+                moves both controls beside that column: the note keeps its two
+                lines and the amount keeps the card's wide-cell spacing. */}
+            {stackBalance ? (
+              <View className="shrink-0 items-center gap-1">
+                {visibilityToggle}
+                {addCreditsAction}
               </View>
-              <Pressable
-                className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
-                onPress={() => {
-                  selectionHaptic();
-                  setHideBalance(!hideBalance);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
-                }
-              >
-                {hideBalance ? (
-                  <Eye size={18} color={colors.mutedForeground} />
-                ) : (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-              {stackBalance && addCreditsAction}
-            </View>
-            {/* The note keeps the card's full width in the stacked layout:
-                beside the visibility toggle and the purchase action it wrapped
-                to three lines on a compact phone. */}
-            {stackBalance && expirySlot}
+            ) : (
+              visibilityToggle
+            )}
           </Animated.View>
           {!stackBalance && (
             <View className="max-w-full flex-row flex-wrap items-center gap-2">

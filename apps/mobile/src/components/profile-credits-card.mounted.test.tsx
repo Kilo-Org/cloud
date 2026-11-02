@@ -1104,12 +1104,19 @@ describe('CreditsCard balance row', () => {
     return String(balance.props.className).split(' ');
   }
 
-  /** The row the amount and the visibility toggle share in both layouts. */
-  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
+  /** The row holding the text block and the controls: the card's only `min-w-0 flex-row items-start` box. */
+  function balanceRow(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(node =>
+      String(node.props.className).includes('min-w-0 flex-row items-start gap-1')
+    );
+  }
+
+  /** The amount-and-note column: the card's only `min-w-0 flex-1 gap-1` box. */
+  function textBlock(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        String(node.props.className).includes('min-w-0 flex-row items-center gap-1')
+        String(node.props.className).includes('min-w-0 flex-1 gap-1')
     );
   }
 
@@ -1140,38 +1147,40 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
-  it('keeps the amount, note and controls on one line on a wide card', async () => {
+  it('keeps the note in the amount column on a wide card, with the purchase action in its own row', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
 
-    const classes = balanceClasses(renderer);
-    expect(classes).toContain('flex-row');
-    expect(classes).not.toContain('items-stretch');
-    // The note stays in the amount's column; the purchase action sits outside
-    // that row, in the trailing control column.
-    const row = amountRow(renderer);
-    expect(renders(row, 'No expiring credits.')).toBe(true);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    // The note shares the amount's column, which gives it the same tight gap
+    // under the amount as the wide layout always had.
+    expect(renders(textBlock(renderer), 'No expiring credits.')).toBe(true);
+    // The purchase action sits outside the balance row on a wide card.
+    expect(renders(balanceRow(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
   });
 
   it.each<[string, number]>([
     // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:
-    // in the one-line row the note's column there wrapped the sentence to three
-    // lines, so both stack instead.
+    // the one-row layout wrapped the sentence to three lines there, so the
+    // controls move beside the text block instead of below it.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])('stacks the balance on %s so the note keeps its two lines', async (_name, width) => {
-    const { renderer, unmount } = await mountAtCardWidth(width);
+  ])(
+    'keeps the note in the amount column and the controls beside it on %s',
+    async (_name, width) => {
+      const { renderer, unmount } = await mountAtCardWidth(width);
 
-    const classes = balanceClasses(renderer);
-    expect(classes).toContain('items-stretch');
-    expect(classes).not.toContain('flex-row');
-    // The amount, the toggle and the purchase action share the first row; the
-    // note sits on its own row beneath it, at the card's full width instead of
-    // in the squeezed column that wrapped it to three lines.
-    const row = amountRow(renderer);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
-    expect(renders(row, 'No expiring credits.')).toBe(false);
-    unmount();
-  });
+      const classes = balanceClasses(renderer);
+      expect(classes).toContain('items-stretch');
+      expect(classes).not.toContain('flex-row');
+      // The note stays directly under the amount, in the same column, and the
+      // visibility toggle and the purchase action sit beside that column rather
+      // than on a row of their own above the note.
+      const block = textBlock(renderer);
+      expect(renders(block, 'No expiring credits.')).toBe(true);
+      expect(renders(block, 'ADD_CREDITS_BUTTON')).toBe(false);
+      const row = balanceRow(renderer);
+      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
+      unmount();
+    }
+  );
 });

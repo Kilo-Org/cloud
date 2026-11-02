@@ -3911,7 +3911,6 @@
       "environment": "Опкружување (JSON)",
       "headers": "Заглавија (JSON)",
       "timeout": "Тајмаут",
-      "enableServer": "Овозможи сервер",
       "secretCount_one": "{{count}} тајна",
       "secretCount_other": "{{count}} тајни",
       "namePlaceholder": "my-server",

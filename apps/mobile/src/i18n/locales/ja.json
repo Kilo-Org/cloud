@@ -3911,7 +3911,6 @@
       "environment": "環境(JSON)",
       "headers": "ヘッダー (JSON)",
       "timeout": "タイムアウト",
-      "enableServer": "サーバーを有効にする",
       "secretCount_one": "シークレット {{count}} 件",
       "secretCount_other": "シークレット {{count}} 件",
       "namePlaceholder": "my-server",

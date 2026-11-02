@@ -3917,7 +3917,6 @@
       "environment": "පරිසර විචල්‍යයන් (JSON)",
       "headers": "ශීර්ෂ (JSON)",
       "timeout": "කල් ඉකුත්වීමේ කාලය",
-      "enableServer": "සේවාදායකය සක්‍රීය කරන්න",
       "secretCount_one": "{{count}} රහස",
       "secretCount_other": "{{count}} රහස්",
       "namePlaceholder": "my-server",

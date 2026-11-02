@@ -4135,7 +4135,6 @@
       "environment": "Amgylchedd (JSON)",
       "headers": "Penawdau (JSON)",
       "timeout": "Terfyn amser",
-      "enableServer": "Galluogi gweinydd",
       "secretCount_zero": "{{count}} cyfrinach",
       "secretCount_one": "{{count}} cyfrinach",
       "secretCount_two": "{{count}} cyfrinach",

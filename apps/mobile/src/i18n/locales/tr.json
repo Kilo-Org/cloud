@@ -3911,7 +3911,6 @@
       "environment": "Ortam (JSON)",
       "headers": "Başlıklar (JSON)",
       "timeout": "Zaman aşımı",
-      "enableServer": "Sunucuyu etkinleştir",
       "secretCount_one": "{{count}} sır",
       "secretCount_other": "{{count}} sır",
       "namePlaceholder": "my-server",

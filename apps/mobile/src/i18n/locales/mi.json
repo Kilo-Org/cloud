@@ -3911,7 +3911,6 @@
       "environment": "Taiao (JSON)",
       "headers": "Pane (JSON)",
       "timeout": "Wā tatari",
-      "enableServer": "Whakahohea te tūmau",
       "secretCount_one": "{{count}} muna",
       "secretCount_other": "{{count}} muna",
       "namePlaceholder": "my-server",

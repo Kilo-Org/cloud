@@ -3911,7 +3911,6 @@
       "environment": "Deegaanka (JSON)",
       "headers": "Madaxda (JSON)",
       "timeout": "Waqtigu",
-      "enableServer": "Shid server-ka",
       "secretCount_one": "{{count}} sir",
       "secretCount_other": "{{count}} siro",
       "namePlaceholder": "my-server",

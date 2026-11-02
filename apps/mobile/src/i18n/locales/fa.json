@@ -3917,7 +3917,6 @@
       "environment": "محیط (JSON)",
       "headers": "سرصفحه ها (JSON)",
       "timeout": "تایم اوت",
-      "enableServer": "فعال‌سازی سرور",
       "secretCount_one": "{{count}} راز",
       "secretCount_other": "{{count}} راز",
       "namePlaceholder": "my-server",

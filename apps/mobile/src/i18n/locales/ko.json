@@ -3911,7 +3911,6 @@
       "environment": "환경(JSON)",
       "headers": "헤더(JSON)",
       "timeout": "제한시간",
-      "enableServer": "서버 활성화",
       "secretCount_one": "{{count}} 비밀",
       "secretCount_other": "{{count}} 비밀",
       "namePlaceholder": "my-server",

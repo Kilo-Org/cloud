@@ -3918,7 +3918,6 @@
       "environment": "पर्यावरण (JSON)",
       "headers": "हेडर (JSON)",
       "timeout": "टाइमआउट",
-      "enableServer": "सर्वर चालू करें",
       "secretCount_one": "{{count}} रहस्य",
       "secretCount_other": "{{count}} रहस्य",
       "namePlaceholder": "my-server",

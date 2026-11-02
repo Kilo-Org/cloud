@@ -4023,7 +4023,6 @@
       "environment": "Prostredie (JSON)",
       "headers": "Hlavičky (JSON)",
       "timeout": "Časový limit",
-      "enableServer": "Zapnúť server",
       "secretCount_one": "{{count}} tajomstvo",
       "secretCount_few": "{{count}} tajomstvá",
       "secretCount_many": "{{count}} tajomstiev",

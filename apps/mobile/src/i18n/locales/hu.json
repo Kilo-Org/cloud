@@ -3911,7 +3911,6 @@
       "environment": "Környezet (JSON)",
       "headers": "Fejlécek (JSON)",
       "timeout": "Időtúllépés",
-      "enableServer": "Szerver engedélyezése",
       "secretCount_one": "{{count}} titok",
       "secretCount_other": "{{count}} titok",
       "namePlaceholder": "my-server",

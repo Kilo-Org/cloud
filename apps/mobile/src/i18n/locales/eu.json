@@ -3911,7 +3911,6 @@
       "environment": "Ingurunea (JSON)",
       "headers": "Goiburuak (JSON)",
       "timeout": "Denbora-muga",
-      "enableServer": "Gaitu zerbitzaria",
       "secretCount_one": "{{count}} sekretu",
       "secretCount_other": "{{count}} sekretu",
       "namePlaceholder": "my-server",

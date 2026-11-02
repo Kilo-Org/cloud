@@ -3917,7 +3917,6 @@
       "environment": "ಪರಿಸರ (JSON)",
       "headers": "ಹೆಡರ್‌ಗಳು (JSON)",
       "timeout": "ಸಮಯ ಮೀರುವಿಕೆ",
-      "enableServer": "ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ",
       "secretCount_one": "{{count}} ರಹಸ್ಯ",
       "secretCount_other": "{{count}} ರಹಸ್ಯಗಳು",
       "namePlaceholder": "my-server",

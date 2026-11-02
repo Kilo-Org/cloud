@@ -3911,7 +3911,6 @@
       "environment": "Anviwònman (JSON)",
       "headers": "Tèt (JSON)",
       "timeout": "Delè",
-      "enableServer": "Aktive sèvè",
       "secretCount_one": "{{count}} sekrè",
       "secretCount_other": "{{count}} sekrè",
       "namePlaceholder": "my-server",

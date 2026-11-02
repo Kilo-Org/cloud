@@ -4023,7 +4023,6 @@
       "environment": "Okolje (JSON)",
       "headers": "Glave (JSON)",
       "timeout": "Časovna omejitev",
-      "enableServer": "Omogoči strežnik",
       "secretCount_one": "{{count}} skrivnost",
       "secretCount_two": "{{count}} skrivnosti",
       "secretCount_few": "{{count}} skrivnosti",

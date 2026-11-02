@@ -3911,7 +3911,6 @@
       "environment": "Naannoo (JSON)",
       "headers": "Mata dureewwan (JSON) .",
       "timeout": "Yeroon xumuraa",
-      "enableServer": "Sarvarii dandeessisi",
       "secretCount_one": "{{count}} icciti",
       "secretCount_other": "{{count}} iccitiwwan",
       "namePlaceholder": "my-server",

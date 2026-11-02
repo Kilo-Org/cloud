@@ -3911,7 +3911,6 @@
       "environment": "Ympäristö (JSON)",
       "headers": "Otsikot (JSON)",
       "timeout": "Aikakatkaisu",
-      "enableServer": "Ota palvelin käyttöön",
       "secretCount_one": "{{count}} salaisuus",
       "secretCount_other": "{{count}} salaisuutta",
       "namePlaceholder": "my-server",

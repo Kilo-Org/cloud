@@ -3917,7 +3917,6 @@
       "environment": "Միջավայր (JSON)",
       "headers": "Վերնագրեր (JSON)",
       "timeout": "Ժամկետ",
-      "enableServer": "Միացնել սերվերը",
       "secretCount_one": "{{count}} գաղտնիք",
       "secretCount_other": "{{count}} գաղտնիք",
       "namePlaceholder": "my-server",

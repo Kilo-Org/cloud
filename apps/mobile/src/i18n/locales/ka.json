@@ -3911,7 +3911,6 @@
       "environment": "გარემო (JSON)",
       "headers": "სათაურები (JSON)",
       "timeout": "ტაიმაუტი",
-      "enableServer": "ჩართე სერვერი",
       "secretCount_one": "{{count}} საიდუმლო",
       "secretCount_other": "{{count}} საიდუმლო",
       "namePlaceholder": "my-server",

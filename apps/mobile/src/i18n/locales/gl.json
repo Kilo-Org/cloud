@@ -3911,7 +3911,6 @@
       "environment": "Ambiente (JSON)",
       "headers": "Cabeceiras (JSON)",
       "timeout": "Tempo de espera",
-      "enableServer": "Activar servidor",
       "secretCount_one": "{{count}} segredo",
       "secretCount_other": "{{count}} segredos",
       "namePlaceholder": "my-server",

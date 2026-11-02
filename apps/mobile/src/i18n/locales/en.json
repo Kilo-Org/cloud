@@ -3978,7 +3978,6 @@
       "environment": "Environment (JSON)",
       "headers": "Headers (JSON)",
       "timeout": "Timeout",
-      "enableServer": "Enable server",
       "secretCount_one": "{{count}} secret",
       "secretCount_other": "{{count}} secrets",
       "namePlaceholder": "my-server",

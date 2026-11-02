@@ -106,21 +106,6 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
 
 /**
- * The same base direction for a text input that holds machine-read content (a
- * command line, a JSON document), plus the alignment it needs: an RTL
- * interface otherwise lays the example out right to left — the closing brace on
- * the first line, the opening brace on the last — and right-aligns the key
- * line, which reads as broken JSON. A text input takes its paragraph direction
- * from `direction` on Android and `writingDirection` on iOS, while `textAlign`
- * lands behind the shared RTL alignment in `@/components/ui/input`, so a
- * caller's own style wins there.
- */
-export const LTR_INPUT_DIRECTION: TextStyle = {
-  ...LTR_TEXT_DIRECTION,
-  textAlign: 'left',
-};
-
-/**
  * The start alignment for a block of prose. A renderer that resolves a
  * paragraph's direction from its first strong character — the native markdown
  * text does — leaves a Latin reply at the left edge of a right-to-left

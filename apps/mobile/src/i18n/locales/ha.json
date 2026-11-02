@@ -3911,7 +3911,6 @@
       "environment": "Muhalli (JSON)",
       "headers": "Shugabanni (JSON)",
       "timeout": "Ƙayyadaddun lokaci",
-      "enableServer": "Kunna uwar garken",
       "secretCount_one": "{{count}} sirri",
       "secretCount_other": "{{count}} sirri",
       "namePlaceholder": "my-server",

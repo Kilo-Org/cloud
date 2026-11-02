@@ -3911,7 +3911,6 @@
       "environment": "Umgebung (JSON)",
       "headers": "Header (JSON)",
       "timeout": "Time-out",
-      "enableServer": "Server aktivieren",
       "secretCount_one": "{{count}} Geheimnis",
       "secretCount_other": "{{count}} Geheimnisse",
       "namePlaceholder": "my-server",

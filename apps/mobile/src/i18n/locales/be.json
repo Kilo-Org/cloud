@@ -4023,7 +4023,6 @@
       "environment": "Асяроддзе (JSON)",
       "headers": "Загалоўкі (JSON)",
       "timeout": "Тайм-аўт",
-      "enableServer": "Уключыць сервер",
       "secretCount_one": "{{count}} сакрэт",
       "secretCount_few": "{{count}} сакрэты",
       "secretCount_many": "{{count}} сакрэтаў",

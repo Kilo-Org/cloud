@@ -3911,7 +3911,6 @@
       "environment": "Persekitaran (JSON)",
       "headers": "Pengepala (JSON)",
       "timeout": "tamat masa",
-      "enableServer": "Aktifkan pelayan",
       "secretCount_one": "{{count}} rahsia",
       "secretCount_other": "{{count}} rahsia",
       "namePlaceholder": "my-server",

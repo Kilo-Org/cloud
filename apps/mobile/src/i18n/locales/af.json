@@ -3911,7 +3911,6 @@
       "environment": "Omgewing (JSON)",
       "headers": "Opskrifte (JSON)",
       "timeout": "Uitteltyd",
-      "enableServer": "Skakel bediener aan",
       "secretCount_one": "{{count}} geheim",
       "secretCount_other": "{{count}} geheime",
       "namePlaceholder": "my-server",

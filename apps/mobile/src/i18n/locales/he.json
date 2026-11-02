@@ -3967,7 +3967,6 @@
       "environment": "סביבה (JSON)",
       "headers": "כותרות (JSON)",
       "timeout": "זמן קצוב",
-      "enableServer": "הפעלת שרת",
       "secretCount_one": "{{count}} סוד",
       "secretCount_two": "{{count}} סודות",
       "secretCount_other": "{{count}} סודות",

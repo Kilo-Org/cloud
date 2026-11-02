@@ -3911,7 +3911,6 @@
       "environment": "Gburugburu usoro (JSON)",
       "headers": "Ndị isi (JSON)",
       "timeout": "Nkeji oge",
-      "enableServer": "Gbanye sava",
       "secretCount_one": "{{count}} nzuzo",
       "secretCount_other": "{{count}} nzuzo",
       "namePlaceholder": "my-server",

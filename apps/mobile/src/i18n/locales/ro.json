@@ -3967,7 +3967,6 @@
       "environment": "Mediu (JSON)",
       "headers": "Anteturi (JSON)",
       "timeout": "Timeout",
-      "enableServer": "Activează serverul",
       "secretCount_one": "{{count}} secret",
       "secretCount_few": "{{count}} secrete",
       "secretCount_other": "{{count}} secrete",

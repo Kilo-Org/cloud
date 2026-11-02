@@ -3911,7 +3911,6 @@
       "environment": "పర్యావరణం (JSON)",
       "headers": "శీర్షికలు (JSON)",
       "timeout": "టైమ్‌అవుట్",
-      "enableServer": "సర్వర్‌ని చేతనం చేయండి",
       "secretCount_one": "{{count}} రహస్యం",
       "secretCount_other": "{{count}} రహస్యాలు",
       "namePlaceholder": "my-server",

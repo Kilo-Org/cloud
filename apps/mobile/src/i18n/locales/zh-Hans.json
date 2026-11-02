@@ -3911,7 +3911,6 @@
       "environment": "环境（JSON）",
       "headers": "标头（JSON）",
       "timeout": "超时",
-      "enableServer": "启用服务器",
       "secretCount_one": "{{count}} 个密钥",
       "secretCount_other": "{{count}} 个密钥",
       "namePlaceholder": "my-server",

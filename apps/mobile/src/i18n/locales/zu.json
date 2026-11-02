@@ -3917,7 +3917,6 @@
       "environment": "Isimo sokusebenza (JSON)",
       "headers": "Izihloko (JSON)",
       "timeout": "Isikhathi sokulinda",
-      "enableServer": "Vula iseva",
       "secretCount_one": "{{count}} imfihlo",
       "secretCount_other": "{{count}} izimfihlo",
       "namePlaceholder": "my-server",

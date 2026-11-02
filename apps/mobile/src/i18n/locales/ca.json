@@ -3967,7 +3967,6 @@
       "environment": "Entorn (JSON)",
       "headers": "Capçaleres (JSON)",
       "timeout": "Temps d'espera",
-      "enableServer": "Activa el servidor",
       "secretCount_one": "{{count}} secret",
       "secretCount_many": "{{count}} secrets",
       "secretCount_other": "{{count}} secrets",

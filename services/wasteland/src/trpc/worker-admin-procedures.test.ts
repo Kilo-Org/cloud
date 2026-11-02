@@ -141,6 +141,17 @@ describe('real wasteland procedures respect the capability action allowlist', ()
     expect(unregister).not.toHaveBeenCalled();
   });
 
+  it('adminListWastelands rejects a capability scoped to one wasteland', async () => {
+    const authority = await authorityFor(['trpc:wasteland.adminListWastelands'], {
+      kind: 'wasteland',
+      id: WASTELAND,
+    });
+    await expect(caller(authority).wasteland.adminListWastelands()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(listAll).not.toHaveBeenCalled();
+  });
+
   it('adminListWastelands requires a service-scoped capability', async () => {
     const authority = await authorityFor(['trpc:wasteland.adminListWastelands'], {
       kind: 'service',

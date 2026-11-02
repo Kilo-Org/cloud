@@ -321,9 +321,13 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     value: string,
     size: number,
     color: string,
-    weight: 'regular' | 'semibold' = 'regular'
+    weight: 'regular' | 'semibold' = 'regular',
+    // Only for a run drawn from a list, where React needs a stable key.
+    listKey?: string
   ) => (
-    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+    <Text key={listKey} modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>
+      {value}
+    </Text>
   );
   // A number never truncates: it keeps its content size while the labels
   // around it compress, so the counts stay readable in every language.
@@ -332,9 +336,11 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     value: string,
     size: number,
     color: string,
-    weight: 'regular' | 'semibold' = 'regular'
+    weight: 'regular' | 'semibold' = 'regular',
+    listKey?: string
   ) => (
     <Text
+      key={listKey}
       modifiers={[
         font({ size, weight }),
         lineLimit(1),
@@ -477,20 +483,23 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // The plan line: the localized count ("3 of 7"), and the bar, then the step
   // in progress on its own line. The step is never repeated, so the line never
   // shows it twice. The counts are separate runs because a number must not
-  // truncate, and the words between them are whichever the language put there.
+  // truncate, and the runs keep the template's own spacing, so a catalog that
+  // attaches an affix to a count ("7-dən 3") is not given a gap in its middle.
   const planCount = (scheme: Scheme, size: number) => (
-    <HStack spacing={3}>
-      {planSegments.map(segment => {
+    <HStack spacing={0}>
+      {planSegments.map((segment, at) => {
         if ('name' in segment) {
           return number(
             count(segment.name === 'done' ? planDone : planTotal),
             size,
             scheme.fg,
-            'semibold'
+            'semibold',
+            `count-${at}`
           );
         }
-        const run = segment.text.trim();
-        return run === '' ? null : text(run, size, scheme.muted);
+        return segment.text === ''
+          ? null
+          : text(segment.text, size, scheme.muted, 'regular', `run-${at}`);
       })}
     </HStack>
   );

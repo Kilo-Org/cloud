@@ -446,7 +446,23 @@ describe('session card layout: locale word order', () => {
     const shown = texts(
       renderWithCopy(PASHTU)({ ...BASE, plan: { done: 3, total: 7, current: null } }).banner
     );
-    expect(shown.slice(shown.indexOf('له'))).toEqual(['له', '7', 'څخه', '3']);
+    // The runs are drawn in the template's order, and the template's own
+    // spacing survives, so the line reads as one phrase.
+    expect(shown.join('')).toContain('له 7 څخه 3');
+    expect(shown.join('')).not.toContain('{{');
+  });
+
+  it('keeps an affix the catalog attaches to a count attached to it', () => {
+    // Azerbaijani writes the pair as "7-dən 3": the case ending belongs to the
+    // total, so no gap may be inserted between the count and its suffix.
+    const shown = texts(
+      renderWithCopy({ planProgress: '{{total}}-dən {{done}}' })({
+        ...BASE,
+        plan: { done: 3, total: 7, current: null },
+      }).banner
+    );
+    expect(shown.join('')).toContain('7-dən 3');
+    expect(shown.join('')).not.toContain('7 -dən');
   });
 
   it('fills the finished-in template instead of prefixing the duration', () => {

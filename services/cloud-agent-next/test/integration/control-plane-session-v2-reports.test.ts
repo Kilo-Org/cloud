@@ -591,6 +591,44 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect((await stub.getMetadata())?.callback).toBeUndefined();
   });
 
+  it.each(['session:parent', 'https://callback.test/hook'])(
+    'keeps %s armed when steering admission discovers the old preparation failed',
+    async callbackUrl => {
+      const { sessionId, stub, peer } = await setup(callbackUrl);
+      peer.prepareView = peer.view('preparing');
+      const captured = await installCapturedQueues(stub);
+      await stub.send(promptPayload('initial'));
+      expect(await messageStatus(stub, 'initial')).toBe('queued');
+
+      peer.prepareView = {
+        state: 'failed',
+        attemptId: peer.attemptId,
+        reason: 'workspace_setup_failed',
+      };
+      peer.prepareViews = [peer.view('preparing')];
+      expect(await stub.send(promptPayload('steering'))).toEqual({ type: 'ok' });
+      peer.prepareView = peer.view('preparing');
+      await flush(stub);
+      expect(await messageStatus(stub, 'initial')).toBe('failed');
+      expect(await messageStatus(stub, 'steering')).toBe('queued');
+      expect(captured.reports.map(report => report.run.messageId)).toEqual(['initial']);
+      expect(captured.callbacks).toHaveLength(0);
+      expect((await stub.getMetadata())?.callback?.target.url).toBe(callbackUrl);
+
+      peer.prepareView = peer.view('ready');
+      await stub.onRoute(peer.view('ready'));
+      await waitFor(async () => expect(await messageStatus(stub, 'steering')).toBe('running'));
+      await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'steering' });
+      await flush(stub);
+      expect(captured.callbacks).toHaveLength(1);
+      expect(captured.callbacks[0]?.payload).toMatchObject({
+        messageId: 'steering',
+        status: 'completed',
+      });
+      expect((await stub.getMetadata())?.callback).toBeUndefined();
+    }
+  );
+
   it('delivers the old failure callback if the incoming steering message cannot be persisted', async () => {
     const { stub, peer } = await setup('session:parent');
     peer.prepareView = peer.view('preparing');

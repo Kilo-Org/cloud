@@ -189,6 +189,7 @@ const context: MicrodollarUsageContext = {
   machine_id: null,
   user_byok: false,
   is_free: false,
+  custom_llm_pricing: null,
   has_tools: false,
   feature: null,
   session_id: null,

@@ -1,5 +1,9 @@
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  isWorkspaceAnchorMetadata,
+  workspaceMcpAnchorSessionId,
+} from '../cloud-agent-authority.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { createMessageId } from '../session/message-id.js';
 import type { Env } from '../types.js';
@@ -119,6 +123,54 @@ describe('parent session callback delivery', () => {
       expect(queuePrompt).not.toHaveBeenCalled();
     }
   );
+
+  it('routes to the canonical workspace anchor and never elects a sibling when the anchor is missing', async () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const siblingId = 'workspace_22222222-2222-4222-8222-222222222222';
+    const anchorId = `workspace_${worktreeId.slice('worktree_'.length)}`;
+    expect(workspaceMcpAnchorSessionId(worktreeId, siblingId)).toBe(anchorId);
+
+    child.parentCloudAgentSessionId = anchorId;
+    parent.identity.sessionId = anchorId;
+    parent.workspace = { worktreeId };
+    const sibling: SessionMetadata = {
+      ...child,
+      identity: { userId, sessionId: siblingId },
+      auth: { kiloSessionId: 'ses_sibling' },
+      parentCloudAgentSessionId: undefined,
+      allowSubagentSessions: true,
+      workspace: { worktreeId },
+    };
+    expect(isWorkspaceAnchorMetadata(parent)).toBe(true);
+    expect(isWorkspaceAnchorMetadata(sibling)).toBe(false);
+
+    const metadataFor = (sessionId: string): SessionMetadata | null =>
+      sessionId === childId
+        ? child
+        : sessionId === anchorId
+          ? parent
+          : sessionId === siblingId
+            ? sibling
+            : null;
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner === userId ? metadataFor(sessionId) : null
+    );
+
+    expect(await deliverParentSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    expect(queuePrompt).toHaveBeenCalledOnce();
+    expect(queuePrompt.mock.calls[0][0].cloudAgentSessionId).toBe(anchorId);
+    expect(getMetadata.mock.calls.map(([, , sessionId]) => sessionId)).toEqual([childId, anchorId]);
+
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner === userId && sessionId !== anchorId ? metadataFor(sessionId) : null
+    );
+    getMetadata.mockClear();
+    queuePrompt.mockClear();
+
+    expect(await deliverParentSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+    expect(queuePrompt).not.toHaveBeenCalled();
+    expect(getMetadata.mock.calls.map(([, , sessionId]) => sessionId)).toEqual([childId, anchorId]);
+  });
 
   it('rejects callbacks without server-owned routing context', async () => {
     delete job.parentSession;

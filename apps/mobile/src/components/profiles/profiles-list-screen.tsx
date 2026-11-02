@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
+import { ProfileOwnerHeading } from '@/components/profiles/profile-owner-heading';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
@@ -172,17 +173,7 @@ export function ProfilesListScreen({
           sections.length > 0 &&
           sections.map(section => (
             <View key={section.key} className="gap-3">
-              {section.titleKey ? (
-                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                  {t(section.titleKey, {
-                    // Reviewed English heading until the `profiles.list.*`
-                    // copy lands with the translation slice.
-                    defaultValue: t(
-                      section.key === 'organization' ? 'common.organization' : 'common.personal'
-                    ),
-                  })}
-                </Text>
-              ) : null}
+              {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
               {section.profiles.map((profile, index) => {
                 const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
                 const isDefault = isEffectiveDefault(profile, effectiveDefaultId);

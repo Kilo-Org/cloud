@@ -43,6 +43,7 @@ import {
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/public-custom-llm-snapshot';
+import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-direct-byok-providers';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -63,7 +64,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
     headers,
   });
   if (!modelsResponse.ok) {
-    throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
+    throw new Error(`Fetching models from ${gateway.type} failed: ${modelsResponse.status}`);
   }
   const models = ModelsSchema.parse(await modelsResponse.json());
 
@@ -84,7 +85,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
         }
         if (!endpointsResponse.ok) {
           throw new Error(
-            `Fetching model endpoints for ${gateway.id}/${model.id} failed: ${endpointsResponse.status}`
+            `Fetching model endpoints for ${gateway.type}/${model.id} failed: ${endpointsResponse.status}`
           );
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
@@ -107,15 +108,15 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
 
   if (modelsWithoutEndpoints.length > 0) {
     console.warn(
-      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.id} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
+      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.type} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
     );
   }
 
   const count = Object.keys(result).length;
   if (count < 100) {
-    throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
+    throw new Error(`Suspicious: total number of ${gateway.type} models is ${count} < 100`);
   }
-  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
+  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.type}`);
 
   return result;
 }
@@ -296,7 +297,9 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = allProviders.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   // Calculate total models across all providers
   const totalModels = sortedProviders.reduce((sum, provider) => sum + provider.models.length, 0);

@@ -125,10 +125,7 @@ export function parseCloudAgentSessionScopeV2Headers(
   const rawMemberRoots = memberRootKiloSessionIds.split(',');
   if (rawMemberRoots.some(value => value.trim().length === 0)) return { kind: 'invalid' };
   const normalizedMemberRoots = [...new Set(rawMemberRoots.map(value => value.trim()))];
-  if (
-    normalizedMemberRoots.length === 0 ||
-    normalizedMemberRoots.length > MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS
-  ) {
+  if (normalizedMemberRoots.length > MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS) {
     return { kind: 'invalid' };
   }
 

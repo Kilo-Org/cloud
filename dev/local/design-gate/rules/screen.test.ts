@@ -361,3 +361,38 @@ test('safe-area: content scrolled under a system inset is fine', () => {
     []
   );
 });
+
+test('touch-overlap: a presented sheet never competes with the window behind it', () => {
+  // A full detent spans the window, so its placed frames sit exactly where the
+  // window's own controls are. The sheet still takes the tap first: two boxes
+  // that intersect across windows are not one ambiguous target. `normalize`
+  // places the sheet in window space before the rule runs.
+  const header: ProbeNode = { parent: 0, tag: 'View', rect: [0, 0, 48, 48], pressable: true };
+  const sheet: ProbeNode = { parent: 3, tag: 'View', rect: [0, 0, 400, 44], pressable: true };
+  const presented: ProbeNode[] = [
+    header,
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 400, 800] },
+    { parent: 2, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 400, 800] },
+    sheet,
+  ];
+
+  const placed = tree(presented);
+  const headerNode = placed.nodes[1];
+  const sheetButton = placed.nodes[4];
+  // Precondition: both boxes are in window space and they do intersect.
+  assert.deepEqual(headerNode.rect, [0, 0, 48, 48]);
+  assert.deepEqual(sheetButton.rect, [0, 0, 400, 44]);
+  assert.equal(sheetButton.presented?.space, placed.nodes[2].index);
+  assert.equal(headerNode.presented, undefined);
+  assert.ok(sheetButton.rect[2] > headerNode.rect[0] && headerNode.rect[2] > sheetButton.rect[0]);
+  assert.ok(sheetButton.rect[3] > headerNode.rect[1] && headerNode.rect[3] > sheetButton.rect[1]);
+
+  assert.deepEqual(run('touch-overlap', presented), []);
+
+  // The same two boxes in one window are the defect the rule exists for.
+  const [finding] = run('touch-overlap', [
+    header,
+    { parent: 0, tag: 'View', rect: [0, 0, 400, 44], pressable: true },
+  ]);
+  assert.equal(finding?.measured, 44);
+});

@@ -9,6 +9,7 @@
       "lowBalance": "Bilanci juaj ka nevojë për vëmendje",
       "spendAlert": "Shpenzimi juaj ka nevojë për vëmendje",
       "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
+      "securityUpdate": "Një kontroll sigurie ka një përditësim",
       "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Një gjetje sigurie ka nevojë për vëmendje"
+      "body": "Një kontroll sigurie ka një përditësim"
     }
   },
   "instanceLifecycle": {

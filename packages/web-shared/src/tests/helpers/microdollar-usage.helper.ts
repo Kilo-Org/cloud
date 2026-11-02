@@ -122,6 +122,7 @@ export function createMockUsageContext(
     machine_id: null,
     user_byok: false,
     is_free: false,
+    custom_llm_pricing: null,
     has_tools: false,
     feature: 'vscode-extension',
     session_id: null,

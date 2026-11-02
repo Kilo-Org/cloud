@@ -8,7 +8,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ScreenHeader } from '@/components/screen-header';
 import { i18n } from '@/i18n';
 
-// Development-only visual fixture: kiloapp:///dev/new-session-plan-refusal-fixture.
+// Development-only visual fixture, opened through the development fixture link.
 // Renders the real new-session body in the state a lapsed organization's plan
 // produces before any press: `organizations.list` carries the server gate's
 // own verdict, so the form shows the plan explanation under the composer and

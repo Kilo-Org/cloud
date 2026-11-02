@@ -40,15 +40,16 @@ import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
-  type Asked,
+  addKept,
   askedIn,
+  dropKept,
   forgetAsked,
   keptIn,
   migrateAsked,
   moveQuestions,
   rememberAsked,
   rememberFirstQuestion,
-  rememberKept,
+  sameQuestion,
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -500,8 +501,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
       /* A kept question that repeats the slot's is one attempt: see
-         `sameAttempt`. */
-      displaced: asked === null ? kept : kept.filter(one => !sameAttempt(one, asked)),
+         `sameQuestion`. */
+      displaced: asked === null ? kept : kept.filter(one => !sameQuestion(one, asked)),
       status: 'idle',
       failed: null,
       failureKey: null,
@@ -534,8 +535,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       /* A kept question that repeats the slot's is one attempt: see
-         `sameAttempt`. */
-      displaced: asked === null ? kept : kept.filter(one => !sameAttempt(one, asked)),
+         `sameQuestion`. */
+      displaced: asked === null ? kept : kept.filter(one => !sameQuestion(one, asked)),
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
     });
@@ -547,24 +548,6 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
   }
-}
-
-/**
- * Whether a kept question and the slot's question are one attempt: a retry that
- * was interrupted after the slot wrote its record and before the kept list
- * dropped it leaves both, and one question is drawn once. The images are
- * compared by what they are, so two questions that carry different pictures stay
- * two.
- */
-function sameAttempt(kept: Displaced, asked: Asked): boolean {
-  return (
-    kept.text === asked.text &&
-    kept.model === asked.model &&
-    kept.effort === asked.effort &&
-    /* The pictures are compared as they were stored: the same image is the same
-       base64, and a comparison per part would only re-index what this folds. */
-    JSON.stringify(kept.images) === JSON.stringify(asked.images)
-  );
 }
 
 /**
@@ -600,7 +583,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedModel: null,
     askedEffort: null,
   });
-  await rememberKept(sessionId, displaced);
+  await addKept(sessionId, kept);
 }
 
 /**
@@ -664,11 +647,11 @@ export async function say(
        an empty one still writes, because what is being dropped may be only in
        storage. */
     const keptNow = snapshotOf(current).displaced;
-    const keptNext = keptNow.filter(one => !sameAttempt(one, { text, images, model, effort }));
+    const keptNext = keptNow.filter(one => !sameQuestion(one, { text, images, model, effort }));
     if (keptNext.length !== keptNow.length) {
       change(current, { displaced: keptNext });
     }
-    await rememberKept(current, keptNext);
+    await dropKept(current, { text, images, model, effort });
     current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -762,7 +745,7 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
             model: at.askedModel ?? at.model,
             effort: at.askedEffort,
           };
-    if (slot !== null && sameAttempt(displaced, slot)) {
+    if (slot !== null && sameQuestion(displaced, slot)) {
       try {
         await rememberAsked(at.sessionId, {
           text: displaced.text,

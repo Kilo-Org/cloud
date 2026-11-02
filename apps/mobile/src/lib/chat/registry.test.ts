@@ -1130,6 +1130,39 @@ describe('a question a later send took the slot from', () => {
     expect(snapshotOf(opened).asked).toBe('second');
   });
 
+  it('keeps the written copy of a retry still waiting when another question is asked', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const held = snapshotOf(opened).displaced;
+    expect(held.map(one => one.text)).toEqual(['first', 'second']);
+
+    creditsFailureFor = undefined;
+    await say(opened, { text: 'fourth', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // Both retries wait for the answer arriving, with nothing but their written
+    // copies to survive a restart.
+    await retryChat(opened, held[0]);
+    await retryChat(opened, held[1]);
+    await settled();
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first', 'second']);
+    // The third one the fourth send pushed out of the slot is written too.
+    const waiting = await keptIn(opened);
+    expect(waiting.map(one => one.text)).toEqual(['first', 'second', 'third']);
+
+    // The answer lands and the first retry is asked, which writes its own copy
+    // away without touching the one still waiting behind it.
+    finish?.();
+    await settled();
+    const written = await keptIn(opened);
+    expect(written.map(one => one.text)).not.toContain('first');
+    expect(written.map(one => one.text)).toContain('second');
+  });
+
   it('opens with one bubble for a retry that was interrupted between its two records', async () => {
     storedHistory = [];
     await releaseChat(opened);

@@ -81,13 +81,53 @@ export async function askedIn(sessionId: string): Promise<Asked | null> {
 }
 
 /** Writes the questions a later send took the slot from, in the order they were asked. */
-export async function rememberKept(sessionId: string, kept: readonly Displaced[]): Promise<void> {
+async function writeKept(sessionId: string, kept: readonly Displaced[]): Promise<void> {
   await setItem(KEPT_SCOPE, sessionId, JSON.stringify(kept));
 }
 
 export async function keptIn(sessionId: string): Promise<readonly Displaced[]> {
   const kept = await getItem(KEPT_SCOPE, sessionId);
   return kept === null ? [] : keptSchema.parse(JSON.parse(kept));
+}
+
+/**
+ * Whether two questions are one attempt: the same words, the same model and
+ * effort, and the same pictures. A question can be written twice — in the slot
+ * being asked and in the kept list it came from — and this is what tells those
+ * two records apart from two questions.
+ */
+export function sameQuestion(one: Question & ChatTarget, other: Question & ChatTarget): boolean {
+  return (
+    one.text === other.text &&
+    one.model === other.model &&
+    one.effort === other.effort &&
+    /* The pictures are compared as they were stored: the same image is the same
+       base64, and a comparison per part would only re-index what this folds. */
+    JSON.stringify(one.images) === JSON.stringify(other.images)
+  );
+}
+
+/**
+ * Adds a kept question to the ones already written down. It reads the list
+ * first, because a question can have a copy here that nothing in memory knows
+ * about: a retry waiting in the queue is held in memory alone, and only this
+ * entry would survive a restart.
+ */
+export async function addKept(sessionId: string, question: Displaced): Promise<void> {
+  const kept = await keptIn(sessionId);
+  await writeKept(sessionId, [...kept.filter(one => one.id !== question.id), question]);
+}
+
+/**
+ * Drops the written copy of one question and no other, which is what a question
+ * that reached the slot leaves behind.
+ */
+export async function dropKept(sessionId: string, question: Question & ChatTarget): Promise<void> {
+  const kept = await keptIn(sessionId);
+  const next = kept.filter(one => !sameQuestion(one, question));
+  if (next.length !== kept.length) {
+    await writeKept(sessionId, next);
+  }
 }
 
 /** Remembers the words a chat is named for, which are the first ones said in it. */
@@ -135,7 +175,7 @@ export async function moveQuestions(from: string, to: string): Promise<void> {
     await rememberAsked(to, asked);
   }
   if (kept.length > 0) {
-    await rememberKept(to, kept);
+    await writeKept(to, kept);
   }
   if (name !== null) {
     await rememberFirstQuestion(to, name);

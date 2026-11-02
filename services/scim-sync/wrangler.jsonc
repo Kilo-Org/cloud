@@ -39,6 +39,15 @@
       "new_sqlite_classes": ["ScimSyncDO"],
     },
   ],
+  // Gates `/status`, which is reachable from the public internet via
+  // `workers_dev`. Both names already exist in the shared store.
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+  ],
   // ============================================
   // DEVELOPMENT ENVIRONMENT
   // Deploy with: wrangler deploy --env dev
@@ -58,6 +67,13 @@
           },
         ],
       },
+      "secrets_store_secrets": [
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_DEV",
+        },
+      ],
     },
   },
 }

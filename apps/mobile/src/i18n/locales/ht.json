@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tradui rezime zouti yo",
     "toolSummaryTranslationSubtitle": "Voye chak rezime zouti bay yon modèl pou tradui li nan lang aplikasyon w lan. Yo montre orijinal la si tradiksyon an echwe.",
     "toolSummaryTranslationModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(common.model) pou chwazi yon lòt.",
+    "translateSummaries": "Tradui rezime",
     "autoExpandThinkingInactiveSubtitle": "Pa gen okenn efè lè detay refleksyon yo kache."
   },
   "prReview": {

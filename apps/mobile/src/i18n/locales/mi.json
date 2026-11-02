@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Whakamāoritia ngā whakarāpopototanga taputapu",
     "toolSummaryTranslationSubtitle": "Tukuna ia whakarāpopototanga taputapu ki tētahi tauira hei whakamāori ki te reo o tō taupānga. Ka whakaatuhia te taketake mena ka rahua te whakamāoritanga.",
     "toolSummaryTranslationModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(common.model) ki te kōwhiri i tētahi atu.",
+    "translateSummaries": "Whakamāoritia ngā whakarāpopototanga",
     "autoExpandThinkingInactiveSubtitle": "Kāore he pānga ina hunaia ngā taipitopito o te whakaaro."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Përkthe përmbledhjet e mjeteve",
     "toolSummaryTranslationSubtitle": "Dërgo çdo përmbledhje mjeti te një model për ta përkthyer në gjuhën e aplikacionit tënd. Origjinali shfaqet nëse përkthimi dështon.",
     "toolSummaryTranslationModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(common.model) për të zgjedhur një tjetër.",
+    "translateSummaries": "Përkthe përmbledhjet",
     "autoExpandThinkingInactiveSubtitle": "Nuk ka asnjë efekt kur detajet e arsyetimit janë të fshehura."
   },
   "prReview": {

@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
     "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
     "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba.",
+    "translateSummaries": "Isalin ang mga buod",
     "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip."
   },
   "prReview": {

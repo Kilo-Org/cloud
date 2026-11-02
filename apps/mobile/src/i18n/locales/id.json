@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Terjemahkan ringkasan alat",
     "toolSummaryTranslationSubtitle": "Kirim setiap ringkasan alat ke model untuk diterjemahkan ke bahasa aplikasi Anda. Teks asli ditampilkan jika terjemahan gagal.",
     "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain.",
+    "translateSummaries": "Terjemahkan ringkasan",
     "autoExpandThinkingInactiveSubtitle": "Tidak berpengaruh saat detail pemikiran disembunyikan."
   },
   "notifications": {

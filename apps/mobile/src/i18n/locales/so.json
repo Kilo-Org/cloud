@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Turjun koobabka qalabka",
     "toolSummaryTranslationSubtitle": "Dir koob kasta oo qalab ah moodel si uu ugu turjumo luqadda abkaaga. Waxaa la muujiyaa asalka haddii turjumaadda ay fashilanto.",
     "toolSummaryTranslationModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(common.model) si aad u dooratid mid kale.",
+    "translateSummaries": "Turjun koobabka",
     "autoExpandThinkingInactiveSubtitle": "Wax saameyn ah kuma lahan marka faahfaahinta fikirka la qariyay."
   },
   "prReview": {

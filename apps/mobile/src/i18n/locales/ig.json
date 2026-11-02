@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Tụgharịa nchịkọta ngwa ọrụ",
     "toolSummaryTranslationSubtitle": "Zipu nchịkọta ngwa ọrụ ọ bụla na ihe nlereanya ka ọ tụgharịa ya n'asụsụ ngwa gị. A na-egosi nke mbụ ma ọ bụrụ na ntụgharị ahụ daa.",
     "toolSummaryTranslationModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(common.model) iji họrọ ọzọ.",
+    "translateSummaries": "Tụgharịa nchịkọta",
     "autoExpandThinkingInactiveSubtitle": "Enweghị mmetụta mgbe a zoo nkọwa echiche."
   },
   "prReview": {

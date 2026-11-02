@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "תרגם סיכומי כלים",
     "toolSummaryTranslationSubtitle": "שלח כל סיכום כלי למודל כדי לתרגם אותו לשפת האפליקציה שלך. המקור יוצג אם התרגום ייכשל.",
     "toolSummaryTranslationModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(common.model) כדי לבחור אחר.",
+    "translateSummaries": "תרגם סיכומים",
     "autoExpandThinkingInactiveSubtitle": "אין לו השפעה כאשר פרטי החשיבה מוסתרים."
   },
   "notifications": {

@@ -364,6 +364,7 @@
     "toolSummaryTranslation": "Translate tool summaries",
     "toolSummaryTranslationSubtitle": "Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.",
     "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another.",
+    "translateSummaries": "Translate summaries",
     "autoExpandThinkingInactiveSubtitle": "No effect while thinking details are hidden."
   },
   "prReview": {

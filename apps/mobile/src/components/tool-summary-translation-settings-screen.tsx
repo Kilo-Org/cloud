@@ -94,7 +94,7 @@ export function ToolSummaryTranslationSettingsScreen() {
       >
         <PreferenceRow
           icon={WandSparkles}
-          title={t('preferences.toolSummaryTranslation')}
+          title={t('preferences.translateSummaries')}
           subtitle={t('preferences.toolSummaryTranslationSubtitle')}
           value={enabled}
           disabled={!hasLoaded}

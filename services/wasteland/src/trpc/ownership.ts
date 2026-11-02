@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
+import { emitWorkerAdminDecision } from '../middleware/worker-admin.middleware';
 import type { TRPCContext } from './init';
 
 type WastelandOwnershipResult =
@@ -11,6 +12,13 @@ async function workerAdminAllows(ctx: TRPCContext, wastelandId: string): Promise
   const decision = await ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, {
     kind: 'wasteland',
     id: wastelandId,
+  });
+  emitWorkerAdminDecision(ctx.env, decision, {
+    action: `trpc:${ctx.procedurePath}`,
+    userId: ctx.userId || null,
+    wastelandId,
+    jti: decision.allowed ? decision.jti : null,
+    delivery: 'trpc',
   });
   if (!decision.allowed && decision.status === 503) {
     throw new TRPCError({

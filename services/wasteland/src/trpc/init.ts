@@ -6,6 +6,7 @@ import type {
 } from '@kilocode/worker-utils/worker-admin-capability';
 import { z } from 'zod';
 import { writeEvent } from '../util/analytics.util';
+import { emitWorkerAdminDecision } from '../middleware/worker-admin.middleware';
 import { checkRateLimit } from '../util/rate-limit.util';
 
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -120,6 +121,13 @@ export const adminProcedure = procedure.use(async ({ ctx, path, getRawInput, nex
   const action = `trpc:${path}`;
   const target = adminTargetForInput(await getRawInput());
   const decision = await ctx.workerAdmin.decide(action, target);
+  emitWorkerAdminDecision(ctx.env, decision, {
+    action,
+    userId: ctx.userId || null,
+    wastelandId: target.kind === 'wasteland' ? target.id : null,
+    jti: decision.allowed ? decision.jti : null,
+    delivery: 'trpc',
+  });
   if (!decision.allowed) {
     throw new TRPCError({
       code:

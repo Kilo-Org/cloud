@@ -38,6 +38,7 @@ import {
   RpcMergeQueueDataOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
+import { emitWorkerAdminDecision } from '../middleware/worker-admin.middleware';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
@@ -119,6 +120,13 @@ async function workerAdminAllows(
   target: { kind: 'town' | 'user' | 'wasteland' | 'service'; id: string }
 ): Promise<boolean> {
   const decision = await ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, target);
+  emitWorkerAdminDecision(ctx.env, decision, {
+    action: `trpc:${ctx.procedurePath}`,
+    userId: ctx.userId || null,
+    townId: target.kind === 'town' ? target.id : null,
+    jti: decision.allowed ? decision.jti : null,
+    delivery: 'trpc',
+  });
   if (!decision.allowed && decision.status === 503) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',

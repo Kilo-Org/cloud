@@ -33,6 +33,7 @@ result, they revert it in one click.
 | Setup larger than 16,000 characters | The agent MAY open a PR that adds a setup script to the repository. The environment's script then calls that file. See §8. |
 | Network | Uses the environment network controls from #8899. Only the user changes the policy (None / Limited / Full, plus extra hosts, and request overrides). The agent records a **minimum network** the environment needs. When the policy is restricted, the user must approve every host the agent adds. See §10. |
 | Network of setup and test sessions | They follow the same resolution as any session: organization settings and defaults (once they exist), then the environment's policy, then the platform default. The setup feature never grants a broader policy. |
+| Who approves secrets and network requests | Anyone allowed to manage the environment: the personal owner, or an organization owner or admin (`ORGANIZATION_MANAGE_ROLES`, the same check as `create` and `update`). Only these roles can start a run, so the person who started it can approve its requests; no second approver is needed. Other members and billing managers see requests read-only. The role is checked again at approval time. |
 | Dropping the minimum for one session | Not supported for now. A follow-up shows a **suggestion** the user can adopt (§10). |
 | Where secrets go | Only in the existing environment editor's Variables page, opened from a request notice in the chat. The chat itself never shows input fields. The start form also accepts secrets up front. See "Secrets". |
 | Snapshot builds | Enabled for every owner, including personal accounts (`ENVIRONMENT_SNAPSHOT_ORG_IDS="*"` on main). Every publish triggers a snapshot build. A build only runs the setup and does not run smoke checks, so the gate stays the child-session test. |
@@ -324,7 +325,7 @@ A new `setupRuns` sub-router, behind the release toggle
 | `setupRuns.start` | **Input:** `{organizationId?, repositories, requirements, model, variant?, name?, targetEnvironmentId?, secrets?, operationKey}`.<br>**Checks before creating anything:** repository access (`assertEnvironmentRepositoriesAccess`), that an isolated sandbox is offered, the balance, and the toggle.<br>**Then:** creates the draft and the run, and starts the session (§4).<br>**Returns:** `{runId, cloudAgentSessionId}`. Idempotent on `operationKey`. |
 | `setupRuns.get` / `setupRuns.listForEnvironment` | Run state, the draft view (keys only for secrets), and the difference from the target. Also derives failure from the session's terminal state (see Failure UX). |
 | `setupRuns.provideSecrets` | `{runId, secrets: [{key, value}], skipped?: string[]}`. Called by the environment editor's Variables page when it is opened for a draft with pending requests. Writes encrypted values to the draft and sends the agent a follow-up without values. |
-| `setupRuns.resolveNetworkRequests` | `{runId, approved: string[], declined: string[]}`. Called from the editor's Network page. Approved hosts are added to the draft's `egress_required_hosts`, and the agent gets a follow-up. |
+| `setupRuns.resolveNetworkRequests` | `{runId, approved: string[], declined: string[]}`. Called from the editor's Network page. Needs the manage role, like every user procedure in this table; it is checked again on each call. Approved hosts are added to the draft's `egress_required_hosts`, and the agent gets a follow-up. |
 | `setupRuns.publish` | Manual publish, used for `publish_conflict`, `waiting_for_merge` (publish before merge) or `failed`. Needs `force: true` when the draft is unverified. |
 | `setupRuns.revert` | §2 `revertSetupRun`. |
 | `setupRuns.cancel` | Interrupts the setup session and its test children through the existing interrupt path, and marks the run `cancelled`. The draft is kept until cleanup. |
@@ -784,7 +785,9 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 - **kilo-mcp:** tools are registered only with the claim, and arguments are
   pinned.
 - **Web router:**
-  - permissions: a member is denied, and so is a billing manager;
+  - permissions: a member is denied, and so is a billing manager, including for
+    `provideSecrets` and `resolveNetworkRequests`; an admin who loses the role
+    mid-run can no longer approve;
   - the request is denied when the toggle is off;
   - `start` is idempotent.
 - **E2E (local stack, fake LLM, scripted tool calls):**
@@ -807,10 +810,6 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 
 ## Remaining open questions
 
-1. **Who approves network requests in an organization?** This plan uses the
-   environment manage role (owners and admins), the same as for editing. Should
-   the requesting user be able to approve hosts in their own run, or must a
-   second admin approve?
-2. **High-privilege secret patterns.** Is a warning enough, or should some names
+1. **High-privilege secret patterns.** Is a warning enough, or should some names
    (for example cloud root credentials) be refused for setup-run requests and
    allowed only through manual editing?

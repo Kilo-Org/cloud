@@ -24,7 +24,10 @@ export type RoutingDecisionByokCandidate = {
   /** The key's position in the owner's whole key list, which orders the candidates. */
   route_order: number;
   outcome: 'selected' | 'skipped' | 'unreached';
-  /** Why the key was skipped. On a selected key, the request preference it was used despite. */
+  /**
+   * Why the key was skipped. On a selected key, why it was used only as a fallback: the request
+   * ignores its provider, or it does not serve the API kind and the request fails with that error.
+   */
   reason?: ByokCandidateSkipReason;
 };
 
@@ -183,14 +186,6 @@ export function createRoutingDecisionRecorder(
       const candidate = candidates[index];
       if (!candidate) return;
       candidates[index] = { ...candidate, outcome, ...(reason ? { reason } : {}) };
-      if (outcome === 'selected') {
-        steps.push({
-          step: 'byok-key',
-          outcome,
-          route: candidate.route,
-          provider_id: candidate.provider_id,
-        });
-      }
     },
     finish(result: DecidedProviderResult): ProviderRoutingDecision {
       let decisionResult: RoutingDecisionResult;

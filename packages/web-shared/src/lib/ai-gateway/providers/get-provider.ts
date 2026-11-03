@@ -789,8 +789,15 @@ async function selectProvider(
     }
   };
   const selectKey = (route: (typeof routes)[number]) => {
-    logSelection(byokRouteKey(route).providerId);
+    const { providerId } = byokRouteKey(route);
+    logSelection(providerId);
     decision.markByokCandidate(routes.indexOf(route), 'selected');
+    decision.step({
+      step: 'byok-key',
+      outcome: 'selected',
+      route: route.route,
+      provider_id: providerId,
+    });
   };
   const keyNotLoaded = (route: (typeof routes)[number]) => {
     console.warn('[getProvider] BYOK key ranked for the request could not be loaded', {
@@ -881,6 +888,10 @@ async function selectProvider(
       supported_api_kinds: [...getDirectByokModelChatApis(provider, model)],
     } satisfies Partial<RoutingDecisionStep>;
     if (credential) {
+      decision.markByokCandidate(
+        routes.findIndex(route => route.route === 'direct-byok' && route.candidate === unsupported),
+        'selected'
+      );
       decision.step({ ...unsupportedKey, outcome: 'selected' });
       return directByokProviderResult(provider, model, credential, requestedModel, request, true);
     }

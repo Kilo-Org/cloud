@@ -133,7 +133,8 @@ async function routeAndRecord(
   expect(decisions).toHaveLength(1);
   const [decision] = decisions;
   const serialized = JSON.stringify(decision);
-  expect(serialized).not.toMatch(/secret|hello/);
+  expect(serialized).not.toMatch(/secret|hello|upstream-key/);
+  if (input.organizationId) expect(serialized).not.toContain(input.organizationId);
   if (!isAnonymousContext(input.user)) {
     expect(serialized).not.toContain(input.user.id);
     expect(serialized).not.toContain(input.user.google_user_email);
@@ -491,7 +492,7 @@ describe('getProvider routing decision', () => {
     });
 
     expect(decision.byok_candidates).toEqual([
-      candidate('direct-byok', 'synthetic', 0, 'skipped', { reason: 'unsupported-api-kind' }),
+      candidate('direct-byok', 'synthetic', 0, 'selected', { reason: 'unsupported-api-kind' }),
     ]);
     expect(decision.steps.slice(-2)).toEqual([
       { step: 'byok-key', outcome: 'skipped', reason: 'none-served' },

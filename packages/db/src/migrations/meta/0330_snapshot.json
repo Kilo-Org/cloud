@@ -1,5 +1,5 @@
 {
-  "id": "b1efd9dc-692f-4fc0-b9b6-2f355a293ec2",
+  "id": "ddc770d9-2af5-4667-bd17-a9d0e7f6f31d",
   "prevId": "df411b7f-8c0e-45e2-914b-5493e3b29d85",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -5954,13 +5904,13 @@
           "name": "platform",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "repo_full_name": {
           "name": "repo_full_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "gitlab_clone_url": {
           "name": "gitlab_clone_url",
@@ -5977,6 +5927,12 @@
         "bitbucket_repository_uuid": {
           "name": "bitbucket_repository_uuid",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repositories": {
+          "name": "repositories",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -6189,6 +6145,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_cloud_agent_environments_repositories": {
+          "name": "IDX_cloud_agent_environments_repositories",
+          "columns": [
+            {
+              "expression": "repositories",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "jsonb_path_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "gin",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -6227,21 +6199,9 @@
           "name": "cloud_agent_environments_owner_check",
           "value": "(\n        (\"cloud_agent_environments\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_environments\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
         },
-        "cloud_agent_environments_platform_check": {
-          "name": "cloud_agent_environments_platform_check",
-          "value": "\"cloud_agent_environments\".\"platform\" IN ('github', 'gitlab', 'bitbucket')"
-        },
-        "cloud_agent_environments_github_identity_check": {
-          "name": "cloud_agent_environments_github_identity_check",
-          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'github') = (\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
-        },
-        "cloud_agent_environments_gitlab_identity_check": {
-          "name": "cloud_agent_environments_gitlab_identity_check",
-          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'gitlab') = (\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
-        },
-        "cloud_agent_environments_bitbucket_identity_check": {
-          "name": "cloud_agent_environments_bitbucket_identity_check",
-          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'bitbucket') = (\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL\n        )\n      )"
+        "cloud_agent_environments_identity_check": {
+          "name": "cloud_agent_environments_identity_check",
+          "value": "(\n        (\n          \"cloud_agent_environments\".\"repositories\" IS NULL AND\n          \"cloud_agent_environments\".\"platform\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"repo_full_name\" IS NOT NULL AND (\n            (\n              \"cloud_agent_environments\".\"platform\" = 'github' AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n            ) OR (\n              \"cloud_agent_environments\".\"platform\" = 'gitlab' AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n            ) OR (\n              \"cloud_agent_environments\".\"platform\" = 'bitbucket' AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL\n            )\n          )\n        ) OR (\n          \"cloud_agent_environments\".\"repositories\" IS NOT NULL AND\n          jsonb_typeof(\"cloud_agent_environments\".\"repositories\") = 'array' AND\n          \"cloud_agent_environments\".\"repositories\" <> '[]'::jsonb AND\n          \"cloud_agent_environments\".\"platform\" IS NULL AND\n          \"cloud_agent_environments\".\"repo_full_name\" IS NULL AND\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
         }
       },
       "isRLSEnabled": false

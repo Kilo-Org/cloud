@@ -11,9 +11,6 @@ import type {
 
 export type { EnvironmentBuildRequestResult, EnvironmentBuildStatus, EnvironmentBuildSummary };
 
-export const SNAPSHOT_REUSE_NOTICE =
-  'Cached files may retain old values, including secrets. Refresh the snapshot to replace them.';
-
 const ACTIVE_STATES: ReadonlySet<EnvironmentBuildSummary['state']> = new Set([
   'queued',
   'preparing',

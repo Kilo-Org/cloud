@@ -903,9 +903,8 @@ async function selectProvider(
     decision.step({ ...unsupportedKey, outcome: 'skipped', reason: 'not-loaded' });
   }
 
-  const kiloRouteUsesVercel = await shouldRouteToVercel(
-    { requestedModel, boundedSpending, organizationDisabledVercelAiGateway },
-    async () => withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
+  const kiloRouteUsesVercel = await shouldRouteToVercel(input, async () =>
+    withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
   );
   decision.step({
     step: 'kilo',

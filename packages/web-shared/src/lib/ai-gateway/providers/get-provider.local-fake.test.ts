@@ -260,11 +260,7 @@ describe('getProvider local fake deterministic routing', () => {
           bypassAccessCheck: false,
         });
         expect(shouldRouteToVercel).toHaveBeenCalledWith(
-          {
-            requestedModel: modelId,
-            boundedSpending: false,
-            organizationDisabledVercelAiGateway: false,
-          },
+          expect.objectContaining({ requestedModel: modelId }),
           expect.any(Function)
         );
       }

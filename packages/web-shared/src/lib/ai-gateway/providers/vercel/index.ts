@@ -1,5 +1,4 @@
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { GetProviderInput } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -65,15 +64,15 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
+/** The `GetProviderInput` fields that decide whether Kilo's own route uses the Vercel AI Gateway. */
+export type VercelRoutingInput = {
+  requestedModel: string;
+  boundedSpending?: boolean;
+  organizationDisabledVercelAiGateway?: boolean;
+};
+
 export async function shouldRouteToVercel(
-  {
-    requestedModel,
-    boundedSpending,
-    organizationDisabledVercelAiGateway,
-  }: Pick<
-    GetProviderInput,
-    'requestedModel' | 'boundedSpending' | 'organizationDisabledVercelAiGateway'
-  >,
+  { requestedModel, boundedSpending, organizationDisabledVercelAiGateway }: VercelRoutingInput,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   if (organizationDisabledVercelAiGateway) {

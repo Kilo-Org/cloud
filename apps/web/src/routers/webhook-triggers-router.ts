@@ -83,6 +83,7 @@ export const WebhookTriggerCreateInput = z
       .max(10000, 'Prompt template must be 10,000 characters or less'),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
+    skipIfRunning: z.boolean().optional(),
     webhookAuth: z
       .object({
         header: z.string().trim().min(1, 'Webhook auth header is required'),
@@ -205,6 +206,7 @@ export const WebhookTriggerUpdateInput = z
     bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
+    skipIfRunning: z.boolean().optional(),
     isActive: z.boolean().optional(),
     webhookAuth: z
       .object({
@@ -761,6 +763,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           bodySchema: input.bodySchema,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
+          skipIfRunning: input.skipIfRunning,
           webhookAuth: input.webhookAuth,
           activationMode: input.activationMode,
           cronExpression: input.cronExpression,
@@ -897,6 +900,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       input.bodySchema,
       input.autoCommit,
       input.condenseOnComplete,
+      input.skipIfRunning,
       input.isActive,
       input.webhookAuth,
       input.cronExpression,
@@ -925,6 +929,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       bodySchema: input.bodySchema,
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
+      skipIfRunning: input.skipIfRunning,
       webhookAuth: input.webhookAuth,
       cronExpression: isScheduledTrigger ? input.cronExpression : undefined,
       cronTimezone: isScheduledTrigger ? input.cronTimezone : undefined,
@@ -1026,6 +1031,12 @@ export const webhookTriggersRouter = createTRPCRouter({
     }
     if (result.status === 400) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Trigger is not scheduled' });
+    }
+    if (result.runInProgress) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'A previous run is still in progress',
+      });
     }
     if (result.status === 409) {
       throw new TRPCError({ code: 'CONFLICT', message: 'Trigger is inactive' });

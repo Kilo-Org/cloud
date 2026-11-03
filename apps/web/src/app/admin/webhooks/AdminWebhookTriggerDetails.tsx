@@ -197,6 +197,10 @@ export function AdminWebhookTriggerDetails({ params, scope }: AdminWebhookTrigge
                 <p className="text-muted-foreground text-sm">Condense on Complete</p>
                 <p className="text-sm">{data.condenseOnComplete ? 'Enabled' : 'Disabled'}</p>
               </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Skip if Running</p>
+                <p className="text-sm">{data.skipIfRunning ? 'Enabled' : 'Disabled'}</p>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -201,6 +201,7 @@ export const TriggerConfigInput = z
     bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
+    skipIfRunning: z.boolean().optional(),
     webhookAuth: z
       .object({
         header: z.string().trim().min(1, 'webhookAuth.header is required'),
@@ -335,6 +336,7 @@ export const TriggerConfigUpdateInput = z
     bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
+    skipIfRunning: z.boolean().optional(),
     webhookAuth: z
       .object({
         header: z.string().trim().min(1).nullable().optional(),
@@ -493,6 +495,7 @@ async function handleInvokeScheduled(c: RouteContext, namespace: string, trigger
       NOT_SCHEDULED: 400,
       INACTIVE: 409,
       INFLIGHT_LIMIT: 429,
+      RUN_IN_PROGRESS: 409,
       QUEUE_FAILED: 500,
     } as const;
     const status = statusByError[result.error];

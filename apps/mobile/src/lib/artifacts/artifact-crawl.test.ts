@@ -43,6 +43,9 @@ const fakeFs = vi.hoisted(() => {
     }
 
     create(): void {
+      if (fakeFs.failCreate) {
+        throw new Error('cannot create the target');
+      }
       this.created = true;
       this.size = 0;
       this.writes = [];
@@ -62,13 +65,16 @@ const fakeFs = vi.hoisted(() => {
     }
   }
 
-  return {
+  const state = {
     File: FileMock,
     files,
+    failCreate: false,
     reset: () => {
       files.length = 0;
+      state.failCreate = false;
     },
   };
+  return state;
 });
 
 vi.mock('expo-file-system', () => ({ Directory: vi.fn(), File: fakeFs.File, Paths: {} }));
@@ -568,6 +574,37 @@ describe('materializeArtifact', () => {
     ).resolves.toEqual({ ok: false, reason: 'download-failed' });
     expect(cancelled).toBe(true);
     expect(tracked.created).toBe(false);
+  });
+
+  it('releases the body when the target cannot be created', async () => {
+    let cancelled = false;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (init?.headers !== undefined) {
+        return new Response('x', {
+          status: 206,
+          headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+        });
+      }
+      if (url !== ALLOWED_URL) {
+        throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+      }
+      return new Response(
+        new ReadableStream({
+          cancel: () => {
+            cancelled = true;
+          },
+        }),
+        { status: 200 }
+      );
+    });
+    const { file, tracked } = target();
+    fakeFs.failCreate = true;
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    expect(cancelled).toBe(true);
+    expect(tracked.streamed).toBe(0);
   });
 
   it.each<[string, string]>([

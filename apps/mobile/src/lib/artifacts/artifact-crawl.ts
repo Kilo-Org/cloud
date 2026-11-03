@@ -343,7 +343,7 @@ async function fetchAllowedArtifact(
  * Download an allowed artifact URL into `target`, following only redirects that
  * stay on the allowed origins; a refused hop leaves no bytes behind. The body is
  * piped through the file handle, so a download never sits in memory whole while
- * it is written.
+ * it is written, and every failure path releases the body.
  */
 async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
   const response = await fetchAllowedArtifact(url, { method: 'GET' });
@@ -356,18 +356,23 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
     await response.body?.cancel();
     throw new Error(`Artifact download failed with status ${response.status}`);
   }
-  // `writableStream()` opens a write-only handle: iOS throws when the file does
-  // not exist, and neither platform truncates there. Creating it first makes the
-  // staging path a fresh empty file, so a leftover of the same name cannot leave
-  // a tail behind the new bytes.
-  target.create({ intermediates: true, overwrite: true });
   try {
+    // `writableStream()` opens a write-only handle: iOS throws when the file does
+    // not exist, and neither platform truncates there. Creating it first makes
+    // the staging path a fresh empty file, so a leftover of the same name cannot
+    // leave a tail behind the new bytes.
+    target.create({ intermediates: true, overwrite: true });
     await (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream());
+    return target;
   } catch (error) {
+    try {
+      await response.body?.cancel();
+    } catch {
+      // A failed pipe already released the stream, so nothing is left to cancel.
+    }
     deleteQuietly(target);
     throw error;
   }
-  return target;
 }
 
 // `messages` comes off tRPC as a trusted-shaped but statically unknown payload,

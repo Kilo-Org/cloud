@@ -212,6 +212,7 @@ describe('hasInferenceProviderUserByokForModel', () => {
     await expect(
       hasInferenceProviderUserByokForModel(GEMMA_4_26B_A4B_IT_FREE_ID, ['anthropic'])
     ).resolves.toBe(false);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
   });
 
   test('does not count keys for an id a custom LLM owns, which routing serves first', async () => {

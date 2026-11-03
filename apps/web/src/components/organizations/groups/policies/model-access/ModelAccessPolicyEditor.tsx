@@ -210,7 +210,7 @@ export function ModelAccessPolicyEditor({
             <SelectContent className="z-[70]">
               <SelectItem value="all">All organization-approved models</SelectItem>
               <SelectItem value="none">No model access</SelectItem>
-              <SelectItem value="selected">Selected models and providers</SelectItem>
+              <SelectItem value="selected">Specific models and providers</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -228,9 +228,9 @@ export function ModelAccessPolicyEditor({
                 isLoading={false}
                 canEdit
                 search={modelSearch}
-                selectedOnly={selectedModelsOnly}
+                enabledOnly={selectedModelsOnly}
                 onSearchChange={setModelSearch}
-                onSelectedOnlyChange={setSelectedModelsOnly}
+                onEnabledOnlyChange={setSelectedModelsOnly}
                 allowedModelIds={selectedModels}
                 enabledProviderSlugs={selectedProviders}
                 filteredModelRows={filteredModels}
@@ -241,6 +241,14 @@ export function ModelAccessPolicyEditor({
                       : current.filter(value => value !== modelId)
                   )
                 }
+                onSetModelsAllowed={(modelIds, enabled) => {
+                  const affectedIds = new Set(modelIds);
+                  setModelIds(current =>
+                    enabled
+                      ? sortUniqueStrings([...current, ...affectedIds])
+                      : current.filter(value => !affectedIds.has(value))
+                  );
+                }}
                 onOpenModelDetails={() => undefined}
               />
             </TabsContent>
@@ -271,6 +279,14 @@ export function ModelAccessPolicyEditor({
                       : current.filter(value => value !== providerSlug)
                   )
                 }
+                onSetProvidersEnabled={(providerSlugs, enabled) => {
+                  const affectedSlugs = new Set(providerSlugs);
+                  setProviderSlugs(current =>
+                    enabled
+                      ? sortUniqueStrings([...current, ...affectedSlugs])
+                      : current.filter(value => !affectedSlugs.has(value))
+                  );
+                }}
                 onOpenProviderDetails={() => undefined}
               />
             </TabsContent>

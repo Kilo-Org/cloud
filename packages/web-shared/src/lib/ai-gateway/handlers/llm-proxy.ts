@@ -182,8 +182,6 @@ import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-g
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
-const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
-
 /**
  * Checks if a string starts with a required prefix and removes it.
  * @param str The input string to check
@@ -992,16 +990,6 @@ export async function handleLlmProxyRequest(
         ? effectiveProviderContext.userByok?.[0]?.providerId
         : undefined
     );
-  }
-
-  // Large responses may run longer than the 800s serverless function timeout.
-  const requestMaxTokens = getMaxTokens(requestBodyParsed);
-  if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
-    console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {
-      maxTokens: requestMaxTokens,
-      bodyText: requestBodyText,
-    });
-    return temporarilyUnavailableResponse();
   }
 
   if (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))) {

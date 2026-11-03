@@ -173,8 +173,8 @@ function createInternalApiContext(options: {
     authToken: effectiveAuthToken,
     request: { headers } as Request,
     env: {
-      Sandbox: {} as TRPCContext['env']['Sandbox'],
-      SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
+      SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+      SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
       SANDBOX_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),

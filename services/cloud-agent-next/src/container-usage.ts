@@ -126,12 +126,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
   private async assertCapacityBeforeStart(): Promise<void> {
     if (this.ctx.container?.running === true) return;
-    if (
-      this.sandboxClassName === 'SandboxCodeReview' ||
-      this.sandboxClassName === 'SandboxCodeReviewContainment'
-    ) {
-      return;
-    }
     const attribution = await this.billing.getStartAttribution();
     if (!attribution) return;
     await assertContainerCapacity(this.env, { ...attribution, checkpoint: 'sandbox-start' });

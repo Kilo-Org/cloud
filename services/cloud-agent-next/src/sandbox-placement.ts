@@ -7,6 +7,7 @@ import {
 import {
   classifySandboxId,
   getSandboxNamespace,
+  getSandboxNamespaceForClass,
   hashToSandboxId,
   isPlacedSandboxKey,
   selectDefaultSandboxProvider,
@@ -27,14 +28,7 @@ export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
 
-type SandboxNamespaceEnv = Pick<
-  Env,
-  | 'Sandbox'
-  | 'SandboxContainment'
-  | 'SandboxSmallContainment'
-  | 'SandboxCodeReviewContainment'
-  | 'SandboxDIND'
->;
+type SandboxNamespaceEnv = Pick<Env, 'SandboxContainment' | 'SandboxSmallContainment'>;
 
 /**
  * The legacy key class each kind stands in for, so class-based rules (billing
@@ -46,14 +40,6 @@ const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
   'code-review': 'code-review',
   shared: 'shared',
 };
-
-/** The contained pool per kind; the same mapping the legacy prefixes encode. */
-const CONTAINED_NAMESPACE = {
-  isolated: 'SandboxSmallContainment',
-  'isolated-standard': 'SandboxContainment',
-  'code-review': 'SandboxCodeReviewContainment',
-  shared: 'SandboxContainment',
-} as const satisfies Record<SandboxKind, keyof SandboxNamespaceEnv>;
 
 export type ControlPlaneSandboxDecision = {
   sandboxId: SandboxId;
@@ -149,6 +135,7 @@ export function resolveSandboxNamespace(
   if (input.sandboxKind === undefined) {
     return getSandboxNamespace(env, input.sandboxId, { managedScmContainment: input.contained });
   }
-  // Every non-contained sandbox runs in the standard pool, as for legacy keys.
-  return input.contained ? env[CONTAINED_NAMESPACE[input.sandboxKind]] : env.Sandbox;
+  return getSandboxNamespaceForClass(env, KIND_SANDBOX_ID_CLASS[input.sandboxKind], {
+    managedScmContainment: input.contained,
+  });
 }

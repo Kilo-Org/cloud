@@ -9,7 +9,7 @@ import {
   isSandboxContainerRunning,
   parseSandboxBillingInput,
 } from '../container-usage-context.js';
-import { MANAGED_SCM_OUTBOUND_HANDLER } from '../sandbox-id.js';
+import { MANAGED_SCM_OUTBOUND_HANDLER, RetiredSandboxRuntimeError } from '../sandbox-id.js';
 import type { SandboxInstance } from '../types.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
@@ -68,6 +68,18 @@ export function decodeCloudflareProviderRef(raw: string | null): CloudflareProvi
 }
 
 export type CloudflareSandboxHandle = SandboxInstance;
+
+/** A retired runtime can never start, so creation fails permanently instead of retrying. */
+async function rejectRetiredRuntime<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof RetiredSandboxRuntimeError) {
+      throw new ProviderCreationError('invalid_configuration');
+    }
+    throw error;
+  }
+}
 
 type SandboxOptions = { containment: boolean };
 
@@ -184,7 +196,7 @@ export function createCloudflareProviderAdapter(deps: {
           : true,
         instanceId: intent.intentId,
       });
-      await ensureBillingAdmission(providerRef, intent.billing);
+      await rejectRetiredRuntime(() => ensureBillingAdmission(providerRef, intent.billing));
       return { providerRef };
     },
     async launch(ref, { command, env }) {
@@ -192,7 +204,9 @@ export function createCloudflareProviderAdapter(deps: {
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
         throw new ProviderCreationError('invalid_configuration');
       }
-      const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
+      const sandbox = await rejectRetiredRuntime(async () =>
+        deps.getSandbox(parsed.sandboxId, { containment: parsed.containment })
+      );
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
       await sandbox.startProcess(command.argv.map(shellQuote).join(' '), {
         cwd: '/',
@@ -218,7 +232,8 @@ export function createCloudflareProviderAdapter(deps: {
             running === true ? 'active' : running === false && !settling ? 'terminal' : 'unknown',
           providerRef,
         };
-      } catch {
+      } catch (error) {
+        if (error instanceof RetiredSandboxRuntimeError) return { status: 'terminal', providerRef };
         return { status: 'unknown', providerRef };
       }
     },
@@ -243,7 +258,8 @@ export function createCloudflareProviderAdapter(deps: {
           durationMs: Date.now() - startedAt,
         });
         return 'terminal';
-      } catch {
+      } catch (error) {
+        if (error instanceof RetiredSandboxRuntimeError) return 'terminal';
         logControlDiagnostic(
           'native_stop',
           {

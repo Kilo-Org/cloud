@@ -1331,7 +1331,7 @@ export async function listSandboxContainers(
     if (!id || !name || !image) continue;
     // Match sandbox DO container names. cloudflare/containers uses a naming
     // scheme that includes the DO class name; we match on `Sandbox` (covers
-    // both `Sandbox` and `SandboxSmall`) plus the dev worker prefix when
+    // the retained sandbox classes) plus the dev worker prefix when
     // present. Relaxed match keeps the harness robust to wrangler version
     // changes.
     const isSandbox =

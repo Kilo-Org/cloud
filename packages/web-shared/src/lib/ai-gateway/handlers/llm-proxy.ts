@@ -11,16 +11,7 @@ import {
   BRIEFING_SETTLEMENT_HEADER,
   recordBriefingUsage,
 } from '@kilocode/web-shared/lib/agent-briefing-usage';
-import type {
-  OpenRouterChatCompletionRequest,
-  GatewayResponsesRequest,
-  GatewayMessagesRequest,
-  GatewayRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import {
-  getEffectiveProviderPrivacy,
-  providerPrivacySchema,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -57,11 +48,8 @@ import {
   extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
-  invalidRequestResponse,
-  malformedJsonResponse,
   invalidTokenResponse,
   makeErrorReadable,
-  modelDoesNotExistResponse,
   modelNotAllowedResponse,
   efficientPoolBlockedResponse,
   extractHeaderAndLimitLength,
@@ -76,7 +64,6 @@ import {
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
-  storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   allowedInferenceProviders,
   inferenceProvidersNotAllowedResponse,
@@ -181,21 +168,21 @@ import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import {
+  parseLlmProxyRequest,
+  type LlmProxyPath,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 
-function validatePath(
-  url: URL
-):
-  | { path: '/chat/completions' | '/responses' | '/messages' }
-  | { errorResponse: ReturnType<typeof invalidPathResponse> } {
+function llmProxyPath(url: URL): LlmProxyPath | null {
   switch (url.pathname) {
     case '/api/v1/chat/completions':
-      return { path: '/chat/completions' };
+      return '/chat/completions';
     case '/api/v1/responses':
-      return { path: '/responses' };
+      return '/responses';
     case '/api/v1/messages':
-      return { path: '/messages' };
+      return '/messages';
     default:
-      return { errorResponse: invalidPathResponse() };
+      return null;
   }
 }
 
@@ -248,12 +235,10 @@ export async function handleLlmProxyRequest(
   const requestStartedAtMs = Date.now();
 
   const url = new URL(request.url);
+  const path = llmProxyPath(url);
+  if (!path) return invalidPathResponse();
 
-  const pathResult = validatePath(url);
-  if ('errorResponse' in pathResult) return pathResult.errorResponse;
-  const { path } = pathResult;
-
-  const ipAddress = rawClientIp(request);
+  const rawIpAddress = rawClientIp(request);
   const countryCode = requestCountryCode(request.headers);
 
   // Cap the account before this function starts any database work. Every WAF
@@ -264,7 +249,7 @@ export async function handleLlmProxyRequest(
   // account with a read-replica query, so a cap placed after auth still spends a
   // connection on every flooded request. The key comes from the signed token
   // instead, which costs no query.
-  const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
+  const accountKey = gatewayRateLimitKey(request.headers, rawIpAddress);
   if (await isGatewayAccountRateLimited(request, accountKey)) {
     console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
     return NextResponse.json(
@@ -283,81 +268,10 @@ export async function handleLlmProxyRequest(
     expectedAudience: KILO_GATEWAY_AUDIENCE,
   });
   debugSaveProxyRequest(requestBodyText);
-  let requestBodyParsed: GatewayRequest;
-  try {
-    if (path === '/chat/completions') {
-      const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
-      // Inject or merge stream_options.include_usage = true (only when streaming)
-      if (body.stream) {
-        body.stream_options = { ...(body.stream_options || {}), include_usage: true };
-      }
-      requestBodyParsed = { kind: 'chat_completions', body };
-    } else if (path === '/messages') {
-      const body = JSON.parse(requestBodyText) as GatewayMessagesRequest;
-      requestBodyParsed = { kind: 'messages', body };
-    } else {
-      const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
-      requestBodyParsed = { kind: 'responses', body };
-    }
-    // Usage accounting parses the response as SSE only when `stream` is exactly true.
-    if (requestBodyParsed.body.stream) {
-      requestBodyParsed.body.stream = true;
-    }
-  } catch (e) {
-    return malformedJsonResponse(e);
-  }
-
-  if (requestBodyParsed.body.providerOptions !== undefined) {
-    const error = 'The providerOptions field is not supported. Use provider instead.';
-    return NextResponse.json(
-      { error, error_type: ProxyErrorType.unsupported_field, message: error },
-      { status: 400 }
-    );
-  }
-
-  if (
-    typeof requestBodyParsed.body.model !== 'string' ||
-    requestBodyParsed.body.model.trim().length === 0
-  ) {
-    return modelDoesNotExistResponse();
-  }
-
-  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
-    if (!Array.isArray(requestBodyParsed.body.messages)) {
-      return invalidRequestResponse();
-    }
-  }
-
-  if (requestBodyParsed.kind === 'responses') {
-    const { input } = requestBodyParsed.body;
-    if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
-      return invalidRequestResponse();
-    }
-  }
-
+  const parsed = parseLlmProxyRequest(path, requestBodyText, rawIpAddress);
+  if (!parsed.ok) return parsed.response;
+  const { request: requestBodyParsed, requestPrivacy, ipAddress } = parsed;
   const requestProvider = requestBodyParsed.body.provider;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
-
-  if (!ipAddress) {
-    return NextResponse.json(
-      {
-        error: 'Unable to determine client IP',
-        error_type: ProxyErrorType.missing_client_ip,
-      },
-      { status: 400 }
-    );
-  }
-
-  if (
-    requestBodyParsed.kind === 'responses' &&
-    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
-  ) {
-    return storeAndPreviousResponseIdIsNotSupported();
-  }
-
-  // Canonicalize once so routing, policy, and the upstream request all see the same id.
-  requestBodyParsed.body.model = requestBodyParsed.body.model.trim();
   const requestedModel = requestBodyParsed.body.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
@@ -466,7 +380,7 @@ export async function handleLlmProxyRequest(
 
   const { settings: privacySettings } = await balanceAndSettingsPromise;
   const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
+    requestPrivacy,
     privacySettings?.data_collection
   );
   if (Object.keys(effectivePrivacy).length > 0) {

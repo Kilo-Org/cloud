@@ -2596,6 +2596,98 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     reconnected.close();
   });
 
+  it.each(['fail', 'pass', undefined] as const)(
+    'forwards a completed wrapper outcome through the Sandbox DO to the callback with gateResult %s',
+    async gateResult => {
+      const sessionId = newSessionId();
+      const sandboxId = unique('sbx__gate_result');
+      const provider = createFakeProvider();
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          return stored?.auth.kiloSessionId
+            ? { userId: ownerId, kiloSessionId: stored.auth.kiloSessionId }
+            : null;
+        });
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+        });
+      });
+      const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      await sessionStub.registerSessionFromMetadata({
+        metadata: parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: SESSION_OWNER_ID, orgId: 'org_123' },
+          auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
+          agent: { mode: 'code', model: 'test/model' },
+          repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+          callback: { target: { url: 'https://callback.test/hook' } },
+          lifecycle: { version: 1, timestamp: 1 },
+        }),
+        sandboxSelection: { provider: 'cloudflare' },
+      });
+      const callbacks: CallbackJob[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = { send: async () => {} } as never;
+        instance.env.CALLBACK_QUEUE = {
+          send: async (job: CallbackJob) => {
+            callbacks.push(job);
+          },
+        } as never;
+      });
+      await sessionStub.send(promptPayload('m1'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      try {
+        expect(
+          await wrapper.hello({
+            wrapperId: 'wr_gate_result',
+            allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+          })
+        ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.prepare',
+          spec: { sessionId },
+        });
+        wrapper.send({ type: 'session.ready', sessionId });
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.prompt',
+          sessionId,
+          payload: { messageId: 'm1' },
+        });
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('running'));
+        wrapper.send({
+          type: 'session.outcome',
+          sessionId,
+          status: 'completed',
+          lastMessageId: 'm1',
+          ...(gateResult === undefined ? {} : { gateResult }),
+        });
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('completed'));
+        await runSessionAlarm(sessionStub);
+        expect(callbacks).toHaveLength(1);
+        expect(callbacks[0]?.payload).toMatchObject({
+          sessionId,
+          cloudAgentSessionId: sessionId,
+          messageId: 'm1',
+          status: 'completed',
+        });
+        expect(callbacks[0]?.payload.gateResult).toBe(gateResult);
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
   it('carries the roots of a V2 registration through the Session DO to the wrapper frame', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');

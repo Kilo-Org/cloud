@@ -19,14 +19,12 @@ import {
   observeMembershipRole,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { evaluateSupportAccessForObserve } from '@kilocode/web-shared/lib/admin/support-access-resolver';
-import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   findSupportAllowEntry,
   supportStandInRole,
   type OrganizationAccess,
   type SupportActionClass,
-  type SupportDecision,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { TRPCError } from '@trpc/server';
@@ -96,12 +94,10 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
-  const mode = getSupportAccessMode();
-
-  if (user.is_admin && mode !== 'enforce') {
+  if (user.is_admin && !isSupportAccessEnabled()) {
     // Parent ordering: record the elevation before awaiting the organization
     // lookup, so a missing/deleted organization or a DB error is still
-    // attributed. In observe, also evaluate the would-be support decision.
+    // attributed.
     const organizationResult = getOrganizationById(organizationId).then(
       value => ({ ok: true as const, value }),
       error => ({ ok: false as const, error })
@@ -110,26 +106,6 @@ export async function getAuthorizedOrgContext(
       () => loadEffectiveMembershipRows(user.id, organizationId),
       roles
     );
-    const membershipDecision: SupportDecision | null = observation.wouldPassWithoutAdmin
-      ? 'member'
-      : observation.membershipRole !== null
-        ? 'deny_actor_permission'
-        : null;
-    const evaluation =
-      mode === 'observe' && membershipDecision === null
-        ? await evaluateSupportAccessForObserve({
-            actorKiloUserId: user.id,
-            organizationId,
-            requiredActionClass:
-              options.requiredActionClass ??
-              (requestMethod === 'GET' ? 'support_read' : 'support_write'),
-            roles,
-            surface: (surface ?? 'rest') as SupportSurface,
-            key: options.supportKey ?? null,
-            supportActionId: options.supportKey ?? null,
-          })
-        : null;
-    const supportDecision = membershipDecision ?? evaluation?.decision ?? null;
     await recordKiloAdminElevation(
       {
         user,
@@ -143,10 +119,6 @@ export async function getAuthorizedOrgContext(
         reason: 'organization_access_rest',
         target: organizationTarget(organizationId),
         ...observation,
-        supportDecision,
-        supportGrantId: evaluation?.grantId ?? null,
-        supportActionId: options.supportKey ?? null,
-        inventoryId: null,
       }
     );
     const lookup = await organizationResult;
@@ -160,11 +132,7 @@ export async function getAuthorizedOrgContext(
       data: {
         user: { ...user, role: 'owner' },
         organization,
-        access: {
-          kind: 'legacy_admin',
-          role: 'owner',
-          wouldBe: supportDecision,
-        },
+        access: { kind: 'legacy_admin', role: 'owner' },
       },
     });
   }

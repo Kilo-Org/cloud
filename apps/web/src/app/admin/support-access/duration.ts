@@ -1,8 +1,13 @@
+import {
+  SUPPORT_READ_MAX_DURATION_SECONDS,
+  SUPPORT_WRITE_MAX_DURATION_SECONDS,
+} from '@kilocode/web-shared/lib/admin/support-access';
+
 export type SupportDurationActionClass = 'support_read' | 'support_write';
 
 const MAX_MINUTES: Record<SupportDurationActionClass, number> = {
-  support_read: 60,
-  support_write: 15,
+  support_read: SUPPORT_READ_MAX_DURATION_SECONDS / 60,
+  support_write: SUPPORT_WRITE_MAX_DURATION_SECONDS / 60,
 };
 
 export function maxSupportDurationMinutes(actionClass: SupportDurationActionClass): number {

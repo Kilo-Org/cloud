@@ -62,7 +62,6 @@ CREATE TABLE "support_access_grants" (
 	CONSTRAINT "support_access_grants_active_requires_issue_check" CHECK (NOT ("support_access_grants"."status" = 'active' AND "support_access_grants"."issued_at" IS NULL))
 );
 --> statement-breakpoint
-ALTER TABLE "kilocode_users" ADD COLUMN "can_request_support_org_access" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "support_access_grant_events" ADD CONSTRAINT "support_access_grant_events_grant_id_support_access_grants_id_fk" FOREIGN KEY ("grant_id") REFERENCES "public"."support_access_grants"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_access_grant_events" ADD CONSTRAINT "support_access_grant_events_performed_by_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("performed_by_kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "support_access_grants" ADD CONSTRAINT "support_access_grants_actor_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("actor_kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -77,5 +76,4 @@ CREATE UNIQUE INDEX "UQ_support_access_grants_open" ON "support_access_grants" U
 CREATE INDEX "IDX_support_access_grants_actor_org_expires" ON "support_access_grants" USING btree ("actor_kilo_user_id","organization_id","expires_at") WHERE "support_access_grants"."status" = 'active';--> statement-breakpoint
 CREATE INDEX "IDX_support_access_grants_organization_requested" ON "support_access_grants" USING btree ("organization_id","requested_at");--> statement-breakpoint
 CREATE INDEX "IDX_support_access_grants_pending_requested" ON "support_access_grants" USING btree ("requested_at") WHERE "support_access_grants"."status" = 'pending';--> statement-breakpoint
-CREATE INDEX "IDX_support_access_grants_unreviewed_emergency" ON "support_access_grants" USING btree ("issued_at") WHERE "support_access_grants"."review_required" AND "support_access_grants"."reviewed_at" IS NULL;--> statement-breakpoint
-ALTER TABLE "kilocode_users" ADD CONSTRAINT "kilocode_users_can_request_support_org_access_requires_admin_check" CHECK (NOT "kilocode_users"."can_request_support_org_access" OR "kilocode_users"."is_admin");
+CREATE INDEX "IDX_support_access_grants_unreviewed_emergency" ON "support_access_grants" USING btree ("issued_at") WHERE "support_access_grants"."review_required" AND "support_access_grants"."reviewed_at" IS NULL;

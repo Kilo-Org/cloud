@@ -91,14 +91,12 @@ describe('trpc tests', () => {
         canViewSessions: false,
         canManageCredits: false,
         canExportApiRequestLogs: false,
-        canRequestSupportOrgAccess: false,
       });
       await expect(creditManagerCaller.admin.getPermissions()).resolves.toEqual({
         isSuperadmin: false,
         canViewSessions: false,
         canManageCredits: true,
         canExportApiRequestLogs: false,
-        canRequestSupportOrgAccess: false,
       });
     });
   });

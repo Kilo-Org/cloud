@@ -16,10 +16,6 @@ export function userCanExportApiRequestLogs(user: User): boolean {
   return user.is_admin && user.can_export_api_request_logs;
 }
 
-export function userCanRequestSupportOrgAccess(user: User): boolean {
-  return user.is_admin && user.can_request_support_org_access;
-}
-
 // Permission checks read the primary so a granted or revoked permission
 // applies to a session that is already signed in.
 async function currentUserHasPermission(
@@ -43,8 +39,4 @@ export function canCurrentUserViewSessions(kiloUserId: string): Promise<boolean>
 
 export function canCurrentUserExportApiRequestLogs(kiloUserId: string): Promise<boolean> {
   return currentUserHasPermission(kiloUserId, userCanExportApiRequestLogs);
-}
-
-export function canCurrentUserRequestSupportOrgAccess(kiloUserId: string): Promise<boolean> {
-  return currentUserHasPermission(kiloUserId, userCanRequestSupportOrgAccess);
 }

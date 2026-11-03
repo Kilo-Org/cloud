@@ -7,7 +7,6 @@ import {
   support_access_grant_events,
   support_access_grants,
 } from '@kilocode/db/schema';
-import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq, isNotNull } from 'drizzle-orm';
@@ -17,6 +16,11 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 describe('getAuthorizedOrgContext', () => {
   let testOrganizationId: string;
@@ -33,7 +37,7 @@ describe('getAuthorizedOrgContext', () => {
   });
 
   afterEach(async () => {
-    setSupportAccessModeForTest(null);
+    enableSupportAccess(false);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(support_access_grant_events);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -132,103 +136,6 @@ describe('getAuthorizedOrgContext', () => {
         kind: 'kilo_admin_elevation',
         membershipRole: null,
         wouldPassWithoutAdmin: null,
-      });
-    });
-
-    test('observe derives the decision from the admin real membership', async () => {
-      setSupportAccessModeForTest('observe');
-      const adminUser = await insertTestUser({ is_admin: true });
-      await db.insert(organization_memberships).values({
-        organization_id: testOrganizationId,
-        kilo_user_id: adminUser.id,
-        role: 'owner',
-        invited_by: 'test-admin',
-      });
-      const events: AdminAccessEvent[] = [];
-      setAdminAccessSinkForTest(event => events.push(event));
-      const originalSelect = db.select.bind(db);
-      const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
-        const builder = originalSelect(...args);
-        return new Proxy(builder, {
-          get(target, property, receiver) {
-            if (property === 'from') {
-              return (table: Parameters<typeof target.from>[0]) => {
-                if (table === support_access_grants) {
-                  throw new Error('grant lookup must not run for a real member');
-                }
-                return target.from(table);
-              };
-            }
-            const value = Reflect.get(target, property, receiver);
-            return typeof value === 'function' ? value.bind(target) : value;
-          },
-        });
-      });
-      try {
-        const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
-          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.user.role).toBe('owner');
-          expect(result.data.access).toMatchObject({
-            kind: 'legacy_admin',
-            wouldBe: 'member',
-          });
-        }
-      } finally {
-        selectSpy.mockRestore();
-        setAdminAccessSinkForTest(null);
-      }
-      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
-        membershipRole: 'owner',
-        wouldPassWithoutAdmin: true,
-        supportDecision: 'member',
-      });
-    });
-
-    test('observe continues as legacy owner when the grant lookup fails', async () => {
-      setSupportAccessModeForTest('observe');
-      const adminUser = await insertTestUser({
-        is_admin: true,
-        can_request_support_org_access: true,
-      });
-      const events: AdminAccessEvent[] = [];
-      setAdminAccessSinkForTest(event => events.push(event));
-      const originalSelect = db.select.bind(db);
-      const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
-        const builder = originalSelect(...args);
-        return new Proxy(builder, {
-          get(target, property, receiver) {
-            if (property === 'from') {
-              return (table: Parameters<typeof target.from>[0]) => {
-                if (table === support_access_grants) {
-                  throw new Error('grant lookup failed');
-                }
-                return target.from(table);
-              };
-            }
-            const value = Reflect.get(target, property, receiver);
-            return typeof value === 'function' ? value.bind(target) : value;
-          },
-        });
-      });
-      try {
-        const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
-          supportKey: '/api/organizations/[id]/defaults',
-        });
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.user.role).toBe('owner');
-          expect(result.data.access.kind).toBe('legacy_admin');
-        }
-      } finally {
-        selectSpy.mockRestore();
-        setAdminAccessSinkForTest(null);
-      }
-      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
-        supportDecision: null,
       });
     });
 
@@ -560,11 +467,10 @@ describe('getAuthorizedOrgContext', () => {
     }
   });
 
-  test('enforce admits an allowlisted REST read with a support grant', async () => {
-    setSupportAccessModeForTest('enforce');
+  test('when on, admits an allowlisted REST read with a support grant', async () => {
+    enableSupportAccess(true);
     const admin = await insertTestUser({
       is_admin: true,
-      can_request_support_org_access: true,
     });
     const now = new Date();
     await db.insert(support_access_grants).values({
@@ -590,11 +496,10 @@ describe('getAuthorizedOrgContext', () => {
     }
   });
 
-  test('enforce denies a REST read whose route is not allowlisted', async () => {
-    setSupportAccessModeForTest('enforce');
+  test('when on, denies a REST read whose route is not allowlisted', async () => {
+    enableSupportAccess(true);
     const admin = await insertTestUser({
       is_admin: true,
-      can_request_support_org_access: true,
     });
     const now = new Date();
     await db.insert(support_access_grants).values({

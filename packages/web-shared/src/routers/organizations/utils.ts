@@ -20,11 +20,10 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   findSupportAllowEntry,
-  getSupportAccessMode,
-  observeOnlyStepUp,
+  interimSupportStepUp,
+  isSupportAccessEnabled,
   supportStandInRole,
   type OrganizationAccess,
-  type SupportAccessMode,
   type SupportDecision,
   type SupportActionClass,
   type SupportContext,
@@ -32,7 +31,6 @@ import {
 } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   evaluateSupportAccess,
-  evaluateSupportAccessForObserve,
   isLiveOrganization,
   latestSupportGrantStatus,
   organizationState,
@@ -43,8 +41,10 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const parentOrganizations = alias(organizations, 'parent_organizations');
+const warnSupportLookupFailure = sentryLogger('support_access_lookup', 'error');
 
 export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
@@ -251,7 +251,8 @@ type SupportAccessReason =
   | 'support_grant_expired'
   | 'support_grant_revoked'
   | 'support_access_not_allowlisted'
-  | 'support_access_action_class';
+  | 'support_access_action_class'
+  | 'support_grant_lookup_failed';
 
 function supportAccessReasonFor(params: {
   decision: SupportDecision | null;
@@ -264,6 +265,15 @@ function supportAccessReasonFor(params: {
   }
   if (params.decision === 'deny_action_class') return 'support_access_action_class';
   return 'support_grant_required';
+}
+
+function supportLookupFailedError(): TRPCError {
+  warnSupportLookupFailure('Support grant lookup failed; denying access');
+  return new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'Support access could not be verified; retry the request',
+    cause: { supportAccessReason: 'support_grant_lookup_failed' },
+  });
 }
 
 function deniedAccessError(params: {
@@ -310,10 +320,10 @@ export async function resolveOrganizationAccess(
       rows = [];
     }
   }
-  const mode: SupportAccessMode = getSupportAccessMode();
+  const enabled = isSupportAccessEnabled();
   const isAdmin = ctx.user.is_admin;
   const role = effectiveMembershipRole(rows, options.roles);
-  if (role && !(isAdmin && mode !== 'enforce')) {
+  if (role && (!isAdmin || enabled)) {
     return { kind: 'member', role };
   }
 
@@ -337,115 +347,86 @@ export async function resolveOrganizationAccess(
     }
   }
 
+  if (!enabled) {
+    await recordKiloAdminElevation(ctx, {
+      reason: options.auditReason ?? 'organization_access',
+      target: organizationTarget(organizationId),
+      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
+      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
+    });
+    return { kind: 'legacy_admin', role: 'owner' };
+  }
+
   if (rows.length > 0) {
-    if (mode === 'enforce') {
-      // Enforce uses the real role; a support grant cannot elevate over an
-      // existing membership.
-      throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'You do not have the required organizational role to access this feature',
+    // A real member without the required role keeps the role-specific error;
+    // a support grant cannot elevate over an existing membership.
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have the required organizational role to access this feature',
+    });
+  }
+
+  const { surface, key } = supportKeyFor(ctx, options);
+  const supportActionId = supportActionIdFor(ctx, options, key);
+  let evaluation;
+  try {
+    evaluation = await evaluateSupportAccess({
+      actorKiloUserId: ctx.user.id,
+      organizationId,
+      requiredActionClass: requiredActionClassFor(ctx, options),
+      roles: options.roles,
+      surface,
+      key,
+      supportActionId,
+    });
+  } catch {
+    throw supportLookupFailedError();
+  }
+
+  if (evaluation.access) {
+    if (evaluation.access.actionClass === 'support_write') {
+      await interimSupportStepUp.requireFresh({
+        userId: ctx.user.id,
+        action: 'support_write_request',
+      });
+      await recordSupportWriteUse({
+        grantId: evaluation.access.grantId,
+        actorKiloUserId: ctx.user.id,
+        organizationId,
+        supportActionId: evaluation.access.supportActionId,
       });
     }
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',
       target: organizationTarget(organizationId),
-      membershipRole: effectiveMembershipRole(rows),
-      wouldPassWithoutAdmin: role !== null,
-      supportDecision: mode === 'off' ? null : role !== null ? 'member' : 'deny_actor_permission',
-    });
-    return {
-      kind: 'legacy_admin',
-      role: 'owner',
-      wouldBe: mode === 'off' ? null : role !== null ? 'member' : 'deny_actor_permission',
-    };
-  }
-
-  const { surface, key } = supportKeyFor(ctx, options);
-  const supportActionId = supportActionIdFor(ctx, options, key);
-  const evaluation =
-    mode === 'observe'
-      ? await evaluateSupportAccessForObserve({
-          actorKiloUserId: ctx.user.id,
-          organizationId,
-          requiredActionClass: requiredActionClassFor(ctx, options),
-          roles: options.roles,
-          surface,
-          key,
-          supportActionId,
-        })
-      : await evaluateSupportAccess({
-          actorKiloUserId: ctx.user.id,
-          organizationId,
-          requiredActionClass: requiredActionClassFor(ctx, options),
-          roles: options.roles,
-          surface,
-          key,
-          supportActionId,
-        });
-  const membershipRole = membershipObserved ? effectiveMembershipRole(rows) : null;
-  const wouldPassWithoutAdmin = membershipObserved ? role !== null : null;
-  const elevationReason = options.auditReason ?? 'organization_access';
-
-  if (mode === 'enforce') {
-    if (evaluation.access) {
-      if (evaluation.access.actionClass === 'support_write') {
-        await observeOnlyStepUp.requireFresh({
-          userId: ctx.user.id,
-          action: 'support_write_request',
-        });
-        await recordSupportWriteUse({
-          grantId: evaluation.access.grantId,
-          actorKiloUserId: ctx.user.id,
-          organizationId,
-          supportActionId: evaluation.access.supportActionId,
-        });
-      }
-      await recordKiloAdminElevation(ctx, {
-        reason: elevationReason,
-        target: organizationTarget(organizationId),
-        membershipRole,
-        wouldPassWithoutAdmin,
-        supportDecision: evaluation.decision,
-        supportGrantId: evaluation.grantId,
-        supportActionId,
-        inventoryId: evaluation.access.inventoryId,
-      });
-      return evaluation.access;
-    }
-    const grantStatus =
-      evaluation.decision === 'deny_no_grant'
-        ? await latestSupportGrantStatus({
-            actorKiloUserId: ctx.user.id,
-            organizationId,
-          })
-        : null;
-    await recordKiloAdminElevation(ctx, {
-      reason: elevationReason,
-      target: organizationTarget(organizationId),
-      membershipRole,
-      wouldPassWithoutAdmin,
+      membershipRole: null,
+      wouldPassWithoutAdmin: null,
       supportDecision: evaluation.decision,
       supportGrantId: evaluation.grantId,
       supportActionId,
-      inventoryId: null,
+      inventoryId: evaluation.access.inventoryId,
     });
-    throw deniedAccessError({
-      decision: evaluation.decision,
-      grantStatus,
-    });
+    return evaluation.access;
   }
 
+  const grantStatus = await latestSupportGrantStatus({
+    actorKiloUserId: ctx.user.id,
+    organizationId,
+  });
   await recordKiloAdminElevation(ctx, {
-    reason: elevationReason,
+    reason: options.auditReason ?? 'organization_access',
     target: organizationTarget(organizationId),
-    membershipRole,
-    wouldPassWithoutAdmin,
+    membershipRole: null,
+    wouldPassWithoutAdmin: null,
     supportDecision: evaluation.decision,
     supportGrantId: evaluation.grantId,
     supportActionId,
     inventoryId: null,
   });
-  return { kind: 'legacy_admin', role: 'owner', wouldBe: evaluation.decision };
+  throw deniedAccessError({
+    decision: evaluation.decision,
+    grantStatus,
+  });
 }
 
 /**
@@ -521,7 +502,6 @@ export async function requireLiveOrganizationForPlatformAdmin(
     reason: 'organization_access',
     target: organizationTarget(organizationId),
     ...observation,
-    supportDecision: null,
   });
 }
 
@@ -621,7 +601,7 @@ export async function getOrganizationsAccessRoles(
   if (uniqueIds.length === 0) {
     return result;
   }
-  if (getSupportAccessMode() === 'enforce') {
+  if (isSupportAccessEnabled()) {
     const rolesByOrg = await loadBatchMembershipRoles(ctx.user.id, uniqueIds);
     for (const [organizationId, roles] of rolesByOrg) {
       const best = rolePriority.find(role => roles.includes(role));
@@ -690,7 +670,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
   organizationId: Organization['id'],
   roles?: OrganizationRole[]
 ): Promise<Organization> {
-  if (ctx.user.is_admin && getSupportAccessMode() === 'off') {
+  if (ctx.user.is_admin && !isSupportAccessEnabled()) {
     const organizationResult = settle(
       db
         .select()

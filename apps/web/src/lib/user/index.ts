@@ -1187,7 +1187,6 @@ export async function anonymizeCloudUserData(
       can_view_sessions: false,
       can_manage_credits: false,
       can_export_api_request_logs: false,
-      can_request_support_org_access: false,
       customer_source: null,
       signup_ip: null,
     })

@@ -7,7 +7,6 @@ import {
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   userCanExportApiRequestLogs,
-  userCanRequestSupportOrgAccess,
   userCanViewSessions,
   userIsSuperadmin,
 } from '@/lib/admin/admin-permissions';
@@ -377,7 +376,6 @@ const SetAdminPermissionsSchema = z.object({
       canViewSessions: z.boolean().optional(),
       canManageCredits: z.boolean().optional(),
       canExportApiRequestLogs: z.boolean().optional(),
-      canRequestSupportOrgAccess: z.boolean().optional(),
     })
     .refine(
       permissions => Object.values(permissions).some(value => value !== undefined),
@@ -401,7 +399,6 @@ const platformAdminUserColumns = {
   can_view_sessions: kilocode_users.can_view_sessions,
   can_manage_credits: kilocode_users.can_manage_credits,
   can_export_api_request_logs: kilocode_users.can_export_api_request_logs,
-  can_request_support_org_access: kilocode_users.can_request_support_org_access,
   is_admin: kilocode_users.is_admin,
 };
 
@@ -421,7 +418,6 @@ function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): Platform
     can_view_sessions: user.can_view_sessions,
     can_manage_credits: user.can_manage_credits,
     can_export_api_request_logs: user.can_export_api_request_logs,
-    can_request_support_org_access: user.can_request_support_org_access,
     is_admin: user.is_admin,
   };
 }
@@ -539,7 +535,6 @@ function adminRoleSnapshot(user: User) {
     canViewSessions: user.can_view_sessions,
     canManageCredits: user.can_manage_credits,
     canExportApiRequestLogs: user.can_export_api_request_logs,
-    canRequestSupportOrgAccess: user.can_request_support_org_access,
   };
 }
 
@@ -576,7 +571,6 @@ export const adminRouter = createTRPCRouter({
       canViewSessions: userCanViewSessions(currentUser),
       canManageCredits: userCanManageCredits(currentUser),
       canExportApiRequestLogs: userCanExportApiRequestLogs(currentUser),
-      canRequestSupportOrgAccess: userCanRequestSupportOrgAccess(currentUser),
     };
   }),
   impactReferrals: adminImpactReferralsRouter,
@@ -2016,7 +2010,6 @@ export const adminRouter = createTRPCRouter({
                       can_view_sessions: false,
                       can_manage_credits: false,
                       can_export_api_request_logs: false,
-                      can_request_support_org_access: false,
                       web_session_pepper: crypto.randomUUID(),
                       api_token_pepper: crypto.randomUUID(),
                     }
@@ -2139,11 +2132,6 @@ export const adminRouter = createTRPCRouter({
               input.permissions.canExportApiRequestLogs !== target.can_export_api_request_logs && {
                 can_export_api_request_logs: input.permissions.canExportApiRequestLogs,
               }),
-            ...(input.permissions.canRequestSupportOrgAccess !== undefined &&
-              input.permissions.canRequestSupportOrgAccess !==
-                target.can_request_support_org_access && {
-                can_request_support_org_access: input.permissions.canRequestSupportOrgAccess,
-              }),
           };
 
           if (Object.keys(changes).length === 0) {
@@ -2155,14 +2143,6 @@ export const adminRouter = createTRPCRouter({
 
           if (changes.is_super_admin === false) {
             await assertNotLastUnblockedSuperadmin(tx, target);
-          }
-
-          if (changes.can_request_support_org_access === false) {
-            await revokeOpenSupportGrants(tx, {
-              actorKiloUserId: target.id,
-              reason: 'support access permission revoked',
-              performedByKiloUserId: actor.id,
-            });
           }
 
           const [updatedTarget] = await tx
@@ -2199,10 +2179,6 @@ export const adminRouter = createTRPCRouter({
               (changes.can_export_api_request_logs
                 ? 'Granted API request log export access.'
                 : 'Revoked API request log export access.'),
-            changes.can_request_support_org_access !== undefined &&
-              (changes.can_request_support_org_access
-                ? 'Granted support organization access requester permission.'
-                : 'Revoked support organization access requester permission.'),
           ].filter((note): note is string => typeof note === 'string');
 
           await tx.insert(user_admin_notes).values(

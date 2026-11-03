@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   kilocode_users,
   organizations,
@@ -9,11 +9,9 @@ import {
   type SupportAccessActionClass,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { findPrivilegedInventoryEntry } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   findSupportAllowEntry,
-  getSupportAccessMode,
   isSupportNeverKey,
   supportEntrySatisfiesRoles,
   type SupportContext,
@@ -21,12 +19,9 @@ import {
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
 
-const warnObserveFailure = sentryLogger('support_access_observe', 'warning');
-
 export type SupportResolution = {
   access: SupportContext | null;
-  /** Null in `off` mode, where support access is not evaluated at all. */
-  decision: SupportDecision | null;
+  decision: SupportDecision;
   grantId: string | null;
 };
 
@@ -60,13 +55,6 @@ async function findUsableGrant(params: {
           ? eq(support_access_grants.action_class, 'support_write')
           : inArray(support_access_grants.action_class, ['support_read', 'support_write']),
         eq(kilocode_users.is_admin, true),
-        or(
-          eq(kilocode_users.can_request_support_org_access, true),
-          and(
-            eq(kilocode_users.is_super_admin, true),
-            eq(support_access_grants.grant_kind, 'emergency')
-          )
-        ),
         isNull(kilocode_users.blocked_reason),
         isNull(organizations.deleted_at)
       )
@@ -118,10 +106,6 @@ export async function evaluateSupportAccess(params: {
   key: string | null;
   supportActionId: string | null;
 }): Promise<SupportResolution> {
-  const mode = getSupportAccessMode();
-  if (mode === 'off') {
-    return { access: null, decision: null, grantId: null };
-  }
   if (params.key === null) {
     return { access: null, decision: 'deny_not_allowlisted', grantId: null };
   }
@@ -173,29 +157,6 @@ export async function evaluateSupportAccess(params: {
     decision: 'support_grant',
     grantId: grant.id,
   };
-}
-
-/**
- * Observe mode must never change an admin's outcome. If the would-be support
- * measurement cannot be read (missing table, DB error), record no decision and
- * let the legacy path continue. The report is sanitized: no query params,
- * organization id, or user id are logged.
- */
-export async function evaluateSupportAccessForObserve(params: {
-  actorKiloUserId: string;
-  organizationId: string;
-  requiredActionClass: SupportAccessActionClass;
-  roles: readonly string[] | undefined;
-  surface: SupportSurface;
-  key: string | null;
-  supportActionId: string | null;
-}): Promise<SupportResolution> {
-  try {
-    return await evaluateSupportAccess(params);
-  } catch {
-    warnObserveFailure('Support access observation failed; continuing with legacy access');
-    return { access: null, decision: null, grantId: null };
-  }
 }
 
 export async function isLiveOrganization(organizationId: string): Promise<boolean> {

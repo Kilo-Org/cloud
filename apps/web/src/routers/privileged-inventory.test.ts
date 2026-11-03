@@ -201,7 +201,6 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
         'credit_manager',
         'session_viewer',
         'api_request_log_exporter',
-        'support_access_requester',
       ])
     );
   });

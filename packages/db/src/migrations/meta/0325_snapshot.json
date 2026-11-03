@@ -1,5 +1,5 @@
 {
-  "id": "88cd04d7-a606-4371-8e93-d3a575c7bdb4",
+  "id": "c7033798-f886-4be5-94e0-93db9fd5ffe3",
   "prevId": "704d1452-61a4-44cb-914a-07bd75ae0e34",
   "version": "7",
   "dialect": "postgresql",
@@ -22256,13 +22256,6 @@
           "notNull": true,
           "default": false
         },
-        "can_request_support_org_access": {
-          "name": "can_request_support_org_access",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "total_microdollars_acquired": {
           "name": "total_microdollars_acquired",
           "type": "bigint",
@@ -22620,10 +22613,6 @@
         "kilocode_users_can_export_api_request_logs_requires_admin_check": {
           "name": "kilocode_users_can_export_api_request_logs_requires_admin_check",
           "value": "NOT \"kilocode_users\".\"can_export_api_request_logs\" OR \"kilocode_users\".\"is_admin\""
-        },
-        "kilocode_users_can_request_support_org_access_requires_admin_check": {
-          "name": "kilocode_users_can_request_support_org_access_requires_admin_check",
-          "value": "NOT \"kilocode_users\".\"can_request_support_org_access\" OR \"kilocode_users\".\"is_admin\""
         }
       },
       "isRLSEnabled": false

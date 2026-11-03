@@ -1,5 +1,4 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -22,6 +21,11 @@ import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client
 import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
@@ -273,7 +277,7 @@ describe('organizations members trpc router', () => {
       const organization = await createOrganization('Enforced Self Removal Org', owner.id);
       const kiloAdmin = await insertTestUser({ is_admin: true });
       await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
-      setSupportAccessModeForTest('enforce');
+      enableSupportAccess(true);
       try {
         await expect(
           (await createCallerForUser(kiloAdmin.id)).organizations.members.remove({
@@ -282,7 +286,7 @@ describe('organizations members trpc router', () => {
           })
         ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       } finally {
-        setSupportAccessModeForTest(null);
+        enableSupportAccess(false);
       }
     });
 
@@ -660,7 +664,7 @@ describe('organizations members trpc router', () => {
       const childOwner = await insertTestUser({ is_admin: false });
       const child = await createChildOrganization('Enforced Child Members', childOwner.id);
       const kiloAdmin = await insertTestUser({ is_admin: true });
-      setSupportAccessModeForTest('enforce');
+      enableSupportAccess(true);
       try {
         await expect(
           (await createCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships({
@@ -670,7 +674,7 @@ describe('organizations members trpc router', () => {
           })
         ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       } finally {
-        setSupportAccessModeForTest(null);
+        enableSupportAccess(false);
         await cleanupChildOrganizations([child.id]);
       }
     });
@@ -680,7 +684,7 @@ describe('organizations members trpc router', () => {
       const child = await createChildOrganization('Enforced Billing Child', childOwner.id);
       const kiloAdmin = await insertTestUser({ is_admin: true });
       await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'billing_manager');
-      setSupportAccessModeForTest('enforce');
+      enableSupportAccess(true);
       try {
         const result = await (
           await createCallerForUser(kiloAdmin.id)
@@ -691,7 +695,7 @@ describe('organizations members trpc router', () => {
         });
         expect(result.added).toEqual([child.id]);
       } finally {
-        setSupportAccessModeForTest(null);
+        enableSupportAccess(false);
         await cleanupChildOrganizations([child.id]);
       }
     });

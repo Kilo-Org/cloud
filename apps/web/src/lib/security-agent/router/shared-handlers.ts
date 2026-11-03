@@ -1,4 +1,4 @@
-import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { createHash } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
@@ -271,7 +271,7 @@ async function resolveAuditReportOwner(
  * member admin; observe mode preserves today's behavior.
  */
 function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
-  if (getSupportAccessMode() === 'enforce') return false;
+  if (isSupportAccessEnabled()) return false;
   return ctx.user.is_admin;
 }
 

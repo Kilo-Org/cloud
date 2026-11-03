@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { support_access_grants } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
 afterEach(async () => {
-  setSupportAccessModeForTest(null);
+  enableSupportAccess(false);
   // eslint-disable-next-line drizzle/enforce-delete-with-where
   await db.delete(support_access_grants);
 });
@@ -21,7 +25,6 @@ async function adminWithGrant(actionClass: 'support_read' | 'support_write' = 's
   );
   const admin = await insertTestUser({
     is_admin: true,
-    can_request_support_org_access: true,
   });
   const now = new Date();
   await db.insert(support_access_grants).values({
@@ -38,8 +41,8 @@ async function adminWithGrant(actionClass: 'support_read' | 'support_write' = 's
 }
 
 describe('allowlisted support read call sites', () => {
-  test('usageStats admits an allowlisted support read in enforce mode', async () => {
-    setSupportAccessModeForTest('enforce');
+  test('usageStats admits an allowlisted support read when on', async () => {
+    enableSupportAccess(true);
     const { admin, organization } = await adminWithGrant();
     const caller = await createCallerForUser(admin.id);
 
@@ -48,8 +51,8 @@ describe('allowlisted support read call sites', () => {
     expect(result).toMatchObject({ totalRequestCount: expect.anything() });
   });
 
-  test('a non-allowlisted organization read still denies support in enforce mode', async () => {
-    setSupportAccessModeForTest('enforce');
+  test('a non-allowlisted organization read still denies support when on', async () => {
+    enableSupportAccess(true);
     const { admin, organization } = await adminWithGrant();
     const caller = await createCallerForUser(admin.id);
 
@@ -58,8 +61,8 @@ describe('allowlisted support read call sites', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  test('observe mode leaves the same non-allowlisted read available to an admin', async () => {
-    setSupportAccessModeForTest('observe');
+  test('off leaves the same non-allowlisted read available to an admin', async () => {
+    enableSupportAccess(false);
     const { admin, organization } = await adminWithGrant();
     const caller = await createCallerForUser(admin.id);
 

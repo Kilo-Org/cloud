@@ -18,7 +18,7 @@ import {
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_REQUEST_TTL_SECONDS,
 } from '@kilocode/web-shared/lib/admin/support-access';
-import { userCanRequestSupportOrgAccess, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 
 const OPEN_STATUSES: SupportAccessGrantStatus[] = ['pending', 'active'];
@@ -94,9 +94,9 @@ async function lockActors(
   return new Map(rows.map(row => [row.id, row]));
 }
 
-function assertRequesterPermission(actor: GrantActorRow | undefined): GrantActorRow {
-  if (!actor || actor.blocked_reason !== null || !userCanRequestSupportOrgAccess(actor)) {
-    throw forbidden('Support organization access requester permission required');
+function assertAdminActor(actor: GrantActorRow | undefined): GrantActorRow {
+  if (!actor || actor.blocked_reason !== null || !actor.is_admin) {
+    throw forbidden('Platform admin access required');
   }
   return actor;
 }
@@ -235,7 +235,7 @@ export async function requestSupportGrant(params: {
     return await db.transaction(async tx => {
       await lockGrantScope(tx, params.actorKiloUserId, params.organizationId);
       const actors = await lockActors(tx, [params.actorKiloUserId]);
-      const actor = assertRequesterPermission(actors.get(params.actorKiloUserId));
+      const actor = assertAdminActor(actors.get(params.actorKiloUserId));
       await expireStaleGrants(tx, {
         actorKiloUserId: params.actorKiloUserId,
         organizationId: params.organizationId,
@@ -321,14 +321,10 @@ export async function approveSupportGrant(params: {
     if (pending.action_class !== 'support_write') {
       throw badRequest('Only write grants require approval');
     }
-    assertRequesterPermission(actors.get(pending.actor_kilo_user_id));
+    assertAdminActor(actors.get(pending.actor_kilo_user_id));
     const approver = actors.get(params.approverKiloUserId);
-    if (
-      !approver ||
-      approver.blocked_reason !== null ||
-      (!userCanRequestSupportOrgAccess(approver) && !userIsSuperadmin(approver))
-    ) {
-      throw forbidden('Support access approver permission required');
+    if (!approver || approver.blocked_reason !== null || !approver.is_admin) {
+      throw forbidden('Platform admin access required');
     }
     await assertLiveOrganization(tx, pending.organization_id);
 
@@ -376,12 +372,8 @@ export async function denySupportGrant(params: {
     await lockGrantScope(tx, unlocked.actor_kilo_user_id, unlocked.organization_id);
     const actors = await lockActors(tx, [params.approverKiloUserId]);
     const approver = actors.get(params.approverKiloUserId);
-    if (
-      !approver ||
-      approver.blocked_reason !== null ||
-      (!userCanRequestSupportOrgAccess(approver) && !userIsSuperadmin(approver))
-    ) {
-      throw forbidden('Support access approver permission required');
+    if (!approver || approver.blocked_reason !== null || !approver.is_admin) {
+      throw forbidden('Platform admin access required');
     }
     const [grant] = await tx
       .update(support_access_grants)

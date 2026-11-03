@@ -1,30 +1,30 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, test } from '@jest/globals';
 import {
   SUPPORT_NEVER_KEYS,
   SUPPORT_READ_ALLOWLIST,
   SUPPORT_WRITE_ALLOWLIST,
   findSupportAllowEntry,
-  getSupportAccessMode,
-  resolveSupportAccessMode,
-  setSupportAccessModeForTest,
+  isSupportAccessEnabled,
   supportEntrySatisfiesRoles,
   supportStandInRole,
 } from '@kilocode/web-shared/lib/admin/support-access';
 
-describe('support access mode', () => {
-  test('defaults to off and clamps enforce outside the test seam', () => {
-    expect(resolveSupportAccessMode(undefined)).toBe('off');
-    expect(resolveSupportAccessMode('')).toBe('off');
-    expect(resolveSupportAccessMode('unexpected')).toBe('off');
-    expect(resolveSupportAccessMode('observe')).toBe('observe');
-    expect(resolveSupportAccessMode('enforce')).toBe('observe');
+describe('support access switch', () => {
+  afterEach(() => {
+    delete process.env.SUPPORT_ACCESS_ENABLED;
   });
 
-  test('the test seam can select enforce and then reset', () => {
-    setSupportAccessModeForTest('enforce');
-    expect(getSupportAccessMode()).toBe('enforce');
-    setSupportAccessModeForTest(null);
-    expect(getSupportAccessMode()).toBe('off');
+  test('only the exact string true enables support access', () => {
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+    expect(isSupportAccessEnabled()).toBe(false);
+    process.env.SUPPORT_ACCESS_ENABLED = '';
+    expect(isSupportAccessEnabled()).toBe(false);
+    process.env.SUPPORT_ACCESS_ENABLED = 'false';
+    expect(isSupportAccessEnabled()).toBe(false);
+    process.env.SUPPORT_ACCESS_ENABLED = '1';
+    expect(isSupportAccessEnabled()).toBe(false);
+    process.env.SUPPORT_ACCESS_ENABLED = 'true';
+    expect(isSupportAccessEnabled()).toBe(true);
   });
 });
 

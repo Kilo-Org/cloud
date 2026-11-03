@@ -3,7 +3,6 @@ import { eq, and, isNull } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   kilocode_users,
-  support_access_grant_events,
   support_access_grants,
   user_admin_notes,
 } from '@kilocode/db/schema';
@@ -605,84 +604,9 @@ describe('admin.users.setAdminPermissions', () => {
     ]);
   });
 
-  test('grants and revokes the support organization access requester permission', async () => {
-    const admin = await insertQualifyingAdmin();
-    const target = await insertQualifyingAdmin({ is_super_admin: false });
-    const caller = await createCallerForUser(admin.id);
-
-    const granted = await caller.admin.users.setAdminPermissions({
-      userId: target.id,
-      permissions: { canRequestSupportOrgAccess: true },
-    });
-
-    expect(granted).toMatchObject({
-      changed: true,
-      user: { can_request_support_org_access: true },
-    });
-
-    await caller.admin.users.setAdminPermissions({
-      userId: target.id,
-      permissions: { canRequestSupportOrgAccess: false },
-    });
-
-    expect((await getUser(target.id)).can_request_support_org_access).toBe(false);
-    expect((await getUserAdminNotes(target.id)).map(note => note.note_content).sort()).toEqual([
-      'Granted support organization access requester permission.',
-      'Revoked support organization access requester permission.',
-    ]);
-  });
-
-  test('revoking the requester permission revokes open grants in the same transaction', async () => {
-    const admin = await insertQualifyingAdmin();
-    const target = await insertQualifyingAdmin({
-      is_super_admin: false,
-      can_request_support_org_access: true,
-    });
-    const owner = await insertTestUser({ is_admin: false });
-    const organization = await createTestOrganization(
-      `support-revoke-${crypto.randomUUID()}`,
-      owner.id,
-      0
-    );
-    const now = new Date();
-    const [grant] = await db
-      .insert(support_access_grants)
-      .values({
-        actor_kilo_user_id: target.id,
-        organization_id: organization.id,
-        action_class: 'support_read',
-        reason: 'investigating a customer report',
-        requested_duration_seconds: 1800,
-        status: 'active',
-        issued_at: now.toISOString(),
-        expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
-      })
-      .returning();
-
-    const caller = await createCallerForUser(admin.id);
-    await caller.admin.users.setAdminPermissions({
-      userId: target.id,
-      permissions: { canRequestSupportOrgAccess: false },
-    });
-
-    const revoked = await db.query.support_access_grants.findFirst({
-      where: eq(support_access_grants.id, grant.id),
-    });
-    expect(revoked?.status).toBe('revoked');
-    const events = await db.query.support_access_grant_events.findMany({
-      where: eq(support_access_grant_events.grant_id, grant.id),
-    });
-    expect(events).toEqual([
-      expect.objectContaining({ event_type: 'revoked', organization_id: organization.id }),
-    ]);
-  });
-
-  test('revoking platform admin access clears the requester permission and open grants', async () => {
+  test('revoking platform admin access revokes open support grants', async () => {
     const superadmin = await insertQualifyingAdmin();
-    const target = await insertQualifyingAdmin({
-      is_super_admin: false,
-      can_request_support_org_access: true,
-    });
+    const target = await insertQualifyingAdmin({ is_super_admin: false });
     const owner = await insertTestUser({ is_admin: false });
     const organization = await createTestOrganization(
       `support-admin-revoke-${crypto.randomUUID()}`,
@@ -709,7 +633,6 @@ describe('admin.users.setAdminPermissions', () => {
 
     const updated = await getUser(target.id);
     expect(updated.is_admin).toBe(false);
-    expect(updated.can_request_support_org_access).toBe(false);
     const revoked = await db.query.support_access_grants.findFirst({
       where: eq(support_access_grants.id, grant.id),
     });

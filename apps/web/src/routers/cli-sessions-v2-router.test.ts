@@ -1,5 +1,4 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { setSupportAccessModeForTest } from '@kilocode/web-shared/lib/admin/support-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -29,6 +28,11 @@ import type {
 } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
@@ -1756,7 +1760,7 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
-    it('enforce removes the platform-admin cross-organization list bypass', async () => {
+    it('support access removes the platform-admin cross-organization list bypass', async () => {
       const adminSessionId = 'ses_read_auth_admin_enforce_1234';
       await db.insert(cli_sessions_v2).values({
         session_id: adminSessionId,
@@ -1765,13 +1769,13 @@ describe('cli-sessions-v2-router', () => {
         created_on_platform: 'cloud-agent',
       });
 
-      setSupportAccessModeForTest('enforce');
+      enableSupportAccess(true);
       try {
         const caller = await createCallerForUser(adminUser.id);
         const result = await caller.cliSessionsV2.list({});
         expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
       } finally {
-        setSupportAccessModeForTest(null);
+        enableSupportAccess(false);
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
       }
     });

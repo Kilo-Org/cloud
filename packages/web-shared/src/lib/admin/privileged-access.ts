@@ -34,7 +34,6 @@ export type PlatformAdminPermissions = {
   canViewSessions: boolean;
   canManageCredits: boolean;
   canExportApiRequestLogs: boolean;
-  canRequestSupportOrgAccess: boolean;
 };
 
 export type AdminStepUpState = { status: 'absent' };

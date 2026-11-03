@@ -1,4 +1,4 @@
-import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   updateUserRoleInOrganization,
@@ -306,7 +306,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       const childOrganizationIds = Array.from(new Set(input.childOrganizationIds));
 
       const directRole =
-        user.is_admin && getSupportAccessMode() !== 'enforce'
+        user.is_admin && !isSupportAccessEnabled()
           ? 'owner'
           : await getDirectOrganizationRole(organizationId, user.id);
       if (directRole !== 'owner' && directRole !== 'billing_manager') {
@@ -469,7 +469,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { organizationId, memberId } = input;
 
       // Prevent users from removing themselves (unless they are kilo admin users)
-      if (user.id === memberId && (!user.is_admin || getSupportAccessMode() === 'enforce')) {
+      if (user.id === memberId && (!user.is_admin || isSupportAccessEnabled())) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You cannot remove yourself from the organization',

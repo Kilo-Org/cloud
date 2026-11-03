@@ -7,7 +7,6 @@
  * `support-access-resolver.ts` and grant lifecycle in `apps/web`.
  */
 
-export type SupportAccessMode = 'off' | 'observe' | 'enforce';
 export type SupportActionClass = 'support_read' | 'support_write';
 export type SupportSurface = 'trpc' | 'rest' | 'server-component';
 
@@ -46,15 +45,12 @@ export type MemberAccess = {
 };
 
 /**
- * Today's unconditional `is_admin` shortcut, preserved outside enforce mode.
- * `wouldBe` records what enforcement would have decided so observe mode can
- * report the cutover effect without changing behavior.
+ * Today's unconditional `is_admin` shortcut, preserved while support access is
+ * OFF. ON never produces this kind.
  */
 export type LegacyAdminAccess = {
   kind: 'legacy_admin';
   role: 'owner';
-  /** Null when support access is off and no decision is evaluated. */
-  wouldBe: SupportDecision | null;
 };
 
 export type OrganizationAccess = MemberAccess | SupportContext | LegacyAdminAccess;
@@ -299,38 +295,12 @@ export function supportEntrySatisfiesRoles(
   return roles.includes(supportStandInRole(entry));
 }
 
-export function supportDecisionDenialReason(entry: SupportAllowEntry | undefined): SupportDecision {
-  return entry ? 'deny_action_class' : 'deny_not_allowlisted';
-}
-
-const SUPPORT_ACCESS_MODES: readonly SupportAccessMode[] = ['off', 'observe', 'enforce'];
-let testMode: SupportAccessMode | null = null;
-
 /**
- * `SUPPORT_ACCESS_MODE` defaults to `off`. `enforce` is clamped to `observe`
- * outside the test seam so this PR cannot start enforcing in a deployment.
+ * Support access is binary. Only the exact string `true` enables enforcement;
+ * unset, `false`, or any other value is OFF.
  */
-export function resolveSupportAccessMode(raw: string | undefined): SupportAccessMode {
-  if (raw === undefined || raw === '') return 'off';
-  if (!SUPPORT_ACCESS_MODES.includes(raw as SupportAccessMode)) return 'off';
-  if (raw === 'enforce') return 'observe';
-  return raw as SupportAccessMode;
-}
-
-export function getSupportAccessMode(): SupportAccessMode {
-  if (testMode !== null) return testMode;
-  return resolveSupportAccessMode(process.env.SUPPORT_ACCESS_MODE);
-}
-
-/**
- * Test seam. Setting `enforce` here is the only way this branch can enforce;
- * the environment variable is always clamped.
- */
-export function setSupportAccessModeForTest(mode: SupportAccessMode | null): void {
-  if (process.env.NODE_ENV !== 'test') {
-    throw new Error('setSupportAccessModeForTest is only available in tests');
-  }
-  testMode = mode;
+export function isSupportAccessEnabled(): boolean {
+  return process.env.SUPPORT_ACCESS_ENABLED === 'true';
 }
 
 export type AdminStepUpEvidence = { status: 'absent' } | { status: 'fresh'; verifiedAt: string };
@@ -347,10 +317,11 @@ export type SupportStepUpPort = {
 };
 
 /**
- * Interim adapter: records that no step-up occurred and never blocks. The
- * `evidence` value is shaped like `AdminStepUpState` so PR2 can replace it.
+ * Interim adapter used until PR2's privileged-actor guard lands. It records no
+ * step-up and never blocks because PR2 is not in this branch yet; the caller
+ * seam stays in place so the guard can be wired without touching call sites.
  */
-export const observeOnlyStepUp: SupportStepUpPort = {
+export const interimSupportStepUp: SupportStepUpPort = {
   async requireFresh() {
     return { evidence: { status: 'absent' } };
   },

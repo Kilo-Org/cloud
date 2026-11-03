@@ -3,7 +3,7 @@ import {
   getAuthorizedOrgContext,
   getAuthorizedOrgContextOrSupport,
 } from '@/lib/organizations/organization-auth';
-import { getSupportAccessMode } from '@kilocode/web-shared/lib/admin/support-access';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { Organization } from '@kilocode/db/schema';
@@ -56,11 +56,7 @@ export async function OrganizationByPageLayout({
   const { user, organization, access } = result.data;
   const isSupport = access.kind === 'support';
   const role =
-    getSupportAccessMode() === 'enforce' || isSupport
-      ? user.role
-      : user.is_admin
-        ? 'owner'
-        : user.role;
+    isSupportAccessEnabled() || isSupport ? user.role : user.is_admin ? 'owner' : user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
       {access.kind === 'support' && <SupportAccessBanner access={access} />}

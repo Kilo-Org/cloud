@@ -4,16 +4,12 @@ import * as z from 'zod';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { markPrivilegedGuard } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
-  observeOnlyStepUp,
+  interimSupportStepUp,
 } from '@kilocode/web-shared/lib/admin/support-access';
-import {
-  canCurrentUserRequestSupportOrgAccess,
-  userIsSuperadmin,
-} from '@/lib/admin/admin-permissions';
+import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   approveSupportGrant,
@@ -35,31 +31,6 @@ const ReasonSchema = z.string().trim().min(10).max(2000);
 const TicketReferenceSchema = z.string().trim().max(200).optional();
 const ActionClassSchema = z.enum(['support_read', 'support_write']);
 
-export const supportAccessRequesterProcedure = adminProcedure.use(
-  markPrivilegedGuard(async ({ ctx, next }) => {
-    if (!(await canCurrentUserRequestSupportOrgAccess(ctx.user.id))) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Support organization access requester permission required',
-      });
-    }
-    return next();
-  }, 'support_access_requester')
-);
-
-async function assertApproverPermission(userId: string): Promise<void> {
-  const [canRequest, superadmin] = await Promise.all([
-    canCurrentUserRequestSupportOrgAccess(userId),
-    dbUserIsSuperadmin(userId),
-  ]);
-  if (!canRequest && !superadmin) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Support access approver permission required',
-    });
-  }
-}
-
 async function dbUserIsSuperadmin(userId: string): Promise<boolean> {
   const user = await db.query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, userId),
@@ -68,7 +39,7 @@ async function dbUserIsSuperadmin(userId: string): Promise<boolean> {
 }
 
 export const adminSupportAccessRouter = createTRPCRouter({
-  request: supportAccessRequesterProcedure
+  request: adminProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -84,7 +55,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await observeOnlyStepUp.requireFresh({
+      await interimSupportStepUp.requireFresh({
         userId: ctx.user.id,
         action:
           input.actionClass === 'support_read' ? 'support_read_request' : 'support_write_request',
@@ -122,8 +93,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await assertApproverPermission(ctx.user.id);
-      await observeOnlyStepUp.requireFresh({
+      await interimSupportStepUp.requireFresh({
         userId: ctx.user.id,
         action: 'support_approval',
       });
@@ -142,7 +112,6 @@ export const adminSupportAccessRouter = createTRPCRouter({
     }),
 
   deny: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
-    await assertApproverPermission(ctx.user.id);
     const grant = await denySupportGrant({
       approverKiloUserId: ctx.user.id,
       grantId: input.grantId,
@@ -156,21 +125,19 @@ export const adminSupportAccessRouter = createTRPCRouter({
     return toSupportGrantSummary(grant);
   }),
 
-  cancel: supportAccessRequesterProcedure
-    .input(z.object({ grantId: z.uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      const grant = await cancelSupportGrant({
-        actorKiloUserId: ctx.user.id,
-        grantId: input.grantId,
-      });
-      await recordAdminAction(ctx, {
-        action: 'support_access.cancel',
-        target: { type: 'organization', id: grant.organization_id },
-        message: 'Cancelled support access request',
-        metadata: { grantId: grant.id },
-      });
-      return toSupportGrantSummary(grant);
-    }),
+  cancel: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
+    const grant = await cancelSupportGrant({
+      actorKiloUserId: ctx.user.id,
+      grantId: input.grantId,
+    });
+    await recordAdminAction(ctx, {
+      action: 'support_access.cancel',
+      target: { type: 'organization', id: grant.organization_id },
+      message: 'Cancelled support access request',
+      metadata: { grantId: grant.id },
+    });
+    return toSupportGrantSummary(grant);
+  }),
 
   revoke: adminProcedure
     .input(z.object({ grantId: z.uuid(), reason: ReasonSchema }))
@@ -240,19 +207,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
     return toSupportGrantSummary(grant);
   }),
 
-  listMine: supportAccessRequesterProcedure.query(async ({ ctx }) => {
+  listMine: adminProcedure.query(async ({ ctx }) => {
     const grants = await listMySupportGrants(ctx.user.id);
     return grants.map(toSupportGrantSummary);
   }),
 
-  listPending: adminProcedure.query(async ({ ctx }) => {
-    await assertApproverPermission(ctx.user.id);
+  listPending: adminProcedure.query(async () => {
     const grants = await listPendingSupportGrants();
     return grants.map(toSupportGrantSummary);
   }),
 
-  listActive: adminProcedure.query(async ({ ctx }) => {
-    await assertApproverPermission(ctx.user.id);
+  listActive: adminProcedure.query(async () => {
     const grants = await listActiveSupportGrants();
     return grants.map(toSupportGrantSummary);
   }),
@@ -267,8 +232,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
 
   getActiveForOrganization: adminProcedure
     .input(z.object({ organizationId: z.uuid() }))
-    .query(async ({ ctx, input }) => {
-      await assertApproverPermission(ctx.user.id);
+    .query(async ({ input }) => {
       const grants = await getActiveSupportGrantsForOrganization(input.organizationId);
       return grants.map(toSupportGrantSummary);
     }),

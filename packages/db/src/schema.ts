@@ -484,7 +484,6 @@ export const kilocode_users = pgTable(
     can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
     can_export_api_request_logs: boolean().default(false).notNull(),
-    can_request_support_org_access: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
@@ -559,10 +558,6 @@ export const kilocode_users = pgTable(
     check(
       'kilocode_users_can_export_api_request_logs_requires_admin_check',
       sql`NOT ${table.can_export_api_request_logs} OR ${table.is_admin}`
-    ),
-    check(
-      'kilocode_users_can_request_support_org_access_requires_admin_check',
-      sql`NOT ${table.can_request_support_org_access} OR ${table.is_admin}`
     ),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)

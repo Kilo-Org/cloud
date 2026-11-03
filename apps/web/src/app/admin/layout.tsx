@@ -5,6 +5,7 @@ import { AppSidebar } from './components/AppSidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { BuildInfo } from '@/app/admin/components/BuildInfo';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user: currentUser } = await getUserFromAuth({ adminOnly: true });
@@ -17,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen">
       <SidebarProvider>
         <AppShellSkipLink />
-        <AppSidebar variant="inset">
+        <AppSidebar variant="inset" supportAccessEnabled={isSupportAccessEnabled()}>
           {/* Need to pass BuildInfo as children from a server component to make it have access to the right variables */}
           <BuildInfo />
         </AppSidebar>

@@ -12,7 +12,6 @@ async function insertRequester(overrides: Parameters<typeof insertTestUser>[0] =
   return insertTestUser({
     is_admin: true,
     is_super_admin: false,
-    can_request_support_org_access: true,
     ...overrides,
   });
 }
@@ -21,7 +20,6 @@ async function insertSuperadmin(overrides: Parameters<typeof insertTestUser>[0] 
   return insertTestUser({
     is_admin: true,
     is_super_admin: true,
-    can_request_support_org_access: true,
     ...overrides,
   });
 }
@@ -63,18 +61,17 @@ function eventsFor(grantId: string) {
 }
 
 describe('admin.supportAccess request', () => {
-  test('requires the requester permission', async () => {
-    const admin = await insertRequester({ can_request_support_org_access: false });
+  test('every platform admin can request without an extra permission', async () => {
+    const admin = await insertRequester();
     const { organization } = await orgWithOwner();
     const caller = await createCallerForUser(admin.id);
 
-    await expect(
-      caller.admin.supportAccess.request({
-        organizationId: organization.id,
-        actionClass: 'support_read',
-        reason: 'investigating a customer report',
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+    expect(grant.status).toBe('active');
   });
 
   test('rejects a missing or deleted organization', async () => {

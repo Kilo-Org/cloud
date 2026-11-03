@@ -184,7 +184,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       repositories: repositories && repositories.length > 0 ? repositories : null,
     });
 
-    if (stored.instanceChanged) {
+    if (stored.instanceChanged || stored.accountChanged) {
       await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
     }
 

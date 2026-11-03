@@ -229,19 +229,65 @@ function isAllowedArtifactUrl(url: string): boolean {
   return R2_ACCOUNT_LABEL.test(accountLabel);
 }
 
+/** The path and query of an `http(s)` URL, with the authority removed. */
+function urlPathOf(url: string): string {
+  const schemeEnd = url.indexOf('://');
+  const remainder = url.slice(schemeEnd + 3);
+  const authorityEnd = remainder.search(/[/?#\\]/);
+  return authorityEnd === -1 ? '/' : remainder.slice(authorityEnd);
+}
+
+/** The path of an `http(s)` URL with its query and fragment removed. */
+function basePathOf(path: string): string {
+  const queryIndex = path.search(/[?#]/);
+  return queryIndex === -1 ? path : path.slice(0, queryIndex);
+}
+
+/**
+ * Resolve a relative reference against the path it answered for, per RFC 3986:
+ * a leading `/` replaces the path, a leading `?` keeps it and replaces the
+ * query, and anything else replaces the last segment. Dot segments resolve
+ * against the origin root, so the result never climbs above it.
+ */
+function resolveRelativePath(from: string, target: string): string {
+  const basePath = basePathOf(urlPathOf(from));
+  const directory = basePath.endsWith('/')
+    ? basePath
+    : basePath.slice(0, basePath.lastIndexOf('/') + 1);
+  let resolved = target;
+  if (target.startsWith('?')) {
+    resolved = `${basePath}${target}`;
+  } else if (!target.startsWith('/')) {
+    resolved = `${directory}${target}`;
+  }
+  const queryIndex = resolved.search(/[?#]/);
+  const resolvedPath = queryIndex === -1 ? resolved : resolved.slice(0, queryIndex);
+  const suffix = queryIndex === -1 ? '' : resolved.slice(queryIndex);
+  const segments: string[] = [];
+  for (const segment of resolvedPath.split('/')) {
+    if (segment === '..') {
+      segments.pop();
+    } else if (segment !== '.') {
+      segments.push(segment);
+    }
+  }
+  const path = segments.join('/');
+  return `${path.startsWith('/') ? path : `/${path}`}${suffix}`;
+}
+
 /**
  * The URL a redirect's `Location` points at, or null when it must not be
  * followed.
  *
- * An absolute target is adjudicated on its own. A relative one keeps the host
- * of the URL it came from — the hop's only variable is its path — so the origin
- * is taken from the already-validated URL and the target can never leave it.
+ * An absolute target is adjudicated on its own. A relative one is resolved
+ * against the URL it answered for, while the origin stays the one already
+ * validated, so a hop can be followed without leaving that origin.
  */
 function allowedRedirectTarget(from: string, location: string | null): string | null {
   if (location === null) {
     return null;
   }
-  const target = location.trim();
+  const target = location.trim().replaceAll('\\', '/');
   if (target === '') {
     return null;
   }
@@ -259,7 +305,7 @@ function allowedRedirectTarget(from: string, location: string | null): string | 
     return null;
   }
   const authority = origin.port === '' ? origin.hostname : `${origin.hostname}:${origin.port}`;
-  return `https://${authority}/${target.replace(/^[/\\]+/, '')}`;
+  return `https://${authority}${resolveRelativePath(from, target)}`;
 }
 
 /**
@@ -305,6 +351,9 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
     throw new Error('Artifact download address is not an allowed origin');
   }
   if (!response.ok) {
+    // The caller keeps no bytes from a failed status, so release the body rather
+    // than leaving the connection's stream unread.
+    await response.body?.cancel();
     throw new Error(`Artifact download failed with status ${response.status}`);
   }
   // `writableStream()` opens a write-only handle: iOS throws when the file does

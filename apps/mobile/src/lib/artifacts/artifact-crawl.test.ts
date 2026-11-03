@@ -480,6 +480,96 @@ describe('materializeArtifact', () => {
     expect(tracked.streamed).toBe(5);
   });
 
+  it('resolves a relative redirect against the request path', async () => {
+    // The served URL is `/attachments/f1.bin`, so `real.bin` names its sibling
+    // under `/attachments/`, not the origin root.
+    const redirected = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/real.bin`;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (url === ALLOWED_URL) {
+        return new Response(null, { status: 302, headers: { location: 'real.bin' } });
+      }
+      if (url === redirected) {
+        return init?.headers === undefined
+          ? new Response('hello', { status: 200 })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            });
+      }
+      throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+    });
+    const { file } = target();
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).toEqual({ ok: true, size: 5 });
+    expect(probeFetch.mock.calls.map(call => call[0])).toEqual([
+      ALLOWED_URL,
+      redirected,
+      ALLOWED_URL,
+      redirected,
+    ]);
+  });
+
+  it('keeps a dot segment of a relative redirect below the origin root', async () => {
+    const redirected = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/real.bin`;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (url === ALLOWED_URL) {
+        return new Response(null, { status: 302, headers: { location: '../../real.bin' } });
+      }
+      if (url === redirected) {
+        return init?.headers === undefined
+          ? new Response('hello', { status: 200 })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            });
+      }
+      throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+    });
+    const { file } = target();
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).toEqual({ ok: true, size: 5 });
+    expect(probeFetch.mock.calls.map(call => call[0])).toEqual([
+      ALLOWED_URL,
+      redirected,
+      ALLOWED_URL,
+      redirected,
+    ]);
+  });
+
+  it('releases the body of a status it does not keep', async () => {
+    let cancelled = false;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (init?.headers !== undefined) {
+        return new Response('x', {
+          status: 206,
+          headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+        });
+      }
+      if (url !== ALLOWED_URL) {
+        throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+      }
+      return new Response(
+        new ReadableStream({
+          cancel: () => {
+            cancelled = true;
+          },
+        }),
+        { status: 500 }
+      );
+    });
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    expect(cancelled).toBe(true);
+    expect(tracked.created).toBe(false);
+  });
+
   it.each<[string, string]>([
     ['cleartext link-local', 'http://169.254.169.254/latest/meta-data/'],
     ['an outside origin', 'https://outside.example/collect.png'],

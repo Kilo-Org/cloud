@@ -13,10 +13,9 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import {
-  applyKiloExclusiveModelSettings,
-  findKiloExclusiveModel,
-  isKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+  applyAutoSmallFreeModelSettings,
+  isAutoSmallFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
@@ -254,8 +253,8 @@ export function removeUnsupportedRequestServiceTier(
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
-      : isKiloExclusiveModel(requestedModel)
-        ? 'Kilo-exclusive model'
+      : isAutoSmallFreeModel(requestedModel)
+        ? 'auto small free model'
         : null;
   const serviceTier = requestToMutate.body.service_tier;
   if (!reason || serviceTier === undefined) {
@@ -379,9 +378,8 @@ export async function applyProviderSpecificLogic(
     requestToMutate,
     getCustomPricing(await getCustomPricingConfig(), requestedModel)
   );
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-  if (kiloExclusiveModel) {
-    applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
+  if (isAutoSmallFreeModel(requestedModel)) {
+    applyAutoSmallFreeModelSettings(requestToMutate);
   }
 
   if (isClaudeModel(requestedModel)) {

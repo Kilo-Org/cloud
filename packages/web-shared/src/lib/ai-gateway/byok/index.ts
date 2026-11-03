@@ -31,7 +31,7 @@ import {
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -61,13 +61,13 @@ async function deriveModelInferenceUserByokProviders(
 }
 
 /**
- * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
- * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
- * take them over. A custom LLM can share an id with a gateway catalog model, so
+ * Free models stay on Kilo's own accounts: they are served through
+ * Kilo-specific routes or paid for by Kilo, so a gateway key must not take
+ * them over. A custom LLM can share an id with a gateway catalog model, so
  * callers that may see custom LLM ids exclude them separately.
  */
 export function isGatewayUserByokEligibleModel(modelId: string): boolean {
-  return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
+  return !isFreeModelExcludingCustomLlms(modelId);
 }
 
 export async function getModelGatewayUserByokProviders(
@@ -262,11 +262,7 @@ export async function addUserByokAvailability(
   const derived = { examined: 0, withoutInferenceProviders: 0 };
   const modelsWithAvailability = await Promise.all(
     models.map(async model => {
-      if (
-        enabledProviders.size === 0 ||
-        isKiloExclusiveModel(model.id) ||
-        (await isCustomLlm(model.id))
-      ) {
+      if (enabledProviders.size === 0 || (await isCustomLlm(model.id))) {
         return { ...model, hasUserByokAvailable: false };
       }
       const inferenceProviders = vercelModelMetadata
@@ -317,7 +313,7 @@ export async function hasInferenceProviderUserByokForModel(
   enabledProviderIds: readonly UserByokProviderId[]
 ): Promise<boolean> {
   if (await isCustomLlm(modelId)) return false;
-  if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
+  if (isAutoSmallFreeModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
     return false;
   }
   const modelProviders = (await lookupInferenceUserByokProviders(modelId)) ?? [];

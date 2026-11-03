@@ -60,7 +60,7 @@ import {
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -220,7 +220,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   };
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
-    if (isKiloExclusiveModel(openRouterModel.id)) continue;
+    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
     for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
       addSupportedModel(providerId, openRouterModel);
     }

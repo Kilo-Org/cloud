@@ -164,6 +164,22 @@ export class ChallengeRateLimitError extends Error {
 // ── Admission payload validation ───────────────────────────────────────────
 
 /**
+ * Longest `payload` string the admission wire contract accepts, in characters
+ * of the base64 form the client sends.
+ *
+ * Chosen from the size of a real device proof plus headroom: an App Attest
+ * attestation object with either documented certificate chain shape stays well
+ * inside this limit, and a Play Integrity verdict is a JWE of similar size.
+ */
+export const MAX_ADMISSION_PAYLOAD_CHARS = 16 * 1024;
+
+/** Whether an admission object carries a payload longer than the contract accepts. */
+function payloadExceedsMaxLength(obj: Record<string, unknown>): boolean {
+  const payload = obj['payload'];
+  return typeof payload === 'string' && payload.length > MAX_ADMISSION_PAYLOAD_CHARS;
+}
+
+/**
  * Validate the shape of the admission payload received from the client.
  * Returns a sanitized AdmissionPayload on success, undefined on failure.
  */
@@ -174,8 +190,9 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-  // payload: non-empty string (base64)
+  // payload: non-empty base64 string within MAX_ADMISSION_PAYLOAD_CHARS
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
+  if (payloadExceedsMaxLength(obj)) return undefined;
 
   const kind = obj['kind'] as AdmissionKind;
   const platform = obj['platform'] as AdmissionPlatform;
@@ -209,7 +226,19 @@ export function requireAdmissionPayload(
   // Roll the telemetry window on any native auth request, so the final window
   // of a sparse traffic pattern still flushes.
   rollAdmissionWindowIfNeeded(Date.now());
-  return validateAdmissionPayload(body['admission']);
+
+  const raw = body['admission'];
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    payloadExceedsMaxLength(raw as Record<string, unknown>)
+  ) {
+    // A payload longer than the contract accepts is aggregated as
+    // native_admission_oversized.
+    countAdmissionCondition('native_admission_oversized');
+  }
+
+  return validateAdmissionPayload(raw);
 }
 
 /**

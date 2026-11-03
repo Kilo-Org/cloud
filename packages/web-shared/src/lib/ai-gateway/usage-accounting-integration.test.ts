@@ -941,38 +941,35 @@ describe('gateway accounting integration', () => {
       { region, target: 'staging', environment: 'preview' },
       { region, target: 'production', environment: 'production' },
     ])
-  )(
-    '$target $region live direct accounting records',
-    async ({ region, target, environment }) => {
-      const original = { ...process.env };
-      try {
-        process.env.USAGE_SHADOW_PUBLISH_ENABLED = 'true';
-        configureQueueEnvironment({
-          USAGE_QUEUE_ONLY_ENABLED: 'false',
-          VERCEL_REGION: region,
-          VERCEL_ENV: environment,
-          VERCEL_TARGET_ENV: target,
-        });
-        jest.isolateModules(() => {
-          const actual = jest.requireActual<typeof ServerConfig>(
-            '@kilocode/web-shared/lib/config.server'
-          );
-          expect(actual).not.toHaveProperty('USAGE_SHADOW_PUBLISH_ENABLED');
-        });
-        const lifecycle = requestLifetime();
-        const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
-        lifecycle.close();
-        await lifecycle.drain();
-        expect(record?.status).toBe('recorded');
-        expect(publisher.enqueueUsage).not.toHaveBeenCalled();
-        expect(fetch).not.toHaveBeenCalled();
-        expect(writer).toHaveBeenCalledTimes(region === 'sfo1' ? 1 : 0);
-        expect(db.transaction).toHaveBeenCalledTimes(region === 'fra1' ? 1 : 0);
-      } finally {
-        process.env = original;
-      }
+  )('$target $region live direct accounting records', async ({ region, target, environment }) => {
+    const original = { ...process.env };
+    try {
+      process.env.USAGE_SHADOW_PUBLISH_ENABLED = 'true';
+      configureQueueEnvironment({
+        USAGE_QUEUE_ONLY_ENABLED: 'false',
+        VERCEL_REGION: region,
+        VERCEL_ENV: environment,
+        VERCEL_TARGET_ENV: target,
+      });
+      jest.isolateModules(() => {
+        const actual = jest.requireActual<typeof ServerConfig>(
+          '@kilocode/web-shared/lib/config.server'
+        );
+        expect(actual).not.toHaveProperty('USAGE_SHADOW_PUBLISH_ENABLED');
+      });
+      const lifecycle = requestLifetime();
+      const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(record?.status).toBe('recorded');
+      expect(publisher.enqueueUsage).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(writer).toHaveBeenCalledTimes(region === 'sfo1' ? 1 : 0);
+      expect(db.transaction).toHaveBeenCalledTimes(region === 'fra1' ? 1 : 0);
+    } finally {
+      process.env = original;
     }
-  );
+  });
 
   test('direct accounting does not register publication even with configured transport', async () => {
     const helper = jest.mocked(publisher.enqueueUsage);

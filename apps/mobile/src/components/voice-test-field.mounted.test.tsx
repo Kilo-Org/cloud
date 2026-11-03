@@ -29,6 +29,9 @@ const voice = vi.hoisted(() => ({
 const applyVoiceDraftToInput = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
+  // The field renders the shared Input, whose alignment helper reads
+  // `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -119,6 +122,9 @@ describe('VoiceTestField', () => {
       placeholder: 'Tap the microphone and start speaking.',
       textAlignVertical: 'top',
     });
+    // The visible title above the field is a sibling `Text`, so without a name
+    // of its own the native node is named after the transcript it holds.
+    expect(input.props.accessibilityLabel).toBe('Test voice input');
     // Uncontrolled on iOS: text flows through the native draft writes, never a
     // controlled `value` prop.
     expect(input.props.value).toBeUndefined();

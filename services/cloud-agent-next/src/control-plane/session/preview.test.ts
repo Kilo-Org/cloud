@@ -8,7 +8,12 @@ vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 
-function metadata(platform: string, sandboxId: string | null = SANDBOX_ID, sessionId = SESSION_ID) {
+function metadata(
+  platform: string,
+  sandboxId: string | null = SANDBOX_ID,
+  sessionId = SESSION_ID,
+  worktreeId?: string
+) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
@@ -21,7 +26,11 @@ function metadata(platform: string, sandboxId: string | null = SANDBOX_ID, sessi
     workspace:
       sandboxId === null
         ? { sandboxProvider: 'cloudflare' }
-        : { sandboxId, sandboxProvider: 'cloudflare' },
+        : {
+            sandboxId,
+            sandboxProvider: 'cloudflare',
+            ...(worktreeId ? { worktreeId } : {}),
+          },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -40,6 +49,7 @@ function fixture(
     platform?: string;
     sandboxId?: string | null;
     sessionId?: string;
+    worktreeId?: string;
     result?: PreviewTargetResult;
   } = {}
 ) {
@@ -48,7 +58,12 @@ function fixture(
     getMetadata: () =>
       input.platform === '__missing__' || input.sandboxId === '__missing__'
         ? null
-        : metadata(input.platform ?? 'cloud-agent-web', input.sandboxId, input.sessionId),
+        : metadata(
+            input.platform ?? 'cloud-agent-web',
+            input.sandboxId,
+            input.sessionId,
+            input.worktreeId
+          ),
     resolveTarget,
   });
   return { preview, resolveTarget };
@@ -65,6 +80,24 @@ describe('V2 control-plane preview resolver', () => {
     const { preview, resolveTarget } = fixture({
       sessionId: 'agent_11111111-1111-4111-8111-111111111111',
     });
+    await expect(preview.resolve()).resolves.toEqual({ status: 'ineligible' });
+    expect(resolveTarget).not.toHaveBeenCalled();
+  });
+
+  it.each(['desktop', 'agent-manager'])(
+    'allows preview for an inherited %s hosted worktree session',
+    async platform => {
+      const { preview, resolveTarget } = fixture({
+        platform,
+        worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      });
+      await expect(preview.resolve()).resolves.toEqual(COORDINATES);
+      expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID);
+    }
+  );
+
+  it('rejects a native desktop session without a hosted worktree', async () => {
+    const { preview, resolveTarget } = fixture({ platform: 'desktop' });
     await expect(preview.resolve()).resolves.toEqual({ status: 'ineligible' });
     expect(resolveTarget).not.toHaveBeenCalled();
   });

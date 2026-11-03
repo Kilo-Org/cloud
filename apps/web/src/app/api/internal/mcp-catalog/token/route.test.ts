@@ -53,6 +53,17 @@ function noIdentityOverride() {
   mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
 }
 
+function eligibleAccount(overrides: Record<string, unknown> = {}) {
+  return {
+    id: DEFAULT_BENCHMARK_USER_ID,
+    is_bot: true,
+    api_token_pepper: 'pepper',
+    blocked_at: null,
+    blocked_reason: null,
+    ...overrides,
+  };
+}
+
 describe('POST /api/internal/mcp-catalog/token', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -82,7 +93,7 @@ describe('POST /api/internal/mcp-catalog/token', () => {
   });
 
   it('returns 404 when the benchmark organization membership is missing', async () => {
-    mockRows.push({ id: DEFAULT_BENCHMARK_USER_ID, api_token_pepper: 'pepper' });
+    mockRows.push(eligibleAccount());
     const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));
     expect(res.status).toBe(404);
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
@@ -116,8 +127,41 @@ describe('POST /api/internal/mcp-catalog/token', () => {
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 
+  // The token carries the account's pepper and organization claims, so the mint
+  // holds the identity to the internal-bot rules instead of minting for whatever
+  // the worker config names.
+  it.each([
+    ['is_bot is false', { is_bot: false }, 'not a bot user'],
+    ['blocked_at is set', { blocked_at: '2026-10-01T00:00:00.000Z' }, 'blocked'],
+    ['blocked_reason is set', { blocked_reason: 'manual block' }, 'blocked'],
+    ['the pepper is empty', { api_token_pepper: '  ' }, 'no API token pepper'],
+    ['the pepper is null', { api_token_pepper: null }, 'no API token pepper'],
+  ])('returns 403 when %s', async (_label, overrides, message) => {
+    mockRows.push(eligibleAccount(overrides));
+    mockMembershipRows.push({ role: 'owner' });
+
+    const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));
+
+    expect(res.status).toBe(403);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toContain(message);
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it.each(['billing_manager', 'admin'])('returns 403 for the %s organization role', async role => {
+    mockRows.push(eligibleAccount());
+    mockMembershipRows.push({ role });
+
+    const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));
+
+    expect(res.status).toBe(403);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toContain('organization role is not supported');
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
   it('mints a 1h benchmarking token scoped to the benchmark organization', async () => {
-    const user = { id: DEFAULT_BENCHMARK_USER_ID, api_token_pepper: 'pepper' };
+    const user = eligibleAccount();
     mockRows.push(user);
     mockMembershipRows.push({ role: 'owner' });
 
@@ -126,10 +170,12 @@ describe('POST /api/internal/mcp-catalog/token', () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
       token: string;
+      userId: string;
       organizationId: string;
       expiresAt: string;
     };
     expect(json.token).toBe('minted-token');
+    expect(json.userId).toBe(DEFAULT_BENCHMARK_USER_ID);
     expect(json.organizationId).toBe(DEFAULT_BENCHMARK_ORG_ID);
     expect(typeof json.expiresAt).toBe('string');
     expect(mockGenerateApiToken).toHaveBeenCalledWith(
@@ -157,16 +203,17 @@ describe('POST /api/internal/mcp-catalog/token', () => {
         },
       },
     });
-    mockRows.push({ id: userId, api_token_pepper: 'pepper' });
+    mockRows.push(eligibleAccount({ id: userId }));
     mockMembershipRows.push({ role: 'member' });
 
     const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));
 
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { organizationId: string };
+    const json = (await res.json()) as { userId: string; organizationId: string };
+    expect(json.userId).toBe(userId);
     expect(json.organizationId).toBe(organizationId);
     expect(mockGenerateApiToken).toHaveBeenCalledWith(
-      { id: userId, api_token_pepper: 'pepper' },
+      eligibleAccount({ id: userId }),
       {
         tokenSource: 'mcp-catalog',
         organizationId,
@@ -195,7 +242,7 @@ describe('POST /api/internal/mcp-catalog/token', () => {
 
   it('falls back to the contracts defaults when the benchmark config is null', async () => {
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
-    mockRows.push({ id: DEFAULT_BENCHMARK_USER_ID, api_token_pepper: 'pepper' });
+    mockRows.push(eligibleAccount());
     mockMembershipRows.push({ role: 'owner' });
 
     const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));

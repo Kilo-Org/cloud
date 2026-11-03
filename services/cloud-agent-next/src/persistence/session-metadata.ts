@@ -218,11 +218,10 @@ const MetadataAgentSchema = z
   .object({
     mode: z.string().optional(),
     model: z.string().optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    // Variant values are provider-specific (for example `budget-32768`), and a
+    // continued session may forward an empty string. Keep `""` distinct from an
+    // absent variant; do not widen any other public input.
+    variant: z.string().max(50).optional(),
     appendSystemPrompt: z.string().max(10000).optional(),
   })
   .strip();
@@ -311,6 +310,13 @@ const MetadataWorkspaceSchema = egressPolicySchema
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
+    /**
+     * The generated `kilo/<slug>` branch of a session on a V2 environment. The
+     * launch repository can run on `repository.branch` instead, so `branchName`
+     * is not always this value. A repository of the environment without a
+     * requested branch uses it.
+     */
+    generatedBranchName: branchNameSchema.optional(),
     shallow: z.boolean().optional(),
     credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),
@@ -376,11 +382,11 @@ const MetadataWorkspaceSchema = egressPolicySchema
   })
   .refine(
     workspace =>
-      workspace.egressMode !== 'allowlist' ||
+      (workspace.egressMode !== 'allowlist' && workspace.egressAudit !== true) ||
       (workspace.sandboxProvider === 'cloudflare-containers' &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'allowlist egress requires an isolated Cloudflare containers sandbox'
+    'Egress policy requires an isolated Cloudflare containers sandbox'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
@@ -450,6 +456,13 @@ export const CurrentSessionMetadataSchema = z
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
     clone: MetadataCloneSchema.optional(),
+    /**
+     * Server-only marker set by the `continueHostedWorkspace` handler. It makes
+     * the wrapper skip transcript file restoration: the pushed branch is the
+     * source of truth. Never set from client input; a metadata clone is not this
+     * signal.
+     */
+    continuation: z.literal(true).optional(),
     initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),

@@ -122,6 +122,7 @@ export async function resolveCodeReviewDispatchBilling(params: {
       user: { id: params.owner.userId },
       modelId: model,
       organizationId,
+      includeSharedServicesConnection: true,
     });
     if (!eligibility.isFree && !eligibility.hasUserByokAvailable) {
       everyModelExempt = false;

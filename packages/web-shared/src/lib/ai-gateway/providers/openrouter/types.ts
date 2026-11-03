@@ -82,7 +82,7 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // OpenRouter specific field we do not support
+  // Forwarded as providerOptions.gateway.models on the Vercel path
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 

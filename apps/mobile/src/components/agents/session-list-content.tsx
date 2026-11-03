@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
@@ -205,11 +206,7 @@ export function AgentSessionListContent({
   // The no-history body's next step. It opens the same composer the Agents
   // tab's "New session" action does, so an empty history never dead-ends at a
   // message.
-  const createSessionAction = (
-    <Button onPress={onCreateSession}>
-      <Text>{t('common.newSession')}</Text>
-    </Button>
-  );
+  const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
   // is pushed the Agents list is frozen. On return, each row re-reads the ack
@@ -332,6 +329,7 @@ export function AgentSessionListContent({
         <StoredSessionRow
           session={item.session}
           sortBy={SESSION_LIST_SORT}
+          sectionTitle={item.sectionTitle}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {

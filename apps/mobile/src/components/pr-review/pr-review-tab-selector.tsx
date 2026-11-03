@@ -26,12 +26,15 @@ type PrReviewTabSelectorProps = {
    */
   discussionCount?: number;
   /**
-   * Disables every tab while the PR body is in a failed load state: the
-   * tabs' own reads cannot succeed while the overview that gates them
-   * failed, so the row stays at its size but stops switching.
+   * Tabs whose own reads cannot succeed while the request fails to load, so
+   * the row keeps its size but those entries stop switching. The caller
+   * leaves out the tab that hosts the failure and its recovery, because that
+   * entry is the way back to it.
    */
-  disabled?: boolean;
+  disabledTabs?: readonly PrReviewTabId[];
 };
+
+const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 /**
  * Horizontal pill row at the top of the PR review surface that picks
@@ -43,13 +46,14 @@ export function PrReviewTabSelector({
   activeTab,
   onChange,
   discussionCount,
-  disabled = false,
+  disabledTabs = NO_DISABLED_TABS,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
     <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
+        const disabled = disabledTabs.includes(tab.id);
         const badge =
           tab.id === 'discussion' && discussionCount && discussionCount > 0
             ? formatNumber(discussionCount, i18n.language)
@@ -68,22 +72,29 @@ export function PrReviewTabSelector({
             }}
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              active && 'bg-card shadow-sm shadow-[#0000000D]',
+              // Dark has no neutral above the row's `bg-secondary`, and
+              // `bg-card` is darker than it there, so the selected pill is
+              // raised with a translucent white surface instead.
+              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-[#FFFFFF1A]',
               disabled && 'opacity-60'
             )}
           >
-            <View className="flex-row items-center gap-1.5">
+            <View className="flex-row items-center gap-1">
               <Text
                 className={cn(
                   'text-sm',
-                  active ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                  active ? 'font-semibold text-foreground' : 'text-muted-foreground dark:text-ink2'
                 )}
               >
                 {t(tab.labelKey)}
               </Text>
               {badge ? (
-                <View className="min-w-5 rounded-full bg-muted px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] text-muted-foreground">{badge}</Text>
+                // `muted` equals the row's `secondary` in both palettes, so the
+                // badge fills with `muted-soft` to read as a pill at all.
+                <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
+                  <Text className="text-center text-[11px] font-medium text-foreground">
+                    {badge}
+                  </Text>
                 </View>
               ) : null}
             </View>

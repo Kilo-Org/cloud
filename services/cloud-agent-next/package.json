@@ -73,7 +73,6 @@
     "@types/node": "catalog:",
     "@types/ws": "^8.5.12",
     "@typescript/native-preview": "catalog:",
-    "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
     "jscpd": "5.0.16",
     "tsx": "catalog:",

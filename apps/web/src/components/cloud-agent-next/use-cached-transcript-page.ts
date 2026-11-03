@@ -6,14 +6,16 @@ import { transcriptCacheKey, transcriptCacheScope } from './session-transcript-c
 
 /**
  * The cached page of a chat, read while rendering: on the server, it was seeded
- * for the open chat; on the client, it is the last page seen of a recent chat.
+ * for the open chat and its signed-in user; on the client, it is the last page
+ * that user saw of a recent chat.
  */
 export function useCachedTranscriptPage(
+  userId: string,
   organizationId: string | null,
   sessionId: string | null
 ): CachedSessionSnapshotPage | null {
   const { data } = useQuery<CachedSessionSnapshotPage>({
-    queryKey: transcriptCacheKey(transcriptCacheScope(organizationId), sessionId ?? ''),
+    queryKey: transcriptCacheKey(transcriptCacheScope(userId, organizationId), sessionId ?? ''),
     queryFn: skipToken,
   });
   return sessionId ? (data ?? null) : null;

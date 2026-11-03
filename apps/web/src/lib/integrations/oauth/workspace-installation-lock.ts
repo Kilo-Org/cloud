@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 
 export async function withWorkspaceInstallationLock<T>(
-  platform: 'linear' | 'slack',
+  platform: 'linear' | 'slack' | 'discord',
   owner: Owner,
   installationId: string,
   operation: (tx: DrizzleTransaction) => Promise<T>

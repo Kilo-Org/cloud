@@ -4,6 +4,7 @@ import {
   type LanguageStartupDeps,
   retryLanguageStartupDirectionAsync,
   runLanguageStartupDirectionAsync,
+  runLanguageStartupDirectionGuardedAsync,
 } from './startup-direction-run';
 
 type Effects = LanguageStartupDeps & {
@@ -101,6 +102,69 @@ describe('runLanguageStartupDirectionAsync', () => {
     ).resolves.toBe('retry');
 
     expect(deps.writeAttempt).toHaveBeenCalledWith('ur');
+  });
+});
+
+describe('runLanguageStartupDirectionGuardedAsync', () => {
+  it('turns a rejected step into the retry outcome and reports it once', async () => {
+    const failure = new Error('direction switch unavailable');
+    const deps = effects({
+      readAttempt: vi.fn(() => Promise.reject(failure)),
+    });
+    const onFailure = vi.fn<(error: unknown) => void>();
+
+    await expect(
+      runLanguageStartupDirectionGuardedAsync(
+        { language: 'en', isRtl: false, shouldBeRtl: false },
+        deps,
+        onFailure
+      )
+    ).resolves.toBe('retry');
+
+    expect(onFailure).toHaveBeenCalledExactlyOnceWith(failure);
+    // The failure happened at the first read: no effect ran, so nothing was
+    // forced or relaunched.
+    expect(deps.syncRtl).not.toHaveBeenCalled();
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+
+  it('turns a thrown synchronous direction switch into the retry outcome', async () => {
+    const failure = new Error('I18nManager unavailable');
+    const deps = effects();
+    deps.syncRtl = vi.fn(() => {
+      throw failure;
+    });
+    const onFailure = vi.fn<(error: unknown) => void>();
+
+    await expect(
+      runLanguageStartupDirectionGuardedAsync(
+        { language: 'ar', isRtl: false, shouldBeRtl: true },
+        deps,
+        onFailure
+      )
+    ).resolves.toBe('retry');
+
+    // The direction record was written before the switch threw, so the next
+    // cold start does not relaunch again for the same direction.
+    expect(deps.writeAttempt).toHaveBeenCalledExactlyOnceWith('ar');
+    expect(onFailure).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(deps.reload).not.toHaveBeenCalled();
+  });
+
+  it('passes a settled outcome through without reporting', async () => {
+    const deps = effects();
+    const onFailure = vi.fn<(error: unknown) => void>();
+
+    await expect(
+      runLanguageStartupDirectionGuardedAsync(
+        { language: 'en', isRtl: false, shouldBeRtl: false },
+        deps,
+        onFailure
+      )
+    ).resolves.toBe('applied');
+
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(deps.calls).toEqual(['readAttempt', 'clearAttempt']);
   });
 });
 

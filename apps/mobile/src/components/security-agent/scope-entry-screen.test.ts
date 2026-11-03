@@ -23,7 +23,7 @@ let permissionData = {
 };
 let configData = structuredClone(securityConfigFixture);
 let repositoriesData: { id: number }[] = [];
-let roles: { organizationId: string; role: string }[] = [];
+let roles: { organizationId: string; organizationName: string; role: string }[] = [];
 let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
@@ -57,6 +57,7 @@ vi.mock('@/lib/trpc', async () => {
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
@@ -89,6 +90,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
@@ -158,7 +160,7 @@ beforeEach(() => {
   connectivity = 'online';
   releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
-  roles = [{ organizationId: 'org_123', role: 'owner' }];
+  roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
     if (configHold && procedureFor(input) === 'getConfig') {
@@ -329,6 +331,181 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen GitHub install capability', () => {
+  // `githubApps.mintInstallState` is the authority on who may start an
+  // organization installation: it resolves the caller through
+  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
+  // parent-organization role. The entry therefore offers the press and lets the
+  // server refuse it, so a device-side membership read cannot deny a caller the
+  // server admits.
+  it.each(['member', 'billing_manager'])(
+    'shows the read-only notice once the mint refuses a %s',
+    async role => {
+      roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+
+      const root = await mount('org_123');
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBe(
+        'Ask an organization owner or admin to connect GitHub.'
+      );
+      expect(setup?.props.url).toBeUndefined();
+    }
+  );
+
+  it('keeps the press when the membership read cannot name a role for the organization', async () => {
+    // An organization reached through the server's parent-organization role has
+    // no direct row here; its mint still succeeds, so the unresolved device-side
+    // role must not withhold the press.
+    roles = [{ organizationId: 'parent_123', organizationName: 'Parent', role: 'member' }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+  });
+
+  it.each(['owner', 'admin'])('keeps the install press for an %s', async role => {
+    roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the retryable press when the mint fails for any other reason', async () => {
+    // Only a refused role retires the action; a transport or server failure
+    // leaves the press, which re-mints before opening.
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+    failingProcedures = new Set(['mintInstallState']);
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+  });
+
+  it.each(['personal', 'org_123'])(
+    'keeps the retryable press when the %s mint answers a session auth failure',
+    async scope => {
+      // A session that expired answers UNAUTHORIZED with `data.authRequired`.
+      // The app signs out on it; retiring the press for the role notice would
+      // claim an organization role decided it, which a personal scope lacks.
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+      sessionAuthRequired = true;
+
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBeUndefined();
+      expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    }
+  );
+
+  it("keeps the install press while an enabled agent's role list is unread", async () => {
+    // An enabled agent with no connection reaches the connect view before the
+    // shared membership list lands. Withholding the press on that unresolved
+    // role would hide the only action from the owner who can take it.
+    configData.isEnabled = true;
+    roles = [];
+    heldProcedures = new Set(['list']);
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    releaseHeld?.();
+  });
+
+  it('never withholds the personal install press', async () => {
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('personal');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+});
+
+describe('ScopeEntryScreen names the scope it acts on', () => {
+  // An admin in several organizations reauthorizes one organization's GitHub
+  // app: the header has to say whose agent the button acts on, the way the Code
+  // Reviewer's scope screens already do.
+  it('names the organization on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Drain Labs');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('personal');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Personal');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the load-failure view', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('org_123');
+    const failure = host(root, 'PlatformErrorScreen')[0];
+    expect(failure?.props.title).toBe('Drain Labs');
+    expect(failure?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the no-access view', async () => {
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    const denied = host(root, 'ScopeAccessDeniedScreen')[0];
+    expect(denied?.props.title).toBe('Drain Labs');
+    expect(denied?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list is still loading', async () => {
+    // The name arrives with the shared membership list. Until then the header
+    // keeps a placeholder title rather than an empty line, so the body does not
+    // move when the real name lands.
+    heldProcedures = new Set(['list']);
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Organization');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+    releaseHeld?.();
+  });
+});
+
 describe('ScopeEntryScreen dashboard first mount', () => {
   it('paints the enabled dashboard on the first mount with no entering animation above it', async () => {
     configData.isEnabled = true;
@@ -350,16 +527,16 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     expect(host(root, 'Animated.View')).toHaveLength(0);
   });
 
-  it('renders the loading skeleton, then the dashboard, on the first mount', async () => {
+  it('paints the dashboard frame, then the dashboard, on the first mount', async () => {
     configData.isEnabled = true;
     const held = Promise.withResolvers<boolean>();
     configHold = held.promise;
 
     const root = await mount('personal');
-    // Pending settings keep the screen on the header + skeleton, never on an
-    // empty body.
-    expect(host(root, 'ScreenHeader')).toHaveLength(1);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // A pending config keeps the screen on the dashboard's own frame — the
+    // header, its actions, the filter row and the tile slots — never on an
+    // empty body or a placeholder the destination then moves.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
 
     act(() => {
@@ -370,7 +547,7 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     await advanceBy();
 
     expect(host(root, 'DashboardScreen')).toHaveLength(1);
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
   });
 });
 
@@ -512,12 +689,15 @@ describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],
 ] as const)('%s settings readiness and access', (presentation, Screen) => {
+  // An empty repository set keeps the picker reachable: the disabled switch is
+  // refused without an effective repository, and the GitHub App grant is widened
+  // from the picker, so hiding the row there stranded the page.
   it.each([
-    ['selected', [], { repos: [], disabled: true, cta: false }],
+    ['selected', [], { repos: [], disabled: true, cta: true }],
     ['selected', [], { repos: [{ id: 1 }], disabled: true, cta: true }],
     ['selected', [1], { repos: [], disabled: false, cta: false }],
     ['all', [], { repos: [{ id: 1 }], disabled: false, cta: false }],
-    ['all', [], { repos: [], disabled: true, cta: false }],
+    ['all', [], { repos: [], disabled: true, cta: true }],
   ] as const)(
     'preserves setup controls for %s, selection %j and repositories %j',
     async (mode, selected, expected) => {
@@ -546,7 +726,10 @@ describe.each([
   it.each(['member', 'absent'])(
     'keeps the %s organization role restricted after Retry',
     async role => {
-      roles = role === 'absent' ? [] : [{ organizationId: 'org_123', role }];
+      roles =
+        role === 'absent'
+          ? []
+          : [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
       onlineManager.setOnline(false);
       const root = await mount('org_123', Screen);
       await retry(root);
@@ -609,14 +792,16 @@ describe('ScopeEntryScreen retry recovery', () => {
     heldProcedures = new Set(['getConfig']);
     await retry(root);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // An unanswered config cannot name its destination yet, so the retry shows
+    // the dashboard's own frame.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
 
     releaseHeld?.();
     await advanceBy();
     await advanceBy();
     await advanceBy();
 
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
     expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
   });

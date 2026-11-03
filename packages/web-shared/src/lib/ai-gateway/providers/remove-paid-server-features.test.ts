@@ -10,9 +10,9 @@ const functionTool = {
   function: { name: 'lookup', parameters: { type: 'object' } },
 } as const;
 
-function makeProvider(id: Provider['id'] = 'openrouter'): Provider {
+function makeProvider(type: Provider['type'] = 'openrouter'): Provider {
   return {
-    id,
+    type,
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
     disableUrlSuffix: false,

@@ -39,6 +39,60 @@ const MAX_GITLAB_PAGINATION_PAGES = 100;
 const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
 
 /**
+ * Cumulative response bytes one paginated read keeps across its pages. A real page of 100
+ * projects is about 90 KiB and a page of 100 branches about 100 KiB on gitlab.com, so
+ * MAX_GITLAB_PAGINATION_PAGES full pages come to roughly 10 MiB; 16 MiB leaves headroom for
+ * payloads larger than that.
+ */
+export const MAX_GITLAB_LISTING_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Total duration of one paginated read, shared by every page request. A real page answers in
+ * well under a second, so the page cap is reached in seconds and this limit applies only to a
+ * read far slower than a listing.
+ */
+export const GITLAB_LISTING_TIMEOUT_MS = 60_000;
+
+/**
+ * One paginated read's budget: the response bytes it keeps across pages and the single
+ * total-duration signal every page request of that read shares. A read that exceeds either
+ * limit fails with an error naming the read.
+ */
+class GitLabListingBudget {
+  readonly signal: AbortSignal;
+  private readonly controller = new AbortController();
+  private readonly context: string;
+  private readonly timer: NodeJS.Timeout;
+  private retainedBytes = 0;
+
+  constructor(context: string) {
+    this.context = context;
+    this.timer = setTimeout(() => {
+      this.controller.abort(
+        new Error(
+          `GitLab pagination limit exceeded: ${context} did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+        )
+      );
+    }, GITLAB_LISTING_TIMEOUT_MS);
+    this.timer.unref?.();
+    this.signal = this.controller.signal;
+  }
+
+  retain(bytes: number): void {
+    this.retainedBytes += bytes;
+    if (this.retainedBytes > MAX_GITLAB_LISTING_BYTES) {
+      throw new Error(
+        `GitLab pagination limit exceeded: ${this.context} returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+      );
+    }
+  }
+
+  dispose(): void {
+    clearTimeout(this.timer);
+  }
+}
+
+/**
  * Upper bound on the merge-request note text one read keeps, matching the GitHub
  * adapter's stored review-comment budget. Pagination stops once a read reaches it,
  * so the result is a partial review state rather than a full provider history.
@@ -63,8 +117,17 @@ function checkGitLabPaginationBounds(page: number, itemCount: number, context: s
   }
 }
 
-async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
-  const response = await fetchGitLabOnce(url, init);
+async function fetchGitLab(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget,
+  redirectCount = 0
+): Promise<Response> {
+  const response = await fetchGitLabOnce(
+    url,
+    budget ? { ...init, signal: budget.signal } : init,
+    budget
+  );
   if (!isGitLabRedirect(response.status)) {
     return response;
   }
@@ -82,21 +145,59 @@ async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): 
   return fetchGitLab(
     redirectUrl,
     buildRedirectRequestInit(init, response.status, url, redirectUrl),
+    budget,
     redirectCount + 1
   );
 }
 
-async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
-  const resolvedUrl = await resolveGitLabUrlSafely(url);
-  if (!resolvedUrl.address) {
-    return fetchBounded(url, init);
+/**
+ * Awaits a step that cannot observe the listing signal itself, such as a DNS lookup, so the
+ * read still ends at its deadline.
+ */
+async function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    throw signal.reason;
   }
 
-  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+  const { promise, reject } = Promise.withResolvers<never>();
+  const onAbort = (): void => reject(signal.reason);
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    return await Promise.race([work, promise]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
-async function fetchBounded(url: string, init?: RequestInit): Promise<Response> {
-  const signal = init?.signal ?? AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+async function fetchGitLabOnce(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget
+): Promise<Response> {
+  const resolvedUrl = budget
+    ? await withDeadline(resolveGitLabUrlSafely(url), budget.signal)
+    : await resolveGitLabUrlSafely(url);
+  if (!resolvedUrl.address) {
+    return fetchBounded(url, init, budget);
+  }
+
+  return fetchGitLabBoundToAddress(
+    { ...resolvedUrl, address: resolvedUrl.address },
+    init,
+    MAX_GITLAB_RESPONSE_BYTES,
+    budget
+  );
+}
+
+async function fetchBounded(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget
+): Promise<Response> {
+  const requestTimeout = AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+  // A caller signal (a listing's total deadline) bounds the whole read; the per-request
+  // inactivity bound still applies to the single request.
+  const signal = init?.signal ? AbortSignal.any([init.signal, requestTimeout]) : requestTimeout;
   const response = await fetch(url, {
     ...init,
     signal,
@@ -135,6 +236,7 @@ async function fetchBounded(url: string, init?: RequestInit): Promise<Response> 
   }
 
   const body = responseStatusForbidsBody(response.status) ? null : Buffer.concat(chunks);
+  budget?.retain(responseBytes);
   return new Response(body, {
     status: response.status,
     statusText: response.statusText,
@@ -188,7 +290,8 @@ function buildRedirectRequestInit(
 export function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
   init?: RequestInit,
-  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES
+  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES,
+  budget?: GitLabListingBudget
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
@@ -198,82 +301,91 @@ export function fetchGitLabBoundToAddress(
     headers['content-length'] = String(Buffer.byteLength(body));
   }
 
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: init?.method ?? 'GET',
-        headers,
-        family,
-        lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
-        ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
-      },
-      response => {
-        const chunks: Buffer[] = [];
-        let responseBytes = 0;
-        response.on('data', chunk => {
-          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          responseBytes += buffer.byteLength;
-          if (responseBytes > maxResponseBytes) {
-            const error = new Error('GitLab response exceeded size limit');
-            response.destroy(error);
-            req.destroy(error);
-            reject(error);
-            return;
-          }
+  const { promise, resolve, reject } = Promise.withResolvers<Response>();
+  const signal = init?.signal;
+  const onAbort = (): void => {
+    req.destroy(signal?.reason);
+    fail(signal?.reason);
+  };
+  /** Settles the request and drops its deadline listener, so one read keeps one listener. */
+  const settle = (value: Response): void => {
+    signal?.removeEventListener('abort', onAbort);
+    resolve(value);
+  };
+  const fail = (error: unknown): void => {
+    signal?.removeEventListener('abort', onAbort);
+    reject(error);
+  };
 
-          chunks.push(buffer);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          try {
-            const status = response.statusCode ?? 500;
-            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
-            resolve(
-              new Response(body, {
-                status,
-                statusText: response.statusMessage,
-                headers: responseHeadersToHeaders(response.headers),
-              })
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
+  const req = request(
+    {
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port,
+      path: `${url.pathname}${url.search}`,
+      method: init?.method ?? 'GET',
+      headers,
+      family,
+      lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
+      ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
+    },
+    response => {
+      const chunks: Buffer[] = [];
+      let responseBytes = 0;
+      response.on('data', chunk => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        responseBytes += buffer.byteLength;
+        if (responseBytes > maxResponseBytes) {
+          const error = new Error('GitLab response exceeded size limit');
+          response.destroy(error);
+          req.destroy(error);
+          fail(error);
+          return;
+        }
 
-    req.on('error', reject);
-    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error('GitLab request timed out'));
-    });
-
-    const signal = init?.signal;
-    if (signal) {
-      if (signal.aborted) {
-        req.destroy(signal.reason);
-        reject(signal.reason);
-        return;
-      }
-
-      signal.addEventListener(
-        'abort',
-        () => {
-          req.destroy(signal.reason);
-          reject(signal.reason);
-        },
-        { once: true }
-      );
+        chunks.push(buffer);
+      });
+      response.on('error', fail);
+      response.on('end', () => {
+        try {
+          const status = response.statusCode ?? 500;
+          const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
+          budget?.retain(responseBytes);
+          settle(
+            new Response(body, {
+              status,
+              statusText: response.statusMessage,
+              headers: responseHeadersToHeaders(response.headers),
+            })
+          );
+        } catch (error) {
+          fail(error);
+        }
+      });
     }
+  );
 
-    if (body) {
-      req.write(body);
-    }
-    req.end();
+  req.on('error', fail);
+  req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
+    req.destroy(new Error('GitLab request timed out'));
   });
+
+  if (signal) {
+    if (signal.aborted) {
+      req.destroy(signal.reason);
+      fail(signal.reason);
+      return promise;
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  if (body) {
+    req.write(body);
+  }
+  req.end();
+
+  return promise;
 }
 
 function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
@@ -485,56 +597,65 @@ export async function fetchGitLabProjects(
   accessToken: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<PlatformRepository[]> {
-  const projects: PlatformRepository[] = [];
-  let page = 1;
-  const perPage = 100;
+  const budget = new GitLabListingBudget('project listing');
+  try {
+    const projects: PlatformRepository[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(instanceUrl, '/api/v4/projects', {
-        membership: true,
-        per_page: perPage,
-        page,
-        archived: false,
-      }),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, '/api/v4/projects', {
+          membership: true,
+          per_page: perPage,
+          page,
+          archived: false,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab projects fetch failed:', {
+          status: response.status,
+          bodyExcerpt,
+        });
+        throw new Error(`GitLab projects fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const bodyExcerpt = providerErrorExcerpt(await response.text());
-      logExceptInTest('GitLab projects fetch failed:', { status: response.status, bodyExcerpt });
-      throw new Error(`GitLab projects fetch failed: ${response.status}`);
+      const data = (await response.json()) as GitLabProject[];
+
+      projects.push(
+        ...data.filter(isActiveGitLabProject).map(project => ({
+          id: project.id,
+          name: project.name,
+          full_name: project.path_with_namespace,
+          private: project.visibility === 'private',
+        }))
+      );
+
+      const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
+      if (Number.isInteger(nextPage) && nextPage > page) {
+        checkGitLabPaginationBounds(nextPage, projects.length, 'project listing');
+        page = nextPage;
+        continue;
+      }
+
+      checkGitLabPaginationBounds(page, projects.length, 'project listing');
+      break;
     }
 
-    const data = (await response.json()) as GitLabProject[];
+    logExceptInTest('GitLab projects fetched', { count: projects.length });
 
-    projects.push(
-      ...data.filter(isActiveGitLabProject).map(project => ({
-        id: project.id,
-        name: project.name,
-        full_name: project.path_with_namespace,
-        private: project.visibility === 'private',
-      }))
-    );
-
-    const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
-    if (Number.isInteger(nextPage) && nextPage > page) {
-      checkGitLabPaginationBounds(nextPage, projects.length, 'project listing');
-      page = nextPage;
-      continue;
-    }
-
-    checkGitLabPaginationBounds(page, projects.length, 'project listing');
-    break;
+    return projects;
+  } finally {
+    budget.dispose();
   }
-
-  logExceptInTest('GitLab projects fetched', { count: projects.length });
-
-  return projects;
 }
 
 /**
@@ -559,45 +680,51 @@ export async function fetchGitLabBranches(
 ): Promise<GitLabBranch[]> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-  const branches: GitLabBranch[] = [];
-  let page = 1;
-  const perPage = 100;
+  const budget = new GitLabListingBudget('branch listing');
+  try {
+    const branches: GitLabBranch[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/repository/branches`, {
-        per_page: perPage,
-        page,
-      }),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/repository/branches`, {
+          per_page: perPage,
+          page,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      }
-    );
-
-    if (!response.ok) {
-      const bodyExcerpt = providerErrorExcerpt(await response.text());
-      logExceptInTest('GitLab branches fetch failed:', { status: response.status, bodyExcerpt });
-      throw new GitLabBranchesFetchError(
-        response.status,
-        `GitLab branches fetch failed: ${response.status}`
+        budget
       );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab branches fetch failed:', { status: response.status, bodyExcerpt });
+        throw new GitLabBranchesFetchError(
+          response.status,
+          `GitLab branches fetch failed: ${response.status}`
+        );
+      }
+
+      const data = (await response.json()) as GitLabBranch[];
+      branches.push(...data);
+
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
+      if (page >= totalPages) break;
+      page++;
     }
 
-    const data = (await response.json()) as GitLabBranch[];
-    branches.push(...data);
+    logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
 
-    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
-    if (page >= totalPages) break;
-    page++;
+    return branches;
+  } finally {
+    budget.dispose();
   }
-
-  logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
-
-  return branches;
 }
 
 /**
@@ -1229,50 +1356,56 @@ export async function findKiloReviewNote(
   let reachedByteLimit = false;
   let page = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR note listing');
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(
-        instanceUrl,
-        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
-        { per_page: perPage, page }
-      ),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+  try {
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(
+          instanceUrl,
+          `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+          { per_page: perPage, page }
+        ),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, bodyExcerpt });
+        throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const bodyExcerpt = providerErrorExcerpt(await response.text());
-      logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, bodyExcerpt });
-      throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
-    }
+      const data = (await response.json()) as GitLabNote[];
+      notesRead += data.length;
 
-    const data = (await response.json()) as GitLabNote[];
-    notesRead += data.length;
+      for (const note of data) {
+        if (note.system || note.author.id !== tokenUser.id) continue;
+        if (!note.body?.includes('<!-- kilo-review -->')) continue;
 
-    for (const note of data) {
-      if (note.system || note.author.id !== tokenUser.id) continue;
-      if (!note.body?.includes('<!-- kilo-review -->')) continue;
-
-      // The body is written back to this note when Kilo updates the summary, so it stays
-      // whole; only its size counts against the read budget.
-      retainedNoteBytes += Buffer.byteLength(note.body);
-      candidateNotes.push({ id: note.id, body: note.body, updated_at: note.updated_at });
-      if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
-        reachedByteLimit = true;
-        break;
+        // The body is written back to this note when Kilo updates the summary, so it stays
+        // whole; only its size counts against the read budget.
+        retainedNoteBytes += Buffer.byteLength(note.body);
+        candidateNotes.push({ id: note.id, body: note.body, updated_at: note.updated_at });
+        if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
       }
-    }
 
-    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, notesRead, 'MR note listing');
-    if (reachedByteLimit) break;
-    if (page >= totalPages) break;
-    page++;
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, notesRead, 'MR note listing');
+      if (reachedByteLimit) break;
+      if (page >= totalPages) break;
+      page++;
+    }
+  } finally {
+    budget.dispose();
   }
 
   logExceptInTest('[findKiloReviewNote] Fetched notes', {
@@ -1409,43 +1542,49 @@ export async function hasMRNoteWithMarker(
 
   let page = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR note marker search');
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(
-        instanceUrl,
-        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
-        { per_page: perPage, page }
-      ),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+  try {
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(
+          instanceUrl,
+          `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+          { per_page: perPage, page }
+        ),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab MR notes fetch failed:', {
+          status: response.status,
+          bodyExcerpt,
+          projectId,
+          mrIid,
+          page,
+        });
+        throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const bodyExcerpt = providerErrorExcerpt(await response.text());
-      logExceptInTest('GitLab MR notes fetch failed:', {
-        status: response.status,
-        bodyExcerpt,
-        projectId,
-        mrIid,
-        page,
-      });
-      throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
+      const notes = (await response.json()) as Array<{ body: string; author: { id: number } }>;
+      if (notes.some(n => n.body?.includes(marker) && n.author.id === tokenUser.id)) {
+        return true;
+      }
+
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
+      if (page >= totalPages) break;
+      page++;
     }
-
-    const notes = (await response.json()) as Array<{ body: string; author: { id: number } }>;
-    if (notes.some(n => n.body?.includes(marker) && n.author.id === tokenUser.id)) {
-      return true;
-    }
-
-    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
-    checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
-    if (page >= totalPages) break;
-    page++;
+  } finally {
+    budget.dispose();
   }
 
   return false;
@@ -1499,6 +1638,7 @@ export async function fetchMRInlineComments(
   let reachedByteLimit = false;
   let totalPages = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR discussion listing');
 
   async function readDiscussionPage(page: number): Promise<GitLabDiscussion[]> {
     const response = await fetchGitLab(
@@ -1511,7 +1651,8 @@ export async function fetchMRInlineComments(
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
+      budget
     );
 
     if (!response.ok) {
@@ -1567,14 +1708,18 @@ export async function fetchMRInlineComments(
   // read starts at the last page and walks back, consuming each page newest first. That keeps the
   // newest comments when the budget ends the read, as the GitHub adapter does with its
   // newest-first request, and the returned comments are ordered newest first.
-  const oldestPage = await readDiscussionPage(1);
-  checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
-  for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
-    const data = await readDiscussionPage(page);
-    retainDiscussions([...data].reverse());
-  }
-  if (!reachedByteLimit) {
-    retainDiscussions([...oldestPage].reverse());
+  try {
+    const oldestPage = await readDiscussionPage(1);
+    checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
+    for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
+      const data = await readDiscussionPage(page);
+      retainDiscussions([...data].reverse());
+    }
+    if (!reachedByteLimit) {
+      retainDiscussions([...oldestPage].reverse());
+    }
+  } finally {
+    budget.dispose();
   }
 
   // Attribution is best-effort: a failed lookup leaves the comments unattributed for this

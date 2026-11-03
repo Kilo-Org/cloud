@@ -9,6 +9,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { deleteExpiredRequestLoggingOptIns } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 
 const RETENTION_DAYS = 30;
 const BATCH_SIZE = 10_000;
@@ -44,11 +45,13 @@ export async function GET(request: Request) {
         ? await db.delete(api_request_log).where(inArray(api_request_log.id, batchIds))
         : null;
 
+    const deletedOptInCount = await deleteExpiredRequestLoggingOptIns();
     const deletedApiRequestLogCount = result?.rowCount ?? 0;
     const hasMore = expiredRows.length > BATCH_SIZE;
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_api_request_log_count: deletedApiRequestLogCount,
+        deleted_request_logging_opt_in_count: deletedOptInCount,
         deleted_count: deletedApiRequestLogCount,
         batch_size: BATCH_SIZE,
         has_more: hasMore,
@@ -57,6 +60,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       deletedCount: deletedApiRequestLogCount,
+      deletedOptInCount,
       batchSize: BATCH_SIZE,
       hasMore,
       cutoffDate,

@@ -51,7 +51,10 @@ import {
   setCommitStatus,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  resolveReviewProviderIntegration,
+  reviewOwnerScope,
+} from '@/lib/code-reviews/provider-integration';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -1159,6 +1162,21 @@ export async function POST(
     const isManualReview = manualConfig !== null;
     const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
 
+    // Every provider side effect below runs with the review owner's own integration. A review
+    // row whose integration belongs to another owner resolves to null, so the completion still
+    // records while no foreign credential is used.
+    const reviewOwner = reviewOwnerScope(review);
+    let ownerScopedIntegrationResolved = false;
+    let ownerScopedIntegration: PlatformIntegration | null = null;
+    const getOwnerScopedIntegration = async (): Promise<PlatformIntegration | null> => {
+      if (!shouldPublishToProvider || !reviewOwner) return null;
+      if (!ownerScopedIntegrationResolved) {
+        ownerScopedIntegrationResolved = true;
+        ownerScopedIntegration = await resolveReviewProviderIntegration(review, reviewOwner);
+      }
+      return ownerScopedIntegration;
+    };
+
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
@@ -1237,7 +1255,7 @@ export async function POST(
             attemptId: preUpdateAttemptId,
             reviewId,
             platform: review.platform,
-            platformIntegrationId: review.platform_integration_id,
+            platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
             repoFullName: review.repo_full_name,
             prNumber: review.pr_number,
             previousSummaryBody: review.previous_summary_body,
@@ -1351,7 +1369,7 @@ export async function POST(
           attemptId: preUpdateAttemptId,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,
@@ -1696,10 +1714,7 @@ export async function POST(
     }
 
     // Fetch integration once — used for gate check updates and post-completion actions
-    const integration =
-      shouldPublishToProvider && review.platform_integration_id
-        ? await getIntegrationById(review.platform_integration_id)
-        : null;
+    const integration = await getOwnerScopedIntegration();
 
     if (status === 'completed') {
       if (review.platform === PLATFORM.GITHUB) {
@@ -1707,7 +1722,7 @@ export async function POST(
           attemptId: attempt.id,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,

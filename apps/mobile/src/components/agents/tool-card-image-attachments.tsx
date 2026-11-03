@@ -16,7 +16,7 @@ import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
 } from './tool-card-attachments';
-import { useToolCardImageUri } from './tool-card-image-cache';
+import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-cache';
 import { getFilename } from './tool-card-utils';
 
 const toolInputFilePathSchema = z.object({ filePath: z.string() });
@@ -51,12 +51,27 @@ function ToolCardImageAttachment({
 }: Readonly<ToolCardImageAttachmentsProps & { label: string }>) {
   const { t } = useTranslation();
   const uri = useToolCardImageUri(part.id);
+  const pending = isToolCardImagePending(part.id);
   const [aspectRatio, setAspectRatio] = useState<number | undefined>(undefined);
   const [failedUri, setFailedUri] = useState<string | undefined>(undefined);
   const failed = imageFailed ?? failedUri === uri;
   const [viewerVisible, setViewerVisible] = useState(false);
 
   if (uri === undefined) {
+    if (pending) {
+      return (
+        <View
+          className="w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+          accessible
+          accessibilityState={{ busy: true }}
+          accessibilityLabel={t('agentChat.filePart.loadingImage')}
+          // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
+          style={{ aspectRatio: IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
+        >
+          <Skeleton className="absolute inset-0" />
+        </View>
+      );
+    }
     return (
       <UnavailableRow
         icon={ImageOff}

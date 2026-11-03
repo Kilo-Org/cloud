@@ -9,6 +9,7 @@
       "lowBalance": "Je saldo heeft aandacht nodig",
       "spendAlert": "Je bestedingen hebben aandacht nodig",
       "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
+      "securityUpdate": "Een beveiligingscontrole heeft een update",
       "activeAgentsGlanceable": "Actieve agents hebben een update"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Een beveiligingsbevinding heeft aandacht nodig"
+      "body": "Een beveiligingscontrole heeft een update"
     }
   },
   "instanceLifecycle": {

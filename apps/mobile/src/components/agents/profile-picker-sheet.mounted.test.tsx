@@ -77,6 +77,7 @@ const FRONTEND = profile({ id: 'frontend', name: 'Frontend', skillCount: 2 });
 function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePickerSheetProps {
   return {
     candidates: [BACKEND, FRONTEND],
+    isOrganizationContext: false,
     hasProfiles: true,
     selectedOverrideProfileId: null,
     defaultProfileApplies: false,
@@ -142,8 +143,8 @@ describe('ProfilePickerSheet', () => {
     expect(renderer.root.findByType('PickerSheet' as never).props.title).toBe('Pick a profile');
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'No profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
     expect(texts(renderer)).toContain('3 vars · 1 MCP · 1 cmd · 2 setup cmds · 1 agent');
     expect(checkedStates(renderer)).toEqual([true, false, false]);
@@ -154,14 +155,37 @@ describe('ProfilePickerSheet', () => {
     expect(checkedStates(renderer)).toEqual([false, false, true]);
   });
 
+  it('groups rows by owner in an organization scope, organization first', () => {
+    const agency = profile({ id: 'agency', name: 'Agency', ownerType: 'organization' });
+    const renderer = mount({
+      // Personal row first, so the order can only come from the owner split.
+      candidates: [FRONTEND, agency],
+      isOrganizationContext: true,
+    });
+
+    expect(texts(renderer)).toEqual(expect.arrayContaining(['Organization', 'Personal']));
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Agency, Organization',
+      'Frontend, Personal',
+    ]);
+  });
+
+  it('renders no owner heading in a personal scope', () => {
+    const renderer = mount();
+
+    expect(texts(renderer)).not.toContain('Organization');
+    expect(texts(renderer)).not.toContain('Personal');
+  });
+
   it('selects a candidate, and clears it when the checked row is tapped again', () => {
     const onSelect = vi.fn<() => void>();
     const renderer = mount({ selectedOverrideProfileId: 'backend', onSelect });
 
-    press(radio(renderer, 'Frontend'));
+    press(radio(renderer, 'Frontend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith('frontend');
 
-    press(radio(renderer, 'Backend'));
+    press(radio(renderer, 'Backend, Personal'));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 
@@ -178,18 +202,46 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({
       selectedOverrideProfileId: 'backend',
       defaultProfileApplies: true,
+      defaultProfileName: BACKEND.name,
       onSelect,
     });
 
     // Clearing the override hands the session to the default, so the row says
-    // which profile that is instead of claiming no profile.
+    // which profile that is instead of claiming no profile. The name is what
+    // the Environment chip shows, so the checked row and the chip agree.
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'Default profile: Backend',
+      'Backend, Personal',
+      'Frontend, Personal',
+    ]);
+    expect(texts(renderer)).toContain('Default profile');
+    expect(texts(renderer)).toContain('Resolves to Backend');
+    press(radio(renderer, 'Default profile: Backend'));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps the generic default row when the resolved profile name is unknown', () => {
+    const renderer = mount({ defaultProfileApplies: true });
+
     expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
       'Default profile',
-      'Backend',
-      'Frontend',
+      'Backend, Personal',
+      'Frontend, Personal',
     ]);
-    press(radio(renderer, 'Default profile'));
-    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
+  });
+
+  it('does not name a default on the No profile row when none applies', () => {
+    // A name without an applicable default must not leak onto the row that
+    // clears the override: that row means the session runs on no profile.
+    const renderer = mount({ defaultProfileName: BACKEND.name });
+
+    expect(radios(renderer).map(node => node.props.accessibilityLabel)).toEqual([
+      'No profile',
+      'Backend, Personal',
+      'Frontend, Personal',
+    ]);
+    expect(texts(renderer)).not.toContainEqual(expect.stringContaining('Resolves to'));
   });
 
   it('leaves every row unchecked and shows the attention copy for a stale override', () => {
@@ -204,6 +256,28 @@ describe('ProfilePickerSheet', () => {
 
     expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(4);
     expect(radios(renderer)).toHaveLength(0);
+  });
+
+  // SheetHeader centres the title only between a leading and a trailing
+  // control, so a state without Cancel would redraw the sheet with a
+  // leading-aligned title and shift the header between states.
+  it('keeps the same header in every state', () => {
+    for (const state of [
+      { name: 'list', props: {} },
+      { name: 'empty', props: { hasProfiles: false, candidates: [] } },
+      { name: 'loading', props: { isLoading: true } },
+      { name: 'error', props: { isError: true } },
+    ] as const) {
+      const onClose = vi.fn<() => void>();
+      const header = mount({ ...state.props, onClose }).root.findByType('PickerSheet' as never);
+
+      expect(header.props.title, state.name).toBe('Pick a profile');
+      expect(typeof header.props.onCancel, state.name).toBe('function');
+      act(() => {
+        (header.props.onCancel as () => void)();
+      });
+      expect(onClose, state.name).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('renders the retryable failure with Retry and refetches', () => {
@@ -224,8 +298,11 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({ hasProfiles: false, candidates: [], onManageProfiles });
 
     const empty = renderer.root.findByType('EmptyState' as never);
+    // The header already shows the sheet title, so the body names the
+    // condition rather than repeating it.
+    expect(empty.props.title).toBe('No profiles yet');
     expect(empty.props.description).toBe(
-      'No profiles yet. Create one to add environment variables, MCP servers, and skills.'
+      'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
     const manage = renderer.root.findByType('Button' as never);
     expect(manage.props.accessibilityLabel).toBe('Manage profiles');

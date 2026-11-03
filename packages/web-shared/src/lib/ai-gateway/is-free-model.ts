@@ -1,15 +1,19 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  findCustomLlm,
+  isCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
-/** Whether Kilo charges nothing for the model. Custom LLMs are always free. */
+/** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
 export async function isFreeModel(modelId: string): Promise<boolean> {
-  return (await isCustomLlm(modelId)) || isFreeModelExcludingCustomLlms(modelId);
+  const customLlm = await findCustomLlm(modelId);
+  if (customLlm?.definition.pricing) return false;
+  return customLlm !== null || isFreeModelExcludingCustomLlms(modelId);
 }
 
 /**
@@ -19,7 +23,6 @@ export async function isFreeModel(modelId: string): Promise<boolean> {
 export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
   return (
-    isKiloExclusiveModel(modelId) ||
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
@@ -29,7 +32,7 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
   );
 }
 
-/** Free models, custom LLMs included, are assumed to train on prompts. */
+/** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return await isFreeModel(model);
+  return (await isCustomLlm(model)) || isFreeModelExcludingCustomLlms(model);
 }

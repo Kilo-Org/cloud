@@ -88,14 +88,3 @@ export function expectHiddenReservedBox(root: React.ReactElement): void {
   expect(props.accessibilityElementsHidden).toBe(true);
   expect(props.importantForAccessibility).toBe('no');
 }
-
-/** Asserts the pill body renders exactly one text child holding the dash. */
-export function expectDashLabel(root: React.ReactElement): void {
-  const texts = findAll(root, el => el.type === 'Text');
-  expect(texts).toHaveLength(1);
-  const dash = texts[0];
-  if (dash == null) {
-    throw new Error('expected the dash label');
-  }
-  expect((dash.props as { children?: unknown }).children).toBe('—');
-}

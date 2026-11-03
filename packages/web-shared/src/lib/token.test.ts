@@ -43,6 +43,7 @@ const mockUser: User = {
   is_super_admin: false,
   can_view_sessions: false,
   can_manage_credits: false,
+  can_export_api_request_logs: false,
   total_microdollars_acquired: 0,
   next_credit_expiration_at: null,
   has_validation_stytch: null,
@@ -69,6 +70,7 @@ const mockUser: User = {
   account_deletion_requested_at: null,
   normalized_email: null,
   email_domain: null,
+  external_id: null,
   personal_account_disabled: false,
 };
 

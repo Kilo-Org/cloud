@@ -4407,6 +4407,117 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       }
     }
   );
+
+  test('a fee-only charge.refunded records the fee refund without suspending the organization agreement', async () => {
+    await cleanupDbForTest();
+    const user = await insertTestUser();
+    const organization = await createOrganization('Organization fee refund', user.id);
+    const subscriptionId = `sub_org_fee_refund_${crypto.randomUUID()}`;
+    const chargeId = `ch_org_fee_refund_${crypto.randomUUID()}`;
+    const window = {
+      start: new Date('2026-07-01T00:00:00.000Z'),
+      end: new Date('2026-08-01T00:00:00.000Z'),
+    };
+    const pending = await createPendingAgreement({
+      parentOrganizationId: organization.id,
+      actorUserId: user.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: subscriptionId,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: user.id,
+      paidFrom: window.start,
+      paidUntil: window.end,
+      paidSeatCount: 1,
+      firstWindow: window,
+      isBridge: false,
+    });
+    const assessmentKey = `invoice:${crypto.randomUUID()}`;
+    await db.insert(stripe_service_fee_assessments).values({
+      assessment_key: assessmentKey,
+      version: 'test',
+      flow: 'organization_kilo_pass',
+      outcome: 'charged',
+      currency: 'usd',
+      kilo_user_id: user.id,
+      organization_id: organization.id,
+      stripe_invoice_id: `in_${chargeId}`,
+      stripe_charge_id: chargeId,
+      stripe_invoice_fee_line_item_id: `il_fee_${chargeId}`,
+      eligibility_created_at: '2026-11-01T12:00:00.000Z',
+      eligible_subtotal_minor: 1_900,
+      expected_fee_minor: 95,
+      charged_fee_minor: 95,
+      gross_paid_minor: 1_995,
+      settled_product_minor: 1_900,
+      settled_at: '2026-11-01T12:01:00.000Z',
+    });
+    const invoice = {
+      id: `in_${chargeId}`,
+      object: 'invoice',
+      parent: {
+        subscription_details: {
+          subscription: subscriptionId,
+          metadata: {
+            type: 'kilo-pass-org',
+            organizationId: organization.id,
+            kiloUserId: user.id,
+            tier: 'tier_19',
+            cadence: 'monthly',
+          },
+        },
+      },
+      lines: { data: [] },
+    } as unknown as Stripe.Invoice;
+    const feeRefund = {
+      id: `re_${chargeId}`,
+      object: 'refund',
+      amount: 95,
+      status: 'succeeded',
+      metadata: { serviceFeeRefundProductMinor: '0', serviceFeeRefundFeeMinor: '95' },
+    } as unknown as Stripe.Refund;
+    const provider = mockChargeInvoice(invoice, { customer: user.stripe_customer_id });
+    const listRefunds = jest.spyOn(client.refunds, 'list').mockResolvedValue({
+      object: 'list',
+      data: [feeRefund],
+      has_more: false,
+      url: '/v1/refunds',
+      lastResponse: { headers: {}, requestId: 'req_fee_refund', statusCode: 200 },
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Refund>>);
+    const charge = sampleStripeCharge({
+      id: chargeId,
+      customer: user.stripe_customer_id,
+      payment_intent: 'pi_invoice_context',
+      amount: 1_995,
+      amount_refunded: 95,
+      refunds: { object: 'list', data: [feeRefund], has_more: false, url: '' },
+    });
+    try {
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'charge.refunded',
+        data: { object: charge },
+      } as Stripe.Event);
+
+      const agreement = await db.query.kilo_pass_org_agreements.findFirst({
+        where: eq(kilo_pass_org_agreements.id, pending.agreementId),
+      });
+      expect(agreement?.payment_review_required_at).toBeNull();
+      const assessment = await db.query.stripe_service_fee_assessments.findFirst({
+        where: eq(stripe_service_fee_assessments.assessment_key, assessmentKey),
+      });
+      expect(assessment).toMatchObject({ refunded_fee_minor: 95, refunded_product_minor: 0 });
+    } finally {
+      listRefunds.mockRestore();
+      provider.mockRestore();
+    }
+  });
 });
 
 describe('getStripeInvoicesPage', () => {

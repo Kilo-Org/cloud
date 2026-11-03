@@ -438,13 +438,21 @@ export function FindingRemediationPanel({
                         ? t(originKey)
                         : (storedText(attempt.origin)?.replaceAll('_', ' ') ?? t('common.unknown'))
                     }
+                    valueFace="text"
                   />
                   <KvRow
                     label={t('common.model')}
                     value={attempt.remediationModelSlug}
+                    valueDirection="ltr"
                     selectable
                   />
-                  <KvRow label={t('common.branch')} value={attempt.branchName} last selectable />
+                  <KvRow
+                    label={t('common.branch')}
+                    value={attempt.branchName}
+                    last
+                    valueDirection="ltr"
+                    selectable
+                  />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}

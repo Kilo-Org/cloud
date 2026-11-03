@@ -12,7 +12,10 @@ type Renderer = Awaited<ReturnType<typeof renderWithProviders>>['renderer'];
 type Instance = Renderer['root'];
 
 const cache = vi.hoisted(() => new Map<string, string>());
-vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: (id: string) => cache.get(id) }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: (id: string) => cache.get(id),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   View: 'View',

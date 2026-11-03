@@ -1,7 +1,10 @@
 import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
-import { validateCloudAgentAuthorityRequest } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  cloudAgentAuthorityProcedureKind,
+  validateCloudAgentAuthorityRequest,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   JsonRpcFailure,
   type Catalog,
@@ -14,7 +17,12 @@ import {
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32000;
 
-function assertScopedCall(auth: ForwardedAuth, path: string, input: unknown): void {
+function assertScopedCall(
+  auth: ForwardedAuth,
+  path: string,
+  input: unknown,
+  kind?: CatalogRow['kind']
+): void {
   if (auth.cloudAgentAuthority === undefined) return;
   try {
     if (
@@ -24,6 +32,9 @@ function assertScopedCall(auth: ForwardedAuth, path: string, input: unknown): vo
       throw new Error('Invalid authority binding');
     }
     validateCloudAgentAuthorityRequest(auth.cloudAgentAuthority, path, input);
+    if (kind !== undefined && cloudAgentAuthorityProcedureKind(path) !== kind) {
+      throw new Error('Cloud Agent authority kind does not match the catalog');
+    }
   } catch {
     throw new JsonRpcFailure(INVALID_PARAMS, 'Cloud Agent authority does not permit this request');
   }
@@ -229,7 +240,7 @@ function protectedRequestsUnavailable(path: string): JsonRpcFailure {
  * `submit_otp`'s recorded-payload re-check all run these exact checks, so the
  * payload the user approves is exactly the payload the upstream receives.
  */
-function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown): boolean {
+export function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown): boolean {
   const schemaIsEmpty = isNoInputSchema(row.inputSchema);
   const sendInput = input !== undefined && input !== null;
   if (schemaIsEmpty && sendInput) {
@@ -309,8 +320,18 @@ export async function forwardCatalogCall(options: {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
+  return serializeWithCap(await fetchCatalogCall(options));
+}
+
+export async function fetchCatalogCall(options: {
+  row: CatalogRow;
+  input: unknown;
+  auth: ForwardedAuth;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<unknown> {
   const { row, input, auth, webBaseUrl } = options;
-  assertScopedCall(auth, row.path, input);
+  assertScopedCall(auth, row.path, input, row.kind);
   const path = row.path;
   const sendInput = input !== undefined && input !== null;
   const url = new URL(`/api/trpc/${row.path}`, webBaseUrl);
@@ -405,8 +426,7 @@ export async function forwardCatalogCall(options: {
   }
   // A void procedure has no `data` key: serialize `null` so the agent gets a
   // success result instead of a false error for a write that landed.
-  const data = Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
-  return serializeWithCap(data);
+  return Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
 }
 
 /**

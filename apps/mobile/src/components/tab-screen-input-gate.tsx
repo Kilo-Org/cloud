@@ -1,7 +1,10 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { isTabSwitchPending } from '@/lib/tab-switch-input-gate';
+import { shouldClaimTabSwitchTouch } from '@/lib/tab-switch-input-gate';
+
+/** The scene surface the gate reads: whether this scene is the focused one. */
+type SceneNavigation = { isFocused: () => boolean };
 
 /**
  * The tabs navigator's `screenLayout`: every tab screen is wrapped by it, and
@@ -22,15 +25,31 @@ import { isTabSwitchPending } from '@/lib/tab-switch-input-gate';
  * a tab family renders, so only the families that remembered to mount it were
  * shielded.
  *
- * The window is closed by the tab stacks' `transitionEnd` listener
- * (`settleTabSwitchInput`, passed by the tab layouts) and, for a press that
- * opens no screen, by the bounded settle in `tab-switch-input-gate.ts`.
+ * Which scene claims is decided by that scene's own focus: the scene the user
+ * is leaving is the one the touch was hit-tested against, and it reports itself
+ * blurred from the moment the destination is chosen, while the destination
+ * reports itself focused before its views have replaced the old ones. Claiming
+ * on "the scene I am not on" therefore shields exactly the outgoing screen for
+ * exactly as long as it stays in the touch path, and never blocks the screen
+ * the user switched to. Closing the window from a navigation event could not do
+ * that: measured on the Android emulator, the destination's `focus` fires
+ * before the scenes swap and even its `transitionEnd` can land while the
+ * outgoing views are still the touch targets, so a window settled from either
+ * one let a tap run the outgoing screen's control. Without the focus-scoped
+ * claim, nothing settled the window on a tab switch at all — it pushes nothing
+ * into the destination stack — and every touch inside the newly shown tab
+ * screen, the Agents empty state's view-history link included, was dropped
+ * silently until the window's 1200 ms bound expired (explorer finding: the link
+ * did nothing).
  */
-export function TabSwitchInputSettle({ children }: Readonly<{ children: ReactNode }>) {
+export function TabSwitchInputSettle({
+  navigation,
+  children,
+}: Readonly<{ navigation: SceneNavigation; children?: ReactNode }>) {
   return (
     <View
       className="flex-1"
-      onStartShouldSetResponderCapture={() => isTabSwitchPending()}
+      onStartShouldSetResponderCapture={() => shouldClaimTabSwitchTouch(navigation.isFocused())}
       onResponderTerminationRequest={() => false}
     >
       {children}

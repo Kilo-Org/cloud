@@ -236,22 +236,35 @@ export async function pollOperation(opts: PollOperationOptions): Promise<PollOpe
       const forkParsed = ForkPollResponse.safeParse(res.json ?? {});
       if (forkParsed.success) {
         const { status: forkStatus, owner_name, database_name } = forkParsed.data;
-        if (owner_name && database_name) {
-          return {
-            committed: true,
-            fromCommitId: null,
-            toCommitId: null,
-            status: 'Success',
-            message: '',
-          };
+        const lower = (forkStatus ?? '').trim().toLowerCase();
+        if (lower === 'error') {
+          throw new WlDoltHubError(
+            `Fork operation ${opts.operationName} failed`,
+            400,
+            res.json,
+            url
+          );
         }
-        const lower = (forkStatus ?? '').toLowerCase();
+        // A terminal status completes the operation, and so does a body
+        // that names the fork while stating no status. A stated
+        // non-success status is not overridden by the names it carries —
+        // pending keeps polling and error fails above — and an
+        // unrecognized one keeps polling until the deadline.
         if (lower === 'success' || lower === 'done' || lower === 'completed') {
           return {
             committed: true,
             fromCommitId: null,
             toCommitId: null,
             status: forkStatus ?? '',
+            message: '',
+          };
+        }
+        if (lower === '' && owner_name && database_name) {
+          return {
+            committed: true,
+            fromCommitId: null,
+            toCommitId: null,
+            status: 'Success',
             message: '',
           };
         }

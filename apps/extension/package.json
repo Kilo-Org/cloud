@@ -24,7 +24,7 @@
     "format:check": "pnpm -w exec oxfmt --list-different apps/extension",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "validate:firefox": "npx --loglevel error -y -p node@22 node ./node_modules/web-ext/bin/web-ext.js lint --source-dir .output/firefox-mv3 --no-input",
+    "validate:firefox": "web-ext lint --source-dir .output/firefox-mv3 --no-input",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test",
     "postinstall": "wxt prepare"
   },

@@ -21,6 +21,7 @@ import * as Notifications from 'expo-notifications';
 
 import {
   androidChannelIdForPushData,
+  genericPushContentForPushData,
   NEEDS_INPUT_ACTION_IDS,
   type NeedsInputActionId,
   needsInputCategoryDescriptors,
@@ -30,7 +31,7 @@ import {
 
 import * as Sentry from '@sentry/react-native';
 
-import { i18n } from '@/i18n';
+import { getLanguageSnapshot, i18n } from '@/i18n';
 
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
@@ -41,6 +42,7 @@ import { notificationPathForData, prPathForData } from './notification-path';
 import {
   clearPostedNeedsInputNotification,
   notificationIdentifierForSession,
+  type NotificationPreviews,
 } from './needs-input-notification';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
@@ -122,6 +124,14 @@ export type NeedsInputActionDeps = {
    * `defaultRefreshGlanceableSurfaces`).
    */
   refreshGlanceableSurfaces?: () => Promise<void>;
+  /**
+   * The user's message-preview choice, read from the notification-preferences
+   * query the app already holds. Only an in-app response has it: a response
+   * handled while the app is closed runs outside that cache, so it passes none
+   * and the result keeps the title of the notification the user acted on,
+   * which was produced under the choice at that moment.
+   */
+  readPreviews?: () => NotificationPreviews | undefined;
 };
 
 /** The shape of the s4 entry point, kept as an annotation on the lazy load. */
@@ -432,6 +442,25 @@ function resultPresentationFor(
   }
 }
 
+/**
+ * The title the result notification carries. It is the copy already on screen,
+ * except when the app knows the user chose `generic` previews: the result then
+ * uses the shared generic title, so the result follows the same preview rule as
+ * the raise. Without a preference source (a response handled while the app is
+ * closed) the acted-on title passes through unchanged — it was produced under
+ * the choice at post time.
+ */
+function resultTitleFor(args: {
+  previews: NotificationPreviews | undefined;
+  actedOnTitle: string | null | undefined;
+  data: NeedsInputRaiseData;
+}): string {
+  if (args.previews === 'generic') {
+    return genericPushContentForPushData(args.data, getLanguageSnapshot()).title;
+  }
+  return args.actedOnTitle ?? i18n.t('notifications.category.agentAttentionTitle');
+}
+
 async function runAnswerAction(args: {
   response: Notifications.NotificationResponse;
   data: NeedsInputRaiseData;
@@ -466,9 +495,11 @@ async function runAnswerAction(args: {
   await replaceNotification({
     resultIdentifier: notificationIdentifierForSession(data.cliSessionId),
     originalIdentifier: response.notification.request.identifier,
-    title:
-      response.notification.request.content.title ??
-      i18n.t('notifications.category.agentAttentionTitle'),
+    title: resultTitleFor({
+      previews: deps.readPreviews?.(),
+      actedOnTitle: response.notification.request.content.title,
+      data,
+    }),
     body: presentation.body,
     data,
     categoryIdentifier: presentation.categoryIdentifier,

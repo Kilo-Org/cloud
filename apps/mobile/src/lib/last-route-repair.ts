@@ -5,6 +5,14 @@
  * (the base Intent's destination). Same destination means the OS restore
  * already reopened the right screen and there is nothing to repair.
  *
+ * A launch that opened one of the app's own routes is not repaired at all: the
+ * OS hands the same base Intent to a killed task and to a fresh link tap, so
+ * the only remaining evidence of intent is which link the launch named. A
+ * universal link is the shape a killed task replays (a notification or a web
+ * session link from an earlier process), so the recorded route replaces it; a
+ * route inside the app is a screen this launch was started for, and the pending
+ * consumer opens it above the shell instead.
+ *
  * The root layouts' groups (`(app)`, `(tabs)`) are routing groups and are
  * stripped from both sides. A parenthesized tab (`(3_profile)`) or nested
  * layout is a destination and stays, so two sides that differ only by which
@@ -13,7 +21,11 @@
 export function shouldRepairRestoredRoute(input: {
   readonly recordedHref: string | null;
   readonly restoredRoute: string;
+  readonly launchOpenedAppRoute: boolean;
 }): boolean {
+  if (input.launchOpenedAppRoute) {
+    return false;
+  }
   if (input.recordedHref === null) {
     return false;
   }

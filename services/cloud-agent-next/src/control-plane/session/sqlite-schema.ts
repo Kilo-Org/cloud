@@ -20,6 +20,13 @@ export const events = sqliteTable(
   ]
 );
 
+export const cloudAgentChildSessions = sqliteTable('cloud_agent_child_sessions', {
+  child_session_id: text('child_session_id').primaryKey(),
+  initial_message_id: text('initial_message_id'),
+  worktree_id: text('worktree_id'),
+  created_at: integer('created_at').notNull(),
+});
+
 export const controlPlaneMessages = sqliteTable('control_plane_messages', {
   message_id: text('message_id').primaryKey(),
   intent: text('intent').notNull(),

@@ -44,10 +44,18 @@ export function selectPartialSubmitMessage(args: {
   if (args.staleCount === 0) {
     return null;
   }
-  return i18n.t('prReview.submit.partialPostedMessage', {
-    freshCount: args.freshCount,
-    staleCount: args.staleCount,
+  // Each count drives its own clause: one fixed string cannot inflect two
+  // numbers, so a single posted or single stale comment would keep the plural
+  // form of both. The fresh clause carries its catalog's own sentence
+  // separator — a space after the terminator in most catalogs, none in
+  // Japanese and Chinese — so the composition adds nothing between them.
+  const fresh = i18n.t('prReview.submit.partialPostedFresh', {
+    count: args.freshCount,
     displayFreshCount: formatNumber(args.freshCount, i18n.language),
+  });
+  const stale = i18n.t('prReview.submit.partialPostedStale', {
+    count: args.staleCount,
     displayStaleCount: formatNumber(args.staleCount, i18n.language),
   });
+  return `${fresh}${stale}`;
 }

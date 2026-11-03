@@ -48,11 +48,14 @@ const {
   registerNewSessionMock,
   startNewSessionMock,
   createSessionWithLedgerMock,
-  parentRuntimeTokenMock,
+  parentSpawnContextMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
-  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
-  parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
+  parentSpawnContextMock: vi.fn().mockResolvedValue({
+    token: 'trusted-parent-model-token',
+    createdOnPlatform: 'cloud-agent-web',
+  }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -104,6 +107,7 @@ vi.mock('../../model-validation.js', () => ({
 
 vi.mock('../../session/validate-repository-access.js', () => ({
   assertRepositoryAccessBeforeSessionCreation: assertBitbucketRepositoryAccessMock,
+  assertEnvironmentRepositoriesAccess: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -117,7 +121,7 @@ vi.mock('../../session/session-registration.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnContext: parentSpawnContextMock }),
 }));
 vi.mock('../../balance-validation.js', () => ({
   validateBalanceOnly: vi.fn(async () => ({ success: true })),
@@ -160,7 +164,7 @@ describe('prepareSession operation-ledger admission gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
-    loadEnvironmentForSessionMock.mockResolvedValue(null);
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
@@ -239,7 +243,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
-  it('derives child lineage from authority', async () => {
+  it('derives child lineage from authority and requires a ledger operation key', async () => {
     const context = createContext();
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     const authority = {
@@ -259,14 +263,47 @@ describe('prepareSession operation-ledger admission gate', () => {
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
       autoInitiate: true,
-      createdOnPlatform: 'cloud-agent-web',
+      operationKey: OPERATION_KEY,
+      createdOnPlatform: 'cloud-agent',
     });
-    const [request, registration] = startNewSessionMock.mock.calls[0];
+    const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
     expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
     expect(request).not.toHaveProperty('allowSubagentSessions');
-    expect(request.options.createdOnPlatform).toBe('cloud-agent');
+    expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
     expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
     expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+    expect(options.operationKey).toBe(OPERATION_KEY);
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a scoped child launch without a ledger operation key', async () => {
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const caller = router.createCaller(context);
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'operation_key_required' });
+
+    expect(parentSpawnContextMock).not.toHaveBeenCalled();
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
 
   it('permits normal parent preparation inputs without requiring auto-initiation or GitHub', async () => {
@@ -543,6 +580,104 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(registerNewSessionMock).not.toHaveBeenCalled();
     expect(startNewSessionMock).not.toHaveBeenCalled();
   });
+
+  it.each(['webhook', 'scheduled'])(
+    'prepares a repository agent without runtimeAgents for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+
+      await caller.prepareSession({
+        prompt: 'Use the repository foreman agent',
+        mode: 'foreman',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform,
+      });
+
+      expect(registerNewSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agent: expect.objectContaining({ mode: 'foreman' }),
+          options: expect.objectContaining({ createdOnPlatform }),
+          profile: expect.objectContaining({
+            resolved: expect.objectContaining({ runtimeAgents: undefined }),
+          }),
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+      expect(assertKiloModelAvailableMock).toHaveBeenCalledOnce();
+      expect(assertBitbucketRepositoryAccessMock).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'retains explicit runtimeAgents validation for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+      await expect(
+        caller.prepareSession({
+          prompt: 'Use foreman',
+          mode: 'foreman',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          createdOnPlatform,
+          runtimeAgents: [],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('does not match any runtimeAgents'),
+      });
+      expect(registerNewSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'preserves profile-defined agents for %s',
+    async createdOnPlatform => {
+      const agent = {
+        slug: 'foreman',
+        name: 'Foreman',
+        config: { mode: 'primary' as const, prompt: 'Use the profile foreman' },
+      };
+      mergeProfileConfigurationMock.mockResolvedValueOnce({ agents: [agent] });
+      const caller = router.createCaller(createContext());
+      await caller.prepareSession({
+        prompt: 'Use foreman',
+        mode: 'foreman',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform,
+        profileId: '123e4567-e89b-12d3-a456-426614174011',
+      });
+      expect(registerNewSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agent: expect.objectContaining({ mode: 'foreman' }),
+          profile: expect.objectContaining({
+            resolved: expect.objectContaining({ runtimeAgents: [agent] }),
+          }),
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
+
+  it.each(['cloud-agent-web', 'discord', 'slack', 'code-review', undefined])(
+    'retains missing custom-agent rejection for %s',
+    async createdOnPlatform => {
+      const caller = router.createCaller(createContext());
+      await expect(
+        caller.prepareSession({
+          prompt: 'Use foreman',
+          mode: 'foreman',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          createdOnPlatform,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(registerNewSessionMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('passes the exact profile-resolved request to registration', async () => {
     const caller = router.createCaller(createContext());
@@ -831,7 +966,10 @@ describe('prepareSession operation-ledger admission gate', () => {
     const caller = router.createCaller(createContext());
     const environmentId = '123e4567-e89b-12d3-a456-426614174099';
     const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
-    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer, environmentId));
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      status: 'match',
+      environment: environmentLoad(layer, environmentId),
+    });
     mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
 
     await caller.prepareSession({

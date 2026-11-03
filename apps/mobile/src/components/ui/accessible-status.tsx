@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 const TONE_CLASS = {
   error: 'text-destructive',
+  warn: 'text-warn',
   status: 'text-muted-foreground',
 } as const;
 

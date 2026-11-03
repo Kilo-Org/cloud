@@ -22,7 +22,7 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
   let active = 0;
 
   return {
-    tryAcquire(source: QueueSource): Admission {
+    tryAcquire(source: QueueSource, usageId: string): Admission {
       const gauges = {
         total: writerPool.totalCount,
         idle: writerPool.idleCount,
@@ -52,6 +52,7 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
               pool_max: poolMax,
               pool: gauges,
               sample_rate: sampleRate,
+              ...(reason !== null ? { usage_id: usageId } : {}),
             })
           );
         }

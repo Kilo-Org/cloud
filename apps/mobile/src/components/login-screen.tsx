@@ -224,7 +224,12 @@ export function LoginScreen() {
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
-          <Text className="text-center text-lg">{t('login.welcome')}</Text>
+          {/* DESIGN.md's title step (1.5rem / 600), not body size: `text-lg`
+              alone renders 15.75pt medium, which reads weaker than the 17pt
+              button labels under it and leaves the screen without a heading. */}
+          <Text variant="h3" className="text-center">
+            {t('login.welcome')}
+          </Text>
         </View>
 
         {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2

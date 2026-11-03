@@ -191,8 +191,14 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
   sent as a new message.
-- Each terminal message produces one report. The batch callback fires when no `queued` or
-  `accepted` message remains (current callback semantics).
+- Each terminal message produces one report. An armed callback target produces one batch callback
+  when no `queued` or `accepted` message remains, including failed and interrupted batches.
+  The Session DO atomically writes the durable callback outbox job and removes the target from
+  session metadata. Delivery retries use that job without rearming the target.
+  Later batches produce no callback unless `tryUpdate`/`updateSession` explicitly rearms the target.
+  This rule applies to both HTTP and `session:parent` targets. Admitted steering stays in the
+  batch, including when admission discovers an older preparation failure; that failure does not
+  consume the target before the steering message settles.
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
   session `/stream?replay=false` log the client stream uses and buffers its live frames, then pages
   the `nativeSnapshot`, writes the fence, and delivers the buffered and later frames above it. The

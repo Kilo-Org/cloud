@@ -93,7 +93,9 @@ pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
 ```
 
 The request contains `runId`, `lane`, `fakeLlmScope`, `descriptorPath`,
-`projectDir`, and the per-run XDG `state` directories. `prepare` writes the
+`projectDir`, and the per-run XDG `state` directories. A run id is 1-55
+characters of letters, digits, underscore, or dash: `scopeForRun` prefixes
+`kilo-e2e-` and the fake LLM caps a scope token at 64 characters. `prepare` writes the
 descriptor atomically with mode 0600, refuses a scope other than
 `kilo-e2e-<runId>`, and returns the K1 `ProviderPrepareResult`. K1's default
 provider timeout is 30 seconds; a Cloud-lane `prepare` creates a hosted

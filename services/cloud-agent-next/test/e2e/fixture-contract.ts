@@ -221,13 +221,15 @@ export function assertLoopbackOrigins(origins: Origins): void {
   }
 }
 
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// `scopeForRun` prefixes `kilo-e2e-` (9 characters) and the fake accepts a
+// scope token of at most 64 characters, so the run id is capped at 55.
+const RUN_ID = /^[A-Za-z0-9_-]{1,55}$/;
 
 export function assertSafeRunId(runId: string): void {
-  if (!RUN_ID.test(runId) || runId.includes('..')) {
+  if (!RUN_ID.test(runId)) {
     throw new FixtureProviderError(
       'invalid_request',
-      'run id must be a single safe path segment (letters, digits, dot, underscore, dash)'
+      'run id must be 1-55 characters of letters, digits, underscore, or dash (the fake LLM scope token is capped at 64)'
     );
   }
 }
@@ -247,6 +249,18 @@ async function restrictMode(target: string, mode: number): Promise<void> {
 }
 
 export async function ensurePrivateDir(dir: string): Promise<void> {
+  try {
+    const info = await stat(dir);
+    if (!info.isDirectory()) {
+      throw new FixtureProviderError('protocol', `${dir} is not a directory`);
+    }
+    // A caller-supplied or system directory is never tightened: only
+    // directories this helper creates are chmoded to 0700.
+    return;
+  } catch (error) {
+    if (error instanceof FixtureProviderError) throw error;
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await restrictMode(dir, 0o700);
 }

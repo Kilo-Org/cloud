@@ -391,6 +391,10 @@ export function workspaceOwnership(
   input: { userId: string; profileId?: string }
 ): { owned: boolean; reason?: string } {
   if (state.worktree === null) return { owned: true };
+  // A completed tombstone is a removed workspace: the real deletion removes
+  // the root session rows in the same transaction, so a retry must not treat
+  // the missing session as a foreign resource.
+  if (state.worktree.deletionCompletedAt !== null) return { owned: true };
   if (state.session === null) {
     return { owned: false, reason: 'hosted root session is missing for the owned workspace' };
   }

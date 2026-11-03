@@ -11,6 +11,7 @@ import {
   SCHEMA_VERSION,
   assertLoopbackOrigins,
   assertScopedTag,
+  assertSafeRunId,
   parseFixtureDescriptor,
   parseProviderRequest,
   readRestrictedJson,
@@ -142,6 +143,15 @@ describe('restricted documents', () => {
     expect(await readFile(file, 'utf8')).toContain('"runId": "run-1"');
   });
 
+  it('does not tighten a pre-existing parent directory', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'fixture-contract-'));
+    await chmod(dir, 0o755);
+    const file = path.join(dir, 'descriptor.json');
+    await writeRestrictedJson(file, descriptor());
+    expect((await stat(dir)).mode & 0o777).toBe(0o755);
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
+  });
+
   it('refuses a group-readable descriptor', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'fixture-contract-'));
     const file = path.join(dir, 'descriptor.json');
@@ -167,6 +177,12 @@ describe('scope and redaction', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
     const text = redactText(`key=secret Bearer abc.def ${jwt}`, ['secret']);
     expect(text).toBe('key=[redacted] Bearer [redacted] [redacted-jwt]');
+  });
+
+  it('rejects run ids that cannot prefix a fake-LLM scope token', () => {
+    expect(() => assertSafeRunId('run-1')).not.toThrow();
+    expect(() => assertSafeRunId('run.1')).toThrowError(/1-55 characters/);
+    expect(() => assertSafeRunId('a'.repeat(56))).toThrowError(/1-55 characters/);
   });
 
   it('keeps fixture errors typed', () => {

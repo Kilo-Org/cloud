@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -54,6 +54,7 @@ type FakeOptions = {
   failInspect?: boolean;
   failListWaiters?: boolean;
   failDeleteWorkspace?: boolean;
+  workspaceGoneAfterDelete?: boolean;
 };
 
 class FakeCloud implements FixtureCloud {
@@ -71,6 +72,7 @@ class FakeCloud implements FixtureCloud {
     { userId: string; deletionStartedAt: string | null; deletionCompletedAt: string | null }
   >();
   sessions = new Map<string, { userId: string; profileId: string | null }>();
+  workspaceSessions = new Map<string, string>();
   gates: string[] = [];
   private profileSeq = 0;
   private workspaceSeq = 0;
@@ -117,6 +119,7 @@ class FakeCloud implements FixtureCloud {
       userId: input.identity.user.id,
       profileId: input.profileId,
     });
+    this.workspaceSessions.set(workspaceId, cloudAgentSessionId);
     return {
       workspaceId,
       cloudAgentSessionId,
@@ -142,7 +145,15 @@ class FakeCloud implements FixtureCloud {
     this.calls.push(`deleteWorkspace:${workspaceId}`);
     if (this.options.failDeleteWorkspace) throw new Error('workspace deletion failed');
     const row = this.worktrees.get(workspaceId);
-    if (row) this.worktrees.set(workspaceId, { ...row, deletionCompletedAt: '2026-11-02T00:00:00Z' });
+    if (row) {
+      this.worktrees.set(workspaceId, { ...row, deletionCompletedAt: '2026-11-02T00:00:00Z' });
+    }
+    // The real deletion removes root session rows and keeps the tombstone.
+    const cloudSessionId = this.workspaceSessions.get(workspaceId);
+    if (cloudSessionId !== undefined) {
+      this.sessions.delete(cloudSessionId);
+      this.workspaceSessions.delete(workspaceId);
+    }
   }
 
   async deleteProfile(profileId: string): Promise<void> {
@@ -151,6 +162,7 @@ class FakeCloud implements FixtureCloud {
   }
 
   async waitWorkspaceGone(workspaceId: string): Promise<boolean> {
+    if (this.options.workspaceGoneAfterDelete === false) return false;
     return this.worktrees.get(workspaceId)?.deletionCompletedAt !== null;
   }
 
@@ -300,6 +312,23 @@ describe('prepareFixture', () => {
     ).rejects.toThrowError(/workspace creation failed/);
     expect(cloud.profiles.size).toBe(0);
     await expect(stat(descriptorPath)).rejects.toThrow();
+  });
+
+  it('retains the ownership profile when workspace deletion is unconfirmed', async () => {
+    const cloud = new FakeCloud();
+    cloud.waitWorkspaceGone = async () => false;
+    // Force a post-resource failure: the descriptor parent is a regular file.
+    const parentFile = await tempDescriptorPath('not-a-directory');
+    await writeFile(parentFile, 'x');
+    await expect(
+      prepareFixture({
+        request: prepareRequest('cloud', path.join(parentFile, 'descriptor.json')),
+        cloud,
+      })
+    ).rejects.toThrow();
+    expect(cloud.profiles.size).toBe(1);
+    expect(cloud.calls).toContain('deleteWorkspace:worktree_1');
+    expect(cloud.calls).not.toContain('deleteProfile:profile-1');
   });
 });
 
@@ -481,6 +510,23 @@ describe('directive templates', () => {
 });
 
 describe('workspace ownership helper', () => {
+  it('treats a completed tombstone as removed when the root session is gone', () => {
+    expect(
+      workspaceOwnership(
+        {
+          profile: null,
+          worktree: {
+            userId: USER_ID,
+            deletionStartedAt: '2026-11-02T00:00:00Z',
+            deletionCompletedAt: '2026-11-02T00:01:00Z',
+          },
+          session: null,
+        },
+        { userId: USER_ID, profileId: 'profile-1' }
+      )
+    ).toEqual({ owned: true });
+  });
+
   it('rejects a session created with a different profile', () => {
     expect(
       workspaceOwnership(

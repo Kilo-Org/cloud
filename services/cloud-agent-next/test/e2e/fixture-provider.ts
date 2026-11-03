@@ -231,17 +231,26 @@ async function recover(input: {
             cloudSessionId: input.hosted.cloudAgentSessionId,
           }),
     });
+    let workspaceGone = true;
     if (input.hosted !== undefined && state.worktree !== null) {
-      const verdict = workspaceOwnership(state, {
-        userId: input.identity.user.id,
-        profileId: input.profileId,
-      });
-      if (verdict.owned) {
-        await input.cloud.deleteWorkspace(input.hosted.workspaceId, input.identity);
-        await input.cloud.waitWorkspaceGone(input.hosted.workspaceId);
+      if (state.worktree.deletionCompletedAt !== null) {
+        workspaceGone = true;
+      } else {
+        const verdict = workspaceOwnership(state, {
+          userId: input.identity.user.id,
+          profileId: input.profileId,
+        });
+        if (verdict.owned) {
+          await input.cloud.deleteWorkspace(input.hosted.workspaceId, input.identity);
+          workspaceGone = await input.cloud.waitWorkspaceGone(input.hosted.workspaceId);
+        } else {
+          workspaceGone = false;
+        }
       }
     }
-    if (input.profileId !== undefined && state.profile !== null) {
+    // Keep the ownership marker while an owned workspace may still exist so a
+    // retry can verify it against the profile.
+    if (input.profileId !== undefined && state.profile !== null && workspaceGone) {
       await input.cloud.deleteProfile(input.profileId, input.identity.user.id);
     }
   } catch {

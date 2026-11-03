@@ -158,7 +158,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
       return;
     }
 
-    const meta = (
+    const eventProviderMetadata = (
       (json.type === 'message_start' ? json.message : json) as
         | MaybeHasVercelProviderMetadata
         | undefined
@@ -202,10 +202,11 @@ export async function parseMessagesMicrodollarUsageFromStream(
       deltaUsage = json.usage ?? deltaUsage;
     }
 
-    if (meta && (json.type === 'message_start' || json.type === 'message_delta')) {
-      providerMetadata = meta;
-      model = getVercelResolvedModel(meta) ?? model;
-      inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+    if (eventProviderMetadata && (json.type === 'message_start' || json.type === 'message_delta')) {
+      providerMetadata = eventProviderMetadata;
+      model = getVercelResolvedModel(eventProviderMetadata) ?? model;
+      inference_provider =
+        eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
     }
   };
 

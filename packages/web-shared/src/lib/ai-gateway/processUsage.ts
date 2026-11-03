@@ -1350,7 +1350,6 @@ export async function parseMicrodollarUsageFromStream(
     }
 
     const json = JSON.parse(event.data) as ChatCompletionChunk;
-    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -1358,6 +1357,10 @@ export async function parseMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if ('error' in json) {
       const error = json.error as OpenRouterError;
@@ -1383,8 +1386,6 @@ export async function parseMicrodollarUsageFromStream(
     model = json.model ?? model;
     messageId = json.id ?? messageId;
     usage = json.usage ?? usage;
-    const choice = json.choices?.[0];
-    const chunkProviderMetadata = choice?.delta?.provider_metadata;
     if (chunkProviderMetadata) {
       vercelProviderMetadata = chunkProviderMetadata;
     }
@@ -1447,6 +1448,8 @@ export function parseMicrodollarUsageFromString(
         MaybeHasOpenRouterUsage &
         MaybeHasVercelProviderMetaData)
     | null;
+  const choice = responseJson?.choices?.[0];
+  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   metadataCapture?.captureVercelMetadata(responseJson);
 
   if (
@@ -1459,9 +1462,7 @@ export function parseMicrodollarUsageFromString(
       extra: { responseJson },
     });
   }
-  const choice = responseJson?.choices?.[0];
   const finish_reason = choice?.finish_reason ?? null;
-  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,

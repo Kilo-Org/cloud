@@ -127,7 +127,6 @@ export async function parseResponsesMicrodollarUsageFromStream(
     }
 
     const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
-    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -135,6 +134,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const eventProviderMetadata = json.response?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if ('error' in json && json.error) {
       reportedError = true;
@@ -162,10 +164,10 @@ export async function parseResponsesMicrodollarUsageFromStream(
       if (response.usage) {
         usage = response.usage as ResponsesApiUsage;
       }
-      const meta = response.provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+      if (eventProviderMetadata) {
+        providerMetadata = eventProviderMetadata;
+        inference_provider =
+          eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
       }
       finish_reason = response.status ?? finish_reason;
     }
@@ -217,10 +219,9 @@ export function parseResponsesMicrodollarUsageFromString(
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
-  metadataCapture?.captureVercelMetadata(responseJson);
-
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
 

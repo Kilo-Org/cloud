@@ -1490,6 +1490,10 @@ export async function processTokenData(
     return null;
   }
 
+  if (servingProvider?.type === 'direct-byok') {
+    usageStats.inference_provider ??= servingProvider.inferenceProviderId ?? null;
+  }
+
   const timer = createTimer();
   const generationProvider = getGenerationLookupProvider(usageStats, usageContext, servingProvider);
   const generation =

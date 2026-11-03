@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
       "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
       "status": {
+        "open": "Irekita",
         "edited": "Editatuta",
         "opening_change_request": "PRa irekitzen",
         "change_request_failed": "PRak huts egin du",

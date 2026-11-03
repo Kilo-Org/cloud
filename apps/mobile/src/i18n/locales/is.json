@@ -1532,6 +1532,7 @@
       "prOpened": "Samrunabeiðni fyrir REVIEW.md opnuð",
       "alreadyPresent": "Leiðbeiningarnar eru þegar í REVIEW.md",
       "status": {
+        "open": "Opið",
         "edited": "Breytt",
         "opening_change_request": "Opna PR",
         "change_request_failed": "Ekki tókst að opna PR",

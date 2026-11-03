@@ -1532,6 +1532,7 @@
       "prOpened": "Pull request pou REVIEW.md ouvri",
       "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
       "status": {
+        "open": "Louvri",
         "edited": "Modifye",
         "opening_change_request": "Ap ouvri PR",
         "change_request_failed": "Ouvèti PR la echwe",

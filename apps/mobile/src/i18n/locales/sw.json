@@ -1532,6 +1532,7 @@
       "prOpened": "Ombi la kuunganisha mabadiliko ya REVIEW.md limefunguliwa",
       "alreadyPresent": "Mwongozo tayari upo kwenye REVIEW.md",
       "status": {
+        "open": "Bado wazi",
         "edited": "Limehaririwa",
         "opening_change_request": "Inafungua PR",
         "change_request_failed": "PR imeshindikana",

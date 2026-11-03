@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md-এর পুল রিকোয়েস্ট খোলা হয়েছে",
       "alreadyPresent": "নির্দেশনা ইতিমধ্যেই REVIEW.md-এ রয়েছে",
       "status": {
+        "open": "খোলা",
         "edited": "সম্পাদিত",
         "opening_change_request": "PR খোলা হচ্ছে",
         "change_request_failed": "PR ব্যর্থ হয়েছে",

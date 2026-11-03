@@ -1055,6 +1055,7 @@
       "prOpened": "Пул-реквест для REVIEW.md открыт",
       "alreadyPresent": "Рекомендации уже есть в REVIEW.md",
       "status": {
+        "open": "Открыто",
         "edited": "Изменено",
         "opening_change_request": "Открытие PR",
         "change_request_failed": "Не удалось открыть PR",

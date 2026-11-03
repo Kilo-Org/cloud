@@ -1532,6 +1532,7 @@
       "prOpened": "I-PR ye-REVIEW.md ivuliwe",
       "alreadyPresent": "Imihlahlandlela isivele ikhona ku-REVIEW.md",
       "status": {
+        "open": "Kuvulekile",
         "edited": "Kuhlelwe",
         "opening_change_request": "Kuvulwa i-PR",
         "change_request_failed": "I-PR yehlulekile",

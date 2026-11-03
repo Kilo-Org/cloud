@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md புல் ரிக்வெஸ்ட் திறக்கப்பட்டது",
       "alreadyPresent": "வழிகாட்டுதல்கள் ஏற்கனவே REVIEW.md இல் உள்ளன",
       "status": {
+        "open": "திறந்துள்ளது",
         "edited": "திருத்தப்பட்டது",
         "opening_change_request": "PR திறக்கப்படுகிறது",
         "change_request_failed": "PR தோல்வியடைந்தது",

@@ -1052,6 +1052,7 @@
       "prOpened": "נפתחה בקשת משיכה עבור REVIEW.md",
       "alreadyPresent": "ההנחיות כבר קיימות בקובץ REVIEW.md",
       "status": {
+        "open": "פתוחה",
         "edited": "נערכה",
         "opening_change_request": "פתיחת PR מתבצעת",
         "change_request_failed": "פתיחת PR נכשלה",

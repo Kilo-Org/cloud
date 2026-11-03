@@ -1580,6 +1580,7 @@
       "prOpened": "Zahtevek za združitev za REVIEW.md je odprt",
       "alreadyPresent": "Smernice so že v datoteki REVIEW.md",
       "status": {
+        "open": "Odprto",
         "edited": "Urejeno",
         "opening_change_request": "Odpiranje PR-ja",
         "change_request_failed": "PR ni uspel",

@@ -1556,6 +1556,7 @@
       "prOpened": "Pull request de REVIEW.md oberta",
       "alreadyPresent": "Les pautes ja són a REVIEW.md",
       "status": {
+        "open": "Oberta",
         "edited": "Editada",
         "opening_change_request": "S'està obrint la PR",
         "change_request_failed": "La PR ha fallat",

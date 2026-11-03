@@ -1532,6 +1532,7 @@
       "prOpened": "Το pull request για το REVIEW.md άνοιξε",
       "alreadyPresent": "Οι οδηγίες υπάρχουν ήδη στο REVIEW.md",
       "status": {
+        "open": "Ανοιχτή",
         "edited": "Τροποποιήθηκε",
         "opening_change_request": "Άνοιγμα PR",
         "change_request_failed": "Το PR απέτυχε",

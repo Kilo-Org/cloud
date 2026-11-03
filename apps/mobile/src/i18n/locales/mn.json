@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md файлын pull request нээгдлээ",
       "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
       "status": {
+        "open": "Нээлттэй",
         "edited": "Засварласан",
         "opening_change_request": "PR нээж байна",
         "change_request_failed": "PR амжилтгүй болсон",

@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request pour REVIEW.md ouverte",
       "alreadyPresent": "Les consignes figurent déjà dans REVIEW.md",
       "status": {
+        "open": "Ouverte",
         "edited": "Modifiée",
         "opening_change_request": "Ouverture de la PR",
         "change_request_failed": "Échec de l’ouverture de la PR",

@@ -1532,6 +1532,7 @@
       "prOpened": "Pull request REVIEW.md banameera",
       "alreadyPresent": "Qajeelfamni duraanuu REVIEW.md keessa jira",
       "status": {
+        "open": "Banameera",
         "edited": "Gulaalameera",
         "opening_change_request": "PR banaa jira",
         "change_request_failed": "PR hin milkoofne",

@@ -1532,6 +1532,7 @@
       "prOpened": "เปิด Pull Request สำหรับไฟล์ REVIEW.md แล้ว",
       "alreadyPresent": "มีคำแนะนำนี้ในไฟล์ REVIEW.md อยู่แล้ว",
       "status": {
+        "open": "เปิด",
         "edited": "แก้ไขแล้ว",
         "opening_change_request": "กำลังเปิด PR",
         "change_request_failed": "เปิด PR ไม่สำเร็จ",

@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md ପାଇଁ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
       "alreadyPresent": "ନିର୍ଦ୍ଦେଶାବଳୀ REVIEW.md ରେ ପୂର୍ବରୁ ଅଛି",
       "status": {
+        "open": "ଖୋଲା",
         "edited": "ସମ୍ପାଦିତ",
         "opening_change_request": "PR ଖୋଲାଯାଉଛି",
         "change_request_failed": "PR ବିଫଳ ହୋଇଛି",

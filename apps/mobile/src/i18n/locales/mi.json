@@ -1532,6 +1532,7 @@
       "prOpened": "Kua whakatuwheratia te PR mō REVIEW.md",
       "alreadyPresent": "Kei roto kē ngā aratohu i REVIEW.md",
       "status": {
+        "open": "Kei te tuwhera",
         "edited": "Kua whakatikaina",
         "opening_change_request": "Kei te whakatuwhera PR",
         "change_request_failed": "Kāore i taea te whakatuwhera i te PR",

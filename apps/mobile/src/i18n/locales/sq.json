@@ -1532,6 +1532,7 @@
       "prOpened": "U hap pull request për REVIEW.md",
       "alreadyPresent": "Udhëzimet janë tashmë në REVIEW.md",
       "status": {
+        "open": "Hapur",
         "edited": "Redaktuar",
         "opening_change_request": "Duke hapur PR",
         "change_request_failed": "PR dështoi",

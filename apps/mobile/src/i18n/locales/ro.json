@@ -1556,6 +1556,7 @@
       "prOpened": "Pull request pentru REVIEW.md deschis",
       "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
       "status": {
+        "open": "Deschisă",
         "edited": "Editată",
         "opening_change_request": "Se deschide PR-ul",
         "change_request_failed": "Deschiderea PR-ului a eșuat",

@@ -1532,6 +1532,7 @@
       "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
       "alreadyPresent": "As pautas xa están en REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "Abrindo a PR",
         "change_request_failed": "Erro ao abrir a PR",

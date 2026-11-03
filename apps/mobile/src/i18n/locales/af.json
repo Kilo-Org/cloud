@@ -1532,6 +1532,7 @@
       "prOpened": "Pull request vir REVIEW.md oopgemaak",
       "alreadyPresent": "Riglyne is reeds in REVIEW.md",
       "status": {
+        "open": "Oop",
         "edited": "Gewysig",
         "opening_change_request": "Maak PR oop",
         "change_request_failed": "PR het misluk",

@@ -1532,6 +1532,7 @@
       "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
       "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
       "status": {
+        "open": "Avatud",
         "edited": "Muudetud",
         "opening_change_request": "PR-i avamine",
         "change_request_failed": "PR ebaõnnestus",

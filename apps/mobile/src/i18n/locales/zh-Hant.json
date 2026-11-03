@@ -1049,6 +1049,7 @@
       "prOpened": "已建立 REVIEW.md PR",
       "alreadyPresent": "REVIEW.md 中已有此指引",
       "status": {
+        "open": "開啟",
         "edited": "已編輯",
         "opening_change_request": "正在建立 PR",
         "change_request_failed": "PR 建立失敗",

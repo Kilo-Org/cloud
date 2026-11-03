@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md کے لیے پل ریکویسٹ کھول دی گئی",
       "alreadyPresent": "ہدایات REVIEW.md میں پہلے سے موجود ہیں",
       "status": {
+        "open": "کھلا ہوا",
         "edited": "ترمیم شدہ",
         "opening_change_request": "PR کھولی جا رہی ہے",
         "change_request_failed": "PR کھولنے میں ناکامی",

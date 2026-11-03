@@ -1532,6 +1532,7 @@
       "prOpened": "Pull request for REVIEW.md er åpnet",
       "alreadyPresent": "Retningslinjene finnes allerede i REVIEW.md",
       "status": {
+        "open": "Åpen",
         "edited": "Redigert",
         "opening_change_request": "Åpner PR",
         "change_request_failed": "PR mislyktes",

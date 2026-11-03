@@ -1532,6 +1532,7 @@
       "prOpened": "پول ریکوئست برای REVIEW.md باز شد",
       "alreadyPresent": "دستورالعمل‌ها از قبل در REVIEW.md موجود است",
       "status": {
+        "open": "باز",
         "edited": "ویرایش‌شده",
         "opening_change_request": "در حال باز کردن PR",
         "change_request_failed": "باز کردن PR ناموفق بود",

@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md အတွက် pull request ဖွင့်ပြီးပါပြီ",
       "alreadyPresent": "လမ်းညွှန်ချက်များ REVIEW.md တွင် ရှိပြီးသားဖြစ်သည်",
       "status": {
+        "open": "ဖွင့်ထားသည်",
         "edited": "ပြင်ဆင်ပြီး",
         "opening_change_request": "PR ဖွင့်နေသည်",
         "change_request_failed": "PR မအောင်မြင်ပါ",

@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md-tiedoston pull request avattu",
       "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
       "status": {
+        "open": "Avoin",
         "edited": "Muokattu",
         "opening_change_request": "Avataan PR:ää",
         "change_request_failed": "PR:n avaaminen epäonnistui",

@@ -1061,6 +1061,7 @@
       "prOpened": "تم فتح طلب سحب لملف REVIEW.md",
       "alreadyPresent": "الإرشادات موجودة بالفعل في REVIEW.md",
       "status": {
+        "open": "مفتوح",
         "edited": "تم التعديل",
         "opening_change_request": "جارٍ فتح طلب سحب",
         "change_request_failed": "فشل طلب السحب",

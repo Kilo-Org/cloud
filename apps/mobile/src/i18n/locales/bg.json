@@ -1532,6 +1532,7 @@
       "prOpened": "Отворен е pull request за REVIEW.md",
       "alreadyPresent": "Насоките вече са в REVIEW.md",
       "status": {
+        "open": "Отворено",
         "edited": "Редактирано",
         "opening_change_request": "Отваряне на PR",
         "change_request_failed": "Неуспешен PR",

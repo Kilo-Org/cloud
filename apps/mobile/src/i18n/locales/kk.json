@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md үшін pull request ашылды",
       "alreadyPresent": "Нұсқаулар REVIEW.md файлында бұрыннан бар",
       "status": {
+        "open": "Ашық",
         "edited": "Өңделген",
         "opening_change_request": "PR ашылуда",
         "change_request_failed": "PR ашу сәтсіз аяқталды",

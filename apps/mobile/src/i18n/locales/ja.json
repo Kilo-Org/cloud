@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.mdのプルリクエストを作成しました",
       "alreadyPresent": "指針はすでにREVIEW.mdに記載されています",
       "status": {
+        "open": "オープン",
         "edited": "編集済み",
         "opening_change_request": "PRを作成中",
         "change_request_failed": "PR作成失敗",

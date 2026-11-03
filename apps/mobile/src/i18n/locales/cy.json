@@ -1628,6 +1628,7 @@
       "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
       "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
       "status": {
+        "open": "Ar agor",
         "edited": "Wedi'i olygu",
         "opening_change_request": "Agor PR",
         "change_request_failed": "PR wedi methu",

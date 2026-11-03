@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.md 풀 리퀘스트가 생성되었습니다",
       "alreadyPresent": "지침이 이미 REVIEW.md에 있습니다",
       "status": {
+        "open": "열림",
         "edited": "수정됨",
         "opening_change_request": "PR 생성 중",
         "change_request_failed": "PR 생성 실패",

@@ -1049,6 +1049,7 @@
       "prOpened": "已创建 REVIEW.md 拉取请求",
       "alreadyPresent": "REVIEW.md 中已包含这些审查准则",
       "status": {
+        "open": "待处理",
         "edited": "已编辑",
         "opening_change_request": "正在创建 PR",
         "change_request_failed": "PR 创建失败",

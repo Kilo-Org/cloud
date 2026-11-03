@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md માટે પુલ રિક્વેસ્ટ ખોલાઈ",
       "alreadyPresent": "માર્ગદર્શિકા REVIEW.md માં પહેલેથી જ છે",
       "status": {
+        "open": "ખુલ્લું",
         "edited": "સંપાદિત",
         "opening_change_request": "PR ખોલાઈ રહી છે",
         "change_request_failed": "PR ખોલવામાં નિષ્ફળતા",

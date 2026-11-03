@@ -1532,6 +1532,7 @@
       "prOpened": "A ti ṣí PR fún REVIEW.md",
       "alreadyPresent": "Ìtọ́sọ́nà ti wà nínú REVIEW.md tẹ́lẹ̀",
       "status": {
+        "open": "Ó sí",
         "edited": "A ti ṣàtúnṣe",
         "opening_change_request": "A ń ṣí PR",
         "change_request_failed": "Ṣíṣí PR kùnà",

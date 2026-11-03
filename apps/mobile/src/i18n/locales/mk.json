@@ -1532,6 +1532,7 @@
       "prOpened": "Отворен е PR за REVIEW.md",
       "alreadyPresent": "Насоките веќе се во REVIEW.md",
       "status": {
+        "open": "Отворено",
         "edited": "Изменето",
         "opening_change_request": "Се отвора PR",
         "change_request_failed": "Не успеа отворањето на PR",

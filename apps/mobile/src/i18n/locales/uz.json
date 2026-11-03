@@ -1532,6 +1532,7 @@
       "prOpened": "REVIEW.md uchun pull request ochildi",
       "alreadyPresent": "Ko'rsatmalar REVIEW.md faylida allaqachon mavjud",
       "status": {
+        "open": "Ochiq",
         "edited": "Tahrirlangan",
         "opening_change_request": "PR ochilmoqda",
         "change_request_failed": "PR ochilmadi",

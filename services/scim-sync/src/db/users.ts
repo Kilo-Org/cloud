@@ -21,6 +21,12 @@ export async function findUserById(db: WorkerDb, kiloUserId: string): Promise<Us
 /**
  * Resolve a directory-provisioned user by their WorkOS identifier.
  *
+ * `external_id` is the *only* directory identifier on `kilocode_users`. There
+ * is no `directory_id` or `directory_user_id` column: the `directory_*` columns
+ * live on `organizations` alone (`packages/db/src/schema.ts:3370-3372`), where
+ * they bind an organization to a WorkOS directory and group. A user's tie to
+ * the directory is this single WorkOS id.
+ *
  * Returns every match rather than one: `IDX_kilocode_users_external_id` is
  * non-unique, so the database does not prevent two users sharing an
  * `external_id`. A caller that needs exactly one must decide what a duplicate
@@ -34,17 +40,25 @@ export async function findUsersByExternalId(db: WorkerDb, externalId: string): P
 }
 
 /**
+ * Resolve a user by normalized email.
+ *
+ * Returns every match, like `findUsersByExternalId`:
+ * `IDX_kilocode_users_normalized_email` is a plain non-unique index
+ * (`packages/db/src/schema.ts:595`), so taking the first of several rows would
+ * pick a non-deterministic one. The app-side resolver reads two candidates
+ * specifically to detect ambiguity rather than choose
+ * (`apps/web/src/lib/user/index.ts:2143-2152`), and linking a directory user to
+ * the wrong Kilo account is the failure this prevents.
+ *
  * `normalized_email` is nullable and is cleared when a user is anonymized, so
  * an anonymized row never matches a real address.
  */
-export async function findUserByNormalizedEmail(
+export async function findUsersByNormalizedEmail(
   db: WorkerDb,
   normalizedEmail: string
-): Promise<UserRow | null> {
-  const rows = await db
+): Promise<UserRow[]> {
+  return db
     .select()
     .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, normalizedEmail))
-    .limit(1);
-  return rows.at(0) ?? null;
+    .where(eq(kilocode_users.normalized_email, normalizedEmail));
 }

@@ -3,6 +3,24 @@ import { and, eq } from 'drizzle-orm';
 
 import type { WorkerDb } from './pg';
 
+/**
+ * Kilo's own permission groups, which are **not** WorkOS directory groups
+ * despite the shared word.
+ *
+ * An `organization_groups` row is a named set of capability policies — `read`,
+ * `edit`, `browser`, `command`, `mcp` — scoped to one organization
+ * (`OrganizationGroupPolicies` in `packages/db/src/schema-types.ts:1466-1480`).
+ * A group membership assigns a user those capabilities inside that
+ * organization. Nothing here is populated by directory sync today: a WorkOS
+ * directory group binds to an *organization* through
+ * `organizations.directory_group_id`, not to a row in this table.
+ *
+ * They are read here because a reconciler has to see the authorization state it
+ * might disturb: deleting a membership cascades these assignments away, so the
+ * capabilities a user holds are a consequence of membership changes even though
+ * no directory event names them.
+ */
+
 export type GroupRow = typeof organization_groups.$inferSelect;
 export type GroupMembershipRow = typeof organization_group_memberships.$inferSelect;
 

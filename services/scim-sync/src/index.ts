@@ -14,9 +14,14 @@ export default {
       return Response.json({ status: 'ok', service: 'scim-sync' });
     }
 
-    // Calls the Durable Object, so a 200 proves the namespace is reachable and
-    // not merely that the Worker booted. Unauthenticated, which is why the
-    // Worker publishes no public URL: see `workers_dev` in wrangler.jsonc.
+    // Diagnostic only, and not reachable in production: this Worker has
+    // `workers_dev: false`, no `routes`, and no inbound service binding, so
+    // nothing can issue an HTTP request to it once deployed. It answers under
+    // `wrangler dev`, where the response proves the Durable Object namespace
+    // and the Hyperdrive binding both work. Anything that exposes this route
+    // later has to add authentication first: it reports internal state and
+    // reaching it drives a billable Durable Object request and a database
+    // query.
     if (pathname === '/status') {
       const [doStatus, database] = await Promise.all([
         getScimSyncDOStub(env).getStatus(),
@@ -46,20 +51,21 @@ export default {
  * table this service actually reads. Reports the failure instead of raising it:
  * `/status` is a diagnostic, and a database outage should be visible in the
  * response rather than collapsing it into a 500.
+ *
+ * The failure detail goes to Workers Logs, not the response. A driver error
+ * carries the failing SQL and its parameters, which is useful in a log and
+ * wrong in a body that may one day be exposed; the response says only whether
+ * the database answered.
  */
 async function checkDatabase(env: Env): Promise<DatabaseStatus> {
   const startedAt = Date.now();
   try {
     const organizationCount = await countOrganizations(getPgDb(env));
-    return { reachable: true, organizationCount, latencyMs: Date.now() - startedAt, error: null };
+    return { reachable: true, organizationCount, latencyMs: Date.now() - startedAt };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error('Database reachability check failed', { error: message });
-    return {
-      reachable: false,
-      organizationCount: null,
-      latencyMs: Date.now() - startedAt,
-      error: message,
-    };
+    logger.error('Database reachability check failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { reachable: false, organizationCount: null, latencyMs: Date.now() - startedAt };
   }
 }

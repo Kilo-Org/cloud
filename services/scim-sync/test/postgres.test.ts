@@ -26,7 +26,7 @@ import {
   listUserMemberships,
 } from '../src/db/memberships';
 import { listGroupMemberships, listOrganizationGroups } from '../src/db/groups';
-import { findUserByNormalizedEmail, findUserById, findUsersByExternalId } from '../src/db/users';
+import { findUserById, findUsersByExternalId, findUsersByNormalizedEmail } from '../src/db/users';
 
 const connectionString =
   process.env.POSTGRES_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
@@ -177,10 +177,10 @@ describe('users', () => {
     expect(matches.map(row => row.id)).toEqual([userId]);
   });
 
-  it('reads a user by normalized email', async () => {
-    const found = await findUserByNormalizedEmail(db, `scim-sync-${suffix}@example.test`);
+  it('returns every match for a non-unique normalized email', async () => {
+    const matches = await findUsersByNormalizedEmail(db, `scim-sync-${suffix}@example.test`);
 
-    expect(found?.id).toBe(userId);
+    expect(matches.map(row => row.id)).toEqual([userId]);
   });
 
   it('returns null for an unknown user', async () => {

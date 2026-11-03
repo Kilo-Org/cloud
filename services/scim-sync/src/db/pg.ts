@@ -1,7 +1,15 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 
-/** Bounds a query so a slow or wedged primary surfaces as an error, not a hang. */
-const STATEMENT_TIMEOUT_MS = 10_000;
+/**
+ * Bounds both the statement and the connection.
+ *
+ * `statement_timeout` is sent in the PostgreSQL startup packet, so it cannot
+ * fire until a connection exists. A database or Hyperdrive that refuses or
+ * blackholes new connections would otherwise wait on `pg.Pool`'s default, which
+ * has no client-side connect timeout — the exact outage `/status` exists to
+ * report. Same reasoning as `services/ai-attribution/src/util/auth.ts`.
+ */
+const TIMEOUT_MS = 10_000;
 
 /**
  * Return a Drizzle client for the shared PostgreSQL reachable through the
@@ -15,7 +23,8 @@ const STATEMENT_TIMEOUT_MS = 10_000;
  */
 export function getPgDb(env: Pick<Env, 'HYPERDRIVE'>): WorkerDb {
   return getWorkerDb(env.HYPERDRIVE.connectionString, {
-    statement_timeout: STATEMENT_TIMEOUT_MS,
+    connectionTimeoutMillis: TIMEOUT_MS,
+    statement_timeout: TIMEOUT_MS,
   });
 }
 

@@ -27,10 +27,16 @@ export type ScimSyncDOStatus = {
   lastPoll: PollResult | null;
 };
 
-/** Result of the `/status` PostgreSQL reachability probe. */
+/**
+ * Result of the `/status` PostgreSQL reachability probe.
+ *
+ * Deliberately carries no error detail. A driver error names the failing SQL
+ * and its parameters, which belongs in Workers Logs rather than a response
+ * body; whether the database answered, and how slowly, is all a probe needs to
+ * report.
+ */
 export type DatabaseStatus = {
   reachable: boolean;
   organizationCount: number | null;
   latencyMs: number;
-  error: string | null;
 };

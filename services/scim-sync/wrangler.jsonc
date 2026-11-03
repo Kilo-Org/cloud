@@ -12,8 +12,10 @@
   "compatibility_flags": ["nodejs_compat"],
   // No public URL: `/status` reaches the Durable Object, and an unauthenticated
   // caller on a `*.workers.dev` hostname could create the instance and drive
-  // billable Durable Object requests. Reach this Worker through `wrangler dev`
-  // locally, and `wrangler tail` or the dashboard in production.
+  // billable Durable Object requests. With no `routes`, cron trigger, or
+  // service binding either, nothing reaches this Worker once deployed: use
+  // `wrangler dev` locally, and expect a production deploy to prove only that
+  // the script and the `v1` migration were accepted. See README.md.
   "workers_dev": false,
   "dev": {
     "port": 8819,

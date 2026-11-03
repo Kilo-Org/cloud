@@ -3,9 +3,10 @@ import { DurableObject } from 'cloudflare:workers';
 /**
  * Placeholder Durable Object for the SCIM sync service.
  *
- * This iteration carries no behavior: it exists so the Worker and its Durable
- * Object namespace are deployed and reachable in production. Storage, polling,
- * and WorkOS integration come in later iterations.
+ * This iteration carries no behavior: it exists so the Worker and this Durable
+ * Object class are registered and deploying cleanly. The Worker has no ingress,
+ * so nothing reaches this class in production yet. Storage, polling, and WorkOS
+ * integration come in later iterations.
  */
 export const SCIM_SYNC_DO_NAME = 'scim-sync';
 

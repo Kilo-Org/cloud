@@ -1,8 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { isLegacyBotCallbackTokenAllowed, matchBotCallbackToken } from '@/lib/bot/callback-token';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   bot_requests,
@@ -777,24 +775,12 @@ export async function POST(
 ) {
   try {
     const { botRequestId } = await params;
-    const token = req.headers.get('X-Bot-Callback-Token');
+    const tokenMatch = await matchBotCallbackToken({
+      botRequestId,
+      token: req.headers.get('X-Bot-Callback-Token'),
+    });
 
-    if ((!CALLBACK_TOKEN_SECRET && !INTERNAL_API_SECRET) || !token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const tokenBuf = Buffer.from(token);
-    const validCallbackToken = [CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET]
-      .filter(Boolean)
-      .some(secret => {
-        const expectedToken = createHmac('sha256', secret)
-          .update(`bot-callback:${botRequestId}`)
-          .digest('hex');
-        const expectedBuf = Buffer.from(expectedToken);
-        return tokenBuf.length === expectedBuf.length && timingSafeEqual(tokenBuf, expectedBuf);
-      });
-
-    if (!validCallbackToken) {
+    if (!tokenMatch) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -832,6 +818,11 @@ export async function POST(
     if (!requestRow) {
       logCallback('Bot request not found for callback', { botRequestId });
       return NextResponse.json({ error: 'Bot request not found' }, { status: 404 });
+    }
+
+    if (tokenMatch === 'legacy' && !isLegacyBotCallbackTokenAllowed(requestRow.created_at)) {
+      logCallback('Rejecting callback signed with the compatibility derivation', { botRequestId });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const completedStepCount = Math.max(callbackStepCount, requestRow.steps?.length ?? 0);

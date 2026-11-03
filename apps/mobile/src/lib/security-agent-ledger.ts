@@ -11,10 +11,18 @@
 
 import { i18n } from '@/i18n';
 import {
+  SECURITY_CONFIG_CONFLICT_CODE,
+  SECURITY_SYNC_PRECONDITION_CODES,
+  type SecuritySyncPrecondition,
+  securitySyncPreconditionForCode,
+} from '@kilocode/app-shared/security-agent';
+import {
   isOperationInProgress,
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
 } from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { knownServerErrorCopyKey } from '@/lib/server-error-copy';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** A settled `failed` row replayed under the same key: no recovery, fresh key. */
 export const SECURITY_OPERATION_REPLAY_FAILED_MESSAGE =
@@ -119,6 +127,20 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
 }
 
 /**
+ * True when the failure is the ledger refusing a duplicate of an action that is
+ * still in flight: the same operation key is admitted and has not settled yet.
+ * For a sync that is not a failure at all — the first submit is still running —
+ * so the dashboard presents it as a running sync instead of copy with a retry
+ * that would collide again.
+ */
+export function isSecuritySyncInProgress(error: unknown): boolean {
+  if (error instanceof SecurityMutationError) {
+    return error.copyKey === IN_PROGRESS_KEY_BY_SURFACE.sync;
+  }
+  return isOperationInProgress(error);
+}
+
+/**
  * Whether a retry reuses the operation key. Two different questions a failure
  * answers: can a retry succeed (`isSecuritySyncRetryable`), and is the key
  * still the intent's. A definitive pre-acceptance rejection settles the ledger
@@ -135,8 +157,36 @@ export function securityRetainsOperationKey(error: unknown): boolean {
   );
 }
 
+/**
+ * The copy key for each sync precondition the server can reject a manual sync
+ * with. The server attaches the stable code as `data.upstreamCode` (see
+ * `SECURITY_SYNC_PRECONDITION_CODES`); the sentence it sends for web is not
+ * matched on here, because the device cannot translate it.
+ */
+const SECURITY_SYNC_PRECONDITION_COPY_KEYS = {
+  noRepositories: 'securityAgent.mutations.syncNoRepositories',
+  integrationInactive: 'securityAgent.mutations.syncIntegrationInactive',
+  missingPermission: 'securityAgent.mutations.syncMissingPermission',
+} as const satisfies Record<SecuritySyncPrecondition, string>;
+
+/**
+ * The sync precondition a failure was rejected for, or null when the failure is
+ * not one. A precondition is not a transient fault: the copy that names it also
+ * names the fix, and the surface offers the action that applies it.
+ */
+export function securitySyncPreconditionFor(error: unknown): SecuritySyncPrecondition | null {
+  // The hook hands the surface a mapped error, whose raw failure (and with it
+  // the upstream code) is on `cause`.
+  const source = error instanceof SecurityMutationError ? error.cause : error;
+  return securitySyncPreconditionForCode(readTrpcErrorField(source, 'upstreamCode'));
+}
+
 /** The catalog key each known server marker's copy comes from, or null. */
 function markerKeyFor(error: Error): string | null {
+  const precondition = securitySyncPreconditionFor(error);
+  if (precondition !== null) {
+    return SECURITY_SYNC_PRECONDITION_COPY_KEYS[precondition];
+  }
   switch (error.message) {
     case SECURITY_AMBIGUOUS_MESSAGE: {
       return 'securityAgent.mutations.ambiguous';
@@ -157,7 +207,10 @@ function markerKeyFor(error: Error): string | null {
       return 'securityAgent.mutations.serviceUnavailable';
     }
     default: {
-      return null;
+      // The subscription gate and the organization procedures refuse a write
+      // with their own sentence and no ledger marker: a lapsed trial is the
+      // reason the reader needs, not the generic "could not complete" line.
+      return knownServerErrorCopyKey(error);
     }
   }
 }
@@ -235,6 +288,43 @@ export function securityMutationCopyKey(error: unknown): string | null {
 export function localizedSecurityMarkerMessage(error: unknown): string | null {
   const markerKey = error instanceof Error ? markerKeyFor(error) : null;
   return markerKey === null ? null : i18n.t(markerKey);
+}
+
+/**
+ * The catalog key a config-write refusal's copy comes from, or null when the
+ * server did not mark it. Enabling is refused for the same missing permission a
+ * manual sync is, so it reuses the scope screen's reauthorize sentence instead
+ * of the sync wording that ends "then sync again". Its empty-scope refusal
+ * reuses the sync no-repositories code, but reads the sentence the repository
+ * picker itself shows rather than the one that ends "then sync again".
+ */
+function configMutationCopyKeyFor(error: unknown): string | null {
+  const code = readTrpcErrorField(error, 'upstreamCode');
+  if (code === SECURITY_SYNC_PRECONDITION_CODES.missingPermission) {
+    return 'securityAgent.scopeEntry.reauthorizeDescription';
+  }
+  if (code === SECURITY_SYNC_PRECONDITION_CODES.noRepositories) {
+    return 'securityAgent.repositories.selectAtLeastOne';
+  }
+  if (code === SECURITY_CONFIG_CONFLICT_CODE) {
+    return 'securityAgent.mutations.configConflict';
+  }
+  return null;
+}
+
+/**
+ * The message a Security Agent config write shows when the server refuses it
+ * (the enable toggle and the settings save). A refusal the server marked with a
+ * stable code reads the catalog copy that names it; a rejection carrying one of
+ * the organization sentences the app already explains keeps that reason (the
+ * lapsed-trial gate is the one a settings save hits). Anything else reads the
+ * localized generic sentence, because the server's own English explanation
+ * cannot be translated on the device. The fallback follows the retry class, as
+ * the ledger mapper's does.
+ */
+export function securityConfigMutationMessage(error: unknown): string {
+  const copyKey = configMutationCopyKeyFor(error) ?? knownServerErrorCopyKey(error);
+  return i18n.t(copyKey ?? fallbackKeyFor(isSecuritySyncRetryable(error)));
 }
 
 /** Maps a sync failure onto retryable or terminal security copy. */

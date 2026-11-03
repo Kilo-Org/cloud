@@ -2,6 +2,37 @@ import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
+export const watchPrPolicySchema = z
+  .object({
+    version: z.literal(1),
+    model: z.string().trim().min(1).max(200),
+    profileId: z.string().uuid().nullable(),
+    categories: z.object({
+      reviews: z.boolean(),
+      failedChecks: z.boolean(),
+      baseUpdates: z.boolean(),
+    }),
+    branchStrategy: z.enum(['merge', 'rebase']),
+    historyRewriteConsent: z.boolean(),
+    maxAttemptsPerProblem: z.number().int().min(1).max(2),
+    maxTotalAttempts: z.number().int().min(1).max(10),
+    observationOnlyConsent: z.literal(true),
+    futureEventsOnlyConsent: z.literal(true),
+    noHardSpendCapConsent: z.literal(true),
+  })
+  .strict()
+  .refine(value => value.branchStrategy !== 'rebase' || value.historyRewriteConsent, {
+    message: 'Rebase requires explicit history-rewrite consent',
+    path: ['historyRewriteConsent'],
+  })
+  .refine(value => value.maxAttemptsPerProblem <= value.maxTotalAttempts, {
+    message: 'Per-problem attempts cannot exceed total attempts',
+    path: ['maxAttemptsPerProblem'],
+  });
+
+export type WatchPrPolicy = z.infer<typeof watchPrPolicySchema>;
+export type WatchPrStatus = 'watching' | 'paused' | 'finished';
+
 // =============================================================================
 // A. Runtime Values (used in enumCheck() or .default())
 // =============================================================================
@@ -889,6 +920,9 @@ export const AdminActionAuditAction = z.enum([
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
+  'request_logging_opt_in.create',
+  'request_logging_opt_in.delete',
+  'api_request_log.download',
   'organization.member.invite',
   'organization.member.role.update',
   'organization.member.remove',
@@ -900,6 +934,8 @@ export const AdminActionAuditAction = z.enum([
   'credit_campaign.create',
   'credit_campaign.update',
   'credit_campaign.set_active',
+  'service_fee.rollback_refund',
+  'service_fee.rollback_reconcile',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -1286,8 +1322,8 @@ export const ENKRYPT_DETECTOR_IDS = [
 ] as const satisfies readonly EnkryptDetectorId[];
 
 /**
- * Blocking Enkrypt AI input scan of each gateway chat turn. Flagged turns are always blocked, and
- * so is every turn while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
+ * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always
+ * blocked, and so is every request while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
  * Default. `scan_tool_results` defaults to true so organizations enabled before it existed keep
  * scanning tool results.
  *
@@ -2396,6 +2432,11 @@ export const NormalizedProvider = z.object({
       className: z.string().optional(),
     })
     .optional(),
+  /**
+   * Set on a direct BYOK provider that only serves an organization's own keys in catalog mode.
+   * Provider allow-lists can name it, but Kilo's own routes never use it.
+   */
+  byokOnly: z.literal(true).optional(),
   models: z.array(OpenRouterModel),
 });
 
@@ -2555,9 +2596,12 @@ export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
  * Per-key BYOK settings. Every field is optional so new settings need no backfill.
  * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
  * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
  */
 export const ByokApiKeySettingsSchema = z.object({
   serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
 });
 
 export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
@@ -2776,9 +2820,9 @@ export const CustomLlmInferenceProviderSlugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
 
 /**
- * Makes a custom LLM available to every user, including anonymous ones. Like
- * every custom LLM it is free; unlike private ones it is subject to
- * organization provider allow lists.
+ * Makes a custom LLM available to every user, including anonymous ones when it
+ * is free. Unlike private ones it is subject to organization provider allow
+ * lists.
  */
 export const CustomLlmPublicSchema = z.object({
   /** Provider slugs the upstream may serve this model from. They are listed in
@@ -2796,6 +2840,43 @@ export const VercelCountryCodeSchema = z
   .string()
   .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
 
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingTiersSchema = z
+  .tuple([CustomPricingTierSchema], CustomPricingTierSchema)
+  .superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  });
+
+export type CustomPricingTiers = z.infer<typeof CustomPricingTiersSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
     ...CustomLlmMetadataSchema.shape,
@@ -2808,6 +2889,8 @@ export const CustomLlmDefinitionSchema = z
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
+    /** What Kilo bills users, in the custom pricing tier format. Without it the model is free. */
+    pricing: CustomPricingTiersSchema.optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
@@ -2980,40 +3063,9 @@ export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrder
 
 export const CUSTOM_PRICING_MAX_MODELS = 500;
 
-const PricePerMillionSchema = z.number().finite().nonnegative();
-
-const CustomPricingTierSchema = z.object({
-  start_context_length: z.number().int().nonnegative(),
-  pricing: z.object({
-    prompt_per_million: PricePerMillionSchema,
-    completion_per_million: PricePerMillionSchema,
-    input_cache_read_per_million: PricePerMillionSchema.nullable(),
-    input_cache_write_per_million: PricePerMillionSchema.nullable(),
-  }),
-});
-
 export const CustomPricingSchema = z.object({
   model: GatewayModelIdSchema,
-  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
-    if (tiers[0].start_context_length !== 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'The first pricing tier must start at context length 0',
-        path: [0, 'start_context_length'],
-      });
-    }
-    let previousStart = tiers[0].start_context_length;
-    for (const [index, { start_context_length }] of tiers.entries()) {
-      if (index > 0 && start_context_length <= previousStart) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Pricing tiers must be ordered by ascending start context length',
-          path: [index, 'start_context_length'],
-        });
-      }
-      previousStart = start_context_length;
-    }
-  }),
+  pricing: CustomPricingTiersSchema,
   /** Human-readable discount shown in the model name; never used in calculations. */
   discountPercentage: z.number().gt(0).lte(100).optional(),
   /** Only use this pricing when the upstream response does not report a market cost. */

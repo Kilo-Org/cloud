@@ -678,6 +678,10 @@ describe('AgentSessionListScreen live presentation', () => {
     const history = action('Session history');
     expect(history.props.testID).toBe('agents-view-history-empty');
     expect(history.findByType(Text).children).toEqual(['Session history']);
+    // The body action is the second route into stored history: pressing it must
+    // reach the same destination the header control does.
+    press('Session history');
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
     // The non-empty live list keeps the history route in the header, under its
     // own destination copy instead of this body label.
     state.live.activeSessions = [row];

@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -9,7 +10,7 @@ import { CenteredState } from '@/components/centered-state';
 import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
@@ -40,6 +41,20 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
   const [selectedProposal, setSelectedProposal] = useState<ReviewMemoryProposal | null>(null);
+
+  // The proposal sheet is a native sheet in its own window, so it is not
+  // dismissed by navigation the way a route is: a deep link, a push or any
+  // programmatic push that leaves this screen would otherwise keep the form
+  // presented over the destination, and closing it would reveal that screen
+  // instead of this list. Leaving the screen is what ends the form.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setSelectedProposal(null);
+      },
+      []
+    )
+  );
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
   const setEnabled = useSetReviewMemoryEnabled(scope);
@@ -226,7 +241,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ReviewerHeader
         title={t('codeReviewer.reviewMemory.title')}
         eyebrow={t('common.codeReviewer')}
       />

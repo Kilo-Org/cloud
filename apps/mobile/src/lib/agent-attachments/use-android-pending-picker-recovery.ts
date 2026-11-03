@@ -14,6 +14,7 @@ import {
 } from '@/lib/agent-attachments/pending-picker-result';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 type UseAndroidPendingPickerRecoveryOptions = {
   surface: AttachmentSurface;
@@ -29,6 +30,10 @@ type UseAndroidPendingPickerRecoveryOptions = {
  * An expired context is discarded and cleared (no composer should attach it).
  * A non-expired mismatch (wrong account/surface/session) is left untouched so
  * the matching composer — multiple composers stay mounted — can still read it.
+ *
+ * Best effort: a failed consume, candidate add, or clear is reported once and
+ * swallowed, and a failed clear leaves the stored context for the next
+ * app-active edge to retry. Both call sites fire this off without awaiting it.
  */
 export function useAndroidPendingPickerRecovery(
   options: UseAndroidPendingPickerRecoveryOptions
@@ -71,10 +76,14 @@ export function useAndroidPendingPickerRecovery(
         context.sessionId === sessionIdRef.current;
       if (matches) {
         const assets = await consumeAndroidPendingPickerResult();
-        await clearPickerLaunchContext();
+        // Attach before clearing: the result is already consumed and cannot be
+        // read again, so a failed clear must not skip the assets the person
+        // picked. A clear that still fails leaves the context for the next
+        // app-active edge, which consumes nothing and retries the clear.
         if (assets.length > 0) {
           await addCandidatesRef.current(assets.map(asset => normalizeImageAsset(asset)));
         }
+        await clearPickerLaunchContext();
         return;
       }
       if (expired) {
@@ -86,6 +95,17 @@ export function useAndroidPendingPickerRecovery(
       // Non-expired mismatch (wrong account/surface/session): another mounted
       // composer may still match this context. Leave both the context and the
       // native result for that composer.
+    } catch (error) {
+      // Best effort and self-contained: the call sites fire this off with
+      // `void recover()`, so a rejection must not escape as an unhandled one.
+      // A failed clear leaves the stored context in place, so the next
+      // app-active edge retries it.
+      captureTelemetry({
+        error,
+        level: 'warning',
+        tags: { 'error.subsystem': 'agent_attachments', 'error.operation': 'picker_recovery' },
+        fingerprint: ['android-picker-recovery-failure'],
+      });
     } finally {
       inFlightRef.current = false;
     }

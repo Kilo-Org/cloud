@@ -69,6 +69,66 @@ test('clipped: scroll content and absolute children are not clipped', () => {
   );
 });
 
+test('clipped: a transformed parent frame is compared in the transform-free space', () => {
+  // A natively presented formSheet reports its screen at the window origin and
+  // its content translated by the detent; only the transform-free frames say
+  // whether the content is actually cut.
+  assert.deepEqual(
+    run('clipped', [
+      { parent: 0, tag: 'RNSScreen', rect: [0, 0, 400, 800] },
+      {
+        parent: 1,
+        tag: 'RNSScreenContentWrapper',
+        rect: [0, 457, 400, 800],
+        layoutRect: [0, 0, 400, 800],
+        style: { backgroundColor: '#ffffff' },
+      },
+      {
+        parent: 2,
+        tag: 'Paragraph',
+        rect: [0, 500, 400, 20],
+        layoutRect: [0, 43, 400, 20],
+        text: 'Pick a profile',
+      },
+    ]),
+    []
+  );
+});
+
+test('clipped: real overflow still reports with transform-free frames', () => {
+  const findings = run('clipped', [
+    { parent: 0, tag: 'View', rect: [0, 0, 400, 800] },
+    {
+      parent: 1,
+      tag: 'Paragraph',
+      rect: [0, 0, 400, 900],
+      layoutRect: [0, 0, 400, 900],
+      text: 'x',
+    },
+  ]);
+  assert.equal(findings[0]?.measured, 100);
+});
+
+test('clipped: a transformed parent keeps its own padding in the transform-free space', () => {
+  const findings = run('clipped', [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, 60, 400, 200],
+      layoutRect: [0, 0, 400, 200],
+      style: { paddingHorizontal: 16 },
+    },
+    {
+      parent: 1,
+      tag: 'Paragraph',
+      rect: [0, 60, 400, 20],
+      layoutRect: [0, 0, 400, 20],
+      text: 'x',
+    },
+  ]);
+  assert.equal(findings[0]?.measured, 16);
+});
+
 test('cut-off: past the window edge, tolerance, horizontal scroll', () => {
   const paragraph = (width: number): ProbeNode => ({
     parent: 0,
@@ -300,4 +360,39 @@ test('safe-area: content scrolled under a system inset is fine', () => {
     ),
     []
   );
+});
+
+test('touch-overlap: a presented sheet never competes with the window behind it', () => {
+  // A full detent spans the window, so its placed frames sit exactly where the
+  // window's own controls are. The sheet still takes the tap first: two boxes
+  // that intersect across windows are not one ambiguous target. `normalize`
+  // places the sheet in window space before the rule runs.
+  const header: ProbeNode = { parent: 0, tag: 'View', rect: [0, 0, 48, 48], pressable: true };
+  const sheet: ProbeNode = { parent: 3, tag: 'View', rect: [0, 0, 400, 44], pressable: true };
+  const presented: ProbeNode[] = [
+    header,
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 400, 800] },
+    { parent: 2, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 400, 800] },
+    sheet,
+  ];
+
+  const placed = tree(presented);
+  const headerNode = placed.nodes[1];
+  const sheetButton = placed.nodes[4];
+  // Precondition: both boxes are in window space and they do intersect.
+  assert.deepEqual(headerNode.rect, [0, 0, 48, 48]);
+  assert.deepEqual(sheetButton.rect, [0, 0, 400, 44]);
+  assert.equal(sheetButton.presented?.space, placed.nodes[2].index);
+  assert.equal(headerNode.presented, undefined);
+  assert.ok(sheetButton.rect[2] > headerNode.rect[0] && headerNode.rect[2] > sheetButton.rect[0]);
+  assert.ok(sheetButton.rect[3] > headerNode.rect[1] && headerNode.rect[3] > sheetButton.rect[1]);
+
+  assert.deepEqual(run('touch-overlap', presented), []);
+
+  // The same two boxes in one window are the defect the rule exists for.
+  const [finding] = run('touch-overlap', [
+    header,
+    { parent: 0, tag: 'View', rect: [0, 0, 400, 44], pressable: true },
+  ]);
+  assert.equal(finding?.measured, 44);
 });

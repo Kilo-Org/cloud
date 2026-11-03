@@ -3,6 +3,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { TRPCContext } from '../types.js';
 import { projectTrpcErrorData } from '../trpc-error.js';
 import { validateScopedWorkerPreparation } from '../cloud-agent-authority.js';
+import { assertCloudAgentManagementRequest } from '../cloud-agent-child-management.js';
 
 export const t = initTRPC.context<TRPCContext>().create({
   errorFormatter({ shape, error }) {
@@ -43,6 +44,53 @@ export const protectedProcedure = t.procedure.use(opts => {
     ctx: opts.ctx,
   });
 });
+
+/**
+ * Protected procedure that additionally accepts a Cloud Agent parent authority
+ * for a management path. The authority is validated against the raw input, the
+ * current canonical parent authorization, and the target child's lineage before
+ * the handler runs.
+ */
+export const cloudAgentManagedProcedure = t.procedure.use(
+  async ({ ctx, next, path, getRawInput }) => {
+    if (ctx.cloudAgentAuthority) {
+      await assertCloudAgentManagementRequest({
+        env: ctx.env,
+        authority: ctx.cloudAgentAuthority,
+        userId: ctx.userId,
+        authToken: ctx.authToken,
+        path,
+        rawInput: await getRawInput(),
+      });
+    } else if (!ctx.userId || !ctx.authToken) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required',
+      });
+    }
+    return next({ ctx });
+  }
+);
+
+export const cloudAgentAuthorityProcedure = t.procedure.use(
+  async ({ ctx, next, path, getRawInput }) => {
+    if (!ctx.cloudAgentAuthority) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent authority required',
+      });
+    }
+    await assertCloudAgentManagementRequest({
+      env: ctx.env,
+      authority: ctx.cloudAgentAuthority,
+      userId: ctx.userId,
+      authToken: ctx.authToken,
+      path,
+      rawInput: await getRawInput(),
+    });
+    return next({ ctx });
+  }
+);
 
 // Internal API secret + customer token middleware (for prepareSession/updateSession)
 export const internalApiProtectedProcedure = t.procedure.use(

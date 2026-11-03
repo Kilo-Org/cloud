@@ -1,23 +1,24 @@
 /* eslint-disable max-lines -- The new-session prompt owns its uncontrolled input, starter chips, counter, newline control, voice dictation, and attachment strip end-to-end in one cohesive surface. */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import {
   AccessibilityInfo,
-  Keyboard,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   TextInput as RNTextInput,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
@@ -28,21 +29,19 @@ import {
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
-import { useTextHeight } from '@/components/agents/use-text-height';
 import {
-  NEW_SESSION_PROMPT_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_DEFAULT_LINES,
-  NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   NEW_SESSION_PROMPT_LINE_HEIGHT,
-  NEW_SESSION_PROMPT_VERTICAL_PADDING,
-  resolveComposerMaxHeight,
   resolveNewSessionPromptHeight,
-  SESSION_HEADER_HEIGHT,
+  shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
-import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import {
-  resolveNewSessionPromptMaxHeight,
+  resolveNewSessionPromptControlState,
+  resolvePromptCounterRemaining,
+} from '@/components/agents/new-session-prompt-state';
+import {
+  resolveComposerTopFadeHeight,
   resolveNewSessionPromptMinHeight,
 } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
@@ -52,6 +51,8 @@ import { hasVisibleComposerText } from '@/lib/composer-text';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
 import {
   applyVoiceDraftAtSelection,
@@ -65,21 +66,36 @@ import {
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
 // Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
-// Must mirror the TextInput's actual horizontal padding: px-2 on iOS (16
-// total) / the 24pt-per-side Android inset (48 total).
-const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
+/**
+ * The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is
+ * 7, which the design-gate dump reports as `paddingBlock: 7`. The top fade
+ * starts here, at the text box, so the 1 dp band where a scrolled line is
+ * clipped is covered rather than left as a hard cut.
+ */
+const PROMPT_INPUT_VERTICAL_INSET = 7;
+/** A sub-pixel scroll is not a hidden line above the field. */
+const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
-/** Hide the remaining-characters counter until the draft nears the limit. */
-const PROMPT_COUNTER_VISIBLE_REMAINING = 1000;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
+// LinearGradient is not NativeWind-mapped; the physical style objects follow
+// the skeleton.tsx overlay pattern. The band starts at the text box, where a
+// scrolled field clips its topmost line, and its height comes from the scroll
+// offset on the UI thread.
+const PROMPT_TOP_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: PROMPT_INPUT_VERTICAL_INSET,
+} as const;
+const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -128,7 +144,6 @@ export function NewSessionPrompt({
   initialPrompt,
   frameHeight,
   cardTop = 0,
-  belowCardHeight = 0,
   onStartSession,
   isCloneEntry = false,
   autoFocusOnMount = true,
@@ -140,14 +155,18 @@ export function NewSessionPrompt({
   const takesFocusOnMount = autoFocusOnMount && (shareId === undefined || shareId === '');
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { height: windowHeight } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  const insets = useSafeAreaInsets();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [promptCharacterCount, setPromptCharacterCount] = useState(initialPrompt?.length ?? 0);
+  // The counter's remaining count, or null while it is hidden. Only the value
+  // the card renders is held: the raw character count is not, so a keystroke
+  // that leaves the counter hidden publishes nothing and re-renders nothing.
+  const [counterRemaining, setCounterRemaining] = useState<number | null>(() =>
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
+  const publishedCounterRef = useRef<number | null>(
+    resolvePromptCounterRemaining(initialPrompt?.length ?? 0)
+  );
   const promptRef = useRef(initialPrompt ?? '');
-  const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves
   // like the platform paste.
@@ -164,7 +183,6 @@ export function NewSessionPrompt({
   // divergence above is what aborts dictation when an IME session edits text.
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
-  const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
   // The card rows that render only in some states, read by name in the render
   // below (the measured card chrome covers their height without a static
@@ -172,13 +190,17 @@ export function NewSessionPrompt({
   const showsAttachmentStatus = attachments.some(
     attachment => attachment.metadataStripFailed === true
   );
-  const showsCounter =
-    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  const showsCounter = counterRemaining !== null;
   // The chrome the card renders around the input, measured by the card's
   // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
   // the frame leaves for the input.
   const [cardChromeHeight, setCardChromeHeight] = useState(0);
-  const promptMinHeight = resolveNewSessionPromptMinHeight({
+  // The input is one size whatever the draft holds: the 3-line floor, lowered
+  // only where the frame cannot hold it (the keyboard up on a short window). A
+  // draft taller than the field scrolls inside it. Sizing the field to its text
+  // made every row below it move once the stored draft loaded, seconds after
+  // the screen opened, so the composer is content-independent instead.
+  const promptHeight = resolveNewSessionPromptMinHeight({
     frameHeight: frameHeight ?? 0,
     cardTop,
     cardChromeHeight,
@@ -190,44 +212,35 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
   });
-  // The window cap (keyboard, safe areas, header, chrome) bounds how large the
-  // input may ever get; the frame fit bounds it further, and reserves the Run
-  // on row under the card while the floor still fits beside it.
-  const promptMaxHeight = resolveNewSessionPromptMaxHeight({
-    frameHeight: frameHeight ?? 0,
-    cardTop,
-    cardChromeHeight,
-    belowCardHeight,
-    preferredMaxHeight: resolveComposerMaxHeight({
-      windowHeight,
-      safeAreaInsetTop: insets.top,
-      safeAreaInsetBottom: insets.bottom,
-      keyboardHeight,
-      sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
-      composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT * fontScale,
-      minHeight: promptMinHeight,
-      absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT * fontScale,
-    }),
-    minHeight: promptMinHeight,
-    lineHeight: promptLineHeight,
-    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
-  });
 
-  // Track the keyboard's reported height so the remaining-space cap follows it.
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, event => {
-      setKeyboardHeight(Math.max(event.endCoordinates.height, 0));
-    });
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  // The draft's own laid-out height, reported by the input on every content
+  // change. The field keeps its size, so this only decides whether a vertical
+  // drag over the field scrolls the draft or the form behind it: a drag over a
+  // field whose text fits belongs to the form, exactly as it did when the field
+  // grew to its text and only scrolled once the cap stopped it.
+  const [contentHeight, setContentHeight] = useState(0);
+  const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  // The fade band over the clipped top line, driven from the field's scroll
+  // offset. It lives in a shared value, not React state: a drag reports a frame
+  // per few pixels, and this card's toolbar, attachment strip and controls are
+  // not memoized, so committing each offset would re-render all of them at
+  // frame rate just to resize an overlay. Only the crossing that mounts the
+  // gradient is state.
+  const promptScrollOffset = useSharedValue(0);
+  const [promptFaded, setPromptFaded] = useState(false);
+  const promptTopFadeStyle = useAnimatedStyle(() => ({
+    height: resolveComposerTopFadeHeight({
+      scrollOffset: promptScrollOffset.value,
+      lineHeight: promptLineHeight,
+    }),
+  }));
+
+  function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = Math.max(0, event.nativeEvent.contentOffset.y);
+    promptScrollOffset.value = next;
+    const faded = next > PROMPT_SCROLLED_THRESHOLD;
+    setPromptFaded(current => (current === faded ? current : faded));
+  }
 
   const promptInputStyle = {
     color: colors.foreground,
@@ -237,32 +250,29 @@ export function NewSessionPrompt({
     textAlignVertical: 'top',
   } satisfies TextStyle;
 
-  const promptMeasure = useTextHeight({
-    minHeight: promptMinHeight,
-    maxHeight: promptMaxHeight,
-    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
-    textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
-    fontSize: PROMPT_INPUT_FONT_SIZE,
-    lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
-    fontScale,
-  });
-
-  const promptMeasureSetTextRef = useRef(promptMeasure.setText);
-  useEffect(() => {
-    promptMeasureSetTextRef.current(initialPromptRef.current);
+  // Publish the counter only when the value the card renders changes: the
+  // count stays hidden until the draft nears the limit, and republishing the
+  // raw length re-rendered this card — its toolbar, attachment strip, controls
+  // and voice surface — on every keystroke of a draft that never shows it.
+  const publishCounter = useCallback((length: number) => {
+    const next = resolvePromptCounterRemaining(length);
+    if (next === publishedCounterRef.current) {
+      return;
+    }
+    publishedCounterRef.current = next;
+    setCounterRemaining(next);
   }, []);
 
   const handlePromptChange = useCallback(
     (text: string) => {
       promptRef.current = text;
-      promptMeasure.setText(text);
-      setPromptCharacterCount(text.length);
+      publishCounter(text.length);
       onChangeText(text);
     },
-    [onChangeText, promptMeasure]
+    [onChangeText, publishCounter]
   );
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef: promptInputRef,
     maxLength: PROMPT_INPUT_MAX_CHARS,
@@ -342,26 +352,18 @@ export function NewSessionPrompt({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
 
-  function handlePromptInputLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
-    setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
-  }
-
   function handleCardLayout(event: LayoutChangeEvent) {
     const { height } = event.nativeEvent.layout;
-    // Everything the card renders other than the input itself. The input's
-    // height changes when the fit yields and the card's height changes with it,
-    // so this is stable across the yielding re-render. The card's `y` is not
-    // read here: it is relative to the padding-free host wrapper, so the host
-    // passes the frame-relative offset as `cardTop` instead.
-    const nextChromeHeight = height - promptMeasure.height;
+    // Everything the card renders other than the input itself, which is a
+    // constant here, so one layout pass settles it. The card's `y` is not read
+    // here: it is relative to the padding-free host wrapper, so the host passes
+    // the frame-relative offset as `cardTop` instead.
+    const nextChromeHeight = height - promptHeight;
     setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
   }
 
@@ -455,6 +457,16 @@ export function NewSessionPrompt({
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}
+      {sharePrefill.failed ? (
+        <SharePrefillFailure
+          onRetry={() => {
+            sharePrefill.retry();
+          }}
+          onDismiss={() => {
+            sharePrefill.dismiss();
+          }}
+        />
+      ) : null}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -470,56 +482,83 @@ export function NewSessionPrompt({
         />
       ) : null}
       <View className="px-2 pt-2">
-        {promptMeasure.measureElement}
-        <RNTextInput
-          ref={promptInputRef}
-          placeholder={t('agentChat.newSession.promptPlaceholder')}
-          placeholderTextColor={colors.mutedForeground}
-          multiline
-          defaultValue={initialPrompt}
-          // No dimming while a create is in flight: the field stays editable
-          // (an in-flight create must not steal the IME from the pinned
-          // footer), so it must not read as disabled. The busy affordance is
-          // the Start button's own spinner. An edit made mid-flight is not
-          // discarded: the creator cancels the attempt before it dispatches
-          // and keeps this draft (see `createSessionFromDraft`).
-          className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
-          style={[
-            promptInputStyle,
-            { height: promptMeasure.height },
-            Platform.OS === 'android'
-              ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
-              : undefined,
-          ]}
-          onChangeText={handlePromptChange}
-          onSelectionChange={handlePromptSelectionChange}
-          onLayout={handlePromptInputLayout}
-          scrollEnabled={promptMeasure.height >= promptMeasure.maxHeight}
-          maxLength={PROMPT_INPUT_MAX_CHARS}
-          returnKeyType={returnSendsMessage ? 'send' : 'default'}
-          submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
-          onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
-          maxFontSizeMultiplier={1}
-          // Focus on arrival only when the form has nothing left to configure
-          // (the host resolves this) and no share payload prefills it: the
-          // keyboard it raises would otherwise shrink the frame past the
-          // repository, Environment and Advanced sections the session still
-          // needs before it can start.
-          autoFocus={takesFocusOnMount}
-          // Android's IME swaps the app for its full-screen extract editor in a
-          // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
-          disableFullscreenUI
-        />
+        <View>
+          <RNTextInput
+            ref={promptInputRef}
+            placeholder={t('agentChat.newSession.promptPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            defaultValue={initialPrompt}
+            // No dimming while a create is in flight: the field stays editable
+            // (an in-flight create must not steal the IME from the pinned
+            // footer), so it must not read as disabled. The busy affordance is
+            // the Start button's own spinner. An edit made mid-flight is not
+            // discarded: the creator cancels the attempt before it dispatches
+            // and keeps this draft (see `createSessionFromDraft`).
+            className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
+            style={[
+              promptInputStyle,
+              { height: promptHeight },
+              Platform.OS === 'android'
+                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                : undefined,
+            ]}
+            onChangeText={handlePromptChange}
+            onSelectionChange={handlePromptSelectionChange}
+            onContentSizeChange={event => {
+              const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
+              setContentHeight(current => (current === next ? current : next));
+              if (!shouldEnableComposerInputScroll(next, promptHeight)) {
+                // The draft fits again: the field is back at its top, where the
+                // first line is whole.
+                promptScrollOffset.value = 0;
+                setPromptFaded(false);
+              }
+            }}
+            onScroll={handlePromptScroll}
+            scrollEnabled={promptScrolls}
+            maxLength={PROMPT_INPUT_MAX_CHARS}
+            returnKeyType={returnSendsMessage ? 'send' : 'default'}
+            submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+            onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
+            maxFontSizeMultiplier={1}
+            // Focus on arrival only when the form has nothing left to configure
+            // (the host resolves this) and no share payload prefills it: the
+            // keyboard it raises would otherwise shrink the frame past the
+            // repository, Environment and Advanced sections the session still
+            // needs before it can start.
+            autoFocus={takesFocusOnMount}
+            // Android's IME swaps the app for its full-screen extract editor in a
+            // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+            disableFullscreenUI
+          />
+          {promptFaded ? (
+            <Animated.View
+              className="absolute left-0 right-0"
+              pointerEvents="none"
+              style={[PROMPT_TOP_FADE_STYLE, promptTopFadeStyle]}
+            >
+              <LinearGradient
+                // The card's own color, so the slice fades into the surface
+                // behind it instead of drawing a bar of its own.
+                colors={[resolveAlphaColor(colors.card, 1), resolveAlphaColor(colors.card, 0)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={PROMPT_TOP_FADE_FILL}
+              />
+            </Animated.View>
+          ) : null}
+        </View>
         {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                count: PROMPT_INPUT_MAX_CHARS - promptCharacterCount,
+                count: counterRemaining,
               })}
             >
-              {PROMPT_INPUT_MAX_CHARS - promptCharacterCount}
+              {counterRemaining}
             </Text>
           </View>
         ) : null}

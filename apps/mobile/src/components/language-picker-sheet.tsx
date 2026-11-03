@@ -27,6 +27,7 @@ import {
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's
@@ -125,6 +126,13 @@ export function LanguagePickerSheet({
   // without it a tapped row keeps the `checked` state and the check mark of the
   // selection the sheet opened with, and the picker reads as inert.
   const rowExtraData = useMemo(() => ({ selected, disabled: busy }), [selected, busy]);
+  // A row tap marks the choice and closes the search keyboard with it, so the
+  // check mark and the sheet's Done control sit where the keyboard was instead
+  // of under it.
+  const handleSelectRow = useCallback((preference: LanguagePreference) => {
+    dismissSearchPickerKeyboard();
+    setSelected(preference);
+  }, []);
   // Hoisted so the cell keeps one renderer identity while only the selection or
   // the busy state change, and memoized `LanguagePickerRow`s re-render only
   // when their own flag moved.
@@ -142,10 +150,10 @@ export function LanguagePickerSheet({
         disabled={busy}
         deviceEndonym={deviceEndonym}
         isRtl={isRtl}
-        onSelect={setSelected}
+        onSelect={handleSelectRow}
       />
     ),
-    [items, selected, busy, deviceEndonym, isRtl]
+    [items, selected, busy, deviceEndonym, isRtl, handleSelectRow]
   );
 
   const handleDone = async () => {
@@ -331,8 +339,7 @@ export function LanguagePickerSheet({
           data={items}
           extraData={rowExtraData}
           keyExtractor={item => item.key}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          {...SEARCHABLE_PICKER_LIST_PROPS}
           ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
           renderItem={renderItem}
         />

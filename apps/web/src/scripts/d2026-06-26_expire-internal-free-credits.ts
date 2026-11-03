@@ -33,6 +33,7 @@ import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray, or } from 'drizzle-orm';
 import { computeExpiration, type ExpiringTransaction } from '@kilocode/db/credit-expiration';
 import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -293,12 +294,6 @@ async function processUser(
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
 async function main() {
   const { execute, yes, batchSize, concurrency } = parseArgs();
 
@@ -336,7 +331,7 @@ async function main() {
   // Identify which matched users actually hold a free, positive, personal grant.
   const usersById = new Map(users.map(u => [u.id, u]));
   const userIdsWithFree = new Set<string>();
-  for (const idChunk of chunk(
+  for (const idChunk of chunkArray(
     users.map(u => u.id),
     batchSize
   )) {

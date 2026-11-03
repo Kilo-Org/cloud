@@ -280,8 +280,10 @@ function CategoryRow({
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity: blanket opacity
-            drops every label below the 4.5:1 text minimum. The Switch renders
-            its own disabled appearance. */}
+            drops every label below the 4.5:1 text minimum. The switch carries
+            the other half: a disabled `Switch` paints the palette's muted pair
+            on Android, where the platform draws none, so an unavailable row
+            never shows a full-strength accent beside it. */}
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
           {title}
         </Text>
@@ -728,7 +730,7 @@ export function NotificationsScreen() {
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">{t('common.notifications')}</Text>
+              <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
@@ -763,7 +765,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('common.notifications')}
+                  accessibilityLabel={t('notifications.deviceTitle')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {

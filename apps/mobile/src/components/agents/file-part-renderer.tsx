@@ -437,7 +437,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
         className="my-1 flex-row items-center gap-2 rounded-lg bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       >
         {sharing || resolved.status === 'resolving' ? (
-          <ActivityIndicator />
+          <ActivityIndicator size={14} color={colors.mutedForeground} />
         ) : (
           <FileIcon size={14} color={colors.mutedForeground} />
         )}

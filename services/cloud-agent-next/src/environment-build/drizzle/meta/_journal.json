@@ -8,6 +8,13 @@
       "when": 1792104003857,
       "tag": "0000_environment_build",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793171117833,
+      "tag": "0001_solid_whiplash",
+      "breakpoints": true
     }
   ]
 }

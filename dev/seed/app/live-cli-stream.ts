@@ -294,7 +294,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   try {
     replayTurn();
 
-    console.log(`Streaming for ${seconds}s. Open kiloapp://agent-chat/${SESSION_ID} now.`);
+    console.log(`Streaming for ${seconds}s. Open kiloapp:///(app)/agent-chat/${SESSION_ID} now.`);
     let cursor = 0;
     const deadline = Date.now() + seconds * 1000;
     while (Date.now() < deadline) {
@@ -336,6 +336,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     sessionId: SESSION_ID,
     streamedChars: text.length,
-    deepLink: `kiloapp://agent-chat/${SESSION_ID}`,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
   };
 }

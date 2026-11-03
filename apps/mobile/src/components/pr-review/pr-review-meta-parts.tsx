@@ -14,10 +14,9 @@ import {
   Clock,
   type LucideIcon,
   MessageSquare,
-  UserRound,
-  Users,
 } from '@/components/ui/icons';
 import { PrAvatar } from '@/components/pr-review/pr-review-overview-parts';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -29,6 +28,7 @@ import {
   reviewerStateLabelKey,
   reviewerStateTone,
   type ReviewerTone,
+  visibleReviewers,
 } from '@/lib/pr-review/overview-meta';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -55,18 +55,6 @@ const REVIEWER_STATE_ICON = {
   DISMISSED: MessageSquare,
   PENDING: Clock,
 } satisfies Record<PrReviewerState, LucideIcon>;
-
-function SectionHeading({ icon: Icon, label }: Readonly<{ icon?: LucideIcon; label: string }>) {
-  const colors = useThemeColors();
-  return (
-    <View className="flex-row items-center gap-1.5">
-      {Icon ? <Icon size={12} color={colors.mutedForeground} /> : null}
-      <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 /** "Opened 3 days ago · Updated 2 hours ago" — one line, always present. */
 function PrTimelineLine({ overview }: Readonly<{ overview: PrOverviewDto }>) {
@@ -114,14 +102,14 @@ function PrReviewersSection({ reviewers }: Readonly<{ reviewers: PrOverviewDto['
   const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <SectionHeading icon={Users} label={t('prReview.overview.reviewers')} />
+      <PrReviewSectionLabel label={t('prReview.overview.reviewers')} />
       {reviewers.map(reviewer => {
         const tone = reviewerStateTone(reviewer.state);
         const StateIcon = REVIEWER_STATE_ICON[reviewer.state];
         const stateLabel = t(reviewerStateLabelKey(reviewer.state));
         return (
           <View key={reviewer.login} accessible className="flex-row items-center gap-2">
-            <PrAvatar avatarUrl={reviewer.avatarUrl} />
+            <PrAvatar avatarUrl={reviewer.avatarUrl} login={reviewer.login} />
             <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
               {reviewer.login}
             </Text>
@@ -138,11 +126,11 @@ function PrAssigneesRow({ assignees }: Readonly<{ assignees: PrOverviewDto['assi
   const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <SectionHeading icon={UserRound} label={t('prReview.overview.assignees')} />
+      <PrReviewSectionLabel label={t('prReview.overview.assignees')} />
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
         {assignees.map(assignee => (
           <View key={assignee.login} className="flex-row items-center gap-1.5">
-            <PrAvatar avatarUrl={assignee.avatarUrl} />
+            <PrAvatar avatarUrl={assignee.avatarUrl} login={assignee.login} />
             <Text className="text-sm text-foreground" numberOfLines={1}>
               {assignee.login}
             </Text>
@@ -158,7 +146,7 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
   const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <SectionHeading icon={CircleDot} label={t('prReview.overview.linkedIssues')} />
+      <PrReviewSectionLabel label={t('prReview.overview.linkedIssues')} />
       {issues.map(issue => {
         const Icon = issue.closed ? CircleCheck : CircleDot;
         return (
@@ -192,16 +180,17 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
  */
 export function PrOverviewMeta({ overview }: Readonly<{ overview: PrOverviewDto }>) {
   const { t } = useTranslation();
+  const reviewers = visibleReviewers(overview.state, overview.reviewers);
   return (
     <View className="gap-4">
       <PrTimelineLine overview={overview} />
       {overview.labels.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading label={t('prReview.overview.labels')} />
+          <PrReviewSectionLabel label={t('prReview.overview.labels')} />
           <PrLabelChips labels={overview.labels} />
         </View>
       ) : null}
-      {overview.reviewers.length > 0 ? <PrReviewersSection reviewers={overview.reviewers} /> : null}
+      {reviewers.length > 0 ? <PrReviewersSection reviewers={reviewers} /> : null}
       {overview.assignees.length > 0 ? <PrAssigneesRow assignees={overview.assignees} /> : null}
       {overview.linkedIssues.length > 0 ? <PrLinkedIssues issues={overview.linkedIssues} /> : null}
     </View>

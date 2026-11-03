@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import {
+  changeText,
   findAll,
   mountScreen,
   resetOverviewState,
@@ -15,6 +16,7 @@ const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   confirm: vi.fn(),
+  guard: { enabled: false as boolean },
   connectivity: 'online' as string,
   query: {
     data: undefined as TestProfileDetail | undefined,
@@ -53,7 +55,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ isFocused: () => true }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
+  usePreventRemove: (enabled: boolean) => {
+    h.guard.enabled = enabled;
+  },
   useRouter: () => ({ back: h.back, push: h.push }),
 }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -71,6 +76,7 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',
@@ -113,6 +119,7 @@ describe('ProfileOverviewScreen without the manage role', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
+    h.guard.enabled = false;
     resetOverviewState(h);
   });
 
@@ -131,6 +138,19 @@ describe('ProfileOverviewScreen without the manage role', () => {
     // The default toggle is disabled.
     expect(findAll(renderer.root, 'PreferenceRow')[0]?.props.disabled).toBe(true);
     expect(findAll(renderer.root, 'ProfileRepoPinsSection')[0]?.props.canManage).toBe(false);
+
+    unmount();
+  });
+
+  it('never guards the metadata of a read-only viewer', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    changeText(renderer.root, 'Profile description', 'Typed into a disabled field');
+
+    expect(h.guard.enabled).toBe(false);
 
     unmount();
   });

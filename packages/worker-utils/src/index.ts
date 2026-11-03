@@ -180,6 +180,8 @@ export { redactSensitiveHeaders } from './redact-headers.js';
 
 export { normalizeGitUrl } from './normalize-git-url.js';
 
+export { chunkArray } from './chunk-array.js';
+
 export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
 export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
 

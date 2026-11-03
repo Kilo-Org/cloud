@@ -1,4 +1,4 @@
-import { type QueryClient } from '@tanstack/react-query';
+import { type Query, type QueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 
 const infiniteQueryDataSchema = z.looseObject({
@@ -44,35 +44,132 @@ export function hasRetentionBudget(
 }
 
 /**
- * Reset every matching infinite query to empty, then invalidate the same
- * prefix so page one is refetched from `initialPageParam`.
+ * A page-one refetch is one page from the start. `infiniteQueryBehavior` reads
+ * the page count from the options, and without it a plain refetch re-requests
+ * every retained page (up to the retention bound).
  *
- * The reset empties `pages`/`pageParams` rather than keeping `pages[0]`:
- * after `maxPages` evicts the oldest page from the front of the array,
- * `pages[0]` is no longer page one, so keeping it would refetch the wrong
- * cursor. Invalidate then refills page one from `initialPageParam`.
- *
- * Uses `setQueriesData` (plural) on purpose: callers hold an invalidate
- * prefix while the live cache keys carry the query input as well, so
- * `setQueryData` on the prefix would match nothing.
- *
- * A non-infinite entry under the prefix is left untouched: it does not parse
- * as infinite query data, so the callback returns it unchanged.
+ * The option is only typed on `queryClient.infiniteQuery`, so it joins the
+ * fetch options by spread rather than as a written property.
  */
-export function reconcileFirstPage(
+const FIRST_PAGE_ONLY = { pages: 1 };
+
+/** The options of an infinite query, as much as the reconcile reads back. */
+const infiniteQueryOptionsSchema = z.looseObject({ initialPageParam: z.unknown() });
+
+/**
+ * Whether a cached entry is an infinite query at all, and the start cursor it
+ * carries. Only infinite queries have `initialPageParam`; the shared
+ * `QueryOptions` type does not declare it, so the property decides. Its value
+ * cannot decide on its own: `undefined` is a legitimate page param for a
+ * cursor list.
+ */
+type InitialPageParamProbe = { present: false } | { present: true; value: unknown };
+
+function readInitialPageParam(query: Query): InitialPageParamProbe {
+  const options = infiniteQueryOptionsSchema.safeParse(query.options);
+  if (!options.success || !('initialPageParam' in options.data)) {
+    return { present: false };
+  }
+  return { present: true, value: options.data.initialPageParam };
+}
+
+async function refetchFirstPage(query: Query): Promise<void> {
+  try {
+    await query.fetch({ ...query.options, ...FIRST_PAGE_ONLY });
+  } catch {
+    // A failed page-one refetch keeps the retained pages in place. A reconcile
+    // is a refresh, and pull-to-refresh or Retry reports the failure; clearing
+    // the rows here would make a failed refresh look like an empty list.
+  }
+}
+
+/**
+ * Re-anchor one entry's start cursor and start its page-one refetch.
+ *
+ * Returns the in-flight refetch, or null when the entry is not a mounted
+ * infinite query, or when nothing may fetch it.
+ */
+function reconcileEntry(queryClient: QueryClient, query: Query): Promise<void> | null {
+  const data = infiniteQueryDataSchema.safeParse(query.state.data);
+  const initialPageParam = readInitialPageParam(query);
+  if (!data.success || !initialPageParam.present) {
+    return null;
+  }
+  if (query.observers.length === 0) {
+    // Nothing renders these rows, so the entry goes rather than keeping pages
+    // whose next mount would fan out over all of them. Dropping it, instead of
+    // emptying its pages, matters: a zero-page success reads as "loaded, and
+    // there is nothing" to every consumer, and the read cache would persist
+    // that snapshot. A removed entry is simply not loaded until its next mount.
+    queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
+    return null;
+  }
+  if (data.data.pageParams.length > 0 && data.data.pageParams[0] !== initialPageParam.value) {
+    // Cursor-only rewrite: the rows and their update stamp stay as they are, so
+    // nothing reads this as a delivery.
+    query.setState({
+      data: {
+        pages: data.data.pages,
+        pageParams: [initialPageParam.value, ...data.data.pageParams.slice(1)],
+      },
+    });
+  }
+  // A read its observer has not enabled yet (the screen waits on filters, on an
+  // organization, or on a session) must not run: `query.fetch` ignores
+  // `enabled`, unlike the refetch an invalidation would have started.
+  return query.isDisabled() ? null : refetchFirstPage(query);
+}
+
+/**
+ * Refresh page one of every infinite query under `queryKeyPrefix`, keeping the
+ * rows already on screen until that page arrives.
+ *
+ * A plain `invalidateQueries` on an infinite query refetches every retained
+ * page (`infiniteQueryBehavior` starts a fetch of the cached page count), so
+ * this used to empty `pages`/`pageParams` first and let the invalidate refill
+ * page one. An emptied cache is indistinguishable from a successful empty
+ * result: any list reading it painted its "nothing here" state while the
+ * refetch was paused by lost connectivity or had failed, and replaced the rows
+ * the reader was looking at.
+ *
+ * So a reconcile is a refresh, not a reset:
+ *
+ * - The cached pages stay, so a list keeps its rows through a paused or failed
+ *   refetch.
+ * - `pageParams[0]` is re-anchored at `initialPageParam` first. `maxPages`
+ *   trims from the front, so once a page was evicted index 0 is no longer page
+ *   one, and a refetch started from it would reload the oldest retained page
+ *   and replace the newest rows with it.
+ * - The prefix is marked stale without refetching it, so an entry no list is
+ *   showing refetches on its next mount.
+ * - Each mounted, enabled entry fetches page one from the start; the pages are
+ *   replaced only when that page is delivered.
+ * - An entry no list is showing has nothing to keep on screen, so it is removed
+ *   and its next mount fetches page one rather than fanning out over every
+ *   retained page. Removing it, rather than emptying its pages, keeps "no rows
+ *   yet" distinct from "loaded, and empty".
+ *
+ * The returned promise settles once the page-one fetches settle, so a caller
+ * that needs the refresh finished (pull-to-refresh, foreground resume) can
+ * await it.
+ */
+export async function reconcileFirstPage(
   queryClient: QueryClient,
   queryKeyPrefix: readonly unknown[]
-): void {
-  queryClient.setQueriesData({ queryKey: queryKeyPrefix }, old => {
-    const parsed = infiniteQueryDataSchema.safeParse(old);
-    if (!parsed.success) {
-      return old;
+): Promise<void> {
+  const entries = queryClient.getQueryCache().findAll({ queryKey: queryKeyPrefix });
+  // Mark the prefix stale first: a page-one fetch that succeeds clears its own
+  // entry's invalidation, so the rows it delivered are fresh, while an entry no
+  // list is showing stays stale and refetches on its next mount.
+  await queryClient.invalidateQueries({ queryKey: queryKeyPrefix, refetchType: 'none' });
+  const refetches: Promise<void>[] = [];
+
+  for (const query of entries) {
+    const refetch = reconcileEntry(queryClient, query);
+    if (refetch !== null) {
+      refetches.push(refetch);
     }
-    return {
-      ...parsed.data,
-      pages: [],
-      pageParams: [],
-    };
-  });
-  void queryClient.invalidateQueries({ queryKey: queryKeyPrefix });
+  }
+
+  await Promise.all(refetches);
 }

@@ -35,20 +35,10 @@ export function getOpenRouterFreeEndpoints(
 export function applyFreeEndpointDataPolicy({
   providerModelData,
   openRouterFreeEndpoints,
-  kiloExclusiveModelIds,
-  unavailableModelIds,
 }: {
   providerModelData: ProviderModels;
   openRouterFreeEndpoints: ReadonlyArray<OpenRouterFreeEndpoint>;
-  kiloExclusiveModelIds: ReadonlyArray<string>;
-  unavailableModelIds: ReadonlySet<string>;
 }): void {
-  const exclusiveModelIds = new Set(
-    kiloExclusiveModelIds
-      .filter(modelId => !unavailableModelIds.has(modelId))
-      .map(modelId => normalizeModelId(modelId))
-  );
-
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
@@ -58,7 +48,7 @@ export function applyFreeEndpointDataPolicy({
       const hasFreeOpenRouterEndpoint = openRouterFreeEndpoints.some(
         endpoint => endpoint.modelId === modelId && endpoint.providerId === providerId
       );
-      if (!exclusiveModelIds.has(modelId) && !hasFreeOpenRouterEndpoint) continue;
+      if (!hasFreeOpenRouterEndpoint) continue;
 
       model.endpoint.data_policy = {
         ...model.endpoint.data_policy,

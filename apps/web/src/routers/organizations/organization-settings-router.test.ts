@@ -14,7 +14,6 @@ import {
   type User,
   type Organization,
   auto_routing_custom_routers,
-  custom_llm2,
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
@@ -435,10 +434,7 @@ describe('organizations settings trpc router', () => {
         organization_ids: [],
         group_ids: [group.id],
       };
-      await db.insert(custom_llm2).values({
-        public_id: publicId,
-        definition,
-      });
+      await insertCustomLlmForTest(publicId, definition);
 
       try {
         await expect(userHasCustomLlmAccess(definition, organization.id, member.id)).resolves.toBe(
@@ -460,7 +456,7 @@ describe('organizations settings trpc router', () => {
         expect(memberResult.data.some(model => model.id === publicId)).toBe(true);
         expect(ownerResult.data.some(model => model.id === publicId)).toBe(false);
       } finally {
-        await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+        await deleteCustomLlmForTest(publicId);
         await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });

@@ -88,6 +88,9 @@ export function ChatToolbar({
       value={model}
       variant={variant}
       options={modelOptions}
+      // Every composer that renders this chip stores the variant its
+      // `onModelSelect` receives together with the model id.
+      acceptsVariant
       onSelect={onModelSelect}
       disabled={disabled || modelLocked}
       isLoading={isLoadingModels}

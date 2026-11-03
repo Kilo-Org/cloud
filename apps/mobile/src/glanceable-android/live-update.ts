@@ -3,7 +3,7 @@ import {
   glanceableAgentsSnapshotSchema,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type AndroidNotificationChannelId } from '@kilocode/notifications';
+import { type AndroidNotificationChannelId } from '@kilocode/notifications/schemas';
 import { requireOptionalNativeModule } from 'expo';
 
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';

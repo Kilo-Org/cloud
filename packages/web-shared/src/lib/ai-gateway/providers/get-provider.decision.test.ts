@@ -16,6 +16,7 @@ import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/d
 import {
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
+  getStoredByokKeys,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -35,6 +36,7 @@ import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -190,6 +192,7 @@ const NO_DIRECT_BYOK_MODEL = {
   outcome: 'skipped',
   reason: 'no-match',
 } as const;
+const CHATGPT_UNAVAILABLE = { step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' } as const;
 
 beforeEach(() => {
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
@@ -689,6 +692,151 @@ describe('getProvider routing decision', () => {
     expect(error).toHaveBeenCalledWith('[getProvider] failed to report the routing decision', {
       errorType: 'TypeError',
     });
+  });
+});
+
+describe('getProvider route order with a ChatGPT connection', () => {
+  const chatGptProvider = {
+    kind: 'provider',
+    provider: { ...OPENROUTER, type: 'openai-chatgpt' },
+    userByok: null,
+    bypassAccessCheck: false,
+    skipBalanceCheck: true,
+  } as const;
+
+  function deleteKeysAfterTheyAreRead(user: User) {
+    const actual = jest.requireActual<typeof byokModule>(
+      '@kilocode/web-shared/lib/ai-gateway/byok'
+    );
+    jest.mocked(getStoredByokKeys).mockImplementationOnce(async (fromDb, owner) => {
+      const stored = await actual.getStoredByokKeys(fromDb, owner);
+      await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, user.id));
+      return stored;
+    });
+  }
+
+  test('serves a ranked catalog key whose row is deleted before decryption, never Kilo', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'zai-coding', catalogMode: true }]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(chatGptProvider);
+    deleteKeysAfterTheyAreRead(user);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(decision.result).toMatchObject({ route: 'direct-byok', payer: 'owner-byok-key' });
+    expect(decision.byok_candidates).toEqual([
+      candidate('direct-byok', 'zai-coding', 0, 'selected'),
+    ]);
+    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { chatGpt: 'connected', route: 'chatgpt' },
+    { chatGpt: 'unavailable', route: 'direct-byok' },
+  ] as const)(
+    'checks a $chatGpt ChatGPT connection ahead of a catalog key when an ignored provider key ranks first',
+    async ({ chatGpt, route }) => {
+      const user = await insertTestUser();
+      await insertKeys(user, [
+        { providerId: 'anthropic', priority: 0 },
+        { providerId: 'zai-coding', catalogMode: true, priority: 1 },
+      ]);
+      jest
+        .mocked(findDirectByokCatalogModels)
+        .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+      jest
+        .mocked(checkOpenAiChatGptByok)
+        .mockResolvedValue(chatGpt === 'connected' ? chatGptProvider : null);
+
+      const decision = await routeAndRecord({
+        requestedModel: MODEL,
+        request: request('responses', ['anthropic']),
+        user,
+        organizationId: undefined,
+      });
+
+      expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
+      expect(decision.result).toMatchObject({ route });
+      expect(decision.byok_candidates).toEqual(
+        chatGpt === 'connected'
+          ? [
+              candidate('vercel-byok', 'anthropic', 0, 'unreached', { priority: 0 }),
+              candidate('direct-byok', 'zai-coding', 1, 'unreached', { priority: 1 }),
+            ]
+          : [
+              candidate('vercel-byok', 'anthropic', 0, 'skipped', {
+                priority: 0,
+                reason: 'ignored-by-request',
+              }),
+              candidate('direct-byok', 'zai-coding', 1, 'selected', { priority: 1 }),
+            ]
+      );
+    }
+  );
+
+  test('checks the ChatGPT connection once, even when the keys ranked below it are deleted', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'anthropic', priority: 0 },
+      { providerId: 'moonshotai', priority: 1 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 2 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    deleteKeysAfterTheyAreRead(user);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
+    expect(decision.steps.slice(2)).toEqual([
+      CHATGPT_UNAVAILABLE,
+      { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'anthropic' },
+    ]);
+  });
+
+  test('records a disabled key and a key outside catalog mode as skipped', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'synthetic', priority: 0 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 1, isEnabled: false },
+      { providerId: 'moonshotai', priority: 2 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([
+        catalogModel('synthetic', ['chat_completions']),
+        catalogModel('zai-coding', ['chat_completions']),
+      ]);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(decision.byok_candidates).toEqual([
+      candidate('direct-byok', 'synthetic', 0, 'skipped', {
+        priority: 0,
+        reason: 'not-catalog-mode',
+      }),
+      candidate('direct-byok', 'zai-coding', 1, 'skipped', { priority: 1, reason: 'disabled' }),
+      candidate('vercel-byok', 'moonshotai', 2, 'selected', { priority: 2 }),
+    ]);
   });
 });
 

@@ -1,14 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import {
-  BRIEFING_SETTLEMENT_HEADER,
-  recordBriefingUsage,
-} from '@kilocode/web-shared/lib/agent-briefing-usage';
+import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -26,12 +22,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
-  accountForMicrodollarUsage,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
   invalidTokenResponse,
-  makeErrorReadable,
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
@@ -45,10 +39,7 @@ import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import {
-  rewriteModelResponse,
-  logUnrewrittenResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import { logUnrewrittenResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -59,12 +50,10 @@ import {
   isFreeModelRateLimited,
   type FreeModelRateLimitSubject,
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { AUTO_DECISION_HEADER } from '@kilocode/auto-routing-contracts';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
@@ -72,7 +61,6 @@ import {
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { evaluateEffectiveModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -101,6 +89,7 @@ import {
   resolveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
 import { resolveProviderAndPolicy } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-provider-policy';
+import { respondToUpstream } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-respond';
 
 function llmProxyPath(url: URL): LlmProxyPath | null {
   switch (url.pathname) {
@@ -122,17 +111,36 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
  * response instead. Auth has already resolved by the time free-model requests
  * get here, because balance and settings wait on it.
  */
-async function resolveFreeModelRateLimitSubject(
-  ipAddress: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
-): Promise<NextResponseType<unknown> | FreeModelRateLimitSubject> {
-  const { user, authFailedResponse, credentialsRejected } = await authPromise;
-  if (authFailedResponse && credentialsRejected) {
-    return invalidTokenResponse();
-  }
-  return user && !authFailedResponse
-    ? { kind: 'account', kiloUserId: user.id }
-    : { kind: 'ip', ipAddress };
+async function freeModelRateLimitResponse(params: {
+  request: NextRequest;
+  ipAddress: string;
+  authPromise: ReturnType<typeof getUserFromAuth>;
+  model: string;
+  isPrivateCustomLlm: boolean;
+  feature: string | null;
+}): Promise<NextResponseType<unknown> | null> {
+  const { user, authFailedResponse, credentialsRejected } = await params.authPromise;
+  if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
+  const subject: FreeModelRateLimitSubject =
+    user && !authFailedResponse
+      ? { kind: 'account', kiloUserId: user.id }
+      : { kind: 'ip', ipAddress: params.ipAddress };
+
+  // Private custom LLMs are exempt for signed-in callers, even when their id
+  // matches a free-model pattern. So is the default internal benchmark user: a run
+  // sends every case of every free model it measures, and the anti-abuse limit
+  // would otherwise throttle the measurement itself. A benchmark user override is
+  // not exempt.
+  const isExempt =
+    subject.kind === 'account' &&
+    (params.isPrivateCustomLlm || subject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
+  if (isExempt || !(await isFreeModelRateLimited(params.request, subject))) return null;
+  console.warn(
+    `Model rate limit exceeded, ${freeModelRateLimitKey(subject)}, model: ${params.model}, feature: ${params.feature ?? 'none'}`
+  );
+  return subject.kind === 'account'
+    ? accountFreeModelLimitResponse()
+    : anonymousFreeModelLimitResponse();
 }
 
 export async function handleLlmProxyRequest(
@@ -313,25 +321,15 @@ export async function handleLlmProxyRequest(
   const clientIp = bareIpLiteral(ipAddress);
 
   if (isPubliclyFreeModel) {
-    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
-    if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
-
-    // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern. So is the default internal benchmark user: a run
-    // sends every case of every free model it measures, and the anti-abuse limit
-    // would otherwise throttle the measurement itself. A benchmark user override is
-    // not exempt.
-    const isExempt =
-      rateLimitSubject.kind === 'account' &&
-      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
-    if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
-      console.warn(
-        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
-      );
-      return rateLimitSubject.kind === 'account'
-        ? accountFreeModelLimitResponse()
-        : anonymousFreeModelLimitResponse();
-    }
+    const rateLimited = await freeModelRateLimitResponse({
+      request,
+      ipAddress,
+      authPromise,
+      model: effectiveModelIdLowerCased,
+      isPrivateCustomLlm,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
   }
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -503,20 +501,6 @@ export async function handleLlmProxyRequest(
     op: 'http.client',
   });
 
-  const upstreamAttemptOptions = {
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: headers.sessionId,
-    taskId: headers.taskId,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId: headers.vercelRequestId,
-  };
-
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
   // rejects; every other outcome sends the request.
   const bouncerVerdict = await bouncerVerdictPromise;
@@ -549,9 +533,19 @@ export async function handleLlmProxyRequest(
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
-    ...upstreamAttemptOptions,
     providerContext: providerResult,
     request: requestBodyParsed,
+    requestedModel: effectiveModelIdLowerCased,
+    fraudHeaders,
+    userId: user.id,
+    organizationId: organizationId ?? null,
+    sessionId: headers.sessionId,
+    taskId: headers.taskId,
+    isNonTrialEnterprise,
+    search: url.search,
+    method: request.method,
+    signal: request.signal,
+    vercelRequestId: headers.vercelRequestId,
     costLimit:
       requestCostLimit !== null && requestCostBalance
         ? {
@@ -565,117 +559,18 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed } = attempt;
-  const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
-  logExceptInTest(
-    'upstream response status: %s, x-vercel-id: %s, session_id: %s',
-    response.status,
-    response.headers.get('x-vercel-id') || '<none>',
-    usageContext.session_id || '<none>'
-  );
-
-  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!providerResult.userByok,
-      mode: headers.mode || undefined,
-      provider: providerResult.provider.type,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
-      toolsAvailable,
-      toolsUsed,
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
-  usageContext.status_code = response.status;
-  const userByokProviderIds =
-    providerResult.userByok === null ? null : providerResult.userByok.map(byok => byok.providerId);
-
-  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
-    response,
-    providerId: providerResult.provider.type,
-    isUserByok: !!providerResult.userByok,
-    user,
-    request: requestBodyParsed.body,
-    organizationId,
-    model: finalUpstreamModel,
-    gatewayModel: effectiveModelIdLowerCased,
-    byokProviderIds: userByokProviderIds,
-  });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
-
-  const clonedReponse = response.clone(); // reading from body is side-effectful
-
-  const accounting = accountForMicrodollarUsage(
-    clonedReponse,
-    usageContext,
-    openrouterRequestSpan,
-    providerResult.provider
-  );
-  const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
-  if (
-    settlementToken &&
-    !isAnonymousContext(user) &&
-    !usageContext.isStreaming &&
-    autoModel === null &&
-    usageContext.session_id?.startsWith('agent-briefing:') &&
-    headers.clientRequestId === usageContext.session_id
-  ) {
-    const generationId = usageContext.session_id;
-    after(
-      accounting
-        .then(usage =>
-          recordBriefingUsage({
-            kiloUserId: user.id,
-            organizationId,
-            generationId,
-            settlementToken,
-            usage,
-          })
-        )
-        .catch(() => {
-          errorExceptInTest('Briefing accounting receipt could not be stored');
-        })
-    );
-  }
-
-  {
-    const errorResponse = await makeErrorReadable({
-      provider: providerResult.provider.type,
-      requestedModel: effectiveModelIdLowerCased,
-      request: requestBodyParsed,
-      response,
-      userByokProviderIds,
-    });
-    if (errorResponse) {
-      await logUnrewrittenResponse({
-        response,
-        model: effectiveModelIdLowerCased,
-        providerId: providerResult.provider.type,
-        logging: requestLogging,
-        error: null,
-      });
-      return errorResponse;
-    }
-  }
-
-  return await rewriteModelResponse({
-    response,
+  return await respondToUpstream({
+    upstream: attempt,
+    request: requestBodyParsed,
     model: effectiveModelIdLowerCased,
-    providerId: providerResult.provider.type,
-    kind: requestBodyParsed.kind,
-    isFree: usageContext.is_free,
-    userByok: usageContext.user_byok,
-    customLlmPricing: usageContext.custom_llm_pricing,
+    requestedModel: requestedModelLowerCased,
+    providerResult,
+    user,
+    organizationId,
+    usageContext,
+    upstreamSpan: openrouterRequestSpan,
+    requestStartedAt,
+    briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
     logging: requestLogging,
-    responseTransforms: providerResult.provider.responseTransforms,
   });
 }

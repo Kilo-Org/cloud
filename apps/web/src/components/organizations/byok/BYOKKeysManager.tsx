@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -364,6 +364,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [reorderAnnouncement, setReorderAnnouncement] = useState('');
+  const [pendingFocus, setPendingFocus] = useState<{
+    keyId: string;
+    index: number;
+    direction: ReorderDirection;
+  } | null>(null);
 
   // Build query options - only include organizationId if provided
   const listQueryInput = organizationId ? { organizationId } : {};
@@ -474,6 +479,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       onError: (error, _input, context) => {
         queryClient.setQueryData(listQueryKey, context?.previousKeys);
         setReorderAnnouncement('');
+        setPendingFocus(null);
         toast.error(`Failed to save key priority: ${error.message}`);
       },
       onSettled: () => {
@@ -631,15 +637,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setReorderAnnouncement(
       `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
     );
+    setPendingFocus({ keyId: movedId, index: target, direction });
     reorderMutation.mutate({ keyIds: reordered });
-    const isAtEdge = target === 0 || target === keyIds.length - 1;
-    requestAnimationFrame(() => {
-      document
-        .getElementById(
-          reorderButtonId(movedId, isAtEdge ? (direction === 'up' ? 'down' : 'up') : direction)
-        )
-        ?.focus();
-    });
   };
 
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
@@ -649,6 +648,29 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       is_enabled,
     });
   };
+
+  const listedKeyOrder =
+    keys
+      ?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID)
+      .map(key => key.id)
+      .join() ?? '';
+
+  // The optimistic reorder renders asynchronously, so focus follows the moved key once the
+  // committed list shows it at its new position. At an edge the button in the move direction is
+  // disabled, so focus goes to the other one.
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const order = listedKeyOrder.split(',');
+    if (order.indexOf(pendingFocus.keyId) !== pendingFocus.index) return;
+    const direction =
+      pendingFocus.index === 0
+        ? 'down'
+        : pendingFocus.index === order.length - 1
+          ? 'up'
+          : pendingFocus.direction;
+    document.getElementById(reorderButtonId(pendingFocus.keyId, direction))?.focus();
+    setPendingFocus(null);
+  }, [pendingFocus, listedKeyOrder]);
 
   if (keysLoading) {
     return (

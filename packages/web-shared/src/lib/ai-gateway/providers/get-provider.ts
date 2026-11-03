@@ -7,8 +7,11 @@ import {
   shouldRouteToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  DirectUserByokInferenceProviderIdSchema,
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
+  VercelUserByokInferenceProviderIdSchema,
+  openRouterToVercelInferenceProviderId,
   isGatewayUserByokProviderId,
   isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
@@ -156,14 +159,13 @@ async function directByokProviderResult(
   };
 }
 
-type RoutingCatalogKey = Awaited<ReturnType<typeof getCatalogModeByokCredentials>>[number] & {
-  isEnabled: true;
-};
-
-/** A catalog id: the caller's catalog-mode keys for it, ranked with their other keys by the caller. */
+/**
+ * A catalog id: metadata of the caller's enabled catalog-mode keys for it, ranked with their other
+ * keys by the caller. Only the key that takes the request is decrypted.
+ */
 type DirectByokCatalogCandidates = {
   kind: 'direct-byok-catalog-candidates';
-  candidates: DirectByokCatalogCandidate<RoutingCatalogKey>[];
+  candidates: DirectByokCatalogCandidate<ByokKeyState>[];
 };
 
 /**
@@ -176,7 +178,8 @@ async function resolveDirectByokProvider(
   requestedModel: string,
   request: GatewayRequest,
   organizationId: string | undefined,
-  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>
+  isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>,
+  loadKeyStates: () => Promise<ByokKeyState[]>
 ): Promise<
   GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokCatalogCandidates | null
 > {
@@ -212,18 +215,12 @@ async function resolveDirectByokProvider(
     }
   }
   if (catalogModels.length === 0) return null;
-  const credentials = await getCatalogModeByokCredentials(
-    readDb,
-    owner,
-    catalogModels.map(({ provider }) => provider.id)
+  const catalogModeKeys = (await loadKeyStates()).filter(
+    key => key.isEnabled && key.serveCatalogModels
   );
   return {
     kind: 'direct-byok-catalog-candidates',
-    candidates: rankDirectByokCatalogKeys(
-      catalogModels,
-      credentials.map(credential => ({ ...credential, isEnabled: true as const })),
-      request.kind
-    ),
+    candidates: rankDirectByokCatalogKeys(catalogModels, catalogModeKeys, request.kind),
   };
 }
 
@@ -438,14 +435,30 @@ async function getGatewayRoutedByokKeys(
 async function getGatewayRoutedByokKeyStates(
   user: User | AnonymousUserContext,
   requestedModel: string,
-  organizationId: string | undefined,
-  options: GatewayRoutedByokOptions
+  options: GatewayRoutedByokOptions,
+  loadKeyStates: () => Promise<ByokKeyState[]>
 ): Promise<ByokKeyState[]> {
   if (isAnonymousContext(user)) return [];
   const candidateProviders = await getAllowedGatewayRoutedByokProviders(requestedModel, options);
   if (candidateProviders.length === 0) return [];
-  const keys = await getByokKeyStates(readDb, byokOwner(user.id, organizationId));
+  const keys = await loadKeyStates();
   return keys.filter(key => key.isEnabled && candidateProviders.includes(key.providerId));
+}
+
+/**
+ * Whether the request's own `provider.ignore` names the Vercel provider of a key. Kilo's provider
+ * preferences are added to the request later and never apply to the caller's keys.
+ */
+function createRequestIgnoreCheck(request: GatewayRequest) {
+  const ignored = new Set(
+    (request.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
+  );
+  return (providerId: UserByokProviderId) =>
+    ignored.has(
+      providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
+        ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+        : providerId
+    );
 }
 
 const noProviderAllowList = async () => undefined;
@@ -591,12 +604,21 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return await resolveCustomLlmProvider(customLlm, user, organizationId, countryCode);
   }
 
+  let keyStates: Promise<ByokKeyState[]> | undefined;
+  const loadKeyStates = () =>
+    (keyStates ??= getByokKeyStates(readDb, byokOwner(user.id, organizationId)));
+  const decryptCatalogKey = async (providerId: UserByokProviderId) =>
+    (
+      await getCatalogModeByokCredentials(readDb, byokOwner(user.id, organizationId), [providerId])
+    ).find(credential => credential.providerId === providerId);
+
   const directByok = await resolveDirectByokProvider(
     user,
     requestedModel,
     request,
     organizationId,
-    isDirectByokProviderAllowed
+    isDirectByokProviderAllowed,
+    loadKeyStates
   );
   if (directByok && directByok.kind !== 'direct-byok-catalog-candidates') {
     return directByok;
@@ -633,29 +655,51 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   const decideGatewayKey = createGatewayKeyDecider(requestedModel, resolveRoutingProviderConfig);
   const routes = rankByokRoutes(
     directCandidates,
-    await getGatewayRoutedByokKeyStates(user, requestedModel, organizationId, {
-      includeGatewayKeys: true,
-      getAllowedProviders,
-    })
+    await getGatewayRoutedByokKeyStates(
+      user,
+      requestedModel,
+      { includeGatewayKeys: true, getAllowedProviders },
+      loadKeyStates
+    )
   );
-  for (const route of routes) {
-    if (route.route === 'direct-byok') {
-      if (route.candidate.decision !== 'serves') continue;
-      const { provider, model, key } = route.candidate;
-      return directByokProviderResult(provider, model, key, requestedModel, request, true);
-    }
-    if (route.route === 'gateway-byok' && (await decideGatewayKey(route.providerId)) !== 'serves') {
-      continue;
-    }
+  const takeGatewayRoutedRoute = async (
+    route: Exclude<(typeof routes)[number], { route: 'direct-byok' }>
+  ): Promise<GetProviderResult | null> => {
     const chatGpt = catalogKeyServes ? await checkChatGpt() : null;
     if (chatGpt) return chatGpt;
-    if (isAnonymousContext(user)) continue;
+    if (isAnonymousContext(user)) return null;
     const { providerId } = route.key;
     const key = (await decryptGatewayRoutedByokKeys(user.id, organizationId, [providerId])).find(
       byok => byok.providerId === providerId
     );
-    if (!key) continue;
-    return gatewayRoutedByokResult(route, key, requestedModel);
+    return key ? gatewayRoutedByokResult(route, key, requestedModel) : null;
+  };
+
+  // The request's `provider.ignore` is a preference: an ignored provider key yields to any later
+  // route that serves, but still serves when nothing else does, so it never bills Kilo instead.
+  const isIgnoredByRequest = createRequestIgnoreCheck(request);
+  let firstIgnoredRoute: Extract<(typeof routes)[number], { route: 'vercel-byok' }> | undefined;
+  for (const route of routes) {
+    if (route.route === 'direct-byok') {
+      if (route.candidate.decision !== 'serves') continue;
+      const { provider, model, key } = route.candidate;
+      const credential = await decryptCatalogKey(key.providerId);
+      if (!credential) continue;
+      return directByokProviderResult(provider, model, credential, requestedModel, request, true);
+    }
+    if (route.route === 'gateway-byok' && (await decideGatewayKey(route.providerId)) !== 'serves') {
+      continue;
+    }
+    if (route.route === 'vercel-byok' && isIgnoredByRequest(route.key.providerId)) {
+      firstIgnoredRoute ??= route;
+      continue;
+    }
+    const result = await takeGatewayRoutedRoute(route);
+    if (result) return result;
+  }
+  if (firstIgnoredRoute) {
+    const result = await takeGatewayRoutedRoute(firstIgnoredRoute);
+    if (result) return result;
   }
 
   // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
@@ -663,7 +707,10 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   const unsupported = findUnsupportedApiKindCandidate(routes);
   if (unsupported) {
     const { provider, model, key } = unsupported;
-    return directByokProviderResult(provider, model, key, requestedModel, request, true);
+    const credential = await decryptCatalogKey(key.providerId);
+    if (credential) {
+      return directByokProviderResult(provider, model, credential, requestedModel, request, true);
+    }
   }
 
   const kiloRouteUsesVercel = await shouldRouteToVercel(

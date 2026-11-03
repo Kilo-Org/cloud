@@ -74,20 +74,30 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getCatalogModeByokCredentials: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
-  // Key metadata mirrors whatever the test's getBYOKforUser/getBYOKforOrganization mocks return.
-  getByokKeyStates: jest.fn(async (fromDb: never, owner: { type: string; id: string }) => {
-    const byok = jest.requireMock<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok');
-    const keys =
-      owner.type === 'user'
-        ? await byok.getBYOKforUser(fromDb, owner.id, [])
-        : await byok.getBYOKforOrganization(fromDb, owner.id, []);
-    return (keys ?? []).map(({ providerId, priority }) => ({
-      providerId,
-      priority,
-      isEnabled: true,
-      serveCatalogModels: false,
-    }));
-  }),
+  // Key metadata mirrors whatever the test's credential mocks return.
+  getByokKeyStates: jest.fn(
+    async (fromDb: never, owner: { type: 'user' | 'organization'; id: string }) => {
+      const byok = jest.requireMock<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok');
+      const keys =
+        owner.type === 'user'
+          ? await byok.getBYOKforUser(fromDb, owner.id, [])
+          : await byok.getBYOKforOrganization(fromDb, owner.id, []);
+      const catalogKeys = await byok.getCatalogModeByokCredentials(fromDb, owner, []);
+      return [
+        ...(keys ?? []).map(({ providerId, priority }) => ({
+          providerId,
+          priority,
+          isEnabled: true,
+          serveCatalogModels: false,
+        })),
+        ...catalogKeys.map(({ providerId, serveCatalogModels }) => ({
+          providerId,
+          isEnabled: true,
+          serveCatalogModels,
+        })),
+      ];
+    }
+  ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
@@ -894,10 +904,10 @@ describe('getProvider direct BYOK routing', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected provider result');
 
-    expect(getCatalogModeByokCredentials).toHaveBeenCalledWith(
+    expect(getCatalogModeByokCredentials).toHaveBeenLastCalledWith(
       expect.anything(),
       { type: 'organization', id: ORG_ID },
-      ['synthetic', 'zai-coding']
+      ['zai-coding']
     );
     expect(result.provider).toMatchObject({
       type: 'direct-byok',
@@ -980,7 +990,11 @@ describe('getProvider direct BYOK routing', () => {
       isDirectByokProviderAllowed: async () => false,
     });
 
-    expect(getCatalogModeByokCredentials).not.toHaveBeenCalled();
+    expect(getCatalogModeByokCredentials).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ['synthetic']
+    );
     expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
   });
 

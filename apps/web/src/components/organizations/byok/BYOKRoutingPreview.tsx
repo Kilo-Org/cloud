@@ -300,7 +300,7 @@ export function BYOKRoutingPreview({
         <p className="text-muted-foreground text-xs">
           {organizationId
             ? 'Organization model and provider policies still apply: they can block the model or change which gateway serves it.'
-            : 'Provider preferences sent with a request can change which gateway serves it.'}
+            : 'A request that ignores a provider uses the next key that serves it.'}
         </p>
       </CardContent>
     </Card>

@@ -269,6 +269,26 @@ describe('BYOK Router', () => {
       expect(rows.map(row => row.settings)).toEqual([{}, {}, {}]);
     });
 
+    test('lists direct keys that were never reordered in the order routing considers them', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      // Providers no catalog-mode test uses, since their model lists are cached per process.
+      const [later, earlier] = await db
+        .insert(byok_api_keys)
+        .values(
+          (['ollama-cloud', 'chutes-byok'] as const).map((provider_id, index) => ({
+            kilo_user_id: ownerUser.id,
+            provider_id,
+            encrypted_api_key: encryptApiKey(`key-${provider_id}`, BYOK_ENCRYPTION_KEY),
+            created_by: ownerUser.id,
+            created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+            settings: { serve_catalog_models: true },
+          }))
+        )
+        .returning({ id: byok_api_keys.id });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([earlier.id, later.id]);
+    });
+
     test('adds a new provider key above the gateway keys once the owner reordered', async () => {
       const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
       await caller.byok.reorder({ keyIds: ids });

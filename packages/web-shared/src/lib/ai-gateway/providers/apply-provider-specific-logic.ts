@@ -388,13 +388,13 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (!usesUserGatewayKey && (provider.type === 'openrouter' || provider.type === 'vercel')) {
-    // A user's own BYOK credential is never ignored.
+  // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
+  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,
       requestToMutate.body,
-      isNonTrialEnterprise || userByok !== null
+      isNonTrialEnterprise
     );
   }
 

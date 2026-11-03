@@ -1,20 +1,22 @@
-import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
+import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   GatewayUserByokProviderIdSchema,
   isGatewayUserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
+const directProviderIds: readonly string[] = DIRECT_BYOK_PROVIDERS.map(provider => provider.id);
+
 /**
  * The default route order for keys the owner never prioritized: provider keys that can use Kilo
- * catalog model IDs, then provider keys sent through Vercel, then the Vercel AI Gateway key, then
- * the OpenRouter key.
+ * catalog model IDs in `DIRECT_BYOK_PROVIDERS` order (the order catalog candidates are found in),
+ * then provider keys sent through Vercel, then the Vercel AI Gateway key, then the OpenRouter key.
  */
 export function getByokKeyDefaultRank(providerId: string): number {
   if (isGatewayUserByokProviderId(providerId)) {
     return 2 + GatewayUserByokProviderIdSchema.options.indexOf(providerId);
   }
-  const directProviderIds: readonly string[] = DIRECT_BYOK_PROVIDER_IDS;
-  return directProviderIds.includes(providerId) ? 0 : 1;
+  const directIndex = directProviderIds.indexOf(providerId);
+  return directIndex === -1 ? 1 : directIndex / directProviderIds.length;
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   type BillingContext,
   type ContainerUsageClient,
 } from '@kilocode/container-usage';
+import { withTimeout } from '@kilocode/worker-utils';
 import { Sandbox as StockSandbox } from '@cloudflare/sandbox';
 import type { Env } from './types.js';
 import { fetchPreviewPort, previewNotRunningResponse } from './preview/container-port-fetch.js';
@@ -20,7 +21,7 @@ import {
   type BillingIdentity,
   type ContainerStopParams,
 } from './metered-billing-lifecycle.js';
-import { assertContainerCapacity } from './container-concurrency.js';
+import { containerCapacityEnforced } from './container-concurrency.js';
 
 export function billingHeartbeatSeconds(value: string | undefined): number {
   if (value === undefined || value.trim() === '') return DEFAULT_BILLING_HEARTBEAT_SECONDS;
@@ -43,6 +44,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     this.billing = new MeteredBillingLifecycle({
       storage: this.ctx.storage,
       usageClient: this.usageClient,
+      enforceContainerCapacity: containerCapacityEnforced(env),
       schedule: (delaySeconds, callback, payload) => this.schedule(delaySeconds, callback, payload),
       deleteSchedules: callback => this.deleteSchedules(callback),
       getState: () => this.getState(),
@@ -75,9 +77,20 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   private createUsageClient(env: Env): ContainerUsageClient {
-    return createContainerUsageClient(env.CONTAINER_USAGE_METER, {
-      service: usageServiceForSandboxClass(this.sandboxClassName),
-    });
+    const meter = env.CONTAINER_USAGE_METER;
+    // Bound each transport attempt so a stalled RPC cannot hold the billing queue.
+    return createContainerUsageClient(
+      {
+        recordStart: input =>
+          withTimeout(meter.recordStart(input), 10_000, 'Meter start timed out'),
+        recordHeartbeat: input =>
+          withTimeout(meter.recordHeartbeat(input), 10_000, 'Meter heartbeat timed out'),
+        recordStop: input => withTimeout(meter.recordStop(input), 10_000, 'Meter stop timed out'),
+      },
+      {
+        service: usageServiceForSandboxClass(this.sandboxClassName),
+      }
+    );
   }
 
   /**
@@ -132,9 +145,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     ) {
       return;
     }
-    const attribution = await this.billing.getStartAttribution();
-    if (!attribution) return;
-    await assertContainerCapacity(this.env, { ...attribution, checkpoint: 'sandbox-start' });
+    await this.billing.admitBeforeStart(this.billingIdentity);
   }
 
   override async onStart(): Promise<void> {

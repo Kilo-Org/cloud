@@ -9,10 +9,6 @@ import {
   type EnvironmentReference,
 } from '@kilocode/cloud-agent-profile';
 import { resolveSecret } from '../auth.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../container-concurrency.js';
 import { isCloudflareContainersEnrolled } from '../agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
@@ -128,21 +124,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
         buildInput: id => loadEnvironmentBuildInput(getPgDb(env), id),
         actorAccess: (owner, userId) => environmentActorAccess(getPgDb(env), owner, userId),
         gitSource: input => resolveBuilderGitSource(env, input),
-        capacity: async (owner, instanceId, actorUserId) => {
-          try {
-            await assertContainerCapacity(env, {
-              subject: billingSubject(owner),
-              instanceId,
-              actor: { type: 'user', id: actorUserId },
-              checkpoint: 'sandbox-start',
-            });
-            return 'ok';
-          } catch (error) {
-            if (getContainerCapacityFailureReason(error) === 'container_limit_reached')
-              return 'limit_reached';
-            throw error;
-          }
-        },
       },
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,

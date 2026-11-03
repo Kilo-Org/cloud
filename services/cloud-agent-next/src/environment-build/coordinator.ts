@@ -3,6 +3,7 @@ import type {
   EnvironmentReference,
 } from '@kilocode/cloud-agent-profile';
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import {
@@ -74,12 +75,6 @@ export type CoordinatorEnvironment = {
     repoFullName: string;
     actorUserId: string;
   }): Promise<BuilderGitSource>;
-  /** Owner-level container concurrency, the limit sessions use. */
-  capacity(
-    owner: EnvironmentReference['owner'],
-    sandboxId: string,
-    actorUserId: string
-  ): Promise<'ok' | 'limit_reached'>;
 };
 
 export type CoordinatorDeps = {
@@ -213,13 +208,6 @@ export class EnvironmentBuildCoordinator {
     }
     if (reference.configurationRevision !== request.expectedRevision) {
       return { status: 'conflict', reason: 'revision_changed', buildId: null };
-    }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(reference.owner, sandboxId, request.actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'rejected', reason: 'container_limit_reached' };
     }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (input === null) {
@@ -384,13 +372,6 @@ export class EnvironmentBuildCoordinator {
       !sameEnvironmentScope(current, reference)
     ) {
       return { status: 'skipped', reason: 'revision_superseded' };
-    }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(current.owner, sandboxId, actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'skipped', reason: 'container_limit_reached' };
     }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (
@@ -760,13 +741,6 @@ export class EnvironmentBuildCoordinator {
     if (access === 'none' || (build.trigger === 'manual' && access !== 'manage')) {
       return this.terminalWithoutAllocation(build, 'failed', 'actor_unauthorized');
     }
-    const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(reference.owner, sandboxId, build.actor_user_id)) ===
-      'limit_reached'
-    ) {
-      return this.terminalWithoutAllocation(build, 'failed', 'container_limit_reached');
-    }
     const git = await this.deps.environment.gitSource({
       reference: input.reference,
       repoFullName: input.repoFullName,
@@ -777,7 +751,7 @@ export class EnvironmentBuildCoordinator {
       return this.terminalWithoutAllocation(build, 'failed', 'repository_unauthorized');
     }
     const allocation: BuilderAllocation = {
-      sandboxId,
+      sandboxId: this.deps.builderSandboxId,
       allocationId: this.deps.uuid(),
       instance: build.instance as BuilderAllocation['instance'],
     };
@@ -811,9 +785,10 @@ export class EnvironmentBuildCoordinator {
       );
     } catch (error) {
       const reason =
-        error instanceof ProviderCreationError && error.code === 'insufficient_credits'
+        getContainerCapacityFailureReason(error) ??
+        (error instanceof ProviderCreationError && error.code === 'insufficient_credits'
           ? 'billing_blocked'
-          : 'billing_unavailable';
+          : 'billing_unavailable');
       this.beginStopping(build.id, ['preparing'], 'failed', { reason });
       return;
     }

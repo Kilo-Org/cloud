@@ -164,6 +164,7 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
       return state as Awaited<ReturnType<MeteredBillingHost['getState']>>;
     });
     const lifecycle = new MeteredBillingLifecycle({
+      enforceContainerCapacity: true,
       storage: ctx.storage,
       usageClient: {} as ContainerUsageClient,
       schedule: async () => {
@@ -304,6 +305,7 @@ it('preserves real heartbeat settlement and one stop record per settled generati
     });
     const deleteSchedules = vi.fn();
     const lifecycle = new MeteredBillingLifecycle({
+      enforceContainerCapacity: true,
       storage: ctx.storage,
       usageClient: client,
       schedule,

@@ -210,6 +210,8 @@ const CREDENTIAL_KEY = new RegExp(
 // outside the quoted string. Unquoted values stop at whitespace, quotes, list
 // separators, closing brackets and the separators of a following pair, so one pair
 // never swallows the next (`user=bob&password=...`), and they never start on a quote.
+// Only a character that starts a following pair bounds a value; any other punctuation
+// stays inside it, so such a value is still replaced as a whole.
 const QUOTED_VALUE =
   String.raw`"(?:[^"\\\n]|\\.)*"` +
   '|' +
@@ -219,7 +221,7 @@ const QUOTED_VALUE =
   '|' +
   String.raw`\\'[^'\\\n]*\\'(?=[\s,;:.!?})\]]|$)`;
 const ASSIGNMENT_VALUE = new RegExp(
-  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'\]})&|?]+)`
+  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'\]})&|]+)`
 );
 // Credential value shapes that carry no key name of their own. Opaque runs must mix
 // letters with digits: 32 characters or more in the identifier alphabet, and 48 or

@@ -94,6 +94,14 @@ describe('briefing evidence screening', () => {
     );
   });
 
+  it('screens a punctuated value as a whole', () => {
+    const text = redactBriefingExcerpt('password=' + 'p@ss' + '?word more');
+    expect(text).toBe('[redacted credential] more');
+    expect(redactBriefingExcerptOrDrop('password=' + 'p@ss' + '?word more')).toBe(
+      '[redacted credential] more'
+    );
+  });
+
   it('screens a quoted key and its value', () => {
     const json = redactBriefingExcerpt('{"' + 'password' + '":"' + 'hunter2' + '"}');
     expect(json).not.toContain('hunter2');

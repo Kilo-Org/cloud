@@ -144,6 +144,7 @@ it('sends screened evidence to the model provider', async () => {
   const escaped = 'abc' + '\\"def' + 'SECRET';
   const nested = 'hunter' + '2';
   const shellJson = 'nested' + '9';
+  const punctuated = 'p@ss' + '?Quokka';
   await db
     .update(cli_sessions_v2)
     .set({
@@ -154,7 +155,8 @@ it('sends screened evidence to the model provider', async () => {
         text:
           'Deploy ran with AWS_SECRET_' +
           `ACCESS_KEY=${secret} in the shell. Config {"password":"${escaped}"} and ` +
-          `flags user=bob&password=${nested}. Hook: curl -d "{\\"password\\":\\"${shellJson}\\"}".`,
+          `flags user=bob&password=${nested}. Hook: curl -d "{\\"password\\":\\"${shellJson}\\"}". ` +
+          `Rotated with password=${punctuated} before the run.`,
       },
     })
     .where(eq(cli_sessions_v2.kilo_user_id, user.id));
@@ -176,6 +178,7 @@ it('sends screened evidence to the model provider', async () => {
   expect(prompt).not.toContain('def' + 'SECRET');
   expect(prompt).not.toContain(nested);
   expect(prompt).not.toContain(shellJson);
+  expect(prompt).not.toContain('Quokka');
   expect(prompt).toContain('Agent session');
   expect(prompt).toContain('[redacted credential]');
 });

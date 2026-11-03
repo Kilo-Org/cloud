@@ -141,13 +141,19 @@ it('claims paid generation once across simultaneous workers and never refreshes 
 it('sends screened evidence to the model provider', async () => {
   const { user, now } = await scheduled();
   const secret = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+  const escaped = 'abc' + '\\"def' + 'SECRET';
+  const nested = 'hunter' + '2';
   await db
     .update(cli_sessions_v2)
     .set({
+      title: 'Sweep for client_' + 'secret: "' + secret,
       briefing_excerpt: {
         messageId: 'completed',
         completedAt: new Date(now.getTime() - 3600_000).toISOString(),
-        text: 'Deploy ran with AWS_SECRET_' + `ACCESS_KEY=${secret} in the shell.`,
+        text:
+          'Deploy ran with AWS_SECRET_' +
+          `ACCESS_KEY=${secret} in the shell. Config {"password":"${escaped}"} and ` +
+          `flags user=bob&password=${nested}.`,
       },
     })
     .where(eq(cli_sessions_v2.kilo_user_id, user.id));
@@ -166,6 +172,9 @@ it('sends screened evidence to the model provider', async () => {
   };
   const prompt = body.messages.map(message => message.content).join('\n');
   expect(prompt).not.toContain(secret);
+  expect(prompt).not.toContain('def' + 'SECRET');
+  expect(prompt).not.toContain(nested);
+  expect(prompt).toContain('Agent session');
   expect(prompt).toContain('[redacted credential]');
 });
 

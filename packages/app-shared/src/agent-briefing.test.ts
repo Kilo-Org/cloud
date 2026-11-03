@@ -6,6 +6,7 @@ import {
   briefingSummarySchema,
   redactBriefingExcerpt,
   redactBriefingExcerptOrDrop,
+  redactBriefingTitle,
   truncateBriefingUtf8,
 } from './agent-briefing';
 
@@ -125,5 +126,19 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingExcerptOrDrop('Completed response with no credentials.')).toBe(
       'Completed response with no credentials.'
     );
+  });
+
+  it('screens a quoted value that contains an escaped quote', () => {
+    const text = '{"password":"abc' + '\\"def' + 'SECRET"}';
+    expect(redactBriefingExcerpt(text)).not.toContain('def' + 'SECRET');
+    expect(redactBriefingExcerptOrDrop(text)).not.toContain('def' + 'SECRET');
+  });
+
+  it('screens titles with the excerpt rules and keeps a neutral title otherwise', () => {
+    expect(redactBriefingTitle('Captured session')).toBe('Captured session');
+    expect(redactBriefingTitle('Deploy ' + 'AWS_SECRET_ACCESS_KEY=' + secretKey)).toBe(
+      'Deploy [redacted credential]'
+    );
+    expect(redactBriefingTitle('Plan for client_' + 'secret: "' + secretKey)).toBe('Agent session');
   });
 });

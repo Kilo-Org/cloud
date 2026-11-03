@@ -49,6 +49,7 @@ import {
   briefingSummaryErrorSchema,
   redactBriefingExcerpt,
   redactBriefingExcerptOrDrop,
+  redactBriefingTitle,
   type BriefingEstimate,
 } from '@kilocode/app-shared/agent-briefing';
 import {
@@ -88,12 +89,12 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
     omittedFromSummary: 0,
     sessions: facts.sessions.map(session => ({
       ...session,
-      title: redactBriefingExcerpt(session.title, 160),
+      title: redactBriefingTitle(session.title),
       sources: session.sources.map(({ excerpt, ...source }) => {
         const safeExcerpt = excerpt ? redactBriefingExcerptOrDrop(excerpt) : undefined;
         return {
           ...source,
-          title: redactBriefingExcerpt(source.title, 160),
+          title: redactBriefingTitle(source.title),
           ...(safeExcerpt ? { excerpt: safeExcerpt } : {}),
         };
       }),

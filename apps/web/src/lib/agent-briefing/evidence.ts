@@ -4,13 +4,13 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { sessionLiveSummarySchema } from '@kilocode/session-ingest-contracts';
 import {
+  BRIEFING_FALLBACK_TITLE,
   BRIEFING_MAX_SESSIONS,
   BRIEFING_MAX_SNAPSHOT_BYTES,
-  BRIEFING_MAX_TITLE_LENGTH,
   BRIEFING_MAX_URL_LENGTH,
   briefingReportSchema,
-  redactBriefingExcerpt,
   redactBriefingExcerptOrDrop,
+  redactBriefingTitle,
   type BriefingSource,
 } from '@kilocode/app-shared/agent-briefing';
 
@@ -48,7 +48,7 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
   });
   for (const row of rows.slice(0, BRIEFING_MAX_SESSIONS)) {
     if (!row.last_activity_at) continue;
-    const title = redactBriefingExcerpt(row.title ?? 'Agent session', BRIEFING_MAX_TITLE_LENGTH);
+    const title = redactBriefingTitle(row.title ?? BRIEFING_FALLBACK_TITLE);
     const url = `/cloud/sessions/${encodeURIComponent(row.session_id)}`;
     const occurredAt = new Date(row.last_activity_at).toISOString();
     const excerpt = completedExcerptSchema.safeParse(row.briefing_excerpt);

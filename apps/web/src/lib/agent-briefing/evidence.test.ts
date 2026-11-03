@@ -41,6 +41,16 @@ it('counts only selected sessions and reports omitted sessions without claiming 
     pullRequests: 'partial',
   });
 });
+it('screens snapshot titles with the excerpt rules', () => {
+  const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+  const facts = buildBriefingSnapshot([
+    { ...session(0), title: 'Deploy token=' + 'abc' + '123' },
+    { ...session(1), title: 'Plan for client_' + 'secret: "' + secretKey },
+  ]);
+  expect(facts.sessions[0]?.title).toBe('Deploy [redacted credential]');
+  expect(facts.sessions[1]?.title).toBe('Agent session');
+  expect(JSON.stringify(facts)).not.toContain(secretKey);
+});
 it('bounds serialized snapshots including duplicate source rendering and multibyte excerpts', () => {
   const rows = Array.from({ length: BRIEFING_MAX_SESSIONS }, (_, index) => ({
     ...session(index),
@@ -121,7 +131,7 @@ it('withholds an excerpt that screening cannot clear and keeps a cleared one', (
       briefing_excerpt: {
         messageId: 'done',
         completedAt: '2026-10-28T07:00:00.000Z',
-        text: 'Stopped after ' + 'client_' + `secret: "` + 'wJalrXUtnFEMI/K7MDENG',
+        text: 'Stopped after ' + 'client_' + `secret=]` + 'wJalrXUtnFEMI/K7MDENG',
       },
     },
   ]);

@@ -349,12 +349,12 @@ describe('briefing model pricing', () => {
   });
 });
 
-function reportRow(excerpt: string): BriefingReportRow {
+function reportRow(excerpt: string, title = 'Captured session'): BriefingReportRow {
   const source = {
     id: 'activity:ses_prompt',
     sessionId: 'ses_prompt',
     kind: 'activity' as const,
-    title: 'Captured session',
+    title,
     url: '/cloud/sessions/ses_prompt',
     occurredAt: '2026-10-28T06:30:00.000Z',
     excerpt,
@@ -396,12 +396,21 @@ describe('briefing prompt evidence', () => {
     expect(prompt).toContain('[redacted credential]');
   });
 
-  it('omits an excerpt that screening cannot clear', () => {
+  it('sends only excerpts that screening clears', () => {
     const prompt = briefingPrompt(
       reportRow('Stopped at client_' + 'secret: "' + secretKey),
       'English'
     );
     expect(prompt).not.toContain(secretKey);
     expect(prompt).not.toContain('Stopped at');
+  });
+
+  it('sends only titles that screening clears', () => {
+    const prompt = briefingPrompt(
+      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).toContain('Agent session');
   });
 });

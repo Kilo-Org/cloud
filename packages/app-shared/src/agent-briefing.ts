@@ -4,6 +4,7 @@ export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
+export const BRIEFING_FALLBACK_TITLE = 'Agent session';
 export const BRIEFING_MAX_URL_LENGTH = 2048;
 export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
 export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;
@@ -194,17 +195,19 @@ const CREDENTIAL_QUALIFIER_WINDOW = Math.max(
 );
 const PRIVATE_KEY_BLOCK = /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g;
 const BEARER_VALUE = /\bbearer\s+[^\s,;"}]+/gi;
-// A credential key name followed by an assignment, quoted or not. `(?![=>])` keeps
-// comparison operators and arrows from being read as an assignment. Unquoted values
-// stop at whitespace, quotes, list separators, closing brackets and the separators
-// of a following pair, so one pair never swallows the next (`user=bob&password=...`).
-const UNQUOTED_VALUE = String.raw`[^\s,;"'\]})&|?]+`;
-const ASSIGNMENT_VALUE = String.raw`(?:"[^"\n]*"|'[^'\n]*'|` + UNQUOTED_VALUE + ')';
-// A closing quote between a key name and its separator belongs to a quoted key.
-const CREDENTIAL_ASSIGNMENT = new RegExp(
-  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*(` + ASSIGNMENT_VALUE + ')',
+// A key name and its assignment separator. Key names are scanned on their own, apart
+// from the value they assign. `(?![=>])` keeps comparison operators and arrows from
+// being read as an assignment, and a closing quote between the name and the separator
+// belongs to a quoted key.
+const CREDENTIAL_KEY = new RegExp(
+  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*`,
   'g'
 );
+// The value a scanned key assigns, at the position the key ended. A quoted value may
+// escape a quote with a backslash, and it ends on its line. Unquoted values stop at
+// whitespace, quotes, list separators, closing brackets and the separators of a
+// following pair, so one pair never swallows the next (`user=bob&password=...`).
+const ASSIGNMENT_VALUE = /^(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|[^\s,;"'\]})&|?]+)/;
 // Credential value shapes that carry no key name of their own. Opaque runs must mix
 // letters with digits: 32 characters or more in the identifier alphabet, and 48 or
 // more when hyphens are allowed, so file paths, words, and short identifiers in
@@ -223,10 +226,6 @@ const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
 const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
-const CREDENTIAL_KEY_SCAN = new RegExp(
-  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*([^\n&|?]*)`,
-  'g'
-);
 const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
 
 function splitCredentialKeyTokens(key: string): string[] {
@@ -260,13 +259,31 @@ function isCredentialKeyName(key: string): boolean {
 
 /** True when screened text still carries credential material after redaction. */
 function briefingExcerptCarriesCredential(text: string): boolean {
-  for (const match of text.matchAll(CREDENTIAL_KEY_SCAN)) {
-    const key = match[1];
-    const assigned = match[2] ?? '';
-    if (!key || !assigned.trim() || !isCredentialKeyName(key)) continue;
-    if (!REDACTION_PLACEHOLDER.test(assigned)) return true;
+  for (const match of text.matchAll(CREDENTIAL_KEY)) {
+    if (!isCredentialKeyName(match[1])) continue;
+    const assigned = (text.slice((match.index ?? 0) + match[0].length).split('\n')[0] ?? '').trim();
+    if (assigned.length > 0 && !REDACTION_PLACEHOLDER.test(assigned)) return true;
   }
   return CREDENTIAL_VALUE_SHAPES.some(([shape]) => text.match(shape) !== null);
+}
+
+/** Replaces the value of every credential assignment. */
+function redactCredentialAssignments(text: string): string {
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const key of text.matchAll(CREDENTIAL_KEY)) {
+    if (!isCredentialKeyName(key[1])) continue;
+    const start = key.index ?? 0;
+    if (start < cursor) continue;
+    const valueStart = start + key[0].length;
+    const assigned = ASSIGNMENT_VALUE.exec(text.slice(valueStart))?.[0];
+    if (!assigned || REDACTION_PLACEHOLDER.test(assigned)) continue;
+    pieces.push(text.slice(cursor, start), '[redacted credential]');
+    cursor = valueStart + assigned.length;
+  }
+  if (pieces.length === 0) return text;
+  pieces.push(text.slice(cursor));
+  return pieces.join('');
 }
 
 export function redactBriefingExcerpt(
@@ -275,12 +292,8 @@ export function redactBriefingExcerpt(
 ): string {
   let redacted = value
     .replace(PRIVATE_KEY_BLOCK, '[redacted key]')
-    .replace(BEARER_VALUE, '[redacted credential]')
-    .replace(CREDENTIAL_ASSIGNMENT, (match, key: string, assigned: string) =>
-      isCredentialKeyName(key) && !REDACTION_PLACEHOLDER.test(assigned)
-        ? '[redacted credential]'
-        : match
-    );
+    .replace(BEARER_VALUE, '[redacted credential]');
+  redacted = redactCredentialAssignments(redacted);
   for (const [shape, replacement] of CREDENTIAL_VALUE_SHAPES) {
     redacted = redacted.replace(shape, replacement);
   }
@@ -299,6 +312,14 @@ export function redactBriefingExcerptOrDrop(
 ): string | undefined {
   const redacted = redactBriefingExcerpt(value, maxBytes);
   return briefingExcerptCarriesCredential(redacted) ? undefined : redacted;
+}
+
+/**
+ * A title for a session or a source. The report schema requires one, so a title that
+ * screening cannot clear becomes a neutral fallback.
+ */
+export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
+  return redactBriefingExcerptOrDrop(value, maxBytes) ?? BRIEFING_FALLBACK_TITLE;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {

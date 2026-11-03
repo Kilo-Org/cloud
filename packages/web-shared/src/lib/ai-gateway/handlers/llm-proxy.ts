@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -27,6 +28,7 @@ import {
   NO_ORGANIZATION_GATEWAY_SETTINGS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -954,6 +956,7 @@ export async function handleLlmProxyRequest(
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
 
+  const usageId = randomUUID();
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -968,6 +971,7 @@ export async function handleLlmProxyRequest(
     getAllowedProviders: accessCheckResolver.getAllowedProviders,
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
+    onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -1139,6 +1143,7 @@ export async function handleLlmProxyRequest(
     ttfb_ms: null,
     requestStartedAt,
     clientRequestId,
+    usageId,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),

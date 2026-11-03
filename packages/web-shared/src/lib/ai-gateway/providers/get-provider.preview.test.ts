@@ -6,6 +6,7 @@ import {
   type ByokRoutePreviewStep,
   type GetProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   findDirectByokCatalogModels,
   type DirectByokCatalogModel,
@@ -246,12 +247,17 @@ describe('previewByokRouting', () => {
         jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(gatewayProviders);
         const scenario = { keys, apiKind, vercelServes, gatewayProviders };
 
+        const decisions: ProviderRoutingDecision[] = [];
         const routed = await getProvider({
           requestedModel: MODEL,
           request: request(apiKind),
           user,
           organizationId: owner.type === 'organization' ? owner.id : undefined,
+          onDecision: decision => decisions.push(decision),
         });
+        expect(decisions.map(decision => decision.result)).toEqual([
+          expect.objectContaining({ route: routeOf(routed, apiKind).route }),
+        ]);
 
         jest.mocked(decryptApiKey).mockClear();
         jest.mocked(getByokCredentials).mockClear();

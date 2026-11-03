@@ -32,7 +32,6 @@ const mocks = vi.hoisted(() => {
     createSandbox: vi.fn(),
     inspectByName: vi.fn(),
     executeCommand: vi.fn(),
-    writeFiles: vi.fn(),
     listCommands: vi.fn(),
     getCommand: vi.fn(),
     stopSession: vi.fn(),
@@ -56,8 +55,8 @@ const mocks = vi.hoisted(() => {
     fetchCredential: vi.fn(),
     resolveAccess: vi.fn(),
     projectStatus: vi.fn(),
-    getArtifacts: vi.fn(),
     getIdentity: vi.fn(),
+    downloadedStartup: vi.fn(),
   };
 });
 
@@ -101,14 +100,13 @@ vi.mock('../byoc/vercel-credential-resolver.js', () => ({
   projectByocVercelStatus: mocks.projectStatus,
 }));
 
-vi.mock('../byoc/vercel-runtime-artifacts.js', () => ({
-  getVercelRuntimeArtifacts: mocks.getArtifacts,
-}));
-
 vi.mock('../byoc/vercel-runtime-identity.js', () => ({
   getVercelRuntimeIdentity: mocks.getIdentity,
   VERCEL_RUNTIME_BUN_VERSION: '1.3.14',
-  VERCEL_RUNTIME_KILO_CLI_VERSION: '7.4.20',
+}));
+
+vi.mock('../sandbox-control/downloaded-startup.js', () => ({
+  downloadedStartup: mocks.downloadedStartup,
 }));
 
 vi.mock('../agent-sandbox/vercel/vercel-sandbox-rest-client.js', () => ({
@@ -246,6 +244,7 @@ function createBuild(
   const env = {
     WORKER_URL: 'https://worker.invalid',
     NEXTAUTH_SECRET: 'snapshot-test-signing-secret',
+    RUNTIME_RELEASE_DESCRIPTOR: 'descriptor-test',
     SANDBOX_CONTROL: { getByName: () => mocks.control },
   };
   return new VercelSnapshotBuild(ctx as never, env as never);
@@ -376,7 +375,6 @@ beforeEach(() => {
   mocks.client.listSnapshots.mockResolvedValue([]);
   mocks.client.stopSession.mockResolvedValue({ status: 'stopped' });
   mocks.client.deleteSnapshot.mockResolvedValue(undefined);
-  mocks.client.writeFiles.mockResolvedValue(undefined);
   mocks.client.executeCommand.mockImplementation(async (_sessionId, input) =>
     input.wait === false
       ? { id: 'command-test', exitCode: null }
@@ -386,22 +384,14 @@ beforeEach(() => {
         }
   );
   mocks.getIdentity.mockResolvedValue({
-    wrapperVersion: '2.4.0',
-    releasedAt: '2026-09-08',
+    wrapperVersion: 'downloaded-base-v1',
+    releasedAt: '2026-10-23',
     digest: 'digest-test',
   });
-  mocks.getArtifacts.mockResolvedValue([
-    {
-      path: 'usr/local/bin/kilocode-control-plane-wrapper.js',
-      bytes: new TextEncoder().encode('control-wrapper'),
-      sha256: 'b'.repeat(64),
-    },
-    {
-      path: 'usr/local/bin/kilocode-control-plane-supervisor.sh',
-      bytes: new TextEncoder().encode('supervisor'),
-      sha256: 'c'.repeat(64),
-    },
-  ]);
+  mocks.downloadedStartup.mockResolvedValue({
+    argv: ['/bin/sh', '-c', 'exec /bin/sh /usr/local/bin/kilocode-control-plane-supervisor.sh'],
+    user: 'root',
+  });
 });
 
 describe('VercelSnapshotBuild persistence isolation', () => {
@@ -1863,6 +1853,17 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(identity?.allocationId).toBe(FIRST_GENERATION);
     if (!identity) throw new Error('Expected signed validator identity');
     expect(launch.env.PROVIDER_INSTANCE_ID).toBe(providerRef);
+    expect(mocks.downloadedStartup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: 'descriptor-test',
+        sandboxId: `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`,
+        allocationId: FIRST_GENERATION,
+        deadlineAt: createdAt + 600_000,
+      })
+    );
+    expect(launch.command).toBe('/bin/sh');
+    expect(launch.args.at(-1)).toContain(`# byoc-call-home:${FIRST_GENERATION}`);
+    expect(launch.sudo).toBe(true);
     expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith({
       build: {
         organizationId: ORGANIZATION_ID,
@@ -2209,37 +2210,26 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain('test -w /workspace');
   });
 
-  it('stages runtime artifacts in tmp and installs validated root-owned files with sudo', async () => {
+  it('snapshots the base image without baking a CLI or control wrapper', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, {
-      step: 'upload_runtime_artifacts',
+      step: 'install_node_dependencies',
       builder_session_id: 'builder-session',
     });
 
     await fixture.build.alarm();
 
-    expect(mocks.client.writeFiles).toHaveBeenCalledWith('builder-session', '/tmp', [
-      expect.objectContaining({ path: 'kilocode-control-plane-wrapper.js' }),
-      expect.objectContaining({ path: 'kilocode-control-plane-supervisor.sh' }),
-      expect.objectContaining({ path: 'kilo-runtime-manifest.json' }),
-    ]);
-    const manifest = JSON.parse(
-      mocks.client.writeFiles.mock.calls[0]?.[2]?.find(
-        (file: { path: string }) => file.path === 'kilo-runtime-manifest.json'
-      )?.content
-    );
-    expect(manifest.controlWrapperSha256).toBe('b'.repeat(64));
-
-    await fixture.build.alarm();
-
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
-    expect(command.args[1]).toContain(
-      'sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js'
-    );
-    expect(command.args[1]).toContain(
-      'sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json'
-    );
-    expect(command.args[1]).toContain('sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js');
+    expect(command.args[1]).toContain('test "$(bun --version)" = "1.3.14"');
+    expect(command.args[1]).toContain('git --version');
+    expect(command.args[1]).not.toContain('@kilocode/cli');
+    expect(command.args[1]).not.toContain('kilo --version');
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'snapshot_builder',
+      snapshot_source_session_id: 'builder-session',
+      snapshot_baseline_json: null,
+      snapshot_requested: 0,
+    });
   });
 });

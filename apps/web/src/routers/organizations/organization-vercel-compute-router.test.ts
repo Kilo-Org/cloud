@@ -1,6 +1,10 @@
 import { GET as getPersonalEnrollment } from '@/app/api/internal/byoc/vercel-credentials/user/[userId]/route';
 import { GET as getOrganizationEnrollment } from '@/app/api/internal/byoc/vercel-credentials/organization/[organizationId]/route';
-import { decodeVercelConnection, vercelConnectionUpdate } from '@/lib/byoc/vercel-connection';
+import {
+  decodeVercelConnection,
+  vercelConnectionUpdate,
+  vercelSetupStepSchema,
+} from '@/lib/byoc/vercel-connection';
 import { NextRequest } from 'next/server';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -1056,6 +1060,28 @@ describe('Shared BYOC connections', () => {
       ).rejects.toMatchObject({ cause: { constraint: 'byoc_connections_owner_check' } });
     } finally {
       await db.delete(byoc_connections).where(eq(byoc_connections.id, inserted.id));
+    }
+  });
+
+  it('accepts current split setup steps and rejects retired baked-runtime steps', () => {
+    const currentSteps = [
+      'validating_access',
+      'create_builder',
+      'install_system_dependencies',
+      'install_node_dependencies',
+      'snapshot_builder',
+      'create_validator',
+      'launch_validator_wrapper',
+      'verify_validator_call_home',
+      'stop_validator',
+      'confirm_terminal',
+    ] as const;
+
+    for (const step of currentSteps) {
+      expect(vercelSetupStepSchema.safeParse(step).success).toBe(true);
+    }
+    for (const step of ['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const) {
+      expect(vercelSetupStepSchema.safeParse(step).success).toBe(false);
     }
   });
 

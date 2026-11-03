@@ -23,9 +23,16 @@ import type {
 import type { EnvironmentActorAccess, BuilderGitSource } from './access.js';
 import {
   builderInstance,
+  vercelBuilderSandboxName,
+  BuilderRetryableError,
   type BuilderAllocation,
+  type BuilderLifecycleState,
   type BuilderProvider,
 } from './builder-provider.js';
+import type { EnvironmentBuildTarget } from './target.js';
+import { targetBaseImage } from './target.js';
+import type { BuildTargetResolution } from './target.js';
+import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
 import {
   BUILDER_FIRST_REPORT_MS,
   BUILDER_REPORT_LOSS_MS,
@@ -74,6 +81,13 @@ export type CoordinatorEnvironment = {
     repoFullName: string;
     actorUserId: string;
   }): Promise<BuilderGitSource>;
+  /** Resolve the saved environment/repository/context allocation into one pinned target. */
+  buildTarget(input: {
+    reference: EnvironmentReference;
+    repoFullName: string;
+    commands: readonly string[];
+    sandboxAllocation: string | null;
+  }): Promise<BuildTargetResolution>;
   /** Owner-level container concurrency, the limit sessions use. */
   capacity(
     owner: EnvironmentReference['owner'],
@@ -92,6 +106,8 @@ export type CoordinatorDeps = {
   armAlarm(at: number): Promise<void>;
   environment: CoordinatorEnvironment;
   provider: BuilderProvider;
+  /** Non-secret mutable provider state, stored per build outside the input JSON. */
+  lifecycle(buildId: string): BuilderLifecycleState;
   /** The builder's control base URL for `buildId`, or null when the Worker URL is unknown. */
   runnerUrl(environmentId: string, buildId: string): string | null;
   /** The signed runner credential bound to this build and allocation. */
@@ -149,6 +165,7 @@ export type SnapshotResolution = {
   snapshot: {
     snapshotId: string;
     baseImage: string;
+    provider: PublishedSnapshot['provider'];
     revision: number;
     capturedAt: number;
     buildId: string;
@@ -215,12 +232,6 @@ export class EnvironmentBuildCoordinator {
       return { status: 'conflict', reason: 'revision_changed', buildId: null };
     }
     const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(reference.owner, sandboxId, request.actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'rejected', reason: 'container_limit_reached' };
-    }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (input === null) {
       store.markDeleted(this.deps.now());
@@ -229,8 +240,23 @@ export class EnvironmentBuildCoordinator {
     if (input.reference.configurationRevision !== request.expectedRevision) {
       return { status: 'conflict', reason: 'revision_changed', buildId: null };
     }
+    const target = await this.deps.environment.buildTarget({
+      reference: input.reference,
+      repoFullName: input.repoFullName,
+      commands: input.commands,
+      sandboxAllocation: input.sandboxAllocation,
+    });
+    if (!target.ok) return { status: 'rejected', reason: 'unsupported_provider' };
+    if (
+      target.target.provider === 'cloudflare-containers' &&
+      (await this.deps.environment.capacity(reference.owner, sandboxId, request.actorUserId)) ===
+        'limit_reached'
+    ) {
+      return { status: 'rejected', reason: 'container_limit_reached' };
+    }
     const buildId = await this.admit(
       input,
+      target.target,
       request.requestId,
       request.trigger,
       request.actorUserId
@@ -252,6 +278,7 @@ export class EnvironmentBuildCoordinator {
    */
   private async admit(
     input: ProfileBuildInput,
+    target: EnvironmentBuildTarget,
     requestId: string,
     trigger: BuildTrigger,
     actorUserId: string
@@ -263,6 +290,7 @@ export class EnvironmentBuildCoordinator {
       repoFullName: input.repoFullName,
       commands: input.commands,
       plainVars: input.plainVars,
+      target,
     };
     const runtimeRelease = await this.deps.provider.runtimeReleaseId();
     const admitted = this.deps.transaction(() => {
@@ -275,7 +303,7 @@ export class EnvironmentBuildCoordinator {
         actor_user_id: actorUserId,
         input: JSON.stringify(record),
         encrypted_secrets: JSON.stringify(input.encryptedSecrets),
-        instance: builderInstance(input.commands),
+        instance: target.provider === 'cloudflare-containers' ? target.instance : 'vercel',
         runtime_release: runtimeRelease,
         state: 'queued',
         cleanup_attempts: 0,
@@ -327,14 +355,37 @@ export class EnvironmentBuildCoordinator {
         admission: { status: 'skipped', reason: 'environment_deleted' },
       };
     }
+    const input = await this.deps.environment.buildInput(this.environmentId);
+    if (input === null) {
+      store.markDeleted(now);
+      return {
+        snapshot: null,
+        reason: 'deleted',
+        admission: { status: 'skipped', reason: 'environment_deleted' },
+      };
+    }
+    const target = await this.deps.environment.buildTarget({
+      reference: input.reference,
+      repoFullName: input.repoFullName,
+      commands: input.commands,
+      sandboxAllocation: input.sandboxAllocation,
+    });
+    if (!target.ok) {
+      return {
+        snapshot: null,
+        reason: 'unsupported',
+        admission: { status: 'skipped', reason: 'unsupported' },
+      };
+    }
     const published = store.published();
-    const current = await this.compatibility();
+    const current = await this.compatibility(target);
     const eligibility = snapshotEligibility(published, request.reference, now, current);
     const snapshot =
       eligibility.eligible && published !== null
         ? {
             snapshotId: published.snapshotId,
             baseImage: published.baseImage,
+            provider: published.provider,
             revision: published.revision,
             capturedAt: published.capturedAt,
             buildId: published.buildId,
@@ -386,12 +437,6 @@ export class EnvironmentBuildCoordinator {
       return { status: 'skipped', reason: 'revision_superseded' };
     }
     const sandboxId = this.deps.builderSandboxId;
-    if (
-      (await this.deps.environment.capacity(current.owner, sandboxId, actorUserId)) ===
-      'limit_reached'
-    ) {
-      return { status: 'skipped', reason: 'container_limit_reached' };
-    }
     const input = await this.deps.environment.buildInput(this.environmentId);
     if (
       input === null ||
@@ -399,8 +444,23 @@ export class EnvironmentBuildCoordinator {
     ) {
       return { status: 'skipped', reason: 'revision_superseded' };
     }
+    const target = await this.deps.environment.buildTarget({
+      reference: input.reference,
+      repoFullName: input.repoFullName,
+      commands: input.commands,
+      sandboxAllocation: input.sandboxAllocation,
+    });
+    if (!target.ok) return { status: 'skipped', reason: 'unsupported' };
+    if (
+      target.target.provider === 'cloudflare-containers' &&
+      (await this.deps.environment.capacity(current.owner, sandboxId, actorUserId)) ===
+        'limit_reached'
+    ) {
+      return { status: 'skipped', reason: 'container_limit_reached' };
+    }
     const buildId = await this.admit(
       input,
+      target.target,
       `session:${reference.configurationRevision}:${this.deps.uuid()}`,
       'session',
       actorUserId
@@ -416,12 +476,35 @@ export class EnvironmentBuildCoordinator {
 
   // --- reads -----------------------------------------------------------------
 
-  /** The image and runtime ABI a session would start with now. */
-  private async compatibility(): Promise<SnapshotCompatibility> {
+  /** The provider/base identity and runtime ABI a session would start with now. */
+  private async compatibility(
+    target: BuildTargetResolution | null
+  ): Promise<SnapshotCompatibility> {
+    if (target?.ok === true) {
+      return {
+        provider: target.target.provider,
+        baseImage: await targetBaseImage(target.target, () =>
+          this.deps.provider.currentImage(this.deps.builderSandboxId)
+        ),
+        runtimeAbi: RUNTIME_BASE_ABI,
+      };
+    }
     return {
-      baseImage: await this.deps.provider.currentImage(this.deps.builderSandboxId),
+      provider: target?.provider ?? 'cloudflare-containers',
+      baseImage: null,
       runtimeAbi: RUNTIME_BASE_ABI,
     };
+  }
+
+  private async currentTarget(): Promise<BuildTargetResolution | null> {
+    const input = await this.deps.environment.buildInput(this.environmentId);
+    if (input === null) return null;
+    return this.deps.environment.buildTarget({
+      reference: input.reference,
+      repoFullName: input.repoFullName,
+      commands: input.commands,
+      sandboxAllocation: input.sandboxAllocation,
+    });
   }
 
   async status(
@@ -430,13 +513,15 @@ export class EnvironmentBuildCoordinator {
   ): Promise<EnvironmentBuildStatus> {
     const { store } = this.deps;
     const now = this.deps.now();
-    const current = await this.compatibility();
+    const target = await this.currentTarget();
+    const current = await this.compatibility(target);
     const active = store.activeBuild();
     const latest = store.latestTerminal();
     const published = store.published();
     const attempt = store.autoAttempt(currentRevision);
     const backoff = automaticAdmission(attempt, now);
-    const unsupported = this.deps.unsupportedReason(owner);
+    const unsupported =
+      this.deps.unsupportedReason(owner) ?? (target !== null && !target.ok ? target.reason : null);
     return {
       environmentId: this.environmentId,
       supported: unsupported === null,
@@ -607,7 +692,9 @@ export class EnvironmentBuildCoordinator {
     });
     if (now - this.lastLeaseRenewalAt >= LEASE_RENEW_INTERVAL_MS) {
       this.lastLeaseRenewalAt = now;
-      await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
+      await this.deps.provider
+        .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
+        .catch(() => undefined);
     }
     return { action: 'continue' };
   }
@@ -761,9 +848,11 @@ export class EnvironmentBuildCoordinator {
       return this.terminalWithoutAllocation(build, 'failed', 'actor_unauthorized');
     }
     const sandboxId = this.deps.builderSandboxId;
+    const target = this.targetOf(build, input);
     if (
+      target.provider === 'cloudflare-containers' &&
       (await this.deps.environment.capacity(reference.owner, sandboxId, build.actor_user_id)) ===
-      'limit_reached'
+        'limit_reached'
     ) {
       return this.terminalWithoutAllocation(build, 'failed', 'container_limit_reached');
     }
@@ -776,11 +865,7 @@ export class EnvironmentBuildCoordinator {
       if (git.reason === 'unavailable') return; // The next alarm retries within the deadline.
       return this.terminalWithoutAllocation(build, 'failed', 'repository_unauthorized');
     }
-    const allocation: BuilderAllocation = {
-      sandboxId,
-      allocationId: this.deps.uuid(),
-      instance: build.instance as BuilderAllocation['instance'],
-    };
+    const allocation = this.allocationFor(build, input, target, this.deps.uuid());
     // Plan step 2: the allocation intent is durable before the provider request.
     const preparing = this.deps.store.transition(build.id, ['queued'], {
       state: 'preparing',
@@ -793,6 +878,7 @@ export class EnvironmentBuildCoordinator {
 
   private async launch(build: BuildRow): Promise<void> {
     const allocation = this.allocationOf(build);
+    const state = this.deps.lifecycle(build.id);
     const url = this.deps.runnerUrl(this.environmentId, build.id);
     if (url === null) {
       this.beginStopping(build.id, ['preparing'], 'failed', { reason: 'builder_start_failed' });
@@ -824,11 +910,23 @@ export class EnvironmentBuildCoordinator {
       allocationId: allocation.allocationId,
     });
     try {
-      await this.deps.provider.launch(allocation, {
-        runner: { url, credential },
-        deadlineAt: build.deadline_at,
-      });
-    } catch {
+      await this.deps.provider.launch(
+        allocation,
+        {
+          runner: { url, credential },
+          deadlineAt: build.deadline_at,
+        },
+        state
+      );
+    } catch (error) {
+      if (error instanceof BuilderRetryableError) {
+        // The provider request may still land; keep preparing and inspect again.
+        this.deps.log('Environment builder start is uncertain; retrying', {
+          environmentId: this.environmentId,
+          buildId: build.id,
+        });
+        return;
+      }
       const reason = 'builder_start_failed' as const;
       this.deps.log('Environment builder start failed', {
         environmentId: this.environmentId,
@@ -881,7 +979,9 @@ export class EnvironmentBuildCoordinator {
     }
     if (now - this.lastLeaseRenewalAt >= LEASE_RENEW_INTERVAL_MS) {
       this.lastLeaseRenewalAt = now;
-      await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
+      await this.deps.provider
+        .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
+        .catch(() => undefined);
     }
   }
 
@@ -895,10 +995,16 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['capturing'], 'failed', { reason: 'capture_failed' });
       return;
     }
-    await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
+    await this.deps.provider
+      .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
+      .catch(() => undefined);
     let result;
     try {
-      result = await this.deps.provider.capture(this.allocationOf(build), build.capture_id);
+      result = await this.deps.provider.capture(
+        this.allocationOf(build),
+        build.capture_id,
+        this.deps.lifecycle(build.id)
+      );
     } catch {
       // The reply was lost; the next pass reads the stored result by capture id.
       return;
@@ -960,6 +1066,7 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'capture_failed' });
       return;
     }
+    const target = this.targetOf(build, input);
     const descriptor: PublishedSnapshot = {
       buildId: build.id,
       environmentId: this.environmentId,
@@ -968,11 +1075,11 @@ export class EnvironmentBuildCoordinator {
       repository: input.reference.repository,
       sourceCommit: build.source_commit,
       sourceBranch: build.source_branch,
-      provider: 'cloudflare-containers',
-      baseImage: capture.baseImage,
+      provider: target.provider,
+      baseImage: target.provider === 'vercel' ? vercelSnapshotBaseImage(target) : capture.baseImage,
       runtimeAbi: RUNTIME_BASE_ABI,
       runtimeRelease: build.runtime_release,
-      builderInstance: build.instance,
+      builderInstance: target.provider === 'cloudflare-containers' ? target.instance : 'vercel',
       snapshotId: capture.snapshotId,
       ...(capture.size === undefined ? {} : { size: capture.size }),
       capturedAt: capture.capturedAt,
@@ -1005,7 +1112,10 @@ export class EnvironmentBuildCoordinator {
     }
     let result: 'terminal' | 'retryable';
     try {
-      result = await this.deps.provider.stop(this.allocationOf(build));
+      result = await this.deps.provider.stop(
+        this.allocationOf(build),
+        this.deps.lifecycle(build.id)
+      );
     } catch {
       result = 'retryable';
     }
@@ -1080,13 +1190,42 @@ export class EnvironmentBuildCoordinator {
     });
   }
 
+  private targetOf(build: BuildRow, input: BuildInputRecord): EnvironmentBuildTarget {
+    if (input.target !== undefined) return input.target;
+    const instance =
+      build.instance === 'standard-3' || build.instance === 'standard-4'
+        ? build.instance
+        : builderInstance(input.commands);
+    return { provider: 'cloudflare-containers', instance };
+  }
+
+  private allocationFor(
+    build: BuildRow,
+    input: BuildInputRecord,
+    target: EnvironmentBuildTarget,
+    allocationId: string
+  ): BuilderAllocation {
+    if (target.provider === 'vercel') {
+      return {
+        provider: 'vercel',
+        sandboxId: vercelBuilderSandboxName(build.id),
+        allocationId,
+        owner: input.reference.owner,
+        target,
+      };
+    }
+    return {
+      provider: 'cloudflare-containers',
+      sandboxId: this.deps.builderSandboxId,
+      allocationId,
+      instance: target.instance,
+    };
+  }
+
   private allocationOf(build: BuildRow): BuilderAllocation {
     if (build.allocation_id === null) throw new Error('Build has no allocation');
-    return {
-      sandboxId: this.deps.builderSandboxId,
-      allocationId: build.allocation_id,
-      instance: build.instance as BuilderAllocation['instance'],
-    };
+    const input = parseBuildInput(build);
+    return this.allocationFor(build, input, this.targetOf(build, input), build.allocation_id);
   }
 
   private async failRunning(buildId: string, reason: string, detail?: string): Promise<void> {

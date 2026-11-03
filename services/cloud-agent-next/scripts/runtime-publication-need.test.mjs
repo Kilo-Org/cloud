@@ -3,20 +3,30 @@ import { test } from 'node:test';
 import { catalogNeedsPublication, readSourceCatalog } from './runtime-publication-need.mjs';
 
 const preinstalled = { mode: 'preinstalled', image: 'all-in-one' };
+const preinstalledVercel = { mode: 'preinstalled', image: 'all-in-one', vercel: true };
 const downloaded = { mode: 'downloaded', image: 'runtime-free' };
 
-test('only a downloaded default or named target needs publication', () => {
+test('a downloaded or Vercel target needs publication', () => {
   assert.equal(catalogNeedsPublication({ default: preinstalled, targets: {} }), false);
   assert.equal(
     catalogNeedsPublication({ default: preinstalled, targets: { production: preinstalled } }),
     false
   );
   assert.equal(
+    catalogNeedsPublication({ default: preinstalled, targets: { production: preinstalledVercel } }),
+    true
+  );
+  assert.equal(
     catalogNeedsPublication({ default: preinstalled, targets: { production: downloaded } }),
     true
   );
   assert.equal(catalogNeedsPublication({ default: downloaded, targets: {} }), true);
+  assert.equal(catalogNeedsPublication({ default: preinstalledVercel, targets: {} }), true);
   assert.throws(() => catalogNeedsPublication({ default: preinstalled }), /Invalid/);
+  assert.throws(
+    () => catalogNeedsPublication({ default: { ...preinstalled, vercel: 'yes' }, targets: {} }),
+    /Invalid/
+  );
 });
 
 test('reads the catalog at the exact source SHA', async () => {

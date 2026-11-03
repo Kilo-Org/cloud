@@ -86,6 +86,7 @@ export type ProviderAllocationIntent = {
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
+  snapshot?: ProviderSnapshotStart;
 };
 
 export type ProviderObservation = {
@@ -104,6 +105,8 @@ export type ProviderSnapshotStart = {
   snapshotId: string;
   /** The image the snapshot was captured from. */
   baseImage: string;
+  /** The provider that captured it; absent only for callers that predate BYOC. */
+  provider?: 'cloudflare-containers' | 'vercel';
 };
 
 export type ProviderLaunchOptions = {
@@ -151,7 +154,9 @@ export type ProviderAdapter = {
    * omits this; callers then report no rate instead of inventing one.
    */
   getBillingProjection?(): Promise<ProviderBillingProjection | undefined>;
-  create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
+  create(
+    intent: ProviderCreateIntent
+  ): Promise<{ providerRef: string; snapshotFailed?: true } | { unresolved: true }>;
   launch(
     ref: string,
     startup: { command: ProviderStartupCommand; env: Record<string, string> },

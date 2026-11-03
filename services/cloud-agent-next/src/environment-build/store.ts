@@ -18,6 +18,7 @@ import {
   type AutoAttempt,
   type PublishedSnapshot,
 } from './policy.js';
+import { environmentBuildTargetSchema } from './target.js';
 import { environmentReferenceSchema } from './reference.js';
 
 /**
@@ -52,6 +53,8 @@ export const buildInputRecordSchema = z
     repoFullName: z.string().min(1),
     commands: z.array(z.string()),
     plainVars: z.record(z.string(), z.string()),
+    /** Pinned at admission; absent only for builds admitted before provider selection. */
+    target: environmentBuildTargetSchema.optional(),
   })
   .strict();
 export type BuildInputRecord = z.infer<typeof buildInputRecordSchema>;

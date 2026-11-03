@@ -8,6 +8,7 @@ import {
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
 import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
 import {
   ByocCredentialMissingError,
   ByocVercelNotReadyError,
@@ -52,6 +53,7 @@ export function createByocVercelProviderAdapter(deps: {
   }
 
   return {
+    environmentSnapshots: true,
     ensureBillingAdmission: async () => {},
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -63,7 +65,32 @@ export function createByocVercelProviderAdapter(deps: {
           ...deps,
           config: { ...config, resources: deps.resources },
         });
-        return await adapter.create(intent);
+        const requested = intent.snapshot;
+        const compatible =
+          requested?.provider === 'vercel' &&
+          requested.baseImage ===
+            vercelSnapshotBaseImage({
+              ...config,
+              credentialId: deps.source.credentialId,
+              baseSnapshotId: config.snapshotId,
+            });
+        const { snapshot: _snapshot, ...baseIntent } = intent;
+        if (!compatible) {
+          const created = await adapter.create(baseIntent);
+          return requested === undefined ? created : { ...created, snapshotFailed: true as const };
+        }
+        try {
+          return await adapter.create(intent);
+        } catch (error) {
+          if (
+            !(error instanceof VercelSandboxRestError) ||
+            (error.status !== 400 && error.status !== 404 && error.status !== 410)
+          ) {
+            throw error;
+          }
+          const created = await adapter.create(baseIntent);
+          return { ...created, snapshotFailed: true };
+        }
       } catch (error) {
         if (error instanceof ByocCredentialMissingError)
           throw new ByocVercelProviderError(error.code);

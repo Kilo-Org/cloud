@@ -51,8 +51,9 @@ Publication requires these approved and provisioned resources:
   registry. The publisher reuses the existing deploy token.
 
 An automatic run publishes only when `runtime-targets.json` at the source SHA has a downloaded default
-or named target. The admission job reads that catalog through the GitHub API for the exact SHA.
-A preinstalled-only catalog skips the publish job, so ordinary main CI runs build nothing.
+or named target, or a target marked `vercel: true`. The admission job reads that catalog through the
+GitHub API for the exact SHA. A catalog with only preinstalled non-Vercel targets skips the publish
+job, so ordinary main CI runs build nothing.
 
 A manual `workflow_dispatch` run accepts an exact main SHA and requires a successful trusted CI push
 run for that SHA. A manual run publishes whatever the catalog contains.
@@ -64,14 +65,15 @@ credentials or deploy the Worker.
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.
 
-Downloaded deployment preparation uses the exact checked-out source SHA. The same downloaded catalog
-starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
-without holding the publisher's concurrency lock. It checks source identity,
+Downloaded and Vercel deployment preparation use the exact checked-out source SHA. The same catalog
+entry starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for
+that SHA's handoff without holding the publisher's concurrency lock. It checks source identity,
 base inputs, stored payload bytes, compatibility and target image configuration before Wrangler or
 its custom build can run. Runtime-free targets use the recorded registry digest. Registry credentials
 stay in a temporary Docker configuration, which the command removes on exit.
 
-Preinstalled deployments make no runtime storage request and require no publisher credentials.
+Preinstalled deployments without Vercel make no runtime storage request and require no publisher
+credentials. A preinstalled target marked `vercel: true` still prepares the published release.
 The Worker deployment matrix does not cancel unrelated jobs when one target fails.
 
 The deployment selector can choose an earlier successful CI commit. A checkout that predates both

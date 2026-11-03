@@ -4,13 +4,15 @@ import { pathToFileURL } from 'node:url';
 const shaPattern = /^[a-f0-9]{40}$/;
 const catalogPath = 'services/cloud-agent-next/runtime-targets.json';
 
-/** A catalog needs publication when its default or any named target uses downloaded startup. */
+/** A catalog needs publication when any target downloads its runtime or supports Vercel. */
 export function catalogNeedsPublication(catalog) {
   if (typeof catalog?.default !== 'object' || typeof catalog?.targets !== 'object')
     throw new Error('Invalid runtime target catalog');
-  return [catalog.default, ...Object.values(catalog.targets)].some(
-    target => target?.mode === 'downloaded'
-  );
+  return [catalog.default, ...Object.values(catalog.targets)].some(target => {
+    if (target?.vercel !== undefined && typeof target.vercel !== 'boolean')
+      throw new Error('Invalid runtime target catalog');
+    return target?.mode === 'downloaded' || target?.vercel === true;
+  });
 }
 
 /** Read the runtime target catalog exactly as committed at the source SHA. */

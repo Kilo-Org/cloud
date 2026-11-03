@@ -8,6 +8,12 @@ import { Readable } from 'node:stream';
 import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
 import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
+import {
+  adminActionContextFromHeaders,
+  organizationActionTarget,
+  recordAdminAction,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -167,6 +173,12 @@ function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&');
 }
 
+function auditIdentifier(value: string | null): string | null {
+  return value && value.length <= 255 && /^[a-zA-Z0-9_.:|-]+(?:\/[a-zA-Z0-9_.:|-]+)*$/.test(value)
+    ? value
+    : null;
+}
+
 function buildFilter({
   id,
   userId,
@@ -282,6 +294,37 @@ export async function GET(request: NextRequest) {
   if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
+
+  const auditUserId = auditIdentifier(resolvedUserId);
+  const auditOrganizationId = auditIdentifier(organizationId);
+  await recordAdminAction(
+    {
+      ...adminActionContextFromHeaders(user, request.headers),
+      trpcPath: '/admin/api/api-request-log/download',
+    },
+    {
+      action: 'api_request_log.download',
+      target: auditUserId
+        ? userActionTarget(auditUserId)
+        : auditOrganizationId
+          ? organizationActionTarget(auditOrganizationId)
+          : null,
+      message: 'Started API request log ZIP export',
+      metadata: {
+        logId: parsedId?.toString() ?? null,
+        userId: auditUserId,
+        organizationId: auditOrganizationId,
+        startAt: parsedStart.value?.toISOString() ?? null,
+        endAt: parsedEnd.value?.toISOString() ?? null,
+        hasUserFilter: Boolean(resolvedUserId),
+        hasOrganizationFilter: Boolean(organizationId),
+        hasModelPrefixFilter: Boolean(model),
+        hasSessionFilter: Boolean(sessionId),
+        errorsOnly,
+        matchingRows: result.total,
+      },
+    }
+  );
 
   const archive = archiver('zip', { zlib: { level: 6 } });
   let totalAppendedEntries = 0;

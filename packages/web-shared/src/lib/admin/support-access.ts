@@ -1,5 +1,5 @@
 /**
- * Explicit support-organization access: vocabulary, mode resolution, and the
+ * Explicit support-organization access: vocabulary, the on/off switch, and the
  * exact allowlists a support grant can reach.
  *
  * Dependency-free on purpose. `apps/web`, `packages/web-shared`, and tests all

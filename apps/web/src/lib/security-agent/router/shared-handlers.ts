@@ -267,8 +267,8 @@ async function resolveAuditReportOwner(
 }
 
 /**
- * Enforced support access removes the platform-admin unmask even for a real
- * member admin; observe mode preserves today's behavior.
+ * When support access is ON the platform-admin unmask is removed, even for a
+ * real member admin; OFF preserves today's behavior.
  */
 function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
   if (isSupportAccessEnabled()) return false;

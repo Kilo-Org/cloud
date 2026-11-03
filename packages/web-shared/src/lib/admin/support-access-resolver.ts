@@ -51,15 +51,15 @@ async function findUsableGrant(params: {
         eq(support_access_grants.organization_id, params.organizationId),
         eq(support_access_grants.status, 'active'),
         sql`${support_access_grants.expires_at} > now()`,
-        params.requiredActionClass === 'support_write'
-          ? eq(support_access_grants.action_class, 'support_write')
-          : inArray(support_access_grants.action_class, ['support_read', 'support_write']),
         eq(kilocode_users.is_admin, true),
         isNull(kilocode_users.blocked_reason),
         isNull(organizations.deleted_at)
       )
     )
-    .orderBy(desc(support_access_grants.expires_at))
+    .orderBy(
+      sql`${support_access_grants.action_class} = ${params.requiredActionClass} DESC`,
+      desc(support_access_grants.expires_at)
+    )
     .limit(1);
 
   return row && row.expiresAt !== null
@@ -92,10 +92,7 @@ export async function latestSupportGrantStatus(params: {
 
 /**
  * Evaluates whether an active support grant authorizes one exact surface.
- *
- * `mode` gates whether the grant is honored: only `enforce` returns a
- * `SupportContext`. `observe` still measures the decision so telemetry can show
- * what the cutover would do.
+ * Callers only invoke this while `SUPPORT_ACCESS_ENABLED` is on.
  */
 export async function evaluateSupportAccess(params: {
   actorKiloUserId: string;

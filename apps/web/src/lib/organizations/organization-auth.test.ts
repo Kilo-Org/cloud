@@ -520,7 +520,48 @@ describe('getAuthorizedOrgContext', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.nextResponse.status).toBe(404);
+      expect(result.nextResponse.status).toBe(403);
+      await expect(result.nextResponse.json()).resolves.toMatchObject({
+        code: 'support_access_not_allowlisted',
+      });
+    }
+  });
+
+  test('when on, a grant lookup failure returns a retryable 503', async () => {
+    enableSupportAccess(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const originalSelect = db.select.bind(db);
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === support_access_grants) {
+                throw new Error('grant lookup failed');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+        supportKey: '/api/organizations/[id]/defaults',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.nextResponse.status).toBe(503);
+        await expect(result.nextResponse.json()).resolves.toMatchObject({
+          code: 'support_grant_lookup_failed',
+        });
+      }
+    } finally {
+      selectSpy.mockRestore();
     }
   });
 

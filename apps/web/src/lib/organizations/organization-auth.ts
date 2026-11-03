@@ -19,9 +19,9 @@ import {
   observeMembershipRole,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   findSupportAllowEntry,
+  isSupportAccessEnabled,
   supportStandInRole,
   type OrganizationAccess,
   type SupportActionClass,
@@ -64,7 +64,7 @@ export async function getAuthorizedOrgContext(
     requestMethod?: string;
     /**
      * Exact allowlist key for a support grant. Omitted means support is never
-     * accepted here, even in enforce mode.
+     * accepted here, even when support access is on.
      */
     supportKey?: string | null;
     /** Required for a REST write; REST reads default to `support_read`. */
@@ -194,6 +194,25 @@ export async function getAuthorizedOrgContext(
       warnInSentry(
         `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
       );
+      const supportReason = supportAccessReasonFromError(accessError);
+      if (supportReason === 'support_grant_lookup_failed') {
+        return {
+          success: false,
+          nextResponse: NextResponse.json(
+            { error: 'Support access could not be verified', code: supportReason },
+            { status: 503 }
+          ),
+        };
+      }
+      if (supportReason !== null) {
+        return {
+          success: false,
+          nextResponse: NextResponse.json(
+            { error: 'Support access required', code: supportReason },
+            { status: 403 }
+          ),
+        };
+      }
       const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
       return { success: false, nextResponse: res };
     }
@@ -207,6 +226,13 @@ export async function getAuthorizedOrgContext(
       access,
     },
   });
+}
+
+function supportAccessReasonFromError(error: TRPCError): string | null {
+  const cause = error.cause;
+  if (cause === null || typeof cause !== 'object') return null;
+  const reason = (cause as { supportAccessReason?: unknown }).supportAccessReason;
+  return typeof reason === 'string' ? reason : null;
 }
 
 function roleForAccess(

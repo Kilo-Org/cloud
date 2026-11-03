@@ -144,6 +144,36 @@ describe('admin.supportAccess request', () => {
     ]);
   });
 
+  test('concurrent approvals of one pending grant produce exactly one success', async () => {
+    const requester = await insertRequester();
+    const first = await insertRequester();
+    const second = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const pending = await (
+      await createCallerForUser(requester.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+
+    const results = await Promise.allSettled([
+      (await createCallerForUser(first.id)).admin.supportAccess.approve({
+        grantId: pending.id,
+      }),
+      (await createCallerForUser(second.id)).admin.supportAccess.approve({
+        grantId: pending.id,
+      }),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ code: 'CONFLICT' });
+  });
+
   test('concurrent requests produce exactly one open grant', async () => {
     const requester = await insertRequester();
     const { organization } = await orgWithOwner();

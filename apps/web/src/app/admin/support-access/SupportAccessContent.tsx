@@ -364,7 +364,7 @@ export function SupportAccessContent() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={deny.isPending}
+                          disabled={deny.isPending || grant.actorKiloUserId === currentUserId}
                           onClick={() => deny.mutate({ grantId: grant.id })}
                         >
                           Deny
@@ -478,7 +478,7 @@ export function SupportAccessContent() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={review.isPending}
+                        disabled={review.isPending || grant.actorKiloUserId === currentUserId}
                         onClick={() => review.mutate({ grantId: grant.id })}
                       >
                         Mark reviewed

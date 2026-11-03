@@ -293,12 +293,12 @@ function deniedAccessError(params: {
 }
 
 /**
- * The single mode-aware decision point for organization access.
+ * The single support-access decision point for organization access.
  *
  * - A real membership role always passes and never queries a grant.
- * - `off`/`observe` keep today's `is_admin` -> `owner` shortcut, recording the
- *   decision enforcement would have reached.
- * - `enforce` admits only `member` or an active, allowlisted `SupportContext`.
+ * - OFF keeps today's `is_admin` -> `owner` shortcut.
+ * - ON admits only `member` or an active, allowlisted `SupportContext`; admins
+ *   who are real members keep their real role.
  */
 export async function resolveOrganizationAccess(
   ctx: OrganizationAccessContext,
@@ -313,9 +313,13 @@ export async function resolveOrganizationAccess(
     try {
       rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId);
     } catch (membershipError) {
-      // Elevation telemetry must never be the reason a request fails, and an
-      // admin fallback still has to work when the membership read is unavailable.
       if (!ctx.user.is_admin) throw membershipError;
+      if (isSupportAccessEnabled()) {
+        // ON must fail closed: an unreadable membership could otherwise look
+        // like a non-member and produce a misleading grant-required denial.
+        throw supportLookupFailedError();
+      }
+      // OFF: elevation telemetry must never be the reason a request fails.
       membershipObserved = false;
       rows = [];
     }
@@ -340,21 +344,46 @@ export async function resolveOrganizationAccess(
     });
   }
 
+  if (!enabled) {
+    const observation = {
+      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
+      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
+    };
+    if (!options.skipOrganizationLiveness) {
+      const organizationResult = settle(
+        db
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+          .limit(1)
+      );
+      const result = await organizationResult;
+      if (!result.ok) {
+        // Parent ordering: a lookup failure is attributed before rethrowing.
+        await recordKiloAdminElevation(ctx, {
+          reason: options.auditReason ?? 'organization_access',
+          target: organizationTarget(organizationId),
+          ...observation,
+        });
+        throw result.error;
+      }
+      if (!result.value[0]) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+    }
+    await recordKiloAdminElevation(ctx, {
+      reason: options.auditReason ?? 'organization_access',
+      target: organizationTarget(organizationId),
+      ...observation,
+    });
+    return { kind: 'legacy_admin', role: 'owner' };
+  }
+
   if (!options.skipOrganizationLiveness) {
     const live = options.organizationIsLive ?? (await isLiveOrganization(organizationId));
     if (!live) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
     }
-  }
-
-  if (!enabled) {
-    await recordKiloAdminElevation(ctx, {
-      reason: options.auditReason ?? 'organization_access',
-      target: organizationTarget(organizationId),
-      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
-      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
-    });
-    return { kind: 'legacy_admin', role: 'owner' };
   }
 
   if (rows.length > 0) {
@@ -409,10 +438,17 @@ export async function resolveOrganizationAccess(
     return evaluation.access;
   }
 
-  const grantStatus = await latestSupportGrantStatus({
-    actorKiloUserId: ctx.user.id,
-    organizationId,
-  });
+  let grantStatus: 'expired' | 'revoked' | null = null;
+  if (evaluation.decision === 'deny_no_grant') {
+    try {
+      grantStatus = await latestSupportGrantStatus({
+        actorKiloUserId: ctx.user.id,
+        organizationId,
+      });
+    } catch {
+      throw supportLookupFailedError();
+    }
+  }
   await recordKiloAdminElevation(ctx, {
     reason: options.auditReason ?? 'organization_access',
     target: organizationTarget(organizationId),

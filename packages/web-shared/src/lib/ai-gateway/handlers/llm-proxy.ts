@@ -965,7 +965,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     boundedSpending: requestCostLimit !== null,
-    vercelDisabled: organizationGatewaySettings.disabledGateways.has('vercel'),
+    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,

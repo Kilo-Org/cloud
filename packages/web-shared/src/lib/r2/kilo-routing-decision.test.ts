@@ -35,7 +35,7 @@ const decision: ProviderRoutingDecision = {
       outcome: 'selected',
       gateway: 'openrouter',
       bounded_spending: false,
-      organization_vercel_disabled: false,
+      organization_disabled_vercel_ai_gateway: false,
       kilo_ignored_providers: [],
     },
   ],

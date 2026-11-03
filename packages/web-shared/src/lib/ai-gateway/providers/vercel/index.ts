@@ -1,4 +1,5 @@
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { GetProviderInput } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -65,10 +66,23 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 }
 
 export async function shouldRouteToVercel(
-  requestedModel: string,
-  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>,
-  boundedSpending: boolean
+  {
+    requestedModel,
+    boundedSpending,
+    organizationDisabledVercelAiGateway,
+  }: Pick<
+    GetProviderInput,
+    'requestedModel' | 'boundedSpending' | 'organizationDisabledVercelAiGateway'
+  >,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
+  if (organizationDisabledVercelAiGateway) {
+    console.debug(
+      `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because the organization disabled it`
+    );
+    return false;
+  }
+
   if (boundedSpending) {
     console.debug(
       `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because a spend ceiling is set`

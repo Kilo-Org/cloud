@@ -869,7 +869,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: false,
-          organization_vercel_disabled: false,
+          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: [],
         },
       ],
@@ -1565,13 +1565,15 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       [{ disable_openrouter: true }, ['org-1'], false],
     ] as const)(
       'tells provider selection whether the organization turned Vercel off (%j, %j)',
-      async (settings, organizationIds, vercelDisabled) => {
+      async (settings, organizationIds, organizationDisabledVercelAiGateway) => {
         setOrganization(settings, { gateway_settings: [...organizationIds] });
 
         const { handleLlmProxyRequest } = await import('./llm-proxy');
         await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
-        expect(mockedGetProvider.mock.calls[0]?.[0].vercelDisabled).toBe(vercelDisabled);
+        expect(mockedGetProvider.mock.calls[0]?.[0].organizationDisabledVercelAiGateway).toBe(
+          organizationDisabledVercelAiGateway
+        );
       }
     );
 

@@ -15,6 +15,7 @@ import {
   getWorktreeFileQueryKey,
   groupWorktreeChangesByDirectory,
   groupWorktreeChangesByScope,
+  groupWorktreeChangesByRepository,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -286,6 +287,16 @@ describe('saved worktree changes cache', () => {
   ])('does not replace newer or equal saved revisions', incoming => {
     expect(preserveNewerWorktreeChanges({ snapshot }, { snapshot: incoming })).toEqual({
       snapshot,
+    });
+  });
+
+  it('keeps the repositories of a multi-repository snapshot', () => {
+    const repositories = [
+      { path: 'web', repoFullName: 'acme/web', comparison: snapshot.comparison, truncated: false },
+    ];
+    const grouped = { ...snapshot, repositories };
+    expect(preserveNewerWorktreeChanges(undefined, { snapshot: grouped })).toEqual({
+      snapshot: grouped,
     });
   });
 
@@ -1038,6 +1049,81 @@ describe('buildWorktreeChangesTree', () => {
           },
         ],
       },
+    ]);
+  });
+});
+
+describe('groupWorktreeChangesByRepository', () => {
+  const comparison = (baseRef: string) => ({
+    baseRef,
+    mergeBase: 'a'.repeat(40),
+    head: 'b'.repeat(40),
+  });
+  const file = (path: string): WorktreeChangesFile => ({
+    path,
+    revision: 3,
+    status: 'modified',
+    additions: 1,
+    deletions: 0,
+    tracked: true,
+    binary: false,
+    countsComplete: true,
+  });
+  const grouped = (
+    files: string[],
+    repositories: NonNullable<WorktreeChangesSnapshot['repositories']>
+  ): WorktreeChangesSnapshot => ({ ...snapshot, files: files.map(file), repositories });
+  const byRepository = (value: WorktreeChangesSnapshot | undefined) =>
+    groupWorktreeChangesByRepository(value, value?.files ?? []);
+  const web = {
+    path: 'web',
+    repoFullName: 'acme/web',
+    comparison: comparison('origin/main'),
+    truncated: false,
+  };
+  const api = {
+    path: 'api',
+    repoFullName: 'acme/api',
+    comparison: comparison('origin/dev'),
+    truncated: true,
+  };
+
+  it('shows the plain list for a V1 snapshot and for a single repository', () => {
+    expect(byRepository(snapshot)).toBeNull();
+    expect(byRepository(undefined)).toBeNull();
+    expect(byRepository(grouped(['src/a.ts'], [{ ...web, path: '' }]))).toBeNull();
+  });
+
+  it('groups files by repository in the order the snapshot lists them', () => {
+    const result = byRepository(grouped(['api/src/b.ts', 'web/a.ts', 'web/src/c.ts'], [web, api]));
+    expect(result?.map(group => [group.repoFullName, group.baseRef, group.truncated])).toEqual([
+      ['acme/web', 'origin/main', false],
+      ['acme/api', 'origin/dev', true],
+    ]);
+    expect(result?.map(group => group.files.map(f => f.path))).toEqual([
+      ['web/a.ts', 'web/src/c.ts'],
+      ['api/src/b.ts'],
+    ]);
+  });
+
+  it('does not match a path that only shares a name prefix with a repository', () => {
+    expect(byRepository(grouped(['web-extra/a.ts'], [web, api]))).toBeNull();
+  });
+
+  it('groups only the given files and leaves out a repository without files', () => {
+    const value = grouped(['web/a.ts', 'api/b.ts'], [web, api]);
+    const result = groupWorktreeChangesByRepository(value, [file('web/a.ts')]);
+    expect(result?.map(group => [group.repoFullName, group.files.map(f => f.path)])).toEqual([
+      ['acme/web', ['web/a.ts']],
+    ]);
+  });
+
+  it('gives a file to the repository with the longest matching path', () => {
+    const nested = { ...api, path: 'web/vendor/api' };
+    const result = byRepository(grouped(['web/vendor/api/x.ts', 'web/y.ts'], [web, nested]));
+    expect(result?.map(group => group.files.map(f => f.path))).toEqual([
+      ['web/y.ts'],
+      ['web/vendor/api/x.ts'],
     ]);
   });
 });

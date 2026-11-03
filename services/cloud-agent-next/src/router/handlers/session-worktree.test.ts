@@ -134,6 +134,7 @@ type OwnershipFixture = {
   parentSessionId: string | null;
   cloudAgentSessionScopeId: string | null;
   gitUrl: string | null;
+  gitBranch?: string | null;
   profileId?: string | null;
 };
 
@@ -271,12 +272,12 @@ function ledgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedger
   };
 }
 
-function makeDb(results: OwnershipFixture[][]): WorkerDb {
-  const limit = vi.fn(async () => results.shift() ?? []);
+function makeDb(results: unknown[][]): WorkerDb {
+  const next = vi.fn(async () => results.shift() ?? []);
   return {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({ limit })),
+        where: vi.fn(() => ({ limit: next, orderBy: next })),
       })),
     })),
   } as unknown as WorkerDb;
@@ -286,7 +287,7 @@ function fixture(options?: {
   organizationId?: string;
   userId?: string;
   metadata?: SessionMetadata;
-  ownershipResults?: OwnershipFixture[][];
+  ownershipResults?: unknown[][];
   internalSecret?: string;
   runtimeIsolationEnabled?: string;
   botId?: string;
@@ -629,6 +630,145 @@ describe('createWorktreeChat request validation and authorization', () => {
       worktreeId: WORKTREE_ID,
     });
     expect(generateSessionIdMock).toHaveBeenCalledWith();
+  });
+
+  it.each(['cloud-agent-web', 'agent-manager', 'desktop'])(
+    'creates a sibling from an inherited %s child workspace root without granting MCP',
+    async createdOnPlatform => {
+      verifyKiloTokenForPolicyMock.mockResolvedValue({
+        claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+      });
+      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+      metadata.identity.createdOnPlatform = createdOnPlatform;
+      metadata.parentCloudAgentSessionId = ALTERNATE_SOURCE_WORKSPACE_ID;
+      metadata.allowSubagentSessions = false;
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[ownershipRow({ createdOnPlatform, organizationId: ORGANIZATION_ID })]],
+      });
+
+      await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+        cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+        kiloSessionId: DESTINATION_KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
+      });
+      expect(admitOperationMock).toHaveBeenCalled();
+      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata;
+      expect(registered.identity.createdOnPlatform).toBe(createdOnPlatform);
+      expect(registered.allowSubagentSessions).toBe(false);
+    }
+  );
+
+  it.each(['agent-manager', 'desktop'])(
+    'rejects a non-child %s source on the legacy sibling endpoint',
+    async createdOnPlatform => {
+      const metadata = sourceMetadata();
+      metadata.identity.createdOnPlatform = createdOnPlatform;
+      const { caller, input } = fixture({
+        metadata,
+        ownershipResults: [[ownershipRow({ createdOnPlatform })]],
+      });
+
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('allows a non-child agent-manager source on the unified workspace endpoint', async () => {
+    const metadata = sourceMetadata();
+    metadata.identity.createdOnPlatform = 'agent-manager';
+    admitOperationMock.mockRejectedValueOnce(new Error('admission-reached'));
+    const { caller } = fixture({
+      metadata,
+      ownershipResults: [
+        [{ organizationId: null, deletionStartedAt: null }],
+        [ownershipRow({ createdOnPlatform: 'agent-manager', gitBranch: null, profileId: null })],
+      ],
+    });
+
+    await expect(
+      caller.createHostedWorkspaceSession({
+        workspaceId: WORKTREE_ID,
+        operationKey: OPERATION_KEY,
+        clientProvenance: 'agent-manager',
+        message: { prompt: 'Sibling chat' },
+        agent: { mode: 'code', model: 'test-model' },
+      })
+    ).rejects.toThrow('admission-reached');
+    expect(admitOperationMock).toHaveBeenCalled();
+  });
+
+  it('rejects a non-child desktop source on the unified workspace endpoint', async () => {
+    const metadata = sourceMetadata();
+    metadata.identity.createdOnPlatform = 'desktop';
+    const { caller } = fixture({
+      metadata,
+      ownershipResults: [
+        [{ organizationId: null, deletionStartedAt: null }],
+        [ownershipRow({ createdOnPlatform: 'desktop', gitBranch: null, profileId: null })],
+      ],
+    });
+
+    await expect(
+      caller.createHostedWorkspaceSession({
+        workspaceId: WORKTREE_ID,
+        operationKey: OPERATION_KEY,
+        clientProvenance: 'agent-manager',
+        message: { prompt: 'Sibling chat' },
+        agent: { mode: 'code', model: 'test-model' },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'a V1 environment',
+      environment: {
+        environmentId: '11111111-1111-4111-8111-111111111111',
+        owner: { type: 'user' as const, id: USER_ID },
+        configurationRevision: 3,
+        repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+      },
+    },
+    {
+      name: 'a V2 environment with the branch of each repository',
+      environment: {
+        environmentId: '11111111-1111-4111-8111-111111111111',
+        owner: { type: 'user' as const, id: USER_ID },
+        configurationRevision: 3,
+        repositories: [
+          {
+            identity: { platform: 'github' as const, repoFullName: 'acme/repo' },
+            repoFullName: 'acme/repo',
+            leaf: 'repo',
+            branch: 'feature/shared',
+          },
+          {
+            identity: { platform: 'github' as const, repoFullName: 'acme/api' },
+            repoFullName: 'acme/api',
+            leaf: 'api',
+            branch: 'feature/api',
+          },
+        ],
+      },
+    },
+  ])('copies $name and the generated branch to the sibling', async ({ environment }) => {
+    const metadata = sourceMetadata();
+    metadata.environment = environment;
+    metadata.workspace = { ...metadata.workspace, generatedBranchName: 'kilo/quiet-river-abc' };
+    const { caller, input, destinationStub } = fixture({ metadata });
+
+    await caller.createWorktreeChat(input);
+
+    const registered = parseSessionMetadata({
+      ...destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata,
+      metadataSchemaVersion: 2,
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(registered.environment).toEqual(environment);
+    expect(registered.workspace?.generatedBranchName).toBe('kilo/quiet-river-abc');
   });
 });
 

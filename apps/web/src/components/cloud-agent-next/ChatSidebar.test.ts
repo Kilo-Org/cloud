@@ -275,6 +275,7 @@ describe('ChatSidebar row rendering', () => {
         reviewDecision: null,
         reviewDecisionPending: false,
         platform: 'github',
+        observations: null,
       },
     });
     const title = 'Cloud Agent sidebar session titles should remain readable when truncated';
@@ -308,6 +309,35 @@ describe('ChatSidebar row rendering', () => {
 
     renderSidebar({ sessions: [session] });
     expect(row?.querySelector('[role="tooltip"]')?.textContent).toBe(session.repository);
+  });
+
+  it('lets the owner choose which chat a worktree opens, newest first', () => {
+    const older = makeSession(2, { worktreeId: 'worktree_choice' });
+    const newer = makeSession(1, { worktreeId: 'worktree_choice' });
+    const onOpenSession = jest.fn();
+    const onOpenWorktree = jest.fn();
+    const onMobileSheetOpenChange = jest.fn();
+    renderSidebar({
+      sessions: [older, newer],
+      onOpenSession,
+      onOpenWorktree,
+      onMobileSheetOpenChange,
+    });
+
+    act(() =>
+      dom.container
+        .querySelector<HTMLButtonElement>(
+          '[data-worktree-id="worktree_choice"] button[aria-label^="Open worktree"]'
+        )
+        ?.click()
+    );
+
+    expect(onOpenWorktree).toHaveBeenCalledWith('worktree_choice', [
+      newer.sessionId,
+      older.sessionId,
+    ]);
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(onMobileSheetOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('waits for the worktree name instead of flashing a repository label', () => {

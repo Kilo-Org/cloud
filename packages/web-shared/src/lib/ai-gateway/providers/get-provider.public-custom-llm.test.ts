@@ -15,10 +15,6 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const OTHER_ORG_ID = '00000000-0000-4000-8000-000000000002';
@@ -56,8 +52,6 @@ function providerInput(
 }
 
 describe('getProvider with public custom LLMs', () => {
-  useKiloExclusiveModel();
-
   beforeAll(async () => {
     await insertCustomLlmForTest(
       'acme/public-model',
@@ -72,11 +66,6 @@ describe('getProvider with public custom LLMs', () => {
     await insertCustomLlmForTest(
       'acme/multi-api-model',
       publicCustomLlmDefinition(['acme'], { api_kinds: ['chat_completions', 'responses'] }),
-      encryptedApiKey
-    );
-    await insertCustomLlmForTest(
-      kiloExclusiveModelFixture.public_id,
-      publicCustomLlmDefinition(['acme']),
       encryptedApiKey
     );
     await insertCustomLlmForTest(
@@ -111,7 +100,6 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/public-web-model');
     await deleteCustomLlmForTest('acme/private-model');
     await deleteCustomLlmForTest('acme/multi-api-model');
-    await deleteCustomLlmForTest(kiloExclusiveModelFixture.public_id);
     await deleteCustomLlmForTest('acme/priced-public-model');
     await deleteCustomLlmForTest('acme/priced-private-model');
     await deleteCustomLlmForTest('acme/country-denied-public-model');
@@ -175,15 +163,6 @@ describe('getProvider with public custom LLMs', () => {
       provider: { supportedChatApis: ['chat_completions', 'responses'] },
     });
     expect(single).toMatchObject({ provider: { supportedChatApis: ['chat_completions'] } });
-  });
-
-  test('routes a Kilo-exclusive id to the Kilo-exclusive model while it exists', async () => {
-    const result = await getProvider(
-      providerInput(kiloExclusiveModelFixture.public_id, user, undefined)
-    );
-
-    expect(result.kind).toBe('provider');
-    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.type);
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {

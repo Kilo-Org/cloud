@@ -1,17 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
-import { findKiloExclusiveModel, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModelExcludingCustomLlms,
 } from './is-free-model';
 import { getRandomNumber } from './getRandomNumber';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-
-useKiloExclusiveModel();
 
 describe('isFreeModelExcludingCustomLlms', () => {
   test('returns a boolean synchronously', () => {
@@ -39,36 +32,9 @@ describe('isFreeModelExcludingCustomLlms', () => {
       expect(isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for Kilo exclusive models', async () => {
-      expect(kiloExclusiveModels).toContain(kiloExclusiveModelFixture);
-      for (const model of kiloExclusiveModels) {
-        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-      }
-    });
-
-    test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
-      expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
-      expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
-    });
-
-    test.each([
-      'tencent/hy3:free',
-      'meituan/longcat-2.0-free',
-      'nex-agi/nex-n2.5-pro:free',
-      'stepfun/step-5-preview-free',
-      'stealth/cat-jam',
-      'stealth/glyph-cluster',
-      'reflection/beam-free',
-    ])('removes %s from exclusive models', modelId => {
-      expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
-      expect(findKiloExclusiveModel(modelId)).toBeNull();
-    });
-
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
-      'inherits %s without an exclusive definition',
-      async model => {
-        expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
-        expect(findKiloExclusiveModel(model)).toBeNull();
+      'treats %s as free',
+      model => {
         expect(isFreeModelExcludingCustomLlms(model)).toBe(true);
       }
     );
@@ -147,12 +113,6 @@ describe('isFreeModelExcludingCustomLlms', () => {
 });
 
 describe('hasBestEffortGuessDataCollectionRequirement', () => {
-  test('requires data collection for Kilo-exclusive models', async () => {
-    expect(
-      await hasBestEffortGuessDataCollectionRequirement(kiloExclusiveModelFixture.public_id)
-    ).toBe(true);
-  });
-
   test('requires data collection for free models', async () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('openrouter/free')).toBe(true);
   });

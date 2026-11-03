@@ -89,6 +89,9 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('./useSavedWorktreeChanges', () => ({
+  useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
+}));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),

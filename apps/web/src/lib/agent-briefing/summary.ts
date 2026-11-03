@@ -116,8 +116,8 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  * batch variant, or one missing from a populated model snapshot - is refused as
  * not allowed, so a quote is never issued for a model the picker never offers.
  * The entries the picker builds from code win over a catalog row with the same
- * id and keep their own price, as the picker does. Exclusive and custom pricing
- * tiers are selected at the input token bound, as gateway admission does.
+ * id and keep their own price, as the picker does. Custom pricing tiers are
+ * selected at the input token bound, as gateway admission does.
  */
 async function briefingPriceRates(
   model: string,

@@ -4,6 +4,10 @@
 // a forge connection. Every read is answered below over the usual tRPC
 // boundary; writes are rejected before any mutation function runs.
 
+import {
+  type ProviderPrChecksResult,
+  type ProviderPrSummary,
+} from '@kilocode/app-shared/provider-review';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
@@ -25,6 +29,10 @@ export type PrReviewOverviewFixtureSurface =
   | 'overview'
   | 'overview-no-checks'
   | 'overview-multi-group'
+  | 'overview-blocked'
+  | 'overview-merged'
+  | 'overview-auto-merge'
+  | 'merge-request'
   | 'merge-request-missing'
   | 'merge-request-error';
 
@@ -32,17 +40,27 @@ export type PrReviewOverviewFixtureSurface =
  * What each overview surface reads. The GitHub surfaces differ only in the
  * shape of the checks answer — one run, no runs, and one run per status group —
  * because the Review button and the merge section below that card must keep one
- * position after the first settled frame in all three.
+ * position after the first settled frame in all three. `overview-auto-merge`
+ * keeps the single-run checks and turns auto-merge on, which is the only shape
+ * that draws the merge section's auto-merge banner.
  */
 const SURFACE_READS = {
-  overview: { scope: 'github', checks: 'one-run' },
-  'overview-no-checks': { scope: 'github', checks: 'no-runs' },
-  'overview-multi-group': { scope: 'github', checks: 'multi-group' },
-  'merge-request-missing': { scope: 'gitlab', checks: 'one-run' },
-  'merge-request-error': { scope: 'gitlab', checks: 'one-run' },
+  overview: { scope: 'github', checks: 'one-run', autoMerge: false },
+  'overview-no-checks': { scope: 'github', checks: 'no-runs', autoMerge: false },
+  'overview-multi-group': { scope: 'github', checks: 'multi-group', autoMerge: false },
+  'overview-blocked': { scope: 'github', checks: 'one-run', autoMerge: false },
+  'overview-merged': { scope: 'github', checks: 'one-run', autoMerge: false },
+  'overview-auto-merge': { scope: 'github', checks: 'one-run', autoMerge: true },
+  'merge-request': { scope: 'gitlab', checks: 'one-run', autoMerge: false },
+  'merge-request-missing': { scope: 'gitlab', checks: 'one-run', autoMerge: false },
+  'merge-request-error': { scope: 'gitlab', checks: 'one-run', autoMerge: false },
 } as const satisfies Record<
   PrReviewOverviewFixtureSurface,
-  { readonly scope: 'github' | 'gitlab'; readonly checks: 'one-run' | 'no-runs' | 'multi-group' }
+  {
+    readonly scope: 'github' | 'gitlab';
+    readonly checks: 'one-run' | 'no-runs' | 'multi-group';
+    readonly autoMerge: boolean;
+  }
 >;
 
 const headSha = '0123456789abcdef0123456789abcdef01234567';
@@ -95,6 +113,47 @@ export const reviewOverviewFixture = {
     viewerLogin: 'ada',
   },
 } satisfies RouterOutputs['githubPrReview']['getPullRequest'];
+
+/** The overview a review decision holds back: the merge section's blocked arm. */
+const blockedOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
+  ...reviewOverviewFixture,
+  mergeableState: 'blocked',
+  reviewDecision: 'CHANGES_REQUESTED',
+};
+
+/** The overview of an already-merged PR: the merge section's terminal arm. */
+const mergedOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
+  ...reviewOverviewFixture,
+  state: 'merged',
+  mergeableState: 'unknown',
+  mergedAt: '2026-01-03T00:00:00.000Z',
+  mergedBy: { login: 'ada', avatarUrl: null },
+};
+
+/**
+ * The same pull request with auto-merge queued. The merge section draws the
+ * auto-merge banner from `autoMerge` and nothing else, so this is the only
+ * fixture shape that shows the copy which names the queued method.
+ */
+const autoMergeOverviewFixture: RouterOutputs['githubPrReview']['getPullRequest'] = {
+  ...reviewOverviewFixture,
+  autoMerge: { method: 'squash' },
+};
+
+function githubOverviewFixture(
+  surface: PrReviewOverviewFixtureSurface
+): RouterOutputs['githubPrReview']['getPullRequest'] {
+  if (surface === 'overview-blocked') {
+    return blockedOverviewFixture;
+  }
+  if (surface === 'overview-merged') {
+    return mergedOverviewFixture;
+  }
+  if (surface === 'overview-auto-merge') {
+    return autoMergeOverviewFixture;
+  }
+  return reviewOverviewFixture;
+}
 
 const reviewChecksFixture = {
   checkRuns: [
@@ -150,6 +209,40 @@ const reviewChecksMultiGroupFixture = {
   rollup: { total: 4, success: 1, failure: 1, pending: 1, skipped: 1 },
 } satisfies RouterOutputs['githubPrReview']['listChecks'];
 
+/**
+ * The GitLab merge request the provider surfaces read: the same review the
+ * overview fixture renders, in the shape the provider read layer returns, so
+ * the provider arm goes through its real normalizer.
+ */
+const mergeRequestSummary = {
+  ref: { platform: 'gitlab', projectPath: 'sample/review-copy', mrIid: 1 },
+  title: 'Review copy',
+  body: 'Sample merge request.',
+  author: { login: 'ada', avatarUrl: null },
+  state: 'open',
+  draft: false,
+  headRef: 'review-copy',
+  baseRef: 'main',
+  headSha,
+  changedFiles: 2,
+  additions: 3,
+  deletions: 1,
+  webUrl: 'https://gitlab.example.com/sample/review-copy/-/merge_requests/1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-02T00:00:00.000Z',
+} satisfies ProviderPrSummary;
+
+const providerChecksFixture = {
+  checks: [
+    {
+      name: 'Pipeline',
+      status: 'success',
+      conclusion: 'success',
+      detailsUrl: null,
+    },
+  ],
+} satisfies ProviderPrChecksResult;
+
 const CHECKS_BY_SHAPE = {
   'one-run': reviewChecksFixture,
   'no-runs': reviewChecksNoRunsFixture,
@@ -191,15 +284,21 @@ function createFixtureClient(surface: PrReviewOverviewFixtureSurface) {
             throw new Error('Review overview fixture does not allow writes');
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
-            return fixtureResponse(reviewOverviewFixture);
+            return fixtureResponse(githubOverviewFixture(surface));
           }
           if (url.includes('/githubPrReview.listChecks')) {
             return fixtureResponse(CHECKS_BY_SHAPE[SURFACE_READS[surface].checks]);
           }
           if (url.includes('/providerReview.getPullRequest')) {
+            if (surface === 'merge-request') {
+              return fixtureResponse(mergeRequestSummary);
+            }
             return surface === 'merge-request-missing'
               ? providerErrorResponse('NOT_FOUND', 404)
               : providerErrorResponse('INTERNAL_SERVER_ERROR', 500);
+          }
+          if (url.includes('/providerReview.listChecks')) {
+            return fixtureResponse(providerChecksFixture);
           }
           throw new Error('Read not provided by the review overview fixture');
         },

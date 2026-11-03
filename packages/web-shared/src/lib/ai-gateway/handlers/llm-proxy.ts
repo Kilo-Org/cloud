@@ -1078,7 +1078,9 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`);
+  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`, {
+    byokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
+  });
 
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);

@@ -769,7 +769,7 @@ describe('ConversationMessages', () => {
           textPart('child-answer', 'Child transcript stays in the drawer.'),
           toolPart('child-running', 'read', {
             status: 'running',
-            input: { filePath: '/repo/src/parser.ts' },
+            input: { filePath: `/cloud-agent/sessions/${childSessionId}/src/parser.ts` },
             time: { start: 4 },
           }),
         ],
@@ -829,7 +829,7 @@ describe('ConversationMessages', () => {
     expect(childControl).toContain('>Explore<');
     expect(childControl).not.toContain('explore Agent');
     expect(childControl).toMatch(/<title>Working<\/title>[\s\S]*Inspect the parser/);
-    expect(childControl).toContain('>Read parser.ts<');
+    expect(childControl).toContain('>Read src/parser.ts<');
     expect(childControl).not.toContain('Latest:');
     expect(childControl).toContain('2 tool calls');
     expect(childControl).toContain('aria-busy="true"');
@@ -854,7 +854,7 @@ describe('ConversationMessages', () => {
     'keeps latest child activity visible after its state becomes %s',
     status => {
       const sessionId = `ses_${'c'.repeat(26)}`;
-      const input = { filePath: '/repo/package.json' };
+      const input = { filePath: `/cloud-agent/sessions/${sessionId}/package.json` };
       const state: ToolPart['state'] =
         status === 'pending'
           ? { status, input, raw: '' }
@@ -908,7 +908,7 @@ describe('ConversationMessages', () => {
         assistantMessage('child-2', [
           toolPart('next-read', 'read', {
             status: 'running',
-            input: { filePath: '/repo/README.md' },
+            input: { filePath: `/cloud-agent/sessions/${sessionId}/README.md` },
             time: { start: 4 },
           }),
         ])

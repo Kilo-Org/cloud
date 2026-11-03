@@ -44,8 +44,6 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
-      kiloExclusiveModelIds: [],
-      unavailableModelIds: noUnavailableModels,
     });
 
     expect(freeVariant.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
@@ -67,32 +65,12 @@ describe('applyFreeEndpointDataPolicy', () => {
         [{ provider: { slug: 'novita' }, models: [model] }],
         noUnavailableModels
       ),
-      kiloExclusiveModelIds: [],
-      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
   });
 
-  test('applies a Kilo-exclusive model to every provider', () => {
-    const first = offering('example/model');
-    const second = offering('example/model');
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [
-        { provider: { slug: 'novita' }, models: [first] },
-        { provider: { slug: 'deepinfra' }, models: [second] },
-      ],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModelIds: ['example/model:free'],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(first.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-    expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-  });
-
-  test('ignores unavailable OpenRouter and exclusive free models', () => {
+  test('ignores unavailable OpenRouter free models', () => {
     const freeVariant = offering('google/gemma-4-31b-it:free', true);
     const model = offering('google/gemma-4-31b-it');
     const providerModelData = [{ provider: { slug: 'darkbloom' }, models: [freeVariant, model] }];
@@ -101,8 +79,6 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints: getOpenRouterFreeEndpoints(providerModelData, unavailableModelIds),
-      kiloExclusiveModelIds: ['google/gemma-4-31b-it:free'],
-      unavailableModelIds,
     });
 
     expect(freeVariant.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
@@ -121,8 +97,6 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
-      kiloExclusiveModelIds: [],
-      unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });

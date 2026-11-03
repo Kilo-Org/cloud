@@ -94,7 +94,7 @@ export function genericPushContentForPushData(
       // A status change (analysis finished, remediation queued, …) is not an
       // outstanding finding, so it must not reuse the finding body.
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.securityUpdate',

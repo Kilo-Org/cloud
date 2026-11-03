@@ -1,4 +1,3 @@
-import type { GetProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayChatApiKind,
@@ -109,7 +108,17 @@ export type RoutingDecisionResult =
       payer: Payer | null;
       is_free: boolean;
     }
-  | { kind: Exclude<GetProviderResult['kind'], 'provider'> };
+  | { kind: 'chatgpt-reconnect' | 'custom-llm-unavailable' | 'direct-byok-catalog-only' };
+
+/** The parts of a `getProvider` result the decision reports. */
+type DecidedProviderResult =
+  | {
+      kind: 'provider';
+      provider: { type: ProviderType };
+      userByok: { providerId: UserByokProviderId }[] | null;
+      isFree: boolean;
+    }
+  | Exclude<RoutingDecisionResult, { kind: 'provider' }>;
 
 export type ProviderRoutingDecision = {
   requested_model: string;
@@ -183,7 +192,7 @@ export function createRoutingDecisionRecorder(
         });
       }
     },
-    finish(result: GetProviderResult): ProviderRoutingDecision {
+    finish(result: DecidedProviderResult): ProviderRoutingDecision {
       let decisionResult: RoutingDecisionResult;
       if (result.kind === 'provider') {
         const selected = steps.findLast(isSelectedStep);

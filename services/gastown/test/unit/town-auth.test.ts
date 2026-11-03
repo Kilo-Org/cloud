@@ -124,6 +124,22 @@ describe('townAuthMiddleware', () => {
     });
   });
 
+  it('lets an org member read an org town through the user route', async () => {
+    config({ owner_type: 'org', organization_id: 'org-1' });
+    const { app: a, decide } = app({
+      userId: 'member-1',
+      memberships: [{ orgId: 'org-1', role: 'member' }],
+      decision: { allowed: false },
+    });
+    const response = await a.request(
+      `http://localhost/api/users/member-1/towns/${town}/events`,
+      {},
+      {} as never
+    );
+    expect(response.status).toBe(200);
+    expect(decide).not.toHaveBeenCalled();
+  });
+
   it("rejects a user-target capability for another user's town", async () => {
     config({ owner_type: 'user', owner_user_id: 'owner-2' });
     const { app: a, decide } = app({ userId: 'admin-1', decision: { allowed: true } });

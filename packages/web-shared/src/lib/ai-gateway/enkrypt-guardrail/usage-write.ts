@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
 
 export const ENKRYPT_USAGE_WRITE_PATH = '/api/internal/enkrypt-usage/record';
@@ -15,7 +16,7 @@ export const EnkryptUsageWriteSchema = z.strictObject({
     'responses',
   ] satisfies EnkryptGuardrailApiKind[]),
   decision: z.enum(['allowed', 'blocked', 'error'] satisfies EnkryptGuardrailDecision[]),
-  creditsCost: z.number().nonnegative().nullable(),
+  creditsCost: z.number().nonnegative().max(MAX_ENKRYPT_CREDITS_PER_CALL).nullable(),
   addedLatencyMs: z.number().int().nonnegative().nullable(),
 });
 

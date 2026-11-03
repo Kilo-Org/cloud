@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { enkrypt_usage, organizations } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
 import type { EnkryptUsageWrite } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
@@ -82,6 +83,10 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     ['a non-UUID id', (write: EnkryptUsageWrite) => ({ ...write, id: 'usage-1' })],
     ['an unknown decision', (write: EnkryptUsageWrite) => ({ ...write, decision: 'maybe' })],
     ['negative credits', (write: EnkryptUsageWrite) => ({ ...write, creditsCost: -1 })],
+    [
+      'credits above the per-call maximum',
+      (write: EnkryptUsageWrite) => ({ ...write, creditsCost: MAX_ENKRYPT_CREDITS_PER_CALL + 1 }),
+    ],
     ['a missing field', ({ creditsCost: _creditsCost, ...write }: EnkryptUsageWrite) => write],
     ['an unexpected field', (write: EnkryptUsageWrite) => ({ ...write, prompt: 'secret text' })],
   ])('rejects %s without writing', async (_name, makeBody) => {
@@ -118,6 +123,31 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     expect(await microdollarsUsed(usageWrite.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
+  });
+
+  test('reports a failed write without logging query parameters', async () => {
+    const usageWrite = await usageWriteForNewOrganization();
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(db, 'transaction').mockRejectedValueOnce(
+      Object.assign(new Error(`Failed query: insert ... params: ${usageWrite.kiloUserId}`), {
+        cause: Object.assign(new Error('violates foreign key'), {
+          code: '23503',
+          constraint: 'fk_test',
+        }),
+      })
+    );
+
+    const response = await post(usageWrite);
+
+    expect(response.status).toBe(500);
+    expect(consoleError).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] failed to record usage in the primary region',
+      {
+        usage_id: usageWrite.id,
+        error: expect.objectContaining({ code: '23503', constraint: 'fk_test' }),
+      }
+    );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(usageWrite.kiloUserId);
   });
 
   test('accepts a handoff from recordEnkryptUsageInPrimaryRegion', async () => {

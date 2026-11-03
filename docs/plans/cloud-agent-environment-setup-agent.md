@@ -31,9 +31,11 @@ result, they revert it in one click.
 |---|---|
 | Publication | Automatic when the completion gate passes. The previous configuration is kept, so the user can revert in one click. |
 | Setup larger than 16,000 characters | The agent MAY open a PR that adds a setup script to the repository. The environment's script then calls that file. See §8. |
-| Network | Uses the environment network controls from #8899. The user owns the policy (None / Limited / Full, plus extra hosts, and request overrides). The agent records a **minimum network** the environment needs, and restricted policies always include it. See §10. |
-| Where secrets go | In a write-only form attached to the setup run, inside the chat and in the environment editor. The start form also accepts secrets up front. See "Secrets". |
-| Snapshot builds | Not part of the gate (see "What exists today"). Every owner is tested with a child session. Organizations that have snapshots enabled also get a snapshot build after publish. |
+| Network | Uses the environment network controls from #8899. Only the user changes the policy (None / Limited / Full, plus extra hosts, and request overrides). The agent records a **minimum network** the environment needs. When the policy is restricted, the user must approve every host the agent adds. See §10. |
+| Network of setup and test sessions | They follow the same resolution as any session: organization settings and defaults (once they exist), then the environment's policy, then the platform default. The setup feature never grants a broader policy. |
+| Dropping the minimum for one session | Not supported for now. A follow-up shows a **suggestion** the user can adopt (§10). |
+| Where secrets go | Only in the existing environment editor's Variables page, opened from a request notice in the chat. The chat itself never shows input fields. The start form also accepts secrets up front. See "Secrets". |
+| Snapshot builds | Enabled for every owner, including personal accounts (`ENVIRONMENT_SNAPSHOT_ORG_IDS="*"` on main). Every publish triggers a snapshot build. A build only runs the setup and does not run smoke checks, so the gate stays the child-session test. |
 | Usage attribution | No special handling. Setup and test sessions are ordinary Cloud Agent sessions, billed to the same owner like any other session. |
 
 ## What exists today
@@ -48,7 +50,9 @@ result, they revert it in one click.
 | UI | `EnvironmentDialog` (overview / scripts / variables / network), `RepositoryEnvironmentChip`, settings `EnvironmentsSection` | `apps/web/src/components/cloud-agent-next/` |
 | How a session uses an environment | Preflight picks the environment for implicit origins. `requestedEnvironment` picks one explicitly. The setup script runs with `bash -e -o pipefail` after clone, in `/workspace/<name>` (one repo) or `/workspace` (several). Timeouts are 5 min without output and 8 min total. A failure is reported as `workspace_setup_failed`. | `session-creation-preflight.ts`, `wrapper/src/control-plane/repository-preparation.ts:266` |
 | Revision on session | `EnvironmentReference.configurationRevision` records which revision a session ran with. | `packages/cloud-agent-profile/src/environment-contracts.ts:183` |
-| Snapshot builds | The **Build** button in the environment editor (`EnvironmentBuildPanel`). It runs the saved setup in a fresh builder container and saves a disk snapshot, so later sessions start faster. It is enabled only for organizations listed in `ENVIRONMENT_SNAPSHOT_ORG_IDS`. Personal accounts are never enabled. | `services/cloud-agent-next/src/environment-build/` |
+| Snapshot builds | The **Build** button in the environment editor (`EnvironmentBuildPanel`). It runs the saved setup in a fresh builder container and saves a disk snapshot, so later sessions start faster. Enabled for every owner, personal accounts included (`ENVIRONMENT_SNAPSHOT_ORG_IDS="*"`). | `services/cloud-agent-next/src/environment-build/`, `wrangler.jsonc` |
+| Organization network settings | None exist on main. Today a session's network comes from the request or the environment (#8899). | — |
+| Secret exposure at runtime | Environment secrets are decrypted into the environment of every session that uses the environment. The agent in those sessions can read them (`env`). Output redaction (`redactsNamedSecrets`) masks known values on a best-effort basis; it is not a guarantee. | `services/cloud-agent-next/docs/control-plane.md:629` |
 | Platform tools inside the sandbox | The `kilo-cloud-agent` MCP receives a `delegated-workload` JWT with a `cloudAgentAuthority` claim. Its allowlist covers only child-session and folder procedures, so it **cannot read or change environments**. | `packages/worker-utils/src/cloud-agent-authority.ts`, `services/kilo-mcp/src/child-session-tools.ts` |
 | Egress audit | Opt-in, bounded audit of the hosts a sandbox contacted. Requires `cloudflare-containers`. | #7608, `packages/worker-utils/src/egress-audit.ts` |
 
@@ -59,16 +63,22 @@ What this means for the design:
   one environment, it now has two. Slack, webhook and scheduled sessions then
   start with **no** environment (spec start rule 16). Editing an existing
   environment in place would also give every session the unverified changes.
-- **Testing cannot depend on snapshot builds,** because builds are enabled for
-  only some organizations. Every owner is tested with a normal child session
-  that names the draft explicitly.
+- **Snapshot builds are not the test.** They are available to everyone, but they
+  only prove that setup exits 0. A normal child session that names the draft
+  runs setup, the network policy and the agent's smoke checks.
 - **The agent needs a new, narrow authority.** Today's user-level MCP catalog
   exposes all of `cloudEnvironments.*`, which is the user's full power. The
   sandbox authority must reach only one draft.
 - **Test children need the draft's network policy, not the parent's.**
-  Under #8899 a scoped child inherits its parent's recorded network policy. For
-  a test child this must change: it uses the draft's policy, but only when that
-  policy is no broader than the parent's (§6).
+  Under #8899 a scoped child inherits its parent's recorded network policy. A
+  test child must instead use the draft's policy, and every part of that policy
+  must be set or approved by the user (§6, §10).
+- **A secret request is new; secret exposure is not.** Secrets in an environment
+  already reach every session that uses it. What the agent changes is that it
+  *asks* for credentials. That is a phishing-shaped interaction, and repository
+  content can steer it through prompt injection. The design has to make the
+  request look and behave like platform UI, not like the agent asking for a
+  password ("Secrets").
 
 ## User flow
 
@@ -89,7 +99,8 @@ What this means for the design:
    visible first message, and preparation and agent work stream as usual.
 4. **While the agent works,** a setup-run card in the chat header shows:
    - The status.
-   - Any secrets the agent requested.
+   - Pending requests: secrets and network hosts the agent asked for, each with
+     a button that opens the environment editor (no inputs on the card).
    - The difference between the draft and the current environment.
    - The latest test: which revision, whether preparation passed and how long
      setup took, the agent's smoke checks, and a link to the test chat.
@@ -97,8 +108,8 @@ What this means for the design:
 5. **Publication.** When the gate passes, the draft is published automatically
    (§7) and the card shows **Published**. A **Revert** button restores the
    previous configuration. A new environment has no earlier version, so its
-   button is **Delete** instead. Snapshot-enabled organizations then get a
-   snapshot build.
+   button is **Delete** instead. A snapshot build starts automatically. The
+   Published card lists any secrets and network hosts the run added.
 6. **Talking to the agent.** The user can message the agent at any time to answer
    its `question` prompts or to redirect it. **Ask agent to change…** is just a
    chat follow-up. A change after publish opens a new run that refines the
@@ -106,25 +117,83 @@ What this means for the design:
 
 ### Secrets
 
-The agent never sees secret values, and values never pass through chat. Secrets
-can enter in three ways:
+#### What is and is not protected
 
-1. **The start form's Secrets field.** Good for keys the user knows up front.
-2. **A secret request from the agent.** The agent calls
-   `request_environment_secrets` with keys and a reason for each, for example
-   `STRIPE_TEST_SECRET_KEY — used by the payments integration tests the
-   requirement mentions`. The chat shows an inline **secrets card**, similar to
-   a question card, with one password field per key. The same form appears on
-   the run card in the environment editor. Submitting it:
-   - Writes the encrypted values into the draft, using the same storage as the
-     editor's secrets.
-   - Marks the request as satisfied.
-   - Sends the agent a follow-up that names the keys but contains no values.
-   The user can instead mark a key **Skip — not needed**, and the agent must
-   adapt.
+- **Protected:** secret values never pass through chat, prompts, tool results,
+  commits or logs. No setup tool returns a value. Values are stored encrypted,
+  exactly like secrets entered in the editor today.
+- **Not protected, and the UI must say so:** once saved, a secret is available
+  as an environment variable to every session that uses the environment. That
+  includes the agent's test sessions and, after publication, every future
+  session, including other organization members' sessions. Any agent in those
+  sessions can read it. Output redaction is best-effort. This is how
+  environment secrets work today; the setup agent does not change it.
+- **The new risk is the request itself.** An agent asking for credentials looks
+  like phishing. Repository content or the requirement text can also steer the
+  agent (prompt injection) into asking for a high-value credential with a
+  plausible reason. If that secret later reaches a session with open network
+  access, it can be exfiltrated.
+
+#### Design
+
+Secrets enter in three ways.
+
+1. **The start form's Secrets field.** It is the standard `KEY=value` editor,
+   for keys the user knows up front.
+2. **A request from the agent.** The agent calls `request_environment_secrets`
+   with, for each key:
+   - the key name;
+   - a reason;
+   - **references**: where the repository uses the key, as
+     `{repository, path, line}`, for example `apps/web/.env.example:42`.
+
+   **The chat never shows an input field.** It shows a platform notice in
+   distinct system styling, never rendered from agent markdown: "The setup
+   agent requested 2 secrets for environment *cloud (draft)*", with an **Add
+   secrets** button. The button opens the **existing environment editor** on
+   its Variables page for the draft. The requested keys are listed there as
+   pending entries, each with:
+   - the agent's reason, labelled "Reason given by the agent";
+   - links to each reference at the commit being set up. For GitHub, the server
+     checks that the key name actually appears at that path. If it does not,
+     the entry says "Not found in the repository";
+   - fixed platform copy: "Stored encrypted in *environment name*. Every session
+     that uses this environment can read it, including other members' sessions
+     in *organization*. Prefer a test or restricted key."
+   - a high-privilege warning when the name matches patterns such as
+     `AWS_SECRET_ACCESS_KEY`, `*_ADMIN*`, `*PROD*`, `GITHUB_TOKEN`,
+     `*_SERVICE_ROLE*`, or when the requirement text does not mention the key's
+     integration.
+
+   **Skip — not needed** is always available, and the run never waits on the
+   user without an end (Failure UX). Saving or skipping:
+   - writes the encrypted values into the draft, using the editor's existing
+     storage and the existing `cloudEnvironments.update` permission checks;
+   - marks each request `provided` or `skipped`;
+   - sends the agent a follow-up that names the keys and their states but
+     contains no values.
 3. **Values the agent generates itself,** such as a random local
    `NEXTAUTH_SECRET`. The agent writes them through `update_environment_draft`.
-   They are stored as secrets and never echoed back.
+   They are stored as secrets and never echoed back. The Published card lists
+   them as "Generated by the agent".
+
+**Limits:**
+- At most 10 keys per request and 20 per run.
+- Keys follow the existing key rules and reserved names.
+- The agent cannot request a key that already holds a value in the draft. To
+  replace one, it explains why in chat and the user edits it in the editor.
+
+**Why this should earn trust:**
+- Values are typed only into the screen where users already manage environment
+  secrets, never into something that looks like chat.
+- The user sees where the key will be stored and who can read it.
+- The user sees the evidence for the request (the key in the repository's own
+  files) and can always skip.
+- The agent itself is shown as untrusted: its reason is labelled as the agent's,
+  and its references are checked.
+
+**Follow-up:** warn when a user pastes something that looks like a secret into
+the chat composer during a setup run, and point them to the editor.
 
 When a draft refines an existing environment, the draft starts with that
 environment's secrets. The encrypted envelopes are copied server-side without
@@ -171,8 +240,9 @@ migration comes after #8899's `0331`.
   needs (§10).
   - It uses the same hostname validation as `egress_allowlist`.
   - Like `egress_allowlist`, it is a build input.
-  - Only the setup agent or the editor sets it. The editor shows it read-only,
-    with a "Clear" action.
+  - The setup agent adds to it directly only under Full. Under a restricted
+    policy, hosts enter only after the user approves them. The editor shows the
+    list read-only, with a "Clear" action.
 - The V1 partial unique indexes need a `where status = 'active'` predicate, so
   that a V1-era repository can still get a draft.
 
@@ -188,8 +258,9 @@ migration comes after #8899's `0331`.
 | `requirements` | `text` |
 | `model`, `variant` | `text` |
 | `cloud_agent_session_id` | `text` (`workspace_*`) |
-| `status` | `text`, one of `starting`, `running`, `needs_secrets`, `verifying`, `waiting_for_merge`, `published`, `publish_conflict`, `failed`, `cancelled`, `reverted` |
-| `requested_secrets` | `jsonb`: `[{key, reason, state: 'pending'\|'provided'\|'skipped'}]`. Never contains values. |
+| `status` | `text`, one of `starting`, `running`, `needs_secrets`, `needs_approval`, `verifying`, `waiting_for_merge`, `published`, `publish_conflict`, `failed`, `cancelled`, `reverted` |
+| `requested_secrets` | `jsonb`: `[{key, reason, references: [{repository, path, line, verified?}], state: 'pending'\|'provided'\|'skipped'}]`. Never contains values. |
+| `network_requests` | `jsonb`: `[{kind: 'host', host, reason, evidence: {deniedCount, firstSeenAt, childSessionId}, state: 'pending'\|'approved'\|'declined'}]`. Used only when the user's policy is restricted (§10). |
 | `setup_pull_request` | `jsonb`: `{platform, repository, number, url, branch, state}` or null |
 | `last_verification` | `jsonb`: `{childSessionId, configurationRevision, preparation: 'pending'\|'succeeded'\|'failed', failureReason?, setupDurationMs, egressMode, observedHosts?, checks: [{name, passed, evidence}], reportedAt}` |
 | `verification_count` | `int` |
@@ -252,7 +323,8 @@ A new `setupRuns` sub-router, behind the release toggle
 |---|---|
 | `setupRuns.start` | **Input:** `{organizationId?, repositories, requirements, model, variant?, name?, targetEnvironmentId?, secrets?, operationKey}`.<br>**Checks before creating anything:** repository access (`assertEnvironmentRepositoriesAccess`), that an isolated sandbox is offered, the balance, and the toggle.<br>**Then:** creates the draft and the run, and starts the session (§4).<br>**Returns:** `{runId, cloudAgentSessionId}`. Idempotent on `operationKey`. |
 | `setupRuns.get` / `setupRuns.listForEnvironment` | Run state, the draft view (keys only for secrets), and the difference from the target. Also derives failure from the session's terminal state (see Failure UX). |
-| `setupRuns.provideSecrets` | `{runId, secrets: [{key, value}], skipped?: string[]}`. Writes encrypted values to the draft and sends the agent a follow-up without values. |
+| `setupRuns.provideSecrets` | `{runId, secrets: [{key, value}], skipped?: string[]}`. Called by the environment editor's Variables page when it is opened for a draft with pending requests. Writes encrypted values to the draft and sends the agent a follow-up without values. |
+| `setupRuns.resolveNetworkRequests` | `{runId, approved: string[], declined: string[]}`. Called from the editor's Network page. Approved hosts are added to the draft's `egress_required_hosts`, and the agent gets a follow-up. |
 | `setupRuns.publish` | Manual publish, used for `publish_conflict`, `waiting_for_merge` (publish before merge) or `failed`. Needs `force: true` when the draft is unverified. |
 | `setupRuns.revert` | §2 `revertSetupRun`. |
 | `setupRuns.cancel` | Interrupts the setup session and its test children through the existing interrupt path, and marks the run `cancelled`. The draft is kept until cleanup. |
@@ -264,8 +336,9 @@ role, the run is not terminal, and the draft id equals the authority's.
 | Procedure | Purpose |
 |---|---|
 | `setupRuns.agent.getDraft` | Returns everything the agent needs to plan:<br>• the requirements (marked as user data);<br>• the repositories, their sandbox paths and the setup working directory;<br>• commands and plaintext vars, plus the keys of secrets;<br>• the allocation and the allocations offered with their sizes;<br>• network: the user's mode and allowlist, the required hosts, the baseline description, and whether the owner's sandbox can enforce allowlists or audit;<br>• limits (`ENVIRONMENT_LIMITS`, timeouts, reserved keys);<br>• the revision, the last test result and the setup PR. |
-| `setupRuns.agent.updateDraft` | `{expectedRevision, script?, plainVars?, secrets?: [{key, value} \| {key, delete:true}], sandboxAllocation?, requiredHosts?, egressMode?, egressAllowlist?}`. Returns the new revision. **Network rule:** the agent may change `egressMode` or `egressAllowlist` only when the user's requirement asks for it, or when the draft is new and has no policy. Otherwise it changes only `requiredHosts` (§10). The server enforces the "existing policy" half of this rule. |
-| `setupRuns.agent.requestSecrets` | `{secrets: [{key, reason}]}`. Sets the status to `needs_secrets`. |
+| `setupRuns.agent.updateDraft` | `{expectedRevision, script?, plainVars?, secrets?: [{key, value} \| {key, delete:true}], sandboxAllocation?, requiredHosts?}`. Returns the new revision. **Network rule, enforced by the server:** the agent never changes `egressMode` or `egressAllowlist`. `requiredHosts` is accepted directly only when the user's policy is Full or unset. Under a restricted policy it is rejected with "use `request_network_hosts`" (§10). |
+| `setupRuns.agent.requestSecrets` | `{secrets: [{key, reason, references}]}`. Validates the limits, verifies the references where possible, and sets the status to `needs_secrets`. |
+| `setupRuns.agent.requestNetworkHosts` | `{hosts: [{host, reason, childSessionId}]}`. Only under a restricted policy. The server attaches evidence from that child's egress audit: the host must appear there as `denied`, otherwise the request is rejected. Sets the status to `needs_approval`. A request to change the policy itself (for example "this needs Full access") goes through `fail` or a chat message, never a tool. |
 | `setupRuns.agent.recordVerification` | `{childSessionId}`, then `{checks}`. See §6. |
 | `setupRuns.agent.recordSetupPullRequest` | `{platform, repository, number, branch}`. The server checks that the PR exists, belongs to a draft repository and targets its default branch (§8). |
 | `setupRuns.agent.complete` | `{summary}`. Gated, and then publishes automatically (§7). |
@@ -289,13 +362,19 @@ general catalog.
 - **Network of the setup session.**
   - The setup session itself runs with `egressAudit: true` when the owner's
     sandbox supports it.
-  - Its egress mode is the **broader** of the draft's policy and `unrestricted`
-    while exploring. The agent must be able to find out what is needed before
-    the policy narrows it.
-  - Because it is unrestricted, its children are free to use the draft's
-    narrower policy (§6).
-  - An organization that forbids unrestricted sessions cannot start a run in
-    this mode; this case needs a product decision before implementation.
+  - Its egress policy is resolved **exactly like any other session**:
+    organization settings and defaults (none exist on main yet; they apply once
+    they do), then the draft's policy (copied from the target, or unset for a
+    new environment), then the platform default. The setup feature adds no
+    exception and never widens the policy.
+  - Under a restricted policy, the audit's `denied` records show the agent what
+    is missing. It asks for those hosts through `request_network_hosts` (§10).
+    Its own policy stays fixed for the life of the session; approved hosts take
+    effect in its test children.
+  - If organization settings forbid something the requirement needs (for
+    example a registry outside the organization's allowed hosts), the agent
+    calls `fail_environment_setup` with that specific reason. It does not try
+    to work around it.
 - **Preflight.**
   - Remove any `environmentSetupRunId` the client sent.
   - Accept it only from the authenticated web path, then check it against the
@@ -337,6 +416,7 @@ general catalog.
   - `get_environment_draft`
   - `update_environment_draft`
   - `request_environment_secrets`
+  - `request_network_hosts`
   - `verify_environment_draft`: spawns the test child (§6) with
     `callbackTarget: session:parent`, then records it.
   - `report_verification_checks`
@@ -361,11 +441,16 @@ There are two levels. The UI never overstates what was proven.
      revision. Real preparation runs: clone, variables and secrets, the setup
      script with its real timeouts and redaction, and the network policy.
    - **Network for the child.** Preflight checks `verificationOf` against the
-     parent's `environmentSetup` metadata. It then applies the **draft's**
-     effective policy, which is the user policy plus `egress_required_hosts`
-     (§10). This replaces the inherited parent policy only when the draft's
-     policy is no broader than the parent's recorded one; otherwise it fails
-     closed. When supported, the child also runs with `egressAudit: true`.
+     parent's `environmentSetup` metadata. It then resolves the child's policy
+     like any session on the draft: organization settings and defaults, then
+     the draft's effective policy (the user policy plus `egress_required_hosts`,
+     §10), instead of inheriting the parent's recorded policy.
+     - This is safe because every part of the draft's policy was set or approved
+       by the user. The agent cannot change the mode or allowlist, and under a
+       restricted policy it cannot add required hosts without approval.
+     - If the draft's policy cannot be loaded or validated, preflight fails
+       closed, as #8899 does for inherited policies.
+     - When supported, the child also runs with `egressAudit: true`.
    - The child's prompt asks it to run the agent's smoke checks and reply in a
      fixed structured format.
    - **Facts the platform verifies** (read from the child session's state, not
@@ -385,8 +470,9 @@ There are two levels. The UI never overstates what was proven.
 - `last_verification.configurationRevision` equals the draft's current revision.
 - Preparation succeeded.
 - Every smoke check reported as passed.
-- No secret request is still `pending`.
-- If the user's policy is restricted, the test ran under that restricted policy.
+- No secret request or network request is still `pending`.
+- The test ran under the policy that sessions will get after publication: the
+  same mode, allowlist and required hosts.
 - `verification_count ≤ MAX_VERIFICATIONS` (default 6).
 
 If any condition fails, the call is rejected and names the unmet condition.
@@ -402,8 +488,8 @@ After the gate passes, `agent.complete` calls `publishDraftEnvironment` in the
 same request.
 
 - **Success.** The status becomes `published`. `published_revision` is recorded,
-  `previous_configuration` is stored, and the agent's summary is shown. For
-  snapshot-enabled organizations, a build is requested with
+  `previous_configuration` is stored, and the agent's summary is shown. A
+  snapshot build is requested for every owner with
   `expectedRevision = published_revision`. Its result appears on the card but
   never changes the run status.
 - **The target changed meanwhile.** The status becomes `publish_conflict`, and
@@ -489,12 +575,16 @@ with its source in
   yourself. Request real third-party credentials from the user, with a reason
   for each.
 - **Network.**
-  - Derive `requiredHosts` from the setup session's audit and the child's audit,
-    for example package registries, container registries and toolchain
-    downloads. Exclude the server-owned baseline.
+  - Derive hosts from the egress audit of the setup session and the test
+    children, for example package registries, container registries and
+    toolchain downloads. Exclude the server-owned baseline.
+  - Under Full or no policy, record them directly as `requiredHosts`. Under a
+    restricted policy, ask with `request_network_hosts`, citing the child whose
+    audit denied them.
   - Keep the list minimal and justified.
-  - Never change the user's policy unless the requirement asks.
-  - When the user's policy is restricted, the clean test must pass under it.
+  - You cannot change the user's policy. If the requirement truly needs a
+    broader one, say so in chat or fail with that reason.
+  - The clean test must pass under the policy sessions will actually get.
 - **Smoke checks.** Define concrete checks that prove the requirement, not just
   "the script exited 0". Examples: `pnpm dev:status`, a health check with curl,
   one focused test.
@@ -511,9 +601,24 @@ Builds on #8899's `egress_mode` and `egress_allowlist`.
 - **User policy.** This is #8899 unchanged: None, Limited (plus extra hosts) or
   Full. It is owned by the user, who can edit it in the editor. Explicit session
   requests can still override it, as #8899 preserves.
+- **Organization settings and defaults.** None exist on main yet. Once they do,
+  they sit above the user policy, for the setup session and test children as
+  for every other session.
 - **Required hosts (minimum).** `egress_required_hosts` lists the hosts the
-  environment needs in order to work. The setup agent sets it from audit
-  evidence, and the editor shows it read-only with its justification.
+  environment needs in order to work. The editor shows it read-only with its
+  justification. How hosts get there depends on the user policy:
+  - **Full or unset:** the agent records them directly. They have no effect
+    until the user restricts the policy. When the user switches to None or
+    Limited, the editor shows the list prominently so the change is visible.
+  - **None or Limited:** every host is a **network request**. The agent cites
+    a test child whose audit shows the host as `denied`, and the server
+    attaches that evidence. The chat shows a platform notice with a **Review
+    hosts** button that opens the editor's Network page. There, each host shows
+    the agent's reason (labelled as the agent's), the evidence, and
+    Approve / Decline. Only approved hosts enter the draft.
+
+  Without this rule, an agent could widen the network of every future session
+  through automatic publication, without any user action.
 
 **Effective allowlist.** When the resolved mode is `allowlist`, whether it comes
 from the environment or from a request, the allowlist is:
@@ -539,6 +644,18 @@ required hosts in the editor, which is an explicit, visible choice.
 effect. `getDraft` tells the agent, and the agent still records it for
 documentation.
 
+**Follow-up: suggestions instead of overrides.** For now, no session request
+can drop the minimum. Later, the platform shows suggestions the user can adopt
+with one click, for example:
+- A required host that no session has contacted in the last N sessions (from
+  audit) gets a "Remove unused host" suggestion.
+- A user who starts a session with a narrower override that excludes required
+  hosts gets an offer of a saved variant of the environment without them, such
+  as an offline environment.
+
+Suggestions never apply themselves. Adopting one is an ordinary environment
+edit.
+
 ## Worked example: Kilo-Org/cloud + local dev stack
 
 1. **Start.** The user picks `Kilo-Org/cloud` and writes "set it up to use the
@@ -557,8 +674,9 @@ documentation.
      fake values.
 4. **Required hosts.** The audit shows `registry.npmjs.org`,
    `registry-1.docker.io`, `auth.docker.io`, `production.cloudflare.docker.com`
-   and others. The agent records them as `requiredHosts`. The user's policy
-   (Full) is left unchanged.
+   and others. The user's policy is Full, so the agent records them directly
+   as `requiredHosts`. Under Limited, the same hosts would be network requests
+   for the user to approve in the editor before the clean test.
 5. **First clean test.** Setup passes in 6m10s. The checks pass:
    `pnpm dev:status --json` reports all services healthy, and the fake login
    endpoint returns 200. The card shows a duration warning.
@@ -576,11 +694,12 @@ documentation.
 | 0 | **Docs.** Add a spec section "Environment setup agent" to `.specs/cloud-agent-session.md` covering: drafts excluded from matching, permissions, secrets, the gate, automatic publication and revert, the setup PR, and required hosts. Update `services/cloud-agent-next/docs/control-plane.md` for the `environmentSetup` metadata, the grant and the test child's network policy. | Spec reviewed; #8899 merged |
 | 1 | **Data and domain.** DB migration (draft status, required hosts, setup-run table). Domain service (create draft, publish, revert, matching exclusion, `allowDraft`). Cleanup job. | Unit tests: drafts never match implicitly; publish new and existing; revision conflict; envelope copy without decryption; revert |
 | 2 | **Authority and tools.** Authority v2 claim, scoped procedures, the `agent.*` web procedures, kilo-mcp tools, and grant issuance from session metadata. | Authority unit tests; kilo-mcp tests; router tests for the role re-check, the pinned run id and rejection of terminal runs |
-| 3 | **Start flow and UI.** `setupRuns.start/get/provideSecrets/cancel/publish/revert`, the prompt builder, the runtime skill, preflight acceptance, the start dialog, the run card and secrets card, and the toggle. | Local stack E2E with the fake LLM (`cloud-agent-local-testing` skill): start, draft update, secrets, publish, revert |
+| 3 | **Start flow and UI.** `setupRuns.start/get/provideSecrets/cancel/publish/revert`, the prompt builder, the runtime skill, preflight acceptance, the start dialog, the run card, the chat request notices, the editor's pending-secret entries (reason, references, storage and audience copy, high-privilege warning, GitHub reference check), and the toggle. | Local stack E2E with the fake LLM (`cloud-agent-local-testing` skill): start, draft update, secrets entered in the editor, skip, publish, revert. A design review of the secret request with a few users before GA. |
 | 4 | **Clean tests and automatic publication.** Test children with the draft's network policy and audit, the preparation-outcome read, the gate, automatic publication, the duration warning, and the test cap. | E2E: a failing script records `workspace_setup_failed` with its revision; a fixed script publishes; `complete` is rejected on a stale revision; a concurrent edit gives `publish_conflict` |
-| 5 | **Required hosts.** Column, preflight merge and editor display. Derivation from audit. | Spec and tests; a clean test in allowlist mode on `cloudflare-containers` |
+| 5 | **Required hosts.** Column, preflight merge and editor display. Derivation from audit. Network requests with audit evidence and approval in the editor. | Spec and tests; a clean test in allowlist mode on `cloudflare-containers`; `updateDraft` rejects `requiredHosts` under a restricted policy; a request without a matching `denied` audit record is rejected |
 | 6 | **Setup PR flow.** Record the PR, test on the PR branch, `waiting_for_merge`, publish on GitHub merge, `setup_pr_closed`. | E2E with a fixture repository; the merge webhook publishes only when the head matches the tested commit |
-| 7 | **Extras.** A snapshot build after publish for enabled organizations. A "Fix with agent" entry on `workspace_setup_failed`, prefilled with the failure. Rollout: internal organization first, then GA. | Toggle rollout |
+| 7 | **Extras.** A snapshot build after every publish. A "Fix with agent" entry on `workspace_setup_failed`, prefilled with the failure. Rollout: internal organization first, then GA. | Toggle rollout |
+| 8 | **Follow-ups.** Minimum-network suggestions (§10). A warning when a secret-like value is pasted into chat. Organization network settings, once they exist, picked up by normal resolution. | Separate plans |
 
 ## Failure UX
 
@@ -596,8 +715,12 @@ These follow the Failure UX rules in the root `AGENTS.md`.
   `running`.
 - **A test child fails preparation.** The failure is recorded and reaches the
   agent through the parent callback. It fails only that test, not the run.
-- **Waiting for secrets.** The agent's turn ends. Providing or skipping the
-  secrets resumes it promptly. After 7 days the run becomes `cancelled`.
+- **Waiting for secrets or host approval.** The agent's turn ends. Providing,
+  skipping, approving or declining resumes it promptly. After 7 days the run
+  becomes `cancelled`.
+- **A required host is declined, or organization settings block it.** The agent
+  continues without it. If the requirement cannot be met, it fails with the
+  specific host and reason.
 - **Waiting for the setup PR to merge.** The card explains what is pending.
   After 14 days without a merge, the run asks the user to publish now or cancel.
 - **The test cap is reached.** The run fails with "verification limit reached",
@@ -617,11 +740,23 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 - **Drafts stay private to the run.** They resolve only for the setup session,
   which carries a server-verified `environmentSetupRunId`, and for its direct
   test children, which have the draft pinned in their authority.
-- **Network.** A test child's policy is never broader than its parent's.
-  Required hosts must be valid exact hostnames. The editor shows each one, so
-  the minimum is always visible to the user.
+- **Network.**
+  - The agent cannot change the mode or allowlist.
+  - Under a restricted policy, it cannot add a host without the user's approval
+    and matching audit evidence.
+  - Every session, including setup and test sessions, follows organization
+    settings.
+  - Required hosts must be valid exact hostnames. The editor shows each one, so
+    the minimum is always visible to the user.
+- **Secret requests are untrusted input.** Inputs exist only in the environment
+  editor, never in chat. The agent's reason is labelled as the agent's, and its
+  references are checked where possible. The UI states who can read the secret,
+  warns on high-privilege names, and always allows Skip.
+- **Runtime exposure is unchanged and stated.** Saved secrets are readable by
+  every session that uses the environment, as today. The plan does not claim
+  more.
 - **How secret values travel:**
-  - from the user, through the start form or the secrets card;
+  - from the user, through the start form or the environment editor;
   - from the agent, through `updateDraft` (write-only);
   - between rows, as server-side envelope copies.
   They never appear in prompts, chat, tool results, commits or logs. The
@@ -644,8 +779,8 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 - **Integration (Workers):**
   - `allowDraft` is accepted only with a verified run;
   - the grant contains `environmentSetup` only for the setup session;
-  - the test child gets the draft's network policy only when it is no broader
-    than the parent's.
+  - the test child gets the draft's policy only with a verified
+    `verificationOf`, and fails closed when that policy cannot be validated.
 - **kilo-mcp:** tools are registered only with the claim, and arguments are
   pinned.
 - **Web router:**
@@ -655,7 +790,11 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 - **E2E (local stack, fake LLM, scripted tool calls):**
   - the happy path with automatic publication;
   - a failing script;
-  - needs secrets, then provided, then a clean test;
+  - needs secrets, then provided in the editor, then a clean test;
+  - a secret request with a reference that does not exist shows "Not found in
+    the repository";
+  - restricted policy: network request, approval, then a clean test under the
+    approved allowlist;
   - `complete` with a stale revision;
   - `publish_conflict`;
   - revert;
@@ -668,11 +807,10 @@ These follow the Failure UX rules in the root `AGENTS.md`.
 
 ## Remaining open questions
 
-1. **Organizations that forbid unrestricted network.** The setup session cannot
-   explore unrestricted there. Should it start under the user's restricted
-   policy and request additions? Or should starting a run be blocked until an
-   admin allows it?
-2. **Required hosts and request overrides.** Can an explicit API request
-   override (#8899) ever drop the required hosts, for example for an
-   intentionally air-gapped session? This plan says no; only clearing them in
-   the editor removes them.
+1. **Who approves network requests in an organization?** This plan uses the
+   environment manage role (owners and admins), the same as for editing. Should
+   the requesting user be able to approve hosts in their own run, or must a
+   second admin approve?
+2. **High-privilege secret patterns.** Is a warning enough, or should some names
+   (for example cloud root credentials) be refused for setup-run requests and
+   allowed only through manual editing?

@@ -115,8 +115,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 }));
 
 /** The R2 S3 origin every Kilo artifact presign names: the only host the crawl downloads from. */
-const STORAGE_ORIGIN =
-  'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com';
+const STORAGE_ORIGIN = 'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com';
 
 const USER_ID = 'user-1';
 const T1 = '2026-01-01T00:00:00.000Z';
@@ -146,7 +145,12 @@ function registerDownloads(h: ReturnType<typeof harness>, files: FileInput[]): v
 /** One stored message carrying a `file` part per artifact id. */
 function messageOf(ids: string[]): { parts: unknown[] } {
   return {
-    parts: ids.map(id => ({ id, mime: 'text/plain', type: 'file', url: `${STORAGE_ORIGIN}/${id}` })),
+    parts: ids.map(id => ({
+      id,
+      mime: 'text/plain',
+      type: 'file',
+      url: `${STORAGE_ORIGIN}/${id}`,
+    })),
   };
 }
 
@@ -458,7 +462,9 @@ describe('syncArtifactMirror crawling', () => {
 
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
     // The restart re-reads page one but never re-downloads what it already has.
-    expect(h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f1`)).toHaveLength(1);
+    expect(
+      h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f1`)
+    ).toHaveLength(1);
   });
 
   it('does not record a retryable failed page as a finished crawl and retries it next run', async () => {

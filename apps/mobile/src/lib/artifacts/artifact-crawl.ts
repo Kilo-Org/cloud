@@ -48,7 +48,6 @@ const R2_ACCOUNT_LABEL = /^[0-9a-f]{32}$/;
 /** Redirect hops a probe or a download follows before the artifact fails. */
 const MAX_ARTIFACT_REDIRECTS = 5;
 
-
 /** One artifact discovered in a session's stored messages. */
 export type CrawledArtifact = {
   /** Agent-supplied filename, absent when the part carries none. */

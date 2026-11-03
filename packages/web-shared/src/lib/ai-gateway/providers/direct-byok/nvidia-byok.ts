@@ -8,6 +8,7 @@ import {
 
 export default {
   id: 'nvidia-byok',
+  openrouter_inference_provider_id: 'nvidia',
   models_dev_id: 'nvidia',
   ...apiKeyUpstream({
     apiUrl: 'https://integrate.api.nvidia.com/v1',

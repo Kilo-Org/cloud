@@ -15,6 +15,9 @@ import {
   type BalanceOnlyResult,
 } from '../balance-validation.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
+import { withDORetry } from '../utils/do-retry.js';
+import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
 
 const SKIP_BALANCE_CHECK_HEADER = 'x-skip-balance-check';
 const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
@@ -24,6 +27,16 @@ const SESSION_SCOPED_MUTATIONS = new Set([
   'initiateFromKilocodeSessionV2',
   'send',
 ]);
+
+/**
+ * Balance-required mutations whose billing is deferred to the handler. The
+ * procedure stays in `BALANCE_REQUIRED_MUTATIONS` so the classification, auth
+ * and skip-header rejection still run; only the personal-scope charge is
+ * skipped. `continueHostedWorkspace` derives its payer (organization or
+ * personal) from its source sessions after authorizing them, which the
+ * middleware cannot see.
+ */
+const HANDLER_VALIDATED_BALANCE_MUTATIONS = new Set(['continueHostedWorkspace']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -78,6 +91,11 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     const balanceCalls = parsed.calls.filter(call =>
       BALANCE_REQUIRED_MUTATIONS.has(call.procedure)
     );
+    // Procedures that own their own balance check are excluded from the
+    // middleware charge but still count for authorization/classification.
+    const billedCalls = balanceCalls.filter(
+      call => !HANDLER_VALIDATED_BALANCE_MUTATIONS.has(call.procedure)
+    );
     const procedureLabel = balanceCalls.map(call => call.procedure).join(',');
     const skipBalanceCheck = c.req.header(SKIP_BALANCE_CHECK_HEADER) === 'true';
 
@@ -102,13 +120,18 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     if (!authToken || !userId) {
       return buildTrpcErrorResponse(401, 'Missing auth token', procedureLabel);
     }
+    const cloudAgentAuthority = c.get('cloudAgentAuthority');
 
     const validationCache = new Map<string, Promise<BalanceOnlyResult>>();
-    const validateScope = (orgId: string | undefined): Promise<BalanceOnlyResult> => {
-      const key = orgId ?? '';
+    const validateScope = (
+      token: string,
+      orgId: string | undefined,
+      tokenScope: 'user' | 'parent'
+    ): Promise<BalanceOnlyResult> => {
+      const key = `${tokenScope}:${orgId ?? ''}`;
       const cached = validationCache.get(key);
       if (cached) return cached;
-      const pending = validateBalanceOnly(authToken, orgId, c.env);
+      const pending = validateBalanceOnly(token, orgId, c.env);
       validationCache.set(key, pending);
       return pending;
     };
@@ -116,9 +139,18 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     let validatedSessionAccess: ValidatedSessionAccess | undefined;
     let sessionAccessCount = 0;
 
-    for (const call of balanceCalls) {
+    for (const call of billedCalls) {
       if (!isRecord(call.input)) {
         return buildTrpcErrorResponse(400, 'Invalid request body', call.procedure);
+      }
+
+      const authority =
+        cloudAgentAuthority !== undefined && call.procedure === 'sendMessageV2'
+          ? cloudAgentAuthority
+          : undefined;
+      const scopedFollowUp = authority !== undefined;
+      if (authority !== undefined && userId !== authority.ownerId) {
+        return buildTrpcErrorResponse(403, 'Cloud Agent parent binding mismatch', call.procedure);
       }
 
       const scope = extractBalanceRequestScope(call.procedure, call.input);
@@ -134,7 +166,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
             env: c.env,
             kiloUserId: userId,
             cloudAgentSessionId: scope.sessionId,
-            expectedOrganizationId: orgId,
+            expectedOrganizationId: authority === undefined ? orgId : authority.organizationId,
           });
           sessionAccessCount += 1;
           validatedSessionAccess = {
@@ -149,7 +181,33 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
         }
       }
 
-      const validationResult = await validateScope(orgId);
+      let token = authToken;
+      if (authority !== undefined) {
+        try {
+          token = await withDORetry(
+            () => getSandboxSessionStub(c.env, userId, authority.parentSessionId),
+            stub => stub.getCloudAgentSpawnRuntimeToken(authority),
+            'getCloudAgentSpawnRuntimeToken'
+          );
+        } catch (error) {
+          const denied =
+            error instanceof Error && error.message.includes(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+          return buildTrpcErrorResponse(
+            denied ? 403 : 503,
+            denied
+              ? 'Cloud Agent parent authorization unavailable'
+              : 'Cloud Agent parent authorization is temporarily unavailable',
+            call.procedure
+          );
+        }
+        orgId = authority.organizationId ?? undefined;
+      }
+
+      const validationResult = await validateScope(
+        token,
+        orgId,
+        scopedFollowUp ? 'parent' : 'user'
+      );
       if (!validationResult.success) {
         logger
           .withFields({ status: validationResult.status, procedure: call.procedure })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isInstallStateRefusal,
   type ScopeEntryLoadFailure,
   type ScopeEntryView,
   selectScopeEntryLoadFailure,
@@ -13,7 +14,7 @@ const base: SelectScopeEntryViewInput = {
   isLoading: false,
   isError: false,
   isDenied: false,
-  isGithubStatusUnknown: false,
+  isGithubStatusResolved: true,
   hasIntegration: true,
   hasPermissions: true,
   isEnabled: true,
@@ -74,21 +75,24 @@ describe('selectScopeEntryView', () => {
     expect(viewFor({ isEnabled: true })).toBe('dashboard');
   });
 
-  it('returns dashboard for an enabled scope whose GitHub status is unreadable', () => {
-    // The config read already decided the destination; only the connect /
-    // re-authorize choice needs the status, so its failure must not hold the
-    // enabled entry on the error screen.
-    expect(
-      viewFor({ isGithubStatusUnknown: true, hasIntegration: false, hasPermissions: false })
-    ).toBe('dashboard');
-  });
+  it.each(['pending', 'failed'])(
+    'returns dashboard for an enabled scope whose GitHub status is still %s',
+    () => {
+      // The config read already decided the destination; only the connect /
+      // re-authorize choice needs the status, so an unread one must not hold the
+      // enabled entry on a setup gate or the error screen.
+      expect(
+        viewFor({ isGithubStatusResolved: false, hasIntegration: false, hasPermissions: false })
+      ).toBe('dashboard');
+    }
+  );
 
-  it('keeps the error screen when the GitHub status is unreadable and the scope is not enabled', () => {
+  it('keeps the error screen when the GitHub status is unread and the scope is not enabled', () => {
     // Only the enabled destination is known from config alone. Connect vs
     // re-authorize needs the status, so the failure stays fatal there.
     expect(
       viewFor({
-        isGithubStatusUnknown: true,
+        isGithubStatusResolved: false,
         isError: true,
         isEnabled: false,
         hasIntegration: false,
@@ -97,8 +101,8 @@ describe('selectScopeEntryView', () => {
     ).toBe('error');
   });
 
-  it('keeps a denied scope denied even when the GitHub status is unreadable', () => {
-    expect(viewFor({ isGithubStatusUnknown: true, isDenied: true })).toBe('denied');
+  it('keeps a denied scope denied even when the GitHub status is unread', () => {
+    expect(viewFor({ isGithubStatusResolved: false, isDenied: true })).toBe('denied');
   });
 
   it('does not return a blank/redirect outcome for the disabled case', () => {
@@ -111,8 +115,8 @@ describe('selectScopeEntryView', () => {
 });
 
 /** A tRPC client rejection, as `readTrpcErrorField` reads it. */
-function serverError(code: string): Error {
-  return Object.assign(new Error('boom'), { data: { code, message: 'boom' } });
+function serverError(code: string, data: Record<string, unknown> = {}): Error {
+  return Object.assign(new Error('boom'), { data: { code, message: 'boom', ...data } });
 }
 
 const CONNECTION_DESCRIPTION = 'organization.boundary.loadErrorMessage';
@@ -127,6 +131,28 @@ function failureFor(patch: Partial<SelectScopeEntryLoadFailureInput>): ScopeEntr
     ...patch,
   });
 }
+
+describe('isInstallStateRefusal', () => {
+  it('reads the server’s role answer', () => {
+    expect(isInstallStateRefusal(serverError('UNAUTHORIZED'))).toBe(true);
+  });
+
+  it('keeps a session auth failure retryable, not a role answer', () => {
+    // `createTRPCContext` answers UNAUTHORIZED with `data.authRequired` when the
+    // session is invalid or missing. The app signs out on it; it is not the
+    // organization-role decision, and a personal scope has no owner to ask.
+    expect(isInstallStateRefusal(serverError('UNAUTHORIZED', { authRequired: true }))).toBe(false);
+  });
+
+  it('keeps every other failure retryable', () => {
+    // FORBIDDEN is the single-installation guard, not a missing role, and a
+    // transport rejection never reached the server at all.
+    expect(isInstallStateRefusal(serverError('FORBIDDEN'))).toBe(false);
+    expect(isInstallStateRefusal(serverError('INTERNAL_SERVER_ERROR'))).toBe(false);
+    expect(isInstallStateRefusal(new TypeError('Network request failed'))).toBe(false);
+    expect(isInstallStateRefusal(undefined)).toBe(false);
+  });
+});
 
 describe('selectScopeEntryLoadFailure', () => {
   it('names the connection when the failed read never reached the server', () => {

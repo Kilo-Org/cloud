@@ -153,7 +153,13 @@ function MarkdownRun({
           );
         }
         return run.language === 'mermaid' && run.closed ? (
-          <MarkdownMermaid key={`md-fence-${index}`} source={run.code} palette={palette} />
+          <MarkdownMermaid
+            key={`md-fence-${index}`}
+            source={run.code}
+            palette={palette}
+            selectable={selectable}
+            onCopyCode={onCopyCode}
+          />
         ) : (
           <MarkdownCodeFence
             key={`md-fence-${index}`}

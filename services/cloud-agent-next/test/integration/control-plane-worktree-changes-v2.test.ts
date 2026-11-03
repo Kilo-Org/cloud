@@ -33,6 +33,7 @@ import {
   WORKTREE_RECOVERY_KEY,
 } from '../../src/sandbox-session/worktree-changes.js';
 import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
+import { MAX_WORKTREE_CHANGES_BYTES } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -1275,6 +1276,46 @@ describe('control-plane worktree changes (B10)', () => {
       status: 'offline',
       snapshot: null,
     });
+  });
+
+  it('trims an over-budget saved snapshot to the largest prefix that fits when read', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const files = Array.from({ length: 1_000 }, (_, index) => ({
+      path: `${index}/${'漢"\\\n'.repeat(25)}`,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 0,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+      revision: 1,
+    }));
+    const sessionStub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      seed: storage =>
+        storage.kv.put(WORKTREE_CHANGES_KEY, {
+          ...SNAPSHOT_SUMMARY,
+          revision: 1,
+          schemaVersion: 2,
+          capturedAt: '2026-08-26T12:00:00.000Z',
+          files,
+        }),
+    });
+
+    const { snapshot: saved } = await sessionStub.getWorktreeChanges();
+    if (saved === null) throw new Error('Expected the seeded snapshot to be read back');
+    const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+    expect(saved.files).toEqual(files.slice(0, saved.files.length));
+    expect(saved.files.length).toBeLessThan(files.length);
+    expect(saved.truncated).toBe(true);
+    expect(bytes(saved)).toBeLessThanOrEqual(MAX_WORKTREE_CHANGES_BYTES);
+    expect(bytes({ ...saved, files: files.slice(0, saved.files.length + 1) })).toBeGreaterThan(
+      MAX_WORKTREE_CHANGES_BYTES
+    );
   });
 
   it('ignores a child-session worktree event and captures for its own', async () => {

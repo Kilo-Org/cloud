@@ -4,11 +4,13 @@ import { useTextHeight } from '@/components/agents/use-text-height';
 
 /**
  * Imperative surface the composer drives without rendering itself. A keystroke
- * pushes its text through `setText`, which re-renders only this leaf; nothing
- * about the 1400-line `ChatComposer` commits on a typed frame whose rendered
- * values did not change. A native content-size report goes through
- * `setNativeContentHeight` for the same reason: it only sharpens the pitch the
- * measured cap snaps to, so it must not re-render the composer either.
+ * pushes its text through `setText`, which re-renders only this leaf, and only
+ * while the change can move the measured height: an append to a draft that
+ * already fills the cap re-renders nothing at all. Nothing about the 1400-line
+ * `ChatComposer` commits on a typed frame whose rendered values did not change.
+ * A native content-size report goes through `setNativeContentHeight` for the
+ * same reason: it only sharpens the pitch the measured cap snaps to, so it must
+ * not re-render the composer either.
  */
 export type ChatComposerMeasureHandle = {
   setText: (text: string) => void;

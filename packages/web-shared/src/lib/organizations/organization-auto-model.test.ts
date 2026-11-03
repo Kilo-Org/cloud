@@ -7,7 +7,11 @@ import {
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -35,6 +39,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({ getByokCredential
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
   () => ({
+    getAllowedDirectByokCatalogModelIds: jest.fn(async () => new Set()),
     modelsServedByOrganizationInferenceProviderUserByok: jest.fn(async () => []),
   })
 );
@@ -45,6 +50,24 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokCatalogModelId: jest.fn(),
   supportsCatalogMode: (providerId: string) => providerId === 'synthetic',
 }));
+
+const mockedPolicyContext = jest.fn();
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: (...args: unknown[]) => mockedPolicyContext(...args),
+  })
+);
+
+function policyContext(defaultPolicies: unknown[] = []) {
+  return {
+    organization: { id: 'org-1', plan: 'enterprise', settings: {} },
+    defaultPolicies,
+    groupIds: [],
+    groupPolicies: [],
+    policyRevision: 1,
+  };
+}
 
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedGetCatalogModelId = jest.mocked(getDirectByokCatalogModelId);
@@ -60,6 +83,7 @@ function credential(serveCatalogModels: boolean): ByokCredential {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockedPolicyContext.mockResolvedValue(policyContext());
   mockedGetDirectByokModel.mockImplementation(async modelId =>
     modelId.startsWith('synthetic/')
       ? {
@@ -168,6 +192,44 @@ describe('validateOrganizationAutoTarget with organization inference provider ke
     expect(mockedServedModels).toHaveBeenCalledWith('org-1', ['moonshotai/kimi-k2.6']);
   });
 
+  test('accepts a model outside the provider allow-list that the default policy explicitly grants', async () => {
+    mockedPolicyContext.mockResolvedValue(
+      policyContext([
+        {
+          type: 'model_access',
+          data: {
+            mode: 'selected',
+            model_allow_list: ['moonshotai/kimi-k2.6'],
+            provider_allow_list: [],
+          },
+        },
+      ])
+    );
+
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ provider_allow_list: ['anthropic'] }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedPolicyContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-1', subject: { type: 'defaultAccess' } })
+    );
+  });
+
+  test('evaluates the default policy against the settings being validated', async () => {
+    mockedPolicyContext.mockResolvedValue(
+      policyContext([{ type: 'model_access', data: { mode: 'all' } }])
+    );
+
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ provider_allow_list: ['anthropic'] }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual(notAllowed);
+  });
+
   test('rejects a model outside the provider allow-list without such a key', async () => {
     await expect(
       validateOrganizationAutoTarget(
@@ -190,5 +252,39 @@ describe('validateOrganizationAutoTarget with organization inference provider ke
       )
     ).resolves.toEqual(notAllowed);
     expect(mockedServedModels).not.toHaveBeenCalled();
+  });
+
+  describe('with a catalog-mode direct BYOK key serving the model through Z.AI', () => {
+    beforeEach(() => {
+      jest
+        .mocked(getAllowedDirectByokCatalogModelIds)
+        .mockImplementation(
+          async (_organizationId, policy) =>
+            new Set(
+              (await isModelAllowedForProviderKey(policy, 'moonshotai/kimi-k2.6', 'z-ai'))
+                ? ['moonshotai/kimi-k2.6']
+                : []
+            )
+        );
+    });
+
+    test('accepts the model when the provider allow-list names the key provider', async () => {
+      await expect(
+        validateOrganizationAutoTarget(
+          organization({ provider_allow_list: ['anthropic', 'z-ai'] }),
+          'moonshotai/kimi-k2.6'
+        )
+      ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+      expect(getAllowedDirectByokCatalogModelIds).toHaveBeenCalledWith('org-1', expect.anything());
+    });
+
+    test('rejects the model when the provider allow-list does not name the key provider', async () => {
+      await expect(
+        validateOrganizationAutoTarget(
+          organization({ provider_allow_list: ['anthropic'] }),
+          'moonshotai/kimi-k2.6'
+        )
+      ).resolves.toEqual(notAllowed);
+    });
   });
 });

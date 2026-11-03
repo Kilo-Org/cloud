@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy';
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import {
   type AgentProfileDetail,
@@ -84,7 +85,7 @@ export function useAgentProfileMutations(organizationId?: string) {
     void queryClient.invalidateQueries(profilesFilter);
   };
   const toastError = (error: { message: string }) => {
-    toast.error(error.message);
+    toast.error(agentProfileMutationErrorMessage(error.message));
   };
   // `networkMode: 'always'` keeps a save settling while the online manager is
   // offline (NetInfo can misreport while the backend is reachable): the request

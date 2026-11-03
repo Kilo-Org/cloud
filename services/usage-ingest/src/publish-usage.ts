@@ -21,6 +21,9 @@ export type Env = Omit<
 
 // Queues allow 128,000 bytes including internal metadata; leave 8,000 bytes of headroom.
 export const MAX_USAGE_BYTES = 120_000;
+// One percent gives a modest baseline; one second captures slow sends regardless of sampling.
+const ENQUEUE_SAMPLE_RATE = 0.01;
+const SLOW_ENQUEUE_MS = 1_000;
 
 function errorResponse(error: string, status: number): Response {
   return Response.json({ error }, { status });
@@ -92,10 +95,18 @@ async function handlePublishUsage(
         after_send_at_ms: Date.now(),
         send_duration_ms: Math.round(performance.now() - sendStartedAt),
       }));
+    else
+      logSafely('warn', () => ({
+        event: 'usage_ingest_enqueue',
+        usage_id: result.data.core.id,
+        outcome: 'unavailable',
+        send_duration_ms: Math.round(performance.now() - sendStartedAt),
+      }));
     return errorResponse('Queue unavailable', 503);
   }
   const afterSendAtMs = Date.now();
-  const sendDurationMs = Math.round(performance.now() - sendStartedAt);
+  const sendDuration = performance.now() - sendStartedAt;
+  const sendDurationMs = Math.round(sendDuration);
   if (diagnostic)
     logSafely('info', () => ({
       event: 'usage_ingest_enqueue',
@@ -106,6 +117,13 @@ async function handlePublishUsage(
       after_send_at_ms: afterSendAtMs,
       send_duration_ms: sendDurationMs,
       ...queueMetrics(response),
+    }));
+  else if (sendDuration >= SLOW_ENQUEUE_MS || Math.random() < ENQUEUE_SAMPLE_RATE)
+    logSafely('info', () => ({
+      event: 'usage_ingest_enqueue',
+      usage_id: result.data.core.id,
+      outcome: 'accepted',
+      send_duration_ms: sendDurationMs,
     }));
   return new Response(null, { status: 202 });
 }

@@ -1,3 +1,4 @@
+import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
 import { type BannerState } from '@/lib/offline-banner-state';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -20,12 +21,12 @@ export type SelectScopeEntryViewInput = {
    */
   isDenied: boolean;
   /**
-   * The GitHub status read (permission status) failed, so `hasIntegration` and
-   * `hasPermissions` below carry no information. With `isEnabled` resolved the
-   * destination is already known — the dashboard reports its own GitHub state —
-   * so an unreadable status must not hold the entry on an error screen.
+   * Whether the GitHub status read produced a value. An enabled agent's
+   * destination is already known from the config, and the dashboard reports
+   * its own GitHub state, so a status that is still unread — pending, paused
+   * or failed — must not hold the entry on a setup gate or an error screen.
    */
-  isGithubStatusUnknown: boolean;
+  isGithubStatusResolved: boolean;
   hasIntegration: boolean;
   hasPermissions: boolean;
   isEnabled: boolean;
@@ -34,15 +35,15 @@ export type SelectScopeEntryViewInput = {
 /**
  * Pure selector deciding which view the Security Agent scope entry should
  * render. Mirrors the precedence in ScopeEntryScreen: loading first, then
- * access, then error, then the enabled destination when the GitHub status is
- * unreadable, then the missing-integration / missing-permission gates, then
+ * access, then error, then the enabled destination while the GitHub status is
+ * still unread, then the missing-integration / missing-permission gates, then
  * the connected-but-disabled state, and finally the enabled dashboard.
  */
 export function selectScopeEntryView({
   isLoading,
   isError,
   isDenied,
-  isGithubStatusUnknown,
+  isGithubStatusResolved,
   hasIntegration,
   hasPermissions,
   isEnabled,
@@ -56,7 +57,7 @@ export function selectScopeEntryView({
   if (isError) {
     return 'error';
   }
-  if (isGithubStatusUnknown && isEnabled) {
+  if (isEnabled && !isGithubStatusResolved) {
     return 'dashboard';
   }
   if (!hasIntegration) {
@@ -69,6 +70,28 @@ export function selectScopeEntryView({
     return 'disabled-settings';
   }
   return 'dashboard';
+}
+
+/**
+ * Whether the install state was refused for this caller's organization role.
+ *
+ * `githubApps.mintInstallState` authorizes through `resolveAuthorizedOwner(...,
+ * ORGANIZATION_MANAGE_ROLES)` (`apps/web/src/lib/integrations/resolve-owner.ts`)
+ * before it writes anything, and `ensureOrganizationAccess` answers
+ * `UNAUTHORIZED` for a role below that. That answer is the server's own role
+ * decision, so the entry reads it instead of inferring the role on the device: a
+ * local membership read cannot see the server's Kilo-admin elevation or a
+ * parent-organization role, and withholding the press on it would deny callers
+ * the server admits. Any other failure is a retryable error, not a role answer.
+ *
+ * A context-level auth failure — an invalid or missing session — is also
+ * `UNAUTHORIZED`, but it is flagged `data.authRequired`, the same way
+ * `isPermissionDeniedError` tells it apart. It is not a role answer: the app
+ * signs the reader out on it, and a personal scope has no organization whose
+ * owner could be asked to connect.
+ */
+export function isInstallStateRefusal(error: unknown): boolean {
+  return readTrpcErrorField(error, 'code') === 'UNAUTHORIZED' && !isUnauthorizedTrpcError(error);
 }
 
 /** The cause-named description the failure screen shows, or null for the variant's own copy. */

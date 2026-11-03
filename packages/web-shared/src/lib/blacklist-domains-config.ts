@@ -16,9 +16,8 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 export type { BlacklistDomainsConfig };
 
 /**
- * TLDs refused for new signups until an admin changes the stored list. `.top`
- * and `.shop` are the long-standing defaults; `.asia` is one of the cheap TLDs
- * signup farms rotate through.
+ * TLDs refused for new signups until an admin changes the stored list. `.shop`
+ * and `.top` are the long-standing defaults.
  */
 export const DEFAULT_BLOCKED_SIGNUP_TLDS = ['shop', 'top'];
 

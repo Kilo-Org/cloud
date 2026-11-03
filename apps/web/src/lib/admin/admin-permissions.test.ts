@@ -1,8 +1,14 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import {
+  canCurrentUserExportApiRequestLogs,
+  canCurrentUserViewSessions,
+  userCanExportApiRequestLogs,
+  userCanViewSessions,
+  userIsSuperadmin,
+} from '@/lib/admin/admin-permissions';
 import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 describe('admin permissions', () => {
   it.each([
@@ -23,15 +29,28 @@ describe('admin permissions', () => {
     expect(userCanViewSessions(defineTestUser(permissions))).toBe(expected);
   });
 
+  it.each([
+    [{ is_admin: false, can_export_api_request_logs: false }, false],
+    [{ is_admin: false, can_export_api_request_logs: true }, false],
+    [{ is_admin: true, can_export_api_request_logs: false }, false],
+    [{ is_admin: true, can_export_api_request_logs: true }, true],
+  ] as const)('evaluates API request log exporter state %#', (permissions, expected) => {
+    expect(userCanExportApiRequestLogs(defineTestUser(permissions))).toBe(expected);
+  });
+
   it('enforces every subordinate permission database invariant', async () => {
     await expect(insertTestUser({ is_admin: false, is_super_admin: true })).rejects.toThrow();
     await expect(insertTestUser({ is_admin: false, can_view_sessions: true })).rejects.toThrow();
+    await expect(
+      insertTestUser({ is_admin: false, can_export_api_request_logs: true })
+    ).rejects.toThrow();
 
     const admin = await insertTestUser({
       is_admin: true,
       is_super_admin: true,
       can_view_sessions: true,
       can_manage_credits: true,
+      can_export_api_request_logs: true,
     });
 
     await expect(
@@ -46,8 +65,104 @@ describe('admin permissions', () => {
           is_super_admin: false,
           can_view_sessions: false,
           can_manage_credits: false,
+          can_export_api_request_logs: false,
         })
         .where(eq(kilocode_users.id, admin.id))
     ).resolves.toBeDefined();
+  });
+
+  describe('canCurrentUserViewSessions', () => {
+    const createdUserIds: string[] = [];
+
+    async function createUser(overrides: Parameters<typeof insertTestUser>[0]) {
+      const user = await insertTestUser(overrides);
+      createdUserIds.push(user.id);
+      return user;
+    }
+
+    afterEach(async () => {
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, createdUserIds));
+      createdUserIds.length = 0;
+    });
+
+    it('follows the stored permission of the caller', async () => {
+      const viewer = await createUser({ is_admin: true, can_view_sessions: true });
+      const admin = await createUser({ is_admin: true });
+
+      expect(await canCurrentUserViewSessions(viewer.id)).toBe(true);
+      expect(await canCurrentUserViewSessions(admin.id)).toBe(false);
+    });
+
+    it('follows a permission change without a new sign-in', async () => {
+      const admin = await createUser({ is_admin: true });
+
+      expect(await canCurrentUserViewSessions(admin.id)).toBe(false);
+
+      await db
+        .update(kilocode_users)
+        .set({ can_view_sessions: true })
+        .where(eq(kilocode_users.id, admin.id));
+
+      expect(await canCurrentUserViewSessions(admin.id)).toBe(true);
+    });
+
+    it('rejects a blocked admin and an unknown user', async () => {
+      const blocked = await createUser({
+        is_admin: true,
+        can_view_sessions: true,
+        blocked_reason: 'manual block',
+      });
+
+      expect(await canCurrentUserViewSessions(blocked.id)).toBe(false);
+      expect(await canCurrentUserViewSessions('missing-admin-user')).toBe(false);
+    });
+  });
+
+  describe('canCurrentUserExportApiRequestLogs', () => {
+    const createdUserIds: string[] = [];
+
+    async function createUser(overrides: Parameters<typeof insertTestUser>[0]) {
+      const user = await insertTestUser(overrides);
+      createdUserIds.push(user.id);
+      return user;
+    }
+
+    afterEach(async () => {
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, createdUserIds));
+      createdUserIds.length = 0;
+    });
+
+    it('requires the exporter permission rather than session viewing', async () => {
+      const exporter = await createUser({ is_admin: true, can_export_api_request_logs: true });
+      const sessionViewer = await createUser({ is_admin: true, can_view_sessions: true });
+
+      expect(await canCurrentUserExportApiRequestLogs(exporter.id)).toBe(true);
+      expect(await canCurrentUserExportApiRequestLogs(sessionViewer.id)).toBe(false);
+      expect(await canCurrentUserViewSessions(exporter.id)).toBe(false);
+    });
+
+    it('follows a permission change without a new sign-in', async () => {
+      const admin = await createUser({ is_admin: true });
+
+      expect(await canCurrentUserExportApiRequestLogs(admin.id)).toBe(false);
+
+      await db
+        .update(kilocode_users)
+        .set({ can_export_api_request_logs: true })
+        .where(eq(kilocode_users.id, admin.id));
+
+      expect(await canCurrentUserExportApiRequestLogs(admin.id)).toBe(true);
+    });
+
+    it('rejects a blocked admin and an unknown user', async () => {
+      const blocked = await createUser({
+        is_admin: true,
+        can_export_api_request_logs: true,
+        blocked_reason: 'manual block',
+      });
+
+      expect(await canCurrentUserExportApiRequestLogs(blocked.id)).toBe(false);
+      expect(await canCurrentUserExportApiRequestLogs('missing-admin-user')).toBe(false);
+    });
   });
 });

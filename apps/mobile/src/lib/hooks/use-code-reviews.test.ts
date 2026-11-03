@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- one file for the review-list pagination builder and the mutation wiring suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   buildReviewFirstPageQueryOptions,
   buildReviewListQueryKey,
@@ -22,7 +24,7 @@ import {
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onSuccess?: (data: unknown, vars: unknown) => void;
-  onError?: (error: unknown) => void;
+  onError?: (error: unknown, vars?: { reviewId: string }) => void;
 };
 
 const cancelMutateMock = vi.fn();
@@ -204,14 +206,14 @@ describe('useCancelReview wiring', () => {
 });
 
 describe('retriggerReviewMutationFn', () => {
-  it('throws a typed error carrying the server error message on {success:false}', async () => {
+  it('rejects with the localized copy when the retry did not start', async () => {
     retriggerMutateMock.mockResolvedValueOnce({
       success: false,
-      error: 'Repository not connected',
+      error: 'Dispatch failed: could not reach the code review service.',
     });
 
     await expect(retriggerReviewMutationFn({ reviewId: 'r2' })).rejects.toThrow(
-      'Repository not connected'
+      i18n.t('codeReviewer.reviewDetail.retryNotStarted')
     );
   });
 
@@ -224,7 +226,7 @@ describe('retriggerReviewMutationFn', () => {
 });
 
 describe('useRetriggerReview wiring', () => {
-  it('toasts the thrown error message via onError and does NOT invalidate queries', async () => {
+  it('toasts the localized copy via onError and refreshes the review', async () => {
     retriggerMutateMock.mockResolvedValueOnce({
       success: false,
       error: 'Provider rate limit hit',
@@ -234,11 +236,13 @@ describe('useRetriggerReview wiring', () => {
     try {
       await opts.mutationFn?.({ reviewId: 'r2' });
     } catch (error) {
-      opts.onError?.(error);
+      opts.onError?.(error, { reviewId: 'r2' });
     }
 
-    expect(toastErrorMock).toHaveBeenCalledWith('Provider rate limit hit');
-    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      i18n.t('codeReviewer.reviewDetail.retryNotStarted')
+    );
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
   });
 
   it('invalidates the review list and detail on real success', () => {

@@ -60,3 +60,68 @@ describe('PrReviewTabSelector', () => {
     expect(badges(0)).toEqual([]);
   });
 });
+
+type Pill = {
+  readonly props: {
+    readonly disabled?: boolean;
+    readonly accessibilityState?: { readonly selected: boolean; readonly disabled?: boolean };
+    readonly onPress?: () => void;
+  };
+};
+
+function renderSelector({
+  activeTab,
+  disabledTabs,
+}: {
+  activeTab: PrReviewTabId;
+  disabledTabs?: readonly PrReviewTabId[];
+}) {
+  const onChange = vi.fn<(tab: PrReviewTabId) => void>();
+  const rendered: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  act(() => {
+    rendered.current = TestRenderer.create(
+      createElement(PrReviewTabSelector, { activeTab, onChange, disabledTabs })
+    );
+  });
+  if (!rendered.current) {
+    throw new Error('render produced no tree');
+  }
+  const pills = rendered.current.root.findAll(
+    node => String(node.type) === 'Pressable'
+  ) as unknown as Pill[];
+  if (pills.length !== 3) {
+    throw new Error(`expected three tabs, found ${pills.length}`);
+  }
+  return { onChange, pills };
+}
+
+describe('PrReviewTabSelector failure states', () => {
+  it('leaves the tab that hosts the failure pressable', () => {
+    // A reader parked on a tab whose reads cannot succeed still needs the way
+    // back to the surface that explains the failure and offers its recovery.
+    const { onChange, pills } = renderSelector({
+      activeTab: 'files',
+      disabledTabs: ['files', 'discussion'],
+    });
+    const [overview, files, discussion] = pills;
+    if (!overview || !files || !discussion) {
+      throw new Error('expected three tabs');
+    }
+    expect(overview.props).toEqual(expect.objectContaining({ disabled: false }));
+    expect(overview.props.accessibilityState).toEqual({ selected: false, disabled: false });
+    expect(files.props).toEqual(expect.objectContaining({ disabled: true }));
+    expect(files.props.accessibilityState).toEqual({ selected: true, disabled: true });
+    expect(discussion.props).toEqual(expect.objectContaining({ disabled: true }));
+
+    overview.props.onPress?.();
+    expect(onChange).toHaveBeenCalledWith('overview');
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps every tab pressable without disabledTabs', () => {
+    const { pills } = renderSelector({ activeTab: 'overview' });
+    for (const pill of pills) {
+      expect(pill.props).toEqual(expect.objectContaining({ disabled: false }));
+    }
+  });
+});

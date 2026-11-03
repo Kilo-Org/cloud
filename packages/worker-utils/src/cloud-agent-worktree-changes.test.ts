@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_WORKTREE_CHANGES_BYTES,
   MAX_WORKTREE_CHANGES_FILES,
@@ -173,6 +173,57 @@ describe('cloud agent worktree changes contracts', () => {
     );
   });
 
+  describe('repositories of a multi-repository snapshot', () => {
+    const repository = (path: string, repoFullName: string) => ({
+      path,
+      repoFullName,
+      comparison: snapshot.comparison,
+      truncated: false,
+    });
+
+    it('keeps the per-repository comparison, and a snapshot without it stays as it is', () => {
+      const repositories = [repository('web', 'acme/web'), repository('api', 'acme/api')];
+      expect(
+        worktreeChangesSnapshotSchema.parse({ ...snapshot, repositories }).repositories
+      ).toEqual(repositories);
+      expect(worktreeChangesSnapshotSchema.parse(snapshot)).not.toHaveProperty('repositories');
+    });
+
+    it('accepts the session directory itself as a repository path', () => {
+      expect(
+        worktreeChangesSnapshotSchema.safeParse({
+          ...snapshot,
+          repositories: [repository('', 'acme/web')],
+        }).success
+      ).toBe(true);
+    });
+
+    it('is strict about the entries, their paths and their number', () => {
+      const parse = (repositories: unknown) =>
+        worktreeChangesSnapshotSchema.safeParse({ ...snapshot, repositories }).success;
+      expect(parse([])).toBe(false);
+      expect(parse([{ ...repository('web', 'acme/web'), extra: true }])).toBe(false);
+      expect(parse([repository('../web', 'acme/web')])).toBe(false);
+      expect(parse([repository('/web', 'acme/web')])).toBe(false);
+      expect(parse([repository('web', 'acme/web'), repository('web', 'acme/other')])).toBe(false);
+    });
+
+    it('counts the repositories against the saved size limit', () => {
+      const repositories = [repository('web', 'acme/web')];
+      const files = Array.from({ length: 1_000 }, (_, index) => ({
+        ...file,
+        revision: 1,
+        path: `${index}/${'x'.repeat(240)}`,
+      }));
+      const saved = worktreeChangesSnapshotSchema.parse({ ...snapshot, files, repositories });
+      expect(saved.repositories).toEqual(repositories);
+      expect(saved.truncated).toBe(true);
+      expect(new TextEncoder().encode(JSON.stringify(saved)).byteLength).toBeLessThanOrEqual(
+        MAX_WORKTREE_CHANGES_BYTES
+      );
+    });
+  });
+
   it('trims whole trailing escaped multibyte entries from near-limit v1 and v2 manifests', () => {
     const files = Array.from({ length: 1_000 }, (_, index) => ({
       ...file,
@@ -195,19 +246,70 @@ describe('cloud agent worktree changes contracts', () => {
         files: legacy.files.map(entry => ({ ...entry, revision: legacy.revision })),
       },
     ]) {
-      const normalized = worktreeChangesSnapshotSchema.parse(input);
-      expect(normalized.files).toEqual(
-        input.files.slice(0, normalized.files.length).map(entry => ({
+      const withSavedRevision = (entries: typeof input.files) =>
+        entries.map(entry => ({
           ...entry,
           revision: 'revision' in entry ? entry.revision : input.revision,
-        }))
+        }));
+      const normalized = worktreeChangesSnapshotSchema.parse(input);
+      expect(normalized.files).toEqual(
+        withSavedRevision(input.files.slice(0, normalized.files.length))
       );
       expect(normalized.files.length).toBeLessThan(input.files.length);
       expect(normalized.truncated).toBe(true);
       expect(new TextEncoder().encode(JSON.stringify(normalized)).byteLength).toBeLessThanOrEqual(
         MAX_WORKTREE_CHANGES_BYTES
       );
+      expect(
+        new TextEncoder().encode(
+          JSON.stringify({
+            ...normalized,
+            files: withSavedRevision(input.files.slice(0, normalized.files.length + 1)),
+          })
+        ).byteLength
+      ).toBeGreaterThan(MAX_WORKTREE_CHANGES_BYTES);
     }
+  });
+
+  it('sizes a full near-limit manifest from per-file measurements', () => {
+    const files = Array.from({ length: MAX_WORKTREE_CHANGES_FILES }, (_, index) => ({
+      ...file,
+      revision: snapshot.revision,
+      path: `${index}/${'漢"\\\n'.repeat(25)}`,
+    }));
+    const input = { ...snapshot, files };
+    expect(new TextEncoder().encode(JSON.stringify(input)).byteLength).toBeGreaterThan(
+      MAX_WORKTREE_CHANGES_BYTES
+    );
+
+    const encode = TextEncoder.prototype.encode;
+    const stringify = JSON.stringify;
+    let encodedBytes = 0;
+    let stringified = 0;
+    const encodeSpy = vi.spyOn(TextEncoder.prototype, 'encode').mockImplementation(function (
+      this: TextEncoder,
+      into?: string
+    ) {
+      const result = encode.call(this, into);
+      encodedBytes += result.byteLength;
+      return result;
+    });
+    const stringifySpy = vi.spyOn(JSON, 'stringify').mockImplementation((value, ...rest) => {
+      stringified += 1;
+      return stringify(value, ...rest);
+    });
+    let normalized: WorktreeChangesSnapshot;
+    try {
+      normalized = worktreeChangesSnapshotSchema.parse(input);
+    } finally {
+      encodeSpy.mockRestore();
+      stringifySpy.mockRestore();
+    }
+
+    expect(normalized.files.length).toBeLessThan(files.length);
+    expect(normalized.truncated).toBe(true);
+    expect(stringified).toBeLessThanOrEqual(2 * MAX_WORKTREE_CHANGES_FILES);
+    expect(encodedBytes).toBeLessThanOrEqual(4 * MAX_WORKTREE_CHANGES_BYTES);
   });
 
   it('keeps an empty truncated manifest canonical', () => {

@@ -3,6 +3,7 @@ import {
   createUserVercelAiGatewayProvider,
   VERCEL_AI_GATEWAY,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyPreferredProvider,
@@ -19,7 +20,7 @@ import {
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
@@ -61,7 +62,7 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'openrouter',
+    type: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -91,8 +92,8 @@ describe('removeUnsupportedRequestServiceTier', () => {
       reason: 'non-fallback custom pricing',
     },
     {
-      model: gemma_4_26b_a4b_it_free_model.public_id,
-      reason: 'Kilo-exclusive model',
+      model: GEMMA_4_26B_A4B_IT_FREE_ID,
+      reason: 'auto small free model',
     },
   ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
     const request = makeRequest(model);
@@ -864,6 +865,53 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
   );
 });
 
+describe('applyProviderSpecificLogic thinking block binding', () => {
+  const model = 'anthropic/claude-opus-5.5';
+
+  async function apply(provider: Provider) {
+    const request = makeMessagesRequest(model);
+    request.body.thinking = { type: 'adaptive' };
+    const extraHeaders: Record<string, string> = {};
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      extraHeaders,
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+    return { thinking: request.body.thinking, extraHeaders };
+  }
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+  ])('drops mismatched thinking blocks on $name', async ({ provider }) => {
+    const { thinking, extraHeaders } = await apply(provider);
+
+    expect(thinking).toEqual({
+      type: 'adaptive',
+      display: 'summarized',
+      block_binding: { prefix_mismatch_behavior: 'drop_block' },
+    });
+    expect(extraHeaders['anthropic-beta']).toBe(
+      'fine-grained-tool-streaming-2025-05-14,thinking-binding-controls-2026-08-01'
+    );
+  });
+
+  it('leaves upstreams without verified support untouched', async () => {
+    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), type: 'custom' });
+
+    expect(thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(extraHeaders['anthropic-beta']).toBe('fine-grained-tool-streaming-2025-05-14');
+  });
+});
+
 describe('applyProviderSpecificLogic paid server features', () => {
   const fields = {
     plugins: [{ id: 'web' }],
@@ -1113,6 +1161,25 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
     expect(
       (await applyToClaude(false, [{ providerId: 'anthropic', decryptedAPIKey: 'key' }]))?.ignore
     ).toBeUndefined();
+  });
+  it("adds no Kilo provider order to a request served by the user's own provider key", async () => {
+    const request = makeRequest(USER_GATEWAY_TEST_MODEL);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      USER_GATEWAY_TEST_MODEL,
+      request,
+      {},
+      [{ providerId: 'bedrock', decryptedAPIKey: 'key' }],
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      'org-1',
+      null,
+      null,
+      false
+    );
+
+    expect(request.body.provider).toBeUndefined();
   });
 });
 

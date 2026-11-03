@@ -130,7 +130,12 @@ export type AdmitOperationResult =
   | { admission: 'duplicate_in_flight'; row: OperationLedgerRow }
   | { admission: 'takeover'; row: OperationLedgerRow }
   | { admission: 'duplicate_reconcile_pending'; row: OperationLedgerRow }
-  | { admission: 'duplicate_reconcile_in_progress'; row: OperationLedgerRow };
+  | { admission: 'duplicate_reconcile_in_progress'; row: OperationLedgerRow }
+  /**
+   * The live row for this identity was admitted in a different organization
+   * scope, so it belongs to a different operation. No row is returned.
+   */
+  | { admission: 'organization_mismatch' };
 
 /** Terminal outbox event input, correlated by event name. */
 export type OutboxEventInput = {
@@ -224,7 +229,9 @@ function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperat
  * Admits an operation. Concurrent same-key admits produce exactly one
  * `admitted` row; the loser receives the typed duplicate outcome. An expired
  * row (`expires_at` past, any status) is deleted and re-inserted in one
- * transaction. A live-lease `admitted` row is `duplicate_in_flight`; an
+ * transaction. An operation's identity includes its organization scope, so an
+ * unexpired row admitted in a different scope is `organization_mismatch` and
+ * carries no row. A live-lease `admitted` row is `duplicate_in_flight`; an
  * expired-lease `admitted` row is a compare-and-set `takeover` that renews
  * the lease. A `reconcile_pending` row with an expired/claimable lease is
  * claimed by exactly one retry (`duplicate_reconcile_pending`); concurrent
@@ -340,6 +347,13 @@ async function evaluateExistingRow(
       throw new Error('Operation ledger re-insert returned no row');
     }
     return { admission: 'admitted', row: fresh };
+  }
+
+  // An operation's identity includes its organization scope, which the
+  // uniqueness key does not. A row stored in another scope belongs to a
+  // different operation, so it is reported before any status is classified.
+  if (row.organization_id !== (input.orgId ?? null)) {
+    return { admission: 'organization_mismatch' };
   }
 
   if (row.status === 'admitted') {

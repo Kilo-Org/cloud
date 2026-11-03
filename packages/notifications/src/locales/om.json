@@ -9,6 +9,7 @@
       "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
       "spendAlert": "Baasiin kee xiyyeeffannaa barbaada",
       "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
+      "securityUpdate": "Sakatta'a nagaa keessa bakka jijjiiramni jira",
       "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Arganni nagaa xiyyeeffannaa barbaada"
+      "body": "Sakatta'a nagaa keessa bakka jijjiiramni jira"
     }
   },
   "instanceLifecycle": {

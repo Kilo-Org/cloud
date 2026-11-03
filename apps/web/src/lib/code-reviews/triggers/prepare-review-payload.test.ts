@@ -142,21 +142,54 @@ function defineReview(
 
 describe('prepareReviewPayload', () => {
   let testUser: User;
+  let otherUser: User;
   let testOrganizationId: string;
+  let otherOrganizationId: string;
   let integration: PlatformIntegration;
+  let organizationIntegration: PlatformIntegration;
+  let otherUserIntegration: PlatformIntegration;
+  let otherOrganizationIntegration: PlatformIntegration;
   let gitlabIntegration: PlatformIntegration;
   let bitbucketIntegration: PlatformIntegration;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    otherUser = await insertTestUser();
     const [organization] = await db
       .insert(organizations)
       .values({ name: `Prepare Review Payload ${Date.now()}` })
       .returning({ id: organizations.id });
     testOrganizationId = organization.id;
+    const [otherOrganization] = await db
+      .insert(organizations)
+      .values({ name: `Prepare Review Payload Other ${Date.now()}` })
+      .returning({ id: organizations.id });
+    otherOrganizationId = otherOrganization.id;
     [integration] = await db
       .insert(platform_integrations)
       .values(defineIntegration(testUser.id))
+      .returning();
+    [organizationIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+    [otherUserIntegration] = await db
+      .insert(platform_integrations)
+      .values(defineIntegration(otherUser.id))
+      .returning();
+    [otherOrganizationIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: otherOrganizationId,
+        })
+      )
       .returning();
     [gitlabIntegration] = await db
       .insert(platform_integrations)
@@ -266,8 +299,19 @@ describe('prepareReviewPayload', () => {
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.id, gitlabIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, otherOrganizationIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, otherUserIntegration.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, organizationIntegration.id));
     await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    await db.delete(organizations).where(eq(organizations.id, otherOrganizationId));
     await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -1297,5 +1341,116 @@ describe('prepareReviewPayload', () => {
       'headsha123'
     );
     expect(payload.previousCloudAgentSessionId).toBe('previous-gitlab-cloud-agent-session');
+  });
+
+  it('prepares an organization review with the organization integration', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, organizationIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(payload.owner).toEqual({ type: 'org', id: testOrganizationId, userId: testUser.id });
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith(
+      organizationIntegration.platform_installation_id,
+      'standard',
+      organizationIntegration.id
+    );
+    expect(payload.sessionInput).toMatchObject({
+      githubToken: 'github-token',
+      platform: 'github',
+    });
+  });
+
+  it('prepares a personal review with the personal integration', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith(
+      integration.platform_installation_id,
+      'standard',
+      integration.id
+    );
+  });
+
+  it('rejects a review whose integration belongs to another user', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, otherUserIntegration.id))
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow(`Provider Code Reviewer job ${review.id} integration is unavailable`);
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization review whose integration belongs to another organization', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, otherOrganizationIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+        })
+      )
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow(`Provider Code Reviewer job ${review.id} integration is unavailable`);
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a personal review whose integration is organization owned', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, organizationIntegration.id))
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toThrow('integration is unavailable');
+
+    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
   });
 });

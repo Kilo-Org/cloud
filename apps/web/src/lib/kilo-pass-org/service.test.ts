@@ -1678,4 +1678,151 @@ describe('Kilo Pass organization agreement service', () => {
       ['2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'],
     ]);
   });
+
+  it('recovers a partially paid window at its prorated amounts', async () => {
+    const owner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createOrganization(`kpo-bridge-retry-${crypto.randomUUID()}`, owner.id);
+    const child = await createOrganization(
+      `kpo-bridge-retry-child-${crypto.randomUUID()}`,
+      childOwner.id
+    );
+    organizationIds.push(parent.id, child.id);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const anchor = window.start;
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 2,
+      issuanceAnchorAt: anchor,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [{ organizationId: child.id, passCapacity: 2 }],
+    });
+    const bridgeWindow = { start: new Date('2026-07-15T00:00:00.000Z'), end: window.end };
+    const blocked = await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: bridgeWindow.start,
+      paidUntil: new Date('2026-09-01T00:00:00.000Z'),
+      paidSeatCount: 1,
+      firstWindow: window,
+      paidBridgeInterval: bridgeWindow,
+      isBridge: true,
+    });
+    expect(blocked).toEqual({ issued: false, blocked: true });
+    const [blockedRun] = await db
+      .select()
+      .from(kilo_pass_org_processing_runs)
+      .where(
+        and(
+          eq(kilo_pass_org_processing_runs.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_processing_runs.window_start, bridgeWindow.start.toISOString())
+        )
+      );
+    if (!blockedRun) throw new Error('blocked processing run was not created');
+    expect(blockedRun).toMatchObject({ state: 'blocked' });
+    expect(new Date(blockedRun.window_start).toISOString()).toBe(bridgeWindow.start.toISOString());
+    expect(new Date(blockedRun.window_end).toISOString()).toBe(bridgeWindow.end.toISOString());
+    await expect(
+      db
+        .select({ id: kilo_pass_org_issuance_snapshots.id })
+        .from(kilo_pass_org_issuance_snapshots)
+        .where(
+          and(
+            eq(kilo_pass_org_issuance_snapshots.agreement_id, pending.agreementId),
+            eq(kilo_pass_org_issuance_snapshots.window_start, bridgeWindow.start.toISOString())
+          )
+        )
+    ).resolves.toHaveLength(0);
+
+    await activatePaidAgreement({
+      agreementId: pending.agreementId,
+      recipientUserId: owner.id,
+      paidFrom: window.end,
+      paidUntil: new Date('2026-10-01T00:00:00.000Z'),
+      paidSeatCount: 3,
+      firstWindow: monthlyWindowFromOriginalAnchor(anchor, 1),
+      isBridge: false,
+    });
+    await organizationKiloPassService.retryRun({
+      organizationId: parent.id,
+      runId: blockedRun.id,
+      actorUserId: owner.id,
+    });
+
+    const recoveredSnapshots = await db
+      .select({
+        container: kilo_pass_org_issuance_snapshots.allocation_container_organization_id,
+        kind: kilo_pass_org_issuance_snapshots.kind,
+        start: kilo_pass_org_issuance_snapshots.window_start,
+        end: kilo_pass_org_issuance_snapshots.window_end,
+        base: kilo_pass_org_issuance_snapshots.base_credit_microdollars,
+        bonus: kilo_pass_org_issuance_snapshots.bonus_credit_microdollars,
+        unlock: kilo_pass_org_issuance_snapshots.unlock_spend_microdollars,
+      })
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(
+        and(
+          eq(kilo_pass_org_issuance_snapshots.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_issuance_snapshots.window_start, bridgeWindow.start.toISOString())
+        )
+      );
+    const byContainer = Object.fromEntries(
+      recoveredSnapshots.map(snapshot => [
+        snapshot.container === child.id ? 'child' : 'parent',
+        {
+          kind: snapshot.kind,
+          start: new Date(snapshot.start).toISOString(),
+          end: new Date(snapshot.end).toISOString(),
+          base: snapshot.base,
+          bonus: snapshot.bonus,
+          unlock: snapshot.unlock,
+        },
+      ])
+    );
+    expect(byContainer).toEqual({
+      child: {
+        kind: 'bridge',
+        start: '2026-07-15T00:00:00.000Z',
+        end: '2026-08-01T00:00:00.000Z',
+        base: 20_838_710,
+        bonus: 4_387_097,
+        unlock: 20_838_710,
+      },
+      parent: {
+        kind: 'bridge',
+        start: '2026-07-15T00:00:00.000Z',
+        end: '2026-08-01T00:00:00.000Z',
+        base: 10_419_355,
+        bonus: 2_193_548,
+        unlock: 10_419_355,
+      },
+    });
+
+    const grants = await db
+      .select({
+        organizationId: credit_transactions.organization_id,
+        category: credit_transactions.credit_category,
+        amount: credit_transactions.amount_microdollars,
+      })
+      .from(credit_transactions)
+      .where(inArray(credit_transactions.organization_id, [child.id, parent.id]));
+    const recoveredGrants = new Map(
+      grants
+        .filter(grant => grant.category?.includes(bridgeWindow.start.toISOString()))
+        .map(grant => [grant.organizationId, grant.amount])
+    );
+    expect(recoveredGrants).toEqual(
+      new Map([
+        [child.id, 20_838_710],
+        [parent.id, 10_419_355],
+      ])
+    );
+  });
 });

@@ -13,10 +13,11 @@ export function toEnvironmentCommands(script: string): string[] {
 
 /** Builds use saved configuration. Keep the editor baseline stable during status polling. */
 export function hasEnvironmentFormChanges(
-  saved: { script: string; variablesText: string; sandboxAllocation: string | null },
-  draft: { script: string; variablesText: string; sandboxAllocation: string | null }
+  saved: { name: string; script: string; variablesText: string; sandboxAllocation: string | null },
+  draft: { name: string; script: string; variablesText: string; sandboxAllocation: string | null }
 ): boolean {
   return (
+    saved.name !== draft.name ||
     saved.script !== draft.script ||
     saved.variablesText !== draft.variablesText ||
     saved.sandboxAllocation !== draft.sandboxAllocation

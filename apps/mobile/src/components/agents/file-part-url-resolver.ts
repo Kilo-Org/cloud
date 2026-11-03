@@ -214,7 +214,12 @@ function stopRenewTimer(): void {
 export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
   const cached = useFilePartCache(part.id);
 
-  const url = cached?.url ?? (isUsableFilePartUrl(part.url) ? part.url : undefined);
+  // A `data:` body still being written has no URL yet: report `resolving` and
+  // never fall back to the part's own inline base64 payload, which the media
+  // surface would decode a second time while the file write is in flight.
+  const writePending = cached?.writePending === true;
+  const url =
+    cached?.url ?? (!writePending && isUsableFilePartUrl(part.url) ? part.url : undefined);
   const ref = cached?.attachmentRef ?? parseCloudAgentAttachmentUrl(part.url);
   const failed = cached?.resolveFailed === true;
   const renewing = cached?.renewing === true;
@@ -275,6 +280,9 @@ export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
       ...(ref ? { attachmentRef: ref } : {}),
       ...(renewing ? { renewing: true } : {}),
     };
+  }
+  if (writePending) {
+    return { status: 'resolving' };
   }
   if (!ref) {
     return { status: 'unavailable' };

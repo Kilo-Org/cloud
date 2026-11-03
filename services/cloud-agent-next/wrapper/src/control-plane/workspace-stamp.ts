@@ -8,6 +8,7 @@ const workspaceStampSchema = z
   .object({
     allocationId: z.string().min(1),
     commit: z.string(),
+    workspacePrepared: z.literal(false).optional(),
     // Lineage written by wrappers that captured session snapshots. Read only so
     // a stamp in an older snapshot still classifies; never written again.
     capturedAt: z.number().int().nonnegative().optional(),
@@ -15,12 +16,6 @@ const workspaceStampSchema = z
   })
   .strict();
 
-/**
- * Written once a workspace is fully prepared: which allocation prepared it and at
- * which commit. A stamp from another allocation means the files came from an
- * environment snapshot (the builder stamps with its own allocation), so they are
- * adopted (reconciled) before use.
- */
 export type WorkspaceStamp = z.infer<typeof workspaceStampSchema>;
 
 /** What the filesystem says about a workspace, without asking the Worker. */
@@ -44,17 +39,19 @@ export function workspaceStampPath(directory: string, hasGit: boolean): string {
     : `${path.resolve(directory)}.${STAMP_FILE}`;
 }
 
-export async function readWorkspaceStamp(
-  directory: string,
-  hasGit: boolean
-): Promise<WorkspaceStamp | null> {
-  try {
-    const raw = await fs.readFile(workspaceStampPath(directory, hasGit), 'utf8');
-    const parsed = workspaceStampSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
+export async function readWorkspaceStamp(directory: string): Promise<WorkspaceStamp | null> {
+  for (const hasGit of [true, false]) {
+    try {
+      const raw = await fs.readFile(workspaceStampPath(directory, hasGit), 'utf8');
+      const parsed = workspaceStampSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
+        continue;
+      return null;
+    }
   }
+  return null;
 }
 
 /** Replaces the stamp atomically so a snapshot never captures half a file. */
@@ -75,6 +72,7 @@ export function classifyWorkspace(input: {
   allocationId: string;
 }): WorkspaceInspection {
   const { hasGit, stamp, allocationId } = input;
+  if (stamp?.workspacePrepared === false) return hasGit ? 'unstamped' : 'empty';
   if (stamp === null) return hasGit ? 'unstamped' : 'empty';
   if (stamp.allocationId === allocationId) return 'same';
   // A stamp beside a directory that has no repository has nothing to adopt.

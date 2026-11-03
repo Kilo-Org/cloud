@@ -1,7 +1,6 @@
 import 'server-only';
 import { type db } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
@@ -22,21 +21,8 @@ export type BalanceCheckModelEligibility = {
  *
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
- * - the model is not Kilo-exclusive AND the user has a BYOK provider
- *   configured that can serve it, so the session is billed against the
- *   user's own key rather than their balance.
- *
- * Kilo-exclusive models are always excluded from the BYOK bypass: they are
- * Kilo-funded and platform billed, so even when `getModelUserByokProviders`
- * reports a provider that can route the model, they must still go through the
- * worker-side balance check and cannot be legitimately served via a user's own
- * BYOK key.
- *
- * The resulting predicate is a strict subset of the
- * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel
- * model picker to filter `hasLimitedAccess` users: this router additionally
- * forces Kilo-exclusive models through the balance check, so the picker
- * may offer a model as free while the router still requires a balance.
+ * - the user has a BYOK provider configured that can serve it, so the
+ *   session is billed against the user's own key rather than their balance.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
@@ -50,10 +36,6 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     return { isFree: true, hasUserByokAvailable: false };
   }
 
-  if (isKiloExclusiveModel(params.modelId)) {
-    return { isFree: false, hasUserByokAvailable: false };
-  }
-
   const enabledProviderIds = params.organizationId
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
@@ -65,19 +47,22 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
   // Callers authorize organization access first, which also admits Kilo admins
   // and parent-organization owners who hold no membership row.
-  const allowedProviders =
-    params.organizationId &&
-    enabled.has('vercel-ai-gateway') &&
-    modelProviders.includes('vercel-ai-gateway')
-      ? (
-          await resolveOrganizationMemberModelDecision({
-            organizationId: params.organizationId,
-            kiloUserId: params.user.id,
-            allowNonMember: true,
-            modelId: params.modelId,
-          })
-        ).decision.eligibleProviderRoutes
-      : undefined;
+  const decision = params.organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId: params.organizationId,
+          kiloUserId: params.user.id,
+          allowNonMember: true,
+          modelId: params.modelId,
+        })
+      ).decision
+    : undefined;
+  // Like routing, a denial leaves no allowed provider for the model.
+  const allowedProviders = decision
+    ? decision.allowed
+      ? decision.eligibleProviderRoutes
+      : new Set<string>()
+    : undefined;
   const hasUserByokAvailable = await hasEnabledUserByokForModel({
     modelId: params.modelId,
     modelProviders,

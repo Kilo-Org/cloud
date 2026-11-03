@@ -1,5 +1,5 @@
 import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type SessionLiveOutcomeKind } from '@kilocode/notifications';
+import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
 import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';

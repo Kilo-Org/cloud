@@ -62,6 +62,7 @@ import {
   runLogoutCleanup,
   unregisterActivityTokensAndTombstone,
 } from '@/lib/auth/logout-cleanup';
+import { forgetUnreadableStoreReports } from '@/lib/auth/unreadable-store-report';
 import {
   attemptLogoutReconciliation,
   hasPendingActivityUnregister,
@@ -122,6 +123,11 @@ function pushOutcome(kind: 'token' | 'none' | 'lookup-failed', token?: string): 
     kind === 'token' ? { kind: 'token', token: token ?? 'push-1' } : { kind }
   );
 }
+
+// The store reports are claimed per process, so every case starts unclaimed.
+beforeEach(() => {
+  forgetUnreadableStoreReports();
+});
 
 describe('runLogoutCleanup', () => {
   beforeEach(() => {
@@ -573,6 +579,66 @@ describe('runLogoutCleanup', () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
 
     await expect(readLogoutCleanupRecords()).resolves.toEqual([]);
+  });
+
+  it('reports one unchanged unreadable payload once, however many reads follow', async () => {
+    const { captureException } = await import('@sentry/react-native');
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
+
+    await readLogoutCleanupRecords();
+    await readLogoutCleanupRecords();
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    await runLogoutCleanup();
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'auth',
+        'error.operation': 'read_logout_cleanup_store',
+        'logout.cleanup.store': 'corrupt',
+      },
+    });
+  });
+
+  it('reports a fresh unreadable payload after a write repaired the store', async () => {
+    const { captureException } = await import('@sentry/react-native');
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
+    await readLogoutCleanupRecords();
+
+    // A logout with an outstanding push token repairs the payload.
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    await runLogoutCleanup();
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(true);
+    await readLogoutCleanupRecords();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    // A payload that becomes unreadable again is new information.
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'still-not-json');
+    await readLogoutCleanupRecords();
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports an unknown store version once, as its own state', async () => {
+    const { captureException } = await import('@sentry/react-native');
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
+    await readLogoutCleanupRecords();
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ version: 3, records: [] }));
+
+    await readLogoutCleanupRecords();
+    await readLogoutCleanupRecords();
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'auth',
+        'error.operation': 'read_logout_cleanup_store',
+        'logout.cleanup.store': 'unreadable',
+      },
+    });
   });
 });
 

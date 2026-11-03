@@ -1,5 +1,11 @@
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import { cloudAgentAuthorityProcedures } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  CHILD_SESSION_INSTRUCTIONS,
+  CHILD_SESSION_TOOL_NAMES,
+  childSessionTools,
+  runChildSessionTool,
+} from './child-session-tools';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -24,7 +30,13 @@ import {
 import { createDefaultHandler } from './oauth/consent';
 import { fetchUserIsAdmin } from './oauth/kilo-pairing';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
-import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
+import {
+  bodyTooLargeResponse,
+  createRefreshReuseHandler,
+  forwardable,
+  isTokenRequest,
+  readTokenBody,
+} from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
@@ -91,7 +103,13 @@ const SERVER_INFO = { name: 'kilo-mcp', title: 'Kilo MCP', version: '1.0.0' } as
  * these and reports everything else as `unknown`, so arbitrary caller text can
  * never reach PostHog.
  */
-const PUBLISHED_TOOL_NAMES = new Set(['search', 'call', 'call_protected', 'submit_otp']);
+const PUBLISHED_TOOL_NAMES = new Set([
+  'search',
+  'call',
+  'call_protected',
+  'submit_otp',
+  ...CHILD_SESSION_TOOL_NAMES,
+]);
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -481,6 +499,10 @@ async function runTool(
   ) {
     throw new JsonRpcFailure(UNAUTHORIZED, 'Cloud Agent authority has expired');
   }
+  // Running clients can retain the old tool list until their next MCP connection.
+  if (auth.cloudAgentAuthority && name !== 'search' && name !== 'call') {
+    return toolResult(await runChildSessionTool({ name, args, auth, ...deps }));
+  }
   if (name === 'search') {
     const parsed = searchArgsSchema.safeParse(args);
     if (!parsed.success) {
@@ -507,7 +529,7 @@ async function runTool(
       includeGuarded: auth.adminEnabled === true,
       ...(auth.cloudAgentAuthority
         ? {
-            allowedPaths: [cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)],
+            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
             cloudAgentAuthority: auth.cloudAgentAuthority,
           }
         : {}),
@@ -754,25 +776,26 @@ async function handleRpcMessage(
           protocolVersion,
           ...(clientName !== undefined ? { clientName } : {}),
         });
-        const childSessionInstructions = auth.cloudAgentAuthority
-          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in this parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
-          : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions:
-            (canUseProtectedActions(auth)
+          instructions: auth.cloudAgentAuthority
+            ? `${CHILD_SESSION_INSTRUCTIONS} ${feedback}`
+            : canUseProtectedActions(auth)
               ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`) +
-            childSessionInstructions,
+              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
         });
       }
       case 'ping':
         return jsonRpcResult(id ?? 0, {});
       case 'tools/list':
         return jsonRpcResult(id ?? 0, {
-          tools: canUseProtectedActions(auth) ? [...TOOLS, ...PROTECTED_TOOLS] : TOOLS,
+          tools: auth.cloudAgentAuthority
+            ? childSessionTools(auth.cloudAgentAuthority)
+            : canUseProtectedActions(auth)
+              ? [...TOOLS, ...PROTECTED_TOOLS]
+              : TOOLS,
         });
       case 'tools/call': {
         const parsed = toolsCallParamsSchema.safeParse(message.params);
@@ -1135,8 +1158,10 @@ export class KiloMcpOAuthStore extends OAuthStore {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (isTokenRequest(request)) return getKiloMcpOAuthStoreStub(env).fetch(request);
-    return fetchWithProvider(request, env, ctx);
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (!isTokenRequest(request)) return fetchWithProvider(request, env, ctx);
+    const body = await readTokenBody(request);
+    if (body.kind === 'too_large') return bodyTooLargeResponse(request);
+    return getKiloMcpOAuthStoreStub(env).fetch(forwardable(request, body.body));
   },
 } satisfies ExportedHandler<Env>;

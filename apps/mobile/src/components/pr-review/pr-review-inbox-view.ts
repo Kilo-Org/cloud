@@ -3,9 +3,8 @@
 // rest of the PR Review surface, plus a later-page failure that keeps
 // already-loaded rows and offers an inline retry.
 
-import { type classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-
-type PrReviewQueryState = ReturnType<typeof classifyPrReviewQueryState>;
+import { type PrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 
 type PrInboxViewKind =
   | 'loading'
@@ -15,13 +14,25 @@ type PrInboxViewKind =
   | 'service-unavailable'
   | 'permission'
   | 'not-found'
-  | 'reconnect';
+  | 'reconnect'
+  | 'access-denied'
+  | 'organization-unavailable';
 
 export type PrInboxView = {
   kind: PrInboxViewKind;
   /** Show the inline "Couldn't load more" + Retry footer row. */
   showLoadMoreRetry: boolean;
 };
+
+/**
+ * The two views that mean the selected organization itself is refused, not a
+ * provider within it. Both own the whole inbox body and offer the same way out,
+ * so a caller that draws provider-recovery chrome must ask this instead of
+ * listing the kinds itself.
+ */
+export function isOrganizationAccessView(view: PrInboxView): boolean {
+  return view.kind === 'access-denied' || view.kind === 'organization-unavailable';
+}
 
 export function selectPrInboxView(args: {
   /**
@@ -35,8 +46,30 @@ export function selectPrInboxView(args: {
   itemCount: number;
   firstPageErrorState: PrReviewQueryState | null;
   laterPageError: boolean;
+  /**
+   * The selected organization's own access, from the scope's query denials.
+   * A lost organization outranks every provider state: it denies the reads
+   * those states describe, so rendering them would either claim nothing is
+   * connected or offer a retry that can never succeed. Rows are dropped with
+   * it — they were read under a scope the server no longer serves.
+   */
+  organizationScopeAccess: OrganizationScopeAccess;
 }): PrInboxView {
-  const { isPending, isFetching, itemCount, firstPageErrorState, laterPageError } = args;
+  const {
+    isPending,
+    isFetching,
+    itemCount,
+    firstPageErrorState,
+    laterPageError,
+    organizationScopeAccess,
+  } = args;
+
+  if (organizationScopeAccess !== 'granted') {
+    return {
+      kind: organizationScopeAccess === 'denied' ? 'access-denied' : 'organization-unavailable',
+      showLoadMoreRetry: false,
+    };
+  }
 
   // A failure is always its own state, whether or not a retry is in flight:
   // the view carries the reason and the Retry that recovers it.
@@ -51,7 +84,10 @@ export function selectPrInboxView(args: {
   // it takes the retryable body: nothing has loaded, nothing was reported
   // empty, and the user gets the Retry that restarts the read.
   if (isPending) {
-    return { kind: isFetching ? 'loading' : 'retryable', showLoadMoreRetry: false };
+    return {
+      kind: isFetching ? 'loading' : 'retryable',
+      showLoadMoreRetry: false,
+    };
   }
 
   if (itemCount === 0) {

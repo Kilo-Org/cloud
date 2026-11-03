@@ -23,7 +23,6 @@ import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { SessionPreviewActionPanel } from './session-preview-action-panel';
 import { SessionPreviewHeaderMeta } from './session-preview-header';
@@ -113,7 +112,7 @@ function SessionPreviewContent({
     messages,
     isLoading: transcriptQuery.isLoading,
     isError: transcriptQuery.isError,
-    errorCode: readTrpcErrorField(transcriptQuery.error, 'code'),
+    error: transcriptQuery.error,
     onRetry: () => {
       void transcriptQuery.refetch();
     },

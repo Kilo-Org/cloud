@@ -9,6 +9,7 @@
       "lowBalance": "Ваш баланс потребує уваги",
       "spendAlert": "Ваші витрати потребують уваги",
       "securityFinding": "Результат безпеки потребує уваги",
+      "securityUpdate": "У перевірці безпеки є оновлення",
       "activeAgentsGlanceable": "В активних агентів є оновлення"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Результат безпеки потребує уваги"
+      "body": "У перевірці безпеки є оновлення"
     }
   },
   "instanceLifecycle": {

@@ -55,9 +55,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
+  usePreventRemove: () => undefined,
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
-vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -131,6 +132,11 @@ describe('ProfileOverviewScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+    // The header holds a title-shaped bar while the read is out, so the heading
+    // does not swap its text when the name arrives.
+    expect(findOne(renderer.root, 'ScreenHeader').props.titleContent).toMatchObject({
+      type: 'Skeleton',
+    });
   });
 
   it('renders the overview in TabScreenScrollView, including the delete action', async () => {
@@ -138,6 +144,10 @@ describe('ProfileOverviewScreen', () => {
     h.query.isPending = false;
 
     const { renderer } = await mountScreen();
+
+    // The name takes the title slot the loading bar held: one heading, no
+    // placeholder left behind it.
+    expect(findOne(renderer.root, 'ScreenHeader').props.titleContent).toBeUndefined();
 
     // The shared scroll view reserves the tab bar (and, while the keyboard is
     // up, the IME) below its viewport, so the destructive action at the end of

@@ -8,14 +8,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export const MANUAL_REVIEW_START_DEADLINE_MS = 15_000;
 
+/**
+ * A settled failure of the watched start: the localized copy the screen
+ * renders and whether sending the same request again can succeed. A refusal
+ * the user cannot fix by resending drops the retry control, so the screen
+ * offers one way forward.
+ */
+export type WatchedStartFailure = {
+  message: string;
+  retryable: boolean;
+};
+
 /** The state a deadline-watched start exposes to its screen. */
 export type DeadlineWatchedStart = {
   /** True while the watched operation is pending and the deadline has not fired. */
   isPending: boolean;
   /** The deadline fired: the start has not settled within its budget. */
   stalled: boolean;
-  /** The settled failure message, or null. */
-  failureMessage: string | null;
+  /** The settled failure, or null when the attempt succeeded or is still out. */
+  failure: WatchedStartFailure | null;
 };
 
 /**
@@ -26,8 +37,8 @@ export type DeadlineWatchedStart = {
  * `isPending = isPendingNow && !stalled`, so the watchdog — not the closure
  * over the flag — is what releases the button at the deadline. `run`
  * receives a `settle` callback the caller invokes when the operation
- * settles: `settle(null)` marks success, `settle(message)` records the
- * failure copy the screen renders inline. The watchdog is re-armed on every
+ * settles: `settle(null)` marks success, `settle(failure)` records the
+ * failure copy the screen renders inline and whether it can be retried. The watchdog is re-armed on every
  * `begin` and cleared on settle or unmount. When the deadline fires while
  * the operation is still out, `stalled` flips true and the button releases,
  * but the operation itself keeps running, so a late success still lands.
@@ -45,10 +56,10 @@ export type DeadlineWatchedStart = {
 export function useDeadlineWatchedStart(
   deadlineMs: number,
   isPendingNow: () => boolean,
-  run: (settle: (failureMessage: string | null) => void) => boolean
+  run: (settle: (failure: WatchedStartFailure | null) => void) => boolean
 ): DeadlineWatchedStart & { begin: () => void; reset: () => void } {
   const [stalled, setStalled] = useState(false);
-  const [failureMessage, setFailureMessage] = useState<string | null>(null);
+  const [failure, setFailure] = useState<WatchedStartFailure | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The attempt that armed the watch in `watchdogRef`. A withdrawn attempt's
   // late settle may only end the watch it started, never a newer attempt's.
@@ -79,9 +90,9 @@ export function useDeadlineWatchedStart(
     const attempt = attemptRef.current + 1;
     attemptRef.current = attempt;
     setStalled(false);
-    setFailureMessage(null);
+    setFailure(null);
     clearWatchdog();
-    const settle = (message: string | null) => {
+    const settle = (settled: WatchedStartFailure | null) => {
       if (attemptRef.current !== attempt) {
         // The input this attempt describes moved on, so its result must not
         // be published. Its own deadline watch ends with it; a newer
@@ -95,7 +106,7 @@ export function useDeadlineWatchedStart(
       }
       clearWatchdog(attempt);
       setStalled(false);
-      setFailureMessage(message);
+      setFailure(settled);
     };
     if (!run(settle)) {
       // The gate refused before anything was pending: no watchdog, and this
@@ -122,7 +133,7 @@ export function useDeadlineWatchedStart(
     // still be released when the budget runs out. The stall copy is not
     // withdrawn for the same reason: it describes the wait, not the draft.
     attemptRef.current += 1;
-    setFailureMessage(null);
+    setFailure(null);
   }, []);
 
   return {
@@ -133,6 +144,6 @@ export function useDeadlineWatchedStart(
     // is current without a ref round-trip.
     isPending: isPendingNow() && !stalled,
     stalled,
-    failureMessage,
+    failure,
   };
 }

@@ -9,6 +9,7 @@
       "lowBalance": "Baki anda memerlukan perhatian",
       "spendAlert": "Perbelanjaan anda memerlukan perhatian",
       "securityFinding": "Penemuan keselamatan memerlukan perhatian",
+      "securityUpdate": "Semakan keselamatan ada kemas kini",
       "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Penemuan keselamatan memerlukan perhatian"
+      "body": "Semakan keselamatan ada kemas kini"
     }
   },
   "instanceLifecycle": {

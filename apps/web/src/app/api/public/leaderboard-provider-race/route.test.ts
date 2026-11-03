@@ -1,4 +1,6 @@
 import { describe, test, expect, jest } from '@jest/globals';
+import { sql } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { resolveSnowflakeConfig } from '@/lib/snowflake';
 import type { GET as RouteGet } from './route';
 
@@ -142,6 +144,92 @@ describe('leaderboard Snowflake database and schema', () => {
       });
     });
   });
+});
+
+describe('public custom model leaderboard usage', () => {
+  test.each([
+    {
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+      modelExpression: 'coalesce(mu.requested_model, mu.model)',
+      rows: [['2026-11-01', 'acme/deleted-public-model', 'code', '12000000']],
+      expected: [
+        {
+          usageDate: '2026-11-01',
+          model: 'acme/deleted-public-model',
+          mode: 'code',
+          tokens: 12_000_000,
+        },
+      ],
+    },
+    {
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+      modelExpression: 'mu.requested_model',
+      rows: [['acme/deleted-public-model', 'acme', '0', '12000000', '10000000', '0', '100', '0']],
+      expected: [
+        {
+          model: 'deleted-public-model',
+          provider: 'Acme',
+          sumTokens: 12_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 100,
+        },
+      ],
+    },
+  ])(
+    'returns public usage without consulting the custom model catalog ($modelExpression)',
+    async ({ loadRoute, modelExpression, rows, expected }) => {
+      await jest.isolateModulesAsync(async () => {
+        const snowflake = await import('@/lib/snowflake');
+        jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+        const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+        executeStatement.mockReset().mockResolvedValue(rows);
+        const { GET } = await loadRoute();
+
+        const response = await GET();
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(expected);
+        const statement = executeStatement.mock.calls[0][0].statement.replace(/\s+/g, ' ');
+        const providerFilter = `( mu.provider != 'custom' or ${modelExpression} = 'reflection/beam-free' or ${modelExpression} = 'stealth/glyph-cluster' )`;
+        expect(statement).toContain(`and ${providerFilter}`);
+        expect(statement).not.toContain('direct-byok');
+        if (modelExpression === 'mu.requested_model') {
+          expect(statement).toContain('and mu.is_user_byok = false');
+        }
+
+        const included = await db.execute<{ id: string }>(sql`
+        select mu.id from (values
+          ('historical-reflection', 'custom', 'reflection/beam-free', 'upstream/beam'),
+          ('historical-stealth', 'custom', 'stealth/glyph-cluster', 'upstream/model'),
+          ('historical-inclusionai', 'custom', 'inclusionai/ling', 'upstream/ling'),
+          ('other-reflection-model', 'custom', 'reflection/beam', 'upstream/beam'),
+          ('other-stealth-model', 'custom', 'stealth/model', 'upstream/model'),
+          ('private', 'custom', 'private/model', 'upstream/model'),
+          ('prefix-lookalike', 'custom', 'stealth-private/model', 'upstream/model'),
+          ('embedded-prefix', 'custom', 'private/reflection/model', 'upstream/model'),
+          ('private-upstream', 'custom', 'private/model', 'reflection/beam-free'),
+          ('missing-requested', 'custom', null, 'reflection/beam-free'),
+          ('public', 'custom-public', 'acme/deleted-public-model', 'upstream/model'),
+          ('ordinary', 'openrouter', 'acme/model', 'upstream/model')
+        ) as mu(id, provider, requested_model, model)
+        where ${sql.raw(providerFilter)}
+        order by mu.id
+      `);
+        expect(included.rows.map(row => row.id)).toEqual(
+          [
+            'historical-reflection',
+            'historical-stealth',
+            ...(modelExpression.startsWith('coalesce') ? ['missing-requested'] : []),
+            'public',
+            'ordinary',
+          ].sort()
+        );
+      });
+    }
+  );
 });
 
 describe('OPTIONS /api/public/leaderboard-provider-race', () => {

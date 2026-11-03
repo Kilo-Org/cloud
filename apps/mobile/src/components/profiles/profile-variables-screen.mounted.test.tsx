@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, delete flows, and the inline refusals for the variables screen */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   confirmRequest,
@@ -9,6 +9,7 @@ import {
   findField,
   findOne,
   findPressable,
+  isSecretToggleOn,
   mountScreen,
   pressButton,
   pressPressable,
@@ -16,9 +17,13 @@ import {
   type TestConfirmMock,
   testVars,
   type TestVars,
+  toggleSecret,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
+import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -43,11 +48,13 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileVars: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -92,6 +99,7 @@ function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['ren
 describe('ProfileVariablesScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.canManage = true;
     Object.assign(h.query, {
       data: undefined,
@@ -160,6 +168,102 @@ describe('ProfileVariablesScreen', () => {
     await waitFor(() =>
       findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'API_KEY')
     );
+
+    unmount();
+  });
+
+  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(true);
+
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'NEW_VAR');
+    changeText(renderer.root, 'Value', 'v');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(h.error).toHaveBeenCalledWith(limitCopy);
+
+    unmount();
+  });
+
+  const atVariableLimit = (): TestVars =>
+    testVars([
+      { key: 'API_KEY', value: 'old', isSecret: false },
+      ...Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      })),
+    ]);
+
+  it('still fills a stored variable at the limit', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', 'new');
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      key: 'API_KEY',
+      value: 'new',
+    });
+    expect(h.error).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('states the limit only for a reader who can add variables', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.canManage = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('reaches a screen reader as the mark-secret switch alone, without a duplicate label stop', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+
+    const label = i18n.t('profiles.secrets.markSecret');
+    const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+    expect(findAll(renderer.root, 'Switch').map(node => node.props.accessibilityLabel)).toEqual([
+      label,
+    ]);
 
     unmount();
   });
@@ -234,11 +338,11 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    changeText(renderer.root, 'Key', 'a'.repeat(257));
+    changeText(renderer.root, 'Key', 'a'.repeat(129));
     pressButton(renderer.root, 'Save');
 
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 256 characters or fewer');
+    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 128 characters or fewer');
 
     unmount();
   });
@@ -352,7 +456,7 @@ describe('ProfileVariablesScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '••••••••')).toBe(
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === SECRET_MASK)).toBe(
       true
     );
     expect(findAll(renderer.root, 'Text').some(node => node.props.children === '***')).toBe(false);
@@ -383,6 +487,14 @@ describe('ProfileVariablesScreen', () => {
 
     pressPressable(renderer.root, 'Reveal value');
     expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(false);
+    // The revealed value's control names what it does now: it hides it again.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Reveal value'
+      )
+    ).toBe(false);
+    pressPressable(renderer.root, 'Hide value');
+    expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(true);
 
     unmount();
   });
@@ -511,5 +623,93 @@ describe('ProfileVariablesScreen', () => {
     expect(findPressable(renderer.root, 'API_KEY')).toBeTruthy();
 
     unmount();
+  });
+
+  it('restores an open add form with its key, value and secret after a remount', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'portal token');
+    changeText(first.renderer.root, 'Value', 'super-secret-value');
+    toggleSecret(first.renderer.root, true);
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('portal token');
+    expect(findField(second.renderer.root, 'Value').props.defaultValue).toBe('super-secret-value');
+    expect(isSecretToggleOn(second.renderer.root)).toBe(true);
+    // The normalization hint is rebuilt from the restored key, not just the text.
+    expect(findAll(second.renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as PORTAL_TOKEN'
+    );
+    second.unmount();
+  });
+
+  it('restores an edit form with the value typed into it after a remount', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '***', isSecret: true }]);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressPressable(first.renderer.root, 'API_KEY');
+    changeText(first.renderer.root, 'Value', 'rotated-secret');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('API_KEY');
+    expect(findField(second.renderer.root, 'Value').props.defaultValue).toBe('rotated-secret');
+    second.unmount();
+  });
+
+  it('clears the draft when the variable is saved', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'PORTAL_TOKEN');
+    changeText(first.renderer.root, 'Value', 'super-secret-value');
+    pressButton(first.renderer.root, 'Save');
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    second.unmount();
+  });
+
+  it('clears the draft when the form is cancelled', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 'Add variable');
+    changeText(first.renderer.root, 'Key', 'PORTAL_TOKEN');
+    pressButton(first.renderer.root, 'Cancel');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    second.unmount();
+  });
+  it('still offers the add control when the restored edit names a row that is gone', async () => {
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressPressable(first.renderer.root, 'API_KEY');
+    first.unmount();
+
+    // The row was deleted elsewhere while the screen was away, so the restored
+    // edit has nothing to edit; the screen must not strand the reader without
+    // the add control.
+    h.query.data = testVars([{ key: 'OTHER_KEY', value: '2', isSecret: false }]);
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    pressButton(second.renderer.root, 'Add variable');
+    expect(findField(second.renderer.root, 'Key').props.defaultValue).toBe('');
+    second.unmount();
   });
 });

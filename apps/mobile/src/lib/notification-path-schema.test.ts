@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pushDataSchema } from '@kilocode/notifications';
+import { pushDataSchema } from '@kilocode/notifications/schemas';
 
 import { notificationPathForData } from './notification-path';
 

@@ -29,6 +29,12 @@ type NewSessionRepositorySectionProps = {
   isRetrying: boolean;
   onChange: (fullName: string) => void;
   onConnect: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. That provider's own
+   * open control shows the busy state, so the network round trip at the start of
+   * the flow never reads as an inert tap.
+   */
+  connectingProvider?: RepositoryPlatform | null;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
   /** Recently used rows for the picker's "Recently used" section. */
@@ -62,6 +68,7 @@ export function NewSessionRepositorySection({
   isRetrying,
   onChange,
   onConnect,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -157,6 +164,7 @@ export function NewSessionRepositorySection({
           <RepositoryUnavailableCard
             platform={platform}
             onConnect={onConnect}
+            isConnecting={connectingProvider === platform}
             onRefreshRepos={onRefreshRepos}
             isRetrying={isRetrying}
           />
@@ -204,8 +212,12 @@ export function NewSessionRepositorySection({
     }
     return (
       <CollapsibleSection
-        className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
+        className="mt-3 rounded-lg border border-border bg-card"
         contentClassName="gap-3"
+        // The connected-but-empty card below is a `p-4` surface, and the two are
+        // mutually exclusive states of the same region, so this one keeps that
+        // 14 dp inset instead of the section's 10.5 dp default.
+        inset="roomy"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
         // The card stacks under the repository picker in a scrolling column,
@@ -236,6 +248,7 @@ export function NewSessionRepositorySection({
         platform={platform}
         labelKey={selectedRepository === null ? copy.openLabel : copy.connectTitle}
         onConnect={onConnect}
+        isConnecting={connectingProvider === platform}
         onRefreshRepos={onRefreshRepos}
         isRetrying={isRetrying}
       />

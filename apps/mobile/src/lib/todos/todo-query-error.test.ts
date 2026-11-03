@@ -2,6 +2,7 @@
 // shows the access-denied state and no failure that cannot succeed on a retry
 // carries a Retry action.
 
+import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import { selectTodoQueryErrorView } from './todo-query-error';
@@ -42,6 +43,13 @@ describe('selectTodoQueryErrorView', () => {
   it('keeps a 500-class code on the server state with a retry', () => {
     expect(selectTodoQueryErrorView(makeTrpcError('INTERNAL_SERVER_ERROR'))).toEqual({
       variant: 'server',
+      showRetry: true,
+    });
+  });
+
+  it('names a deadline abort as the retryable slow-response state', () => {
+    expect(selectTodoQueryErrorView(new RequestDeadlineError(15_000))).toEqual({
+      variant: 'timeout',
       showRetry: true,
     });
   });

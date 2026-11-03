@@ -43,7 +43,10 @@ type ScreenLayoutProps = Omit<
 > & {
   navigation: Pick<
     NativeStackNavigationProp<ParamListBase>,
-    'setOptions' | 'isFocused' | 'addListener'
+    // `getState`/`reset` let a scene layout repair the Stack it belongs to —
+    // a screen that a fresh destination opened on its own has no parent to
+    // pop to (see use-repair-security-agent-scope-stack).
+    'setOptions' | 'isFocused' | 'addListener' | 'getState' | 'reset'
   >;
 };
 

@@ -234,7 +234,7 @@ const HEADER_VALUE = new RegExp(
 const CREDENTIAL_FLAG = new RegExp(
   String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` +
     QUOTED_VALUE +
-    String.raw`|(?!\\?["'])(?!-)[^\s,;"'&]+)`,
+    String.raw`|(?!\\?["'])(?!--)[^\s,;"'&]+)`,
   'g'
 );
 // Credential value shapes that carry no key name of their own. An opaque run is 48
@@ -258,13 +258,14 @@ const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
 // A token that continues a credential past the value screening replaces is treated as
 // credential material only when it looks like an encoded secret rather than prose or an
 // identifier: 20 characters or more that mix letters with digits, 32 characters or more
-// in any mix, or 10 or more that carry an encoding character. The comparison stops at an
-// assignment, so a following pair is classified on its own key name.
+// in any mix, or 10 or more that mix letters with digits and carry an encoding character.
+// The comparison stops at an assignment, so a following pair is classified on its own
+// key name.
 const RESIDUAL_OPAQUE_TOKEN = new RegExp(
   String.raw`^(?:` +
     String.raw`(?=[A-Za-z0-9+/=_-]{20,}$)(?=[A-Za-z0-9+/=_-]*[0-9])(?=[A-Za-z0-9+/=_-]*[A-Za-z])[A-Za-z0-9+/=_-]+` +
     String.raw`|[A-Za-z0-9+/=_-]{32,}` +
-    String.raw`|(?=[A-Za-z0-9+/=_-]{10,}$)(?=.*[+/])[A-Za-z0-9+/=_-]+` +
+    String.raw`|(?=[A-Za-z0-9+/=_-]{10,}$)(?=.*[+/])(?=[A-Za-z0-9+/=_-]*[0-9])(?=[A-Za-z0-9+/=_-]*[A-Za-z])[A-Za-z0-9+/=_-]+` +
     String.raw`)$`
 );
 

@@ -627,7 +627,7 @@ export function CustomLlmsContent() {
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>.
+                OpenRouter model.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Set <code>api_kinds</code> to a subset of <code>chat_completions</code>,{' '}

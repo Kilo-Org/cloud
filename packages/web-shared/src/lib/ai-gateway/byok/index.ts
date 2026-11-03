@@ -32,7 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
@@ -66,14 +66,14 @@ async function deriveModelInferenceUserByokProviders(
  * them over. A custom LLM can share an id with a gateway catalog model, so
  * callers that may see custom LLM ids exclude them separately.
  */
-export function isGatewayUserByokEligibleModel(modelId: string): boolean {
-  return !isFreeModelExcludingCustomLlms(modelId);
+export async function isGatewayUserByokEligibleModel(modelId: string): Promise<boolean> {
+  return !(await isFreeModel(modelId));
 }
 
 export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
-  if (!isGatewayUserByokEligibleModel(modelId)) {
+  if (!(await isGatewayUserByokEligibleModel(modelId))) {
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([

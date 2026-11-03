@@ -1935,7 +1935,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     }
   });
 
-  it('rate-limits anonymous callers of a private custom LLM with a free model id', async () => {
+  it('asks anonymous callers of a private custom LLM with a free model id to sign in', async () => {
     setAnonymousAuth();
     mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('stealth/private-alpha', false));
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
@@ -1946,7 +1946,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         makeRequest(makeBody('stealth/private-alpha')) as never
       );
 
-      expect(response.status).toBe(429);
+      expect(response.status).toBe(401);
+      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
       expect(mockedGetProvider).not.toHaveBeenCalled();
     } finally {
       mockedFindCustomLlm.mockResolvedValue(null);

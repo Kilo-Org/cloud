@@ -30,10 +30,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -256,7 +253,7 @@ export async function handleAudioTranscriptionsRequest(
     kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
+    is_free: await isFreeModel(requestedModelLowerCased),
     custom_llm_pricing: null,
     promptInfo,
     max_tokens: null,

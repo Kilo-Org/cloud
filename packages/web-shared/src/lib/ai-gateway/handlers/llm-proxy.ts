@@ -43,7 +43,6 @@ import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
-  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findCustomLlm,
@@ -669,13 +668,9 @@ export async function handleLlmProxyRequest(
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // A public custom LLM owns its id, so it is publicly free exactly when it sets
-  // no pricing. Anonymous callers cannot use private custom LLMs, so for them a
-  // private custom LLM id must behave exactly like an unknown id.
+  // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
   const isPubliclyFreeModel =
-    customLlm !== null && !isPrivateCustomLlm
-      ? !customLlm.definition.pricing
-      : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+    !isPrivateCustomLlm && (await isFreeModel(effectiveModelIdLowerCased));
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -695,14 +690,12 @@ export async function handleLlmProxyRequest(
     const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern. So is the default internal benchmark user: a run
-    // sends every case of every free model it measures, and the anti-abuse limit
-    // would otherwise throttle the measurement itself. A benchmark user override is
-    // not exempt.
+    // The default internal benchmark user is exempt: a run sends every case of
+    // every free model it measures, and the anti-abuse limit would otherwise
+    // throttle the measurement itself. A benchmark user override is not exempt.
     const isExempt =
       rateLimitSubject.kind === 'account' &&
-      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
+      rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
     if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`

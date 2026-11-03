@@ -36,7 +36,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -321,9 +321,12 @@ export async function applyProviderSpecificLogic(
   const usesUserGatewayKey =
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
+  // Custom LLM providers handle paid server features in `getProvider`.
+  const isCustomLlmProvider = provider.type === 'custom' || provider.type === 'custom-public';
+
   removeModelsFallback(requestedModel, requestToMutate);
   if (
-    isFreeModelExcludingCustomLlms(requestedModel) ||
+    (!isCustomLlmProvider && (await isFreeModel(requestedModel))) ||
     (userByok !== null && !usesUserGatewayKey)
   ) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);

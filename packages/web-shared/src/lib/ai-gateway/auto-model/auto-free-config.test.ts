@@ -55,8 +55,8 @@ describe('isAutoFreeEligibleModelId', () => {
     ['anthropic/claude-sonnet-4:free', false],
     ['openai/gpt-oss-120b:free', true],
     ['openai/gpt-5:free', false],
-  ])('%s -> %s', (model, expected) => {
-    expect(isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
+  ])('%s -> %s', async (model, expected) => {
+    await expect(isAutoFreeEligibleModelId(model, undefined)).resolves.toBe(expected);
   });
 
   function customLlm(definition: CustomLlmDefinition): CustomLlm {
@@ -111,13 +111,15 @@ describe('isAutoFreeEligibleModelId', () => {
       }),
       false,
     ],
-  ])('%s', (_name, definition, expected) => {
-    expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
+  ])('%s', async (_name, definition, expected) => {
+    await expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).resolves.toBe(
+      expected
+    );
   });
 });
 
 describe('getIneligibleAutoFreeModelIds', () => {
-  it('accepts public custom LLMs and rejects private ones', () => {
+  it('accepts public custom LLMs and rejects private ones', async () => {
     const customLlms: CustomLlm[] = [
       {
         public_id: 'Acme/Public-Free',
@@ -131,7 +133,7 @@ describe('getIneligibleAutoFreeModelIds', () => {
       },
     ];
 
-    expect(
+    await expect(
       getIneligibleAutoFreeModelIds(
         {
           models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
@@ -142,6 +144,6 @@ describe('getIneligibleAutoFreeModelIds', () => {
         },
         customLlms
       )
-    ).toEqual(['acme/private-free', 'provider/paid-model']);
+    ).resolves.toEqual(['acme/private-free', 'provider/paid-model']);
   });
 });

@@ -3,7 +3,6 @@ import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
-  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   customLlmDefinition,
@@ -27,21 +26,25 @@ describe('isFreeModel', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest('acme/custom-model');
     await insertCustomLlmForTest('acme/priced-custom-model', customLlmDefinition({ pricing }));
+    await insertCustomLlmForTest('stealth/priced-model-free', customLlmDefinition({ pricing }));
   });
 
   afterAll(async () => {
     await deleteCustomLlmForTest('acme/custom-model');
     await deleteCustomLlmForTest('acme/priced-custom-model');
+    await deleteCustomLlmForTest('stealth/priced-model-free');
   });
 
   test('treats a custom LLM without pricing as free', async () => {
     await expect(isFreeModel('acme/custom-model')).resolves.toBe(true);
-    expect(isFreeModelExcludingCustomLlms('acme/custom-model')).toBe(false);
   });
 
   test('treats a custom LLM with pricing as not free', async () => {
     await expect(isFreeModel('acme/priced-custom-model')).resolves.toBe(false);
-    expect(isFreeModelExcludingCustomLlms('acme/priced-custom-model')).toBe(false);
+  });
+
+  test('uses custom LLM pricing even when the id looks free', async () => {
+    await expect(isFreeModel('stealth/priced-model-free')).resolves.toBe(false);
   });
 
   test('assumes custom LLMs require data collection, like other free models', async () => {

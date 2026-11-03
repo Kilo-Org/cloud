@@ -10,29 +10,22 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 /** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
-export async function isFreeModel(modelId: string): Promise<boolean> {
-  const customLlm = await findCustomLlm(modelId);
-  if (customLlm?.definition.pricing) return false;
-  return customLlm !== null || isFreeModelExcludingCustomLlms(modelId);
-}
-
-/**
- * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
- * custom LLMs need separate handling, as for `kilo-auto/free` candidates.
- */
-export function isFreeModelExcludingCustomLlms(model: string): boolean {
+export async function isFreeModel(model: string): Promise<boolean> {
   const modelId = model ?? '';
+  const customLlm = await findCustomLlm(modelId);
+  if (customLlm) return !customLlm.definition.pricing;
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
-    modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||
-    (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
+    modelId.endsWith(':free') ||
+    modelId.endsWith('-free') ||
+    modelId.startsWith('stealth/')
   );
 }
 
 /** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (await isCustomLlm(model)) || isFreeModelExcludingCustomLlms(model);
+  return (await isCustomLlm(model)) || (await isFreeModel(model));
 }

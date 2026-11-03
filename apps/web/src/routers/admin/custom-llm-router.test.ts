@@ -557,20 +557,20 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
     });
 
-    it('rejects a free model id', async () => {
-      const caller = await createCallerForUser(admin.id);
+    it.each(['stealth/custom-alpha', 'acme/model-free'])(
+      'accepts the free model id %s',
+      async publicId => {
+        const caller = await createCallerForUser(admin.id);
 
-      await expect(
-        caller.admin.customLlm.upsert({
-          public_id: 'stealth/custom-alpha',
+        const result = await caller.admin.customLlm.upsert({
+          public_id: publicId,
           definition: validDefinition,
           credentials,
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('free model id'),
-      });
-    });
+        });
+
+        expect(result.public_id).toBe(publicId);
+      }
+    );
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {
       await db

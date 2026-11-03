@@ -37,7 +37,16 @@ export async function applyReportedSessionTitle(
   if (!existing) return { kind: 'not_found' };
 
   const { title, generated } = params.input;
-  if (generated && !isDefaultSessionTitle(existing.title)) return { kind: 'refused' };
+  const existingIsPlaceholder = isDefaultSessionTitle(existing.title);
+  if (generated && !existingIsPlaceholder) return { kind: 'refused' };
+  // A late or retried non-generated report can still carry the creation
+  // placeholder (`New session - <timestamp>`) after the agent or a user has
+  // named the session. That reporter may not know about the newer title, so
+  // letting the placeholder through would reset the sidebar row to "New chat".
+  // Real renames still win last-write.
+  if (!generated && !existingIsPlaceholder && isDefaultSessionTitle(title)) {
+    return { kind: 'refused' };
+  }
 
   const writeWhere = generated
     ? and(

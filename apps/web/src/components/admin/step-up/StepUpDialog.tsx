@@ -77,6 +77,7 @@ export function StepUpCeremonyContent({
   dismissible = true,
   headings = 'dialog',
   headingLevel = 'h2',
+  onRunningChange,
 }: {
   requirement: StepUpRequirement | null;
   onVerified: () => void;
@@ -84,9 +85,11 @@ export function StepUpCeremonyContent({
   dismissible?: boolean;
   headings?: 'dialog' | 'plain';
   headingLevel?: 'h1' | 'h2';
+  onRunningChange?: (running: boolean) => void;
 }) {
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reauthRequired, setReauthRequired] = useState(false);
   const errorRef = useRef<HTMLParagraphElement | null>(null);
@@ -149,8 +152,22 @@ export function StepUpCeremonyContent({
     if (error) errorRef.current?.focus();
   }, [error]);
 
+  useEffect(() => {
+    onRunningChange?.(isRunning);
+  }, [isRunning, onRunningChange]);
+
+  async function retryStatus() {
+    if (isRetrying) return;
+    setIsRetrying(true);
+    try {
+      await statusQuery.refetch();
+    } finally {
+      setIsRetrying(false);
+    }
+  }
+
   const enrolled = statusQuery.data?.enrolled ?? false;
-  const retrying = statusQuery.isRefetching;
+  const retrying = isRetrying;
   const actionLabel = !statusKnown
     ? statusFailed
       ? retrying
@@ -211,9 +228,7 @@ export function StepUpCeremonyContent({
           <StepUpSignInAgainButton size="default" />
         ) : (
           <Button
-            onClick={() =>
-              statusFailed || unavailable ? void statusQuery.refetch() : void runCeremony()
-            }
+            onClick={() => (statusFailed || unavailable ? void retryStatus() : void runCeremony())}
             disabled={actionDisabled}
           >
             {isRunning || retrying ? (
@@ -249,11 +264,12 @@ export function StepUpDialog({
   onCancel: () => void;
   dismissible?: boolean;
 }) {
+  const [running, setRunning] = useState(false);
   return (
     <Dialog
       open={open}
       onOpenChange={next => {
-        if (!next && dismissible) onCancel();
+        if (!next && dismissible && !running) onCancel();
       }}
     >
       <DialogContent>
@@ -263,6 +279,7 @@ export function StepUpDialog({
           onCancel={onCancel}
           dismissible={dismissible}
           headings="dialog"
+          onRunningChange={setRunning}
         />
       </DialogContent>
     </Dialog>

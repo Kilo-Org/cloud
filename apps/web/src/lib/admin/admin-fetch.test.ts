@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { registerStepUpHandler } from '@/lib/trpc/step-up-link';
-import { adminFetch } from './admin-fetch';
+import { AdminStepUpCancelledError, adminFetch } from './admin-fetch';
 
 const ok = () => new Response(JSON.stringify({ ok: true }), { status: 200 });
 const stepUp403 = (code: string) =>
@@ -27,15 +27,19 @@ describe('adminFetch', () => {
     expect(handler).toHaveBeenCalledWith({ code: 'MFA_REQUIRED' });
   });
 
-  it('does not retry when the user cancels', async () => {
+  it('throws a tagged cancellation so query retry can be suppressed', async () => {
     registerStepUpHandler(async () => false);
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(stepUp403('MFA_EXPIRED'));
 
-    const response = await adminFetch('/admin/api/users');
+    const error: unknown = await adminFetch('/admin/api/users').then(
+      () => null,
+      (rejection: unknown) => rejection
+    );
 
-    expect(response.status).toBe(403);
+    expect(error).toBeInstanceOf(AdminStepUpCancelledError);
+    expect((error as AdminStepUpCancelledError).data.stepUp.code).toBe('MFA_EXPIRED');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

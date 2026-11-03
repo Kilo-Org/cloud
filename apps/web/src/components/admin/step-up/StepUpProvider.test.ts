@@ -73,6 +73,19 @@ describe('StepUpProvider', () => {
     expect(mounted!.container.textContent).not.toContain('dialog');
   });
 
+  it('settles pending work when active turns false', async () => {
+    render(true);
+    const handler = mockRegister.mock.calls.at(-1)?.[0] as
+      | ((requirement: { code: 'MFA_REQUIRED' }) => Promise<boolean>)
+      | undefined;
+    const pending = handler?.({ code: 'MFA_REQUIRED' });
+    expect(pending).toBeDefined();
+
+    render(false);
+
+    await expect(pending).resolves.toBe(false);
+  });
+
   it('registers a handler only when active and unregisters on teardown', async () => {
     render(true);
     expect(mockRegister).toHaveBeenCalledWith(expect.any(Function));

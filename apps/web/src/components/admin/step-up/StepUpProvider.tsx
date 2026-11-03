@@ -45,10 +45,23 @@ export function StepUpProvider({ active, children }: { active: boolean; children
   }, []);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      // Settle anything waiting so a refused operation errors instead of
+      // hanging, and drop the abandoned requirement before re-activation.
+      setRequirement(null);
+      queue.current.settle(false);
+      return;
+    }
     registerStepUpHandler(next => requestStepUp(next));
     return () => registerStepUpHandler(null);
   }, [active, requestStepUp]);
+
+  useEffect(
+    () => () => {
+      queue.current.settle(false);
+    },
+    []
+  );
 
   const onVerified = useCallback(() => {
     void queryClient.invalidateQueries({

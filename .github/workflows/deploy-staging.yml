@@ -98,7 +98,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
-    needs: [check-changes, check-staging-db-startup, run-migrations]
+    needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app]
     if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:

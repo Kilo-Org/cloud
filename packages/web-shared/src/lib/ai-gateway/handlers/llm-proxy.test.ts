@@ -4687,7 +4687,7 @@ describe('Enkrypt input guardrail', () => {
         ]);
         expect(
           JSON.parse(fakeR2.objects.get(`test-api-request-log/${rows[0].response_r2_key}`) ?? '')
-        ).toEqual(body);
+        ).toMatchObject({ version: 1, response: JSON.stringify(body) });
       }
     );
 

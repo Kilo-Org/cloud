@@ -123,7 +123,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-ai-gateway:
-    needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
+    needs: [stage-ai-gateway, check-production-db-startup, run-migrations, promote-app]
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}

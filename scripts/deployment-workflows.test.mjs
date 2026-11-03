@@ -439,7 +439,7 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
-test('ai-gateway deploys with each scheduled release after migrations', () => {
+test('ai-gateway deploys with each scheduled release after migrations and the app reader', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
@@ -456,6 +456,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     'stage-ai-gateway',
     'check-production-db-startup',
     'run-migrations',
+    'promote-app',
   ]);
   assert.deepEqual(promoteAiGateway.with, {
     deployment_url: '${{ needs.stage-ai-gateway.outputs.deployment_url }}',
@@ -472,6 +473,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     'check-changes',
     'check-staging-db-startup',
     'run-migrations',
+    'deploy-app',
   ]);
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');

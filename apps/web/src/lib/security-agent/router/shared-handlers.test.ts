@@ -18,6 +18,7 @@ import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { SECURITY_SYNC_PRECONDITION_CODES } from '@kilocode/app-shared/security-agent';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
+import { parseSecurityAgentConfig } from '../core/constants';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -502,6 +503,20 @@ describe('getConfig', () => {
       autoRemediationRequireApproval: true,
     });
   });
+
+  it('reports the remediation default when the stored config only sets the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 1,
+      storedConfig: { analysis_model_slug: 'analysis-model' },
+      config: parseSecurityAgentConfig({ analysis_model_slug: 'analysis-model' }),
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      analysisModelSlug: 'analysis-model',
+      remediationModelSlug: 'kilo-auto/balanced',
+    });
+  });
 });
 
 describe('setEnabled', () => {
@@ -882,6 +897,61 @@ describe('saveConfig', () => {
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
       expect.objectContaining({
         config: expect.objectContaining({ auto_remediation_require_approval: false }),
+      })
+    );
+  });
+
+  it('stores the remediation default when a save changes only the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {},
+      config: parseSecurityAgentConfig({}),
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'analysis-model',
+          remediation_model_slug: 'kilo-auto/balanced',
+        }),
+      })
+    );
+  });
+
+  it('keeps a stored remediation model when a save omits it', async () => {
+    const stored = parseSecurityAgentConfig({
+      analysis_model_slug: 'analysis-model',
+      remediation_model_slug: 'stored-remediation-model',
+    });
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {
+        analysis_model_slug: 'analysis-model',
+        remediation_model_slug: 'stored-remediation-model',
+      },
+      config: stored,
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'next-analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'next-analysis-model',
+          remediation_model_slug: 'stored-remediation-model',
+        }),
       })
     );
   });

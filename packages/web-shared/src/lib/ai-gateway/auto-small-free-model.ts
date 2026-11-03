@@ -1,19 +1,15 @@
 import 'server-only';
 
 import {
-  GEMMA_4_26B_A4B_IT_FREE_ID,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+  AUTO_SMALL_TARGET_MODELS,
+  KILO_AUTO_SMALL_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
-/**
- * The model `kilo-auto/small` routes users without balance to. Direct requests
- * for it are rejected as unavailable. Kilo pays to serve it as the paid model,
- * so it stays on Kilo's own accounts and never uses a user's BYOK key.
- */
+/** Kilo funds this fallback, so it must never use a user's BYOK key. */
 export function isAutoSmallFreeModel(model: string): boolean {
-  return model === GEMMA_4_26B_A4B_IT_FREE_ID;
+  return model === AUTO_SMALL_TARGET_MODELS.free;
 }
 
-export const AUTO_SMALL_FREE_MODEL_UPSTREAM_ID = GEMMA_4_26B_A4B_IT_ID;
+export const AUTO_SMALL_FREE_MODEL_UPSTREAM_ID = AUTO_SMALL_TARGET_MODELS.paid;
 
-export const AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH = 262144;
+export const AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH = KILO_AUTO_SMALL_MODEL.context_length;

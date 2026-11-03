@@ -284,6 +284,38 @@ describe('scanRequestWithVerdictCache', () => {
     expect(result.allowedKey).toBeNull();
   });
 
+  it.each<[string, () => Response]>([
+    ['fails', () => new Response('unavailable', { status: 500 })],
+    ['reports a detector error', () => enkryptResponse({ pii: -1 })],
+  ])('returns no key to cache when a log-only scan %s and allows', async (_name, respond) => {
+    const logOnlyConfig = {
+      scanToolResults: true,
+      status: 'ready',
+      detectors: { pii: { enabled: true, entities: ['secrets'] } },
+      blockingDetectors: [],
+    } satisfies EnkryptGuardrailRequest['config'];
+
+    const result = await scanRequestWithVerdictCache(
+      makeRequest(conversation, { config: logOnlyConfig }),
+      deps(memoryStore(), respond)
+    );
+
+    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(result.allowedKey).toBeNull();
+  });
+
+  it('returns no key to cache when a log-only scan is too large to send', async () => {
+    const result = await scanRequestWithVerdictCache(
+      makeRequest(['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)], {
+        config: { ...config, blockingDetectors: [] },
+      }),
+      deps(memoryStore())
+    );
+
+    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(result.allowedKey).toBeNull();
+  });
+
   it('scans the full text when the cache lookup fails', async () => {
     const store = memoryStore();
     store.mget.mockRejectedValue(new Error('The operation timed out.'));

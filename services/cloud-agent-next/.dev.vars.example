@@ -76,8 +76,8 @@ BYOC_VERCEL_IDS=
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.
 CLOUDFLARE_CONTAINERS_ORG_IDS=
-# Explicit organization IDs allowed to build and restore snapshots. Empty is off; no wildcard.
-ENVIRONMENT_SNAPSHOT_ORG_IDS=
+# Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
+ENVIRONMENT_SNAPSHOT_ORG_IDS=*
 # Explicit organization or user IDs allowed to capture and restore per-session disks. No wildcard.
 SESSION_SNAPSHOT_ORG_IDS=
 SESSION_SNAPSHOT_USER_IDS=

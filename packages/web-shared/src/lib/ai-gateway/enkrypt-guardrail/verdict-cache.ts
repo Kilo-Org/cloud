@@ -112,6 +112,14 @@ async function cachedSegmentCount(
   }
 }
 
+/**
+ * A log-only scan also allows when it fails or the text is too large to send, so only an allow
+ * that Enkrypt itself decided on its final call is cached.
+ */
+function enkryptAllowed({ verdict, usageRecords }: EnkryptGuardrailScanResult): boolean {
+  return verdict.action === 'allow' && usageRecords.at(-1)?.decision === 'allowed';
+}
+
 function isLowSurrogate(codeUnit: number): boolean {
   return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
 }
@@ -159,8 +167,7 @@ export async function scanRequestWithVerdictCache(
   const scannedText = fullyCached ? '' : text.slice(overlapStart(text, cachedCharacters));
 
   const result = await scanRequest({ ...request, text: scannedText, coverage }, deps);
-  const allowedKey =
-    result.verdict.action === 'allow' && !fullyCached ? (keys.at(-1) ?? null) : null;
+  const allowedKey = !fullyCached && enkryptAllowed(result) ? (keys.at(-1) ?? null) : null;
   return { ...result, allowedKey };
 }
 

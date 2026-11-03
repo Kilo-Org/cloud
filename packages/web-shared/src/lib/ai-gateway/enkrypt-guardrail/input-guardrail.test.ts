@@ -14,6 +14,7 @@ import {
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { startEnkryptInputGuardrail } from './input-guardrail';
 
 jest.mock('next/server', () => ({
@@ -46,11 +47,16 @@ const mockedRedisMget = jest.mocked(redisClient.mget);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const signal = new AbortController().signal;
 
+const detectors = {
+  injection_attack: { enabled: true, need_explanation: false },
+  pii: { enabled: true, entities: ['secrets'] },
+} satisfies EnkryptDetectRequestDetectors;
+
 const config = {
   scanToolResults: true,
   status: 'ready',
-  detectors: {},
-  blockingDetectors: [],
+  detectors: { injection_attack: detectors.injection_attack },
+  blockingDetectors: ['injection_attack'],
 } satisfies EnkryptGuardrailRequest['config'];
 
 const scan: EnkryptGuardrailRequest = {
@@ -62,6 +68,39 @@ const scan: EnkryptGuardrailRequest = {
   segments: ['system prompt', 'tool output'],
   config,
 };
+
+const mixedScan: EnkryptGuardrailRequest = {
+  ...scan,
+  config: {
+    scanToolResults: true,
+    status: 'ready',
+    detectors,
+    blockingDetectors: ['injection_attack'],
+  },
+};
+
+const logOnlyScan: EnkryptGuardrailRequest = {
+  ...scan,
+  config: {
+    scanToolResults: true,
+    status: 'ready',
+    detectors: { pii: detectors.pii },
+    blockingDetectors: [],
+  },
+};
+
+function isLogOnly({ config }: Pick<EnkryptGuardrailRequest, 'config'>) {
+  return config.status === 'ready' && config.blockingDetectors.length === 0;
+}
+
+function scanOf({ segments, ...request }: EnkryptGuardrailRequest) {
+  return { ...request, text: segments.join('\n\n'), coverage: expect.any(Object) };
+}
+
+function finalKey(request: EnkryptGuardrailRequest) {
+  if (request.config.status !== 'ready') throw new Error('expected a ready config');
+  return verdictCacheKeys(request, request.config, request.segments).at(-1);
+}
 
 function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCall {
   return {
@@ -125,16 +164,27 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('caches an allowed request by its full content while after() keeps the function alive', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [] });
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
 
     startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
     await runAfterTasks();
 
-    const finalKey = verdictCacheKeys(scan, config, scan.segments).at(-1);
     expect(mockedRedisSet.mock.calls).toEqual([
-      [finalKey, '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }],
+      [finalKey(scan), '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }],
     ]);
+  });
+
+  it('caches the blocking and log-only scans under separate keys', async () => {
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+
+    startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+    await runAfterTasks();
+
+    const blockingKey = finalKey({ ...mixedScan, config: scan.config });
+    const logOnlyKey = finalKey({ ...mixedScan, config: logOnlyScan.config });
+    expect(blockingKey).not.toBe(logOnlyKey);
+    expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([blockingKey, logOnlyKey]);
   });
 
   it.each<[string, EnkryptGuardrailScanResult['verdict']]>([
@@ -185,6 +235,100 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+  });
+
+  it('scans log-only detectors in a second call that the verdict never waits for', async () => {
+    const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
+    mockedScanRequest.mockImplementation(async resolved =>
+      isLogOnly(resolved)
+        ? logOnlyResult.promise
+        : { verdict: { action: 'allow' }, usageRecords: [call()] }
+    );
+    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
+    expect(mockedScanRequest.mock.calls).toEqual([
+      [
+        scanOf({ ...mixedScan, config: scan.config }),
+        expect.objectContaining({ timeoutMs: 30_000, signal }),
+      ],
+      [
+        scanOf({ ...mixedScan, config: logOnlyScan.config }),
+        expect.objectContaining({ timeoutMs: 30_000, signal }),
+      ],
+    ]);
+
+    logOnlyResult.resolve({
+      verdict: { action: 'unavailable', reason: 'timeout' },
+      usageRecords: [call({ decision: 'error', creditsCost: 1 })],
+    });
+    await runAfterTasks();
+
+    expect(mockedRecordUsage.mock.calls).toEqual([
+      [{ ...call(), addedLatencyMs: 237 }],
+      [{ ...call({ decision: 'error', creditsCost: 1 }), addedLatencyMs: null }],
+    ]);
+  });
+
+  it('ignores a log-only verdict that settles before the blocking verdict', async () => {
+    const blockingResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
+    mockedScanRequest.mockImplementation(async resolved =>
+      isLogOnly(resolved)
+        ? { verdict: { action: 'unavailable', reason: 'failed' }, usageRecords: [] }
+        : blockingResult.promise
+    );
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+    const verdict = guardrail.awaitVerdict();
+    await new Promise(resolve => setImmediate(resolve));
+    blockingResult.resolve({ verdict: { action: 'allow' }, usageRecords: [] });
+
+    expect(await verdict).toEqual({ action: 'allow' });
+  });
+
+  it('keeps the blocking verdict when the log-only scan throws unexpectedly', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedScanRequest.mockImplementation(async resolved => {
+      if (isLogOnly(resolved)) throw new RangeError('Maximum call stack size exceeded');
+      return { verdict: { action: 'block', message: 'blocked' }, usageRecords: [call()] };
+    });
+    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_000);
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'block', message: 'blocked' });
+    await runAfterTasks();
+    expect(errorLog).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] log-only scan failed unexpectedly',
+      expect.any(Object)
+    );
+    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
+  });
+
+  it('skips the verdict without waiting when every detector only logs', async () => {
+    const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
+    mockedScanRequest.mockReturnValue(logOnlyResult.promise);
+    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_000.2);
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
+
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'skip' });
+    expect(mockedScanRequest).toHaveBeenCalledTimes(1);
+    expect(mockedScanRequest).toHaveBeenCalledWith(scanOf(logOnlyScan), expect.anything());
+
+    logOnlyResult.resolve({
+      verdict: { action: 'allow' },
+      usageRecords: [call({ decision: 'error', creditsCost: null }), call({ decision: 'error' })],
+    });
+    await runAfterTasks();
+
+    expect(mockedRecordUsage.mock.calls).toEqual([
+      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
+      [{ ...call({ decision: 'error' }), addedLatencyMs: 0 }],
+    ]);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
   });
 
   it('skips the scan and records nothing without a guardrail', async () => {

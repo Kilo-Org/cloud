@@ -30,6 +30,7 @@ export function resolveRequestLoggingMode(
   optIns: RequestLoggingOptIn[],
   params: { accountId: string | null; organizationId: string | null }
 ): RequestLoggingMode | null {
+  if (optIns.length > MAX_REQUEST_LOGGING_OPT_INS) return null;
   const now = Date.now();
   const matching = optIns.filter(
     entry =>

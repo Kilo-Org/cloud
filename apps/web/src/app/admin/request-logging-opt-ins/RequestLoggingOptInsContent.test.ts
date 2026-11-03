@@ -49,6 +49,7 @@ describe('RequestLoggingOptInsContent expiry', () => {
   let root: Root;
   let container: HTMLElement;
   let cleanup: () => void;
+  let Content: typeof RequestLoggingOptInsContentComponent;
 
   beforeEach(async () => {
     jest.useFakeTimers({ now: startTime });
@@ -86,6 +87,7 @@ describe('RequestLoggingOptInsContent expiry', () => {
     }: {
       default: typeof RequestLoggingOptInsContentComponent;
     } = await import('./RequestLoggingOptInsContent');
+    Content = RequestLoggingOptInsContent;
     root = createRoot(container);
     act(() => root.render(createElement(RequestLoggingOptInsContent)));
   });
@@ -126,6 +128,24 @@ describe('RequestLoggingOptInsContent expiry', () => {
       '9 of 10 active opt-ins.'
     );
     expect(submit.disabled).toBe(false);
+  });
+
+  it('disables logging and warns while more than ten opt-ins are stored', () => {
+    mockOptIns.push({
+      ...mockOptIns[0],
+      id: 'opt-in-extra',
+      target_id: 'account-extra',
+      expires_at: null,
+    });
+    try {
+      act(() => root.render(createElement(Content)));
+
+      expect(container.textContent).toContain(
+        'Request logging is disabled while 11 opt-ins are stored.'
+      );
+    } finally {
+      mockOptIns.pop();
+    }
   });
 
   it('cleans up the refresh timer when unmounted', () => {

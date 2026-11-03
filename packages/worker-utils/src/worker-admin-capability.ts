@@ -290,6 +290,8 @@ export type WorkerAdminIntrospectionCache = {
   set(key: string, value: WorkerAdminIntrospectionResponse, ttlMs: number): void;
 };
 
+const MAX_INTROSPECTION_CACHE_ENTRIES = 500;
+
 export function createWorkerAdminIntrospectionCache(): WorkerAdminIntrospectionCache {
   const entries = new Map<string, { value: WorkerAdminIntrospectionResponse; expiresAt: number }>();
   return {
@@ -304,6 +306,16 @@ export function createWorkerAdminIntrospectionCache(): WorkerAdminIntrospectionC
     },
     set(key, value, ttlMs) {
       entries.set(key, { value, expiresAt: Date.now() + ttlMs });
+      if (entries.size <= MAX_INTROSPECTION_CACHE_ENTRIES) return;
+      const now = Date.now();
+      for (const [candidate, entry] of entries) {
+        if (entry.expiresAt <= now) entries.delete(candidate);
+      }
+      while (entries.size > MAX_INTROSPECTION_CACHE_ENTRIES) {
+        const oldest = entries.keys().next().value;
+        if (oldest === undefined) break;
+        entries.delete(oldest);
+      }
     },
   };
 }

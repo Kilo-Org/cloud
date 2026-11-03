@@ -107,6 +107,32 @@ describe('browserCapabilityHeader', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('re-mints instead of returning an expired cached capability', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            capability: 'stale',
+            capabilityExpiresAt: new Date(Date.now() + 25_000).toISOString(),
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            capability: 'fresh',
+            capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+          }),
+          { status: 200 }
+        )
+      );
+    const request = params([{ path: 'gastown.getTown', input: { townId: 'town-9' } }]);
+    await expect(browserCapabilityHeader(request)).resolves.toBe('stale');
+    await expect(browserCapabilityHeader(request)).resolves.toBe('fresh');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('widens when an in-flight result does not cover a concurrent caller', async () => {
     let resolveFirst!: (response: Response) => void;
     const firstResponse = new Promise<Response>(resolve => {

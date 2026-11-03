@@ -450,6 +450,27 @@ describe('worker admin authority', () => {
   });
 });
 
+describe('introspection cache bounds', () => {
+  it('evicts old entries instead of growing without bound', () => {
+    const cache = createWorkerAdminIntrospectionCache();
+    for (let index = 0; index < 600; index += 1) {
+      cache.set(`key-${index}`, { active: true }, 60_000);
+    }
+    expect(cache.get('key-0')).toBeUndefined();
+    expect(cache.get('key-599')).toEqual({ active: true });
+  });
+
+  it('prunes expired entries before evicting live ones', () => {
+    const cache = createWorkerAdminIntrospectionCache();
+    cache.set('expired', { active: true }, -1);
+    for (let index = 0; index < 500; index += 1) {
+      cache.set(`live-${index}`, { active: true }, 60_000);
+    }
+    expect(cache.get('expired')).toBeUndefined();
+    expect(cache.get('live-0')).toEqual({ active: true });
+  });
+});
+
 describe('helpers', () => {
   it('parses JWKS values', () => {
     expect(parseWorkerAdminJwks('{"keys":[{"kty":"EC"}]}')).toEqual({

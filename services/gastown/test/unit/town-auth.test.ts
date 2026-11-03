@@ -31,7 +31,7 @@ function app(params: {
     status: params.decision.status,
   }));
   const app = new Hono<GastownEnv>();
-  app.use('/api/towns/:townId/*', async (c, next) => {
+  app.use('*', async (c, next) => {
     c.set('kiloUserId', params.userId);
     c.set('kiloTokenClaims', { isAdmin: true, iat: 1, exp: 3601 });
     c.set('kiloOrgMemberships', params.memberships ?? []);
@@ -39,7 +39,9 @@ function app(params: {
     return next();
   });
   app.use('/api/towns/:townId/*', townAuthMiddleware);
+  app.use('/api/users/:userId/towns/:townId/*', townAuthMiddleware);
   app.get('/api/towns/:townId/config', c => c.json({ ok: true }));
+  app.get('/api/users/:userId/towns/:townId/events', c => c.json({ ok: true }));
   return { app, decide };
 }
 
@@ -105,6 +107,21 @@ describe('townAuthMiddleware', () => {
       expect.objectContaining({ allowed: false }),
       expect.objectContaining({ townId: town })
     );
+  });
+
+  it('derives a user target for user-scoped events routes', async () => {
+    config({ owner_type: 'user', owner_user_id: 'owner-2' });
+    const { app: a, decide } = app({ userId: 'admin-1', decision: { allowed: true } });
+    const response = await a.request(
+      `http://localhost/api/users/user-target/towns/${town}/events`,
+      {},
+      {} as never
+    );
+    expect(response.status).toBe(200);
+    expect(decide).toHaveBeenCalledWith('rest:GET /api/users/:userId/towns/:townId/events', {
+      kind: 'user',
+      id: 'user-target',
+    });
   });
 
   it('restores admin bypass for a town with no owner id', async () => {

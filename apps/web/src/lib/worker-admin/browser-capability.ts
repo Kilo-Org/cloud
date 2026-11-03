@@ -93,7 +93,11 @@ export async function browserCapabilityHeader(params: {
   for (let attempt = 0; attempt < 3; attempt++) {
     const cached = cache.get(key);
     if (cached && cached.expiresAt <= Date.now()) cache.delete(key);
-    if (cached && actions.every(action => cached.actions.has(action))) {
+    if (
+      cached &&
+      cached.expiresAt > Date.now() &&
+      actions.every(action => cached.actions.has(action))
+    ) {
       return cached.capability;
     }
 

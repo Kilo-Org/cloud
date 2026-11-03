@@ -3,6 +3,10 @@ import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
 import { resError } from '../util/res.util';
 import {
+  GASTOWN_ADMIN_AUDIENCE,
+  capabilityTargetKind,
+} from '@kilocode/worker-utils/worker-admin-actions';
+import {
   emitWorkerAdminDecision,
   getWorkerAdmin,
   restActionForRequest,
@@ -29,7 +33,13 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   const authority = getWorkerAdmin(c);
   if (!authority) return c.json(resError('Internal server error'), 500);
   const action = restActionForRequest(c) ?? `rest:${c.req.method} ${c.req.path}`;
-  const target = { kind: 'town' as const, id: townId };
+  const targetKind = capabilityTargetKind(GASTOWN_ADMIN_AUDIENCE, action) ?? 'town';
+  const target =
+    targetKind === 'user'
+      ? { kind: 'user' as const, id: c.req.param('userId') ?? townId }
+      : targetKind === 'service'
+        ? { kind: 'service' as const, id: 'gastown' }
+        : { kind: 'town' as const, id: townId };
 
   const decide = async () => {
     const decision = await authority.decide(action, target);

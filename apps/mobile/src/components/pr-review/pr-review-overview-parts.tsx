@@ -108,6 +108,9 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
  * A GitHub account's avatar at the size every PR-review row uses. Falls back to
  * the account's initial on a filled disc when GitHub reports no avatar, so a
  * row without a picture still reads as a person instead of an empty circle.
+ * The fallback is decoration: the login beside it is the text a reader gets, so
+ * the disc stays out of both accessibility trees instead of adding a lone
+ * initial to a row that is announced as one element.
  */
 export function PrAvatar({
   avatarUrl,
@@ -127,7 +130,11 @@ export function PrAvatar({
   }
   const initial = login?.trim().charAt(0).toLocaleUpperCase(i18n.language);
   return (
-    <View className="size-6 items-center justify-center rounded-full bg-secondary-fill">
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="size-6 items-center justify-center rounded-full bg-secondary-fill"
+    >
       {initial ? (
         <Text className="text-[11px] font-semibold text-secondary-foreground">{initial}</Text>
       ) : (

@@ -308,7 +308,7 @@ function ownClassStrings(attributes) {
   return strings;
 }
 
-export function checkScrollPadding(relative, text) {
+export function checkScrollPadding(relative, text, index = lineIndex(text)) {
   const problems = [];
   for (const match of text.matchAll(SCROLL_TAG)) {
     let attributesStart = match.index + match[0].length;
@@ -326,7 +326,7 @@ export function checkScrollPadding(relative, text) {
       .flatMap(classes => classes.split(/\s+/))
       .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {
-      const line = text.slice(0, match.index).split('\n').length;
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
@@ -377,7 +377,7 @@ function importsRuntimeText(specifier) {
   return imported.trim() === 'Text' && !specifier.trim().startsWith('type ');
 }
 
-export function checkRawText(relative, text) {
+export function checkRawText(relative, text, index = lineIndex(text)) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
     return problems;
@@ -388,7 +388,7 @@ export function checkRawText(relative, text) {
     const runtime =
       !typeOnly && match[2].split(',').some(specifier => importsRuntimeText(specifier));
     if (runtime) {
-      const line = text.slice(0, match.index).split('\n').length;
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
@@ -505,7 +505,7 @@ function codeMatches(text, pattern, index) {
 
 /**
  * `index` is the file's line index when the caller already built one, so
- * `checkSourceFile` pays for it once for both whole-text scans.
+ * `checkSourceFile` pays for it once for every whole-text scan.
  */
 export function checkDirectIntl(relative, absolute, text, index = lineIndex(text)) {
   const problems = [];
@@ -603,14 +603,14 @@ export function checkCompilerStillDropsThese() {
  * `relative` is the path from the repository root without a leading separator;
  * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
  * prefix test and diagnostic below reads the same spelling of the path. The
- * file's line index is built here too and shared by the two whole-text scans.
+ * file's line index is built here too and shared by every whole-text scan.
  */
 export function checkSourceFile(relative, absolute, text) {
   const path = relative.replace(/^(?:\.?\/)+/, '');
   const index = lineIndex(text);
   return [
-    ...checkScrollPadding(path, text),
-    ...checkRawText(path, text),
+    ...checkScrollPadding(path, text, index),
+    ...checkRawText(path, text, index),
     ...checkDirectIntl(path, absolute, text, index),
     ...checkRules(path, text, index),
   ];

@@ -83,6 +83,12 @@ export const OrganizationSchema = z.object({
 export type UserOrganizationWithSeats = {
   organizationName: string;
   organizationId: Organization['id'];
+  /**
+   * The parent organization's id for a child org, `null` for a top-level one.
+   * `organizations.list` carries it so a screen can tell the two apart on its
+   * first frame, before the heavier membership payload arrives.
+   */
+  parentOrganizationId: Organization['parent_organization_id'];
   role: OrganizationRole;
   memberCount: number;
   balance: number;

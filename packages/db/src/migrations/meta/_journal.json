@@ -2297,6 +2297,13 @@
       "when": 1793654076574,
       "tag": "0327_service_fee_rollback_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 328,
+      "version": "7",
+      "when": 1793696097808,
+      "tag": "0328_drop_legacy_enkrypt_guardrail_charges",
+      "breakpoints": true
     }
   ]
 }

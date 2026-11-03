@@ -8,8 +8,9 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
-import { getOpenAiChatGptByokModelIds } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
+  getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -111,6 +112,8 @@ async function hasOpenAiChatGptByokForModel(params: {
   organizationId?: string;
   includeSharedServicesConnection?: boolean;
 }): Promise<boolean> {
+  if (!(await getOpenAiChatGptCandidateModel('responses', params.modelId))) return false;
+
   const owners: OpenAiChatGptOwner[] = [];
   if (params.includeSharedServicesConnection && params.organizationId) {
     owners.push(openAiChatGptSharedServicesOwner(params.organizationId));
@@ -118,8 +121,8 @@ async function hasOpenAiChatGptByokForModel(params: {
   owners.push({ kiloUserId: params.user.id, organizationId: params.organizationId ?? null });
 
   for (const owner of owners) {
-    const servedModelIds = await getOpenAiChatGptByokModelIds(owner, [params.modelId]);
-    if (servedModelIds?.has(params.modelId)) return true;
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    if (stored?.isEnabled && stored.connection.status === 'connected') return true;
   }
   return false;
 }

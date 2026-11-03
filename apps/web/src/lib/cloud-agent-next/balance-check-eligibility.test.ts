@@ -26,11 +26,15 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
     mockResolveOrganizationMemberModelDecision(...args),
 }));
 
-const mockGetOpenAiChatGptByokModelIds = jest.fn();
+const mockGetOpenAiChatGptStoredConnection = jest.fn();
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
-  getOpenAiChatGptByokModelIds: (...args: unknown[]) => mockGetOpenAiChatGptByokModelIds(...args),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
+  getOpenAiChatGptStoredConnection: (...args: unknown[]) =>
+    mockGetOpenAiChatGptStoredConnection(...args),
 }));
+
+const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 import {
@@ -53,7 +57,7 @@ beforeEach(() => {
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
   mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
-  mockGetOpenAiChatGptByokModelIds.mockResolvedValue(null);
+  mockGetOpenAiChatGptStoredConnection.mockResolvedValue(null);
 });
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
@@ -183,8 +187,8 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
   });
 
-  it('counts a ChatGPT connection that serves the model', async () => {
-    mockGetOpenAiChatGptByokModelIds.mockResolvedValue(new Set(['openai/gpt-5']));
+  it('counts a connected ChatGPT connection for an OpenAI model', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockResolvedValue(CONNECTED_CHATGPT);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
@@ -193,15 +197,15 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
-    expect(mockGetOpenAiChatGptByokModelIds).toHaveBeenCalledWith(
-      { kiloUserId: fakeUser.id, organizationId: null },
-      ['openai/gpt-5']
-    );
+    expect(mockGetOpenAiChatGptStoredConnection).toHaveBeenCalledWith({
+      kiloUserId: fakeUser.id,
+      organizationId: null,
+    });
   });
 
   it("counts the organization's shared-services ChatGPT connection for service runs", async () => {
-    mockGetOpenAiChatGptByokModelIds.mockImplementation(async (owner: { scope?: string }) =>
-      owner.scope === 'shared_services' ? new Set(['openai/gpt-5']) : null
+    mockGetOpenAiChatGptStoredConnection.mockImplementation(async (owner: { scope?: string }) =>
+      owner.scope === 'shared_services' ? CONNECTED_CHATGPT : null
     );
 
     const eligibility = (includeSharedServicesConnection: boolean) =>

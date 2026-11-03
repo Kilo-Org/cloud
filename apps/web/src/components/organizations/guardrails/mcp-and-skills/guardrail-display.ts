@@ -37,9 +37,9 @@ export function configIdentity(
   return config.kind === 'remote' ? config.url : config.identifier;
 }
 
-export function minVersionLabel(config: OrganizationGuardrailConfig): string {
+export function versionSpecLabel(config: OrganizationGuardrailConfig): string {
   if (config.kind === 'remote') return 'Not applicable';
-  return config.min_version ?? 'Any version';
+  return config.version_spec ?? 'Any version';
 }
 
 const CLIENT_LABELS: Record<string, string> = {

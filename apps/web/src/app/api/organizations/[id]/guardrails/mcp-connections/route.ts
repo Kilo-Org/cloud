@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as z from 'zod';
+import { MAX_SEMVER_LENGTH } from '@/lib/organizations/guardrails/version-spec';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import {
   evaluateAndRecordMcpConnections,
@@ -20,7 +21,7 @@ const ConnectionSchema = z.object({
     }),
   ]),
   serverName: z.string().max(200).nullish(),
-  version: z.string().max(64).nullish(),
+  version: z.string().trim().max(MAX_SEMVER_LENGTH).nullish(),
 });
 
 const BodySchema = z.object({
@@ -36,7 +37,11 @@ type ResponseBody = {
 /**
  * Reports the MCP servers a client is connecting to. The server decides each one against the
  * organization's allow list, writes it to the audit log, and answers with the decision and
- * whether the client must block it. `results` is in the order of `connections`.
+ * whether the client must block it. `version` is the resolved version the client is about to
+ * run, not a tag or range. `versionCheck` names who must check it against an allowed-versions
+ * range: the server when the client reported a version, or the client when it did not in enforce
+ * mode. `versionReason` distinguishes a version mismatch, an invalid client version, and an
+ * invalid stored policy. `results` is in the order of `connections`.
  */
 export async function POST(
   request: NextRequest,

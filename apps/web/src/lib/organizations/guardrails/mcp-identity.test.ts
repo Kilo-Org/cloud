@@ -1,9 +1,4 @@
-import {
-  mcpIdentityKey,
-  normalizeMinVersion,
-  normalizePackageIdentifier,
-  normalizeRemoteMcpUrl,
-} from './mcp-identity';
+import { mcpIdentityKey, normalizePackageIdentifier, normalizeRemoteMcpUrl } from './mcp-identity';
 
 describe('normalizeRemoteMcpUrl', () => {
   it.each([
@@ -48,21 +43,6 @@ describe('normalizePackageIdentifier', () => {
     expect(normalizePackageIdentifier('pypi', 'pkg==1.0').ok).toBe(false);
     expect(normalizePackageIdentifier('pypi', 'git+https://x/y').ok).toBe(false);
     expect(normalizePackageIdentifier('pypi', './dir').ok).toBe(false);
-  });
-});
-
-describe('normalizeMinVersion', () => {
-  it('treats blank as no minimum', () => {
-    expect(normalizeMinVersion('  ')).toEqual({ ok: true, value: null });
-    expect(normalizeMinVersion(null)).toEqual({ ok: true, value: null });
-  });
-
-  it('accepts versions and rejects ranges', () => {
-    expect(normalizeMinVersion('1.2.3')).toEqual({ ok: true, value: '1.2.3' });
-    expect(normalizeMinVersion('2.0.0-rc.1').ok).toBe(true);
-    expect(normalizeMinVersion('^1.2.3').ok).toBe(false);
-    expect(normalizeMinVersion('>=1.0').ok).toBe(false);
-    expect(normalizeMinVersion('latest').ok).toBe(false);
   });
 });
 

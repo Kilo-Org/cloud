@@ -14,6 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  MAX_SEMVER_LENGTH,
+  VERSION_SPEC_EXAMPLE,
+} from '@/lib/organizations/guardrails/version-spec-constants';
 import { useTRPC } from '@/lib/trpc/utils';
 import { configIdentity } from './guardrail-display';
 import type { OrganizationGuardrailRow } from './guardrail-types';
@@ -64,13 +68,14 @@ export function CustomMcpForm({
   const valueId = useId();
   const valueHelpId = useId();
   const nameId = useId();
-  const minVersionId = useId();
+  const versionSpecId = useId();
+  const versionSpecHelpId = useId();
   const errorId = useId();
   const [kind, setKind] = useState<CustomKind>(() => initialKind(guardrail));
   const [value, setValue] = useState(() => (guardrail ? configIdentity(guardrail.config) : ''));
   const [name, setName] = useState(guardrail?.name ?? '');
-  const [minVersion, setMinVersion] = useState(
-    guardrail?.config.kind === 'package' ? (guardrail.config.min_version ?? '') : ''
+  const [versionSpec, setVersionSpec] = useState(
+    guardrail?.config.kind === 'package' ? (guardrail.config.version_spec ?? '') : ''
   );
   const copy: { label: string; placeholder: string; help?: string } = VALUE_COPY[kind];
   const hasHelp = copy.help !== undefined;
@@ -94,7 +99,7 @@ export function CustomMcpForm({
       organizationId,
       ...(trimmedName ? { name: trimmedName } : {}),
       target,
-      ...(kind === 'remote' ? {} : { minVersion }),
+      ...(kind === 'remote' ? {} : { versionSpec }),
     };
     if (guardrail) {
       updateMutation.mutate({ ...common, guardrailId: guardrail.id });
@@ -174,13 +179,19 @@ export function CustomMcpForm({
 
       {kind !== 'remote' && (
         <div className="grid gap-2">
-          <Label htmlFor={minVersionId}>Minimum version (optional)</Label>
+          <Label htmlFor={versionSpecId}>Allowed versions (optional)</Label>
           <Input
-            id={minVersionId}
-            value={minVersion}
-            placeholder="Any version"
-            onChange={event => setMinVersion(event.target.value)}
+            id={versionSpecId}
+            value={versionSpec}
+            placeholder={VERSION_SPEC_EXAMPLE}
+            maxLength={MAX_SEMVER_LENGTH}
+            aria-describedby={versionSpecHelpId}
+            onChange={event => setVersionSpec(event.target.value)}
           />
+          <p id={versionSpecHelpId} className="text-muted-foreground text-sm">
+            A semver range checked against the version the client resolves. Leave blank to allow any
+            version.
+          </p>
         </div>
       )}
 

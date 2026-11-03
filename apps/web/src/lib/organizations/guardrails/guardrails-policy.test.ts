@@ -1,6 +1,5 @@
 import {
   evaluateMcpConnect,
-  isVersionAtLeast,
   normalizeMcpConnectTarget,
   resolveGuardrailsSettings,
   type AllowedMcpServer,
@@ -107,22 +106,6 @@ describe('normalizeMcpConnectTarget', () => {
   });
 });
 
-describe('isVersionAtLeast', () => {
-  it.each([
-    ['1.2.3', '1.2.3', true],
-    ['1.10.0', '1.9.9', true],
-    ['2', '1.9', true],
-    ['1.2', '1.2.0', true],
-    ['v1.2.3', '1.2.3', true],
-    ['1.2.0rc1', '1.2.0', true],
-    ['1.2.2', '1.2.3', false],
-    ['0.9.9', '1.0', false],
-    ['latest', '1.0', null],
-  ])('%s against %s', (version, minimum, expected) => {
-    expect(isVersionAtLeast(version, minimum)).toBe(expected);
-  });
-});
-
 describe('evaluateMcpConnect', () => {
   const remoteTarget = normalizeMcpConnectTarget(remote);
   const packageTarget = normalizeMcpConnectTarget(pkg);
@@ -133,56 +116,177 @@ describe('evaluateMcpConnect', () => {
         kind: 'package',
         ecosystem: 'npm',
         identifier: '@acme/server',
-        min_version: '2.0.0',
+        version_spec: '^2.0.0 || >=3.0.3',
       },
       'npm:@acme/server'
     ),
   ];
 
+  const evaluate = (
+    params: Omit<Parameters<typeof evaluateMcpConnect>[0], 'mcpEnforcement'>,
+    mcpEnforcement: 'shadow' | 'enforce' = 'enforce'
+  ) => evaluateMcpConnect({ ...params, mcpEnforcement });
+
   it('allows a server on the list', () => {
-    expect(evaluateMcpConnect({ allowedServers, target: remoteTarget })).toEqual({
+    expect(evaluate({ allowedServers, target: remoteTarget })).toEqual({
       decision: 'allowed',
     });
   });
 
   it('denies a server that is not on the list', () => {
-    expect(evaluateMcpConnect({ allowedServers: [], target: remoteTarget })).toEqual({
+    expect(evaluate({ allowedServers: [], target: remoteTarget })).toEqual({
       decision: 'denied',
       reason: 'not_allowed',
     });
   });
 
   it('denies a target that can never be allowlisted', () => {
-    expect(evaluateMcpConnect({ allowedServers, target: null })).toEqual({
+    expect(evaluate({ allowedServers, target: null })).toEqual({
       decision: 'denied',
       reason: 'unsupported_target',
     });
   });
 
-  it('checks the minimum version only when the client reports one', () => {
-    expect(evaluateMcpConnect({ allowedServers, target: packageTarget })).toEqual({
+  it('asks the client to check the range when it reports no version', () => {
+    expect(evaluate({ allowedServers, target: packageTarget })).toEqual({
       decision: 'allowed',
+      versionCheck: 'client',
     });
+  });
+
+  it('treats a blank reported version as absent', () => {
+    expect(evaluate({ allowedServers, target: packageTarget, version: '   ' })).toEqual({
+      decision: 'allowed',
+      versionCheck: 'client',
+    });
+  });
+
+  it('checks the resolved version against the allowed range', () => {
     expect(
-      evaluateMcpConnect({
+      evaluate({
         allowedServers,
         target: packageTarget,
         version: '2.0.1',
       })
-    ).toEqual({ decision: 'allowed' });
+    ).toEqual({ decision: 'allowed', versionCheck: 'server' });
     expect(
-      evaluateMcpConnect({
+      evaluate({
+        allowedServers,
+        target: packageTarget,
+        version: '3.1.0',
+      })
+    ).toEqual({ decision: 'allowed', versionCheck: 'server' });
+    expect(
+      evaluate({
         allowedServers,
         target: packageTarget,
         version: '1.9.0',
       })
-    ).toEqual({ decision: 'denied', reason: 'below_min_version' });
+    ).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'version_not_allowed',
+      versionCheck: 'server',
+    });
+  });
+
+  it('treats a prerelease as lower than its release', () => {
     expect(
-      evaluateMcpConnect({
+      evaluate({
+        allowedServers,
+        target: packageTarget,
+        version: '2.0.0rc1',
+      })
+    ).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'version_not_allowed',
+      versionCheck: 'server',
+    });
+  });
+
+  it('denies a tag, which is not a resolved version', () => {
+    expect(
+      evaluate({
         allowedServers,
         target: packageTarget,
         version: 'latest',
       })
-    ).toEqual({ decision: 'denied', reason: 'below_min_version' });
+    ).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_version',
+      versionCheck: 'server',
+    });
+  });
+
+  it('distinguishes an invalid stored policy from an invalid client version', () => {
+    const invalidPolicy = [
+      allowed(
+        {
+          kind: 'package',
+          ecosystem: 'npm',
+          identifier: '@acme/server',
+          version_spec: 'not a range',
+        },
+        'npm:@acme/server'
+      ),
+    ];
+    expect(
+      evaluate({ allowedServers: invalidPolicy, target: packageTarget, version: '2.0.0' })
+    ).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    });
+  });
+
+  it('enforces a legacy min_version when no range is stored', () => {
+    const legacy = [
+      allowed(
+        {
+          kind: 'package',
+          ecosystem: 'npm',
+          identifier: '@acme/server',
+          version_spec: null,
+          min_version: '2.0.0',
+        },
+        'npm:@acme/server'
+      ),
+    ];
+    expect(evaluate({ allowedServers: legacy, target: packageTarget, version: '1.9.0' })).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'version_not_allowed',
+      versionCheck: 'server',
+    });
+    expect(evaluate({ allowedServers: legacy, target: packageTarget, version: '2.0.1' })).toEqual({
+      decision: 'allowed',
+      versionCheck: 'server',
+    });
+  });
+
+  it('allows any resolved version when the server has no range', () => {
+    const anyVersion = [
+      allowed(
+        {
+          kind: 'package',
+          ecosystem: 'npm',
+          identifier: '@acme/server',
+          version_spec: null,
+        },
+        'npm:@acme/server'
+      ),
+    ];
+    expect(
+      evaluate({ allowedServers: anyVersion, target: packageTarget, version: '0.0.1' })
+    ).toEqual({ decision: 'allowed' });
+  });
+
+  it('does not ask the client to enforce a range while auditing', () => {
+    expect(evaluate({ allowedServers, target: packageTarget }, 'shadow')).toEqual({
+      decision: 'allowed',
+    });
   });
 });

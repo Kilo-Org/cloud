@@ -1379,7 +1379,9 @@ export type OrganizationMcpGuardrailConfig =
       kind: 'package';
       ecosystem: 'npm' | 'pypi';
       identifier: string;
-      min_version: string | null;
+      version_spec: string | null;
+      /** Transitional floor for clients deployed before version ranges. */
+      min_version?: string | null;
     };
 
 export type OrganizationGuardrailConfig = OrganizationMcpGuardrailConfig;

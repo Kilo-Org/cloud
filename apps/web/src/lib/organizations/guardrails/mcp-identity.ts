@@ -1,4 +1,7 @@
 import type { OrganizationMcpGuardrailConfig } from '@kilocode/db/schema-types';
+import type { Normalized } from './normalized';
+
+export type { Normalized } from './normalized';
 
 export type McpPackageEcosystem = 'npm' | 'pypi';
 
@@ -6,11 +9,8 @@ export type McpTarget =
   | { kind: 'remote'; url: string }
   | { kind: 'package'; ecosystem: McpPackageEcosystem; identifier: string };
 
-export type Normalized<T> = { ok: true; value: T } | { ok: false; reason: string };
-
 const NPM_PACKAGE_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 const PYPI_PACKAGE_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
-const MIN_VERSION = /^[0-9][0-9A-Za-z.+!_~-]{0,63}$/;
 const MAX_NPM_NAME_LENGTH = 214;
 const MAX_PYPI_NAME_LENGTH = 100;
 
@@ -52,15 +52,6 @@ export function normalizePackageIdentifier(
   return { ok: true, value: trimmed };
 }
 
-export function normalizeMinVersion(input: string | null | undefined): Normalized<string | null> {
-  const trimmed = input?.trim() ?? '';
-  if (trimmed === '') return { ok: true, value: null };
-  if (!MIN_VERSION.test(trimmed)) {
-    return { ok: false, reason: 'Enter a version such as 1.2.3.' };
-  }
-  return { ok: true, value: trimmed };
-}
-
 export function mcpIdentityKey(target: McpTarget): string {
   if (target.kind === 'remote') return `remote:${target.url}`;
   if (target.ecosystem === 'npm') return `npm:${target.identifier.toLowerCase()}`;
@@ -75,7 +66,9 @@ export function mcpTargetFromConfig(config: OrganizationMcpGuardrailConfig): Mcp
 
 export function mcpConfigFromTarget(
   target: McpTarget,
-  minVersion: string | null
+  versionSpec: string | null,
+  legacyMinVersion: string | null
 ): OrganizationMcpGuardrailConfig {
-  return target.kind === 'remote' ? target : { ...target, min_version: minVersion };
+  if (target.kind === 'remote') return target;
+  return { ...target, version_spec: versionSpec, min_version: legacyMinVersion };
 }

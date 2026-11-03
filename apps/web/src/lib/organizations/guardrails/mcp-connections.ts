@@ -17,6 +17,7 @@ export type McpConnectClient = (typeof MCP_CONNECT_CLIENTS)[number];
 export type McpConnectionReport = {
   target: McpConnectTargetInput;
   serverName?: string | null;
+  /** The resolved version the client is about to run, not a tag or a range. */
   version?: string | null;
 };
 
@@ -72,6 +73,7 @@ export async function evaluateAndRecordMcpConnections(params: {
         allowedServers,
         target,
         version: connection.version,
+        mcpEnforcement,
       }),
     };
   });

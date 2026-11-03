@@ -93,6 +93,7 @@ describe('useCheckProviderConnection', () => {
       capturedMutationFn()({ platform: 'bitbucket', organizationId: null })
     ).resolves.toEqual({
       connected: false,
+      instanceUrl: null,
     });
     expect(queryMock).not.toHaveBeenCalled();
     expect(invalidateQueries).not.toHaveBeenCalled();
@@ -103,6 +104,7 @@ describe('useCheckProviderConnection', () => {
       capturedMutationFn()({ platform: 'bitbucket', organizationId: '' })
     ).resolves.toEqual({
       connected: false,
+      instanceUrl: null,
     });
     expect(queryMock).not.toHaveBeenCalled();
   });
@@ -112,7 +114,7 @@ describe('useCheckProviderConnection', () => {
 
     await expect(
       capturedMutationFn()({ platform: 'bitbucket', organizationId: 'org-7' })
-    ).resolves.toEqual({ connected: true });
+    ).resolves.toEqual({ connected: true, instanceUrl: null });
     expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({
         queryKey: ['bitbucket-readiness', 'org-7'],
@@ -127,17 +129,18 @@ describe('useCheckProviderConnection', () => {
 
     await expect(
       capturedMutationFn()({ platform: 'bitbucket', organizationId: 'org-7' })
-    ).resolves.toEqual({ connected: false });
+    ).resolves.toEqual({ connected: false, instanceUrl: null });
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it('checks the personal GitLab status when no organization is selected', async () => {
-    queryMock.mockResolvedValueOnce({ connected: false });
+    queryMock.mockResolvedValueOnce({ connected: false, integration: null });
 
     await expect(
       capturedMutationFn()({ platform: 'gitlab', organizationId: null })
     ).resolves.toEqual({
       connected: false,
+      instanceUrl: null,
     });
     expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['personal-gitlab'], staleTime: 0 })
@@ -146,17 +149,32 @@ describe('useCheckProviderConnection', () => {
   });
 
   it('checks the organization GitLab status and invalidates the provider queries', async () => {
-    queryMock.mockResolvedValueOnce({ connected: true });
+    queryMock.mockResolvedValueOnce({
+      connected: true,
+      integration: { instanceUrl: 'https://gitlab.example.com' },
+    });
 
     await expect(
       capturedMutationFn()({ platform: 'gitlab', organizationId: 'org-9' })
     ).resolves.toEqual({
       connected: true,
+      instanceUrl: 'https://gitlab.example.com',
     });
     expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['org-gitlab', 'org-9'], staleTime: 0 })
     );
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['providerReview'] });
+  });
+
+  it('reports the instance a personal connection serves', async () => {
+    queryMock.mockResolvedValueOnce({
+      connected: true,
+      integration: { instanceUrl: 'https://gitlab.com' },
+    });
+
+    await expect(
+      capturedMutationFn()({ platform: 'gitlab', organizationId: null })
+    ).resolves.toEqual({ connected: true, instanceUrl: 'https://gitlab.com' });
   });
 
   it('toasts the failure message', () => {

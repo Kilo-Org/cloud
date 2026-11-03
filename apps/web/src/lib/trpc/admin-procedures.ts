@@ -2,7 +2,11 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { canCurrentUserViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import {
+  canCurrentUserExportApiRequestLogs,
+  canCurrentUserViewSessions,
+  userIsSuperadmin,
+} from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure } from '@kilocode/web-shared/lib/trpc/init';
@@ -42,6 +46,17 @@ export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) =
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Session viewing access required',
+    });
+  }
+
+  return next();
+});
+
+export const apiRequestLogExporterProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  if (!(await canCurrentUserExportApiRequestLogs(ctx.user.id))) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'API request log export access required',
     });
   }
 

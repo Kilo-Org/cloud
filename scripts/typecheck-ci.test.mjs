@@ -19,10 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { load } from 'js-yaml';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml'].map(file => [
+  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
+);
+const harnessBuildAction = load(
+  readFileSync(new URL('../.github/actions/harness-sdk-build/action.yml', import.meta.url), 'utf8')
 );
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
@@ -192,7 +195,6 @@ test('every workflow install job restores a pnpm dependency cache', () => {
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
-  ['ci.yml', 'lint-groups', harnessBuild],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
@@ -200,11 +202,6 @@ for (const [file, name, command, condition] of [
     'pnpm --filter ${{ matrix.workspace.name }} test',
     "matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
-  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
-    'kilo-app-ci.yml',
-    name,
-    harnessBuild,
-  ]),
 ]) {
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
@@ -228,6 +225,85 @@ for (const [file, name, command, condition] of [
     assert.equal(cache.if, condition ?? steps[buildIndex].if);
   });
 }
+
+const harnessBuildGuards = [
+  [
+    'ci.yml',
+    'lint-groups',
+    "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
+  ],
+  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
+    'kilo-app-ci.yml',
+    name,
+    undefined,
+  ]),
+  ...['ios', 'android'].map(name => [
+    'mobile-native-build.yml',
+    name,
+    "steps.published.outputs.published != 'true'",
+  ]),
+  [
+    'explorer-ios-release.yml',
+    'build',
+    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+  ],
+];
+
+test('every consumer job restores or builds the harness SDK through the action', () => {
+  for (const [file, name, guard] of harnessBuildGuards) {
+    const steps = workflows[file].jobs[name].steps;
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    const actionIndex = steps.findIndex(
+      step => step.uses === './.github/actions/harness-sdk-build'
+    );
+    assert.ok(
+      installIndex >= 0 && actionIndex > installIndex,
+      `${file}:${name} runs the action after install`
+    );
+    assert.equal(steps[actionIndex].if, guard, `${file}:${name} keeps its guard`);
+    // explorer-ios-release checks out an arbitrary cloud_ref, which can predate
+    // the action; it is the only job allowed a plain build, behind the
+    // complementary guard.
+    const plain = steps.filter(step => step.run === harnessBuild);
+    if (file !== 'explorer-ios-release.yml') {
+      assert.deepEqual(
+        plain.map(step => step.name),
+        [],
+        `${file}:${name} never builds outside`
+      );
+    } else {
+      assert.equal(plain.length, 1);
+      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+    }
+  }
+});
+
+test('the harness SDK action restores dist and builds only on a miss', () => {
+  const steps = harnessBuildAction.runs.steps;
+  const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
+  const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
+  const build = steps.find(step => step.name === 'Build harness SDK');
+  assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(cache.with.path, 'packages/harness-sdk/dist');
+  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  assert.equal(build.run, harnessBuild);
+  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  // The typia transform takes minutes to compile, so the build's plugin cache
+  // comes from the same action and only when a build will run.
+  assert.equal(plugins.length, 1);
+  assert.equal(plugins[0].uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(plugins[0].with.path, 'node_modules/.cache/ttsc/plugins');
+  assert.equal(
+    plugins[0].with.key,
+    "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
+  );
+  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+});
 
 function runTypecheck(
   t,

@@ -5,7 +5,9 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
+import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
 import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
@@ -39,7 +41,18 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (__DEV__ && handleHomeFixturePath(path)) {
     return null;
   }
+  // Dev-only locked-keychain links (`kiloapp:///dev/locked-keychain/<name>`).
+  if (__DEV__ && handleLockedKeychainFixturePath(path)) {
+    return null;
+  }
   if (__DEV__) {
+    // Dev-only link that opens the connect gate's GitLab-instance state the way
+    // the paste flow reaches it: a provider route carrying the paste's
+    // `?instance=` hint. The handler navigates itself, so this returns falsy —
+    // never a route, which the resolver would re-dispatch.
+    if (handlePrReviewInstanceFixturePath(path)) {
+      return null;
+    }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
     const singleRouteFixture = securityAgentSingleRouteFixtureRoute(path);
@@ -51,7 +64,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return `/(app)/pr-review-entry-fixture${reviewEntryFixture[1] ?? ''}`;
     }
     const reviewCopyFixture =
-      /(?:^|\/)dev\/pr-review-copy-fixture\/(tabs|checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(tabs|checks|navigator|files|merge|overview|overview-no-checks|overview-multi-group|overview-blocked|overview-merged|overview-auto-merge|merge-request|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
         path
       );
     if (reviewCopyFixture) {
@@ -71,6 +84,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
+    }
+    if (/(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/new-session-plan-refusal-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-terminal-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-terminal-failure-fixture';
     }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';

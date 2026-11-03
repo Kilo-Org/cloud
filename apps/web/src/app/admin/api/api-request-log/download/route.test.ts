@@ -1,13 +1,15 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
 import { api_request_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -17,6 +19,11 @@ jest.mock('next/server', () => {
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
+}));
+
+jest.mock('@/lib/admin/admin-action-audit', () => ({
+  ...jest.requireActual('@/lib/admin/admin-action-audit'),
+  recordAdminAction: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
@@ -31,6 +38,7 @@ const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
   '@kilocode/web-shared/lib/r2/create-client'
 );
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedRecordAdminAction = jest.mocked(recordAdminAction);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';
 const BATCH_SIZE = 25;
@@ -67,45 +75,224 @@ const baseRow = {
 };
 
 describe('GET /admin/api/api-request-log/download', () => {
-  let viewer: User;
-  let otherAdmin: User;
+  let exporter: User;
+  let sessionViewer: User;
 
   beforeEach(async () => {
+    mockedRecordAdminAction.mockClear();
     fakeR2.objects.clear();
-    viewer = await insertTestUser({ is_admin: true, can_view_sessions: true });
-    otherAdmin = await insertTestUser({ is_admin: true });
-    mockedGetUserFromAuth.mockResolvedValue({ user: viewer, authFailedResponse: null });
+    exporter = await insertTestUser({ is_admin: true, can_export_api_request_logs: true });
+    sessionViewer = await insertTestUser({ is_admin: true, can_view_sessions: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: exporter, authFailedResponse: null });
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, TEST_USER_ID));
-    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [viewer.id, otherAdmin.id]));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [exporter.id, sessionViewer.id]));
   });
 
-  it('requires session viewing access before reading rows or stored bodies', async () => {
+  it('does not audit an export when authentication fails', async () => {
+    const authFailedResponse = NextResponse.json<FailureResult<string>>(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({ user: null, authFailedResponse });
+
+    const response = await GET(createRequest());
+
+    expect(response).toBe(authFailedResponse);
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('requires export access, not session viewing, before reading rows or bodies', async () => {
     const request_r2_key = '2026-08-01/access/request.json';
     fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ access: true }));
     await db.insert(api_request_log).values({ ...baseRow, request_r2_key });
     const send = jest.spyOn(fakeR2, 'send');
-    mockedGetUserFromAuth.mockResolvedValue({ user: otherAdmin, authFailedResponse: null });
+    mockedGetUserFromAuth.mockResolvedValue({ user: sessionViewer, authFailedResponse: null });
 
     const response = await GET(createRequest());
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'Session viewing access required' });
+    expect(await response.json()).toEqual({ error: 'API request log export access required' });
     expect(send).not.toHaveBeenCalled();
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   it('applies a permission change to a session that is already signed in', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
-      user: { ...otherAdmin, can_view_sessions: true },
+      user: { ...sessionViewer, can_export_api_request_logs: true },
       authFailedResponse: null,
     });
 
     const response = await GET(createRequest());
 
     expect(response.status).toBe(403);
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('does not audit an export when the initial row count fails', async () => {
+    const error = new Error('Database unavailable');
+    jest.spyOn(db, 'select').mockImplementationOnce(() => {
+      throw error;
+    });
+
+    await expect(GET(createRequest({ userId: '' }))).rejects.toThrow(error);
+
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('audits the authorized export start with normalized filters, not request text or payloads', async () => {
+    const organizationId = 'e6ac973c-5536-466a-b6d2-a966e1ce7521';
+    const sensitiveText =
+      'https://customer.example/private?email=customer@example.com&token=secret';
+    const request_r2_key = '2026-08-01/audit/request.json';
+    fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ payload: sensitiveText }));
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        ...baseRow,
+        organization_id: organizationId,
+        model: sensitiveText,
+        session_id: sensitiveText,
+        status_code: 500,
+        request_r2_key,
+      })
+      .returning({ id: api_request_log.id });
+    const request = createRequest({
+      id: String(row.id),
+      organizationId,
+      model: sensitiveText,
+      session_id: sensitiveText,
+      startTime: '12:00',
+      endTime: '12:30',
+      errorsOnly: 'true',
+      arbitraryQuery: sensitiveText,
+    });
+    request.headers.set('authorization', 'Bearer secret');
+    request.headers.set('x-forwarded-for', '192.0.2.1');
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: exporter,
+        authViaToken: true,
+        ip: '192.0.2.1',
+        trpcPath: '/admin/api/api-request-log/download',
+      }),
+      {
+        action: 'api_request_log.download',
+        target: { type: 'user', id: TEST_USER_ID },
+        message: 'Started API request log ZIP export',
+        metadata: {
+          logId: String(row.id),
+          userId: TEST_USER_ID,
+          organizationId,
+          startAt: '2026-08-01T12:00:00.000Z',
+          endAt: '2026-08-01T12:30:59.999Z',
+          hasUserFilter: true,
+          hasOrganizationFilter: true,
+          hasModelPrefixFilter: true,
+          hasSessionFilter: true,
+          errorsOnly: true,
+          matchingRows: 1,
+        },
+      }
+    );
+    expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(sensitiveText);
+    expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain('secret');
+    await response.arrayBuffer();
+    expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('targets the organization for an export without a user filter', async () => {
+    const organizationId = 'e6ac973c-5536-466a-b6d2-a966e1ce7521';
+    await db.insert(api_request_log).values({ ...baseRow, organization_id: organizationId });
+
+    const response = await GET(createRequest({ userId: '', organizationId }));
+
+    expect(response.status).toBe(200);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        target: { type: 'organization', id: organizationId },
+        metadata: expect.objectContaining({ userId: null, organizationId, hasUserFilter: false }),
+      })
+    );
+    await response.arrayBuffer();
+  });
+
+  it.each(['oauth/google:114000741928328149731', 'oauth/github|owner'])(
+    'retains user attribution for OAuth ID %s and email filters',
+    async userId => {
+      const owner = await insertTestUser({ id: userId });
+      const organizationId = 'e6ac973c-5536-466a-b6d2-a966e1ce7521';
+      await db
+        .insert(api_request_log)
+        .values({ ...baseRow, kilo_user_id: owner.id, organization_id: organizationId });
+
+      try {
+        for (const filter of [owner.id, owner.google_user_email]) {
+          mockedRecordAdminAction.mockClear();
+          const response = await GET(createRequest({ userId: filter, organizationId }));
+
+          expect(response.status).toBe(200);
+          await response.arrayBuffer();
+          expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+              target: { type: 'user', id: owner.id },
+              metadata: expect.objectContaining({ userId: owner.id, organizationId }),
+            })
+          );
+          expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(
+            owner.google_user_email
+          );
+        }
+      } finally {
+        await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, owner.id));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, owner.id));
+      }
+    }
+  );
+
+  it('does not copy free-form user or organization filters into the audit entry', async () => {
+    const sensitiveText = 'https://customer.example/private?email=customer@example.com';
+    const userId = 'https://customer.example/private?token=secret';
+    await db.insert(api_request_log).values({
+      ...baseRow,
+      kilo_user_id: userId,
+      organization_id: sensitiveText,
+    });
+
+    try {
+      const response = await GET(createRequest({ userId, organizationId: sensitiveText }));
+
+      expect(response.status).toBe(200);
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          target: null,
+          metadata: expect.objectContaining({
+            userId: null,
+            organizationId: null,
+            hasUserFilter: true,
+            hasOrganizationFilter: true,
+          }),
+        })
+      );
+      expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(sensitiveText);
+      expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(userId);
+      await response.arrayBuffer();
+    } finally {
+      await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, userId));
+    }
   });
 
   it('streams a complete ZIP of R2-backed bodies across backpressured DB batches', async () => {
@@ -134,6 +321,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(response.headers.get('Content-Disposition')).toBe(
       'attachment; filename="api-request-log_api-request-log-download-test-user_2026-08-01_2026-08-01_poolside-laguna-s-2.1-free.zip"'
     );
+    expect(mockedRecordAdminAction).toHaveBeenCalledTimes(1);
 
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect(Array.from(bytes.subarray(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
@@ -168,6 +356,13 @@ describe('GET /admin/api/api-request-log/download', () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Disposition')).toContain(`_id-${id}.zip`);
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          target: null,
+          metadata: expect.objectContaining({ logId: id, hasUserFilter: false }),
+        })
+      );
       const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
       expect(Object.keys(entries)).toHaveLength(1);
       expect(JSON.parse(readEntry(entries, `_${id}_request.json`))).toEqual({ id });
@@ -192,6 +387,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'No records found for the given criteria' });
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   describe('when filtering by organization and model prefix', () => {
@@ -278,6 +474,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     expect(await response.json()).toEqual({
       error: 'Invalid log ID. Use an integer between 1 and 9223372036854775807.',
     });
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   it('filters by UTC start and end time, including the whole end minute', async () => {
@@ -319,6 +516,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     const response = await GET(createRequest(overrides));
 
     expect(response.status).toBe(400);
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   it('treats an empty time as the whole day', async () => {
@@ -357,6 +555,14 @@ describe('GET /admin/api/api-request-log/download', () => {
       const response = await GET(createRequest({ userId: TEST_EMAIL }));
 
       expect(response.status).toBe(200);
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          target: { type: 'user', id: TEST_USER_ID },
+          metadata: expect.objectContaining({ userId: TEST_USER_ID }),
+        })
+      );
+      expect(JSON.stringify(mockedRecordAdminAction.mock.calls)).not.toContain(TEST_EMAIL);
       expect(response.headers.get('Content-Disposition')).toBe(
         'attachment; filename="api-request-log_api-request-log-download-test-user-example.com_2026-08-01_2026-08-01_poolside-laguna-s-2.1-free.zip"'
       );
@@ -371,6 +577,16 @@ describe('GET /admin/api/api-request-log/download', () => {
       const response = await GET(createRequest({ userId: TEST_EMAIL.toUpperCase() }));
 
       expect(response.status).toBe(200);
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          target: { type: 'user', id: TEST_USER_ID },
+          metadata: expect.objectContaining({ userId: TEST_USER_ID }),
+        })
+      );
+      expect(JSON.stringify(mockedRecordAdminAction.mock.calls).toLowerCase()).not.toContain(
+        TEST_EMAIL
+      );
     });
 
     it('rejects an email that matches several users case-insensitively', async () => {
@@ -385,6 +601,7 @@ describe('GET /admin/api/api-request-log/download', () => {
         );
 
         expect(response.status).toBe(400);
+        expect(mockedRecordAdminAction).not.toHaveBeenCalled();
       } finally {
         await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
@@ -397,6 +614,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ error: `No user found with email ${TEST_EMAIL}` });
+      expect(mockedRecordAdminAction).not.toHaveBeenCalled();
     });
   });
 
@@ -405,6 +623,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'Start must be before end.' });
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
   });
 
   describe('when the export reaches its time budget', () => {

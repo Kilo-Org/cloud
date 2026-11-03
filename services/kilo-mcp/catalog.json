@@ -26192,14 +26192,15 @@
         },
         "limit": {
           "default": 50,
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
         "offset": {
           "default": 0,
-          "type": "number",
-          "minimum": 0
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -26281,22 +26282,22 @@
           ]
         },
         "slaCriticalDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaHighDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaMediumDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaLowDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
@@ -26316,7 +26317,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "modelSlug": {
@@ -26480,7 +26483,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       },
@@ -31870,14 +31875,15 @@
         },
         "limit": {
           "default": 50,
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
         "offset": {
           "default": 0,
-          "type": "number",
-          "minimum": 0
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -31941,22 +31947,22 @@
           ]
         },
         "slaCriticalDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaHighDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaMediumDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaLowDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
@@ -31976,7 +31982,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "modelSlug": {
@@ -32132,7 +32140,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       },

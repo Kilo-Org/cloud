@@ -523,17 +523,6 @@ function findUnsupportedApiKindCandidate<D, G>(routes: readonly ByokRoute<D, G>[
   return undefined;
 }
 
-/** The gateway of Kilo's own route, used when no BYOK route takes the request. */
-async function selectKiloGateway(
-  requestedModel: string,
-  boundedSpending: boolean,
-  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
-): Promise<'vercel' | 'openrouter'> {
-  return !boundedSpending && (await shouldRouteToVercel(requestedModel, getRoutingProviderConfig))
-    ? 'vercel'
-    : 'openrouter';
-}
-
 export type GetProviderInput = {
   requestedModel: string;
   request: GatewayRequest;
@@ -565,7 +554,7 @@ export type GetProviderInput = {
 /**
  * KEEP IN SYNC WITH `previewByokRouting` below. The BYOK settings page explains this route order
  * to users. Both share the key decisions (`rankDirectByokCatalogKeys`, `rankByokRoutes`,
- * `createGatewayKeyDecider`, `selectKiloGateway`), but each walks the steps itself, so a new step, a
+ * `createGatewayKeyDecider`, `shouldRouteToVercel`), but each walks the steps itself, so a new step, a
  * reordered step, or a new reason to skip a key must be reflected in both.
  * `get-provider.preview.test.ts` runs both over the same keys and fails when they disagree.
  */
@@ -677,12 +666,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return directByokProviderResult(provider, model, key, requestedModel, request, true);
   }
 
-  const kiloGateway = await selectKiloGateway(requestedModel, boundedSpending, async () =>
-    withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
+  const kiloRouteUsesVercel = await shouldRouteToVercel(
+    requestedModel,
+    async () => withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders),
+    boundedSpending
   );
   return {
     kind: 'provider',
-    provider: kiloGateway === 'vercel' ? VERCEL_AI_GATEWAY : OPENROUTER,
+    provider: kiloRouteUsesVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
     userByok: null,
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: false,
@@ -856,10 +847,16 @@ export async function previewByokRouting({
     });
   }
 
+  const kiloRouteUsesVercel = await shouldRouteToVercel(
+    requestedModel,
+    noProviderRestrictions,
+    // The preview explains the unrestricted route, so no request can carry a spend ceiling here.
+    false
+  );
   steps.push({
     route: 'kilo',
     outcome: 'used',
-    gateway: await selectKiloGateway(requestedModel, false, noProviderRestrictions),
+    gateway: kiloRouteUsesVercel ? 'vercel' : 'openrouter',
   });
   return { kind: 'routes', steps: markUnreachedSteps(steps) };
 }

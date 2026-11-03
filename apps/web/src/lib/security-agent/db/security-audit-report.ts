@@ -31,6 +31,12 @@ export const SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS = 10_000;
 export const SECURITY_AGENT_AUDIT_REPORT_MAX_SERIALIZED_BYTES = 8 * 1024 * 1024;
 export const SECURITY_AGENT_AUDIT_REPORT_REQUEST_TIMEOUT_MS = 25_000;
 export const SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS = 8_000;
+/**
+ * Headroom kept between a statement's `statement_timeout` and the request deadline, so
+ * PostgreSQL's cancellation reaches the client before the request's client-side backstop
+ * fires and the request still ends within its budget.
+ */
+export const SECURITY_AGENT_AUDIT_REPORT_BACKSTOP_GRACE_MS = 500;
 
 const DateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 type SecurityAgentAuditReportFailureStage =
@@ -48,6 +54,40 @@ export class SecurityAgentAuditReportQueryError extends Error {
     super(message);
     this.name = 'SecurityAgentAuditReportQueryError';
   }
+}
+
+export type SecurityAgentAuditReportTimeouts = {
+  requestMs: number;
+  queryMs: number;
+};
+
+/**
+ * One report call's time budget. `requestDeadlineAt` bounds the whole assembly - every
+ * statement gets at most the time left before it, and a statement that cannot start in
+ * that window fails with stage `request` - and `queryTimeoutMs` bounds a single
+ * statement. Tests pass a shorter budget; production uses the exported constants.
+ */
+type AuditReportBudget = {
+  readonly requestDeadlineAt: number;
+  readonly queryTimeoutMs: number;
+};
+
+function createAuditReportBudget(
+  timeouts: Partial<SecurityAgentAuditReportTimeouts>
+): AuditReportBudget {
+  const requestMs = timeouts.requestMs ?? SECURITY_AGENT_AUDIT_REPORT_REQUEST_TIMEOUT_MS;
+  const queryMs = timeouts.queryMs ?? SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS;
+
+  for (const [name, value] of [
+    ['requestMs', requestMs],
+    ['queryMs', queryMs],
+  ] as const) {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`Audit report ${name} must be a positive integer, received ${String(value)}`);
+    }
+  }
+
+  return { requestDeadlineAt: Date.now() + requestMs, queryTimeoutMs: queryMs };
 }
 
 export const SecurityAgentAuditReportInputSchema = z.object({
@@ -379,11 +419,13 @@ export async function getSecurityAgentAuditReport(params: {
   owner: SecurityAgentAuditReportOwner;
   input: SecurityAgentAuditReportInput;
   isRequestingUserKiloAdmin: boolean;
+  timeouts?: Partial<SecurityAgentAuditReportTimeouts>;
 }): Promise<SecurityAgentAuditReport> {
   const parsedInput = SecurityAgentAuditReportInputSchema.parse(params.input);
   const period = normalizeSecurityAgentAuditReportPeriod(parsedInput);
   const generatedAt = new Date().toISOString();
   const startedAt = Date.now();
+  const budget = createAuditReportBudget(params.timeouts ?? {});
   let eventCount: number | null = null;
 
   return await startSpan(
@@ -404,11 +446,12 @@ export async function getSecurityAgentAuditReport(params: {
             ...params,
             period,
             generatedAt,
+            budget,
             onEventCount: count => {
               eventCount = count;
             },
           }),
-          SECURITY_AGENT_AUDIT_REPORT_REQUEST_TIMEOUT_MS,
+          Math.max(1, budget.requestDeadlineAt - Date.now()),
           'request'
         );
 
@@ -446,12 +489,13 @@ async function assembleSecurityAgentAuditReport(params: {
   period: NormalizedAuditReportPeriod;
   generatedAt: string;
   isRequestingUserKiloAdmin: boolean;
+  budget: AuditReportBudget;
   onEventCount: (eventCount: number) => void;
 }): Promise<SecurityAgentAuditReport> {
   const { dataThrough, rows, cutoffStates, currentFindings } = await db.transaction(
     async tx => {
-      const dataThrough = await getDatabaseNow(tx);
-      const eventCount = await countReportEvents(tx, params.owner, params.period);
+      const dataThrough = await getDatabaseNow(tx, params.budget);
+      const eventCount = await countReportEvents(tx, params.owner, params.period, params.budget);
       params.onEventCount(eventCount);
 
       if (eventCount > SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS) {
@@ -461,7 +505,7 @@ async function assembleSecurityAgentAuditReport(params: {
         );
       }
 
-      const rows = await scanReportRows(tx, params.owner, params.period);
+      const rows = await scanReportRows(tx, params.owner, params.period, params.budget);
       if (rows.length !== eventCount) {
         throw new SecurityAgentAuditReportQueryError(
           'Report scan row count does not match counted events',
@@ -474,15 +518,30 @@ async function assembleSecurityAgentAuditReport(params: {
           rows.map(getRowFindingId).filter((findingId): findingId is string => Boolean(findingId))
         )
       );
-      const [cutoffStates, currentFindings] = await Promise.all([
-        loadReportFindingCutoffStates(tx, params.owner, findingIds),
-        loadCurrentReportFindings(tx, params.owner, findingIds),
-      ]);
+      const cutoffStates = await loadReportFindingCutoffStates(
+        tx,
+        params.owner,
+        findingIds,
+        params.budget
+      );
+      const currentFindings = await loadCurrentReportFindings(
+        tx,
+        params.owner,
+        findingIds,
+        params.budget
+      );
 
       return { dataThrough, rows, cutoffStates, currentFindings };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
+
+  // The transaction rolled back on any budget failure, so reaching this point with an
+  // expired deadline means only the client-side backstop is left to win the race: skip
+  // building and serializing a report the caller has already stopped waiting for.
+  if (Date.now() >= params.budget.requestDeadlineAt) {
+    throw new SecurityAgentAuditReportQueryError('Report query did not finish', 'request');
+  }
 
   const report = buildSecurityAgentAuditReportFromRows({
     owner: params.owner,
@@ -573,11 +632,46 @@ export function buildSecurityAgentAuditReportFromRows(params: {
   };
 }
 
-async function getDatabaseNow(tx: DrizzleTransaction): Promise<string> {
-  const { rows } = await withSecurityAgentAuditReportTimeout(
-    tx.execute<{ data_through: string }>(sql`SELECT now() AS data_through`),
-    SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-    'data_through'
+/**
+ * Runs one report statement under the call's budget. The statement gets the smaller of
+ * the per-query budget and the time left in the request, applied as a transaction-local
+ * `statement_timeout` so PostgreSQL cancels it and the read-only transaction rolls back
+ * instead of a timer abandoning a statement that keeps running. Every failure, including
+ * a cancellation, becomes a `SecurityAgentAuditReportQueryError` carrying the stage.
+ */
+async function runAuditReportQuery<T>(
+  tx: DrizzleTransaction,
+  budget: AuditReportBudget,
+  stage: SecurityAgentAuditReportFailureStage,
+  run: () => PromiseLike<T>
+): Promise<T> {
+  const timeoutMs = Math.min(
+    budget.queryTimeoutMs,
+    budget.requestDeadlineAt - Date.now() - SECURITY_AGENT_AUDIT_REPORT_BACKSTOP_GRACE_MS
+  );
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+    // The request deadline passed before this statement could be dispatched, so the
+    // failure belongs to the request budget, not to the stage of the skipped statement.
+    throw new SecurityAgentAuditReportQueryError('Report query did not finish', 'request');
+  }
+
+  try {
+    // PostgreSQL rejects a parameterized SET. The guard above proves timeoutMs is a
+    // positive integer, so the interpolated value cannot carry SQL.
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${timeoutMs}'`));
+    return await run();
+  } catch (error) {
+    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
+    throw new SecurityAgentAuditReportQueryError(
+      error instanceof Error ? error.message : 'Report query did not finish',
+      stage
+    );
+  }
+}
+
+async function getDatabaseNow(tx: DrizzleTransaction, budget: AuditReportBudget): Promise<string> {
+  const { rows } = await runAuditReportQuery(tx, budget, 'data_through', () =>
+    tx.execute<{ data_through: string }>(sql`SELECT now() AS data_through`)
   );
   return new Date(rows[0].data_through).toISOString();
 }
@@ -585,37 +679,29 @@ async function getDatabaseNow(tx: DrizzleTransaction): Promise<string> {
 async function countReportEvents(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  period: NormalizedAuditReportPeriod
+  period: NormalizedAuditReportPeriod,
+  budget: AuditReportBudget
 ): Promise<number> {
-  try {
-    const [row] = await withSecurityAgentAuditReportTimeout(
-      tx
-        .select({ eventCount: count(security_audit_log.id) })
-        .from(security_audit_log)
-        .where(and(...baseReportConditions(owner, period))),
-      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-      'count'
-    );
-    return row.eventCount;
-  } catch (error) {
-    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
-    throw new SecurityAgentAuditReportQueryError(
-      error instanceof Error ? error.message : 'Report query did not finish',
-      'count'
-    );
-  }
+  const [row] = await runAuditReportQuery(tx, budget, 'count', () =>
+    tx
+      .select({ eventCount: count(security_audit_log.id) })
+      .from(security_audit_log)
+      .where(and(...baseReportConditions(owner, period)))
+  );
+  return row.eventCount;
 }
 
 async function scanReportRows(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  period: NormalizedAuditReportPeriod
+  period: NormalizedAuditReportPeriod,
+  budget: AuditReportBudget
 ): Promise<AuditReportRow[]> {
   const rows: AuditReportRow[] = [];
   let cursor: AuditReportCursor | null = null;
 
   while (true) {
-    const page = await scanReportPage(tx, owner, period, cursor);
+    const page = await scanReportPage(tx, owner, period, cursor, budget);
     rows.push(...page);
 
     if (page.length < SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE) return rows;
@@ -628,7 +714,8 @@ async function scanReportPage(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
-  cursor: AuditReportCursor | null
+  cursor: AuditReportCursor | null,
+  budget: AuditReportBudget
 ): Promise<AuditReportRow[]> {
   const effectiveAt = reportEffectiveAtSql();
   const whereConditions = baseReportConditions(owner, period);
@@ -640,47 +727,38 @@ async function scanReportPage(
     if (cursorCondition) whereConditions.push(cursorCondition);
   }
 
-  try {
-    return await withSecurityAgentAuditReportTimeout(
-      tx
-        .select({
-          id: security_audit_log.id,
-          action: security_audit_log.action,
-          actor_id: security_audit_log.actor_id,
-          actor_name: security_audit_log.actor_name,
-          actor_type: security_audit_log.actor_type,
-          before_state: security_audit_log.before_state,
-          after_state: security_audit_log.after_state,
-          metadata: security_audit_log.metadata,
-          created_at: security_audit_log.created_at,
-          finding_id: security_audit_log.finding_id,
-          resource_type: security_audit_log.resource_type,
-          resource_id: security_audit_log.resource_id,
-          occurred_at: security_audit_log.occurred_at,
-          source_occurred_at: security_audit_log.source_occurred_at,
-          finding_snapshot: security_audit_log.finding_snapshot,
-          effective_at: effectiveAt,
-        })
-        .from(security_audit_log)
-        .where(and(...whereConditions))
-        .orderBy(asc(effectiveAt), asc(security_audit_log.id))
-        .limit(SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE),
-      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-      'scan'
-    );
-  } catch (error) {
-    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
-    throw new SecurityAgentAuditReportQueryError(
-      error instanceof Error ? error.message : 'Report query did not finish',
-      'scan'
-    );
-  }
+  return await runAuditReportQuery(tx, budget, 'scan', () =>
+    tx
+      .select({
+        id: security_audit_log.id,
+        action: security_audit_log.action,
+        actor_id: security_audit_log.actor_id,
+        actor_name: security_audit_log.actor_name,
+        actor_type: security_audit_log.actor_type,
+        before_state: security_audit_log.before_state,
+        after_state: security_audit_log.after_state,
+        metadata: security_audit_log.metadata,
+        created_at: security_audit_log.created_at,
+        finding_id: security_audit_log.finding_id,
+        resource_type: security_audit_log.resource_type,
+        resource_id: security_audit_log.resource_id,
+        occurred_at: security_audit_log.occurred_at,
+        source_occurred_at: security_audit_log.source_occurred_at,
+        finding_snapshot: security_audit_log.finding_snapshot,
+        effective_at: effectiveAt,
+      })
+      .from(security_audit_log)
+      .where(and(...whereConditions))
+      .orderBy(asc(effectiveAt), asc(security_audit_log.id))
+      .limit(SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE)
+  );
 }
 
 async function loadReportFindingCutoffStates(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  findingIds: string[]
+  findingIds: string[],
+  budget: AuditReportBudget
 ): Promise<AuditReportFindingCutoffState[]> {
   if (findingIds.length === 0) return [];
 
@@ -707,122 +785,101 @@ async function loadReportFindingCutoffStates(
     findingIdentityCondition,
   ];
 
-  try {
-    const latestRows = await withSecurityAgentAuditReportTimeout(
-      tx
-        .selectDistinctOn([findingId], {
-          findingId,
-          snapshot: security_audit_log.finding_snapshot,
-        })
-        .from(security_audit_log)
-        .where(and(...conditions, isNotNull(security_audit_log.finding_snapshot)))
-        .orderBy(
-          asc(findingId),
-          desc(effectiveAt),
-          desc(security_audit_log.created_at),
-          desc(security_audit_log.id)
-        ),
-      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-      'scan'
-    );
-    const deletionRows = await withSecurityAgentAuditReportTimeout(
-      tx
-        .select({ findingId })
-        .from(security_audit_log)
-        .where(
-          and(...conditions, eq(security_audit_log.action, SecurityAuditLogAction.FindingDeleted))
-        ),
-      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-      'scan'
-    );
-    const latestSnapshotByFindingId = new Map(latestRows.map(row => [row.findingId, row.snapshot]));
-    const deletedFindingIds = new Set(deletionRows.map(row => row.findingId));
+  const latestRows = await runAuditReportQuery(tx, budget, 'scan', () =>
+    tx
+      .selectDistinctOn([findingId], {
+        findingId,
+        snapshot: security_audit_log.finding_snapshot,
+      })
+      .from(security_audit_log)
+      .where(and(...conditions, isNotNull(security_audit_log.finding_snapshot)))
+      .orderBy(
+        asc(findingId),
+        desc(effectiveAt),
+        desc(security_audit_log.created_at),
+        desc(security_audit_log.id)
+      )
+  );
+  const deletionRows = await runAuditReportQuery(tx, budget, 'scan', () =>
+    tx
+      .select({ findingId })
+      .from(security_audit_log)
+      .where(
+        and(...conditions, eq(security_audit_log.action, SecurityAuditLogAction.FindingDeleted))
+      )
+  );
+  const latestSnapshotByFindingId = new Map(latestRows.map(row => [row.findingId, row.snapshot]));
+  const deletedFindingIds = new Set(deletionRows.map(row => row.findingId));
 
-    return findingIds.map(findingId => ({
-      findingId,
-      snapshot: latestSnapshotByFindingId.get(findingId) ?? null,
-      deleted: deletedFindingIds.has(findingId),
-    }));
-  } catch (error) {
-    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
-    throw new SecurityAgentAuditReportQueryError(
-      error instanceof Error ? error.message : 'Report query did not finish',
-      'scan'
-    );
-  }
+  return findingIds.map(findingId => ({
+    findingId,
+    snapshot: latestSnapshotByFindingId.get(findingId) ?? null,
+    deleted: deletedFindingIds.has(findingId),
+  }));
 }
 
 async function loadCurrentReportFindings(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  findingIds: string[]
+  findingIds: string[],
+  budget: AuditReportBudget
 ): Promise<AuditReportCurrentFinding[]> {
   if (findingIds.length === 0) return [];
 
-  try {
-    const rows = await withSecurityAgentAuditReportTimeout(
-      tx
-        .select({
-          findingId: security_findings.id,
-          source: security_findings.source,
-          sourceId: security_findings.source_id,
-          repository: security_findings.repo_full_name,
-          title: security_findings.title,
-          severity: security_findings.severity,
-          status: security_findings.status,
-          packageName: security_findings.package_name,
-          packageEcosystem: security_findings.package_ecosystem,
-          manifestPath: security_findings.manifest_path,
-          patchedVersion: security_findings.patched_version,
-          ghsaId: security_findings.ghsa_id,
-          cveId: security_findings.cve_id,
-          cweIds: security_findings.cwe_ids,
-          cvssScore: security_findings.cvss_score,
-          dependabotUrl: security_findings.dependabot_html_url,
-          firstDetectedAt: security_findings.first_detected_at,
-        })
-        .from(security_findings)
-        .where(
-          and(
-            inArray(security_findings.id, findingIds),
-            owner.type === 'user'
-              ? eq(security_findings.owned_by_user_id, owner.id)
-              : eq(security_findings.owned_by_organization_id, owner.id)
-          )
-        ),
-      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
-      'scan'
-    );
+  const rows = await runAuditReportQuery(tx, budget, 'scan', () =>
+    tx
+      .select({
+        findingId: security_findings.id,
+        source: security_findings.source,
+        sourceId: security_findings.source_id,
+        repository: security_findings.repo_full_name,
+        title: security_findings.title,
+        severity: security_findings.severity,
+        status: security_findings.status,
+        packageName: security_findings.package_name,
+        packageEcosystem: security_findings.package_ecosystem,
+        manifestPath: security_findings.manifest_path,
+        patchedVersion: security_findings.patched_version,
+        ghsaId: security_findings.ghsa_id,
+        cveId: security_findings.cve_id,
+        cweIds: security_findings.cwe_ids,
+        cvssScore: security_findings.cvss_score,
+        dependabotUrl: security_findings.dependabot_html_url,
+        firstDetectedAt: security_findings.first_detected_at,
+      })
+      .from(security_findings)
+      .where(
+        and(
+          inArray(security_findings.id, findingIds),
+          owner.type === 'user'
+            ? eq(security_findings.owned_by_user_id, owner.id)
+            : eq(security_findings.owned_by_organization_id, owner.id)
+        )
+      )
+  );
 
-    return rows.map(row => ({
-      findingId: row.findingId,
-      snapshot: {
-        finding_id: row.findingId,
-        source: row.source,
-        source_id: row.sourceId,
-        repo_full_name: row.repository,
-        title: row.title,
-        severity: row.severity,
-        status: row.status,
-        package_name: row.packageName,
-        package_ecosystem: row.packageEcosystem,
-        manifest_path: row.manifestPath,
-        patched_version: row.patchedVersion,
-        ghsa_id: row.ghsaId,
-        cve_id: row.cveId,
-        cwe_ids: row.cweIds,
-        cvss_score: row.cvssScore,
-        dependabot_html_url: row.dependabotUrl,
-        first_detected_at: row.firstDetectedAt,
-      },
-    }));
-  } catch (error) {
-    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
-    throw new SecurityAgentAuditReportQueryError(
-      error instanceof Error ? error.message : 'Report query did not finish',
-      'scan'
-    );
-  }
+  return rows.map(row => ({
+    findingId: row.findingId,
+    snapshot: {
+      finding_id: row.findingId,
+      source: row.source,
+      source_id: row.sourceId,
+      repo_full_name: row.repository,
+      title: row.title,
+      severity: row.severity,
+      status: row.status,
+      package_name: row.packageName,
+      package_ecosystem: row.packageEcosystem,
+      manifest_path: row.manifestPath,
+      patched_version: row.patchedVersion,
+      ghsa_id: row.ghsaId,
+      cve_id: row.cveId,
+      cwe_ids: row.cweIds,
+      cvss_score: row.cvssScore,
+      dependabot_html_url: row.dependabotUrl,
+      first_detected_at: row.firstDetectedAt,
+    },
+  }));
 }
 
 function baseReportConditions(

@@ -298,7 +298,9 @@ repository.
    the user-set worktree name, otherwise the first surviving chat's non-default
    title, otherwise the repository and branch. This fallback MUST NOT depend on
    which chats are visible in the current search or recent-session page.
-   Selecting the worktree MUST open its latest chat. The row MUST remain visibly
+   Selecting the worktree MUST open its latest open chat; when all its listed
+   chats are closed, it MUST open the worktree without reopening any of them.
+   The row MUST remain visibly
    selected while any sibling is active and MUST reflect busy, question, or
    permission activity across all its chats. Its timestamp and overflow menu
    MUST share the session-row action slot. Associated pull-request information
@@ -343,7 +345,12 @@ repository.
 10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
     or stop its running work. Closed-tab preferences and tab order MUST survive
     refresh and remain scoped to the current user and personal or organization
-    context.
+    context. A closed chat MUST reopen only when the user opens that chat
+    itself, for example from the Sessions list or its own link. Selecting its
+    worktree, closing it while the app is still switching to it, going back
+    from the closed tab, refreshing or restoring a window, or another window
+    still showing the chat MUST NOT reopen it; a window
+    showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
     Most recently closed chats MUST appear first, including after refresh;

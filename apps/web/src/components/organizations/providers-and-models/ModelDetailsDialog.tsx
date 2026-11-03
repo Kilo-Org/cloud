@@ -146,6 +146,7 @@ export function ModelDetailsDialog({
                             <img
                               src={offering.providerIconUrl}
                               alt=""
+                              referrerPolicy="no-referrer"
                               className="h-4 w-4 object-contain"
                             />
                           ) : null}

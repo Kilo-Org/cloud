@@ -897,10 +897,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         result.config.analysis_model_slug ??
         DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
       const remediationModelSlug =
-        result.storedConfig.remediation_model_slug ??
-        result.config.remediation_model_slug ??
-        analysisModelSlug ??
-        DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
+        result.config.remediation_model_slug ?? DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
         hasConfig: true,
@@ -978,7 +975,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                 existingConfig.config.auto_remediation_include_existing,
               autoRemediationEnabledAt: existingConfig.config.auto_remediation_enabled_at,
               remediationModelSlug:
-                existingConfig.config.remediation_model_slug ?? existingAnalysisModelSlug,
+                existingConfig.config.remediation_model_slug ??
+                DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
               modelSlug: existingConfig.config.model_slug,
               triageModelSlug: existingTriageModelSlug,
               analysisModelSlug: existingAnalysisModelSlug,
@@ -1015,8 +1013,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const remediationModelSlug =
           input.remediationModelSlug ??
           existingConfig?.storedConfig.remediation_model_slug ??
-          existingConfig?.config.remediation_model_slug ??
-          analysisModelSlug;
+          DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =

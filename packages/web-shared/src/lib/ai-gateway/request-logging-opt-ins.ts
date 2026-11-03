@@ -12,9 +12,12 @@ export const RequestLoggingOptInSchema = z.object({
   added_by_email: z.string().email(),
   added_at: z.string().datetime(),
   errors_only: z.boolean().default(false),
+  expires_at: z.string().datetime().optional(),
 });
 
+// Keep existing persisted lists readable so admins can remove rules above the new limit.
 export const RequestLoggingOptInsSchema = z.array(RequestLoggingOptInSchema).max(500);
+export const MAX_REQUEST_LOGGING_OPT_INS = 10;
 
 export type RequestLoggingOptIn = z.infer<typeof RequestLoggingOptInSchema>;
 
@@ -27,10 +30,12 @@ export function resolveRequestLoggingMode(
   optIns: RequestLoggingOptIn[],
   params: { accountId: string | null; organizationId: string | null }
 ): RequestLoggingMode | null {
+  const now = Date.now();
   const matching = optIns.filter(
     entry =>
-      (entry.target_type === 'account' && entry.target_id === params.accountId) ||
-      (entry.target_type === 'organization' && entry.target_id === params.organizationId)
+      (entry.expires_at === undefined || Date.parse(entry.expires_at) > now) &&
+      ((entry.target_type === 'account' && entry.target_id === params.accountId) ||
+        (entry.target_type === 'organization' && entry.target_id === params.organizationId))
   );
   if (matching.length === 0) return null;
   return matching.every(entry => entry.errors_only) ? 'errors_only' : 'all';
@@ -70,7 +75,10 @@ export async function createRequestLoggingOptIn(
       .for('update');
     if (!row) throw new Error('Request logging opt-in state row is missing');
 
-    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const now = Date.now();
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns).filter(
+      optIn => optIn.expires_at === undefined || Date.parse(optIn.expires_at) > now
+    );
     if (
       optIns.some(
         optIn =>
@@ -79,7 +87,7 @@ export async function createRequestLoggingOptIn(
     ) {
       return 'duplicate' as const;
     }
-    if (optIns.length >= 500) return 'full' as const;
+    if (optIns.length >= MAX_REQUEST_LOGGING_OPT_INS) return 'full' as const;
 
     const updatedOptIns = [...optIns, validated];
     await tx
@@ -90,24 +98,50 @@ export async function createRequestLoggingOptIn(
   });
 }
 
-export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
+export async function deleteRequestLoggingOptIn(id: string): Promise<RequestLoggingOptIn | null> {
   return db.transaction(async tx => {
     const [row] = await tx
       .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
       .from(ai_gateway_request_logging_opt_ins)
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
       .for('update');
-    if (!row) return false;
+    if (!row) return null;
 
     const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const deleted = optIns.find(entry => entry.id === id);
+    if (!deleted) return null;
     const remaining = optIns.filter(entry => entry.id !== id);
-    if (remaining.length === optIns.length) return false;
 
     await tx
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: remaining })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    return true;
+    return deleted;
+  });
+}
+
+export async function deleteExpiredRequestLoggingOptIns(): Promise<number> {
+  return db.transaction(async tx => {
+    const [row] = await tx
+      .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
+      .from(ai_gateway_request_logging_opt_ins)
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
+      .for('update');
+    if (!row) return 0;
+
+    const now = Date.now();
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const remaining = optIns.filter(
+      entry => entry.expires_at === undefined || Date.parse(entry.expires_at) > now
+    );
+    const deletedCount = optIns.length - remaining.length;
+    if (deletedCount > 0) {
+      await tx
+        .update(ai_gateway_request_logging_opt_ins)
+        .set({ opt_ins: remaining })
+        .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
+    }
+    return deletedCount;
   });
 }
 

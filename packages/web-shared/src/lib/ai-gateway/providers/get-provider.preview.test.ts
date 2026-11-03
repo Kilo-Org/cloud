@@ -510,6 +510,91 @@ describe('previewByokRouting', () => {
     });
   });
 
+  test('ranks a key without a priority by its place in the whole key list, not among the eligible keys', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values([
+      {
+        kilo_user_id: user.id,
+        provider_id: 'openrouter',
+        encrypted_api_key: encryptApiKey('openrouter-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority: 0 },
+      },
+      {
+        kilo_user_id: user.id,
+        provider_id: 'anthropic',
+        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority: 1 },
+      },
+      {
+        kilo_user_id: user.id,
+        provider_id: 'moonshotai',
+        encrypted_api_key: encryptApiKey('moonshotai-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      },
+    ]);
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai']);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const routed = await getProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'user', id: user.id },
+      requestedModel: MODEL,
+      apiKind: 'chat_completions',
+    });
+
+    if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+    const expected = { route: 'gateway-byok', providerId: 'openrouter' };
+    expect(routeOf(routed, 'chat_completions')).toEqual(expected);
+    expect(previewRouteOf(preview.steps)).toEqual(expected);
+  });
+
+  test('logs the selected key and why higher-ranked keys were skipped', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values(
+      (['anthropic', 'bedrock'] as const).map((providerId, priority) => ({
+        kilo_user_id: user.id,
+        provider_id: providerId,
+        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority },
+      }))
+    );
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic', 'bedrock']);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      await getProvider({
+        requestedModel: MODEL,
+        request: {
+          kind: 'chat_completions',
+          body: { model: MODEL, messages: [], provider: { ignore: ['anthropic'] } },
+        },
+        user,
+        organizationId: undefined,
+      });
+
+      expect(debug).toHaveBeenCalledWith('[getProvider] BYOK route selected', {
+        requestedModel: MODEL,
+        selected: 'bedrock',
+        candidates: 2,
+        skipped: [{ providerId: 'anthropic', reason: 'ignored-by-request' }],
+      });
+    } finally {
+      debug.mockRestore();
+    }
+  });
+
   describe("the request's own provider.ignore", () => {
     async function routeWithIgnore(ignore: string[], providerIds: UserByokProviderId[]) {
       const user = await insertTestUser();

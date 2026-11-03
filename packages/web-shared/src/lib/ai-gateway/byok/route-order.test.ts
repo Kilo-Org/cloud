@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
+import {
+  createByokRouteRank,
+  sortByokKeysInRouteOrder,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 
 type Key = { providerId: string; priority?: number };
 
@@ -48,5 +51,18 @@ describe('sortByokKeysInRouteOrder', () => {
         { providerId: 'zai-coding' },
       ])
     ).toEqual(['zai-coding', 'openrouter', 'anthropic', 'minimax', 'vercel-ai-gateway']);
+  });
+});
+
+describe('createByokRouteRank', () => {
+  test('keeps the position a key without a priority has in the whole list', () => {
+    const rank = createByokRouteRank([
+      { providerId: 'openrouter', priority: 0 },
+      { providerId: 'anthropic', priority: 1 },
+      { providerId: 'minimax' },
+    ]);
+
+    expect(rank('openrouter')).toBeLessThan(rank('minimax'));
+    expect(rank('anthropic')).toBeLessThan(rank('minimax'));
   });
 });

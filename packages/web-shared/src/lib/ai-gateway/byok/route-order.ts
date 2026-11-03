@@ -43,3 +43,17 @@ export function sortByokKeysInRouteOrder<T>(
   }
   return ordered;
 }
+
+/**
+ * Each provider's position in the owner's whole key list, as the settings page shows it. Routing
+ * filters keys per request, so it must rank the remaining keys by this owner-wide position: sorting
+ * only the filtered keys could place a key without a priority differently than the page does.
+ */
+export function createByokRouteRank(
+  ownerKeys: readonly { providerId: string; priority?: number }[]
+): (providerId: string) => number {
+  const positions = new Map(
+    sortByokKeysInRouteOrder(ownerKeys, key => key).map((key, index) => [key.providerId, index])
+  );
+  return providerId => positions.get(providerId) ?? Number.MAX_SAFE_INTEGER;
+}

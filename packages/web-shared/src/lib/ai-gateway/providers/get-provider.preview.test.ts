@@ -387,6 +387,14 @@ describe('previewByokRouting', () => {
           scenario,
           decision: routedStepsOfPreview(preview.steps),
         });
+        const used = preview.steps.find(step => step.outcome === 'used');
+        expect({ scenario, used }).not.toMatchObject({ used: { reason: 'disabled' } });
+        if (!keys.some(({ isEnabled }) => isEnabled)) {
+          expect({ scenario, used }).toMatchObject({ used: { route: 'kilo' } });
+        }
+        if (preview.steps.some(step => step.route === 'direct-byok' && step.reason === 'serves')) {
+          expect(preview.steps.map(step => step.route)).not.toContain('unsupported-api-kind');
+        }
       }
     }
   );

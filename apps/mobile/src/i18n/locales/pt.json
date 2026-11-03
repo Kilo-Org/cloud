@@ -3841,9 +3841,9 @@
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
     "thresholdTitle": "Ultrapassagem do limite",
-    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "thresholdSubtitle": "Os gastos acumulados deste âmbito na janela escolhida ultrapassam o seu limite",
     "anomalyTitle": "Pico horário",
-    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste âmbito",
+    "anomalySubtitle": "O ritmo horário deste âmbito está muito acima da sua própria linha de base p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Janela",
     "window24h": "24 horas",
@@ -3860,7 +3860,7 @@
     "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações",
     "multiplierMaxError": "Introduza um multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduza um valor de {{max}} ou menos."
+    "thresholdMaxError": "Introduza um valor de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfis",

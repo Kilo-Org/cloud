@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Send en advarsel via e-mail eller push til faktureringskontakterne, når dette områdes forbrug overskrider en grænse eller stiger over den sædvanlige timesats.",
     "thresholdTitle": "Grænseoverskridelse",
-    "thresholdSubtitle": "Løbende forbrug overskrider din grænse",
+    "thresholdSubtitle": "Dette områdes løbende forbrug i det valgte vindue overskrider din grænse",
     "anomalyTitle": "Spike pr. time",
-    "anomalySubtitle": "En time er langt over dette områdes sædvanlige sats",
+    "anomalySubtitle": "Dette områdes sats pr. time er langt over dets egen p95-baseline",
     "limitLabel": "Grænse (USD)",
     "windowLabel": "Vindue",
     "window24h": "24 timer",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
     "pushOffByCategory": "Fra i Notifikationer",
     "multiplierMaxError": "Angiv en multiplikator på {{max}} eller mindre",
-    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre."
+    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre"
   },
   "profiles": {
     "title": "Profiler",

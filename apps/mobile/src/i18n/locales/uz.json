@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
     "thresholdTitle": "Chegaradan oshish",
-    "thresholdSubtitle": "Joriy xarajat limitingizdan oshib ketdi",
+    "thresholdSubtitle": "Bu sohaning tanlangan oynadagi joriy xarajati limitingizdan oshib ketmoqda",
     "anomalyTitle": "Soatlik ko'tarilish",
-    "anomalySubtitle": "Bir soat bu sohaning odatdagi sur'atidan ancha yuqori",
+    "anomalySubtitle": "Bu sohaning soatlik sur'ati o'zining p95 asosiy darajasidan ancha yuqori",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Oyna",
     "window24h": "24 soat",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
     "pushOffByCategory": "Bildirishnomalarda o'chirilgan",
     "multiplierMaxError": "{{max}} yoki undan kichik koeffitsiyent kiriting",
-    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting."
+    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting"
   },
   "profiles": {
     "title": "Profillar",

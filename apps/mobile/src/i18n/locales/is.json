@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
     "thresholdTitle": "Yfirferð þröskulds",
-    "thresholdSubtitle": "Safnað útgjöld fara yfir mörkin þín",
+    "thresholdSubtitle": "Safnað útgjöld þessa svæðis yfir valda gluggann fara yfir mörkin þín",
     "anomalyTitle": "Uppsveifla á klukkustund",
-    "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
+    "anomalySubtitle": "Klukkustundarhraði þessa svæðis er langt yfir eigin p95 grunnlínu",
     "limitLabel": "Mörk (USD)",
     "windowLabel": "Gluggi",
     "window24h": "24 klukkustundir",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum",
     "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
-    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri."
+    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri"
   },
   "profiles": {
     "title": "Snið",

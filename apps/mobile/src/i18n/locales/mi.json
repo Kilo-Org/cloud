@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
     "thresholdTitle": "Whitinga paepae",
-    "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu i tō paepae",
+    "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu o tēnei rohe i te matapihi kua whiriwhiria i tō paepae",
     "anomalyTitle": "Pikinga ia hāora",
-    "anomalySubtitle": "Kei runga rawa tētahi hāora i te tere noa o tēnei rohe",
+    "anomalySubtitle": "Kei runga rawa te tere ia hāora o tēnei rohe i tōna ake papa p95",
     "limitLabel": "Paepae (USD)",
     "windowLabel": "Matapihi",
     "window24h": "24 hāora",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā matohi whakapaunga.",
     "pushOffByCategory": "Weto i roto i Ngā whakamōhiotanga",
     "multiplierMaxError": "Whakaurua he whakarea {{max}}, iti ake rānei",
-    "thresholdMaxError": "Whakaurua he moni {{max}}, iti ake rānei."
+    "thresholdMaxError": "Whakaurua he moni {{max}}, iti ake rānei"
   },
   "profiles": {
     "title": "Kōtaha",

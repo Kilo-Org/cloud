@@ -3988,9 +3988,9 @@
   "spendAlerts": {
     "subtitle": "Anfon rhybudd drwy e-bost neu wthiad at y cysylltiadau bilio pan fo gwariant y cwmpas hwn yn croesi terfyn neu'n codi uwchlaw ei gyfradd awr arferol.",
     "thresholdTitle": "Croesi trothwy",
-    "thresholdSubtitle": "Mae gwariant crynodedig yn croesi dy derfyn",
+    "thresholdSubtitle": "Mae gwariant crynodedig y cwmpas hwn dros y ffenestr a ddewiswyd yn croesi dy derfyn",
     "anomalyTitle": "Sbig awr",
-    "anomalySubtitle": "Mae awr ymhell uwchlaw cyfradd arferol y cwmpas hwn",
+    "anomalySubtitle": "Mae cyfradd awrol y cwmpas hwn ymhell uwchlaw ei linell sylfaen p95 ei hun",
     "limitLabel": "Terfyn (USD)",
     "windowLabel": "Ffenestr",
     "window24h": "24 awr",
@@ -4007,7 +4007,7 @@
     "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
     "pushOffByCategory": "I ffwrdd yn Hysbysiadau",
     "multiplierMaxError": "Nodwch luosydd o {{max}} neu lai",
-    "thresholdMaxError": "Nodwch swm o {{max}} neu lai."
+    "thresholdMaxError": "Nodwch swm o {{max}} neu lai"
   },
   "profiles": {
     "title": "Proffiliau",

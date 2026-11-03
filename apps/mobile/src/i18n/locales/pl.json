@@ -3886,9 +3886,9 @@
   "spendAlerts": {
     "subtitle": "Wyślij alert e-mailem lub powiadomieniem push do kontaktów rozliczeniowych, gdy wydatki tego zakresu przekroczą limit lub wzrosną powyżej zwykłego tempa godzinowego.",
     "thresholdTitle": "Przekroczenie progu",
-    "thresholdSubtitle": "Bieżące wydatki przekraczają twój limit",
+    "thresholdSubtitle": "Bieżące wydatki tego zakresu w wybranym oknie przekraczają twój limit",
     "anomalyTitle": "Skok godzinowy",
-    "anomalySubtitle": "Godzina jest znacznie powyżej zwykłego tempa tego zakresu",
+    "anomalySubtitle": "Godzinowe tempo wydatków tego zakresu jest znacznie powyżej jego własnej linii bazowej p95",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Okno",
     "window24h": "24 godziny",
@@ -3905,7 +3905,7 @@
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
     "pushOffByCategory": "Wyłączone w Powiadomieniach",
     "multiplierMaxError": "Podaj mnożnik równy {{max}} lub mniejszy",
-    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą."
+    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą"
   },
   "profiles": {
     "title": "Profile",

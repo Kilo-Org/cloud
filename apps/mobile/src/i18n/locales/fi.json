@@ -3803,7 +3803,7 @@
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
     "pushOffByCategory": "Pois päältä Ilmoituksissa",
     "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
-    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi."
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi"
   },
   "profiles": {
     "title": "Profiilit",

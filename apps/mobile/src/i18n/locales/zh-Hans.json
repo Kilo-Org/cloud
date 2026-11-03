@@ -3803,7 +3803,7 @@
     "permissionDenied": "你没有管理支出提醒的权限。",
     "pushOffByCategory": "已在通知中关闭",
     "multiplierMaxError": "请输入 {{max}} 或更小的倍数",
-    "thresholdMaxError": "请输入不大于 {{max}} 的金额。"
+    "thresholdMaxError": "请输入不大于 {{max}} 的金额"
   },
   "profiles": {
     "title": "配置文件",

@@ -3886,9 +3886,9 @@
   "spendAlerts": {
     "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
     "thresholdTitle": "Preseganje praga",
-    "thresholdSubtitle": "Tekoča poraba presega tvojo omejitev",
+    "thresholdSubtitle": "Tekoča poraba tega obsega v izbranem oknu presega tvojo omejitev",
     "anomalyTitle": "Urni skok",
-    "anomalySubtitle": "Ena ura je daleč nad običajno stopnjo tega obsega",
+    "anomalySubtitle": "Urna stopnja tega obsega je daleč nad lastno osnovno vrednostjo p95",
     "limitLabel": "Omejitev (USD)",
     "windowLabel": "Okno",
     "window24h": "24 ur",
@@ -3905,7 +3905,7 @@
     "permissionDenied": "Nimaš dovoljenja za upravljanje opozoril o porabi.",
     "pushOffByCategory": "Izklopljeno v Obvestilih",
     "multiplierMaxError": "Vnesi množitelj {{max}} ali manjši",
-    "thresholdMaxError": "Vnesi znesek {{max}} ali manjši."
+    "thresholdMaxError": "Vnesi znesek {{max}} ali manjši"
   },
   "profiles": {
     "title": "Profili",

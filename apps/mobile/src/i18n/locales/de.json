@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
     "thresholdTitle": "Schwellenwertüberschreitung",
-    "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
+    "thresholdSubtitle": "Die laufenden Ausgaben dieses Bereichs überschreiten im gewählten Zeitfenster dein Limit",
     "anomalyTitle": "Stündliche Spitze",
-    "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
+    "anomalySubtitle": "Die stündliche Rate dieses Bereichs liegt weit über seiner eigenen p95-Basislinie",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Zeitfenster",
     "window24h": "24 Stunden",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
     "pushOffByCategory": "In Benachrichtigungen aus",
     "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
-    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein."
+    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein"
   },
   "profiles": {
     "title": "Profile",

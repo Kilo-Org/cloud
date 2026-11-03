@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
     "thresholdTitle": "Vượt ngưỡng",
-    "thresholdSubtitle": "Chi tiêu tích lũy vượt giới hạn của bạn",
+    "thresholdSubtitle": "Chi tiêu tích lũy của phạm vi này trong khoảng thời gian đã chọn vượt giới hạn của bạn",
     "anomalyTitle": "Tăng vọt theo giờ",
-    "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
+    "anomalySubtitle": "Chi tiêu theo giờ của phạm vi này cao hơn hẳn mức cơ sở p95 của chính nó",
     "limitLabel": "Giới hạn (USD)",
     "windowLabel": "Khoảng thời gian",
     "window24h": "24 giờ",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
     "pushOffByCategory": "Đã tắt trong Thông báo",
     "multiplierMaxError": "Nhập hệ số từ {{max}} trở xuống",
-    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống."
+    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống"
   },
   "profiles": {
     "title": "Hồ sơ",

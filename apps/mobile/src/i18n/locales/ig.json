@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
     "thresholdTitle": "Ịgafe oke",
-    "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
+    "thresholdSubtitle": "Mmefu na-aga n'ihu nke mpaghara a n'oge a họọrọ na-agafe oke gị",
     "anomalyTitle": "Mmụba kwa awa",
-    "anomalySubtitle": "Otu awa dị nnọọ elu karịa ọnụ ọgụgụ mpaghara a",
+    "anomalySubtitle": "Ọnụ ọgụgụ kwa awa nke mpaghara a dị nnọọ elu karịa akara ala p95 nke ya",
     "limitLabel": "Oke (USD)",
     "windowLabel": "Oge",
     "window24h": "Awa 24",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
     "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa",
     "multiplierMaxError": "Tinye ọnụọgụ mmụba nke {{max}} ma ọ bụ obere",
-    "thresholdMaxError": "Tinye ego nke {{max}} ma ọ bụ obere."
+    "thresholdMaxError": "Tinye ego nke {{max}} ma ọ bụ obere"
   },
   "profiles": {
     "title": "Profaịlụ",

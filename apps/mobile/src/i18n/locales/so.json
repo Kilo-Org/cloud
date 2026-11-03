@@ -3784,9 +3784,9 @@
   "spendAlerts": {
     "subtitle": "U dir digniin iimayl ama push xiriirka biilasha marka kharashka goobtan uu dhaafo xad ama uu ka sarreeyo heerka saacadlaha caadiga ah.",
     "thresholdTitle": "Dhaafitaanka xadka",
-    "thresholdSubtitle": "Kharashka socda ayaa dhaafaya xadkaaga",
+    "thresholdSubtitle": "Kharashka socda ee goobtan oo muddada la doortay ayaa dhaafaya xadkaaga",
     "anomalyTitle": "Kor u kaca saacadlaha",
-    "anomalySubtitle": "Hal saac aad ayuu uga sarreeyaa heerka caadiga ah ee goobtan",
+    "anomalySubtitle": "Heerka saacadlaha ee goobtan aad buu uga sarreeyaa saldhigga p95 ee u gaar ah",
     "limitLabel": "Xad (USD)",
     "windowLabel": "Muddo",
     "window24h": "24 saac",
@@ -3803,7 +3803,7 @@
     "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha kharashka.",
     "pushOffByCategory": "Waa damman Ogeysiisyada",
     "multiplierMaxError": "Geli isku-dhufasho {{max}} ama ka yar",
-    "thresholdMaxError": "Geli qaddar {{max}} ama ka yar."
+    "thresholdMaxError": "Geli qaddar {{max}} ama ka yar"
   },
   "profiles": {
     "title": "Profile-yada",

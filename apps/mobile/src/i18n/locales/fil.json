@@ -3790,9 +3790,9 @@
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
     "thresholdTitle": "Paglampas sa hangganan",
-    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ng saklaw na ito sa loob ng napiling panahon ay lumampas sa iyong limitasyon",
     "anomalyTitle": "Pagtaas bawat oras",
-    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "anomalySubtitle": "Ang rate ng saklaw na ito bawat oras ay malayo sa itaas ng sarili nitong p95 baseline",
     "limitLabel": "Limitasyon (USD)",
     "windowLabel": "Panahon",
     "window24h": "24 na oras",
@@ -3809,7 +3809,7 @@
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso",
     "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
-    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa"
   },
   "profiles": {
     "title": "Mga profile",

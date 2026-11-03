@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +19,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { ChevronDown, Settings2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   PENDING_TODO_ID_PREFIX,
   useTodoItemMutations,
@@ -29,6 +31,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
+import { cn } from '@/lib/utils';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
 
@@ -55,7 +58,10 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       accessibilityRole="button"
       accessibilityLabel={t('todos.listSettings.title')}
       accessibilityHint={summary ?? undefined}
-      className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'mx-4 mb-1 flex-row items-center gap-2 py-2 active:opacity-70'
+      )}
     >
       <Settings2 size={16} color={colors.mutedForeground} />
       <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
@@ -103,7 +109,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const handleToggleDone = useCallback(
     (item: TodoItem) => {
       if (item.doneAt === null) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
       }
       update.mutate({ id: item.id, done: item.doneAt === null });
     },
@@ -197,7 +203,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             ) {
               return;
             }
-            void Haptics.selectionAsync();
+            selectionHaptic();
             move.mutate({ id: key, beforeId, afterId });
           }}
         />

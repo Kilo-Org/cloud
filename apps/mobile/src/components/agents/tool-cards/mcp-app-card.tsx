@@ -9,6 +9,7 @@ import { type RemoteMcpApp } from '@kilocode/harness-sdk/plugins/remote-mcp';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { mcpCallResultOf } from '@/lib/chat/remote-mcp-call-results';
 import { openRemoteMcpApp, readRemoteMcpView } from '@/lib/chat/remote-mcp';
 import {
@@ -228,6 +229,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
           <Button
             variant="secondary"
             size="sm"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               setAttempt(current => current + 1);
             }}

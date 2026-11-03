@@ -9,6 +9,7 @@
       "lowBalance": "Balansingiz e'tibor talab qiladi",
       "spendAlert": "Xarajatingiz e'tibor talab qiladi",
       "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
+      "securityUpdate": "Xavfsizlik tekshiruvida yangilanish bor",
       "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Xavfsizlik xulosasi e'tibor talab qiladi"
+      "body": "Xavfsizlik tekshiruvida yangilanish bor"
     }
   },
   "instanceLifecycle": {

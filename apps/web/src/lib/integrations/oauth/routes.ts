@@ -26,6 +26,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'discord_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/discord-service')).getDiscordOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [
@@ -34,6 +35,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'dolthub_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/dolthub-service')).getDoltHubOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [

@@ -248,6 +248,7 @@ export const schedulerChunks = sqliteTable(
     lease_until: integer('lease_until').notNull().default(0),
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
+    throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
@@ -566,6 +567,28 @@ export const clientCaseResults = sqliteTable(
     revision: integer('revision').notNull().default(0),
     // Grader usage the usage writer has not acknowledged yet; a retried upload resends it.
     pending_grader_usage: text('pending_grader_usage'),
+  },
+  table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
+);
+
+/**
+ * Judged grading claim for one client upload. A case identity has at most one row, and only
+ * the holder of its `token` runs the paid judge, so parallel uploads of the same case cannot
+ * each pay for a grading the usage ledger records once. An expired lease is taken over by
+ * the next upload; the holder removes its row when its grading ends.
+ */
+export const clientCaseGradingClaims = sqliteTable(
+  'client_case_grading_claims',
+  {
+    profile_id: text('profile_id')
+      .notNull()
+      .references(() => clientProfiles.id, { onDelete: 'cascade' }),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    token: text('token').notNull(),
+    // Epoch milliseconds after which a vanished holder's claim no longer blocks a retry.
+    lease_until: integer('lease_until').notNull(),
+    created_at: text('created_at').notNull(),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

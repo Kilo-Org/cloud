@@ -81,6 +81,7 @@ import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-c
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   CODE_REVIEW_STATUS_LABELS,
+  MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
   hasInFlightReview,
   isCancellableReviewStatus,
   isRetriggerableReviewStatus,
@@ -101,7 +102,6 @@ type CodeReviewJobsCardProps = {
 
 const PAGE_SIZE = 10;
 const DEFAULT_THINKING_EFFORT_VALUE = '__default__';
-const MANUAL_INSTRUCTIONS_MAX_LENGTH = 4_000;
 
 function getManualJobUrlError(
   value: string,
@@ -601,14 +601,14 @@ export function CodeReviewJobsCard({
                 id="manual-code-review-instructions"
                 value={manualJobInstructions}
                 onChange={event => setManualJobInstructions(event.target.value)}
-                maxLength={MANUAL_INSTRUCTIONS_MAX_LENGTH}
+                maxLength={MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH}
                 placeholder="Focus on the risk areas that matter for this change."
                 className="min-h-28 resize-none"
                 disabled={isManualJobSubmitting}
               />
               <p className="text-muted-foreground text-sm">
                 Optional one-off instructions for this review. {manualJobInstructions.length}/
-                {MANUAL_INSTRUCTIONS_MAX_LENGTH} characters.
+                {MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH} characters.
               </p>
             </div>
 
@@ -711,10 +711,17 @@ export function CodeReviewJobsCard({
   // Retrigger mutation for failed/cancelled/interrupted reviews
   const retriggerMutation = useMutation(
     trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
+      onSuccess: async result => {
+        if (!result.success) {
+          // Dispatch marked the review failed again, so the retry never started.
+          toast.error('Failed to retrigger code review', {
+            description: result.error,
+          });
+        } else {
+          toast.success('Code review retriggered', {
+            description: 'The code review has been queued for processing.',
+          });
+        }
         setActionInProgressId(null);
         // Invalidate the query to refetch the list
         await queryClient.invalidateQueries({
@@ -1030,7 +1037,7 @@ export function CodeReviewJobsCard({
                             className="gap-2"
                           >
                             <RotateCcw
-                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                             />
                             {actionInProgressId === review.id && retriggerMutation.isPending
                               ? 'Retrying...'

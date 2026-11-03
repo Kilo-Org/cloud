@@ -10,6 +10,7 @@ import type { SessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { WorktreeFileReviewBindings, WorktreeReviewEditor } from './worktree-review-bindings';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { WorktreeReviewSendApi } from './worktree-review-send';
+import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   getWorktreeReviewFreshness,
   sameWorktreeReviewCapture,
@@ -18,6 +19,7 @@ import {
   type WorktreeReviewComment,
 } from './worktree-review';
 import {
+  isWorktreeReviewFileAbsent,
   verifyWorktreeReviewComment,
   type WorktreeReviewVerification,
 } from './worktree-review-verify';
@@ -57,6 +59,7 @@ function worktreeReviewVerificationSignature(
     comment.anchor.range,
     comment.anchor.quote,
     capture.revision,
+    capture.scope,
     capture.capturedAt,
     capture.comparison,
   ]);
@@ -67,7 +70,7 @@ function worktreeReviewSnapshotVerificationKey(
     revision: number;
     capturedAt: string;
     comparison: { baseRef: string; mergeBase: string; head: string };
-    files: readonly { path: string; revision: number }[];
+    files: readonly { path: string; revision: number; scope?: WorktreeFileQuery['scope'] }[];
   } | null
 ): string {
   if (!snapshot) return '';
@@ -77,7 +80,7 @@ function worktreeReviewSnapshotVerificationKey(
     snapshot.comparison.baseRef,
     snapshot.comparison.mergeBase,
     snapshot.comparison.head,
-    snapshot.files.map(file => [file.path, file.revision]),
+    snapshot.files.map(file => [file.path, file.scope, file.revision]),
   ]);
 }
 
@@ -244,10 +247,18 @@ export function useWorktreeReview({
     })
   );
   const captures = new Map(
-    sources.map(source => [
-      source,
-      scope ? currentWorktreeReviewCapture(scope, source, latestSnapshots.get(source)) : null,
-    ])
+    (draft?.comments ?? []).map(comment => {
+      const source = comment.anchor.capture.sourceCloudAgentSessionId;
+      return [
+        comment.id,
+        scope
+          ? currentWorktreeReviewCapture(scope, source, latestSnapshots.get(source), {
+              path: comment.anchor.path,
+              scope: comment.anchor.capture.scope,
+            })
+          : null,
+      ] as const;
+    })
   );
   const locked = Boolean(draft && draft.delivery.phase !== 'idle');
   const disabledReason = !enabled
@@ -293,18 +304,24 @@ export function useWorktreeReview({
 
   const fetchWorktreeReviewFile = async (
     source: string,
-    { path, revision }: { path: string; revision: number }
+    {
+      path,
+      revision,
+      scope: fileScope,
+    }: { path: string; revision: number; scope?: WorktreeFileQuery['scope'] }
   ) => {
     const options = organizationId
       ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({
           organizationId,
           cloudAgentSessionId: source,
           path,
+          scope: fileScope,
           expectedRevision: revision,
         })
       : trpc.cloudAgentNext.getWorktreeFile.queryOptions({
           cloudAgentSessionId: source,
           path,
+          scope: fileScope,
           expectedRevision: revision,
         });
     return queryClient.query(options);
@@ -383,24 +400,19 @@ export function useWorktreeReview({
         return next;
       });
     };
-    const stillCurrent = (
-      id: string,
-      signature: string,
-      source: string,
-      capture: WorktreeReviewCapture
-    ) => {
+    const stillCurrent = (id: string, signature: string, capture: WorktreeReviewCapture) => {
       if (cancelled || scopeKeyRef.current !== scopeKey || !commentIdsRef.current.has(id)) {
         return false;
       }
       const record = verificationRecords.current.get(id);
       if (!record || record.signature !== signature) return false;
-      const currentCapture = capturesRef.current.get(source) ?? null;
+      const currentCapture = capturesRef.current.get(id) ?? null;
       return currentCapture !== null && sameWorktreeReviewCapture(currentCapture, capture);
     };
 
     for (const comment of comments) {
       const source = comment.anchor.capture.sourceCloudAgentSessionId;
-      const capture = capturesRef.current.get(source) ?? null;
+      const capture = capturesRef.current.get(comment.id) ?? null;
       if (!capture || getWorktreeReviewFreshness(comment, capture) !== 'stale') continue;
       const snapshot = snapshotsRef.current.get(source);
       if (!snapshot) continue;
@@ -411,7 +423,7 @@ export function useWorktreeReview({
       const commentId = comment.id;
       void (async () => {
         for (let attempt = 0; ; attempt += 1) {
-          if (!stillCurrent(commentId, signature, source, capture)) return;
+          if (!stillCurrent(commentId, signature, capture)) return;
           const fetchFile = fetchFileRef.current;
           const result: WorktreeReviewVerification = await verifyWorktreeReviewComment({
             comment,
@@ -419,7 +431,7 @@ export function useWorktreeReview({
             snapshot,
             fetchFile: input => fetchFile(source, input),
           }).catch(() => ({ status: 'unverified' }));
-          if (!stillCurrent(commentId, signature, source, capture)) return;
+          if (!stillCurrent(commentId, signature, capture)) return;
           if (result.status === 'applied') {
             verificationRecords.current.set(commentId, { signature, phase: 'settled' });
             applyRebaseRef.current(comment, result.comment);
@@ -449,7 +461,7 @@ export function useWorktreeReview({
             }, delay);
             timers.add(timer);
           });
-          if (!retry || !stillCurrent(commentId, signature, source, capture)) {
+          if (!retry || !stillCurrent(commentId, signature, capture)) {
             if (!cancelled) releaseInflight(commentId, signature);
             return;
           }
@@ -466,9 +478,18 @@ export function useWorktreeReview({
   }, [draft?.comments, hydration, isOpen, scope, verificationInputKey]);
   const unappliedCommentIds = new Set<string>();
   for (const comment of draft?.comments ?? []) {
+    if (
+      isWorktreeReviewFileAbsent(
+        comment,
+        latestSnapshots.get(comment.anchor.capture.sourceCloudAgentSessionId)
+      )
+    ) {
+      unappliedCommentIds.add(comment.id);
+      continue;
+    }
     const signature = unappliedVerifications.get(comment.id);
     if (signature === undefined) continue;
-    const capture = captures.get(comment.anchor.capture.sourceCloudAgentSessionId) ?? null;
+    const capture = captures.get(comment.id) ?? null;
     if (!capture || getWorktreeReviewFreshness(comment, capture) !== 'stale') continue;
     if (worktreeReviewVerificationSignature(comment, capture) !== signature) continue;
     unappliedCommentIds.add(comment.id);

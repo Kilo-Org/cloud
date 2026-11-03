@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
-import { sessionLiveActivityTitle } from '@kilocode/notifications';
+import { sessionLiveActivityTitle } from '@kilocode/notifications/schemas';
 
 import { applyStoredLanguage } from './apply-stored-language';
 

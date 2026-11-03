@@ -17,6 +17,7 @@
 // for the same tap.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -150,7 +151,7 @@ export function PrCommentEditSheet({
     }
     try {
       await updateComment.mutateAsync({ owner, repo, number, commentId, kind, body });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       // The mutation hook announces success for a11y; its settle invalidation
       // renders the edited text in the discussion behind the sheet.
       onDismiss();

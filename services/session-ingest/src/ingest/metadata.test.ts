@@ -44,7 +44,6 @@ vi.mock('../session-events', () => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
-import { agent_briefing_events } from '@kilocode/db/schema';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from '../session-events';
 import {
@@ -68,8 +67,6 @@ function createTransactionDb(options: {
   persistedStatus?: string | null;
   rowMissing?: boolean;
 }) {
-  const insertedEvidence = vi.fn(() => ({ onConflictDoNothing: vi.fn(async () => undefined) }));
-  const insert = vi.fn(() => ({ values: insertedEvidence }));
   const updateWhere = vi.fn(async () => undefined);
   const updateSet = vi.fn(() => ({ where: updateWhere }));
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
@@ -135,10 +132,10 @@ function createTransactionDb(options: {
   }));
 
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate, insert })
+    fn({ select, update: applyUpdate })
   );
 
-  return { transaction, select, applyUpdate, updateSet, updateWhere, insertedEvidence };
+  return { transaction, select, applyUpdate, updateSet, updateWhere };
 }
 
 type ApplyMetadataDbOptions = {
@@ -175,8 +172,6 @@ type ApplyMetadataDbOptions = {
  * - parent / read-back: select → from → where → limit (awaited without for)
  */
 function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
-  const insertedEvidence = vi.fn(() => ({ onConflictDoNothing: vi.fn(async () => undefined) }));
-  const insert = vi.fn(() => ({ values: insertedEvidence }));
   const updateSets: unknown[] = [];
   const updateWhere = vi.fn(async () => undefined);
   const updateSet = vi.fn((values: unknown) => {
@@ -184,11 +179,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     return { where: updateWhere };
   });
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
-  const evidenceScopeWhere = vi.fn(async () => undefined);
-  const evidenceScopeSet = vi.fn(() => ({ where: evidenceScopeWhere }));
-  const applyUpdate = vi.fn((table: unknown) => ({
-    set: table === agent_briefing_events ? evidenceScopeSet : updateSet,
-  }));
+  const applyUpdate = vi.fn(() => ({ set: updateSet }));
 
   const queryLog: Array<
     'session-initial' | 'session-lock' | 'membership' | 'parent' | 'read-back'
@@ -208,6 +199,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
       gitUrl: options.initialGitUrl ?? null,
+      organizationId: options.initialOrganizationId ?? null,
     };
   }
 
@@ -298,7 +290,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   }));
   let committedSession = persistedSessionRow();
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const result = await fn({ select, update: applyUpdate, execute, insert });
+    const result = await fn({ select, update: applyUpdate, execute });
     await options.beforeCommit?.();
     committedSession = persistedSessionRow();
     return result;
@@ -312,9 +304,6 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     updateSet,
     updateWhere,
     updateSets,
-    insertedEvidence,
-    evidenceScopeSet,
-    evidenceScopeWhere,
     execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
@@ -389,15 +378,6 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
       status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
       status_updated_at: expect.any(String),
     });
-    expect(db.insertedEvidence).toHaveBeenCalledWith(
-      expect.objectContaining({
-        kilo_user_id: 'usr_1',
-        session_id: 'ses_1',
-        kind: 'status',
-        status: 'retry',
-        occurred_at: expect.any(String),
-      })
-    );
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       env,
       'usr_1',
@@ -653,7 +633,6 @@ describe('applyMetadataChanges', () => {
       status: 'busy',
       status_updated_at: '2026-07-24T23:00:00.000Z',
     });
-    expect(db.insertedEvidence).not.toHaveBeenCalled();
   });
   it('preserves a pre-cutoff originating status even when projection happens after cutoff', async () => {
     const db = createApplyMetadataDb({ initialStatus: 'busy' });
@@ -668,7 +647,6 @@ describe('applyMetadataChanges', () => {
         ['statusOccurredAt', occurredAt],
       ])
     );
-    expect(db.insertedEvidence).not.toHaveBeenCalled();
     expect(db.updateSets[0]).toMatchObject({ status_updated_at: occurredAt });
   });
 
@@ -676,7 +654,6 @@ describe('applyMetadataChanges', () => {
     const db = createApplyMetadataDb({ initialStatus: 'busy' });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['status', 'question']]));
-    expect(db.insertedEvidence).not.toHaveBeenCalled();
     expect(db.updateSets[0]).toMatchObject({ status: 'question' });
   });
   it('does not regress newer SQL status for a delayed historical transition', async () => {
@@ -695,10 +672,9 @@ describe('applyMetadataChanges', () => {
       ])
     );
     expect(db.updateSets).toEqual([]);
-    expect(db.insertedEvidence).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
-  it('does not rewrite a same-state snapshot when its historical source event is delivered separately', async () => {
+  it('does not rewrite a same-state snapshot from an older source timestamp', async () => {
     const db = createApplyMetadataDb({
       initialStatus: 'question',
       initialStatusUpdatedAt: '2026-07-24T08:01:00.000Z',
@@ -714,7 +690,6 @@ describe('applyMetadataChanges', () => {
         ['statusOccurredAt', occurredAt],
       ])
     );
-    expect(db.insertedEvidence).not.toHaveBeenCalled();
     expect(db.updateSets).toEqual([]);
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
@@ -787,12 +762,6 @@ describe('applyMetadataChanges', () => {
           status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
           status_updated_at: resetAt,
         });
-        expect(resetDb.insertedEvidence).toHaveBeenCalledWith(
-          expect.objectContaining({
-            status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
-            occurred_at: resetAt,
-          })
-        );
       } finally {
         vi.useRealTimers();
       }
@@ -897,20 +866,48 @@ describe('applyMetadataChanges', () => {
     });
   });
 
-  it('migrates session evidence atomically to authorized organization scope', async () => {
+  it('clears the old-context excerpt atomically when moving into an authorized organization', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const before = Date.now();
     await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
-    expect(db.evidenceScopeSet).toHaveBeenCalledWith({ organization_id: 'org_owned' });
-    expect(db.evidenceScopeWhere).toHaveBeenCalledTimes(1);
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: 'org_owned',
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+    const update = db.updateSets[0] as { briefing_excerpt_scope_changed_at: string };
+    expect(Date.parse(update.briefing_excerpt_scope_changed_at)).toBeGreaterThanOrEqual(before);
     expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
-  it('does not move evidence for a refused organization claim', async () => {
+  it('clears the organization excerpt before moving the session into personal scope', async () => {
+    const db = createApplyMetadataDb({ initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', null]]));
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+  });
+
+  it('retains the excerpt when an organization claim is refused', async () => {
     const db = createApplyMetadataDb({ membershipRows: 0 });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_foreign']]));
-    expect(db.evidenceScopeSet).not.toHaveBeenCalled();
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('does not reset excerpt ordering for an unchanged organization', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1, initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.updateSets).toEqual([{ organization_id: 'org_owned' }]);
   });
 
   it.each([

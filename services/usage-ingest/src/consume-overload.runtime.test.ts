@@ -11,9 +11,10 @@ it.each([undefined, 'all'])(
   'reports workerd overload and per-item decisions with diagnostics %s',
   async diagnostics => {
     const calls: unknown[] = [];
-    let statuses: (number | 'recorded' | 'duplicate')[] = [];
-    let mixedStatus: number | undefined;
+    let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
+    let mixedStatus: number | 'admission' | undefined;
     let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
+    let heldSecond: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let active = 0;
     let peak = 0;
     const writer = createServer(async (request, response) => {
@@ -30,7 +31,11 @@ it.each([undefined, 'all'])(
             ? 'recorded'
             : mixedStatus;
       if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
-      if (typeof status === 'number') {
+      if (heldSecond && event.core.id.endsWith('3301')) await heldSecond.promise;
+      if (status === 'admission') {
+        response.writeHead(429, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'Usage writer overloaded', reason: 'queue_limit' }));
+      } else if (typeof status === 'number') {
         response.writeHead(status, { 'x-sensitive-header': 'synthetic-private-header' });
         response.end('synthetic-private-body');
       } else {
@@ -95,7 +100,7 @@ it.each([undefined, 'all'])(
       const runtime = worker.raw.runtimes.find(runtime => runtime.mf)?.mf;
       if (!runtime) throw new Error('Expected local workerd runtime');
       const entrypoint = await runtime.getWorker();
-      const events = Array.from({ length: 4 }, (_, index) => ({
+      const events = Array.from({ length: 6 }, (_, index) => ({
         ...usage,
         core: { ...usage.core, id: `4f2504e0-4f89-41d3-9a0c-0305e82c330${index}` },
       }));
@@ -105,7 +110,38 @@ it.each([undefined, 'all'])(
         attempts: 2,
         body,
       }));
-      for (const status of [400, 429, 503]) {
+      // Hold both writer slots: the other four items must wait inside this full batch.
+      statuses = ['recorded', 'duplicate', 'recorded', 'duplicate', 'recorded', 'duplicate'];
+      heldFirst = Promise.withResolvers<void>();
+      heldSecond = Promise.withResolvers<void>();
+      let succeeded = false;
+      const successfulBatch = entrypoint.queue('local-usage', messages).then(result => {
+        succeeded = true;
+        return result;
+      });
+      await vi.waitFor(() => expect(calls).toHaveLength(2));
+      expect(active).toBe(2);
+      expect(peak).toBe(2);
+      expect(succeeded).toBe(false);
+      heldFirst.resolve();
+      heldSecond.resolve();
+      heldFirst = undefined;
+      heldSecond = undefined;
+      const successfulResult = await successfulBatch;
+      expect(successfulResult.outcome).toBe('ok');
+      expect(successfulResult.explicitAcks.toSorted()).toEqual([
+        'queue-0',
+        'queue-1',
+        'queue-2',
+        'queue-3',
+        'queue-4',
+        'queue-5',
+      ]);
+      expect(successfulResult.retryMessages).toEqual([]);
+      expect(calls).toEqual(events);
+      expect(peak).toBe(2);
+      expect(statuses).toEqual([]);
+      for (const status of [400, 429, 503, 'admission'] as const) {
         mixedStatus = status;
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
@@ -124,11 +160,14 @@ it.each([undefined, 'all'])(
         expect(result.ackAll).toBe(false);
         expect(result.explicitAcks).toEqual(['queue-0']);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1']);
+        const delay = result.retryMessages[0].delaySeconds;
+        expect(delay).toBeGreaterThanOrEqual(status === 'admission' ? 2 : 60);
+        expect(delay).toBeLessThanOrEqual(status === 'admission' ? 4 : 120);
         expect(calls.slice(-2)).toEqual(events.slice(0, 2));
       }
       mixedStatus = undefined;
-      for (const status of [429, 503]) {
-        statuses = ['recorded', status, 400, 'duplicate'];
+      for (const status of [429, 503, 'admission'] as const) {
+        statuses = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'];
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
         let finished = false;
@@ -136,7 +175,7 @@ it.each([undefined, 'all'])(
           finished = true;
           return result;
         });
-        await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 4));
+        await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 6));
         expect(finished).toBe(false);
         expect(peak).toBe(2);
         heldFirst.resolve();
@@ -144,9 +183,14 @@ it.each([undefined, 'all'])(
         const result = await work;
         expect(result.outcome).toBe('exception');
         expect(result.ackAll).toBe(false);
-        expect(result.explicitAcks.toSorted()).toEqual(['queue-0', 'queue-3']);
+        expect(result.explicitAcks.toSorted()).toEqual([
+          'queue-0',
+          'queue-3',
+          'queue-4',
+          'queue-5',
+        ]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
-        expect(calls.slice(-4)).toEqual(events);
+        expect(calls.slice(-6)).toEqual(events);
         expect(statuses).toEqual([]);
         // A later delivery retains the usage identity and can settle as a duplicate.
         statuses = ['duplicate'];
@@ -163,7 +207,7 @@ it.each([undefined, 'all'])(
         expect(result.explicitAcks).toEqual([]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
       }
-      expect(calls).toHaveLength(22);
+      expect(calls).toHaveLength(41);
       const serialized = JSON.stringify(logs);
       expect(serialized).toContain('usage_ingest_processing');
       expect(serialized).toContain('writer_overloaded');
@@ -178,6 +222,7 @@ it.each([undefined, 'all'])(
       }
     } finally {
       heldFirst?.resolve();
+      heldSecond?.resolve();
       try {
         await worker?.dispose();
       } finally {

@@ -16,8 +16,15 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
+export type QueryErrorVariant =
+  | 'neutral'
+  | 'offline'
+  | 'permission'
+  | 'not-found'
+  | 'server'
+  | 'timeout';
 
 const VARIANT_ICONS = {
   neutral: AlertCircle,
@@ -25,6 +32,8 @@ const VARIANT_ICONS = {
   permission: Lock,
   'not-found': SearchX,
   server: ServerCrash,
+  // The slow-response state is named by its copy; it shares the generic icon.
+  timeout: AlertCircle,
 } satisfies Record<QueryErrorVariant, LucideIcon>;
 
 const VARIANT_META_KEYS = {
@@ -39,6 +48,10 @@ const VARIANT_META_KEYS = {
     description: 'queryError.notFoundDescription',
   },
   server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },
+  timeout: {
+    title: 'queryError.timeoutTitle',
+    description: 'queryError.timeoutDescription',
+  },
 } as const;
 
 function variantMeta(t: TFunction, variant: QueryErrorVariant) {
@@ -65,6 +78,12 @@ type QueryErrorProps = {
    */
   action?: ReactNode;
   className?: string;
+  /**
+   * Constrains the description's own box. A caller whose copy is long enough to
+   * leave one word alone on its last line caps the measure here so the text
+   * breaks into balanced lines instead.
+   */
+  descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -81,10 +100,12 @@ export function QueryError({
   isRetrying = false,
   action,
   className,
+  descriptionClassName,
   placement = 'center',
   refreshControl,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const meta = variantMeta(t, variant);
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
@@ -95,15 +116,25 @@ export function QueryError({
       icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
-        <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
+        <AccessibleStatus
+          message={descriptionText}
+          tone="status"
+          className={
+            descriptionClassName === undefined
+              ? 'text-center text-sm'
+              : `text-center text-sm ${descriptionClassName}`
+          }
+        />
       }
       className={className}
       placement={placement}
       refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
+      iconColor={colors.destructive}
       iconSize={32}
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
+      compactTitleClassName="text-destructive"
       action={
         action ??
         (onRetry && (

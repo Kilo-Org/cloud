@@ -303,7 +303,10 @@ function getSidebarSessionItemSortTime(
   return Number.isFinite(latest) ? latest : new Date(item.latestSession.updatedAt).getTime();
 }
 
-function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession): number {
+function compareStoredSessionsByUpdatedAtDesc(
+  a: Pick<StoredSession, 'sessionId' | 'updatedAt'>,
+  b: Pick<StoredSession, 'sessionId' | 'updatedAt'>
+): number {
   const difference = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   if (difference !== 0) return difference;
   return b.sessionId.localeCompare(a.sessionId);
@@ -460,6 +463,11 @@ export function getSidebarWorktreeActivity(
     }
   }
 
+  const latestSession = [...sessionsById.values()].reduce<SidebarSessionActivity | undefined>(
+    (latest, session) =>
+      !latest || compareStoredSessionsByUpdatedAtDesc(session, latest) < 0 ? session : latest,
+    undefined
+  );
   let selectedStatus: string | null = null;
   let selectedStatusUpdatedAt: string | null = null;
   let selectedPriority = 0;
@@ -493,6 +501,12 @@ export function getSidebarWorktreeActivity(
                 : (activeStatus ?? null),
             ];
     for (const status of statuses) {
+      if (
+        (status === 'failed' || status === 'system_interrupted') &&
+        session.sessionId !== latestSession?.sessionId
+      ) {
+        continue;
+      }
       const priority =
         status === 'question' || status === 'permission'
           ? 3

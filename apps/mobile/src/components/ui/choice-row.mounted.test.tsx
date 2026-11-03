@@ -1,8 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+import * as Haptics from 'expo-haptics';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 import { ChoiceRow } from './choice-row';
 
@@ -15,7 +18,7 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ foreground: '#111111' }),
+  useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#6f6a61' }),
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -23,10 +26,12 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 type RowProps = {
   label?: string;
   description?: string;
+  accessibleName?: string;
   selected: boolean;
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
+  onPress?: () => void;
   children?: ReactNode;
 };
 
@@ -101,11 +106,107 @@ describe('ChoiceRow accessible name', () => {
     expect(control.props.accessibilityLabel).toBeUndefined();
   });
 
+  it('uses a supplied name for custom content and keeps the checked state', () => {
+    // The row's children spell out only part of what it means, so the caller
+    // supplies the whole name; the state must still reach the screen reader.
+    const control = rowControl(
+      renderRow({
+        selected: true,
+        multi: true,
+        accessibleName: 'acme/api, private repository',
+        children: createElement('Text', null, 'acme/api'),
+      })
+    );
+
+    expect(control.props.accessibilityLabel).toBe('acme/api, private repository');
+    expect(control.props.accessibilityRole).toBe('checkbox');
+    expect(control.props.accessibilityState).toEqual({ checked: true, disabled: false });
+  });
+
   it('reports a multi-select row as a checkbox and a single choice as a radio', () => {
     const single = rowControl(renderRow({ label: 'One', selected: true }));
     expect(single.props.accessibilityRole).toBe('radio');
 
     const multiple = rowControl(renderRow({ label: 'Many', selected: true, multi: true }));
     expect(multiple.props.accessibilityRole).toBe('checkbox');
+  });
+});
+
+describe('ChoiceRow selection haptic', () => {
+  it('runs the row action when the selection tick rejects', async () => {
+    const onPress = vi.fn<() => void>();
+    vi.mocked(Haptics.selectionAsync).mockRejectedValue(new Error('no haptic engine'));
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    try {
+      process.on('unhandledRejection', onUnhandledRejection);
+      const control = rowControl(renderRow({ label: 'Balanced', selected: false, onPress }));
+      act(() => {
+        (control.props.onPress as () => void)();
+      });
+      // One macrotask, the turn Node flags an unhandled rejection in.
+      const flushed = Promise.withResolvers<undefined>();
+      setImmediate(() => {
+        flushed.resolve(undefined);
+      });
+      await flushed.promise;
+
+      expect(onPress).toHaveBeenCalledOnce();
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+      vi.mocked(Haptics.selectionAsync).mockReset();
+    }
+  });
+});
+
+describe('ChoiceRow disabled cue', () => {
+  it('dims the label, not the caption under it', () => {
+    // A row-level opacity multiplied the muted caption to about 2:1 on the row
+    // surface. The dim is the label's own muted token now.
+    const control = rowControl(
+      renderRow({
+        label: 'Lenient',
+        description: 'Only serious problems',
+        selected: false,
+        disabled: true,
+      })
+    );
+
+    expect(String(control.props.className)).not.toContain('opacity-50');
+
+    const [label, caption] = control.findAll(node => Object.is(node.type, 'Text'));
+    expect(label?.props.className).toContain('text-muted-foreground');
+    expect(caption?.props.className).toBe('mt-0.5 text-xs');
+    expect(caption?.props.className).not.toContain('opacity');
+  });
+
+  it('leaves an enabled label at full contrast', () => {
+    const control = rowControl(
+      renderRow({ label: 'Lenient', description: 'Only serious problems', selected: false })
+    );
+
+    const [label] = control.findAll(node => Object.is(node.type, 'Text'));
+    expect(label?.props.className).toBe('text-sm font-medium');
+  });
+});
+
+describe('ChoiceRow touch target', () => {
+  it('carries the shared row floor on the row node itself', () => {
+    // A row sized by its own content reports that content's height as its
+    // rect; the target the audit reads is the row node's own rect, so the floor
+    // must be its class, not a hitSlop.
+    for (const props of [
+      { label: 'Balanced', selected: false },
+      { label: 'Lenient', description: 'Only serious problems', selected: true },
+      { selected: true, children: createElement('Text', null, 'English') },
+    ]) {
+      const control = rowControl(renderRow(props));
+
+      expect(String(control.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(control.props.hitSlop).toBeUndefined();
+    }
   });
 });

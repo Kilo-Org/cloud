@@ -9,6 +9,7 @@ import {
   parseSkillFrontmatter,
   removeCommand,
   replaceCommand,
+  SKILL_NAME_MAX_LENGTH,
   skillNameFromMarkdown,
   validateProfileDescription,
   validateProfileName,
@@ -118,6 +119,22 @@ describe('validateSkillInput', () => {
     expect(validateSkillInput({ name: 'Upper', content })).toEqual({ error: 'bad-name' });
   });
 
+  it('reports a name over the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(101), content })).toEqual({ error: 'too-long' });
+    expect(validateSkillInput({ name: 'a'.repeat(120), content })).toEqual({ error: 'too-long' });
+  });
+
+  it('accepts a name at the server length bound', () => {
+    expect(validateSkillInput({ name: 'a'.repeat(SKILL_NAME_MAX_LENGTH), content })).toEqual({
+      error: null,
+      description: 'Does a thing',
+    });
+  });
+
+  it('reports the length rule, not the pattern, for an over-long name the pattern also rejects', () => {
+    expect(validateSkillInput({ name: 'A'.repeat(120), content })).toEqual({ error: 'too-long' });
+  });
+
   it('reports empty content', () => {
     expect(validateSkillInput({ name: 'my-skill', content: '   ' })).toEqual({
       error: 'no-content',
@@ -172,10 +189,16 @@ describe('variable keys', () => {
     expect(cleanVariableKey('ALREADY_OK')).toBe('ALREADY_OK');
   });
 
-  it('validates the 1..256 non-empty bound', () => {
+  it('keeps a cleaned key starting with a digit acceptable to the server', () => {
+    expect(cleanVariableKey('1var')).toBe('_1VAR');
+    expect(cleanVariableKey('2.0-version')).toBe('_2_0_VERSION');
+    expect(cleanVariableKey('_1VAR')).toBe('_1VAR');
+  });
+
+  it('validates the 1..128 non-empty bound', () => {
     expect(isValidVariableKey('API_KEY')).toBe(true);
-    expect(isValidVariableKey('a'.repeat(256))).toBe(true);
-    expect(isValidVariableKey('a'.repeat(257))).toBe(false);
+    expect(isValidVariableKey('a'.repeat(128))).toBe(true);
+    expect(isValidVariableKey('a'.repeat(129))).toBe(false);
     expect(isValidVariableKey('   ')).toBe(false);
   });
 });

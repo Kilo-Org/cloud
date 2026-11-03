@@ -34,8 +34,16 @@ const CONFIGURATION_ERROR_MESSAGE = vi.hoisted(() => 'Security service is not co
 const CONFIGURATION_COPY = vi.hoisted(
   () => 'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
 );
+const SERVICE_UNAVAILABLE_MESSAGE = vi.hoisted(() => 'Security service is unavailable');
+const SERVICE_UNAVAILABLE_COPY = vi.hoisted(
+  () => 'The security service is unavailable. Try again.'
+);
 
 const routerBack = vi.hoisted(() => vi.fn());
+type MockedFinding = Pick<
+  SecurityFinding,
+  'status' | 'title' | 'repo_full_name' | 'package_name' | 'package_ecosystem'
+>;
 const dismiss = vi.hoisted(() => ({
   mutate: vi.fn(),
   isPending: false,
@@ -55,7 +63,7 @@ const finding = vi.hoisted(() => ({
   isFetching: false,
   isError: false,
   error: null as unknown,
-  data: undefined as Pick<SecurityFinding, 'status'> | undefined,
+  data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
 }));
 const pillGroup = vi.hoisted(() => ({
@@ -112,6 +120,15 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
+// The identity the sheet must name: one title, one repository, one package, so
+// a user can tell this dismissal from the next.
+const FINDING_IDENTITY = {
+  title: 'ReDoS in payments SDK',
+  repo_full_name: 'acme/payments-sdk',
+  package_name: 'payments-sdk',
+  package_ecosystem: 'npm',
+} as const;
+
 function renderScreen(): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
@@ -150,13 +167,13 @@ function buttonDisabled(root: I): boolean | undefined {
 
 function renderedTexts(root: I): string[] {
   return root
-    .findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Text' &&
-        typeof n.props.children === 'string'
-    )
-    .map(n => n.props.children as string);
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
+    .map(n => {
+      const children: unknown = n.props.children;
+      const parts = Array.isArray(children) ? (children as unknown[]) : [children];
+      return parts.every(part => typeof part === 'string') ? (parts as string[]).join('') : null;
+    })
+    .filter((text): text is string => text !== null);
 }
 
 function findCommentInput(root: I): I {
@@ -184,12 +201,22 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isFetching = false;
     finding.isError = false;
     finding.error = null;
-    finding.data = { status: 'open' };
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
     dismissDraft.clear.mockClear();
+  });
+
+  it('names the finding it dismisses above the reason group', () => {
+    const tree = renderScreen();
+    const texts = renderedTexts(tree.root);
+    expect(texts).toContain(FINDING_IDENTITY.title);
+    expect(texts).toContain(FINDING_IDENTITY.repo_full_name);
+    expect(texts).toContain(
+      `${FINDING_IDENTITY.package_name} (${FINDING_IDENTITY.package_ecosystem})`
+    );
   });
 
   it.each(['finding', 'permissions'] as const)(
@@ -269,7 +296,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       capability.status = status;
       capability.canManage = status === 'allowed';
       capability.isError = true;
-      finding.data = { status: findingStatus };
+      finding.data = { status: findingStatus, ...FINDING_IDENTITY };
       finding.isError = true;
       finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       const tree = renderScreen();
@@ -327,6 +354,20 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
+  });
+
+  it('keeps the dismissal CTA enabled after an unreachable service and shows retry copy', () => {
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(new Error(SERVICE_UNAVAILABLE_MESSAGE));
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(SERVICE_UNAVAILABLE_COPY);
+    // The old ambiguous sentence must not be what the reader is told.
+    expect(renderedTexts(root.root)).not.toContain(
+      "Couldn't confirm — check the security review before retrying."
+    );
   });
 
   it('disables the dismissal CTA while the dismissal is pending', () => {
@@ -407,6 +448,30 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       comment: '',
       lastError: IN_PROGRESS_COPY,
       lastErrorKey: 'securityAgent.mutations.dismissalInProgress',
+      retryable: true,
+    });
+  });
+
+  it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    const options = dismiss.mutate.mock.calls[0]?.[1] as {
+      onError?: (error: Error) => void;
+    };
+    act(() => {
+      options.onError?.(mapSecurityDismissOperationError(new Error(SERVICE_UNAVAILABLE_MESSAGE)));
+    });
+
+    expect(dismissDraft.persist).toHaveBeenLastCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: SERVICE_UNAVAILABLE_COPY,
+      lastErrorKey: 'securityAgent.mutations.serviceUnavailable',
       retryable: true,
     });
   });

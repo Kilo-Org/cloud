@@ -2,6 +2,7 @@
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -21,8 +22,17 @@ const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The empty state's connect action is the provider app install, which only an
+// organization-manage role may run; `canManage` is that role, `canEdit` the
+// wider settings capability the sibling screens use.
+const permissionState = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'error' | 'ready',
+  canEdit: true,
+  canManage: true,
+}));
 const status = vi.hoisted(() => ({
   connected: true,
+  gitlabConnected: false,
   loading: false,
   errorCode: null as string | null,
   pending: false,
@@ -125,7 +135,6 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -151,6 +160,21 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({ useReviewerModels: () => ({ models: [] }) }));
+/** The permission the screen reads, driven per test through `permissionState`. */
+function reviewerPermission() {
+  if (permissionState.status === 'loading') {
+    return { status: 'loading' as const };
+  }
+  if (permissionState.status === 'error') {
+    return { status: 'error' as const, refetch: vi.fn(), isRetrying: false };
+  }
+  return {
+    status: 'ready' as const,
+    canEdit: permissionState.canEdit,
+    canManage: permissionState.canManage,
+  };
+}
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
@@ -162,7 +186,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useGitLabStatus: () => ({
-    data: { connected: false },
+    data: { connected: status.gitlabConnected },
     isLoading: status.loading,
     isError: status.errorCode !== null,
     error: { data: { code: status.errorCode } },
@@ -170,6 +194,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: reviewerPermission,
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
@@ -187,39 +212,39 @@ function only<T>(items: T[], what: string): T {
   return item;
 }
 
-async function renderScreen() {
+async function renderScreen(scope = 'personal') {
   // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(
-      TabBarLabelContext,
-      { value: null },
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    )
+    createElement(TabBarLabelContext, { value: null }, createElement(ManualReviewScreen, { scope }))
   );
   return { renderer, unmount };
 }
 
 const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
-const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+const SERVER_RATE_LIMITED = 'GitHub is rate limiting this installation.';
 
 /**
- * The sentence the screen renders for a NOT_FOUND start failure. Read from the
- * catalog at call time, because this suite asserts where and for how long the
- * failure stays on screen; the code-to-copy mapping has its own suite
- * (`manual-review-start-failure.mounted.test.tsx`).
+ * The sentence the screen renders for a retryable (TOO_MANY_REQUESTS) start
+ * failure. Read from the catalog at call time, because this suite asserts where
+ * and for how long the failure and its retry stay on screen; the code-to-copy
+ * mapping has its own suite (`manual-review-start-failure.mounted.test.tsx`).
  */
 function startFailureText(): string {
-  return i18n.t('codeReviewer.manualReview.startNotFound', {
+  return i18n.t('codeReviewer.manualReview.startRateLimited', {
     provider: 'GitHub',
     requestNoun: i18n.t('common.pullRequest'),
   });
 }
 
-/** A failed call as the tRPC client reports it: a code plus the server's message. */
+/**
+ * A failed call as the tRPC client reports it: a code plus the server's
+ * message. Rate limiting is the retryable case, so the recovery control these
+ * tests follow is on screen.
+ */
 function startFailure() {
-  return Object.assign(new Error(SERVER_NOT_FOUND), {
-    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  return Object.assign(new Error(SERVER_RATE_LIMITED), {
+    data: { code: 'TOO_MANY_REQUESTS', message: SERVER_RATE_LIMITED },
   });
 }
 
@@ -269,7 +294,11 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 
 beforeEach(() => {
   keyboardStore.setHeight(0);
+  permissionState.status = 'ready';
+  permissionState.canEdit = true;
+  permissionState.canManage = true;
   status.connected = true;
+  status.gitlabConnected = false;
   status.loading = false;
   status.errorCode = null;
   status.pending = false;
@@ -346,16 +375,17 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     unmount();
   });
 
-  it('keeps the action pinned and disabled while provider status is loading', async () => {
+  it('holds the connect state’s shape while provider status loads', async () => {
     status.loading = true;
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
-    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
-    const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    expect((button.props as { disabled: boolean }).disabled).toBe(true);
-    // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
+    // Neither the form nor its pinned action can be rendered before the status
+    // says whether the scope can start one, and the body cannot stay empty.
+    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(3);
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'EmptyState')).toHaveLength(0);
     unmount();
   });
 
@@ -419,6 +449,75 @@ describe('ManualReviewScreen connect provider CTA', () => {
   });
 });
 
+describe('ManualReviewScreen empty state role gate', () => {
+  const ORG_SCOPE = 'org-1';
+
+  /** The sentence the read-only notice renders, read from the catalog. */
+  function readOnlyNotice(): string {
+    return i18n.t('codeReviewer.notConnectedReadOnly', { platform: 'GitHub' });
+  }
+
+  it('tells an organization member only owners and admins can connect, with no action', async () => {
+    status.connected = false;
+    permissionState.canEdit = false;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('withholds the action from a billing manager, who cannot install the provider app', async () => {
+    status.connected = false;
+    permissionState.canEdit = true;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+
+    unmount();
+  });
+
+  it('keeps the connect action for an owner or admin', async () => {
+    status.connected = false;
+    permissionState.canManage = true;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    const action = propOf(empty, 'action') as ReactElement<{ onPress: () => void }>;
+    expect(action).toBeDefined();
+    act(() => {
+      action.props.onPress();
+    });
+    expect(status.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${ORG_SCOPE}/github`);
+
+    unmount();
+  });
+
+  it.each(['loading', 'error'] as const)(
+    'keeps the connect action while the permission is %s',
+    async state => {
+      status.connected = false;
+      permissionState.status = state;
+      const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+      const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+      // The title and the button carry the instruction; the old description
+      // repeated both, so the connect state has none.
+      expect(propOf(empty, 'description')).toBeUndefined();
+      expect(propOf(empty, 'action')).toBeDefined();
+
+      unmount();
+    }
+  );
+});
+
 describe('ManualReviewScreen failed start', () => {
   it('keeps the form and withdraws the failure when the URL is cleared', async () => {
     status.mutate.mockImplementationOnce(
@@ -442,7 +541,7 @@ describe('ManualReviewScreen failed start', () => {
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
     expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
     expect(renderedTexts(renderer.root)).toContain(startFailureText());
-    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_RATE_LIMITED);
     expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
       'outline'
     );
@@ -641,6 +740,201 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen instructions field', () => {
+  it('names the field after the heading above it, not the draft it holds', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    // The heading is a sibling `Text`, not part of the field, so the field
+    // carried no name of its own: the native edit-text node was named after the
+    // draft. The name now comes from the same catalog key the heading renders.
+    const heading = i18n.t('codeReviewer.manualReview.instructions');
+    only(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.children === heading
+      ),
+      'instructions heading'
+    );
+    const instructions = only(
+      renderer.root.findAll(
+        node => String(node.type) === 'TextInput' && node.props.multiline === true
+      ),
+      'instructions field'
+    );
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+
+    act(() => {
+      (instructions.props.onChangeText as (value: string) => void)('Check the retry budget');
+    });
+    // Uncontrolled: the draft goes to the ref and the mutation only, so the
+    // name stays the heading whether the field is empty or typed into.
+    expect(instructions.props.accessibilityLabel).toBe(heading);
+    expect(instructions.props.value).toBeUndefined();
+    unmount();
+  });
+});
+
+/** The URL box, whichever platform's placeholder it carries. */
+function urlInput(root: TestRenderer.ReactTestInstance) {
+  return only(
+    root.findAll(node => String(node.type) === 'TextInput' && node.props.keyboardType === 'url'),
+    'URL field'
+  );
+}
+
+/** The free-text instructions box, told apart from the URL box by `multiline`. */
+function instructionsField(root: TestRenderer.ReactTestInstance) {
+  return only(
+    root.findAll(node => String(node.type) === 'TextInput' && node.props.multiline === true),
+    'instructions field'
+  );
+}
+
+/** Type into a box the way the native input reports a change. */
+function typeInto(field: TestRenderer.ReactTestInstance, value: string) {
+  act(() => {
+    (propOf(field, 'onChangeText') as (next: string) => void)(value);
+  });
+}
+
+/** The remaining-character row, found by the counted sentence it is named with. */
+function counterRow(root: TestRenderer.ReactTestInstance, remaining: number) {
+  return root.findAll(
+    node =>
+      String(node.type) === 'Text' &&
+      propOf(node, 'accessibilityLabel') ===
+        i18n.t('agentChat.composer.charactersRemaining', { count: remaining })
+  );
+}
+
+describe('ManualReviewScreen instructions limit', () => {
+  it('bounds the field at the limit the route validates', async () => {
+    const { renderer, unmount } = await renderScreen();
+
+    // The route rejects anything longer with its generic request-state line,
+    // so the field cannot let a longer draft exist in the first place.
+    expect(propOf(instructionsField(renderer.root), 'maxLength')).toBe(
+      MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH
+    );
+
+    unmount();
+  });
+
+  it('says nothing about length for an ordinary note', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'Check the retry budget');
+
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.instructionsAtLimit', {
+        max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+      })
+    );
+    expect(counterRow(renderer.root, MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH - 24)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('counts the room left once the note nears the limit', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'x'.repeat(3_500));
+
+    // The number is the visible row; the counted sentence is its accessible
+    // name, so a screen reader reads "500 characters remaining", not "500".
+    const [counter] = counterRow(renderer.root, 500);
+    expect(counter?.props.children).toBe(500);
+
+    unmount();
+  });
+
+  it('states the limit when the note reaches it, without the request-state line', async () => {
+    const { renderer, unmount } = await renderScreen();
+    typeInto(instructionsField(renderer.root), 'x'.repeat(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH));
+
+    const atLimit = i18n.t('codeReviewer.manualReview.instructionsAtLimit', {
+      max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+    });
+    expect(renderedTexts(renderer.root)).toContain(atLimit);
+    // The count would read zero; the sentence says what the bound is instead.
+    expect(counterRow(renderer.root, 0)).toHaveLength(0);
+
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(urlInput(renderer.root), 'onChangeText') as (next: string) => void)(GITHUB_PR_URL);
+    });
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // A note at the limit is a draft the route accepts, so the start goes out
+    // unchanged and the screen never explains the length as a closed or
+    // mislinked request.
+    expect(status.mutate).toHaveBeenCalledTimes(1);
+    const [variables] = status.mutate.mock.calls[0] as [{ instructions?: string }];
+    expect(variables.instructions).toHaveLength(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH);
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.startRejected', {
+        provider: 'GitHub',
+        requestNoun: i18n.t('common.pullRequest'),
+      })
+    );
+
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen platform-shaped URL field', () => {
+  it('names the field after a pull request for GitHub', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const pullRequestUrl = i18n.t('codeReviewer.manualReview.pullRequestUrl');
+
+    expect(renderedTexts(renderer.root)).toContain(pullRequestUrl);
+    expect(propOf(urlInput(renderer.root), 'accessibilityLabel')).toBe(pullRequestUrl);
+
+    unmount();
+  });
+
+  it('names the field after a merge request for GitLab', async () => {
+    // GitLab is the only connected platform in the personal scope, so the form
+    // opens on it, exactly as the finding's screen did.
+    status.connected = false;
+    status.gitlabConnected = true;
+    const { renderer, unmount } = await renderScreen();
+    const mergeRequestUrl = i18n.t('codeReviewer.manualReview.mergeRequestUrl');
+
+    expect(renderedTexts(renderer.root)).toContain(mergeRequestUrl);
+    expect(propOf(urlInput(renderer.root), 'accessibilityLabel')).toBe(mergeRequestUrl);
+    // The placeholder and the start-error copy already said merge request; the
+    // heading was the one part still calling it a pull request.
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.pullRequestUrl')
+    );
+
+    unmount();
+  });
+
+  it('explains a malformed GitLab URL as an invalid merge request URL', async () => {
+    status.connected = false;
+    status.gitlabConnected = true;
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlInput(renderer.root), 'onChangeText') as (next: string) => void)(
+        'https://example.com/not-an-mr'
+      );
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    expect(renderedTexts(renderer.root)).toContain(
+      i18n.t('codeReviewer.manualReview.invalidMergeRequestUrl')
+    );
 
     unmount();
   });

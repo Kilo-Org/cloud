@@ -27,7 +27,7 @@ describe('OpenCode Go session headers', () => {
   ): TransformRequestContext {
     return {
       provider: {
-        id: 'direct-byok',
+        type: 'direct-byok',
         apiUrl: 'https://opencode.ai/zen/go/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,

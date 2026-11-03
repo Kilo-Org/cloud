@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
@@ -208,7 +209,8 @@ export function InviteMemberSheet() {
                   <Pressable
                     key={value}
                     className={cn(
-                      'min-h-11 flex-row items-center justify-between px-4 py-3 active:opacity-70',
+                      ROW_TARGET_CLASS,
+                      'flex-row items-center justify-between px-4 py-3 active:opacity-70',
                       index < INVITABLE_ROLES.length - 1 && 'border-b-[0.5px] border-hair-soft'
                     )}
                     onPress={() => {

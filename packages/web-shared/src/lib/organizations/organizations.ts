@@ -13,6 +13,7 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  agent_briefing_context_preferences,
   cloud_agent_environments,
   cli_sessions_v2,
   kilocode_users,
@@ -74,6 +75,16 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
+  // `organization_seats_purchases` is append-only, so the most recently created
+  // row is the organization's current subscription state — the same input the
+  // subscription gate classifies with.
+  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
@@ -84,6 +95,9 @@ export async function getUserOrganizationsWithSeats(
       requireSeats: organizations.require_seats,
       plan: organizations.plan,
       createdAt: organizations.created_at,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      settings: organizations.settings,
+      latestSeatPurchaseStatus,
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -111,6 +125,7 @@ export async function getUserOrganizationsWithSeats(
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
+  const now = new Date();
   return results.map(result => ({
     organizationName: result.organizationName,
     organizationId: result.organizationId,
@@ -121,6 +136,16 @@ export async function getUserOrganizationsWithSeats(
     plan: result.plan,
     created_at: result.createdAt,
     isSalesDemo: result.isSalesDemo,
+    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+      organization: {
+        created_at: result.createdAt,
+        free_trial_end_at: result.freeTrialEndAt,
+        require_seats: result.requireSeats,
+        settings: result.settings,
+      },
+      latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
+      now,
+    }).isTrialExpiredForEnforcement,
     seatCount: {
       used: result.total_member_count,
       total: result.seatCountTotal,
@@ -664,9 +689,10 @@ export async function getOrganizationMembers(
         member.dailyUsageLimitUsdMicrodollars != null
           ? fromMicrodollars(member.dailyUsageLimitUsdMicrodollars)
           : null,
-      currentDailyUsageUsd: member.currentDailyUsageUsdMicrodollars
-        ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
-        : null,
+      currentDailyUsageUsd:
+        member.currentDailyUsageUsdMicrodollars != null
+          ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
+          : null,
     })),
     ...pendingInvitations.map(invitation => ({
       email: invitation.email,
@@ -862,7 +888,6 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
         kilo_user_id: userId,
@@ -1028,8 +1053,16 @@ export async function markOrganizationAsDeleted(
 
     await tx
       .update(cli_sessions_v2)
-      .set({ public_id: null })
+      .set({
+        public_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: sql`now()`,
+      })
       .where(eq(cli_sessions_v2.organization_id, organizationId));
+    await tx
+      .update(agent_briefing_context_preferences)
+      .set({ enabled: false })
+      .where(eq(agent_briefing_context_preferences.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));

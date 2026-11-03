@@ -23,6 +23,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_invitations,
   organization_recommendation_dismissals,
@@ -68,8 +69,7 @@ import {
   user_activity_tokens,
   user_notification_preferences,
   user_notification_history,
-  agent_briefing_reports,
-  agent_briefing_events,
+  agent_briefing_snapshots,
   agent_briefing_context_preferences,
   agent_briefing_preferences,
   cli_sessions_v2,
@@ -80,6 +80,9 @@ import {
   spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  api_kind,
   credit_campaigns,
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
@@ -340,6 +343,7 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(byoc_connections);
+    await db.delete(enkrypt_usage);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -3394,6 +3398,7 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        external_id: 'ext-abc-123',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
         blocked_reason: 'manual block',
@@ -3403,6 +3408,7 @@ describe('User', () => {
         is_super_admin: true,
         can_view_sessions: true,
         can_manage_credits: true,
+        can_export_api_request_logs: true,
       });
 
       await softDeleteUser(user.id);
@@ -3429,6 +3435,7 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
+      expect(softDeleted!.external_id).toBeNull();
       expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
       expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
       expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
@@ -3443,6 +3450,7 @@ describe('User', () => {
       expect(softDeleted!.is_super_admin).toBe(false);
       expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
+      expect(softDeleted!.can_export_api_request_logs).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
@@ -4607,6 +4615,41 @@ describe('User', () => {
       expect(storedGroup.created_by_kilo_user_id).toBeNull();
       expect(storedAssignment.assigned_by_kilo_user_id).toBeNull();
       expect(storedSettings.updated_by_kilo_user_id).toBeNull();
+    });
+
+    it('should clear the creator of organization guardrails but keep the policy', async () => {
+      const actor = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Guardrail attribution org', plan: 'enterprise' })
+        .returning();
+      const [guardrail] = await db
+        .insert(organization_guardrails)
+        .values({
+          organization_id: organization.id,
+          type: 'mcp',
+          identity_key: 'npm:example-server',
+          name: 'Example server',
+          config: {
+            kind: 'package',
+            ecosystem: 'npm',
+            identifier: 'example-server',
+            min_version: null,
+          },
+          source: { registry: 'custom', id: null },
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+
+      await softDeleteUser(actor.id);
+
+      const [stored] = await db
+        .select()
+        .from(organization_guardrails)
+        .where(eq(organization_guardrails.id, guardrail.id));
+      expect(stored.created_by_kilo_user_id).toBeNull();
+      expect(stored.identity_key).toBe('npm:example-server');
+      expect(stored.name).toBe('Example server');
     });
 
     it('should anonymize security audit logs where user is actor', async () => {
@@ -5883,9 +5926,16 @@ describe('User', () => {
       const now = new Date().toISOString();
       for (const account of [user, otherUser]) {
         const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
-        await db
-          .insert(cli_sessions_v2)
-          .values({ session_id: sessionId, kilo_user_id: account.id, created_on_platform: 'cli' });
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: account.id,
+          created_on_platform: 'cli',
+          briefing_excerpt: {
+            messageId: 'final',
+            completedAt: now,
+            text: 'Private selected outcome',
+          },
+        });
         await db
           .insert(agent_briefing_preferences)
           .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
@@ -5893,32 +5943,34 @@ describe('User', () => {
           kilo_user_id: account.id,
           context_key: 'personal',
           model: 'test/model',
-          ai_enabled: true,
+          enabled: true,
         });
-        await db.insert(agent_briefing_events).values({
-          id: crypto.randomUUID(),
-          kilo_user_id: account.id,
-          session_id: sessionId,
-          kind: 'activity',
-          occurred_at: now,
-          payload: { excerpt: 'Private selected outcome' },
-        });
-        await db.insert(agent_briefing_reports).values({
+        await db.insert(agent_briefing_snapshots).values({
           kilo_user_id: account.id,
           context_key: 'personal',
           local_date: now.slice(0, 10),
+          timezone: 'UTC',
+          language: 'en',
+          captured_at: now,
+          expires_at: new Date(Date.now() + 86_400_000).toISOString(),
           night_start_at: now,
           cutoff_at: now,
           morning_end_at: now,
-          evidence_hash: 'private',
           facts: { sessionTitle: 'Private work' },
           summary: { text: 'Private briefing' },
         });
       }
       await softDeleteUser(user.id);
+      const excerpts = await db
+        .select({ userId: cli_sessions_v2.kilo_user_id, excerpt: cli_sessions_v2.briefing_excerpt })
+        .from(cli_sessions_v2)
+        .where(inArray(cli_sessions_v2.kilo_user_id, [user.id, otherUser.id]));
+      expect(excerpts.find(row => row.userId === user.id)?.excerpt).toBeNull();
+      expect(excerpts.find(row => row.userId === otherUser.id)?.excerpt?.text).toBe(
+        'Private selected outcome'
+      );
       for (const table of [
-        agent_briefing_reports,
-        agent_briefing_events,
+        agent_briefing_snapshots,
         agent_briefing_context_preferences,
         agent_briefing_preferences,
       ]) {
@@ -6276,6 +6328,66 @@ describe('User', () => {
       // Analytics fields preserved
       expect(scans[0].source_platform).toBe('openclaw');
       expect(scans[0].findings_critical).toBe(1);
+    });
+
+    it('should retain enkrypt_usage billing rows and attribution when the user is soft-deleted', async () => {
+      const user = await insertTestUser({ id: `oauth/${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization('Enkrypt usage retention', otherUser.id, 0);
+      const [apiKind] = await db
+        .insert(api_kind)
+        .values({ api_kind: 'chat_completions' })
+        .onConflictDoUpdate({ target: api_kind.api_kind, set: { api_kind: 'chat_completions' } })
+        .returning();
+      const [decision] = await db
+        .insert(enkrypt_usage_decision)
+        .values({ decision: 'allowed' })
+        .onConflictDoUpdate({
+          target: enkrypt_usage_decision.decision,
+          set: { decision: 'allowed' },
+        })
+        .returning();
+      if (!apiKind || !decision) throw new Error('Failed to create Enkrypt usage dimensions');
+
+      const usageFields = {
+        organization_id: organization.id,
+        api_kind_id: apiKind.api_kind_id,
+        decision_id: decision.decision_id,
+        enkrypt_credits_cost: 1.5,
+        charged_microdollars: 15_000,
+        added_latency_ms: 42,
+      };
+      const originalRows = await db
+        .insert(enkrypt_usage)
+        .values([
+          { ...usageFields, kilo_user_id: user.id, session_id: 'deleted-user-session' },
+          {
+            ...usageFields,
+            kilo_user_id: user.id,
+            session_id: null,
+            enkrypt_credits_cost: null,
+            charged_microdollars: 0,
+            added_latency_ms: null,
+          },
+          { ...usageFields, kilo_user_id: otherUser.id, session_id: 'retained-user-session' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const retainedRows = await db
+        .select()
+        .from(enkrypt_usage)
+        .where(
+          inArray(
+            enkrypt_usage.id,
+            originalRows.map(row => row.id)
+          )
+        );
+      expect(retainedRows).toHaveLength(originalRows.length);
+      for (const originalRow of originalRows) {
+        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(originalRow);
+      }
     });
 
     it('should preserve credit transactions and creator attribution', async () => {

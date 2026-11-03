@@ -3,14 +3,16 @@ import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import {
   type AgentProfileListItem,
-  useAgentProfile,
   useAgentProfileList,
   useAgentProfileMutations,
+  useAgentProfileVars,
 } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -19,11 +21,25 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     listCombined: vi.fn(),
     get: vi.fn(),
+    overview: vi.fn(),
+    agents: vi.fn(),
+    vars: vi.fn(),
+    commands: vi.fn(),
+    mcpServers: vi.fn(),
+    skills: vi.fn(),
+    kiloCommands: vi.fn(),
   },
   queryInputs: {
     list: undefined as unknown,
     listCombined: undefined as unknown,
     get: undefined as unknown,
+    overview: undefined as unknown,
+    agents: undefined as unknown,
+    vars: undefined as unknown,
+    commands: undefined as unknown,
+    mcpServers: undefined as unknown,
+    skills: undefined as unknown,
+    kiloCommands: undefined as unknown,
   },
   mutations: {
     create: vi.fn(),
@@ -38,6 +54,18 @@ const mocks = vi.hoisted(() => ({
     updateSkill: vi.fn(),
     deleteSkill: vi.fn(),
     setSkillEnabled: vi.fn(),
+    setMcpEnabled: vi.fn(),
+    setKiloCommandEnabled: vi.fn(),
+    reorderKiloCommands: vi.fn(),
+    createMcp: vi.fn(),
+    updateMcp: vi.fn(),
+    deleteMcp: vi.fn(),
+    createAgent: vi.fn(),
+    updateAgent: vi.fn(),
+    deleteAgent: vi.fn(),
+    createKiloCommand: vi.fn(),
+    updateKiloCommand: vi.fn(),
+    deleteKiloCommand: vi.fn(),
   },
   toastError: vi.fn(),
 }));
@@ -47,6 +75,7 @@ vi.mock('@/lib/trpc', () => {
     return {
       pathFilter: () => ({ queryKey: ['agentProfiles', path] }),
       queryKey: (input: unknown) => ['agentProfiles', path, input],
+      queryFilter: (input: unknown) => ({ queryKey: ['agentProfiles', path, input] }),
       queryOptions: (input: unknown) => {
         mocks.queryInputs[name] = input;
         return {
@@ -72,6 +101,13 @@ vi.mock('@/lib/trpc', () => {
       list: queryProcedure('list', 'list'),
       listCombined: queryProcedure('listCombined', 'listCombined'),
       get: queryProcedure('get', 'get'),
+      overview: queryProcedure('overview', 'overview'),
+      agents: queryProcedure('agents', 'agents'),
+      vars: queryProcedure('vars', 'vars'),
+      commands: queryProcedure('commands', 'commands'),
+      mcpServers: queryProcedure('mcpServers', 'mcpServers'),
+      skills: queryProcedure('skills', 'skills'),
+      kiloCommands: queryProcedure('kiloCommands', 'kiloCommands'),
       create: mutationProcedure('create', 'create'),
       update: mutationProcedure('update', 'update'),
       delete: mutationProcedure('delete', 'delete'),
@@ -84,6 +120,18 @@ vi.mock('@/lib/trpc', () => {
       updateSkill: mutationProcedure('updateSkill', 'updateSkill'),
       deleteSkill: mutationProcedure('deleteSkill', 'deleteSkill'),
       setSkillEnabled: mutationProcedure('setSkillEnabled', 'setSkillEnabled'),
+      setMcpEnabled: mutationProcedure('setMcpEnabled', 'setMcpEnabled'),
+      setKiloCommandEnabled: mutationProcedure('setKiloCommandEnabled', 'setKiloCommandEnabled'),
+      reorderKiloCommands: mutationProcedure('reorderKiloCommands', 'reorderKiloCommands'),
+      createMcp: mutationProcedure('createMcp', 'createMcp'),
+      updateMcp: mutationProcedure('updateMcp', 'updateMcp'),
+      deleteMcp: mutationProcedure('deleteMcp', 'deleteMcp'),
+      createAgent: mutationProcedure('createAgent', 'createAgent'),
+      updateAgent: mutationProcedure('updateAgent', 'updateAgent'),
+      deleteAgent: mutationProcedure('deleteAgent', 'deleteAgent'),
+      createKiloCommand: mutationProcedure('createKiloCommand', 'createKiloCommand'),
+      updateKiloCommand: mutationProcedure('updateKiloCommand', 'updateKiloCommand'),
+      deleteKiloCommand: mutationProcedure('deleteKiloCommand', 'deleteKiloCommand'),
     },
   };
   return { useTRPC: () => trpc };
@@ -141,11 +189,11 @@ function ProfileProbe({
   profileId,
   organizationId,
 }: {
-  holder: { current: ReturnType<typeof useAgentProfile> | null };
+  holder: { current: ReturnType<typeof useAgentProfileVars> | null };
   profileId: string;
   organizationId?: string;
 }) {
-  holder.current = useAgentProfile(profileId, organizationId);
+  holder.current = useAgentProfileVars(profileId, organizationId);
   return null;
 }
 
@@ -270,17 +318,17 @@ describe('useAgentProfileList', () => {
   });
 });
 
-describe('useAgentProfile', () => {
-  it('reads get with the profile id and the organization context', async () => {
-    mocks.queries.get.mockResolvedValue({ id: 'profile-1', name: 'Org profile' });
+describe('useAgentProfileVars', () => {
+  it('reads the vars procedure with the profile id and the organization context', async () => {
+    mocks.queries.vars.mockResolvedValue([{ key: 'API_BASE', value: 'x', isSecret: false }]);
 
-    const holder: { current: ReturnType<typeof useAgentProfile> | null } = { current: null };
+    const holder: { current: ReturnType<typeof useAgentProfileVars> | null } = { current: null };
     const { unmount } = await renderWithProviders(
       createElement(ProfileProbe, { holder, profileId: 'profile-1', organizationId: 'org-1' })
     );
 
     await waitFor(() => current(holder).data !== undefined);
-    expect(mocks.queryInputs.get).toEqual({ profileId: 'profile-1', organizationId: 'org-1' });
+    expect(mocks.queryInputs.vars).toEqual({ profileId: 'profile-1', organizationId: 'org-1' });
     unmount();
   });
 });
@@ -319,6 +367,50 @@ describe('useAgentProfileMutations', () => {
     });
     await waitFor(() => invalidateSpy.mock.calls.length > 0);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['agentProfiles'] });
+    unmount();
+  });
+
+  /**
+   * The delete path invalidates the whole namespace but must not refetch the
+   * deleted profile's own reads: their only possible answer is NOT_FOUND, which
+   * the mounted screens would render as a failure over a profile the user just
+   * removed. Parsed with zod because the spy's arguments are untyped.
+   */
+  it("delete invalidates the namespace without refetching the deleted profile's reads", async () => {
+    const holder: { current: MutationsResult | null } = { current: null };
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(MutationsProbe, { holder })
+    );
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const invalidateArg = z.object({
+      predicate: z.custom<(query: { queryKey: readonly unknown[] }) => boolean>(
+        value => typeof value === 'function'
+      ),
+    });
+
+    await act(async () => {
+      await current(holder).deleteProfile.mutateAsync({ profileId: 'profile-1' });
+    });
+
+    const parsed = invalidateSpy.mock.calls
+      .map(([arg]) => invalidateArg.safeParse(arg))
+      .find(result => result.success);
+    const predicate = parsed?.data.predicate;
+    expect(predicate).toBeDefined();
+    if (predicate === undefined) {
+      throw new Error('delete did not invalidate with a predicate');
+    }
+    for (const path of ['get', 'overview', 'agents']) {
+      expect(predicate({ queryKey: ['agentProfiles', path, { profileId: 'profile-1' }] })).toBe(
+        false
+      );
+    }
+    expect(predicate({ queryKey: ['agentProfiles', 'get', { profileId: 'profile-2' }] })).toBe(
+      true
+    );
+    expect(predicate({ queryKey: ['agentProfiles', 'agents', { profileId: 'profile-3' }] })).toBe(
+      true
+    );
     unmount();
   });
 
@@ -449,9 +541,18 @@ describe('useAgentProfileMutations', () => {
       const listKey = ['agentProfiles', 'list', { organizationId }];
       const untouchedListKey = ['agentProfiles', 'list', { organizationId: 'org-2' }];
       const detailKey = ['agentProfiles', 'get', { profileId: 'other', organizationId: 'org-2' }];
+      const ownId = organizationId ? 'org' : 'personal';
+      const overviewKey = ['agentProfiles', 'overview', { profileId: ownId, organizationId }];
+      const siblingOverviewKey = [
+        'agentProfiles',
+        'overview',
+        { profileId: 'sibling', organizationId },
+      ];
       queryClient.setQueryData(listKey, [organizationId ? org : personal]);
       queryClient.setQueryData(untouchedListKey, [summary({ id: 'other', isDefault: true })]);
       queryClient.setQueryData(detailKey, summary({ id: 'other', isDefault: true }));
+      queryClient.setQueryData(overviewKey, summary({ id: ownId, isDefault: true }));
+      queryClient.setQueryData(siblingOverviewKey, summary({ id: 'sibling', isDefault: true }));
       await act(async () => {
         await (clear
           ? current(holder).clearDefault.mutateAsync({
@@ -468,6 +569,10 @@ describe('useAgentProfileMutations', () => {
       });
       expect(queryClient.getQueryData(untouchedListKey)).toMatchObject([{ isDefault: true }]);
       expect(queryClient.getQueryData(detailKey)).toMatchObject({ isDefault: true });
+      // The Overview renders `isDefault` from the counts read, so the toggle
+      // must move there too, and only inside this owner's scope.
+      expect(queryClient.getQueryData(overviewKey)).toMatchObject({ isDefault: !clear });
+      expect(queryClient.getQueryData(siblingOverviewKey)).toMatchObject({ isDefault: clear });
       expect(queryClient.getQueryData(otherKey)).toMatchObject({
         orgProfiles: [{ isDefault: true }],
         personalProfiles: [{ isDefault: organizationId ? true : personalDefault }],
@@ -529,20 +634,13 @@ describe('useAgentProfileMutations', () => {
     unmount();
   });
 
-  it('setSkillEnabled applies optimistically to the profile detail', async () => {
-    mocks.mutations.setSkillEnabled.mockResolvedValue({ success: true });
-
+  it('setSkillEnabled applies optimistically to the skills read', async () => {
     const queryClient = createTestQueryClient();
-    const detailKey = ['agentProfiles', 'get', { profileId: 'profile-1' }];
-    queryClient.setQueryData(detailKey, {
-      id: 'profile-1',
-      name: 'Profile',
-      isDefault: false,
-      skills: [
-        { id: 'skill-1', name: 'one', enabled: true },
-        { id: 'skill-2', name: 'two', enabled: false },
-      ],
-    });
+    const skillsKey = ['agentProfiles', 'skills', { profileId: 'profile-1' }];
+    queryClient.setQueryData(skillsKey, [
+      { id: 'skill-1', name: 'one', enabled: true },
+      { id: 'skill-2', name: 'two', enabled: false },
+    ]);
 
     const holder: { current: MutationsResult | null } = { current: null };
     const { unmount } = await renderWithProviders(createElement(MutationsProbe, { holder }), {
@@ -557,13 +655,106 @@ describe('useAgentProfileMutations', () => {
       });
     });
 
-    const detail = queryClient.getQueryData<{
-      skills: { id: string; enabled: boolean }[];
-    }>(detailKey);
-    expect(detail?.skills.map(skill => [skill.id, skill.enabled])).toEqual([
+    const skills = queryClient.getQueryData<{ id: string; enabled: boolean }[]>(skillsKey);
+    expect(skills?.map(skill => [skill.id, skill.enabled])).toEqual([
       ['skill-1', true],
       ['skill-2', true],
     ]);
+    unmount();
+  });
+});
+
+type SectionMutationsResult = ReturnType<typeof useAgentProfileSectionMutations>;
+
+function SectionMutationsProbe({
+  holder,
+  organizationId,
+}: {
+  holder: { current: SectionMutationsResult | null };
+  organizationId?: string;
+}) {
+  holder.current = useAgentProfileSectionMutations(organizationId);
+  return null;
+}
+
+describe('useAgentProfileSectionMutations', () => {
+  beforeEach(() => {
+    for (const mutation of Object.values(mocks.mutations)) {
+      mutation.mockReset().mockResolvedValue({ success: true });
+    }
+  });
+
+  it.each([
+    {
+      name: 'setMcpEnabled',
+      procedure: 'mcpServers',
+      rows: [
+        { id: 'mcp-1', name: 'docs', enabled: true },
+        { id: 'mcp-2', name: 'search', enabled: true },
+      ],
+      mutate: (mutations: SectionMutationsResult) =>
+        mutations.setMcpEnabled.mutateAsync({
+          profileId: 'profile-1',
+          mcpServerId: 'mcp-2',
+          enabled: false,
+        }),
+      expected: [
+        ['mcp-1', true],
+        ['mcp-2', false],
+      ],
+    },
+    {
+      name: 'setKiloCommandEnabled',
+      procedure: 'kiloCommands',
+      rows: [
+        { id: 'cmd-1', name: 'deploy', enabled: true, sortOrder: 0 },
+        { id: 'cmd-2', name: 'review', enabled: true, sortOrder: 1 },
+      ],
+      mutate: (mutations: SectionMutationsResult) =>
+        mutations.setKiloCommandEnabled.mutateAsync({
+          profileId: 'profile-1',
+          commandId: 'cmd-2',
+          enabled: false,
+        }),
+      expected: [
+        ['cmd-1', true],
+        ['cmd-2', false],
+      ],
+    },
+    {
+      name: 'reorderKiloCommands',
+      procedure: 'kiloCommands',
+      rows: [
+        { id: 'cmd-1', enabled: true, sortOrder: 0 },
+        { id: 'cmd-2', enabled: true, sortOrder: 1 },
+      ],
+      mutate: (mutations: SectionMutationsResult) =>
+        mutations.reorderKiloCommands.mutateAsync({
+          profileId: 'profile-1',
+          orderedIds: ['cmd-2', 'cmd-1'],
+        }),
+      expected: [
+        ['cmd-2', true],
+        ['cmd-1', true],
+      ],
+    },
+  ])('$name writes the section query the screen renders', async scenario => {
+    const queryClient = createTestQueryClient();
+    const sectionKey = ['agentProfiles', scenario.procedure, { profileId: 'profile-1' }];
+    queryClient.setQueryData(sectionKey, scenario.rows);
+
+    const holder: { current: SectionMutationsResult | null } = { current: null };
+    const { unmount } = await renderWithProviders(
+      createElement(SectionMutationsProbe, { holder }),
+      { queryClient }
+    );
+
+    await act(async () => {
+      await scenario.mutate(current(holder));
+    });
+
+    const rows = queryClient.getQueryData<{ id: string; enabled: boolean }[]>(sectionKey);
+    expect(rows?.map(row => [row.id, row.enabled])).toEqual(scenario.expected);
     unmount();
   });
 });

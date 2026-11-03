@@ -15,7 +15,16 @@ import { checkRateLimit } from '@vercel/firewall';
 const RATE_LIMIT_REPORT_INTERVAL_MS = 60_000;
 const lastReportAt = new Map<string, number>();
 
-function reportRateLimitIssue(rateLimitId: string, source: string, message: string): void {
+/**
+ * Emits one error-level Sentry message per rule id per interval. Callers that
+ * report a limiter answer on their own share this throttle, so the whole app
+ * keeps a single reporting cadence.
+ */
+export function reportFirewallRateLimitIssue(
+  rateLimitId: string,
+  source: string,
+  message: string
+): void {
   const now = Date.now();
   if (now - (lastReportAt.get(rateLimitId) ?? 0) >= RATE_LIMIT_REPORT_INTERVAL_MS) {
     lastReportAt.set(rateLimitId, now);
@@ -60,13 +69,13 @@ export async function checkFirewallRateLimit(
   const { rateLimited, error } = await checkRateLimit(rateLimitId, options);
 
   if (error === 'not-found') {
-    reportRateLimitIssue(
+    reportFirewallRateLimitIssue(
       rateLimitId,
       source,
       `Firewall rate limit '${rateLimitId}' is not configured`
     );
   } else if (error === 'blocked') {
-    reportRateLimitIssue(
+    reportFirewallRateLimitIssue(
       rateLimitId,
       source,
       `Firewall rate limit '${rateLimitId}' could not be evaluated`

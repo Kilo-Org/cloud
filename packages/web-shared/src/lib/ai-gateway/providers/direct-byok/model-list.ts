@@ -30,7 +30,8 @@ export function cachedEnhancedDirectByokModelList({
       });
     },
     600_000,
-    recommendedModels
+    recommendedModels,
+    { name: `directByokModelList[${providerId}]` }
   );
 }
 

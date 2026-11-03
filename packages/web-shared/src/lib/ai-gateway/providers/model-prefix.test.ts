@@ -1,4 +1,4 @@
-import { isClaudeModel } from './anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel, isGptOssModel } from './openai';
 import { isKimiModel } from './moonshotai';
 import { isGrokModel } from './xai';

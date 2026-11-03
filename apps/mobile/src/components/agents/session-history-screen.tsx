@@ -14,6 +14,7 @@ import { useAgentSessionListData } from '@/components/agents/use-agent-session-l
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -68,6 +69,7 @@ export function SessionHistoryScreen() {
     restoredQuery: searchDraftState.value,
     restoreSettled: searchDraftState.settled,
   });
+  const keyboard = useOwnedKeyboard();
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -239,6 +241,8 @@ export function SessionHistoryScreen() {
             showSearchBusy={showSearchBusy}
             onChangeText={handleSearchInputChange}
             onClearSearch={handleClearSearchInput}
+            onFocus={keyboard.handleInputFocus}
+            onBlur={keyboard.handleInputBlur}
             defaultValue={searchDefaultValue}
             inputKey={searchInputKey}
             compact
@@ -246,7 +250,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
+      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
         {sessionListBody}
       </KeyboardAvoidingView>
       <SessionFilterModal

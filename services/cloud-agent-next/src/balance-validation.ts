@@ -345,4 +345,5 @@ export const BALANCE_REQUIRED_MUTATIONS = new Set([
   'send',
   'createHostedWorkspace',
   'createHostedWorkspaceSession',
+  'continueHostedWorkspace',
 ]);

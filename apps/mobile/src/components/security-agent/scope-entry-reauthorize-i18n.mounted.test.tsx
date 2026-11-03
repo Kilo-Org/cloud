@@ -38,7 +38,10 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Clock: 'Clock',
@@ -58,6 +61,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',

@@ -20,7 +20,8 @@ status contract alongside shared worktree navigation and durability; revised
 revised 2026-10-07 to add the optional repository environment; revised
 2026-10-21 to apply the repository environment automatically and move the
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
-show profile conflicts before saving.
+show profile conflicts before saving; revised 2026-10-31 to define
+worktree-owned shared runtime and MCP configuration.
 
 ## Conventions
 
@@ -121,8 +122,9 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild. A
-   failing or timed-out setup command MUST fail preparation and the turn.
+5. Setup commands MUST run on the first prepare and again on every rebuild,
+   except when restoring a private session disk snapshot. A failing or timed-out
+   setup command MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -138,8 +140,9 @@ repository.
 
 ### Environment snapshots
 
-1. A session MUST NOT save its workspace as a snapshot. Only an environment
-   build MAY create an environment snapshot.
+1. Only an environment build MAY create a reusable environment snapshot.
+   Private session disk snapshots MUST follow the separate session snapshot
+   rules below and MUST NOT be published as environment snapshots.
 2. A session that uses a repository environment MAY start from that
    environment's published snapshot when the owner, repository, sandbox image
    and runtime match and the snapshot revision is not newer than the
@@ -166,7 +169,44 @@ repository.
    of one revision. A manual build MUST stay available during backoff.
 10. Environment, profile, and launch screens MUST show a non-blocking notice
     that sessions can reuse a snapshot and cached files may retain earlier
-    values. The notice MUST NOT block a save or a launch or show a value.
+     values. The notice MUST NOT block a save or a launch or show a value.
+
+### Session disk snapshots
+
+1. Session disk snapshots MUST be disabled by default and enabled only for
+   explicitly enrolled users or organizations. Capture and restore MUST both
+   check enrollment independently of environment snapshot enrollment.
+2. An enrolled session MAY capture its container disk after two minutes idle,
+   using the existing wrapper heartbeat and sandbox alarm. Capture MUST NOT
+   delay turn completion or Stop and MUST run at most once per idle period.
+3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
+   owner. Only isolated, single-session native Cloudflare Containers at
+   `/workspace/app` with an interactive origin (`cloud-agent-web`, `desktop` or
+   `agent-manager`) MAY capture or restore. Allocations that hosted another
+   session MUST NOT produce a session snapshot.
+4. Capture publication MUST reject changed allocation, connection, preparation,
+   activity or session identity. Active heartbeats, new delivery, Stop and
+   release MUST invalidate older disk state. Capture failure MUST be best effort
+   without repeatedly retrying in the same idle period.
+5. A cold start MAY prefer its own compatible session snapshot over an
+   environment snapshot or base image. Selection MUST use the Sandbox DO's
+   local metadata and MUST NOT consume the snapshot before work is delivered.
+   Runtime release changes MUST NOT disqualify a checkpoint with compatible
+   startup mode and image. Downloaded startup MUST install the currently selected
+   Kilo and wrapper runtime over the restored disk.
+6. Restore MUST preserve local branches, unpushed commits, the Git index,
+   dirty, untracked and ignored files, and session home state. It MUST NOT run
+   environment-template adoption, checkout, setup replay, or older file recovery
+   over the restored disk. It MUST refresh current credentials and configuration,
+   reuse the restored session history with ordinary ingest fallback, and validate
+   workspace provenance before reporting ready.
+7. Unsupported runtimes, failed restore, or failed restored preparation MUST
+   use the bounded fresh-start fallback without silently hanging the session.
+   Existing history and worktree recovery MUST remain available on that fallback.
+8. A private disk snapshot MAY contain session credentials, caches, and user
+   secrets. It MUST NOT be shared with another session or an environment build.
+   Invalidation or session release MUST NOT claim physical deletion where the
+   provider offers no delete API.
 
 ### Turn
 
@@ -258,7 +298,9 @@ repository.
    the user-set worktree name, otherwise the first surviving chat's non-default
    title, otherwise the repository and branch. This fallback MUST NOT depend on
    which chats are visible in the current search or recent-session page.
-   Selecting the worktree MUST open its latest chat. The row MUST remain visibly
+   Selecting the worktree MUST open its latest open chat; when all its listed
+   chats are closed, it MUST open the worktree without reopening any of them.
+   The row MUST remain visibly
    selected while any sibling is active and MUST reflect busy, question, or
    permission activity across all its chats. Its timestamp and overflow menu
    MUST share the session-row action slot. Associated pull-request information
@@ -303,7 +345,12 @@ repository.
 10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
     or stop its running work. Closed-tab preferences and tab order MUST survive
     refresh and remain scoped to the current user and personal or organization
-    context.
+    context. A closed chat MUST reopen only when the user opens that chat
+    itself, for example from the Sessions list or its own link. Selecting its
+    worktree, closing it while the app is still switching to it, going back
+    from the closed tab, refreshing or restoring a window, or another window
+    still showing the chat MUST NOT reopen it; a window
+    showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
     Most recently closed chats MUST appear first, including after refresh;
@@ -322,6 +369,19 @@ repository.
     and current personal or organization access MUST be checked server-side.
     Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
     MUST NOT permit late creation or ingestion to resurrect the worktree.
+14. Chats in one worktree MUST share one runtime and one MCP configuration.
+    Runtime and MCP configuration MUST NOT be isolated per chat, and a sibling
+    MUST NOT replace the worktree's configuration. Independent worktrees MUST
+    remain isolated. The worktree's MCP configuration MUST be established when
+    the worktree is created, MAY be restored when its runtime is rehydrated, and
+    MUST be reused by later chats.
+15. A workspace's delegated Cloud Agent MCP connection MAY create independent
+    child sessions and list, inspect, check exact message results, interrupt, or
+    send prompt follow-ups to its direct children. Each management operation
+    MUST check current canonical-parent authorization and persisted child
+    lineage, owner and organization. It MUST NOT manage the parent itself,
+    sibling chats or unrelated sessions. Child completion callbacks MUST target
+    the canonical workspace parent, not an arbitrary invoking sibling.
 
 ### Sandbox Status
 
@@ -509,6 +569,13 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-31 -- Worktree-owned runtime and MCP configuration
+
+- Chats in one worktree share the worktree's runtime and MCP configuration; they
+  are not isolated from each other per chat.
+- Independent worktrees remain isolated. MCP configuration is established when
+  the worktree is created or rehydrated and is reused by later chats.
 
 ### 2026-10-22 -- Environment editor and profile transition
 

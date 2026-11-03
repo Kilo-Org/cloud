@@ -12,6 +12,7 @@ import { type SkillInputError } from '@/lib/agent-profile-forms';
 /** The `profiles.*` copy key for each `validateSkillInput` error code. */
 const SKILL_ERROR_KEYS = {
   empty: 'profiles.skillNameRequired',
+  'too-long': 'profiles.skillNameTooLong',
   'bad-name': 'profiles.skillNameInvalid',
   'no-content': 'profiles.skillContentRequired',
 } satisfies Record<SkillInputError, string>;
@@ -39,6 +40,9 @@ export function skillRowSubtitle(skill: SkillRowSource): string | null {
     }
     case 'marketplace': {
       return 'profiles.skillSourceMarketplace';
+    }
+    case 'skills-sh': {
+      return 'profiles.skillSourceSkillsSh';
     }
     default: {
       return null;

@@ -1,7 +1,8 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   agent_briefing_preferences,
-  agent_briefing_reports,
+  agent_briefing_context_preferences,
+  agent_briefing_snapshots,
   organization_memberships,
 } from '@kilocode/db/schema';
 import {
@@ -9,7 +10,7 @@ import {
   type DispatchPushInput,
   type DispatchPushOutcome,
 } from '@kilocode/notifications';
-import { and, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 const activeReportFactsSchema = z.object({
@@ -38,26 +39,39 @@ export async function agentBriefingDispatchGate(
     const currentTime = new Date(now()).toISOString();
     const reports = await db
       .select({
-        facts: agent_briefing_reports.facts,
-        morningEndAt: agent_briefing_reports.morning_end_at,
+        facts: agent_briefing_snapshots.facts,
+        morningEndAt: agent_briefing_snapshots.morning_end_at,
       })
-      .from(agent_briefing_reports)
+      .from(agent_briefing_snapshots)
+      .innerJoin(
+        agent_briefing_context_preferences,
+        and(
+          eq(
+            agent_briefing_context_preferences.kilo_user_id,
+            agent_briefing_snapshots.kilo_user_id
+          ),
+          eq(agent_briefing_context_preferences.context_key, agent_briefing_snapshots.context_key),
+          eq(agent_briefing_context_preferences.enabled, true)
+        )
+      )
       .leftJoin(
         organization_memberships,
         and(
-          eq(organization_memberships.organization_id, agent_briefing_reports.organization_id),
-          eq(organization_memberships.kilo_user_id, input.userId)
+          eq(organization_memberships.organization_id, agent_briefing_snapshots.organization_id),
+          eq(organization_memberships.kilo_user_id, input.userId),
+          ne(organization_memberships.role, 'billing_manager')
         )
       )
       .where(
         and(
-          eq(agent_briefing_reports.kilo_user_id, input.userId),
-          eq(agent_briefing_reports.local_date, window.data.localDate),
-          isNotNull(agent_briefing_reports.published_at),
-          lte(agent_briefing_reports.cutoff_at, currentTime),
-          gt(agent_briefing_reports.morning_end_at, currentTime),
+          eq(agent_briefing_snapshots.kilo_user_id, input.userId),
+          eq(agent_briefing_snapshots.local_date, window.data.localDate),
+          isNotNull(agent_briefing_snapshots.published_at),
+          isNull(agent_briefing_snapshots.dismissed_at),
+          lte(agent_briefing_snapshots.cutoff_at, currentTime),
+          gt(agent_briefing_snapshots.morning_end_at, currentTime),
           or(
-            isNull(agent_briefing_reports.organization_id),
+            isNull(agent_briefing_snapshots.organization_id),
             isNotNull(organization_memberships.kilo_user_id)
           )
         )

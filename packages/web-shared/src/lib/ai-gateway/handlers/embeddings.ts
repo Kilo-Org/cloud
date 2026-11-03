@@ -84,7 +84,7 @@ async function embeddingProxyRequest(params: {
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
 
   // OpenRouter needs these identification headers (same as upstreamRequest)
-  if (provider.id === 'openrouter' || provider.id === 'vercel') {
+  if (provider.type === 'openrouter' || provider.type === 'vercel') {
     for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
       headers.set(key, value);
     }
@@ -206,10 +206,23 @@ export async function handleEmbeddingsRequest(
   // Extract fraud/project headers
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
+  const organizationDecision =
+    !isAnonymousContext(user) && organizationId
+      ? (
+          await resolveOrganizationMemberModelDecision({
+            organizationId,
+            kiloUserId: user.id,
+            modelId: requestedModelLowerCased,
+            fromDb: readDb,
+          })
+        ).decision
+      : undefined;
+
   const { provider, userByok, isFree } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
-    organizationId
+    organizationId,
+    organizationDecision?.eligibleProviderRoutes
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
@@ -235,9 +248,10 @@ export async function handleEmbeddingsRequest(
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'embeddings',
     kiloUserId: user.id,
-    provider: provider.id,
+    provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFree,
+    custom_llm_pricing: null,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
@@ -303,13 +317,8 @@ export async function handleEmbeddingsRequest(
 
     const providerConfig = getOrganizationProviderPrivacy(settings);
 
-    if (organizationId) {
-      const { decision } = await resolveOrganizationMemberModelDecision({
-        organizationId,
-        kiloUserId: user.id,
-        modelId: requestedModelLowerCased,
-        fromDb: readDb,
-      });
+    if (organizationDecision) {
+      const decision = organizationDecision;
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {
         const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
@@ -364,7 +373,7 @@ export async function handleEmbeddingsRequest(
   // BYOK: for Vercel gateway, pass the user's key via providerOptions (same as chat completions).
   const effectiveProvider = provider;
 
-  if (userByok && userByok.length > 0 && provider.id === 'vercel') {
+  if (userByok && userByok.length > 0 && provider.type === 'vercel') {
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
@@ -382,7 +391,7 @@ export async function handleEmbeddingsRequest(
     requestedModelLowerCased
   );
 
-  if (userByok && userByok.length > 0 && provider.id === 'vercel') {
+  if (userByok && userByok.length > 0 && provider.type === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};
     for (const byokEntry of userByok) {
       const [key, list] = getVercelInferenceProviderConfigForUserByok(byokEntry);
@@ -418,7 +427,7 @@ export async function handleEmbeddingsRequest(
       isAnonymous: isAnonymousContext(user),
       isStreaming: false,
       userByok: !!userByok,
-      provider: provider.id,
+      provider: provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(requestedModelLowerCased),
       toolsAvailable: [],
@@ -434,7 +443,7 @@ export async function handleEmbeddingsRequest(
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
-    providerId: provider.id,
+    providerId: provider.type,
     isUserByok: !!userByok,
     user,
     request: upstreamBody,

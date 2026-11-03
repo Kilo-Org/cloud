@@ -9,7 +9,7 @@ import {
 export default {
   id: 'neuralwatt',
   models_dev_id: 'neuralwatt',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.neuralwatt.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

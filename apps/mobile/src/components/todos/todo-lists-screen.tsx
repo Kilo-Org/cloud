@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -94,7 +95,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           .query(trpc.todos.items.list.queryOptions({ listId: list.id }))
           .catch(() => null);
         const deleteList = () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           remove.mutate({ id: list.id });
         };
         if (items?.length === 0) {
@@ -165,7 +166,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
             if (fromIndex === toIndex) {
               return;
             }
-            void Haptics.selectionAsync();
+            selectionHaptic();
             move.mutate({
               id: key,
               beforeId: data[toIndex - 1]?.id ?? null,
@@ -214,7 +215,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         title={t('common.agents')}
         size="large"
         showBackButton={false}
-        className="px-[22px]"
+        className="px-[22px] pb-0"
         inlineActions={
           <View className="min-w-0 shrink flex-row items-center">
             <View className="min-w-0 shrink">
@@ -233,7 +234,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         allowInlineActionsStacking={false}
       />
       <View style={sideInsetStyle}>
-        <View className="flex-row items-center border-b border-border px-[22px]">
+        <View className="mx-[22px] min-h-[48px] flex-row items-center justify-between border-b border-border">
           {tabHeader}
           {context.isReady ? (
             <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>

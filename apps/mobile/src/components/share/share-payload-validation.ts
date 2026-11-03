@@ -5,6 +5,7 @@ import {
   classifyAttachment,
   describeClassificationFailure,
 } from '@/lib/agent-attachments/validate';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { type SharePayload } from '@/lib/share-payload';
 
 type ClassificationReason = 'empty' | 'denied' | 'too-large' | 'unreadable';
@@ -91,7 +92,10 @@ export function validateMeasuredShareFiles(input: {
     rejectedNotes.push({ name, reason: 'unreadable' });
   }
 
-  const hasUsableText = input.text.trim() !== '';
+  // Text counts as content only when a reader can see it, the same reading the
+  // composer's send gate and the auto-send arming use: invisible-only text
+  // would prefill a composer that cannot be sent.
+  const hasUsableText = hasVisibleComposerText(input.text);
 
   if (classifiedAccepted.length === 0 && !hasUsableText) {
     const failedCopies = [...(input.failedCopies ?? [])];

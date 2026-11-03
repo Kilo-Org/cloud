@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the rename-control geometry and the Kilo Pass placeholder suites share one fixture and mock harness in this file. */
 // The organization hub's rename control is icon-only. Before this slice it
 // rendered a bare `<Pencil size={16} />`, so its accessibility node was the
 // 16dp glyph and the audit read it below the 28dp floor. This suite pins the
@@ -5,14 +6,17 @@
 // proves its tap opens the rename sheet. The role gate (`showMoney`) still
 // decides whether the control exists at all.
 
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationHubScreen } from './hub-screen';
 
 /** The smallest box the control-size audit accepts on a control's own node. */
@@ -22,7 +26,11 @@ const MIN_REACH_DP = 44;
 /** One Tailwind spacing unit, in dp. */
 const SPACING_UNIT_DP = 4;
 
-const boundary = vi.hoisted(() => ({ role: 'owner' as string }));
+const boundary = vi.hoisted(() => ({
+  role: 'owner' as string,
+  requireSeats: false,
+  seatCount: { used: 1, total: 1 },
+}));
 const routerPush = vi.hoisted(() => vi.fn());
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -51,8 +59,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       organizationId: 'org-1',
       organizationName: 'Acme',
       balance: 5_000_000,
-      requireSeats: false,
-      seatCount: { used: 1, total: 1 },
+      requireSeats: boundary.requireSeats,
+      seatCount: boundary.seatCount,
     },
     isResolving: false,
   }),
@@ -90,8 +98,22 @@ vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
+// Every other suite keeps the Kilo Pass row out of the tree (`null`); the
+// placeholder suite below sets the loading state the real mapper returns while
+// the summary query has no data (`org-kilo-pass-row-state.ts`).
+const kiloPassRowState = vi.hoisted(() => ({
+  current: null as null | {
+    subtitle: string;
+    attention: boolean;
+    action: 'manage' | 'setup' | 'retry' | 'none';
+    actionLabel: string | null;
+    accessibilityHint: string | null;
+    loading: boolean;
+  },
+}));
+
 vi.mock('@/components/organization/org-kilo-pass-row-state', () => ({
-  getOrgKiloPassRowState: () => null,
+  getOrgKiloPassRowState: () => kiloPassRowState.current,
 }));
 
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
@@ -102,7 +124,18 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The header is not what this suite measures, but the rename control now lives
+// in its trailing slot, so the mock renders `headerRight` as its child instead
+// of dropping it: the control keeps being found, measured and pressed below.
+// `vi.mock` hoists this factory above the file's imports, so it imports
+// `createElement` itself; a top-level import is not initialized yet here.
+vi.mock('@/components/screen-header', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    ScreenHeader: ({ headerRight, title }: { headerRight?: React.ReactNode; title?: string }) =>
+      h('ScreenHeader', { title }, headerRight),
+  };
+});
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
@@ -126,6 +159,11 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
+
+// The Kilo Pass row's unresolved state renders the UI skeleton, whose real
+// component reaches expo-linear-gradient and the reanimated worklets; neither
+// is loaded in this project.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
@@ -183,11 +221,42 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.requireSeats = false;
+  boundary.seatCount = { used: 1, total: 1 };
+  kiloPassRowState.current = null;
   routerPush.mockClear();
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
   membersQuery.isPaused = false;
   membersQuery.refetch.mockClear();
+});
+
+describe('Organization hub card', () => {
+  it('shows the organization name once, in the header beside the rename control', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const header = renderer.root.findAllByType('ScreenHeader')[0];
+    expect(header?.props.title).toBe('Acme');
+    // The card used to repeat the name in its first row, directly under a
+    // header that already carried it.
+    expect(renderer.root.findAll(node => node.props.children === 'Acme')).toHaveLength(0);
+    unmount();
+  });
+
+  it('isolates the seat pair so a right-to-left layout cannot mirror it', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 5 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
+    // pair reads 1 of 5 in either interface direction.
+    expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
 });
 
 describe('OrganizationHubScreen rename control', () => {
@@ -264,6 +333,121 @@ describe('OrganizationHubScreen rename control', () => {
     expect(findRenameControl(renderer.root)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'KvRow').length).toBeGreaterThan(0);
     unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass placeholder', () => {
+  const loadingState = {
+    subtitle: 'Loading…',
+    attention: false,
+    action: 'none',
+    actionLabel: null,
+    accessibilityHint: null,
+    loading: true,
+  } as const;
+
+  function skeletonClasses(root: TestRenderer.ReactTestInstance): string[] {
+    return root
+      .findAll(node => String(node.type) === 'Skeleton')
+      .map(node => String(node.props.className));
+  }
+
+  function subtitleNode(root: TestRenderer.ReactTestInstance, subtitle = 'Not subscribed') {
+    return root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === subtitle
+    )[0];
+  }
+
+  it('renders the loading bar on the subtitle line box, not above it', async () => {
+    // Compile the box the subtitle actually lays out, from the class the screen
+    // renders, then the bar's. Both go through the installed Tailwind and
+    // react-native-css compilers, so this is the box the emulator paints rather
+    // than a hand-written utility map. `h-3` (10.5dp) fails here: it drops the
+    // text block below the 30dp icon tile and the whole row with it.
+    kiloPassRowState.current = { ...loadingState, loading: false, subtitle: 'Not subscribed' };
+    const loaded = await renderHub();
+    const subtitleClass = String(subtitleNode(loaded.renderer.root)?.props.className);
+    loaded.unmount();
+
+    kiloPassRowState.current = { ...loadingState };
+    const loading = await renderHub();
+    const bar = skeletonClasses(loading.renderer.root)[0];
+    loading.unmount();
+
+    // `text-xs` carries a unitless line height (`calc(1 / 0.75)`), so its line
+    // box is that multiple of the font size; both halves compile through the
+    // installed Tailwind and react-native-css compilers, and the product is the
+    // 14dp the emulator measures for a loaded subtitle. `h-3` (10.5dp) fails
+    // here: it drops the text block below the 30dp icon tile and the row with it.
+    const fontSize = await compiledLengthDp(subtitleClass, 'fontSize');
+    const leading = await compiledLengthDp(subtitleClass, 'lineHeight');
+    const lineBox = Math.round(fontSize * leading);
+    // 1 rem at this app's 14-point rem: the height the row keeps in both states.
+    expect(lineBox).toBe(14);
+
+    if (bar === undefined) {
+      throw new Error('Kilo Pass placeholder missing');
+    }
+    expect(Math.round(await compiledLengthDp(bar, 'height'))).toBe(lineBox);
+  });
+
+  it('paints the bar in the token that differs from the card it sits on', async () => {
+    kiloPassRowState.current = { ...loadingState };
+
+    const { renderer, unmount } = await renderHub();
+    const classes = skeletonClasses(renderer.root)[0] ?? '';
+    const tokens = classes.split(/\s+/).filter(Boolean);
+
+    // `bg-muted` equals the `bg-secondary` row card in both palettes, so the
+    // default bar drew nothing on this screen.
+    expect(tokens).toContain('bg-muted-soft');
+    expect(tokens).not.toContain('bg-muted');
+
+    unmount();
+  });
+
+  it('swaps the bar for the status line once the summary resolves', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: null,
+      accessibilityHint: null,
+      loading: false,
+    };
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(skeletonClasses(renderer.root)).toHaveLength(0);
+    const subtitle = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === 'Not subscribed'
+    );
+    expect(subtitle).toHaveLength(1);
+    expect(String(subtitle[0]?.props.className)).toContain('text-xs');
+
+    unmount();
+  });
+
+  it('guards the theme tokens: bg-muted collides with the card, bg-muted-soft does not', () => {
+    const css = readFileSync(new URL('../../global.css', import.meta.url), 'utf8');
+    const values = (name: string) =>
+      [...css.matchAll(new RegExp(`--${name}:\\s*([^;]+);`, 'g'))].map(match =>
+        (match[1] ?? '').trim().toLowerCase()
+      );
+    const secondary = values('secondary');
+    const muted = values('muted');
+    const mutedSoft = values('muted-soft');
+
+    // Both theme blocks are present.
+    expect(secondary.length).toBeGreaterThanOrEqual(2);
+    expect(muted).toHaveLength(secondary.length);
+    expect(mutedSoft).toHaveLength(secondary.length);
+    // The collision that made the default bar invisible on the organization
+    // card, pinned so the token assertions above stay meaningful.
+    expect(muted).toEqual(secondary);
+    for (const [index, soft] of mutedSoft.entries()) {
+      expect(soft).not.toBe(secondary[index]);
+    }
   });
 });
 

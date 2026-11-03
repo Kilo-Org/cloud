@@ -322,9 +322,15 @@ function EnvironmentRow({
       <Boxes className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium" title={environment.name}>
+          <button
+            type="button"
+            className="focus-visible:ring-ring truncate rounded-sm text-left text-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-2"
+            title={environment.name}
+            aria-label={`${canManage ? 'Edit' : 'View'} environment ${environment.name}`}
+            onClick={onEdit}
+          >
             {environment.name}
-          </span>
+          </button>
           <Badge variant="secondary" className="shrink-0 text-[10px]">
             {platformLabel(environment.platform)}
           </Badge>

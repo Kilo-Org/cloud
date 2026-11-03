@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import * as sessionsLive from '@/lib/active-sessions-live';
 import {
+  acceptScope,
   ActiveSessionsLiveSync,
   makeCached,
   makeConnection,
@@ -84,7 +85,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
   it('does NOT schedule enrichment when every row is already enriched', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
-    qc.__setCached({ sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -93,6 +93,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       queryFn,
     });
     sync.attach();
+    await acceptScope(qc, sync, { sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
     const heartbeat: SystemEvent = {
       event: 'sessions.heartbeat',
       data: {
@@ -104,7 +105,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     await sync.getWriteQueue();
     await sync.getFetchQueue();
     expect(sync.getPendingReasons().has('enrichment')).toBe(false);
-    expect(queryFn).toHaveBeenCalledTimes(0);
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
   it('rate-limits enrichment retries ≥10s apart', async () => {
@@ -252,9 +253,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
   it('heartbeat-after-empty-snapshot repopulates the cache (enrichment preserved)', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
-    qc.__setCached({
-      sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })],
-    });
+    const enriched = makeCached({ id: 'a', createdOnPlatform: 'cli' });
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -263,6 +262,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       queryFn,
     });
     sync.attach();
+    await acceptScope(qc, sync, { sessions: [enriched] });
     // Empty snapshot arrives (degraded ingest path).
     const emptySnapshot: SystemEvent = {
       event: 'sessions.list',

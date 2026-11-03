@@ -19,6 +19,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
 import { isShortViewport } from '@/lib/centered-state-layout';
@@ -60,7 +61,13 @@ function InlineFailure({
       <Text accessibilityRole="alert" className="min-w-0 flex-1 text-sm text-muted-foreground">
         {message}
       </Text>
-      <Button variant="outline" size="sm" loading={pending} onPress={onRetry}>
+      <Button
+        variant="outline"
+        size="sm"
+        className={STATE_ACTION_CLASS}
+        loading={pending}
+        onPress={onRetry}
+      >
         <Text>{t('common.retry')}</Text>
       </Button>
     </View>
@@ -157,9 +164,7 @@ export function PasskeysScreen() {
       },
       // Reconcile with the server either way, so a rollback cannot leave a row
       // the server does not have or hide one it does.
-      onSettled: () => {
-        void refetch();
-      },
+      onSettled: () => void refetch(),
     })
   );
 
@@ -297,9 +302,7 @@ export function PasskeysScreen() {
       <InlineFailure
         message={t('profile.passkeysCouldNotLoad')}
         pending={isFetching}
-        onRetry={() => {
-          void refetch();
-        }}
+        onRetry={() => void refetch()}
       />
     );
   }
@@ -336,9 +339,7 @@ export function PasskeysScreen() {
         placement="top"
         title={t('profile.passkeysCouldNotLoad')}
         message={t('profile.passkeysLoadFailed')}
-        onRetry={() => {
-          void refetch();
-        }}
+        onRetry={() => void refetch()}
         isRetrying={isFetching}
       />
     );
@@ -412,9 +413,7 @@ export function PasskeysScreen() {
           placeholder={t('profile.passkeyName')}
           initialValue={renameTarget.name ?? ''}
           maxLength={64}
-          onSave={async name => {
-            await rename.mutateAsync({ id: renameTarget.id, name });
-          }}
+          onSave={name => rename.mutateAsync({ id: renameTarget.id, name })}
           onClose={() => {
             setRenameTarget(null);
           }}

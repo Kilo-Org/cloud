@@ -1,8 +1,10 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports
@@ -79,10 +81,19 @@ export function Sheet({
   children,
 }: Readonly<SheetProps>) {
   const colors = useThemeColors();
+  // The native sheet paints a few strings of its own — the backdrop's dismiss
+  // label, the drag handle and the sheet's pane title. They resolve against the
+  // device locale unless it is told the app's, so a device in Portuguese
+  // announced Portuguese controls inside an Arabic app.
+  const { i18n } = useTranslation();
   // Stay mounted through the dismiss animation. `index` -1 starts the animation
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
+  // The app-wide touch gate stays shut for as long as this sheet is presented:
+  // until the sheet's own window takes touch, a tap made while it opens would
+  // land on the screen and the tab bar behind it.
+  useSheetTouchHold(visible);
   // A dismissal handed to the native sheet that has not reported back yet.
   const [dismissalPending, setDismissalPending] = useState(false);
 
@@ -154,6 +165,7 @@ export function Sheet({
       enablePanDownToClose
       dismissGestures={dismissGestures}
       onRequestDismiss={onRequestDismiss}
+      locale={i18n.language}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
         // again through the caller's own handler. A self-dismissal (backdrop,

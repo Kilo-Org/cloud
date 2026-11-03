@@ -20,9 +20,12 @@ import {
   MAX_WORKTREE_SNAPSHOT_BYTES,
   WORKTREE_FILE_SCHEMA_VERSION,
   sessionGitSnapshotResultSchema,
+  worktreeFileIdentity,
+  worktreeRecoverySchema,
   type SessionGitSnapshotPayload,
   type SessionGitSnapshotResult,
   type WorktreeFileRecord,
+  type WorktreeRecovery,
 } from '../../../src/shared/worktree-changes-wire.js';
 import { git, withTimeoutAndAbort } from '../utils.js';
 import {
@@ -383,31 +386,54 @@ async function collectWorktree(
     }
     const mergeBase = mergeBaseOutput.slice(0, -1);
     const modes = new Map<string, FileModes>();
-    const tracked = parseWorktreeDiff(
-      await command([
-        'diff',
-        '--raw',
-        '--numstat',
-        '--no-renames',
-        '--no-ext-diff',
-        '--no-textconv',
-        '--no-color',
-        '--ignore-submodules=none',
-        '--abbrev=64',
-        '-z',
-        mergeBase,
-        '--',
-      ]),
-      modes
-    );
+    async function trackedChanges(
+      scope: WorktreeChangesFile['scope'],
+      refs: string[]
+    ): Promise<WorktreeChangesFile[]> {
+      const scopedModes = new Map<string, FileModes>();
+      const files = parseWorktreeDiff(
+        await command([
+          'diff',
+          '--raw',
+          '--numstat',
+          '--no-renames',
+          '--no-ext-diff',
+          '--no-textconv',
+          '--no-color',
+          '--ignore-submodules=none',
+          '--abbrev=64',
+          '-z',
+          ...refs,
+          '--',
+        ]),
+        scopedModes
+      ).map(file => (scope === undefined ? file : { ...file, scope }));
+      for (const file of files) {
+        const mode = scopedModes.get(file.path);
+        if (mode) modes.set(worktreeFileIdentity(file), mode);
+      }
+      return files;
+    }
+    const uncommitted = await trackedChanges('uncommitted', [head]);
+    const committed = await trackedChanges('against-base-branch', [mergeBase, head]);
+    const combined = includeFiles ? await trackedChanges(undefined, [mergeBase]) : [];
+    const tracked = [...uncommitted, ...committed];
     const untrackedPaths = nulRecords(
       await command(['ls-files', '--others', '--exclude-standard', '-z'])
     ).map(parsePath);
     if (new Set(untrackedPaths).size !== untrackedPaths.length) throw new Error(CAPTURE_FAILED);
-    const trackedPaths = new Set(tracked.map(file => file.path));
+    const trackedPaths = new Set(uncommitted.map(file => file.path));
     const untracked = untrackedPaths.filter(
       path => path !== '.kilo-bootstrap-complete' && !trackedPaths.has(path)
     );
+    const untrackedSet = new Set(untracked);
+    for (const file of combined) {
+      if (file.status === 'deleted' && untrackedSet.has(file.path)) {
+        file.status = 'modified';
+        file.tracked = false;
+        file.countsComplete = false;
+      }
+    }
 
     const result: SessionGitSummaryResult = {
       revision: payload.revision,
@@ -435,15 +461,21 @@ async function collectWorktree(
     const budget = { remaining: MAX_UNTRACKED_READ_BYTES };
     const capturedUntracked = new Map<string, CapturedUntrackedFile>();
     const failedFiles = new Map<string, FileOmissionReason>();
-    if (!result.truncated) {
+    const combinedPaths = new Set(combined.map(file => file.path));
+    const recoveryUntracked: WorktreeChangesFile[] = [];
+    const recoverySlots = Math.max(0, MAX_WORKTREE_CHANGES_FILES - combined.length);
+    if (!result.truncated || includeFiles) {
       for (let index = 0; index < untracked.length; index += 1) {
         if (result.files.length >= MAX_WORKTREE_CHANGES_FILES) {
           result.truncated = true;
-          break;
         }
+        if (result.truncated && (!includeFiles || recoveryUntracked.length >= recoverySlots)) break;
         const remainingFiles = Math.min(
           untracked.length - index - 1,
-          MAX_WORKTREE_CHANGES_FILES - result.files.length - 1
+          Math.max(
+            MAX_WORKTREE_CHANGES_FILES - result.files.length - 1,
+            includeFiles ? recoverySlots - recoveryUntracked.length - 1 : 0
+          )
         );
         const path = untracked[index];
         let file: WorktreeChangesFile;
@@ -469,7 +501,14 @@ async function collectWorktree(
             countsComplete: false,
           };
         }
-        if (!append(file)) break;
+        if (
+          includeFiles &&
+          recoveryUntracked.length < recoverySlots &&
+          !combinedPaths.has(file.path)
+        ) {
+          recoveryUntracked.push(file);
+        }
+        if (!result.truncated && !append({ ...file, scope: 'uncommitted' }) && !includeFiles) break;
       }
     }
 
@@ -480,12 +519,57 @@ async function collectWorktree(
           temporaryDirectory,
           summary,
           modes,
-          capturedUntracked,
+          capturedUntracked: new Map(capturedUntracked),
           failedFiles,
           runGit: snapshotGit,
           remainingTime: remainingFileTime,
+          reservedBytes: MAX_WORKTREE_CHANGES_BYTES + Buffer.byteLength(',"recovery":'),
         })
       : [];
+    let recovery: WorktreeRecovery | undefined;
+    if (temporaryDirectory) {
+      const candidates = [...combined, ...recoveryUntracked];
+      const recoverySummary: SessionGitSummaryResult = { ...summary, files: [], truncated: false };
+      let recoverySummaryBytes = encodedBytes(recoverySummary);
+      for (const file of candidates) {
+        const extra = encodedBytes(file) + (recoverySummary.files.length > 0 ? 1 : 0);
+        if (
+          recoverySummary.files.length >= MAX_WORKTREE_CHANGES_FILES ||
+          recoverySummaryBytes + extra > SUMMARY_BYTES
+        ) {
+          recoverySummary.truncated = true;
+          break;
+        }
+        recoverySummary.files.push(file);
+        recoverySummaryBytes += extra;
+      }
+      const recoveryRecords = await collectSnapshotFiles({
+        root,
+        temporaryDirectory,
+        summary: recoverySummary,
+        modes,
+        capturedUntracked: new Map(capturedUntracked),
+        failedFiles,
+        runGit: snapshotGit,
+        remainingTime: remainingFileTime,
+        captureContent: false,
+      });
+      const recoveryFiles: WorktreeRecovery['files'] = recoverySummary.files.map(file => ({
+        path: file.path,
+        status: file.status,
+      }));
+      let remaining = MAX_WORKTREE_CHANGES_BYTES - encodedBytes({ files: recoveryFiles });
+      for (const [index, record] of recoveryRecords.entries()) {
+        if (record.diff.status !== 'available') continue;
+        const file = recoveryFiles[index];
+        const extra = encodedBytes({ ...file, patch: record.diff.patch }) - encodedBytes(file);
+        if (extra <= remaining) {
+          file.patch = record.diff.patch;
+          remaining -= extra;
+        }
+      }
+      recovery = worktreeRecoverySchema.parse({ files: recoveryFiles });
+    }
     if (
       (await resolveCommit('HEAD')) !== head ||
       (await resolveCommit(baseRef)) !== base ||
@@ -494,7 +578,7 @@ async function collectWorktree(
       throw new Error(CAPTURE_FAILED);
     }
     remainingTime();
-    const snapshot = { summary, files };
+    const snapshot = { summary, files, ...(recovery === undefined ? {} : { recovery }) };
     return includeFiles ? sessionGitSnapshotResultSchema.parse(snapshot) : snapshot;
   }
 
@@ -583,13 +667,14 @@ function encodedBytes(value: unknown): number {
 
 function omittedRecord(
   revision: number,
-  path: string,
+  file: Pick<WorktreeChangesFile, 'path' | 'scope'>,
   reason: FileOmissionReason
 ): WorktreeFileRecord {
   return {
     schemaVersion: WORKTREE_FILE_SCHEMA_VERSION,
     revision,
-    path,
+    path: file.path,
+    scope: file.scope,
     diff: { status: 'omitted', reason },
     content: { status: 'unavailable', reason },
   };
@@ -604,6 +689,8 @@ async function collectSnapshotFiles({
   failedFiles,
   runGit,
   remainingTime,
+  captureContent = true,
+  reservedBytes = 0,
 }: {
   root: string;
   temporaryDirectory: string;
@@ -613,16 +700,18 @@ async function collectSnapshotFiles({
   failedFiles: Map<string, FileOmissionReason>;
   runGit: SnapshotGit;
   remainingTime: () => number;
+  captureContent?: boolean;
+  reservedBytes?: number;
 }): Promise<WorktreeFileRecord[]> {
   const records = summary.files.map(file =>
-    omittedRecord(summary.revision, file.path, 'budget_exhausted')
+    omittedRecord(summary.revision, file, 'budget_exhausted')
   );
-  let totalBytes = encodedBytes({ summary, files: records });
-  const indices = new Map(records.map((record, index) => [record.path, index]));
-  const contentInputs = new Map<string, { state: WorktreeFileState; bytes?: Buffer }>();
+  let totalBytes = encodedBytes({ summary, files: records }) + reservedBytes;
+  const indices = new Map(records.map((record, index) => [worktreeFileIdentity(record), index]));
+  const contentInputs = new Map<string, { state?: WorktreeFileState; bytes?: Buffer }>();
 
   function replace(record: WorktreeFileRecord): FileOmissionReason | undefined {
-    const index = indices.get(record.path);
+    const index = indices.get(worktreeFileIdentity(record));
     if (index === undefined) throw new Error(CAPTURE_FAILED);
     const bytes = encodedBytes(record);
     if (bytes > MAX_WORKTREE_FILE_BYTES) return 'too_large';
@@ -633,8 +722,8 @@ async function collectSnapshotFiles({
     return undefined;
   }
 
-  async function readBaseFile(path: string, maxBytes: number): Promise<Buffer> {
-    const blob = `${summary.comparison.mergeBase}:${path}`;
+  async function readBlob(ref: string, path: string, maxBytes: number): Promise<Buffer> {
+    const blob = `${ref}:${path}`;
     const sizeOutput = decodeWorktreeUtf8(await runGit(['cat-file', '-s', blob]));
     if (!sizeOutput.endsWith('\n')) throw new Error(CAPTURE_FAILED);
     const size = parseCount(sizeOutput.slice(0, -1));
@@ -648,20 +737,31 @@ async function collectSnapshotFiles({
     path: string,
     bytes: Buffer,
     mode: number | undefined,
-    deleted: boolean
+    deleted: boolean,
+    original?: { bytes: Buffer; mode: number }
   ): Promise<Buffer> {
     const directory = await mkdtemp(join(temporaryDirectory, 'file-'));
     try {
-      const temporaryPath = join(directory, path);
+      const temporaryPath = original ? join(directory, 'b', path) : join(directory, path);
       await mkdir(dirname(temporaryPath), { recursive: true });
       await writeFile(temporaryPath, bytes, { mode });
+      if (original) {
+        const originalPath = join(directory, 'a', path);
+        await mkdir(dirname(originalPath), { recursive: true });
+        await writeFile(originalPath, original.bytes, { mode: original.mode });
+      }
       const operand = path === '-' ? './-' : path;
       return await runGit(
         [
           ...PATCH_ARGUMENTS,
+          ...(original ? ['--no-prefix'] : []),
           '--no-index',
           '--',
-          ...(deleted ? [operand, '/dev/null'] : ['/dev/null', operand]),
+          ...(original
+            ? [`a/${path}`, `b/${path}`]
+            : deleted
+              ? [operand, '/dev/null']
+              : ['/dev/null', operand]),
         ],
         {
           cwd: directory,
@@ -683,10 +783,14 @@ async function collectSnapshotFiles({
   );
 
   for (const file of ordered) {
+    const identity = worktreeFileIdentity(file);
+    const committed = file.scope === 'against-base-branch';
+    const beforeRef =
+      file.scope === 'uncommitted' ? summary.comparison.head : summary.comparison.mergeBase;
     try {
-      const failed = failedFiles.get(file.path);
+      const failed = committed ? undefined : failedFiles.get(file.path);
       if (failed) throw new WorktreeFileCaptureError(failed);
-      const mode = modes.get(file.path);
+      const mode = modes.get(identity);
       if (
         file.tracked &&
         (!mode ||
@@ -697,23 +801,26 @@ async function collectSnapshotFiles({
       }
       if (file.binary) throw new WorktreeFileCaptureError('binary');
       remainingTime();
-      const cached = capturedUntracked.get(file.path);
-      const state =
-        cached?.state ?? (await inspectWorktreeFile(root, file.path, file.status === 'deleted'));
-      await verifyWorktreeFile(state);
+      const cached = committed ? undefined : capturedUntracked.get(file.path);
+      const state = committed
+        ? undefined
+        : (cached?.state ??
+          (await inspectWorktreeFile(root, file.path, file.status === 'deleted')));
+      if (state) await verifyWorktreeFile(state);
       const input = { state, bytes: cached?.bytes };
-      contentInputs.set(file.path, input);
+      contentInputs.set(identity, input);
       let patchBytes: Buffer;
-      if (file.tracked && file.status !== 'deleted') {
+      if (file.tracked && (committed || file.status !== 'deleted')) {
         const output = await runGit(
           [
             ...PATCH_ARGUMENTS,
-            '--diff-filter=AM',
+            '--diff-filter=AMD',
             '--raw',
             '--numstat',
             '--abbrev=64',
             '-z',
-            summary.comparison.mergeBase,
+            beforeRef,
+            ...(committed ? [summary.comparison.head] : []),
             '--',
             file.path,
           ],
@@ -744,8 +851,13 @@ async function collectSnapshotFiles({
         patchBytes = output.subarray(separator + 2);
       } else {
         const deleted = file.status === 'deleted';
+        const recreated = file.scope === undefined && !file.tracked && file.status === 'modified';
+        if (recreated && (!mode || !['100644', '100755'].includes(mode.before))) {
+          throw new WorktreeFileCaptureError('unsupported');
+        }
+        if (!state) throw new Error(CAPTURE_FAILED);
         const bytes = deleted
-          ? await readBaseFile(file.path, MAX_WORKTREE_FILE_BYTES)
+          ? await readBlob(beforeRef, file.path, MAX_WORKTREE_FILE_BYTES)
           : (cached?.bytes ??
             (await readWorktreeFile(state, MAX_WORKTREE_FILE_BYTES, remainingTime)));
         input.bytes = bytes;
@@ -757,14 +869,25 @@ async function collectSnapshotFiles({
         ) {
           throw new WorktreeFileCaptureError('inconsistent');
         }
+        const original = recreated
+          ? {
+              bytes: await readBlob(beforeRef, file.path, MAX_WORKTREE_FILE_BYTES),
+              mode: mode?.before === '100755' ? 0o755 : 0o644,
+            }
+          : undefined;
+        if (original) {
+          if (isBinary(original.bytes)) throw new WorktreeFileCaptureError('binary');
+          decodeWorktreeUtf8(original.bytes);
+        }
         patchBytes = await patchFromBytes(
           file.path,
           bytes,
-          deleted ? (mode?.before === '100755' ? 0o755 : 0o644) : state.stat?.mode,
-          deleted
+          deleted ? (mode?.before === '100755' ? 0o755 : 0o644) : state?.stat?.mode,
+          deleted,
+          original
         );
       }
-      await verifyWorktreeFile(state);
+      if (state) await verifyWorktreeFile(state);
       remainingTime();
       if (isBinary(patchBytes)) throw new WorktreeFileCaptureError('binary');
       let patch = decodeWorktreeUtf8(patchBytes);
@@ -783,7 +906,7 @@ async function collectSnapshotFiles({
       if (lineCount(patchBytes) > MAX_WORKTREE_PATCH_LINES) {
         throw new WorktreeFileCaptureError('line_limit');
       }
-      if (file.tracked && file.status !== 'deleted') {
+      if (file.tracked && file.status !== 'deleted' && state) {
         const afterHash = /^index [0-9a-f]+\.\.([0-9a-f]+)(?: [0-7]{6})?$/m.exec(patch)?.[1];
         if (afterHash) {
           const actualHash = await withStableWorktreeFile(state, remainingTime, handle =>
@@ -800,44 +923,50 @@ async function collectSnapshotFiles({
         }
       }
       const failure = replace({
-        ...omittedRecord(summary.revision, file.path, 'budget_exhausted'),
+        ...omittedRecord(summary.revision, file, 'budget_exhausted'),
         diff: { status: 'available', patch },
       });
       if (failure) throw new WorktreeFileCaptureError(failure);
       if (input.bytes && input.bytes.length >= MAX_WORKTREE_CONTENT_BYTES) input.bytes = undefined;
     } catch (error) {
       const reason = fileOmissionReason(error);
-      replace(omittedRecord(summary.revision, file.path, reason));
-      const input = contentInputs.get(file.path);
+      replace(omittedRecord(summary.revision, file, reason));
+      const input = contentInputs.get(identity);
       if (input) input.bytes = undefined;
       if (!['too_large', 'line_limit', 'budget_exhausted'].includes(reason)) {
-        contentInputs.delete(file.path);
+        contentInputs.delete(identity);
       }
     } finally {
-      capturedUntracked.delete(file.path);
+      if (!committed) capturedUntracked.delete(file.path);
     }
   }
 
-  for (const file of ordered) {
-    const input = contentInputs.get(file.path);
-    const index = indices.get(file.path);
+  for (const file of captureContent ? ordered : []) {
+    const identity = worktreeFileIdentity(file);
+    const input = contentInputs.get(identity);
+    const index = indices.get(identity);
     if (!input || index === undefined) continue;
     const record = records[index];
     try {
       remainingTime();
-      await verifyWorktreeFile(input.state);
+      if (input.state) await verifyWorktreeFile(input.state);
       let bytes: Buffer;
       if (file.status === 'deleted') {
-        bytes = input.bytes ?? (await readBaseFile(file.path, MAX_WORKTREE_CONTENT_BYTES - 1));
+        const beforeRef =
+          file.scope === 'uncommitted' ? summary.comparison.head : summary.comparison.mergeBase;
+        bytes =
+          input.bytes ?? (await readBlob(beforeRef, file.path, MAX_WORKTREE_CONTENT_BYTES - 1));
+      } else if (file.scope === 'against-base-branch') {
+        bytes = await readBlob(summary.comparison.head, file.path, MAX_WORKTREE_CONTENT_BYTES - 1);
       } else {
-        if (!input.state.stat || input.state.stat.size >= MAX_WORKTREE_CONTENT_BYTES) {
+        if (!input.state?.stat || input.state.stat.size >= MAX_WORKTREE_CONTENT_BYTES) {
           throw new WorktreeFileCaptureError('too_large');
         }
         bytes =
           input.bytes ??
           (await readWorktreeFile(input.state, MAX_WORKTREE_CONTENT_BYTES - 1, remainingTime));
       }
-      await verifyWorktreeFile(input.state);
+      if (input.state) await verifyWorktreeFile(input.state);
       remainingTime();
       if (isBinary(bytes)) throw new WorktreeFileCaptureError('binary');
       const text = decodeWorktreeUtf8(bytes);
@@ -858,7 +987,7 @@ async function collectSnapshotFiles({
     } catch (error) {
       const reason = fileOmissionReason(error);
       if (reason === 'inconsistent') {
-        replace(omittedRecord(summary.revision, file.path, reason));
+        replace(omittedRecord(summary.revision, file, reason));
       } else {
         replace({ ...record, content: { status: 'unavailable', reason } });
       }

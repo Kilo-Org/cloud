@@ -125,6 +125,23 @@ test('each heavy job takes its own pull_request slot, the nativeHash slot elsewh
       `${platform}: the job must re-check its artifact`
     );
     const from = job.steps.indexOf(published);
+    const rootOnlyInstall = job.steps.findIndex(
+      item =>
+        item.run?.trim() ===
+        'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts'
+    );
+    assert.ok(
+      rootOnlyInstall >= 0 && rootOnlyInstall < from,
+      `${platform}: the probe must follow a root-only install, or a duplicate pays the workspace install`
+    );
+    assert.ok(
+      job.steps.slice(0, from).every(item => item.run?.trim() !== 'pnpm install --frozen-lockfile'),
+      `${platform}: no workspace install may precede the probe`
+    );
+    assert.ok(
+      job.steps.slice(from + 1).some(item => item.run?.trim() === 'pnpm install --frozen-lockfile'),
+      `${platform}: a job that builds needs the workspace install after the probe`
+    );
     for (const later of job.steps.slice(from + 1)) {
       assert.equal(
         later.if,

@@ -1,4 +1,10 @@
-import { briefingWindow, nextBriefingTime, validateBriefingSchedule } from './schedule';
+import {
+  briefingWindow,
+  nextBriefingTime,
+  scheduledBriefingWindow,
+  latestScheduledBriefingWindow,
+  validateBriefingSchedule,
+} from './schedule';
 
 const defaults = {
   timezone: 'Europe/Berlin',
@@ -46,4 +52,24 @@ describe('briefing schedule', () => {
       nextBriefingTime('02:30', 'America/New_York', new Date('2026-03-08T05:00:00Z')).toISOString()
     ).toBe('2026-03-08T07:30:00.000Z');
   });
+  it('derives the previous configured overnight window from a due morning across DST', () => {
+    expect(scheduledBriefingWindow(defaults, new Date('2026-10-25T07:00:00Z'))).toEqual({
+      nightStartAt: '2026-10-24T20:00:00.000Z',
+      cutoffAt: '2026-10-25T07:00:00.000Z',
+      morningEndAt: '2026-10-25T11:00:00.000Z',
+      localDate: '2026-10-25',
+    });
+  });
+});
+
+it('selects the latest due local morning during recovery across a daylight-saving transition', () => {
+  expect(latestScheduledBriefingWindow(defaults, new Date('2026-10-25T07:05:00.000Z'))).toEqual({
+    nightStartAt: '2026-10-24T20:00:00.000Z',
+    cutoffAt: '2026-10-25T07:00:00.000Z',
+    morningEndAt: '2026-10-25T11:00:00.000Z',
+    localDate: '2026-10-25',
+  });
+  expect(
+    latestScheduledBriefingWindow(defaults, new Date('2026-10-25T06:00:00.000Z')).localDate
+  ).toBe('2026-10-24');
 });

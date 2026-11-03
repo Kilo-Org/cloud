@@ -6,7 +6,11 @@ import { i18n } from '@/i18n';
 
 import { describe, expect, it } from 'vitest';
 
-import { formatConfidence, formatSuggestedAction } from './finding-analysis-panel-helpers';
+import {
+  formatConfidence,
+  formatExploitable,
+  formatSuggestedAction,
+} from './finding-analysis-panel-helpers';
 
 describe('formatConfidence', () => {
   it.each([
@@ -47,6 +51,16 @@ describe('formatSuggestedAction', () => {
     expect(formatSuggestedAction('__proto__')).toBe('  proto  ');
   });
 
+  // A stored analysis can omit the field the row reads: the column is jsonb
+  // behind a compile-time type, so the row must label the gap, not throw.
+  it.each([undefined, null, '', '   ', 7 as unknown as string])(
+    'labels an absent code (%j) as not recorded',
+    value => {
+      expect(formatSuggestedAction(value)).toBe(i18n.t('securityAgent.analysis.notRecorded'));
+      expect(formatConfidence(value)).toBe(i18n.t('securityAgent.analysis.notRecorded'));
+    }
+  );
+
   it('re-reads the catalog after a language change', async () => {
     await i18n.changeLanguage('ar');
     try {
@@ -56,5 +70,21 @@ describe('formatSuggestedAction', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+});
+
+describe('formatExploitable', () => {
+  it.each([undefined, null, 'unknown' as const])(
+    'reads %j as unknown rather than asserting an answer',
+    value => {
+      expect(formatExploitable(value)).toBe(i18n.t('common.unknown'));
+    }
+  );
+
+  it.each([
+    [true, 'securityAgent.analysis.yes'],
+    [false, 'securityAgent.analysis.no'],
+  ] as const)('maps %s to its catalog label', (value, key) => {
+    expect(formatExploitable(value)).toBe(i18n.t(key));
   });
 });

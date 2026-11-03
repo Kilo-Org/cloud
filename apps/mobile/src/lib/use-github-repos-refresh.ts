@@ -5,7 +5,10 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   shouldClearConnectCheckFailed,
@@ -20,7 +23,12 @@ type UseGitHubReposRefreshParams = {
 };
 
 type UseGitHubReposRefreshResult = {
-  openGitHubIntegration: () => void;
+  /**
+   * Mints the install state, opens the browser, refetches on return, and reports
+   * every failure. Resolves when the flow ends, so a caller can hold its own
+   * busy state over the whole of it instead of returning before the mint settles.
+   */
+  openGitHubIntegration: () => Promise<void>;
   refreshReposForceFresh: () => Promise<void>;
   isRefreshingRepos: boolean;
   connectCheckFailed: boolean;
@@ -92,21 +100,26 @@ export function useGitHubReposRefresh({
   );
 
   // ── Open GitHub integration ──────────────────────────────────────
-  const openGitHubIntegration = useCallback(() => {
-    void (async () => {
-      try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: organizationId ?? undefined,
-          returnTo: '/cloud/sessions',
-        });
-        await openAuthorizationAndWaitForReturn(
-          getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token)
-        );
-        await performForceFresh(true);
-      } catch {
-        toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
-      }
-    })();
+  const openGitHubIntegration = useCallback(async () => {
+    try {
+      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+        organizationId: organizationId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      const wait = await openAuthorizationAndWaitForReturn(
+        getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token)
+      );
+      // A launch that fails after the app's own return edge ended the wait
+      // never reaches the catch below.
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
+        },
+      });
+      await performForceFresh(true);
+    } catch {
+      toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
+    }
   }, [organizationId, performForceFresh]);
 
   const refreshReposForceFresh = useCallback(async () => {

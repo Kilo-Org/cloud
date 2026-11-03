@@ -73,11 +73,18 @@ export function useNativeStateGeometry(node: ViewInstance | null) {
         });
         return;
       }
-      setObservation(previous =>
-        previous.node === node && sameGeometry(previous.geometry, geometry)
-          ? previous
-          : { node, status: 'ready', geometry }
-      );
+      // A covered or fully faded scene reports an empty visible range. It keeps
+      // the geometry it was last seen with: an empty range drops its centered
+      // states to the fallback layout, and they jump back only after the
+      // revealed scene reports its range again at the end of the transition.
+      const hidden = geometry.visibleBottom === geometry.visibleTop;
+      setObservation(previous => {
+        const last = previous.node === node ? previous.geometry : null;
+        const keep =
+          last !== null &&
+          (sameGeometry(last, geometry) || (hidden && last.visibleBottom > last.visibleTop));
+        return keep ? previous : { node, status: 'ready', geometry };
+      });
     };
     setObservation({ node, status: 'pending', geometry: null });
     const listener = addSurfaceGeometryListener(publish);

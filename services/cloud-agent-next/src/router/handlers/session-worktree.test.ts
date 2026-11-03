@@ -14,7 +14,14 @@ import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { CreateWorktreeChatInput, createSessionWorktreeHandlers } from './session-worktree.js';
+import {
+  CreateWorktreeChatInput,
+  continuedSiblingIntentFingerprint,
+  createSessionWorktreeHandlers,
+  runSiblingCreate,
+  type SiblingCreateRun,
+  type WorktreeSource,
+} from './session-worktree.js';
 
 const {
   admitOperationMock,
@@ -626,14 +633,24 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat sandbox preset inheritance', () => {
-  it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+  it.each(
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      ...[undefined, [], ['example.com']].map(egressAllowlist => ({
+        egressMode: 'allowlist' as const,
+        egressAllowlist,
+      })),
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )(
     'inherits the native allocation policy %j',
-    async ({ egressAllowlist }) => {
+    async ({ egressMode, egressAllowlist, egressAudit }) => {
       const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
       metadata.workspace = {
         ...metadata.workspace,
-        egressMode: 'allowlist',
+        egressMode,
         egressAllowlist,
+        egressAudit,
       };
       const { caller, input, destinationStub } = fixture({
         metadata,
@@ -643,46 +660,69 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
       expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            workspace: expect.objectContaining({ egressMode: 'allowlist', egressAllowlist }),
+            workspace: expect.objectContaining({
+              egressMode,
+              egressAllowlist,
+              egressAudit,
+            }),
           }),
-          sandboxSelection: expect.objectContaining({ egressMode: 'allowlist' }),
+          sandboxSelection: expect.objectContaining(egressMode === undefined ? {} : { egressMode }),
         })
       );
       const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       expect(registered?.sandboxSelection.egressAllowlist).toEqual(egressAllowlist);
+      expect(registered?.sandboxSelection.egressAudit).toBe(egressAudit);
     }
   );
 
-  it('rejects a changed inherited policy on same-key replay', async () => {
-    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
-    metadata.workspace = {
-      ...metadata.workspace,
-      egressMode: 'allowlist',
-      egressAllowlist: [],
-    };
-    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
-    const { caller, input, destinationStub } = fixture({
-      metadata,
-      organizationId: ORGANIZATION_ID,
-      ownershipResults: [[source], [source]],
-    });
-    await caller.createWorktreeChat(input);
-    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
-    metadata.workspace = { ...metadata.workspace, egressAllowlist: ['example.com'] };
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: ledgerRow({
-        organization_id: ORGANIZATION_ID,
-        status: 'completed',
-        canonical_result: progress,
-      }),
-    });
-    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'operation_key_reuse_mismatch',
-    });
-    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
-  });
+  it.each([
+    { changed: 'allowlist', egressMode: 'allowlist' as const, egressAudit: undefined },
+    ...([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [undefined, true].map(egressAudit => ({
+        changed: 'audit',
+        egressMode,
+        egressAudit,
+      }))
+    ),
+  ])(
+    'rejects changed inherited policy on same-key replay: %j',
+    async ({ changed, egressMode, egressAudit }) => {
+      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+      metadata.workspace = {
+        ...metadata.workspace,
+        egressMode,
+        egressAllowlist: egressMode === 'allowlist' ? [] : undefined,
+        egressAudit,
+      };
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      await caller.createWorktreeChat(input);
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      metadata.workspace = {
+        ...metadata.workspace,
+        ...(changed === 'audit'
+          ? { egressAudit: egressAudit !== true }
+          : { egressAllowlist: ['example.com'] }),
+      };
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'inherits %s after control-plane and selection rollouts are disabled',
@@ -801,6 +841,24 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     });
     expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
     expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a ledger admission stored in another organization scope', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-small');
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+    });
+    admitOperationMock.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
@@ -1677,5 +1735,109 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
       rowId: LEDGER_ROW_ID,
     });
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
+});
+
+describe('continuedSiblingIntentFingerprint', () => {
+  const base = {
+    workspaceId: WORKTREE_ID as `worktree_${string}`,
+    organizationId: undefined,
+    sourceKiloSessionId: SOURCE_KILO_SESSION_ID,
+    agent: { mode: 'code', model: 'test-model' },
+  };
+
+  it('ignores the display title so a same-key retry reuses the destination', async () => {
+    const first = await continuedSiblingIntentFingerprint(base);
+    const renamed = await continuedSiblingIntentFingerprint(base);
+    expect(first).toBe(renamed);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('still fingerprints the clone source and the agent selection', async () => {
+    const baseFingerprint = await continuedSiblingIntentFingerprint(base);
+    expect(
+      await continuedSiblingIntentFingerprint({
+        ...base,
+        sourceKiloSessionId: ALTERNATE_SOURCE_KILO_SESSION_ID,
+      })
+    ).not.toBe(baseFingerprint);
+    expect(
+      await continuedSiblingIntentFingerprint({
+        ...base,
+        agent: { mode: 'ask', model: 'other-model' },
+      })
+    ).not.toBe(baseFingerprint);
+  });
+});
+
+describe('runSiblingCreate clone registration rollback', () => {
+  function cloneSource(): WorktreeSource {
+    const metadata = sourceMetadata();
+    if (!metadata.workspace || !metadata.repository) {
+      throw new Error('source fixture is incomplete');
+    }
+    return {
+      ownership: ownershipRow() as WorktreeSource['ownership'],
+      metadata,
+      workspace: metadata.workspace as WorktreeSource['workspace'],
+      repository: metadata.repository,
+      worktreeId: WORKTREE_ID,
+    } as WorktreeSource;
+  }
+
+  function cloneRun(context: TRPCContext, db: WorkerDb): SiblingCreateRun {
+    return {
+      db,
+      ctx: context,
+      source: cloneSource(),
+      intent: 'continue_workspace_session',
+      operationKey: OPERATION_KEY,
+      organizationId: undefined,
+      options: {
+        fingerprint: 'a'.repeat(64),
+        requestedKiloSessionId: undefined,
+        agent: { mode: 'code', model: 'test-model' },
+        clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+        continuation: true,
+        title: SOURCE_KILO_SESSION_ID,
+      },
+      mapProgress: () => ({}) as never,
+    };
+  }
+
+  it('cleans up a cloned destination by clone source on registration rejection', async () => {
+    const { context, db, destinationStub } = fixture();
+    destinationStub.registerSessionFromMetadata.mockResolvedValueOnce({
+      success: false,
+      error: 'sensitive internal registration detail',
+    });
+
+    await expect(runSiblingCreate(cloneRun(context, db))).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'worktree_chat_registration_failed',
+    });
+    expect(deleteSessionForCloudAgentMock).toHaveBeenCalledWith({
+      sessionId: DESTINATION_KILO_SESSION_ID,
+      kiloUserId: USER_ID,
+      cloneSourceSessionId: SOURCE_KILO_SESSION_ID,
+    });
+  });
+
+  it('keeps onlyIfEmpty cleanup for a non-clone sibling rejection', async () => {
+    const { context, db, destinationStub } = fixture();
+    destinationStub.registerSessionFromMetadata.mockResolvedValueOnce({ success: false });
+
+    const run = cloneRun(context, db);
+    const nonCloneOptions = { ...run.options };
+    delete nonCloneOptions.clone;
+    await expect(runSiblingCreate({ ...run, options: nonCloneOptions })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'worktree_chat_registration_failed',
+    });
+    expect(deleteSessionForCloudAgentMock).toHaveBeenCalledWith({
+      sessionId: DESTINATION_KILO_SESSION_ID,
+      kiloUserId: USER_ID,
+      onlyIfEmpty: true,
+    });
   });
 });

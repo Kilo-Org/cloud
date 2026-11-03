@@ -208,6 +208,9 @@ export function buildControlPlaneSessionRegistration(
   ) {
     throw new Error('Sandbox selection egress allowlist does not match session metadata');
   }
+  if ((sandboxSelection.egressAudit ?? false) !== (metadata.workspace?.egressAudit ?? false)) {
+    throw new Error('Sandbox selection egress audit does not match session metadata');
+  }
   if (
     sandboxSelection.configuration !== undefined &&
     sandboxSelection.configuration.provider !== sandboxSelection.provider
@@ -282,6 +285,7 @@ export function buildControlPlaneSessionRegistration(
   };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...runtimeProfile,
+    ...(metadata.continuation ? { continuation: true } : {}),
     ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...controlPlaneRouteSpecFromAttachPayload(
       payload,

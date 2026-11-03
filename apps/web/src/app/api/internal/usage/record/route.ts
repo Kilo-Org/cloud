@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { UsageRecordRequestSchema, type UsageRecordResponse } from '@kilocode/usage-contracts';
+import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
@@ -75,22 +76,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
     parsed.data;
   const source = request.headers.get('x-usage-write-source');
+  const admission =
+    source === 'queue' || source === 'queue_vercel'
+      ? queueWriterAdmission.tryAcquire(source)
+      : null;
+  if (admission && !admission.admitted) {
+    return NextResponse.json(
+      { error: 'Usage writer overloaded', reason: admission.reason },
+      { status: 429 }
+    );
+  }
 
   // Redelivery is handled inside the write, not by a lookup here.
-  const result = await saveUsageRelatedDataLocally(
-    core,
-    metadata,
-    prior_microdollar_usage,
-    posthog_distinct_id,
-    bouncer_usage_event ?? null,
-    {
-      entrypoint: 'writer_endpoint',
-      writer_caller:
-        source === 'queue' || source === 'queue_vercel' || source === 'region_handoff'
-          ? source
-          : 'unknown',
-    }
-  );
+  let result: Awaited<ReturnType<typeof saveUsageRelatedDataLocally>>;
+  try {
+    result = await saveUsageRelatedDataLocally(
+      core,
+      metadata,
+      prior_microdollar_usage,
+      posthog_distinct_id,
+      bouncer_usage_event ?? null,
+      {
+        entrypoint: 'writer_endpoint',
+        writer_caller:
+          source === 'queue' || source === 'queue_vercel' || source === 'region_handoff'
+            ? source
+            : 'unknown',
+      }
+    );
+  } finally {
+    // Keep the slot through actual completion, including awaited post-commit work.
+    admission?.release();
+  }
   timer.mark('write');
 
   // `saveUsageRelatedDataLocally` swallows database errors and returns null,

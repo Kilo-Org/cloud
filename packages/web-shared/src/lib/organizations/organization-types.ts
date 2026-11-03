@@ -90,6 +90,14 @@ export type UserOrganizationWithSeats = {
   plan: OrganizationPlan;
   created_at: Organization['created_at'];
   isSalesDemo?: boolean;
+  /**
+   * The organization subscription gate's own verdict
+   * (`classifyOrganizationEntitlement`): the trial passed its enforcement
+   * window and no seat subscription, sponsorship, or suppression replaced it.
+   * Clients read it instead of re-deriving the plan state from seats and
+   * balance, so the surfaced refusal always matches `requireActiveSubscriptionOrTrial`.
+   */
+  isTrialExpiredForEnforcement: boolean;
   seatCount: {
     used: number;
     total: number;

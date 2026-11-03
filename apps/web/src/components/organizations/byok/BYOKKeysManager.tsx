@@ -55,6 +55,7 @@ import {
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
+import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
@@ -68,6 +69,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
   azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
+  cohere: 'Cohere',
   deepseek: 'DeepSeek',
   openai: 'OpenAI API key',
   inception: 'Inception',
@@ -229,12 +231,14 @@ function CatalogModeSetting({
         <p className="text-muted-foreground text-xs">
           Turn this on to serve catalog models such as moonshotai/kimi-k2.6 with this key, including
           for Auto models and custom routers.
-          {isOrganizationKey ? ' Organization model restrictions then apply to this key.' : ''}
+          {isOrganizationKey
+            ? ' Organization model and provider restrictions then apply to this key.'
+            : ''}
         </p>
       ) : null}
       {enabled && isOrganizationKey ? (
         <p className="text-muted-foreground text-xs">
-          Organization model restrictions apply to requests through this key.
+          Organization model and provider restrictions apply to requests through this key.
         </p>
       ) : null}
       {!canChange && isOrganizationKey ? (
@@ -310,12 +314,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
+  // Key changes alter the routes the preview shows.
+  const invalidateKeys = () => {
+    void queryClient.invalidateQueries({ queryKey: trpc.byok.list.queryKey(listQueryInput) });
+    void queryClient.invalidateQueries(trpc.byok.previewRouting.pathFilter());
+  };
+
   const createMutation = useMutation(
     trpc.byok.create.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key added successfully');
         closeDialog();
       },
@@ -328,9 +336,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const updateMutation = useMutation(
     trpc.byok.update.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key updated successfully');
         closeDialog();
       },
@@ -343,9 +349,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const deleteMutation = useMutation(
     trpc.byok.delete.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key deleted successfully');
       },
       onError: (error: { message: string }) => {
@@ -357,9 +361,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setEnabledMutation = useMutation(
     trpc.byok.setEnabled.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(data.is_enabled ? 'API key enabled' : 'API key disabled');
       },
       onError: (error: { message: string }) => {
@@ -371,9 +373,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setCatalogModeMutation = useMutation(
     trpc.byok.setCatalogMode.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(
           data.serve_catalog_models
             ? 'Key now serves Kilo catalog model IDs'
@@ -506,12 +506,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
             title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model restrictions no longer apply to requests through this key.' : ''}`,
+            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model and provider restrictions no longer apply to requests through this key.' : ''}`,
             confirmLabel: 'Use provider model IDs',
             destructive: !!organizationId,
           }
@@ -1060,7 +1060,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
-                              Organization model restrictions apply to requests through this key.
+                              Organization model and provider restrictions apply to requests through
+                              this key. The key is not used when the provider allow-list excludes
+                              this provider.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1084,7 +1086,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           {organizationId ? (
                             <p className="mt-2">
                               Models with the <strong>{directProvider.name}</strong> prefix are not
-                              subject to organization model restrictions.
+                              subject to organization model or provider restrictions.
                               {catalogModeSupportedModels?.[directProvider.id]?.length
                                 ? ' Owners and admins can switch this key to Kilo catalog model IDs in the key list, so these restrictions apply.'
                                 : ''}
@@ -1125,8 +1127,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
-                            Models of this provider are subject to organization-configured model
-                            restrictions, but the provider itself is considered trusted.
+                            Organization-configured model and provider restrictions apply. The key
+                            is not used when the provider allow-list excludes this provider.
                           </p>
                         ) : null}
                       </AlertDescription>
@@ -1158,6 +1160,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           <BYOKSetupGuideLink />
         </CardFooter>
       </Card>
+      {listedKeys && listedKeys.length > 0 ? (
+        <BYOKRoutingPreview
+          organizationId={organizationId}
+          getProviderName={getProviderDisplayName}
+        />
+      ) : null}
     </div>
   );
 }

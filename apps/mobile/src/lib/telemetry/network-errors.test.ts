@@ -634,6 +634,64 @@ describe('createNetworkErrorFetch', () => {
     expect(errorMessageOf(serverError)).toBe('GET /api/trpc/session.list -> 500');
   });
 
+  it('(i3) keys a batch on the procedure its body names, not the batch URL remainder', async () => {
+    const response = Response.json(
+      [
+        { result: { data: 'ok' } },
+        {
+          error: {
+            message: 'failed',
+            code: -32_000,
+            data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'orgs.listMembers' },
+          },
+        },
+      ],
+      { status: 207, statusText: 'Multi-Status' }
+    );
+    const report = async (procedures: string) => {
+      const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+        source: 'trpc',
+        isResponseError: status => status >= 400 || status === 207,
+        readResponseError: readTrpcResponseError,
+      });
+      await wrapped(`https://example.com/api/trpc/${procedures}?batch=1`, { method: 'POST' });
+      return reportedEvent();
+    };
+
+    // One procedure failing inside two different batch combinations is one
+    // defect, so the two reports share a key.
+    const alone = await report('orgs.list,orgs.listMembers');
+    const grouped = await report('billing.getPlan,orgs.list,orgs.listMembers');
+
+    expect(alone?.tags).toMatchObject({ 'trpc.procedure': 'orgs.listMembers' });
+    expect(alone?.contexts?.network).toMatchObject({ procedure: 'orgs.listMembers' });
+    expect(alone?.fingerprint).toEqual(['network-error', 'trpc', 'orgs.listMembers', 'http.500']);
+    expect(grouped?.fingerprint).toEqual(alone?.fingerprint);
+    expect(errorMessageOf(alone)).toBe('POST /api/trpc/orgs.listMembers -> 500');
+    // The context URL still names the whole request, for diagnosis.
+    expect(alone?.contexts?.network).toMatchObject({
+      url: 'https://example.com/api/trpc/orgs.list,orgs.listMembers',
+    });
+  });
+
+  it('(i4) falls back to the URL remainder when the body names no procedure', async () => {
+    const response = Response.json([{ error: { data: { code: 'TIMEOUT', path: '' } } }], {
+      status: 207,
+    });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      isResponseError: status => status >= 400 || status === 207,
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/a.b,c.d?batch=1', { method: 'POST' });
+
+    const event = reportedEvent();
+    expect(event?.tags).toMatchObject({ 'trpc.procedure': 'a.b,c.d' });
+    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'a.b,c.d', 'TIMEOUT']);
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b,c.d -> TIMEOUT');
+  });
+
   it('(j) ignores a 207 when no options opt it in', async () => {
     const body = [{ result: { data: 'ok' } }, { error: { data: { code: 'FORBIDDEN' } } }];
     const response = Response.json(body, { status: 207 });
@@ -822,10 +880,10 @@ describe('createNetworkErrorFetch status policy', () => {
     );
 
     expect(events.map(event => event.fingerprint)).toEqual([
-      ['network-error', 'trpc', 'user.getMe,a.b', 'http.500'],
+      ['network-error', 'trpc', 'user.getMe', 'http.500'],
     ]);
     expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
-      'POST /api/trpc/user.getMe,a.b -> 404',
+      'POST /api/trpc/user.getMe -> 404',
     ]);
   });
 
@@ -1043,6 +1101,39 @@ describe('reportNetworkError', () => {
       procedure: 'user.me',
       trpcCode: 'UNAUTHORIZED',
     });
+  });
+
+  it('redacts a token-shaped run in the procedure the body names', () => {
+    reportNetworkError({
+      source: 'trpc',
+      url: 'https://example.com/api/trpc/session.list?input=secret',
+      method: 'POST',
+      status: 500,
+      durationMs: 4,
+      error: { data: { httpStatus: 500, path: 'session.list.abcdefghijklmnopqrst' } },
+    });
+
+    const event = reportedEvent();
+    expect(event?.tags).toMatchObject({ 'trpc.procedure': 'session.list.[redacted]' });
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/session.list.[redacted] -> 500');
+    // The app-set fingerprint is never walked by `scrubEvent`, so the producer
+    // is the only redactor.
+    expect(JSON.stringify(event?.fingerprint)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('names a body procedure on a non-tRPC endpoint without the tRPC path', () => {
+    reportNetworkError({
+      source: 'fetch',
+      url: 'https://example.com/v1/relay',
+      method: 'POST',
+      status: 502,
+      durationMs: 3,
+      error: { data: { code: 'BAD_GATEWAY', httpStatus: 502, path: 'relay.forward' } },
+    });
+
+    const event = reportedEvent();
+    expect(errorMessageOf(event)).toBe('POST relay.forward -> 502');
+    expect(event?.fingerprint).toEqual(['network-error', 'fetch', 'relay.forward', 'http.502']);
   });
 
   it('uses one origin-and-path form for the context, title and fingerprint', () => {

@@ -7,6 +7,7 @@
 
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic, notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
@@ -187,7 +188,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (draftUserId) {
       void clearDraft(draftUserId, commentDraftKey);
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 
@@ -245,7 +246,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       if (draftUserId) {
         void clearDraft(draftUserId, commentDraftKey);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
       // Classified into inlineError by the effect above.
@@ -261,7 +262,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     pending.updateComment(mode.pendingItemId, trimmed);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 

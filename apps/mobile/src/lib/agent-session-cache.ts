@@ -30,7 +30,10 @@ export async function invalidateAgentSessionQueries(
   // Trim the stored list to page one (dropping later pages) and refetch that
   // page. Runs on rename, delete, and create, where the first page is the one
   // that changed.
-  reconcileFirstPage(queryClient as QueryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+  void reconcileFirstPage(
+    queryClient as QueryClient,
+    trpc.cliSessionsV2.list.pathFilter().queryKey
+  );
   await Promise.all([
     queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),

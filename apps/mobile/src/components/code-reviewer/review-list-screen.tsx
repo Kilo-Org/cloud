@@ -8,20 +8,23 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
+import { readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
@@ -96,6 +99,12 @@ function ReviewListFooter({
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
+  // The page-one probe refetches unchanged rows while a review is in flight, so
+  // the row objects keep their identity and nothing re-renders. A shared minute
+  // clock is the row's one changing input: it advances the relative label, and
+  // it is the same instant the review's detail screen reads.
+  const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
   // One style for the whole content container: every row starts at the same
@@ -135,16 +144,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — mirror
   // the review-detail screen and show a permanent state with no retry. Any other
-  // thrown error (or the resolved success:false shape below) stays transient.
-  const errorCode = isError
-    ? (error as { data?: { code?: string } } | null)?.data?.code
-    : undefined;
+  // thrown error (or the resolved success:false shape below) stays transient,
+  // and a request that ran out its deadline keeps its own slow-response state.
+  const errorCode = isError ? readTrpcErrorField(error, 'code') : undefined;
   const isPermanentError =
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
-  let errorVariant: 'server' | 'not-found' | 'permission' = 'server';
-  if (isPermanentError) {
-    errorVariant = errorCode === 'NOT_FOUND' ? 'not-found' : 'permission';
-  }
+  const errorVariant = trpcErrorVariant(error);
 
   let body: ReactNode = null;
   if (!isLoading && firstPage?.success && reviews.length === 0) {
@@ -220,7 +225,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               <View className="mt-1 flex-row items-center gap-2">
                 <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
                 <Text variant="muted" className="text-xs">
-                  {timeAgo(reviewTime(review))}
+                  {timeAgo(reviewTime(review), undefined, now)}
                 </Text>
               </View>
             </Pressable>
@@ -254,7 +259,20 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader
+        title={scopeTitle}
+        // One line on both scopes: the personal and the organization list are
+        // the same header over the same list, so they keep one height, or the
+        // organization one paints its eyebrow lower and leaves a wider gap above
+        // the first review. One line is all the header needs to keep the body
+        // still when the name arrives with the membership read: a longer name
+        // tail-truncates inside the same line instead of wrapping to a second.
+        titleNumberOfLines={1}
+        // The scope now titles the screen, so the eyebrow keeps the screen's own
+        // name where the header's category label goes — the org name is user
+        // prose and must not be uppercased or tail-truncated into it.
+        eyebrow={t('codeReviewer.reviewList.title')}
+      />
       {body}
     </View>
   );

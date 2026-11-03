@@ -190,6 +190,36 @@ describe('CloudAgentWorkspaceTabs', () => {
     }
   });
 
+  it('selects and closes exact scoped file tabs at the same path', () => {
+    const onCloseFile = jest.fn();
+    const path = 'src/file.ts';
+    const html = renderWorkspaceTabs({
+      activeTabId: fileTabId(path, 'against-base-branch'),
+      files: [
+        { path, scope: 'uncommitted' },
+        { path, scope: 'against-base-branch' },
+      ],
+      onCloseFile,
+    });
+    const fileTriggers = (html.match(/<button\b[^>]*>/g) ?? []).filter(
+      button => button.includes('role="tab"') && button.includes('file.ts')
+    );
+    expect(fileTriggers).toHaveLength(2);
+    expect(fileTriggers[0]).toContain('aria-selected="false"');
+    expect(fileTriggers[1]).toContain('aria-selected="true"');
+    expect(fileTriggers[1]).toContain('Against base branch');
+    const previousFrame = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = () => 0;
+    try {
+      getButtonProps('Close file.ts (Against base branch)').onClick?.(
+        {} as React.MouseEvent<HTMLButtonElement>
+      );
+    } finally {
+      globalThis.requestAnimationFrame = previousFrame;
+    }
+    expect(onCloseFile).toHaveBeenCalledWith(path, 'against-base-branch');
+  });
+
   it('keeps workspace navigation limited to chats, terminals, and saved files', () => {
     const html = renderWorkspaceTabs({
       terminals: [{ id: 'pty', title: 'Terminal 1', cloudAgentSessionId: 'workspace-one' }],

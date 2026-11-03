@@ -12,7 +12,7 @@ import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-g
 export default {
   id: 'opencode-go',
   models_dev_id: 'opencode-go',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://opencode.ai/zen/go/v1',
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

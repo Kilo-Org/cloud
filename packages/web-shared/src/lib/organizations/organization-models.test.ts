@@ -23,13 +23,42 @@ const mockReplicaSelect = jest.fn(() => {
 const mockGetContext = jest.fn(
   async (_params: { organizationId: string; subject: OrganizationPolicySubject }) => mockContext
 );
-const mockPolicy = { policyRevision: 7 };
-const mockEvaluatePolicy = jest.fn((_context: OrganizationGroupPolicyContext) => mockPolicy);
+/** Only the grant mode is read from the policy by the catalog filter under test. */
+type MockModelPolicy = { policyRevision: number; memberGrant: { mode: string } };
+const mockPolicy: MockModelPolicy = {
+  policyRevision: 7,
+  memberGrant: { mode: 'selected' },
+};
+const mockEvaluatePolicy = jest.fn(
+  (_context: OrganizationGroupPolicyContext): MockModelPolicy => mockPolicy
+);
 const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
-const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
-  allowed: id !== 'provider/blocked',
-  ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
-}));
+const DENIAL_SOURCES: Record<string, string> = {
+  'provider/blocked': 'group_model',
+  'provider/ceiling-inference': 'organization_provider',
+  'provider/ceiling-catalog': 'organization_provider',
+  'provider/ceiling-gateway': 'organization_provider',
+  'provider/deny-listed-inference': 'organization_model',
+  'provider/ungranted-inference': 'no_grant',
+  'provider/ungranted-catalog': 'no_grant',
+};
+const mockDecision = jest.fn(async (_policy: unknown, id: string) =>
+  DENIAL_SOURCES[id]
+    ? { allowed: false, denialSource: DENIAL_SOURCES[id] }
+    : {
+        allowed: true,
+        ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
+      }
+);
+const INFERENCE_PROVIDER_BYOK_MODELS = new Set([
+  'provider/ceiling-inference',
+  'provider/deny-listed-inference',
+  'provider/ungranted-inference',
+]);
+const mockInferenceProviderUserByok = jest.fn(
+  async (modelId: string, _providers: readonly string[]) =>
+    INFERENCE_PROVIDER_BYOK_MODELS.has(modelId)
+);
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
 const mockCustom = jest.fn<
   Promise<OpenRouterModel[]>,
@@ -37,7 +66,10 @@ const mockCustom = jest.fn<
 >();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
 const mockCatalogModelIds = new Set(['provider/allowed']);
-const mockDirectByokCatalogModelIds = jest.fn(async (_owner: unknown) => mockCatalogModelIds);
+const mockDirectByokCatalogModelIds = jest.fn(
+  async (_organizationId: string, _policy: unknown): Promise<ReadonlySet<string>> =>
+    mockCatalogModelIds
+);
 const mockCatalogAvailability = jest.fn(
   (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
 );
@@ -77,6 +109,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
   getEffectiveModelDecision: mockDecision,
 }));
@@ -85,8 +120,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
-  getDirectByokCatalogModelIds: mockDirectByokCatalogModelIds,
 }));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
+  () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
 }));
@@ -97,6 +135,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
+  hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -177,6 +216,10 @@ function organization(): Organization {
     plan: 'enterprise',
     free_trial_end_at: null,
     company_domain: null,
+    directory_id: null,
+    directory_group_id: null,
+    directory_idp_id: null,
+    external_org_id: null,
   };
 }
 
@@ -364,10 +407,7 @@ describe('organization model producer publication', () => {
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
-    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith({
-      type: 'organization',
-      id: 'fixture-org',
-    });
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
       ['openai'],
@@ -511,5 +551,104 @@ describe('organization model producer publication', () => {
     expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
       true
     );
+  });
+
+  it('lists denied models only when an inference provider key the policy admits serves them', async () => {
+    const catalogModelIds = new Set([
+      'provider/allowed',
+      'provider/ceiling-catalog',
+      'provider/ungranted-catalog',
+    ]);
+    mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
+    mockProviderIds.mockResolvedValueOnce(['moonshotai', 'openrouter']);
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-catalog'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/deny-listed-inference'),
+        catalogModel('provider/ungranted-inference'),
+        catalogModel('provider/ungranted-catalog'),
+      ],
+    };
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'provider/ceiling-catalog',
+      'provider/ungranted-catalog',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), catalogModelIds);
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledWith('provider/ceiling-gateway', [
+      'moonshotai',
+      'openrouter',
+    ]);
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
+      'provider/deny-listed-inference',
+      expect.anything()
+    );
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
+      'provider/ceiling-catalog',
+      expect.anything()
+    );
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
+  });
+
+  it('logs one aggregated record for a catalog wider than the allowed models', async () => {
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/ungranted-inference'),
+      ],
+    };
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledTimes(2);
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug.mock.calls[0]?.[0]).toContain('1 of 2 models');
+  });
+
+  it('lists the whole catalog without per-model access lookups for an unrestricted grant', async () => {
+    await primeAnnotatedCatalog();
+    mockEvaluatePolicy.mockReturnValueOnce({
+      policyRevision: 8,
+      memberGrant: { mode: 'unrestricted' },
+    });
+    mockDecision.mockClear();
+    mockInferenceProviderUserByok.mockClear();
+
+    const result = await resultFor();
+
+    // Every catalog model is admitted, including the ones the restricted
+    // fixture denies, and no provider route is recorded in this mode.
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/blocked',
+      'provider/training',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockDecision).not.toHaveBeenCalled();
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalled();
+    expect(mockAvailability.mock.calls[0][2]?.('provider/allowed')).toBeUndefined();
   });
 });

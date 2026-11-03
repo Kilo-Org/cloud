@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import { NewSessionRunTarget } from '@/components/agents/new-session-run-target'
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -52,12 +53,20 @@ type NewSessionProfileOverrideProps = {
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
   /**
-   * The Organization section above Run on: the active account the create is
-   * attributed to. The body renders it for every entry point — switchable on
-   * the ordinary entry, a read-only scope row on the clone entry.
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
    */
-  organizationSection?: React.ReactNode;
+  accountSection?: React.ReactNode;
 };
+
+/**
+ * Space the advanced configuration keeps above itself when its expansion
+ * scrolls the composer, so the disclosure row it just revealed does not sit
+ * flush against the frame's top edge.
+ */
+const ADVANCED_CONFIG_REVEAL_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -104,10 +113,12 @@ export function NewSessionConfigureForm({
   onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
+  autoFocusPrompt = true,
   groups,
   isRetrying,
   onChangeRepo,
   onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -126,7 +137,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
-  organizationSection,
+  accountSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -136,6 +147,7 @@ export function NewSessionConfigureForm({
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  planRefusal = null,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -143,16 +155,16 @@ export function NewSessionConfigureForm({
   const sideInsetStyle = useSideInsetStyle();
   // The footer reserves the platform inset. KeyboardAvoidingView lifts the
   // scroll body and footer together; the prompt yields height to the viewport.
-  // The scroll view retains focused-input keyboard inset adjustment.
+  // The scroll view takes no keyboard inset of its own: iOS sized that inset
+  // before the lift, so the frame was cleared twice and the content scrolled
+  // the composer's mode and model row out of view once the keyboard settled.
+  // A focused field below the fold still scrolls into view through the text
+  // input's own caret reveal. (The picker-sheet sliver of the e1 spot check is
+  // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
+  // up at its first layout and never re-anchors, so the keyboard must be
+  // dismissed before the sheet opens.)
   const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
-  // The ScrollView's keyboard-inset adjustment stays on for focused-field
-  // scroll-into-view; it sizes against the scroll view's own frame, which
-  // already ends above the footer, so the two never stack into a double lift.
-  // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
-  // triggers: a formSheet anchors over the keyboard that is up at its first
-  // layout and never re-anchors, so the keyboard must be dismissed before
-  // the sheet opens.)
   // The scroll frame's own height, reported by the ScrollView below. It already
   // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
   // parent; the prompt yields its minimum height to it so the whole composer
@@ -163,15 +175,6 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
-  // The Run on block's height, reported by the wrapper below and threaded to
-  // the prompt as `belowCardHeight`, which reserves the row inside the frame
-  // while the composer can still keep its floor. The block starts at the
-  // Organization section (when the entry point renders one) and sits directly
-  // under the card, and its height does not depend on the card, so the frame
-  // fit converges without a second layout pass. Zero until it lays out, which
-  // owes nothing below the card; the corrected pass lands in the same commit
-  // chain.
-  const [runTargetHeight, setRunTargetHeight] = useState(0);
   // The remote surface (launch folder, remote hint, no repository section)
   // covers both a bound computer and the tour's computer target with none
   // connected yet — the target is the computer either way.
@@ -186,12 +189,24 @@ export function NewSessionConfigureForm({
     setFrameHeight(current => (current === next ? current : next));
   }
 
+  // The composer's scroll body, so the advanced configuration can bring its
+  // expanded content into view instead of growing below the fold. The panel
+  // reports its own offset once per expansion, after that content has laid
+  // out; the clamp keeps a panel near the top from overshooting.
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const revealAdvancedConfig = useCallback((contentOffset: number) => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, contentOffset - ADVANCED_CONFIG_REVEAL_GAP),
+      animated: true,
+    });
+  }, []);
+
   const body = (
     <ScrollView
+      ref={scrollRef}
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
       onLayout={handleScrollFrameLayout}
     >
@@ -229,23 +244,22 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
-          belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
+          autoFocusOnMount={autoFocusPrompt}
         />
       </View>
 
-      {/* The block under the card the frame must still show: the Organization
-          section when the entry point renders one, then the Run on row and its
-          refresh control. Each child's own `mt-*` lives inside this wrapper, so
-          the prompt's frame fit reserves the block's whole footprint. */}
-      <View
-        onLayout={event => {
-          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
-          setRunTargetHeight(current => (current === next ? current : next));
-        }}
-      >
-        {organizationSection}
+      {/* The block under the card: the Account section when the entry point
+          renders one, then the Run on row and its refresh control. */}
+      <View>
+        {/* The plan refusal is known before the press, so it sits in the scroll
+            content under the composer rather than in the pinned footer: it
+            never takes height from the fields, the launch folder included. */}
+        {planRefusal !== null ? (
+          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
+        ) : null}
+        {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}
           runOnInstance={runOnInstance}
@@ -269,7 +283,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       {isRemote ? (
-        <Text className="mt-2 text-xs text-muted-foreground">
+        <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
@@ -283,6 +297,7 @@ export function NewSessionConfigureForm({
           isRetrying={isRetrying}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           recents={recents}
@@ -339,6 +354,7 @@ export function NewSessionConfigureForm({
           onManualCommandsChange={onManualCommandsChange}
           disabled={isStarting}
           onRepoDefaults={onOpenRepoDefaults}
+          onRequestReveal={revealAdvancedConfig}
         />
       ) : null}
     </ScrollView>
@@ -377,6 +393,7 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         startBlockedReason={startBlockedReason}
         startBlockedAction={startBlockedAction}
+        blockedByPlan={planRefusal !== null}
         onStartSession={onStartSession}
       />
     </View>

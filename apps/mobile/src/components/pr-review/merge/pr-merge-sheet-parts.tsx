@@ -1,13 +1,15 @@
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -33,7 +35,7 @@ function CommitTitleField({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitTitle')}</Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={titleRef.current}
         editable={!isDisabled}
@@ -44,7 +46,7 @@ function CommitTitleField({
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
+          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -74,7 +76,7 @@ function CommitMessageField({
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.commitMessage')}
       </Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={messageRef.current}
         editable={!isDisabled}
@@ -85,7 +87,7 @@ function CommitMessageField({
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring',
           tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}
@@ -123,6 +125,59 @@ function DeleteBranchToggle({
         onValueChange={onChange}
       />
     </View>
+  );
+}
+
+/**
+ * Stand-in for the form while the account's draft read settles.
+ *
+ * `PrMergeSheet` keeps the uncontrolled fields unmounted until the stored
+ * draft is known, so without this the sheet presents with an empty body under
+ * a finished header and the whole form then arrives in one frame. The
+ * placeholder repeats the form's own gutters and settled row heights, so the
+ * sheet reads as loading and the form replaces it in place.
+ */
+export function MergeSheetFormSkeleton(props: {
+  methodOptions: MergeMethodOption[];
+  showTitle: boolean;
+  showDeleteBranchToggle: boolean;
+}): ReactNode {
+  return (
+    <>
+      <View className="gap-4 px-6 pt-4">
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-16" />
+          {props.methodOptions.length === 0 ? (
+            <Skeleton className="h-11 rounded-md" />
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {props.methodOptions.map(option => (
+                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+              ))}
+            </View>
+          )}
+        </View>
+        {props.showTitle ? (
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-11" />
+          </View>
+        ) : null}
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-24" />
+        </View>
+        {props.showDeleteBranchToggle ? (
+          <View className="rounded-lg bg-secondary px-4 py-3">
+            <Skeleton className="h-[44px]" />
+          </View>
+        ) : null}
+      </View>
+      <PrFormSheetFooter>
+        <Skeleton className="h-[44px]" />
+        <Skeleton className="mt-2 h-[44px]" />
+      </PrFormSheetFooter>
+    </>
   );
 }
 

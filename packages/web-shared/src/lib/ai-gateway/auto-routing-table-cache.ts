@@ -17,7 +17,8 @@ function createCachedRoutingTable(router: AutoRouter) {
       );
     },
     ROUTING_TABLE_TTL_MS,
-    null
+    null,
+    { name: `autoRoutingTable[${router}]` }
   );
 }
 

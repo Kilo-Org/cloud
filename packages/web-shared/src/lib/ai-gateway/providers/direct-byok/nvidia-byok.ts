@@ -8,8 +8,9 @@ import {
 
 export default {
   id: 'nvidia-byok',
+  openrouter_inference_provider_id: 'nvidia',
   models_dev_id: 'nvidia',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://integrate.api.nvidia.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

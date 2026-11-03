@@ -113,6 +113,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
     firstPageErrorState: inboxState.firstPageErrorState,
     firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
+    organizationScopeAccess: 'granted' as const,
   }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
@@ -245,10 +246,7 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 // row — the same fix as `PrRefsRow` in pr-review-overview-parts.tsx.
 describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => {
   beforeEach(() => {
-    insetsState.top = 0;
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
+    Object.assign(insetsState, { top: 0, bottom: 0, left: 0, right: 0 });
     inboxState.query.isPending = false;
     inboxState.query.isFetching = false;
     inboxState.query.hasNextPage = false;
@@ -345,5 +343,16 @@ describe('PrReviewInboxList row metadata and reconnect state', () => {
     // The permission view is the state this fix removes for an organization
     // member's own inbox.
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+  });
+
+  // A pending first read that is not fetching (offline, paused, cancelled)
+  // never settles on its own: it takes the retryable body so the user can
+  // restart the read, never the skeleton and never a false empty state.
+  it('gives a first read that cannot progress the retry action', () => {
+    inboxState.items = [];
+    inboxState.query.isPending = true;
+    inboxState.query.isFetching = false;
+    const bodies = mountInboxList().root.findAll(n => String(n.type) === 'QueryError');
+    expect(bodies).toHaveLength(1);
   });
 });

@@ -116,3 +116,36 @@ describe('buildOverviewRows focus-area labels', () => {
     expect(focusSubtitle(makeConfig({ focusAreas: ['constructor'] }))).toBe('Other (constructor)');
   });
 });
+
+// The row is the only way into the instructions editor, so it stays on the
+// overview for a config with nothing stored: an emptied field must not take
+// the entry point down with it.
+describe('buildOverviewRows instructions row', () => {
+  function instructionsRow(config: ReviewConfigData) {
+    const row = buildOverviewRows({
+      data: config,
+      capabilities,
+      models: [],
+      modelsLoading: false,
+      onOpenModelPicker: () => undefined,
+    }).find(candidate => candidate.field === 'instructions');
+    if (!row) {
+      throw new Error('instructions row not found');
+    }
+    return row;
+  }
+
+  it('offers the editor with a not-set value when nothing is stored', () => {
+    expect(instructionsRow(makeConfig({ customInstructions: null })).subtitle).toBe('Not set');
+  });
+
+  it('treats a blank stored value as nothing stored', () => {
+    expect(instructionsRow(makeConfig({ customInstructions: '  \n ' })).subtitle).toBe('Not set');
+  });
+
+  it('marks stored instructions as set', () => {
+    expect(instructionsRow(makeConfig({ customInstructions: 'Prefer small diffs' })).subtitle).toBe(
+      'Set'
+    );
+  });
+});

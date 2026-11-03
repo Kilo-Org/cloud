@@ -175,6 +175,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     expect(procedures).not.toHaveProperty('resumeHostedSession');
     expect(procedures.interruptSession._def.type).toBe('mutation');
     expect(procedures.send._def.type).toBe('mutation');
+    expect(procedures.listChildSessions._def.type).toBe('query');
   });
 
   it('interrupts a turn without releasing its route and accepts the next message', async () => {

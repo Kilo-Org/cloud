@@ -198,6 +198,7 @@ function HighlightedWorktreeDiff({
   diff,
   lang,
   revision,
+  scope,
   expanded,
   reviewProps,
   diffStyle,
@@ -205,6 +206,7 @@ function HighlightedWorktreeDiff({
   diff: FileDiffMetadata;
   lang: SupportedLanguages;
   revision: number;
+  scope?: WorktreeFileRecord['scope'];
   expanded: boolean;
   reviewProps?: WorktreeReviewDiffProps;
   diffStyle: WorktreeDiffStyle;
@@ -222,7 +224,7 @@ function HighlightedWorktreeDiff({
   );
   return (
     <FileDiff
-      key={JSON.stringify([diff.name, revision, expanded])}
+      key={JSON.stringify([diff.name, scope, revision, expanded])}
       fileDiff={fileDiff}
       {...reviewProps}
       options={{
@@ -290,7 +292,7 @@ export default function WorktreeFileRenderer({
       : viewMode === 'preview'
         ? 'Show changes'
         : 'Preview Markdown';
-  const highlighterKey = JSON.stringify([file.path, file.revision]);
+  const highlighterKey = JSON.stringify([file.path, file.scope, file.revision]);
   const renderedDiff = parsed === null ? null : selectWorktreeRenderedDiff(parsed, expansion);
   const needsHighlighter = parsed !== null && (parsed.hunks.length > 0 || expanded);
   const [highlighter, setHighlighter] = useState<{
@@ -373,6 +375,7 @@ export default function WorktreeFileRenderer({
               diff={renderedDiff ?? parsed}
               lang={lang}
               revision={file.revision}
+              scope={file.scope}
               expanded={expanded}
               reviewProps={reviewProps}
               diffStyle={diffStyle}

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
@@ -89,11 +90,7 @@ export function useStartTodo(): StartTodoControls {
           toast.error(result.message);
           return;
         }
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {
-          // Haptics are decoration; a started session must not fail with them.
-        }
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
         // The session exists now, so nothing below may stop it from opening: a
         // failed link or cache refresh is reported and the session still opens.
         const settled = await Promise.allSettled([

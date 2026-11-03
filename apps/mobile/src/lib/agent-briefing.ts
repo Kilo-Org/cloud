@@ -18,7 +18,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { readCacheScope } from '@/lib/persist/cache-scope';
@@ -131,18 +130,14 @@ export function useBriefingDismissals() {
   };
 }
 
-export function useBriefingPreferences(readOnly = false) {
+export function useBriefingPreferences() {
   const trpc = useTRPC();
   const access = useBriefingAccess();
   const input = {
     timezone: dateTimeFormat(undefined, {}).resolvedOptions().timeZone,
-    language: getResolvedLanguage(),
   };
-  const options = readOnly
-    ? trpc.agentBriefing.oneOffPreferences.queryOptions(input)
-    : trpc.agentBriefing.preferences.queryOptions(input);
   return useQuery({
-    ...options,
+    ...trpc.agentBriefing.preferences.queryOptions(input),
     enabled: access.enabled,
     staleTime: 60_000,
   });

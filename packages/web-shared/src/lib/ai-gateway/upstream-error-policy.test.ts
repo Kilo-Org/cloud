@@ -72,23 +72,29 @@ describe('applyUpstreamErrorPolicy', () => {
     expect(await response.text()).toContain('upstream 402');
   });
 
-  it.each([
-    [400, false],
-    [429, false],
-    [500, true],
-    [503, true],
-  ])('passes status %i through with trackInSentry=%s', async (status, trackInSentry) => {
-    const response = upstream(status);
-    expect(await applyUpstreamErrorPolicy(baseParams(response))).toBeUndefined();
-    expect(captureMock).toHaveBeenCalledTimes(1);
-    expect(captureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        errorMessage: `openrouter returned error ${status}`,
-        trackInSentry,
-      })
-    );
-    expect(response.bodyUsed).toBe(false);
-  });
+  it.each(
+    [400, 401, 403, 429, 500, 502, 503, 504].flatMap(status =>
+      [false, true].map(isUserByok => ({ status, isUserByok }))
+    )
+  )(
+    'logs upstream $status without Sentry and passes it through with BYOK=$isUserByok',
+    async ({ status, isUserByok }) => {
+      const response = upstream(status);
+      expect(
+        await applyUpstreamErrorPolicy({ ...baseParams(response), isUserByok })
+      ).toBeUndefined();
+      expect(captureMock).toHaveBeenCalledTimes(1);
+      expect(captureMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          response,
+          errorMessage: `openrouter returned error ${status}`,
+          trackInSentry: false,
+        })
+      );
+      expect(response.bodyUsed).toBe(false);
+      expect(await response.json()).toEqual({ error: `upstream ${status}` });
+    }
+  );
 
   it('forwards chat error context and the original request', async () => {
     const formData = new FormData();
@@ -112,7 +118,7 @@ describe('applyUpstreamErrorPolicy', () => {
       gatewayModel: 'gateway/model',
       byokProviderIds: ['anthropic'],
       errorMessage: 'openrouter returned error 500',
-      trackInSentry: true,
+      trackInSentry: false,
     });
   });
 });

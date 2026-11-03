@@ -3,7 +3,7 @@ export const RUNTIME_DISTRIBUTION = {
   bun: '1.4.4',
   pnpm: '12.14.0',
   glab: '1.124.0',
-  gh: '2.102.0',
+  gh: '2.103.3',
 } as const;
 
 export type WrapperBundle = {

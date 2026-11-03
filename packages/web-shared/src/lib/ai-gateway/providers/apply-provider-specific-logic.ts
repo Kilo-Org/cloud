@@ -18,8 +18,8 @@ import {
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -63,6 +63,7 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
@@ -346,6 +347,11 @@ export async function applyProviderSpecificLogic(
     removeTopLevelToolSchemaCombinators(requestToMutate);
   }
 
+  if (isKimiModel(requestedModel)) {
+    // Moonshot rejects tools with "tools.function.parameters is not a valid moonshot flavored json schema, details: <At path '...': type is not defined>"
+    addMissingToolSchemaEnumTypes(requestToMutate);
+  }
+
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
@@ -382,7 +388,7 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (!usesUserGatewayKey && (provider.id === 'openrouter' || provider.id === 'vercel')) {
+  if (!usesUserGatewayKey && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     // A user's own BYOK credential is never ignored.
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
@@ -408,7 +414,7 @@ export async function applyProviderSpecificLogic(
     addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
-  if (provider.id === 'vercel') {
+  if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
     await applyVercelSettings(

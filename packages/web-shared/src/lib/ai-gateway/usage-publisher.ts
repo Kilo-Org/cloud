@@ -9,14 +9,22 @@ import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
 import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
-export const USAGE_ENQUEUE_MAX_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 200;
+export const USAGE_ENQUEUE_MAX_ATTEMPTS = 4;
+export const USAGE_ENQUEUE_RETRY_TIMEOUT_MS = 5_000;
+export const USAGE_ENQUEUE_RETRY_BUDGET_MS = 25_000;
+const RETRY_BASE_DELAY_MS = 500;
+const RETRY_MAX_DELAY_MS = 2_000;
 
 /**
  * `publisher_not_configured` means no publisher URL or secret is set, so nothing was attempted.
  * It is an operator error rather than a transport failure.
  */
 export type UsageEnqueueOutcome = { kind: 'accepted' } | { kind: 'unavailable'; reason: string };
+
+export function getUsagePublisherExecutionRegion() {
+  const region = process.env.VERCEL_REGION;
+  return region === 'fra1' || region === 'sfo1' ? region : 'unknown';
+}
 
 function reportUnavailable(
   usageId: string,
@@ -26,6 +34,7 @@ function reportUnavailable(
   const outcome = { kind: 'unavailable', reason } as const;
   console.warn('usage enqueue unavailable', {
     usageId,
+    execution_region: getUsagePublisherExecutionRegion(),
     ...outcome,
     ...(duplicatePossible && { duplicate_possible: true }),
   });
@@ -73,10 +82,18 @@ export async function enqueueUsage(
   }
 
   const maxAttempts = retryTransientFailures ? USAGE_ENQUEUE_MAX_ATTEMPTS : 1;
+  const attemptTimeoutMs = retryTransientFailures
+    ? USAGE_ENQUEUE_RETRY_TIMEOUT_MS
+    : USAGE_ENQUEUE_TIMEOUT_MS;
+  const deadline = retryTransientFailures
+    ? performance.now() + USAGE_ENQUEUE_RETRY_BUDGET_MS
+    : Number.POSITIVE_INFINITY;
   let reason = 'request_failed';
   let duplicatePossible = false;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const signal = AbortSignal.timeout(USAGE_ENQUEUE_TIMEOUT_MS);
+    const remainingAttemptBudgetMs = Math.floor(deadline - performance.now());
+    if (remainingAttemptBudgetMs <= 0) break;
+    const signal = AbortSignal.timeout(Math.min(attemptTimeoutMs, remainingAttemptBudgetMs));
     let retryable: boolean;
     try {
       const response = await fetch(url, {
@@ -106,15 +123,20 @@ export async function enqueueUsage(
     }
 
     if (!retryable || attempt === maxAttempts) break;
+    const remainingBackoffBudgetMs = Math.floor(deadline - performance.now());
+    if (remainingBackoffBudgetMs <= 0) break;
+    const retryDelayMs = Math.min(
+      Math.random() * Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** (attempt - 1)),
+      remainingBackoffBudgetMs
+    );
     console.warn('usage enqueue retrying', {
       usageId: payload.core.id,
+      execution_region: getUsagePublisherExecutionRegion(),
       reason,
       attempt,
       ...(duplicatePossible && { duplicate_possible: true }),
     });
-    await new Promise(resolve =>
-      setTimeout(resolve, RETRY_BASE_DELAY_MS * attempt + Math.random() * RETRY_BASE_DELAY_MS)
-    );
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
   }
 
   return reportUnavailable(payload.core.id, reason, duplicatePossible);

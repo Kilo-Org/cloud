@@ -25,8 +25,8 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
  * that same provider. It serves anonymous callers, so a custom LLM is a
- * candidate only when it is public, unrestricted by country, and serves Chat
- * Completions.
+ * candidate only when it is public, unpriced, unrestricted by country, and
+ * serves Chat Completions.
  */
 export function isAutoFreeEligibleModelId(
   model: string,
@@ -38,6 +38,7 @@ export function isAutoFreeEligibleModelId(
   if (customLlm) {
     return (
       isPublicCustomLlm(customLlm.definition) &&
+      !customLlm.definition.pricing &&
       !customLlm.definition.country_deny_list?.length &&
       getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
     );
@@ -77,5 +78,6 @@ export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<Auto
 export const getConfiguredAutoFreeModels = createCachedFetch(
   readConfiguredAutoFreeModels,
   60_000,
-  null
+  null,
+  { name: 'autoFreeModels' }
 );

@@ -10,6 +10,7 @@
  * Only internal bots are eligible: the `bot-internal-` id prefix, `is_bot`,
  * not blocked, a non-empty API-token pepper, and an owner or member role in
  * the requested organization. Humans and per-org product bots are refused.
+ * The rules live in `@/lib/bot-users/eligibility`, shared with the catalog mint.
  *
  * URL: POST /api/internal/bot-token
  */
@@ -34,7 +35,10 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import jwt from 'jsonwebtoken';
-import { INTERNAL_BOT_USER_ID_PREFIX } from '@/lib/bot-users/types';
+import {
+  isEligibleInternalBotAccount,
+  isInternalBotOrganizationRole,
+} from '@/lib/bot-users/eligibility';
 
 const RequestSchema = z.object({
   userId: z.string().min(1),
@@ -72,14 +76,7 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
-  if (
-    !user.id.startsWith(INTERNAL_BOT_USER_ID_PREFIX) ||
-    user.is_bot !== true ||
-    user.blocked_at !== null ||
-    user.blocked_reason !== null ||
-    typeof user.api_token_pepper !== 'string' ||
-    user.api_token_pepper.trim().length === 0
-  ) {
+  if (!isEligibleInternalBotAccount(user)) {
     return NextResponse.json({ error: 'User is not an internal bot' }, { status: 403 });
   }
 
@@ -97,7 +94,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
   }
   const organizationRole = membership.role;
-  if (organizationRole !== 'owner' && organizationRole !== 'member') {
+  if (!isInternalBotOrganizationRole(organizationRole)) {
     return NextResponse.json(
       { error: 'Organization role is not supported for bot tokens' },
       { status: 403 }

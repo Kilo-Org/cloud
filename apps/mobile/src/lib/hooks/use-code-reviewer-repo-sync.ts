@@ -3,8 +3,10 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+import { isRepoSelectionEpochCurrent } from './repo-selection-senders';
 import { isPersonal } from './use-code-reviewer';
 
 /** Platforms whose repository list has a provider read behind it. */
@@ -41,51 +43,77 @@ export function useReviewerRepositoriesResync(
     }
     inFlight.current = true;
     setResyncing(true);
+    // The snapshot is stored only while the epoch captured here is current,
+    // the same fence the selection hooks in use-code-reviewer-repo-selection.ts
+    // apply to their writes.
+    const epoch = currentAuthEpoch();
+    const storeIfCurrent = (store: () => void) => {
+      if (isRepoSelectionEpochCurrent(epoch)) {
+        store();
+      }
+    };
     try {
+      // Each branch stays written out: tRPC types the personal and the
+      // organization procedure options nominally, so a shared helper around the
+      // read and the key would erase that type.
       if (platform === 'github') {
         if (isPersonal(scope)) {
-          // Each branch is one statement: tRPC types the personal and the
-          // organization procedure options nominally, so the cache write
-          // cannot be shared without erasing that type.
-          queryClient.setQueryData(
-            trpc.personalReviewAgent.listGitHubRepositories.queryOptions({}).queryKey,
-            await trpcClient.personalReviewAgent.listGitHubRepositories.query({
-              forceRefresh: true,
-            })
-          );
+          const repositories = await trpcClient.personalReviewAgent.listGitHubRepositories.query({
+            forceRefresh: true,
+          });
+          storeIfCurrent(() => {
+            queryClient.setQueryData(
+              trpc.personalReviewAgent.listGitHubRepositories.queryOptions({}).queryKey,
+              repositories
+            );
+          });
         } else {
-          queryClient.setQueryData(
-            trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
-              organizationId: scope,
-            }).queryKey,
+          const repositories =
             await trpcClient.organizations.reviewAgent.listGitHubRepositories.query({
               organizationId: scope,
               forceRefresh: true,
-            })
-          );
+            });
+          storeIfCurrent(() => {
+            queryClient.setQueryData(
+              trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
+                organizationId: scope,
+              }).queryKey,
+              repositories
+            );
+          });
         }
       } else if (isPersonal(scope)) {
-        queryClient.setQueryData(
-          trpc.personalReviewAgent.listGitLabRepositories.queryOptions({}).queryKey,
-          await trpcClient.personalReviewAgent.listGitLabRepositories.query({
-            forceRefresh: true,
-          })
-        );
+        const repositories = await trpcClient.personalReviewAgent.listGitLabRepositories.query({
+          forceRefresh: true,
+        });
+        storeIfCurrent(() => {
+          queryClient.setQueryData(
+            trpc.personalReviewAgent.listGitLabRepositories.queryOptions({}).queryKey,
+            repositories
+          );
+        });
       } else {
-        queryClient.setQueryData(
-          trpc.organizations.reviewAgent.listGitLabRepositories.queryOptions({
-            organizationId: scope,
-          }).queryKey,
+        const repositories =
           await trpcClient.organizations.reviewAgent.listGitLabRepositories.query({
             organizationId: scope,
             forceRefresh: true,
-          })
-        );
+          });
+        storeIfCurrent(() => {
+          queryClient.setQueryData(
+            trpc.organizations.reviewAgent.listGitLabRepositories.queryOptions({
+              organizationId: scope,
+            }).queryKey,
+            repositories
+          );
+        });
       }
     } catch {
       // The previous rows stay: a failed forced read is not a reason to empty
-      // a list the user can still select from.
-      toast.error(t('common.couldNotRefresh'));
+      // a list the user can still select from, and only a current refresh
+      // reports its failure.
+      if (isRepoSelectionEpochCurrent(epoch)) {
+        toast.error(t('common.couldNotRefresh'));
+      }
     } finally {
       inFlight.current = false;
       setResyncing(false);

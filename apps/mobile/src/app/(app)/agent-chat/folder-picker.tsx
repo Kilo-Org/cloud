@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
@@ -71,7 +71,7 @@ export default function FolderPickerScreen() {
   }, [router]);
 
   const handleDone = useCallback(() => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     // Unsupported means the CLI cannot list this folder: Done keeps the launch
     // directory (`""`), never the listed path. Every other state confirms the
     // listed folder.

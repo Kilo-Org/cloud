@@ -1,4 +1,4 @@
-import { index, sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { index, sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 
 export const ingestItems = sqliteTable(
   'ingest_items',
@@ -9,6 +9,12 @@ export const ingestItems = sqliteTable(
     item_data: text('item_data').notNull(),
     item_data_r2_key: text('item_data_r2_key'),
     ingested_at: integer('ingested_at'),
+    /**
+     * A message row's contribution to the session's running assistant cost in USD,
+     * decided once from the body this row stores. NULL on rows that predate the
+     * column, or that are not messages: their contribution comes from the body.
+     */
+    cost_usd: real('cost_usd'),
   },
   table => [index('ingest_items_ingested_at_id_idx').on(table.ingested_at, table.id)]
 );

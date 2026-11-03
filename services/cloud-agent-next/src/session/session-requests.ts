@@ -53,6 +53,7 @@ export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 };
 
 export type SessionCreateRequest = {
@@ -73,6 +74,12 @@ export type SessionCreateRequest = {
     /** Inclusive cut: copy source messages up to and including this ID. */
     cloneUpToMessageId?: string;
   };
+  /**
+   * Server-only title for the ingest ownership row (`cli_sessions_v2.title`),
+   * set only by the continuation handler from the source session's title.
+   * Defaults to the generated `New session - <date>` for every other create.
+   */
+  ownershipTitle?: string;
   /**
    * The authorized reference of the repository's environment, set only by
    * preflight after it resolved the environment from the owner and the
@@ -107,6 +114,12 @@ export type SessionCreateRequest = {
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;
+    /**
+     * Server-only marker for a `continueHostedWorkspace` create. It persists on
+     * session metadata and makes the wrapper skip transcript file restoration.
+     * Never set from a client input field.
+     */
+    workspaceContinuation?: boolean;
     /** Client-proposed Kilo session ID; the Worker generates one when absent. */
     kiloSessionId?: string;
   };

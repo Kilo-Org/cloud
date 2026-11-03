@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { type AgentsView, AgentsViewSegment } from './agents-view-segment';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -29,7 +33,9 @@ describe('Agents view tabs', () => {
     if (!renderer) {
       throw new Error('Missing Agents tabs');
     }
-    const tabs = renderer.root.findAllByProps({ accessibilityRole: 'tab' });
+    // iOS is the mocked platform: the entries are typed as buttons there so
+    // VoiceOver gives them a control trait (see lib/a11y/tab-entry).
+    const tabs = renderer.root.findAllByProps({ role: 'button' });
     const [sessions, todos] = tabs;
     if (!sessions || !todos) {
       throw new Error('Missing Agents tabs');

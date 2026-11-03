@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
-export const BRIEFING_MAX_SESSIONS = 64;
+export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
 export const BRIEFING_MAX_URL_LENGTH = 2048;
-export const BRIEFING_MAX_EXCERPT_LENGTH = 600;
+export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
+export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;
 
 export const briefingContextSchema = z.object({
   id: z.string(),
@@ -15,11 +16,17 @@ export const briefingContextSchema = z.object({
 export const briefingSourceSchema = z.object({
   id: z.string(),
   sessionId: z.string(),
-  kind: z.enum(['activity', 'pull_request', 'blocker', 'cost', 'artifact']),
+  kind: z.enum(['activity', 'pull_request', 'blocker', 'artifact']),
   title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
   url: z.string().max(BRIEFING_MAX_URL_LENGTH),
   occurredAt: z.string().datetime(),
-  excerpt: z.string().max(BRIEFING_MAX_EXCERPT_LENGTH).optional(),
+  excerpt: z
+    .string()
+    .refine(
+      value => briefingUtf8End(value, BRIEFING_MAX_EXCERPT_BYTES) === value.length,
+      'Excerpt exceeds UTF-8 byte limit'
+    )
+    .optional(),
 });
 export const briefingSummaryErrorSchema = z.enum([
   'model_pricing_unavailable',
@@ -35,7 +42,7 @@ export const briefingSummaryErrorSchema = z.enum([
   'generation_failed',
 ]);
 export const briefingSummarySchema = z.object({
-  status: z.enum(['disabled', 'pending', 'running', 'ready', 'failed', 'unavailable', 'outdated']),
+  status: z.enum(['disabled', 'pending', 'running', 'ready', 'failed', 'unavailable']),
   text: z.string().nullable(),
   model: z.string().nullable(),
   costMicrodollars: z.number(),
@@ -44,24 +51,22 @@ export const briefingSummarySchema = z.object({
   startedAt: z.string().datetime().nullable(),
   finishedAt: z.string().datetime().nullable(),
   error: briefingSummaryErrorSchema.nullable(),
-  canRetry: z.boolean(),
 });
 export const briefingScorecardSchema = z.object({
   sessions: z.number(),
   pullRequests: z.number(),
   blockers: z.number(),
-  spendMicrodollars: z.number(),
 });
 export const briefingCoverageSchema = z.object({
-  activity: z.enum(['complete', 'partial']),
-  spend: z.enum(['complete', 'partial', 'unavailable']),
-  blockers: z.enum(['complete', 'partial']),
-  pullRequests: z.enum(['complete', 'partial']),
+  activity: z.literal('partial'),
+  blockers: z.literal('partial'),
+  pullRequests: z.literal('partial'),
 });
 export const briefingReportSchema = z.object({
   id: z.string(),
-  kind: z.enum(['scheduled', 'one_off']),
   createdAt: z.string().datetime(),
+  capturedAt: z.string().datetime(),
+  truncated: z.boolean(),
   timezone: z.string(),
   context: briefingContextSchema,
   localDate: z.string(),
@@ -70,8 +75,6 @@ export const briefingReportSchema = z.object({
   morningEndAt: z.string().datetime(),
   publishedAt: z.string().datetime().nullable(),
   updatedAt: z.string().datetime(),
-  revision: z.number().int(),
-  revised: z.boolean(),
   readAt: z.string().datetime().nullable(),
   dismissedAt: z.string().datetime().nullable(),
   scorecard: briefingScorecardSchema,
@@ -83,18 +86,11 @@ export const briefingReportSchema = z.object({
         title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
         url: z.string().max(BRIEFING_MAX_URL_LENGTH),
         status: z.string().nullable(),
-        spendMicrodollars: z.number(),
         sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES_PER_SESSION),
-        /** Evidence items of this session that `sources` leaves out. Absent on older reports. */
-        omittedSources: z.number().int().nonnegative().optional(),
       })
     )
     .max(BRIEFING_MAX_SESSIONS),
   sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES),
-  /** Active sessions of the window that `sessions` leaves out. Absent on older reports. */
-  omittedCollectedSessions: z.number().int().nonnegative().optional(),
-  /** Collected evidence items that `sources` leaves out. Absent on older reports. */
-  omittedCollectedSources: z.number().int().nonnegative().optional(),
   summary: briefingSummarySchema,
   expiresAt: z.string().datetime(),
 });
@@ -109,7 +105,7 @@ export const briefingEstimateSchema = z.object({
 });
 export const briefingContextPreferencesSchema = z.object({
   context: briefingContextSchema,
-  aiEnabled: z.boolean(),
+  enabled: z.boolean(),
   model: z.string(),
   maxDurationSeconds: z.number().int(),
   maxSpendMicrodollars: z.number().int(),
@@ -140,12 +136,6 @@ export const DEFAULT_BRIEFING_SCHEDULE = {
 } as const;
 export const DEFAULT_BRIEFING_MAX_DURATION_SECONDS = 600;
 export const DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS = 2_000_000;
-/**
- * Evidence counts a session once it has any event, pull request, blocker or charge inside the
- * window, so a report whose scorecard has no sessions had no overnight activity at all. Its
- * zeros are the whole report, which is why the publish gate, the summary gates and visibility
- * all read quiet from this one definition.
- */
 export function briefingHasActivity(scorecard: BriefingScorecard): boolean {
   return scorecard.sessions > 0;
 }
@@ -160,9 +150,9 @@ export function isBriefingVisible(report: BriefingReport, now = Date.now()): boo
 }
 export function redactBriefingExcerpt(
   value: string,
-  maxLength = BRIEFING_MAX_EXCERPT_LENGTH
+  maxBytes = BRIEFING_MAX_EXCERPT_BYTES
 ): string {
-  return value
+  const redacted = value
     .replace(
       /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g,
       '[redacted key]'
@@ -174,6 +164,26 @@ export function redactBriefingExcerpt(
     .replace(/\b(?:sk-|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]+/g, '[redacted token]')
     .replace(/\b[A-Za-z0-9_-]{48,}\b/g, '[redacted value]')
     .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted email]')
-    .replace(/(https?:\/\/[^\s?]+)\?[^\s]+/g, '$1')
-    .slice(0, maxLength);
+    .replace(/(https?:\/\/[^\s?]+)\?[^\s]+/g, '$1');
+  return truncateBriefingUtf8(redacted, maxBytes);
+}
+
+export function truncateBriefingUtf8(value: string, maxBytes: number): string {
+  const end = briefingUtf8End(value, maxBytes);
+  return end === value.length ? value : value.slice(0, end);
+}
+
+function briefingUtf8End(value: string, maxBytes: number): number {
+  let bytes = 0;
+  let end = 0;
+  while (end < value.length) {
+    const code = value.charCodeAt(end);
+    const next = value.charCodeAt(end + 1);
+    const pair = code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff;
+    const width = pair ? 4 : code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+    if (bytes + width > maxBytes) break;
+    bytes += width;
+    end += pair ? 2 : 1;
+  }
+  return end;
 }

@@ -316,6 +316,20 @@ export async function listMcpServersForProfile(
   return servers.map(toResponse);
 }
 
+/**
+ * A profile's MCP servers for a caller who holds the profile, ownership
+ * checked. The profile editor's MCP servers screen renders these and nothing
+ * else the profile carries.
+ */
+export async function getProfileMcpServers(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileMcpServerResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listMcpServersForProfile(db, profileId);
+}
+
 export async function createMcpServer(
   db: WorkerDb,
   publicKeyBase64: string,

@@ -1,7 +1,7 @@
 import 'server-only';
 import * as z from 'zod';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { agent_briefing_reports } from '@kilocode/db/schema';
+import { agent_briefing_snapshots } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
@@ -46,15 +46,15 @@ export async function recordBriefingUsage(input: {
   // receipt cannot land on a report whose generation has already moved on.
   await db.transaction(async tx => {
     const [report] = await tx
-      .select({ id: agent_briefing_reports.id, summary: agent_briefing_reports.summary })
-      .from(agent_briefing_reports)
+      .select({ id: agent_briefing_snapshots.id, summary: agent_briefing_snapshots.summary })
+      .from(agent_briefing_snapshots)
       .where(
         and(
-          eq(agent_briefing_reports.generation_id, input.generationId),
-          eq(agent_briefing_reports.kilo_user_id, input.kiloUserId),
+          eq(agent_briefing_snapshots.generation_id, input.generationId),
+          eq(agent_briefing_snapshots.kilo_user_id, input.kiloUserId),
           input.organizationId === undefined
-            ? isNull(agent_briefing_reports.organization_id)
-            : eq(agent_briefing_reports.organization_id, input.organizationId)
+            ? isNull(agent_briefing_snapshots.organization_id)
+            : eq(agent_briefing_snapshots.organization_id, input.organizationId)
         )
       )
       .for('update');
@@ -78,10 +78,10 @@ export async function recordBriefingUsage(input: {
     const path = sql`ARRAY['chargeAccounting', 'generations', ${String(index)}]::text[]`;
     const receipt = JSON.stringify({ usageId: usage.usageId, delivery, deliveryAt });
     await tx
-      .update(agent_briefing_reports)
+      .update(agent_briefing_snapshots)
       .set({
-        summary: sql`jsonb_set(${agent_briefing_reports.summary}, ${path}, coalesce(${agent_briefing_reports.summary} #> ${path}, '{}'::jsonb) || ${receipt}::jsonb)`,
+        summary: sql`jsonb_set(${agent_briefing_snapshots.summary}, ${path}, coalesce(${agent_briefing_snapshots.summary} #> ${path}, '{}'::jsonb) || ${receipt}::jsonb)`,
       })
-      .where(eq(agent_briefing_reports.id, report.id));
+      .where(eq(agent_briefing_snapshots.id, report.id));
   });
 }

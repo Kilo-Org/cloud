@@ -28,6 +28,10 @@ import { QueryError } from '@/components/query-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { i18n } from '@/i18n';
 
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

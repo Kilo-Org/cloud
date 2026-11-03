@@ -37,15 +37,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
 const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
-useKiloExclusiveModel();
-
-const KILO_EXCLUSIVE_MODEL = kiloExclusiveModelFixture.public_id;
-const NON_EXCLUSIVE_MODEL = 'anthropic/claude-sonnet-4';
+const PAID_MODEL = 'anthropic/claude-sonnet-4';
 
 const fakeDb = {} as never;
 const fakeUser = { id: 'user-1' };
@@ -74,96 +67,51 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
   });
 
-  it('returns hasUserByokAvailable: false for a Kilo-exclusive model even when BYOK providers can serve it', async () => {
-    const result = await computeCloudAgentNextBalanceCheckEligibility({
-      fromDb: fakeDb,
-      user: fakeUser,
-      modelId: KILO_EXCLUSIVE_MODEL,
-    });
-
-    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-    expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
-    expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
-    expect(mockGetOrganizationByokProviderIds).not.toHaveBeenCalled();
-  });
-
-  it('returns hasUserByokAvailable: false for a Kilo-exclusive model even when the user has an enabled matching BYOK provider', async () => {
-    mockGetUserByokProviderIds.mockResolvedValueOnce(['openrouter']);
-
-    const result = await computeCloudAgentNextBalanceCheckEligibility({
-      fromDb: fakeDb,
-      user: fakeUser,
-      modelId: KILO_EXCLUSIVE_MODEL,
-    });
-
-    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-    expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
-    expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
-  });
-
-  it('returns hasUserByokAvailable: false for a Kilo-exclusive model in an organization context', async () => {
-    mockGetOrganizationByokProviderIds.mockResolvedValueOnce(['openrouter']);
-
-    const result = await computeCloudAgentNextBalanceCheckEligibility({
-      fromDb: fakeDb,
-      user: fakeUser,
-      modelId: KILO_EXCLUSIVE_MODEL,
-      organizationId: 'org-1',
-    });
-
-    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-    expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
-    expect(mockGetOrganizationByokProviderIds).not.toHaveBeenCalled();
-  });
-
-  it('returns hasUserByokAvailable: true for a non-Kilo-exclusive paid model with a matching enabled user BYOK provider', async () => {
+  it('returns hasUserByokAvailable: true for a paid model with a matching enabled user BYOK provider', async () => {
     mockGetModelUserByokProviders.mockResolvedValueOnce(['openrouter']);
     mockGetUserByokProviderIds.mockResolvedValueOnce(['openrouter']);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
       user: fakeUser,
-      modelId: NON_EXCLUSIVE_MODEL,
+      modelId: PAID_MODEL,
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
   });
 
-  it('returns hasUserByokAvailable: false for a non-Kilo-exclusive paid model with no matching BYOK provider', async () => {
+  it('returns hasUserByokAvailable: false for a paid model with no matching BYOK provider', async () => {
     mockGetModelUserByokProviders.mockResolvedValueOnce(['openrouter']);
     mockGetUserByokProviderIds.mockResolvedValueOnce(['anthropic']);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
       user: fakeUser,
-      modelId: NON_EXCLUSIVE_MODEL,
+      modelId: PAID_MODEL,
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
   });
 
-  it('returns hasUserByokAvailable: false for a non-Kilo-exclusive paid model with no resolvable providers', async () => {
+  it('returns hasUserByokAvailable: false for a paid model with no resolvable providers', async () => {
     mockGetUserByokProviderIds.mockResolvedValueOnce(['anthropic']);
     mockGetModelUserByokProviders.mockResolvedValueOnce([]);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
       user: fakeUser,
-      modelId: NON_EXCLUSIVE_MODEL,
+      modelId: PAID_MODEL,
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-    expect(mockGetModelUserByokProviders).toHaveBeenCalledWith(
-      NON_EXCLUSIVE_MODEL,
-      new Set(['anthropic'])
-    );
+    expect(mockGetModelUserByokProviders).toHaveBeenCalledWith(PAID_MODEL, new Set(['anthropic']));
   });
 
   it('skips model provider discovery when the owner has no enabled keys', async () => {
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
       user: fakeUser,
-      modelId: NON_EXCLUSIVE_MODEL,
+      modelId: PAID_MODEL,
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
@@ -171,14 +119,14 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
   });
 
-  it('uses organization BYOK providers for a non-Kilo-exclusive paid model when organizationId is provided', async () => {
+  it('uses organization BYOK providers for a paid model when organizationId is provided', async () => {
     mockGetModelUserByokProviders.mockResolvedValueOnce(['openrouter']);
     mockGetOrganizationByokProviderIds.mockResolvedValueOnce(['openrouter']);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
       user: fakeUser,
-      modelId: NON_EXCLUSIVE_MODEL,
+      modelId: PAID_MODEL,
       organizationId: 'org-1',
     });
 
@@ -234,7 +182,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       return computeCloudAgentNextBalanceCheckEligibility({
         fromDb: fakeDb,
         user: fakeUser,
-        modelId: NON_EXCLUSIVE_MODEL,
+        modelId: PAID_MODEL,
         organizationId: 'org-1',
       });
     }
@@ -247,7 +195,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
         organizationId: 'org-1',
         kiloUserId: fakeUser.id,
         allowNonMember: true,
-        modelId: NON_EXCLUSIVE_MODEL,
+        modelId: PAID_MODEL,
       });
       const getRoutingProviderConfig = mockCanRouteToVercel.mock
         .calls[0][1] as () => Promise<unknown>;
@@ -287,7 +235,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       return computeCloudAgentNextBalanceCheckEligibility({
         fromDb: fakeDb,
         user: fakeUser,
-        modelId: NON_EXCLUSIVE_MODEL,
+        modelId: PAID_MODEL,
         organizationId: 'org-1',
       });
     }

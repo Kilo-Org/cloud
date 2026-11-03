@@ -8,6 +8,7 @@ import type { NewSessionPanel as NewSessionPanelComponent } from './NewSessionPa
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 const mockRouterPush = jest.fn();
+const mockRepositoryQueryOptions = jest.fn<(options: unknown) => void>();
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
@@ -16,6 +17,7 @@ const mockQueryClient = {
 };
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);
+let mockEnvironmentListFailed = true;
 let mockUploadUrlRequest:
   | { messageUuid: string; attachmentId: string; contentLength: number }
   | undefined;
@@ -60,6 +62,9 @@ const mockRepository = {
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
+  if (kind.endsWith('Repositories') || kind.endsWith('bitbucket.getStatus')) {
+    mockRepositoryQueryOptions(options);
+  }
   const base = {
     data: undefined as unknown,
     isLoading: false,
@@ -87,6 +92,13 @@ function mockQueryResult(options: { __testKind?: string }) {
   }
   if (kind.endsWith('recentRepositories')) {
     return { ...base, data: { repositories: [] } };
+  }
+  if (kind === 'cloudEnvironments.list') {
+    return {
+      ...base,
+      data: mockEnvironmentListFailed ? undefined : [],
+      isError: mockEnvironmentListFailed,
+    };
   }
   return base;
 }
@@ -370,55 +382,94 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
     Object.assign(globalThis, { XMLHttpRequest: MockXMLHttpRequest });
   });
 
-  it('hands a completed attachment to createLocalSession without releasing it', async () => {
-    const dom = installLinkedomDom();
-    const root = createRoot(dom.container);
-    let mounted = true;
+  it.each([true, false])(
+    'hands off attachments when environment list failure is %s',
+    async environmentListFailed => {
+      mockEnvironmentListFailed = environmentListFailed;
+      const dom = installLinkedomDom();
+      const root = createRoot(dom.container);
+      let mounted = true;
 
-    try {
-      act(() => {
-        root.render(
-          createElement(
-            NewSessionPanel,
-            scenario.organizationId ? { organizationId: scenario.organizationId } : {}
-          )
+      try {
+        act(() => {
+          root.render(
+            createElement(
+              NewSessionPanel,
+              scenario.organizationId ? { organizationId: scenario.organizationId } : {}
+            )
+          );
+        });
+        await waitForStartButton(dom.container);
+
+        const repositoryScope = scenario.organizationId
+          ? 'organizations.cloudAgentNext'
+          : 'cloudAgentNext';
+        for (const provider of ['GitHub', 'GitLab']) {
+          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+            expect.objectContaining({
+              __testKind: `${repositoryScope}.list${provider}Repositories`,
+              staleTime: 15 * 60_000,
+              gcTime: 15 * 60_000,
+              input: {
+                forceRefresh: false,
+                ...(scenario.organizationId ? { organizationId: scenario.organizationId } : {}),
+              },
+            })
+          );
+        }
+        for (const procedure of [
+          'cloudAgentNext.listBitbucketRepositories',
+          'bitbucket.getStatus',
+        ]) {
+          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+            expect.objectContaining({
+              __testKind: `organizations.${procedure}`,
+              staleTime: 15 * 60_000,
+              gcTime: 15 * 60_000,
+              enabled: Boolean(scenario.organizationId),
+            })
+          );
+        }
+
+        act(() => {
+          changeFileInput(dom.container, [
+            new File(['handoff'], 'handoff.txt', { type: 'text/plain' }),
+          ]);
+        });
+
+        const startButton = await waitForStartButton(dom.container);
+        expect(mockUploadUrlRequest).toBeDefined();
+
+        act(() => startButton.click());
+
+        expect(mockCreateLocalSession).toHaveBeenCalledTimes(1);
+        const draft = mockCreateLocalSession.mock.calls[0]?.[0] as unknown as HandoffDraft;
+        expect(draft.request.kind).toBe(scenario.requestKind);
+        expect(draft.request.input.attachments).toEqual({
+          path: mockUploadUrlRequest?.messageUuid,
+          files: ['handoff.txt'],
+        });
+        expect(draft.firstMessage.attachmentNames).toEqual(['handoff.txt']);
+        expect(draft.request.input.organizationId).toBe(scenario.organizationId);
+        if (environmentListFailed) {
+          expect(draft.request.input).not.toHaveProperty('requireEnvironmentChoice');
+        } else {
+          expect(draft.request.input).toHaveProperty('requireEnvironmentChoice', true);
+        }
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          `${scenario.basePath}/chat?sessionId=local-session-1`
         );
-      });
-      await waitForStartButton(dom.container);
 
-      act(() => {
-        changeFileInput(dom.container, [
-          new File(['handoff'], 'handoff.txt', { type: 'text/plain' }),
-        ]);
-      });
+        expect(mockReleaseMutate).not.toHaveBeenCalled();
 
-      const startButton = await waitForStartButton(dom.container);
-      expect(mockUploadUrlRequest).toBeDefined();
-
-      act(() => startButton.click());
-
-      expect(mockCreateLocalSession).toHaveBeenCalledTimes(1);
-      const draft = mockCreateLocalSession.mock.calls[0]?.[0] as unknown as HandoffDraft;
-      expect(draft.request.kind).toBe(scenario.requestKind);
-      expect(draft.request.input.attachments).toEqual({
-        path: mockUploadUrlRequest?.messageUuid,
-        files: ['handoff.txt'],
-      });
-      expect(draft.firstMessage.attachmentNames).toEqual(['handoff.txt']);
-      expect(draft.request.input.organizationId).toBe(scenario.organizationId);
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        `${scenario.basePath}/chat?sessionId=local-session-1`
-      );
-
-      expect(mockReleaseMutate).not.toHaveBeenCalled();
-
-      act(() => root.unmount());
-      mounted = false;
-      expect(mockReleaseMutate).not.toHaveBeenCalled();
-    } finally {
-      if (mounted) act(() => root.unmount());
-      dom.cleanup();
-      delete (globalThis as { XMLHttpRequest?: typeof XMLHttpRequest }).XMLHttpRequest;
+        act(() => root.unmount());
+        mounted = false;
+        expect(mockReleaseMutate).not.toHaveBeenCalled();
+      } finally {
+        if (mounted) act(() => root.unmount());
+        dom.cleanup();
+        delete (globalThis as { XMLHttpRequest?: typeof XMLHttpRequest }).XMLHttpRequest;
+      }
     }
-  });
+  );
 });

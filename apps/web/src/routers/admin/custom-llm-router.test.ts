@@ -13,8 +13,6 @@ import type {
 } from '@kilocode/db/schema-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { useKiloExclusiveModel } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
@@ -60,8 +58,6 @@ beforeEach(async () => {
 });
 
 describe('adminCustomLlmRouter', () => {
-  useKiloExclusiveModel();
-
   it('rejects a non-admin caller', async () => {
     const caller = await createCallerForUser(nonAdmin.id);
     await expect(caller.admin.customLlm.list()).rejects.toMatchObject({
@@ -574,54 +570,6 @@ describe('adminCustomLlmRouter', () => {
         code: 'BAD_REQUEST',
         message: expect.stringContaining('free model id'),
       });
-    });
-
-    it.each([
-      ['a private', validDefinition],
-      ['a public', publicDefinition],
-    ])('lets %s custom LLM claim a Kilo-exclusive model id', async (_access, definition) => {
-      const caller = await createCallerForUser(admin.id);
-
-      for (const exclusiveModel of kiloExclusiveModels.filter(
-        model => !model.public_id.includes(':')
-      )) {
-        await expect(
-          caller.admin.customLlm.upsert({
-            public_id: exclusiveModel.public_id,
-            definition,
-            credentials,
-          })
-        ).resolves.toMatchObject({ public_id: exclusiveModel.public_id });
-      }
-    });
-
-    it('lists whether a Kilo-exclusive model still serves the id', async () => {
-      const exclusiveModelId = kiloExclusiveModels.find(
-        model => !model.public_id.includes(':')
-      )?.public_id;
-      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
-      const caller = await createCallerForUser(admin.id);
-      await caller.admin.customLlm.upsert({
-        public_id: exclusiveModelId,
-        definition: publicDefinition,
-        credentials,
-      });
-      await caller.admin.customLlm.upsert({
-        public_id: 'acme/own-model',
-        definition: publicDefinition,
-        credentials,
-      });
-
-      const { items } = await caller.admin.customLlm.list();
-
-      expect(
-        items.map(item => [item.public_id, item.shadowedByKiloExclusiveModel]).toSorted()
-      ).toEqual(
-        [
-          ['acme/own-model', false],
-          [exclusiveModelId, true],
-        ].toSorted()
-      );
     });
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {

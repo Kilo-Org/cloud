@@ -22,6 +22,19 @@ export const SYSTEM_GIT_CONFIG_ENV = {
   GIT_CONFIG_VALUE_1: 'false',
 } as const;
 
+/**
+ * The override of the pinned Git configuration above for the environment
+ * builder's processes. A session answers every repository of a host with one
+ * alias, so `credential.useHttpPath` stays `false`. The builder holds a real
+ * token for each repository and writes one path-qualified record for each, so its
+ * multi-repository build asks Git for the request path. Spread this after
+ * `SYSTEM_GIT_CONFIG_ENV`, and only for that process, so the pinned value still
+ * wins everywhere else.
+ */
+export const MULTI_MEMBER_GIT_CREDENTIAL_ENV = {
+  GIT_CONFIG_VALUE_1: 'true',
+} as const;
+
 const SYSTEM_GIT_CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(SYSTEM_GIT_CONFIG_ENV));
 
 /**

@@ -29,7 +29,7 @@ export type EnkryptGuardrailCall = {
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
-  /** The request's wait for the verdict, on its final call only; see the ledger column. */
+  /** The request's wait for the verdict, on one call per request only; see the ledger column. */
   addedLatencyMs: number | null;
 };
 

@@ -14,8 +14,8 @@ export type SnapshotExtraModel = {
 
 /**
  * Lists each available public custom LLM under every inference provider it
- * declares. Like free Kilo-exclusive models, public custom LLMs are assumed to
- * train on and retain prompts, even when they set pricing.
+ * declares. Public custom LLMs are assumed to train on and retain prompts, even
+ * when they set pricing.
  */
 export function buildPublicCustomLlmSnapshotModels(
   customLlms: readonly CustomLlm[],

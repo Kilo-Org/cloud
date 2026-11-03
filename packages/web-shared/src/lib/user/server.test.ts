@@ -1482,6 +1482,32 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     });
   });
 
+  test.each([
+    ['delegated workload', { tokenSource: 'cloud-agent' }, 'delegated_workload'],
+    ['service assertion', { internalApiUse: true }, 'service_assertion'],
+  ] as const)(
+    'preserves %s provenance on a denied admin request',
+    async (_label, extra, expectedCredential) => {
+      const user = await insertTestUser({
+        google_user_email: `denied-${crypto.randomUUID()}@kilocode.ai`,
+        api_token_pepper: `denied-${crypto.randomUUID()}`,
+      });
+      mockHeaders.mockResolvedValue(
+        new Headers({ Authorization: `Bearer ${generateApiToken(user, extra)}` })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        credential: expectedCredential,
+        outcome: 'denied',
+      });
+    }
+  );
+
   test('does not emit when a non-admin token hits an admin-only check', async () => {
     const nonAdmin = await insertTestUser({
       is_admin: false,

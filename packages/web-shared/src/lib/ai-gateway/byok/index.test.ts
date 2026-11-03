@@ -389,7 +389,8 @@ describe('getStoredByokKeys', () => {
     expect(mockedCaptureException).not.toHaveBeenCalled();
     await expect(stored.decrypt('edenai')).rejects.toThrow();
     expect(mockedCaptureException).toHaveBeenCalledTimes(1);
-    await expect(stored.decrypt('anthropic')).rejects.toThrow('No stored BYOK key for anthropic');
+    await expect(stored.decrypt('openai')).rejects.toThrow('No enabled BYOK key for openai');
+    await expect(stored.decrypt('anthropic')).rejects.toThrow('No enabled BYOK key for anthropic');
   });
 });
 

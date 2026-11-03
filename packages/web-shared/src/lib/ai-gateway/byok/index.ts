@@ -265,7 +265,7 @@ export async function getByokKeyStates(
 export type StoredByokKeys = {
   /** Every key the owner stored, enabled or not, in `getByokKeyStates` order. */
   keys: ByokKeyState[];
-  /** Decrypts the stored key of a provider in `keys`, from the same read. */
+  /** Decrypts the enabled stored key of a provider in `keys`, from the same read. */
   decrypt(providerId: UserByokProviderId): Promise<BYOKResult>;
 };
 
@@ -289,7 +289,7 @@ export async function getStoredByokKeys(
     async decrypt(providerId) {
       // Keys are unique per owner and provider.
       const row = rows.find(candidate => candidate.provider_id === providerId);
-      if (!row) throw new Error(`No stored BYOK key for ${providerId}`);
+      if (!row?.is_enabled) throw new Error(`No enabled BYOK key for ${providerId}`);
       const priority = getByokKeyPriority(row.settings);
       try {
         return {

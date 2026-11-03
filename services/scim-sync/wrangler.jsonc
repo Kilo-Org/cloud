@@ -10,7 +10,11 @@
   // wrangler/miniflare catalog bump.
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
+  // No public URL: `/status` reaches the Durable Object, and an unauthenticated
+  // caller on a `*.workers.dev` hostname could create the instance and drive
+  // billable Durable Object requests. Reach this Worker through `wrangler dev`
+  // locally, and `wrangler tail` or the dashboard in production.
+  "workers_dev": false,
   "dev": {
     "port": 8819,
     "local_protocol": "http",
@@ -39,15 +43,6 @@
       "new_sqlite_classes": ["ScimSyncDO"],
     },
   ],
-  // Gates `/status`, which is reachable from the public internet via
-  // `workers_dev`. Both names already exist in the shared store.
-  "secrets_store_secrets": [
-    {
-      "binding": "INTERNAL_API_SECRET",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "INTERNAL_API_SECRET_PROD",
-    },
-  ],
   // ============================================
   // DEVELOPMENT ENVIRONMENT
   // Deploy with: wrangler deploy --env dev
@@ -55,7 +50,7 @@
   "env": {
     "dev": {
       "name": "cloudflare-scim-sync-dev",
-      "workers_dev": true,
+      "workers_dev": false,
       "vars": {
         "ENVIRONMENT": "development",
       },
@@ -67,13 +62,6 @@
           },
         ],
       },
-      "secrets_store_secrets": [
-        {
-          "binding": "INTERNAL_API_SECRET",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "INTERNAL_API_SECRET_DEV",
-        },
-      ],
     },
   },
 }

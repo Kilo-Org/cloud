@@ -9,17 +9,17 @@ integration, and no database access.
 
 ## HTTP surface
 
-| Route | Auth | Purpose |
-|---|---|---|
-| `GET /health` | none | Worker liveness. Does not touch the Durable Object, so an external monitor cannot drive billable Durable Object requests. |
-| `GET /status` | `X-Internal-Secret` | Calls the Durable Object, so a 200 proves the namespace is reachable and not just that the Worker booted. |
+| Route | Purpose |
+|---|---|
+| `GET /health` | Worker liveness. Does not touch the Durable Object. |
+| `GET /status` | Calls the Durable Object, so a 200 proves the namespace is reachable and not just that the Worker booted. |
 
-`workers_dev` publishes this Worker on the public internet, so `/status` is
-gated: it is the only route that reaches the Durable Object, and an
-unauthenticated request would otherwise create the instance and bill for it.
-The secret is compared before the Durable Object is touched, so a rejected
-caller costs a Secrets Store read and nothing more. Same `X-Internal-Secret`
-header and `INTERNAL_API_SECRET` binding as `services/notifications`.
+Both routes are unauthenticated, so the Worker publishes no public URL
+(`workers_dev: false`) and has no route or custom domain. `/status` reaches the
+Durable Object, and on a public hostname an anonymous caller could create the
+instance and drive billable Durable Object requests. Use `wrangler dev`
+locally; in production, confirm the deployment with `wrangler tail` or the
+Cloudflare dashboard. Add authentication before exposing either route.
 
 ## Durable Object
 

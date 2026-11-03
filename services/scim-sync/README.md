@@ -47,10 +47,12 @@ iteration's work.
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
 | `GET /status` | Interval, cursor, next alarm time, and the last poll result. |
 
-Both routes are unauthenticated, so the Worker has no ingress: no `workers_dev`
-hostname, no `routes`, and no service binding. Neither route is callable in
-production; read the poll output from Workers Logs instead. Add authentication
-before exposing either one.
+Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
+`workers_dev` hostname, no `routes`, and no service binding. Neither route is
+callable in production; read the poll output from Workers Logs, or stream it
+with `wrangler tail` — unlike the previous iteration, there is now traffic to
+see, because the cron trigger and the alarm both invoke the Worker. Add
+authentication before exposing either route.
 
 ## Logging
 

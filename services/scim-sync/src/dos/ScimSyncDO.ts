@@ -1,63 +1,17 @@
 import { DurableObject } from 'cloudflare:workers';
-import { WorkOS, type Event, type EventName } from '@workos-inc/node';
+import { WorkOS, type Event } from '@workos-inc/node';
 
+import type { PollResult, ScimSyncDOStatus } from '../types';
+import {
+  DEFAULT_INTERVAL_SECONDS,
+  DSYNC_EVENTS,
+  LAST_POLL_KEY,
+  MAX_INTERVAL_SECONDS,
+  MIN_INTERVAL_SECONDS,
+  PAGE_LIMIT,
+  SCIM_SYNC_DO_NAME,
+} from '../util/constants';
 import { logger } from '../util/logger';
-
-/**
- * The WorkOS Events API is scoped to the environment its API key belongs to,
- * and WorkOS prescribes a single serial consumer of the stream, so this
- * namespace holds exactly one instance.
- */
-export const SCIM_SYNC_DO_NAME = 'scim-sync';
-
-/**
- * Directory Sync events, as named by the SDK's `EventName` union. Listing them
- * is required: the Events API rejects a request with no `events` filter.
- */
-const DSYNC_EVENTS: EventName[] = [
-  'dsync.activated',
-  'dsync.deleted',
-  'dsync.user.created',
-  'dsync.user.updated',
-  'dsync.user.deleted',
-  'dsync.group.created',
-  'dsync.group.updated',
-  'dsync.group.deleted',
-  'dsync.group.user_added',
-  'dsync.group.user_removed',
-];
-
-/** Events requested per poll. Small on purpose: this iteration only logs. */
-const PAGE_LIMIT = 10;
-
-const DEFAULT_INTERVAL_SECONDS = 60;
-/**
- * A sub-second interval would leave the Durable Object no idle window to
- * hibernate in, billing its full 128 MB allocation continuously.
- */
-const MIN_INTERVAL_SECONDS = 10;
-const MAX_INTERVAL_SECONDS = 3600;
-
-export type ScimSyncDOStatus = {
-  instance: string;
-  environment: string;
-  pollIntervalSeconds: number;
-  cursor: string | null;
-  nextAlarmAt: number | null;
-  lastPoll: PollResult | null;
-};
-
-export type PollResult = {
-  at: string;
-  /** Events returned by the request, all of which were logged. */
-  eventCount: number;
-  /** ID of the last event in the page, to copy into `WORKOS_EVENT_CURSOR`. */
-  lastEventId: string | null;
-  error: string | null;
-};
-
-/** Storage key for the last poll result. */
-const LAST_POLL_KEY = 'lastPoll';
 
 export class ScimSyncDO extends DurableObject<Env> {
   /**

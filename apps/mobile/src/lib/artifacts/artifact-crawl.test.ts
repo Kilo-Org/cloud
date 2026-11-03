@@ -427,15 +427,15 @@ describe('materializeArtifact', () => {
 
   it.each<[string, string]>([
     ['a cleartext URL', `http://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/f1.bin`],
-    ['a third-party https URL', 'https://evil.example/f1.bin'],
+    ['a third-party https URL', 'https://outside.example/f1.bin'],
     ['a userinfo URL', `https://user:pw@${R2_ACCOUNT}.r2.cloudflarestorage.com/f1.bin`],
     ['a non-default port', `https://${R2_ACCOUNT}.r2.cloudflarestorage.com:8443/f1.bin`],
     ['an account-shaped but unlisted host', 'https://0123.r2.cloudflarestorage.com/f1.bin'],
-    ['a lookalike suffix', `https://${R2_ACCOUNT}.r2.cloudflarestorage.com.evil.example/f1.bin`],
-    ['a loopback URL', 'http://127.0.0.1:3000/reboot'],
-    ['a LAN URL', 'http://192.168.1.10/status'],
-    ['a link-local metadata URL', 'http://169.254.169.254/latest/meta-data/'],
-  ])('skips %s without issuing any request', async (_case, url) => {
+    ['a lookalike suffix', `https://${R2_ACCOUNT}.r2.cloudflarestorage.com.outside.example/f1.bin`],
+    ['a loopback URL', 'http://127.0.0.1:3000/local.png'],
+    ['a LAN URL', 'http://192.168.1.10/local.png'],
+    ['a link-local URL', 'http://169.254.169.254/latest/meta-data/'],
+  ])('reports %s as unsupported without issuing any request', async (_case, url) => {
     const { file, tracked } = target();
     const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
 
@@ -482,11 +482,11 @@ describe('materializeArtifact', () => {
 
   it.each<[string, string]>([
     ['cleartext link-local', 'http://169.254.169.254/latest/meta-data/'],
-    ['a third-party origin', 'https://evil.example/collect'],
-    ['a scheme-relative reference', '//evil.example/collect'],
+    ['an outside origin', 'https://outside.example/collect.png'],
+    ['a scheme-relative reference', '//outside.example/collect.png'],
     ['a local file', 'file:///etc/passwd'],
     ['userinfo on the storage host', `https://user:pw@${R2_ACCOUNT}.r2.cloudflarestorage.com/x`],
-  ])('refuses a redirect to %s and writes no file', async (_case, location) => {
+  ])('follows no redirect to %s and writes no file', async (_case, location) => {
     probeFetch.mockImplementation(async url =>
       url === ALLOWED_URL
         ? new Response(null, { status: 302, headers: { location } })

@@ -1,13 +1,6 @@
 /**
- * Splitting of an `http(s)` URL's authority, as the native client reaches it.
- *
- * Every consumer that decides whether a URL may be fetched must derive the host
- * from here rather than from `URL`: React Native's `URL` is a regex-based
- * polyfill whose `hostname` lets `[^@]+` cross a path separator, so
- * `https://attacker.com/x@trusted.com/p.png` keys as `trusted.com` even though
- * the native client connects to `attacker.com`. Deriving the host from an
- * authority this module delimits itself keeps it on the host the request
- * actually reaches.
+ * The parts of an `http(s)` URL's authority, split the way the native client
+ * reads them. One parser serves every destination check.
  */
 export type HttpUrlAuthority = {
   /** Lowercased scheme. */
@@ -16,7 +9,7 @@ export type HttpUrlAuthority = {
   hostname: string;
   /** WHATWG-canonical numeric port, or `''` when the URL carries none. */
   port: string;
-  /** True when the URL carries userinfo; a fetch decision must not ignore it. */
+  /** True when the authority carries userinfo before the host. */
   hasUserInfo: boolean;
 };
 
@@ -25,11 +18,9 @@ const REGISTERED_HOSTNAME_PATTERN = /^[a-z0-9\u00A1-\uFFFF._-]+$/;
 const PORT_PATTERN = /^\d+$/;
 
 /**
- * Splits an authority's host and port. Returns null for any authority shape the
- * native client would not resolve to that exact host, so an unusual authority
- * fails closed instead of keying as a host the request never reaches. An IPv6
- * host keeps its brackets; every other host is lowercased and restricted to
- * registered-name characters.
+ * Splits an authority's host and port, or reports null for a shape that does not
+ * name a resolvable endpoint. An IPv6 host keeps its brackets; every other host
+ * is lowercased and restricted to registered-name characters.
  */
 function parseAuthorityHost(hostPort: string): { hostname: string; port: string } | null {
   let hostname = '';
@@ -66,9 +57,9 @@ function parseAuthorityHost(hostPort: string): { hostname: string; port: string 
 }
 
 /**
- * Parse an `http(s)` URL's authority, or null when it is not `http(s)` or its
- * authority is malformed. A port above the 16-bit maximum fails too: WHATWG
- * parsing rejects it, so the native client would never resolve that endpoint.
+ * Parse an `http(s)` URL's authority, or null when the URL is not `http(s)` or
+ * its authority is malformed. A port above the 16-bit maximum reports null too,
+ * matching WHATWG parsing.
  */
 export function parseHttpUrlAuthority(uri: string): HttpUrlAuthority | null {
   const schemeEnd = uri.indexOf('://');

@@ -952,7 +952,7 @@ export async function handleLlmProxyRequest(
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-    getAllowedProviders: accessCheckResolver.getAllowedProviders,
+    getAllowedProviders: async () => accessCheckResolver.getAllowedProviders?.(),
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
     onDecision: decision => archiveKiloRoutingDecision(usageId, decision),

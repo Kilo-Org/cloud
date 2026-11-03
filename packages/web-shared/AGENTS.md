@@ -45,10 +45,12 @@ work, work after the upstream request starts, and exceptional paths may use it.
 
 ## BYOK routing preview
 
-`previewByokRouting` in `src/lib/ai-gateway/providers/get-provider.ts` shows the BYOK settings
-page the route order of `getProvider`, from key metadata only. When changing `getProvider`'s step
-order or key decisions, update the preview in the same change and keep
-`get-provider.preview.test.ts` passing. The preview must never decrypt keys or call KMS.
+`planRoutes` in `src/lib/ai-gateway/providers/route-plan.ts` orders the routes for a catalog id
+from key metadata and cached catalog lookups. `getProvider` walks that plan and decrypts only the
+key that takes the request, `previewByokRouting` shows the same plan on the BYOK settings page, and
+the routing decision records its candidates from it. Change step order or key decisions in
+`planRoutes`, not in a consumer, and keep `get-provider.preview.test.ts` passing. The plan and the
+preview must never decrypt keys or call KMS.
 
 ## Data collection versus ZDR
 

@@ -8,6 +8,8 @@ import {
   ProviderTypeSchema,
   type ProviderType,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getByokKeyDefaultRank } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
+import type { KeyPlanStep } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
 
 const ByokCandidateRouteSchema = z.enum(['direct-byok', 'vercel-byok', 'gateway-byok']);
 
@@ -18,6 +20,7 @@ const ByokCandidateSkipReasonSchema = z.enum([
   'model-unavailable',
   'provider-settings',
   'ignored-by-request',
+  /** Archived records only: routing now decrypts the key from the read that ranked it. */
   'not-loaded',
 ]);
 
@@ -100,6 +103,7 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('skipped'),
     reason: z.literal('unavailable'),
   }),
+  /** Archived records only: the BYOK candidates now show where the connection was ranked. */
   z.object({
     step: z.literal('chatgpt'),
     outcome: z.literal('deferred'),
@@ -122,6 +126,7 @@ const RoutingDecisionStepSchema = z.union([
     provider_id: UserByokProviderIdSchema,
     supported_api_kinds: z.array(GatewayChatApiKindSchema),
   }),
+  /** Archived records only, like the `not-loaded` candidate reason. */
   z.object({
     step: z.literal('unsupported-api-kind'),
     outcome: z.literal('skipped'),
@@ -247,20 +252,32 @@ export function createRoutingDecisionRecorder(
   request: Pick<ProviderRoutingDecision, 'requested_model' | 'api_kind' | 'owner_type'>
 ) {
   const steps: RoutingDecisionStep[] = [];
+  let keySteps: KeyPlanStep[] = [];
   let candidates: RoutingDecisionByokCandidate[] = [];
 
   return {
     step(step: RoutingDecisionStep) {
       steps.push(step);
     },
-    rankByokCandidates(ranked: RoutingDecisionByokCandidate[]) {
-      candidates = ranked;
+    /** Lists the key steps of the route plan as candidates, none reached yet. */
+    recordByokCandidates(planKeySteps: readonly KeyPlanStep[]) {
+      keySteps = [...planKeySteps];
+      candidates = keySteps.map(({ route, key, routeOrder }) => ({
+        route,
+        provider_id: key.providerId,
+        priority: key.priority ?? null,
+        default_rank: getByokKeyDefaultRank(key.providerId),
+        route_order: routeOrder,
+        outcome: 'unreached',
+      }));
     },
+    /** A selected key keeps the reason it was skipped at its own rank. */
     markByokCandidate(
-      index: number,
+      step: KeyPlanStep,
       outcome: RoutingDecisionByokCandidate['outcome'],
       reason?: ByokCandidateSkipReason
     ) {
+      const index = keySteps.indexOf(step);
       const candidate = candidates[index];
       if (!candidate) return;
       candidates[index] = { ...candidate, outcome, ...(reason ? { reason } : {}) };

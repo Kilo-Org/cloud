@@ -2861,6 +2861,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     reasoning_setting_id: integer(),
+    inference_region_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     // Microdollars charged on top of BYOK inference, such as server tools, plugins
     // and PDF parsing, excluding OpenRouter's BYOK fee. Null when not reported separately.
@@ -3027,6 +3028,15 @@ export const reasoning_setting = pgTable(
     reasoning_setting: text().notNull(),
   },
   table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
+export const inference_region = pgTable(
+  'inference_region',
+  {
+    inference_region_id: serial().notNull().primaryKey(),
+    inference_region: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_inference_region').on(table.inference_region)]
 );
 
 export const microdollar_usage_view = pgView('microdollar_usage_view', {

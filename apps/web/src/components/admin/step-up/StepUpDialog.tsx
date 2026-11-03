@@ -8,13 +8,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { PasskeyRegistrationError, registerNewPasskey } from '@/components/profile/PasskeysCard';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -81,11 +75,13 @@ export function StepUpCeremonyContent({
   onVerified,
   onCancel,
   dismissible = true,
+  headings = 'dialog',
 }: {
   requirement: StepUpRequirement | null;
   onVerified: () => void;
   onCancel: () => void;
   dismissible?: boolean;
+  headings?: 'dialog' | 'plain';
 }) {
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
@@ -98,6 +94,7 @@ export function StepUpCeremonyContent({
   });
   const current = requirement ?? { code: 'MFA_REQUIRED' as const };
   const statusKnown = statusQuery.isSuccess;
+  const statusFailed = statusQuery.isError;
   const unavailable = statusQuery.data?.unavailable === true;
   const needsSignIn =
     current.code === 'SESSION_UNBOUND' ||
@@ -152,37 +149,45 @@ export function StepUpCeremonyContent({
 
   const enrolled = statusQuery.data?.enrolled ?? false;
   const actionLabel = !statusKnown
-    ? 'Checking your passkeys...'
+    ? statusFailed
+      ? 'Retry status check'
+      : 'Checking your passkeys...'
     : unavailable
-      ? 'Verification unavailable'
+      ? 'Retry status check'
       : enrolled
         ? 'Verify with passkey'
         : 'Add a passkey';
-  const actionDisabled = isRunning || !statusKnown || unavailable;
+  const actionDisabled = isRunning || (!statusKnown && !statusFailed);
 
   return (
     <div>
-      <DialogHeader>
-        <div className="mb-2 flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-full bg-muted">
-            {needsSignIn ? (
-              <KeyRound className="size-4" aria-hidden="true" />
-            ) : (
-              <ShieldCheck className="size-4" aria-hidden="true" />
-            )}
-          </span>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex size-8 items-center justify-center rounded-full bg-muted">
+          {needsSignIn ? (
+            <KeyRound className="size-4" aria-hidden="true" />
+          ) : (
+            <ShieldCheck className="size-4" aria-hidden="true" />
+          )}
+        </span>
+        {headings === 'dialog' ? (
           <DialogTitle>{stepUpDialogTitle(current)}</DialogTitle>
-        </div>
+        ) : (
+          <h2 className="text-lg font-semibold">{stepUpDialogTitle(current)}</h2>
+        )}
+      </div>
+      {headings === 'dialog' ? (
         <DialogDescription>{stepUpDialogDescription(current)}</DialogDescription>
-      </DialogHeader>
+      ) : (
+        <p className="text-sm text-muted-foreground">{stepUpDialogDescription(current)}</p>
+      )}
 
-      {!statusKnown ? (
+      {!statusKnown && !statusFailed ? (
         <p className="mt-4 text-sm text-muted-foreground" role="status">
           Checking your passkeys...
         </p>
-      ) : unavailable ? (
-        <p className="mt-4 text-sm text-muted-foreground" role="status">
-          Verification is temporarily unavailable. Try again in a moment.
+      ) : statusFailed || unavailable ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="alert">
+          Could not check verification status. Try again.
         </p>
       ) : null}
 
@@ -196,7 +201,12 @@ export function StepUpCeremonyContent({
         {needsSignIn || reauthRequired ? (
           <StepUpSignInAgainButton size="default" />
         ) : (
-          <Button onClick={() => void runCeremony()} disabled={actionDisabled}>
+          <Button
+            onClick={() =>
+              statusFailed || unavailable ? void statusQuery.refetch() : void runCeremony()
+            }
+            disabled={actionDisabled}
+          >
             {isRunning ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
@@ -243,6 +253,7 @@ export function StepUpDialog({
           onVerified={onVerified}
           onCancel={onCancel}
           dismissible={dismissible}
+          headings="dialog"
         />
       </DialogContent>
     </Dialog>

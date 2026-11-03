@@ -7,6 +7,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { registerStepUpHandler } from '@/lib/trpc/step-up-link';
 import { type StepUpRequirement } from './step-up-error';
 import { StepUpRequestQueue } from './step-up-requests';
+import { isStepUpInterstitialVisible } from './step-up-interstitial-state';
 import { StepUpDialog } from './StepUpDialog';
 
 /**
@@ -20,8 +21,12 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   const queue = useRef(new StepUpRequestQueue());
 
   const requestStepUp = useCallback((nextRequirement: StepUpRequirement) => {
+    // The full-page interstitial owns the only verification UI while it is
+    // showing; do not stack a second dialog over it.
+    if (isStepUpInterstitialVisible()) return Promise.resolve(false);
+    const started = !queue.current.hasPending();
     const pending = queue.current.begin();
-    setRequirement(nextRequirement);
+    if (started) setRequirement(nextRequirement);
     return pending;
   }, []);
 

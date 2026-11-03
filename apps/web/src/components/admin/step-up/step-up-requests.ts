@@ -9,6 +9,10 @@ export class StepUpRequestQueue {
   private pending: Promise<boolean> | null = null;
   private resolvePending: Resolver | null = null;
 
+  hasPending(): boolean {
+    return this.pending !== null;
+  }
+
   begin(): Promise<boolean> {
     if (this.pending) return this.pending;
     this.pending = new Promise(resolve => {

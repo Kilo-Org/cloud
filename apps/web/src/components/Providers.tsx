@@ -11,8 +11,12 @@ import type { PropsWithChildren } from 'react';
 import { useState } from 'react';
 import { SignInHintEmailSyncer } from '@/components/auth/SignInHintEmailSyncer';
 import { stepUpRequirementFromError } from '@/components/admin/step-up/step-up-error';
+import { AdminStepUpRoot } from '@/components/admin/step-up/AdminStepUpRoot';
 
-export function Providers({ children }: PropsWithChildren) {
+export function Providers({
+  children,
+  stepUpEnabled = false,
+}: PropsWithChildren<{ stepUpEnabled?: boolean }>) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -37,8 +41,10 @@ export function Providers({ children }: PropsWithChildren) {
           <GastownTRPCProvider trpcClient={gastownClient} queryClient={queryClient}>
             <WastelandTRPCProvider trpcClient={wastelandClient} queryClient={queryClient}>
               <SessionProvider>
-                <SignInHintEmailSyncer />
-                <ConfirmProvider>{children}</ConfirmProvider>
+                <AdminStepUpRoot enabled={stepUpEnabled}>
+                  <SignInHintEmailSyncer />
+                  <ConfirmProvider>{children}</ConfirmProvider>
+                </AdminStepUpRoot>
               </SessionProvider>
             </WastelandTRPCProvider>
           </GastownTRPCProvider>

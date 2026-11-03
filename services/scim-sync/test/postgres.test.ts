@@ -3,8 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
 import {
   kilocode_users,
-  organization_group_memberships,
-  organization_groups,
   organization_membership_removals,
   organization_memberships,
   organizations,
@@ -25,7 +23,6 @@ import {
   listOrganizationMemberships,
   listUserMemberships,
 } from '../src/db/memberships';
-import { listGroupMemberships, listOrganizationGroups } from '../src/db/groups';
 import { findUserById, findUsersByExternalId, findUsersByNormalizedEmail } from '../src/db/users';
 
 const connectionString =
@@ -47,7 +44,6 @@ const externalId = `directory_user_${suffix}`;
 const directoryGroupId = `directory_group_${suffix}`;
 const directoryIdpId = `idp_group_${suffix}`;
 const externalOrgId = `external_org_${suffix}`;
-const groupId = randomUUID();
 
 const allOrgIds = [parentOrgId, childOrgId, deletedOrgId];
 
@@ -94,18 +90,6 @@ beforeAll(async () => {
     role: 'admin',
   });
 
-  await client.db.insert(organization_groups).values({
-    id: groupId,
-    organization_id: parentOrgId,
-    name: `Engineering ${suffix}`,
-  });
-
-  await client.db.insert(organization_group_memberships).values({
-    organization_id: parentOrgId,
-    group_id: groupId,
-    kilo_user_id: userId,
-  });
-
   await client.db.insert(organization_membership_removals).values({
     organization_id: childOrgId,
     kilo_user_id: userId,
@@ -114,10 +98,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await client.db
-    .delete(organization_group_memberships)
-    .where(inArray(organization_group_memberships.organization_id, allOrgIds));
-  await client.db.delete(organization_groups).where(inArray(organization_groups.id, [groupId]));
   await client.db
     .delete(organization_membership_removals)
     .where(inArray(organization_membership_removals.organization_id, allOrgIds));
@@ -210,14 +190,5 @@ describe('memberships', () => {
     expect((await findMembershipRemoval(db, childOrgId, userId))?.previous_role).toBe('member');
 
     expect(await findMembershipRemoval(db, parentOrgId, userId)).toBeNull();
-  });
-});
-
-describe('groups', () => {
-  it('lists an organization group and its members', async () => {
-    expect((await listOrganizationGroups(db, parentOrgId)).map(row => row.id)).toEqual([groupId]);
-    expect(
-      (await listGroupMemberships(db, parentOrgId, groupId)).map(row => row.kilo_user_id)
-    ).toEqual([userId]);
   });
 });

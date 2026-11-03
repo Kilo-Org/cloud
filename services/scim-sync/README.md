@@ -115,9 +115,11 @@ Four schema facts the query modules encode, each easy to get wrong:
 - **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
   validate, parse, or cast one as a UUID.
 
-Group assignments are the exception to the missing-FK rule: a composite foreign
-key on `(organization_id, kilo_user_id)` points at `organization_memberships`,
-so an assignment cannot exist without a membership and is cascaded away with it.
+Not read here: Kilo's `organization_groups` are capability policy sets, not
+WorkOS directory groups, and nothing populates them from directory sync. Worth
+knowing anyway, because deleting a membership cascades a user's group
+assignments away through a composite foreign key — so a membership write has
+authorization consequences no directory event names.
 
 Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
 strict ISO validators such as `z.string().datetime()` reject. Normalize before

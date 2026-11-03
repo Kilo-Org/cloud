@@ -3330,6 +3330,13 @@ importers:
         version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/scim-sync:
+    dependencies:
+      '@workos-inc/node':
+        specifier: 'catalog:'
+        version: 11.0.0
+      workers-tagged-logger:
+        specifier: 'catalog:'
+        version: 1.0.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'

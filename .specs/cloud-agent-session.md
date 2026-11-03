@@ -119,8 +119,10 @@ repository.
     16,000 characters.
 14. A repository matches every environment that contains it. When exactly one
     matches, it MUST apply with no choice.
-15. When several match, the new-session form in the web UI MUST require the user
-    to choose one and MUST NOT start the session until they do. A request that
+15. When several match, the new-session form in the web UI MUST require a valid
+    choice and MUST NOT start the session without one. The form MUST
+    remember the last choice per repository and personal/organization scope and
+    restore it only while it still matches the repository. A request that
     marks the choice as required and names no environment MUST fail with a
     conflict that names the matching environments. A request that names an
     environment that does not contain the repository MUST fail.
@@ -131,9 +133,9 @@ repository.
     names one is ignored, but a request that lists additional repositories MUST
     fail.
 17. A session on a multi-repository environment MUST ignore the repository's
-    profile binding and the implicit default profile. A profile the user
-    selects explicitly MUST still apply. The new-session form MUST show the same
-    profiles that will apply.
+    profile binding while applying the effective default profile. A profile the
+    user selects explicitly MUST replace the default. The new-session form MUST
+    show the same profiles that will apply.
 18. A session on a multi-repository environment MUST run in an isolated sandbox.
     One repository MUST run at `/workspace/<name>`. Several MUST each be cloned
     at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
@@ -660,6 +662,12 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-03 -- Environment selection preferences
+
+- Remember the environment choice per repository and personal/organization scope.
+- Apply the effective default profile to multi-repository environments unless an
+  explicit profile replaces it. Repository bindings remain ignored.
 
 ### 2026-11-03 -- Snapshot notice removal
 

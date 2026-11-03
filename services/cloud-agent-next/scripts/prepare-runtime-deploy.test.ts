@@ -19,14 +19,14 @@ afterEach(async () => {
   lookup.mockClear();
   for (const root of temporary.splice(0)) await fs.rm(root, { recursive: true, force: true });
 });
-async function checkout(config: string, recipe?: string, mode = 'downloaded') {
+async function checkout(config: string, recipe?: string, mode = 'downloaded', vercel = false) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-deploy-preflight-'));
   temporary.push(root);
   await fs.writeFile(path.join(root, 'wrangler.jsonc'), config);
   await fs.writeFile(
     path.join(root, 'runtime-targets.json'),
     JSON.stringify({
-      default: { mode, image: 'all-in-one' },
+      default: { mode, image: 'all-in-one', ...(vercel ? { vercel: true } : {}) },
       targets: {},
     })
   );
@@ -72,6 +72,17 @@ const config = () =>
       },
     ],
   });
+const vercelConfig = () =>
+  JSON.stringify({
+    vars: { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' },
+    r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
+    containers: [
+      {
+        class_name: 'SandboxContainers',
+        images: { app: { dockerfile: './Dockerfile.containers' } },
+      },
+    ],
+  });
 for (const recipe of [undefined, 'FROM debian:trixie-slim\nCOPY undeclared /tmp/file\n'])
   it(`rejects ${recipe === undefined ? 'missing' : 'undeclared'} base inputs before publication lookup`, async () => {
     const f = await checkout(config(), recipe);
@@ -99,4 +110,19 @@ it('accepts JSONC comments and trailing commas without runtime storage in preins
   );
   await expect(main(['production', f.sha], f.root)).resolves.toBeUndefined();
   expect(lookup).not.toHaveBeenCalled();
+});
+it('preinstalled Vercel targets still require the published handoff', async () => {
+  const f = await checkout(
+    vercelConfig(),
+    'FROM debian:trixie-slim\nRUN true\n',
+    'preinstalled',
+    true
+  );
+  await expect(main(['production', f.sha], f.root)).rejects.toThrow(
+    'Unexpected publication lookup'
+  );
+  expect(lookup).toHaveBeenCalled();
+  await expect(
+    fs.stat(path.join(f.root, 'wrangler.runtime-generated.json'))
+  ).rejects.toHaveProperty('code', 'ENOENT');
 });

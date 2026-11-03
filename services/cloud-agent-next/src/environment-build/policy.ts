@@ -48,7 +48,7 @@ export const publishedSnapshotSchema = z
     repository: environmentRepositoryIdentitySchema,
     sourceCommit: z.string().regex(/^[0-9a-f]{40}$/),
     sourceBranch: z.string().min(1).max(256),
-    provider: z.literal('cloudflare-containers'),
+    provider: z.enum(['cloudflare-containers', 'vercel']),
     baseImage: z.string().min(1),
     runtimeAbi: z.string().min(1),
     runtimeRelease: z.string().min(1).nullable(),
@@ -63,25 +63,34 @@ export const publishedSnapshotSchema = z
 export type PublishedSnapshot = z.infer<typeof publishedSnapshotSchema>;
 
 /**
- * The launch image and runtime ABI a session would start with now. `baseImage`
- * is null when it could not be read; the container DO still refuses another
- * image, so an unknown image never blocks a start.
+ * The provider, account/base identity and runtime ABI a session would start
+ * with now. `baseImage` is null when it could not be read. For native containers
+ * the container DO still refuses another image, so an unknown image never
+ * blocks a start. Vercel has no such guard: an account that cannot be read is
+ * incompatible, because restoring across accounts is never safe.
  */
 export type SnapshotCompatibility = {
+  provider: PublishedSnapshot['provider'];
   baseImage: string | null;
   runtimeAbi: string;
 };
 
-/** Only split-image snapshots with a downloaded runtime can serve sessions. */
+/**
+ * Only split-image snapshots with a downloaded runtime can serve sessions.
+ * Compatibility checks the provider, the base/account identity and the runtime
+ * ABI. The runtime release may advance: the split base is reused across it.
+ */
 export function compatibleWith(
   published: PublishedSnapshot,
   current: SnapshotCompatibility
 ): boolean {
-  return (
-    published.runtimeAbi === current.runtimeAbi &&
-    published.runtimeRelease !== null &&
-    (current.baseImage === null || published.baseImage === current.baseImage)
-  );
+  if (published.provider !== current.provider) return false;
+  if (published.runtimeAbi !== current.runtimeAbi) return false;
+  if (published.provider === 'cloudflare-containers' && published.runtimeRelease === null) {
+    return false;
+  }
+  if (current.baseImage === null) return published.provider !== 'vercel';
+  return published.baseImage === current.baseImage;
 }
 
 /** Why a snapshot is not used for a session, or `eligible`. */

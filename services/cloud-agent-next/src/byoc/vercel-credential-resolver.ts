@@ -39,8 +39,6 @@ const SetupStepSchema = z.enum([
   'create_builder',
   'install_system_dependencies',
   'install_node_dependencies',
-  'upload_runtime_artifacts',
-  'verify_runtime_artifacts',
   'snapshot_builder',
   'create_validator',
   'launch_validator_wrapper',

@@ -4,14 +4,18 @@ import {
   SNAPSHOT_STALE_AFTER_MS,
   automaticAdmission,
   cleanupRetryDelay,
+  compatibleWith,
   replacementNeeded,
   snapshotEligibility,
   type PublishedSnapshot,
+  type SnapshotCompatibility,
 } from './policy.js';
+import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
 import type { SessionEnvironmentReference } from './reference.js';
 
 const NOW = 1_800_000_000_000;
 const CURRENT = {
+  provider: 'cloudflare-containers' as const,
   baseImage: 'registry.example/runtime-free:1',
   runtimeAbi: 'abi',
 };
@@ -168,6 +172,68 @@ describe('snapshotEligibility', () => {
         CURRENT
       ).eligible
     ).toBe(true);
+  });
+
+  it('scopes a Vercel snapshot to its provider, credential, team, project, runtime build and base snapshot', () => {
+    const baseImage = vercelSnapshotBaseImage({
+      credentialId: 'credential-1',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base-1',
+    });
+    const vercel: SnapshotCompatibility = {
+      provider: 'vercel',
+      baseImage,
+      runtimeAbi: 'abi',
+    };
+    const snapshot = published({
+      provider: 'vercel',
+      baseImage,
+      builderInstance: 'vercel',
+      runtimeRelease: null,
+    });
+    expect(compatibleWith(snapshot, vercel)).toBe(true);
+    expect(snapshotEligibility(snapshot, REFERENCE, NOW, vercel)).toEqual({
+      eligible: true,
+      stale: false,
+    });
+    // A runtime release is not part of a Vercel base identity.
+    expect(replacementNeeded(snapshot, 2, NOW, vercel)).toBe(false);
+    // Another provider, account, project or runtime build is incompatible.
+    expect(compatibleWith(snapshot, { ...vercel, provider: 'cloudflare-containers' })).toBe(false);
+    expect(
+      compatibleWith(snapshot, {
+        ...vercel,
+        baseImage: vercelSnapshotBaseImage({
+          credentialId: 'credential-2',
+          teamId: 'team-1',
+          projectId: 'project-1',
+          runtimeBuildId: 'runtime-1',
+          baseSnapshotId: 'snap-base-1',
+        }),
+      })
+    ).toBe(false);
+    expect(compatibleWith(snapshot, { ...vercel, runtimeAbi: 'abi-2' })).toBe(false);
+  });
+
+  it('never treats an unreadable Vercel account as compatible', () => {
+    const baseImage = vercelSnapshotBaseImage({
+      credentialId: 'credential-1',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base-1',
+    });
+    const snapshot = published({
+      provider: 'vercel',
+      baseImage,
+      builderInstance: 'vercel',
+      runtimeRelease: null,
+    });
+    expect(
+      compatibleWith(snapshot, { provider: 'vercel', baseImage: null, runtimeAbi: 'abi' })
+    ).toBe(false);
   });
 });
 

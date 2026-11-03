@@ -830,6 +830,7 @@ export async function loadEnvironmentBuildInput(
         commands: environment.commands,
         plainVars,
         encryptedSecrets,
+        sandboxAllocation: environment.sandbox_allocation,
       };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }

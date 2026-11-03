@@ -41,6 +41,7 @@ it('the committed catalog scopes production runtime-free to an org cohort', asyn
   expect(selectRuntimeTarget(catalog, 'production')).toMatchObject({
     mode: 'downloaded',
     image: 'runtime-free',
+    vercel: true,
     interactiveOrgIds: [expect.any(String)],
   });
   for (const target of ['dev', 'isolated'])
@@ -57,7 +58,11 @@ it('renders both real Wrangler targets without publication credentials', async (
     const output = renderRuntimeTarget({
       config: raw,
       environment,
-      startup: { mode: 'preinstalled', image: 'all-in-one' },
+      startup:
+        environment === 'production'
+          ? { mode: 'preinstalled', image: 'all-in-one', vercel: true }
+          : { mode: 'preinstalled', image: 'all-in-one' },
+      ...(environment === 'production' ? { release } : {}),
     });
     const target = environment === 'production' ? output : output.env?.dev;
     expect(target).toMatchObject({
@@ -86,6 +91,50 @@ it('renders the selected runtime-free digest and retains unrelated target settin
     bucket_name: release.bucket,
   });
   expect(original.containers[0].images.app).toEqual({ dockerfile: './Dockerfile.containers' });
+});
+it('renders a preinstalled Vercel target with the retained release without switching images', () => {
+  const config = baseline();
+  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
+  const output = renderRuntimeTarget({
+    config,
+    environment: 'production',
+    startup: { mode: 'preinstalled', image: 'all-in-one', vercel: true },
+    release,
+  });
+  expect(output.vars).toMatchObject({
+    EXISTING: 'keep',
+    RUNTIME_STARTUP_MODE: 'preinstalled',
+    NATIVE_RUNTIME_IMAGE: 'all-in-one',
+    RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
+  });
+  expect(output.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
+  expect(output.r2_buckets).toContainEqual({
+    binding: 'RUNTIME_RELEASE_BUCKET',
+    bucket_name: release.bucket,
+  });
+  expect(output.containers?.[0].images?.['runtime-free']).toBeUndefined();
+});
+it('requires a release for a preinstalled Vercel target', () => {
+  const config = baseline();
+  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
+  expect(() =>
+    renderRuntimeTarget({
+      config,
+      environment: 'production',
+      startup: { mode: 'preinstalled', image: 'all-in-one', vercel: true },
+    })
+  ).toThrow('verified runtime handoff');
+});
+it('rejects a Vercel-enabled target that does not declare Vercel in the catalog', () => {
+  const config = baseline();
+  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
+  expect(() =>
+    renderRuntimeTarget({
+      config,
+      environment: 'production',
+      startup: { mode: 'preinstalled', image: 'all-in-one' },
+    })
+  ).toThrow('Vercel support belongs in runtime-targets.json');
 });
 it('isolated rendering leaves production selection and vars untouched', () => {
   const output = renderRuntimeTarget({

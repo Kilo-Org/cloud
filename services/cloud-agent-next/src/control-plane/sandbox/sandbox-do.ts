@@ -95,6 +95,7 @@ import {
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
+import { parseVercelSandboxRuntimeDefaults } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
 import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
   resolveSandboxNamespace,
@@ -292,6 +293,13 @@ import {
   type RepositoryPreparationFailure,
 } from './repository-launch.js';
 import {
+  clearPendingProviderReplacement,
+  listPendingProviderReplacements,
+  readPendingProviderReplacement,
+  writePendingProviderReplacement,
+  type PendingProviderReplacement,
+} from './provider-replacement.js';
+import {
   environmentLaunchCandidate,
   environmentStartDetail,
   lookupEnvironmentSnapshot,
@@ -353,6 +361,7 @@ const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_KEY = 'control_plane_owner';
+const PENDING_REPLACEMENT_RETRY_MS = 10_000;
 
 const ALLOCATION_ROW_ID = 'current';
 
@@ -2054,6 +2063,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
+      if (!this.createInFlight) await this.reconcilePendingProviderReplacements();
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
@@ -2127,8 +2137,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     await migrate(this.db, migrations);
+    await this.resetPendingProviderReplacementSchedule();
     const row = await this.readAllocationRow();
-    if (row === null) return;
+    if (row === null) {
+      const pendingReplacementAt = await this.earliestPendingReplacementAt();
+      if (pendingReplacementAt !== null) await this.ctx.storage.setAlarm(pendingReplacementAt);
+      return;
+    }
     const pin = (await this.readProviderPin()) ?? this.defaultPin('cloudflare');
     this.providerPin = pin;
     this.provider = this.createProviderAdapter(pin);
@@ -2321,7 +2336,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
-      this.currentProvider() === 'cloudflare-containers' &&
+      this.provider.environmentSnapshots === true &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
       const routes = await listRoutes(this.db);
@@ -4411,11 +4426,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
           });
         }
 
+        const selectedLaunch =
+          pin.provider === 'vercel'
+            ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
+            : undefined;
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
+          ...(selectedLaunch?.options.snapshot === undefined
+            ? {}
+            : { snapshot: selectedLaunch.options.snapshot }),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
         };
         // N2: create and launch share one bound (the create deadline).
@@ -4471,12 +4493,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launch =
           sessionSnapshot === null
-            ? await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)
+            ? (selectedLaunch ??
+              (await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)))
             : { options: { snapshot: sessionSnapshot }, skipped: false };
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
+        if (created.snapshotFailed) {
+          await notifyPreparingRoutes(this.routeContext(current), {
+            step: 'snapshot_fallback',
+            detail: 'Snapshot restore failed. Starting from the clean base.',
+          });
+        }
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
@@ -4539,6 +4568,79 @@ export class SandboxControlV2 extends DurableObject<Env> {
             step: 'sandbox_start',
             detail: 'Starting sandbox without a snapshot',
           });
+          if (pin.provider === 'vercel') {
+            const runtime = parseVercelSandboxRuntimeDefaults(this.env);
+            if (runtime === undefined) throw new ProviderCreationError('invalid_configuration');
+            const fallbackPin = {
+              ...pin,
+              allocationName: `${intent.allocationName}-image`,
+            };
+            const fallbackProvider = this.createProviderAdapter(fallbackPin);
+            const { snapshot: _snapshot, ...baseIntent } = intent;
+            const replacementIntent: ProviderCreateIntent = {
+              ...baseIntent,
+              createdAt: Date.now(),
+              allocationName: fallbackPin.allocationName,
+            };
+            const pendingReplacement: PendingProviderReplacement = {
+              allocationId,
+              createdAt: replacementIntent.createdAt,
+              expiresAt:
+                replacementIntent.createdAt + runtime.initialTimeoutMs + DEADLINE_MS.createSettle,
+              nextReconcileAt: replacementIntent.createdAt,
+              pin: {
+                allocationName: fallbackPin.allocationName,
+                configuration: fallbackPin.configuration,
+                locator: fallbackPin.locator,
+                ...(fallbackPin.byoc === undefined ? {} : { byoc: fallbackPin.byoc }),
+              },
+              intent: {
+                intentId: replacementIntent.intentId,
+                createdAt: replacementIntent.createdAt,
+                allocationName: fallbackPin.allocationName,
+              },
+            };
+            await writePendingProviderReplacement(this.ctx.storage, pendingReplacement);
+            const creatingReplacement = fallbackProvider.create(replacementIntent);
+            let replacement: { providerRef: string; snapshotFailed?: true } | { unresolved: true };
+            try {
+              replacement = await withTimeout(
+                creatingReplacement,
+                remainingMs(launchDeadline),
+                'Sandbox fallback create timed out'
+              );
+            } catch (error) {
+              this.watchLateProviderReplacement(pendingReplacement, creatingReplacement);
+              await this.reconcilePendingProviderReplacement(pendingReplacement);
+              throw error;
+            }
+            if ('unresolved' in replacement) {
+              await this.reconcilePendingProviderReplacement(pendingReplacement);
+              throw new Error('Sandbox fallback create unresolved');
+            }
+            const replacementRef = replacement.providerRef;
+            const ownsFallback = await this.enqueue(async () => {
+              const latest = await this.readAllocation();
+              if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
+              const next: AllocationState = { ...latest, providerRef: replacementRef };
+              await this.ctx.storage.transaction(async () => {
+                await this.writeProviderPin(fallbackPin);
+                await this.writeAllocation(next, latest);
+                await clearPendingProviderReplacement(this.ctx.storage, allocationId);
+              });
+              this.providerPin = fallbackPin;
+              this.provider = fallbackProvider;
+              createdRef = replacementRef;
+              await this.armAlarm(next);
+              return true;
+            });
+            if (!ownsFallback) {
+              if (await this.stopPendingProviderReplacement(pendingReplacement, replacementRef))
+                await clearPendingProviderReplacement(this.ctx.storage, allocationId);
+              else await this.deferPendingProviderReplacement(pendingReplacement);
+              return;
+            }
+          }
           launched = await withTimeout(
             this.provider.launch(
               createdRef,
@@ -4629,6 +4731,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.enqueue(async () => {
         await this.recoverRepositoryPreparationFailures();
         const pending = await this.readAllocation();
+        // The create's own birth may have cleared the pending-replacement alarm
+        // while createInFlight suppressed it. Re-arm before a retry can start a
+        // new in-flight create, and again after the retry decision below.
+        await this.armAlarm(pending);
         // Stop may finish before this launch returns. Start again only after
         // recordLaunch settles, without changing transient create retry pauses.
         if (pending.kind === 'stopped' && (await routeRetryAllowed(this.routeContext(pending)))) {
@@ -4745,11 +4851,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return { options: {}, skipped: false };
     }
     const { candidate } = selected;
-    const lookup = await lookupEnvironmentSnapshot({
+    let lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
       launchDeadlineAt,
     });
+    if (
+      lookup.kind === 'resolved' &&
+      lookup.resolution.snapshot !== null &&
+      lookup.resolution.snapshot.provider !==
+        (this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers')
+    ) {
+      lookup = {
+        kind: 'resolved',
+        resolution: { ...lookup.resolution, snapshot: null, reason: 'incompatible' },
+      };
+    }
     const snapshot = lookup.kind === 'resolved' ? snapshotStart(lookup.resolution) : undefined;
     log({
       reason: lookup.kind === 'resolved' ? lookup.resolution.reason : lookup.kind,
@@ -4921,6 +5038,174 @@ export class SandboxControlV2 extends DurableObject<Env> {
       nextAllocationId: crypto.randomUUID(),
       retryAllowed: await this.retryAllowed(),
     });
+  }
+
+  private pendingReplacementPin(replacement: PendingProviderReplacement): StoredProviderPin {
+    return {
+      provider: 'vercel',
+      allocationName: replacement.pin.allocationName,
+      configuration: replacement.pin.configuration,
+      locator: replacement.pin.locator,
+      billing: null,
+      containment: null,
+      ...(replacement.pin.byoc === undefined ? {} : { byoc: replacement.pin.byoc }),
+    };
+  }
+
+  private async stopPendingProviderReplacement(
+    replacement: PendingProviderReplacement,
+    providerRef: string
+  ): Promise<boolean> {
+    const result = await withTimeout(
+      this.createProviderAdapter(this.pendingReplacementPin(replacement)).stop(
+        providerRef,
+        replacement.intent
+      ),
+      this.sandboxTimers().providerStopAttemptMs,
+      'Sandbox replacement stop timed out'
+    ).catch(() => 'retryable' as const);
+    logControlDiagnostic('replacement_cleanup', {
+      allocationId: replacement.allocationId,
+      allocationName: replacement.pin.allocationName,
+      result,
+    });
+    return result === 'terminal';
+  }
+
+  private async deferPendingProviderReplacement(
+    replacement: PendingProviderReplacement
+  ): Promise<void> {
+    const current = await readPendingProviderReplacement(
+      this.ctx.storage,
+      replacement.allocationId
+    );
+    if (current === undefined) return;
+    await writePendingProviderReplacement(this.ctx.storage, {
+      ...current,
+      nextReconcileAt: Date.now() + PENDING_REPLACEMENT_RETRY_MS,
+    });
+    await this.armAlarm(await this.readAllocation());
+  }
+
+  private async reconcilePendingProviderReplacement(
+    replacement: PendingProviderReplacement
+  ): Promise<void> {
+    // An unadopted replacement never gets lease extensions.
+    if (Date.now() >= replacement.expiresAt) {
+      await clearPendingProviderReplacement(this.ctx.storage, replacement.allocationId);
+      return;
+    }
+    let status: 'active' | 'terminal' | 'unknown' = 'unknown';
+    let providerRef: string | undefined;
+    try {
+      const observation = await withTimeout(
+        this.createProviderAdapter(this.pendingReplacementPin(replacement)).observe(
+          null,
+          replacement.intent
+        ),
+        this.sandboxTimers().providerStopAttemptMs,
+        'Sandbox replacement reconcile timed out'
+      );
+      status = observation.status;
+      providerRef = observation.providerRef;
+    } catch {
+      status = 'unknown';
+    }
+    if (providerRef !== undefined) {
+      if (await this.stopPendingProviderReplacement(replacement, providerRef)) {
+        await clearPendingProviderReplacement(this.ctx.storage, replacement.allocationId);
+        logControlDiagnostic('replacement_reconcile', {
+          allocationId: replacement.allocationId,
+          allocationName: replacement.pin.allocationName,
+          result: 'stopped',
+        });
+        return;
+      }
+      await this.deferPendingProviderReplacement(replacement);
+      logControlDiagnostic('replacement_reconcile', {
+        allocationId: replacement.allocationId,
+        allocationName: replacement.pin.allocationName,
+        result: 'stop_retry',
+      });
+      return;
+    }
+    if (status === 'terminal') {
+      await clearPendingProviderReplacement(this.ctx.storage, replacement.allocationId);
+      logControlDiagnostic('replacement_reconcile', {
+        allocationId: replacement.allocationId,
+        allocationName: replacement.pin.allocationName,
+        result: 'terminal',
+      });
+      return;
+    }
+    await this.deferPendingProviderReplacement(replacement);
+    logControlDiagnostic('replacement_reconcile', {
+      allocationId: replacement.allocationId,
+      allocationName: replacement.pin.allocationName,
+      result: 'unknown',
+    });
+  }
+
+  private async reconcilePendingProviderReplacements(): Promise<void> {
+    const now = Date.now();
+    for (const replacement of await listPendingProviderReplacements(this.ctx.storage)) {
+      if (replacement.nextReconcileAt > now) continue;
+      await this.reconcilePendingProviderReplacement(replacement);
+    }
+  }
+
+  private async resetPendingProviderReplacementSchedule(): Promise<void> {
+    for (const replacement of await listPendingProviderReplacements(this.ctx.storage)) {
+      await writePendingProviderReplacement(this.ctx.storage, {
+        ...replacement,
+        nextReconcileAt: Date.now(),
+      });
+    }
+  }
+
+  private async earliestPendingReplacementAt(): Promise<number | null> {
+    if (this.createInFlight) return null;
+    let earliest: number | null = null;
+    for (const replacement of await listPendingProviderReplacements(this.ctx.storage)) {
+      if (earliest === null || replacement.nextReconcileAt < earliest)
+        earliest = replacement.nextReconcileAt;
+    }
+    return earliest;
+  }
+
+  private watchLateProviderReplacement(
+    replacement: PendingProviderReplacement,
+    creating: Promise<{ providerRef: string; snapshotFailed?: true } | { unresolved: true }>
+  ): void {
+    const settle = (
+      result: { providerRef: string; snapshotFailed?: true } | { unresolved: true }
+    ) =>
+      this.enqueue(async () => {
+        if ('unresolved' in result) {
+          await this.reconcilePendingProviderReplacement(replacement);
+        } else {
+          const pending = await readPendingProviderReplacement(
+            this.ctx.storage,
+            replacement.allocationId
+          );
+          if (pending === undefined) {
+            await this.stopPendingProviderReplacement(replacement, result.providerRef);
+          } else if (await this.stopPendingProviderReplacement(replacement, result.providerRef)) {
+            await clearPendingProviderReplacement(this.ctx.storage, replacement.allocationId);
+          } else {
+            await this.deferPendingProviderReplacement(pending);
+          }
+        }
+        await this.armAlarm(await this.readAllocation());
+      });
+    this.ctx.waitUntil(
+      creating.then(settle, () =>
+        this.enqueue(async () => {
+          await this.reconcilePendingProviderReplacement(replacement);
+          await this.armAlarm(await this.readAllocation());
+        })
+      )
+    );
   }
 
   private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
@@ -5746,6 +6031,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       retryAt,
       snapshotAt,
       this.earliestHelloDeadlineAt(),
+      await this.earliestPendingReplacementAt(),
     ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();

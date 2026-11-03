@@ -746,7 +746,7 @@ describe('provider-specific contract differences', () => {
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect('environmentSnapshots' in harness.adapter).toBe(false);
+    expect(harness.adapter.environmentSnapshots).toBe(true);
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

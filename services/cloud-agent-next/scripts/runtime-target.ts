@@ -1,17 +1,19 @@
 import { z } from 'zod';
-import {
-  runtimeStartupConfigSchema,
-  type RuntimeStartupConfig,
-} from '../src/shared/runtime-startup-config.js';
+import { runtimeStartupConfigSchema } from '../src/shared/runtime-startup-config.js';
 
 const targetName = z.string().regex(/^[a-z][a-z0-9-]*$/);
+export const runtimeTargetConfigSchema = z.discriminatedUnion('mode', [
+  runtimeStartupConfigSchema.options[0].extend({ vercel: z.boolean().optional() }),
+  runtimeStartupConfigSchema.options[1].extend({ vercel: z.boolean().optional() }),
+]);
+export type RuntimeTargetConfig = z.infer<typeof runtimeTargetConfigSchema>;
 export const runtimeTargetsSchema = z
   .object({
-    default: runtimeStartupConfigSchema,
-    targets: z.record(targetName, runtimeStartupConfigSchema),
+    default: runtimeTargetConfigSchema,
+    targets: z.record(targetName, runtimeTargetConfigSchema),
   })
   .strict();
-export function selectRuntimeTarget(raw: unknown, environment: string): RuntimeStartupConfig {
+export function selectRuntimeTarget(raw: unknown, environment: string): RuntimeTargetConfig {
   targetName.parse(environment);
   const targets = runtimeTargetsSchema.parse(raw);
   return Object.hasOwn(targets.targets, environment)
@@ -95,31 +97,41 @@ export function runtimeBucketBindings(
 }
 
 export type RuntimeTargetRelease = { descriptorSha256: string; baseImage: string; bucket: string };
+
+function enrolledVercel(vars: Record<string, unknown>): boolean {
+  const value = vars.BYOC_VERCEL_IDS;
+  return typeof value === 'string' && value.split(',').some(entry => entry.trim() !== '');
+}
+
+function targetNeedsRelease(startup: RuntimeTargetConfig): boolean {
+  return startup.mode === 'downloaded' || startup.vercel === true;
+}
+
 /** The target catalog owns both Worker vars and the native image selection. */
 export function renderRuntimeTarget(input: {
   config: unknown;
   environment: string;
-  startup: RuntimeStartupConfig;
+  startup: RuntimeTargetConfig;
   release?: RuntimeTargetRelease;
 }) {
-  const startup = runtimeStartupConfigSchema.parse(input.startup);
+  const startup = runtimeTargetConfigSchema.parse(input.startup);
   const { root, target, vars, native } = validateRuntimeTarget(input.config, input.environment);
+  if (enrolledVercel(vars) && startup.vercel !== true)
+    throw new Error('Runtime configuration drift: Vercel support belongs in runtime-targets.json');
   target.vars = {
     ...vars,
     RUNTIME_STARTUP_MODE: startup.mode,
     NATIVE_RUNTIME_IMAGE: startup.image,
   };
-  if (startup.mode === 'downloaded') {
-    if (startup.interactiveOrgIds !== undefined)
-      target.vars.RUNTIME_INTERACTIVE_ORG_IDS = startup.interactiveOrgIds.join(',');
+  if (targetNeedsRelease(startup)) {
     const release = input.release;
-    if (!release) throw new Error('Downloaded target requires a verified runtime handoff');
+    if (!release) throw new Error('Runtime target requires a verified runtime handoff');
     target.r2_buckets = runtimeBucketBindings(target.r2_buckets, release.bucket);
     target.vars.RUNTIME_RELEASE_DESCRIPTOR = z
       .string()
       .regex(/^[a-f0-9]{64}$/)
       .parse(release.descriptorSha256);
-    if (startup.image === 'runtime-free') {
+    if (startup.mode === 'downloaded' && startup.image === 'runtime-free') {
       const digest = z
         .string()
         .regex(/^registry\.cloudflare\.com\/[a-f0-9]{32}\/kilo-runtime-base@sha256:[a-f0-9]{64}$/)
@@ -127,6 +139,8 @@ export function renderRuntimeTarget(input: {
       native.images = { ...native.images, 'runtime-free': { image: digest } };
     }
   }
+  if (startup.mode === 'downloaded' && startup.interactiveOrgIds !== undefined)
+    target.vars.RUNTIME_INTERACTIVE_ORG_IDS = startup.interactiveOrgIds.join(',');
   if (input.environment !== 'production') root.env = { ...root.env, [input.environment]: target };
   return root;
 }

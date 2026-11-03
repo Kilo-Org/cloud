@@ -264,7 +264,7 @@ Only after Stage 0's provider adapter exists. Do not start E2B first.
 Customer Vercel is BYOC: they bring a token for a team they already pay. The REST client, snapshot pipeline, and outbound WSS path already exist. The MVP is credential routing plus one setup step, not a new provider.
 
 1. Org setting: encrypted `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID` (not worker env).
-2. **BYOC setup** (required, once per org / when the runtime image changes): using those credentials, copy or build the Kilo wrapper snapshot into **their** project. Persist the resulting `snapshotId` + `runtimeBuildId` with the org record. Reuse `scripts/vercel-snapshot.ts`; do not assume Kilo's `snap_*` is valid on their token.
+2. **BYOC setup** (required, once per org / when the base image changes): using those credentials, build a runtime-free base snapshot in **their** project with `src/persistence/VercelSnapshotBuild.ts`. Persist the resulting `snapshotId` + `runtimeBuildId` with the org record. Download the Kilo CLI and wrapper from the runtime release published by `scripts/publish-runtime.ts`; do not bake them into the snapshot or assume Kilo's `snap_*` is valid on their token.
 3. Same five-op Vercel adapter. Creates boot from the org's snapshot. `SandboxControl` does not grow a Vercel state machine.
 4. Wrapper only calls home. No public wrapper port.
 5. Prove: setup writes a snapshot in the customer project; two sessions create
@@ -301,7 +301,7 @@ These paths are relative to the call-home tree, not to today's production `Agent
 - `services/cloud-agent-next/src/sandbox-control/` — unchanged state machine; Vercel adapter behind the provider boundary, credentials from the org record.
 - `packages/db/src/schema.ts` — encrypted org Vercel credentials (token, team, project) plus the org's `snapshotId` / `runtimeBuildId` from setup.
 - `apps/web` org settings — token + team + project, then a setup action that copies/builds the snapshot into their project.
-- Snapshot pipeline (`scripts/vercel-snapshot.ts`) — runnable with the org's token against the org's project as part of BYOC setup.
+- Base snapshot setup (`src/persistence/VercelSnapshotBuild.ts`) plus the published runtime release (`scripts/publish-runtime.ts`) — validated against the org's project as part of BYOC setup. `src/environment-build/` builds repository environments from that runtime-free base.
 
 Do **not** add `src/agent-sandbox/e2b/e2b-agent-sandbox.ts`. Do **not** add a second Vercel client.
 

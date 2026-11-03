@@ -1,6 +1,12 @@
 import * as z from 'zod';
-import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
+
+/**
+ * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
+ * larger header value is an Enkrypt bug. Clamping keeps the ledger insert and the balance debit
+ * within column range instead of failing in the deferred write.
+ */
+export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
 export const ENKRYPT_USAGE_WRITE_PATH = '/api/internal/enkrypt-usage/record';
 

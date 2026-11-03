@@ -5,10 +5,12 @@ import { NextRequest } from 'next/server';
 import { enkrypt_usage, organizations } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
-import type { EnkryptUsageWrite } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+import {
+  MAX_ENKRYPT_CREDITS_PER_CALL,
+  type EnkryptUsageWrite,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';

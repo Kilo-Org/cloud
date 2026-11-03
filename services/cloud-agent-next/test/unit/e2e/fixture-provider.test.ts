@@ -135,7 +135,8 @@ class FakeCloud implements FixtureCloud {
     if (this.options.failInspect) throw new Error('database unavailable');
     return {
       profile: ids.profileId === undefined ? null : (this.profiles.get(ids.profileId) ?? null),
-      worktree: ids.workspaceId === undefined ? null : (this.worktrees.get(ids.workspaceId) ?? null),
+      worktree:
+        ids.workspaceId === undefined ? null : (this.worktrees.get(ids.workspaceId) ?? null),
       session:
         ids.cloudSessionId === undefined ? null : (this.sessions.get(ids.cloudSessionId) ?? null),
     };
@@ -525,6 +526,23 @@ describe('workspace ownership helper', () => {
         { userId: USER_ID, profileId: 'profile-1' }
       )
     ).toEqual({ owned: true });
+  });
+
+  it('rejects a foreign tombstone instead of counting it as removed', () => {
+    expect(
+      workspaceOwnership(
+        {
+          profile: null,
+          worktree: {
+            userId: 'other-user',
+            deletionStartedAt: '2026-11-02T00:00:00Z',
+            deletionCompletedAt: '2026-11-02T00:01:00Z',
+          },
+          session: null,
+        },
+        { userId: USER_ID, profileId: 'profile-1' }
+      )
+    ).toEqual({ owned: false, reason: 'workspace is owned by a different local user' });
   });
 
   it('rejects a session created with a different profile', () => {

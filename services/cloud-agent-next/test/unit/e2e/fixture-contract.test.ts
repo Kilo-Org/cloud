@@ -112,9 +112,9 @@ describe('provider request contract', () => {
       descriptorPresent: false,
     });
     expect(cleanup.descriptorPresent).toBe(false);
-    expect(
-      ProviderPrepareRequest.safeParse({ ...prepare, operation: 'cleanup' }).success
-    ).toBe(false);
+    expect(ProviderPrepareRequest.safeParse({ ...prepare, operation: 'cleanup' }).success).toBe(
+      false
+    );
   });
 
   it('rejects a request with an unsupported version', () => {

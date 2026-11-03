@@ -366,8 +366,12 @@ export function redactText(value: string, secrets: readonly (string | undefined)
   return output.replace(BEARER, 'Bearer [redacted]').replace(JWT, '[redacted-jwt]');
 }
 
-export function describeError(error: unknown, secrets: readonly (string | undefined)[] = []): string {
-  if (error instanceof FixtureProviderError) return redactText(`${error.code}: ${error.message}`, secrets);
+export function describeError(
+  error: unknown,
+  secrets: readonly (string | undefined)[] = []
+): string {
+  if (error instanceof FixtureProviderError)
+    return redactText(`${error.code}: ${error.message}`, secrets);
   if (error instanceof Error) return redactText(error.message, secrets);
   return redactText(String(error), secrets);
 }

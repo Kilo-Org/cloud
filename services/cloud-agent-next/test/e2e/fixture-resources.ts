@@ -188,11 +188,14 @@ export function createCloudResources(input: {
     },
 
     async createWorkspace({ identity, profileId, gitUrl, scope }) {
-      const created = await createHostedWorkspace(driverConfig({ stack: input.stack, identity, devVars }), {
-        profileId,
-        prompt: scopedDirective(scope, 'idle'),
-        repository: { type: 'git', url: gitUrl },
-      });
+      const created = await createHostedWorkspace(
+        driverConfig({ stack: input.stack, identity, devVars }),
+        {
+          profileId,
+          prompt: scopedDirective(scope, 'idle'),
+          repository: { type: 'git', url: gitUrl },
+        }
+      );
       return {
         workspaceId: created.workspaceId,
         cloudAgentSessionId: created.cloudAgentSessionId,
@@ -261,8 +264,7 @@ export function createCloudResources(input: {
                 deletionStartedAt: worktree.deletionStartedAt,
                 deletionCompletedAt: worktree.deletionCompletedAt,
               },
-        session:
-          session === null ? null : { userId: session.userId, profileId: session.profileId },
+        session: session === null ? null : { userId: session.userId, profileId: session.profileId },
       };
     },
 
@@ -336,10 +338,10 @@ export function createCloudResources(input: {
       const base = input.stack.fake.replace(/\/$/, '');
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        const response = await fetch(
-          `${base}/test/gate-status?tag=${encodeURIComponent(tag)}`,
-          { headers: fakeAdminHeaders(), signal: AbortSignal.timeout(10_000) }
-        );
+        const response = await fetch(`${base}/test/gate-status?tag=${encodeURIComponent(tag)}`, {
+          headers: fakeAdminHeaders(),
+          signal: AbortSignal.timeout(10_000),
+        });
         if (response.ok) {
           const body = (await response.json()) as { engaged?: unknown };
           if (body.engaged === true) return true;
@@ -391,15 +393,15 @@ export function workspaceOwnership(
   input: { userId: string; profileId?: string }
 ): { owned: boolean; reason?: string } {
   if (state.worktree === null) return { owned: true };
+  if (state.worktree.userId !== input.userId) {
+    return { owned: false, reason: 'workspace is owned by a different local user' };
+  }
   // A completed tombstone is a removed workspace: the real deletion removes
   // the root session rows in the same transaction, so a retry must not treat
   // the missing session as a foreign resource.
   if (state.worktree.deletionCompletedAt !== null) return { owned: true };
   if (state.session === null) {
     return { owned: false, reason: 'hosted root session is missing for the owned workspace' };
-  }
-  if (state.worktree.userId !== input.userId) {
-    return { owned: false, reason: 'workspace is owned by a different local user' };
   }
   if (state.session.userId !== input.userId) {
     return { owned: false, reason: 'root session is owned by a different local user' };

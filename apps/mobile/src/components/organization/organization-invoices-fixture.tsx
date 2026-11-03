@@ -98,6 +98,7 @@ function organizationEntry(organizationId: string): OrganizationList[number] {
     requireSeats: true,
     plan: 'teams',
     created_at: '2026-01-01T00:00:00.000Z',
+    isTrialExpiredForEnforcement: false,
     seatCount: { used: 5, total: 5 },
     inheritedChildren: [],
   };

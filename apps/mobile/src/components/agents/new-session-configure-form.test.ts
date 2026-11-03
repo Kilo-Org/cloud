@@ -11,6 +11,7 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
@@ -413,6 +414,36 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  it('shows the plan refusal in the scroll body under the composer, not the footer', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: 'The organization trial has ended.',
+    }) as Node;
+
+    // A three-line explanation in the pinned footer shrinks the scroll frame
+    // and cuts the launch folder on a compact screen, so the body carries it.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, AccessibleStatus)).toMatchObject({
+      message: 'The organization trial has ended.',
+      tone: 'error',
+    });
+    // The footer keeps only the start-blocked reason (its own component): the
+    // refusal must not take height from the form a second time. The pinned
+    // footer is the KeyboardAvoidingView's second child, after the scroll body,
+    // and it must be found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByComponent(footer, AccessibleStatus)).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──

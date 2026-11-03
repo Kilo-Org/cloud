@@ -104,7 +104,17 @@ function makeCaller(env: Env) {
   return wastelandRouter.createCaller({
     env,
     userId: USER_ID,
-    isAdmin: false,
+    workerAdmin: {
+      legacyClaim: false,
+      decide: async () => ({
+        allowed: false,
+        source: 'none',
+        status: 403,
+        reason: 'legacy_claim_rejected',
+      }),
+    } as never,
+    procedurePath: '',
+    legacyClaimLifetimeSeconds: null,
     apiTokenPepper: null,
     orgMemberships: [],
   });

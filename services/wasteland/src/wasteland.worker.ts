@@ -15,6 +15,7 @@ import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middl
 import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { resolveSecret } from './util/secret.util';
 import { timingMiddleware } from './middleware/analytics.middleware';
+import { resolveWorkerAdminMiddleware } from './middleware/worker-admin.middleware';
 import { debugAccessMiddleware, authorizeDebugUserAction } from './middleware/debug.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
@@ -72,7 +73,7 @@ const corsMiddleware = cors({
     const allowed = ['https://app.kilo.ai', 'https://kilo.ai'];
     return allowed.includes(origin) ? origin : '';
   },
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Kilo-Worker-Capability'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   exposeHeaders: ['Content-Length'],
   maxAge: 3600,
@@ -864,11 +865,13 @@ app.post('/debug/dolthub/:owner/:db/pulls', async c => {
 // routes. Skipped in development mode for easier local testing.
 
 app.use('/api/*', kiloAuthMiddleware);
+app.use('/api/*', resolveWorkerAdminMiddleware);
 
 // Serve the wasteland tRPC router directly. The frontend tRPC client
 // connects here instead of going through the Next.js proxy layer.
 
 app.use('/trpc/*', kiloAuthMiddleware);
+app.use('/trpc/*', resolveWorkerAdminMiddleware);
 app.use(
   '/trpc/*',
   trpcServer({
@@ -877,8 +880,14 @@ app.use(
     createContext: (_opts: unknown, c: Context<WastelandEnv>) => ({
       env: c.env,
       userId: c.get('kiloUserId') ?? '',
-      isAdmin: c.get('kiloIsAdmin') ?? false,
+      workerAdmin: c.get('workerAdmin'),
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
+      legacyClaimLifetimeSeconds: (() => {
+        const claims = c.get('kiloTokenClaims');
+        return typeof claims?.exp === 'number' && typeof claims?.iat === 'number'
+          ? claims.exp - claims.iat
+          : null;
+      })(),
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {

@@ -25,6 +25,7 @@ export type WastelandEventData = {
   delivery?: WastelandDelivery;
   route?: string;
   error?: string;
+  reason?: string;
   userId?: string;
   wastelandId?: string;
   memberId?: string;
@@ -49,7 +50,7 @@ export function writeEvent(
         data.userId ?? '', // blob2
         data.delivery ?? '', // blob3
         data.route ?? '', // blob4
-        data.error ?? '', // blob5
+        data.reason ?? data.error ?? '', // blob5
         data.wastelandId ?? '', // blob6
         data.memberId ?? '', // blob7
         data.label ?? '', // blob8

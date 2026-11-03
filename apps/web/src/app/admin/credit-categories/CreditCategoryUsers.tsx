@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -127,7 +129,7 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
 
       try {
         const queryParams = new URLSearchParams(params);
-        const response = await fetch(
+        const response = await adminFetch(
           `/admin/api/credit-categories/${creditCategoryKey}?${queryParams.toString()}`
         );
 

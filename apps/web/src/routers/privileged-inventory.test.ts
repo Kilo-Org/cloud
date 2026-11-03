@@ -18,7 +18,7 @@ import {
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const APP_ROOT = path.join(REPO_ROOT, 'apps/web/src/app');
 
-const BROAD_WILDCARDS = new Set(['organizations.*', 'codeIndexing.*', 'codingPlans.*']);
+const BROAD_WILDCARDS = new Set(['organizations.*', 'codeIndexing.*']);
 
 type ProcedureDef = {
   _def?: {
@@ -40,6 +40,75 @@ function walkFiles(root: string): string[] {
     const entryPath = path.join(entry.parentPath, entry.name);
     return entry.isDirectory() ? [] : [entryPath];
   });
+}
+
+function stripCommentsAndStrings(source: string): string {
+  let output = '';
+  let state: 'code' | 'line' | 'block' | 'single' | 'double' | 'template' = 'code';
+  let index = 0;
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (state === 'code') {
+      if (char === '/' && next === '/') {
+        state = 'line';
+        index += 2;
+        continue;
+      }
+      if (char === '/' && next === '*') {
+        state = 'block';
+        index += 2;
+        continue;
+      }
+      if (char === "'" || char === '"' || char === '`') {
+        state = char === "'" ? 'single' : char === '"' ? 'double' : 'template';
+        output += ' ';
+        index += 1;
+        continue;
+      }
+      output += char;
+      index += 1;
+      continue;
+    }
+
+    if (state === 'line') {
+      if (char === '\n') {
+        state = 'code';
+        output += '\n';
+      }
+      index += 1;
+      continue;
+    }
+
+    if (state === 'block') {
+      if (char === '*' && next === '/') {
+        state = 'code';
+        index += 2;
+      } else {
+        index += 1;
+      }
+      continue;
+    }
+
+    const quote = state === 'single' ? "'" : state === 'double' ? '"' : '`';
+    if (char === '\\') {
+      index += 2;
+      continue;
+    }
+    if (char === quote) {
+      state = 'code';
+      output += ' ';
+    }
+    index += 1;
+  }
+
+  return output;
+}
+
+function countIsAdminReads(source: string): number {
+  return (stripCommentsAndStrings(source).match(/\.\s*is_admin\b/g) ?? []).length;
 }
 
 function routePathFromAppFile(file: string): string {
@@ -409,18 +478,29 @@ describe('privileged inventory covers branch-level admin reads', () => {
     return [...files].sort();
   }
 
-  function occurrencesIn(relativeFile: string): number {
-    return (
-      fs.readFileSync(path.join(REPO_ROOT, relativeFile), 'utf8').match(/\bis_admin\b/g) ?? []
-    ).length;
+  function isAdminReadsIn(relativeFile: string): number {
+    return countIsAdminReads(fs.readFileSync(path.join(REPO_ROOT, relativeFile), 'utf8'));
   }
+
+  test('does not let a comment marker inside a string hide a real read', () => {
+    const source = [
+      'const url = "https://github.com/example/repo"; const flag = user.is_admin;',
+      'const quoted = "ctx.user.is_admin";',
+      '// user.is_admin in a line comment',
+      '/* tenant.is_admin in a block comment */',
+      'const record = { is_admin: false };',
+      'const value = ctx.user.is_admin;',
+    ].join('\n');
+
+    expect(countIsAdminReads(source)).toBe(2);
+  });
 
   test('every is_admin read is classified with a reviewed occurrence count', () => {
     const counts = new Map(internalElevationSites.map(site => [site.file, site.occurrences]));
     const problems: string[] = [];
 
     for (const file of serverFiles()) {
-      const actual = occurrencesIn(file);
+      const actual = isAdminReadsIn(file);
       if (actual === 0) continue;
       const expected = counts.get(file);
       if (expected === undefined) {
@@ -438,7 +518,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
 
     for (const site of internalElevationSites) {
       const absolute = path.join(REPO_ROOT, site.file);
-      if (!fs.existsSync(absolute) || occurrencesIn(site.file) !== site.occurrences) {
+      if (!fs.existsSync(absolute) || isAdminReadsIn(site.file) !== site.occurrences) {
         stale.push(site.file);
       }
     }

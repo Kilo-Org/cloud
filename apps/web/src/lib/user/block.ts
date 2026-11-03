@@ -8,6 +8,7 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 export type BlockUserParams = {
   kiloUserId: string;
@@ -51,6 +52,8 @@ export async function blockUser(params: BlockUserParams): Promise<boolean> {
       .returning({ id: kilocode_users.id });
 
     if (rows.length === 0) return false;
+
+    await revokeStepUpProofs(params.kiloUserId, 'blocked', tx);
 
     const now = new Date().toISOString();
 

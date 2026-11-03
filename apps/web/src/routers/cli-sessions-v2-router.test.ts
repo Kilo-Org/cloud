@@ -507,6 +507,25 @@ describe('cli-sessions-v2-router', () => {
 
     it.each([
       ['src/relative.ts', 'src/relative.ts'],
+      ['/workspace/app/src/app.ts', `/cloud-agent/sessions/${sessionId}/src/app.ts`],
+      [
+        '/workspace/app/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/app/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/user-1/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/org-1/user-1/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      ['/workspace/application/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['/workspace/app/../private/app.ts', `/cloud-agent/sessions/${sessionId}`],
       [
         `/cloud-agent/sessions/${sessionId}/src/app.ts`,
         `/cloud-agent/sessions/${sessionId}/src/app.ts`,
@@ -527,7 +546,37 @@ describe('cli-sessions-v2-router', () => {
             messages: [
               {
                 info: { id: 'msg_assistant', role: 'assistant' },
-                parts: [{ id: 'prt_patch', type: 'patch', files: [path] }],
+                parts: [
+                  { id: 'prt_patch', type: 'patch', files: [path] },
+                  {
+                    id: 'prt_read',
+                    type: 'tool',
+                    tool: 'read',
+                    state: {
+                      input: {
+                        filePath: path,
+                        file_path: path,
+                        directory: path,
+                        cwd: path,
+                        root: path,
+                        workdir: path,
+                        movePath: path,
+                      },
+                    },
+                  },
+                  {
+                    id: 'prt_grep',
+                    type: 'tool',
+                    tool: 'grep',
+                    state: { input: { path, pattern: 'needle' } },
+                  },
+                  {
+                    id: 'prt_glob',
+                    type: 'tool',
+                    tool: 'glob',
+                    state: { input: { path, pattern: '**/*.ts' } },
+                  },
+                ],
               },
             ],
           }),
@@ -540,6 +589,25 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
       expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
+      expect(result.messages[0].parts[1]).toMatchObject({
+        state: {
+          input: {
+            filePath: expected,
+            file_path: expected,
+            directory: expected,
+            cwd: expected,
+            root: expected,
+            workdir: expected,
+            movePath: expected,
+          },
+        },
+      });
+      expect(result.messages[0].parts[2]).toMatchObject({
+        state: { input: { path: expected, pattern: 'needle' } },
+      });
+      expect(result.messages[0].parts[3]).toMatchObject({
+        state: { input: { path: expected, pattern: '**/*.ts' } },
+      });
     });
 
     it.each([true, false])(
@@ -639,7 +707,7 @@ describe('cli-sessions-v2-router', () => {
       '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
     let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
 
-    function privateAssistantMessage(): KiloSdkStoredMessage {
+    function privateAssistantMessage(directory = privateDirectory): KiloSdkStoredMessage {
       return {
         info: {
           id: 'msg_assistant_01',
@@ -651,7 +719,7 @@ describe('cli-sessions-v2-router', () => {
           providerID: 'openrouter',
           mode: 'code',
           agent: 'code',
-          path: { cwd: privateDirectory, root: privateDirectory },
+          path: { cwd: directory, root: directory },
           cost: 0,
           tokens: {
             input: 1,
@@ -667,11 +735,11 @@ describe('cli-sessions-v2-router', () => {
             messageID: 'msg_assistant_01',
             type: 'file',
             mime: 'text/plain',
-            url: `file://${privateDirectory}/attachment.txt`,
+            url: `file://${directory}/attachment.txt`,
             source: {
               type: 'file',
               text: { value: 'attachment', start: 0, end: 10 },
-              path: `${privateDirectory}/attachment.txt`,
+              path: `${directory}/attachment.txt`,
             },
           },
           {
@@ -680,7 +748,7 @@ describe('cli-sessions-v2-router', () => {
             messageID: 'msg_assistant_01',
             type: 'patch',
             hash: 'patch',
-            files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+            files: [`${directory}/src/app.ts`, 'relative.ts'],
           },
           {
             id: 'prt_tool_01',
@@ -691,15 +759,15 @@ describe('cli-sessions-v2-router', () => {
             tool: 'read',
             state: {
               status: 'completed',
-              input: { filePath: `${privateDirectory}/src/app.ts` },
-              output: `Read ${privateDirectory}/src/app.ts and src/relative.ts`,
+              input: { filePath: `${directory}/src/app.ts` },
+              output: `Read ${directory}/src/app.ts and src/relative.ts`,
               title: 'Read file',
               time: { start: 1761000000100, end: 1761000000200 },
               metadata: {
-                filediff: { file: `${privateDirectory}/src/app.ts` },
+                filediff: { file: `${directory}/src/app.ts` },
                 outputs: [
-                  `${privateDirectory}/result.txt`,
-                  { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
+                  `${directory}/result.txt`,
+                  { output: `Read ${directory}/nested.txt`, relative: 'src/relative.ts' },
                 ],
               },
             },
@@ -709,7 +777,7 @@ describe('cli-sessions-v2-router', () => {
             sessionID: sessionId,
             messageID: 'msg_assistant_01',
             type: 'text',
-            text: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
+            text: `Updated ${directory}/src/app.ts and src/relative.ts`,
           },
         ],
       };
@@ -880,6 +948,47 @@ describe('cli-sessions-v2-router', () => {
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
       expect(message).toEqual(privateAssistantMessage());
     });
+
+    it.each([
+      '/workspace/app',
+      '/workspace/user-1/worktrees/worktree_abc',
+      '/workspace/org-1/user-1/sessions/ses_abc',
+    ])(
+      'preserves known workspace filenames in grouped paginated history from %s',
+      async directory => {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        const message = privateAssistantMessage(directory);
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: sessionId,
+          history: { messages: [message], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId });
+        const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+
+        expect(result.history).toMatchObject({
+          messages: [
+            {
+              parts: [
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
+                {
+                  state: {
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
+                    output: `Read ${directory}/src/app.ts and src/relative.ts`,
+                  },
+                },
+                { text: `Updated ${directory}/src/app.ts and src/relative.ts` },
+              ],
+            },
+          ],
+        });
+        expect(message).toEqual(privateAssistantMessage(directory));
+      }
+    );
 
     it('preserves private-path fields unchanged for ungrouped paginated history', async () => {
       const message = privateAssistantMessage();
@@ -2289,6 +2398,41 @@ describe('cli-sessions-v2-router', () => {
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
     });
 
+    it('returns compact webhook observations without exposing raw evidence', async () => {
+      const head = 'a'.repeat(40);
+      await db
+        .update(github_branch_pull_requests)
+        .set({
+          pr_head_sha: head,
+          pr_observations: {
+            version: 1,
+            headSha: head,
+            checks: [
+              { key: 'check:1:test', id: '1', attempt: 1, at: null, phase: 2, failed: true },
+            ],
+            threads: [{ rootId: '2', threadId: null, state: 'unresolved' }],
+            threadsObserved: true,
+            threadsUnknown: false,
+            checksTruncated: false,
+            threadsTruncated: false,
+          },
+        })
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
+      expect(result.associatedPr?.observations).toEqual({
+        checks: { total: 1, failed: 1 },
+        unresolvedThreads: 1,
+        truncated: false,
+      });
+      expect(result).not.toHaveProperty('pr_observations');
+    });
+
     it('returns null associatedPr when the session has no stored link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
@@ -2522,6 +2666,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: true,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2863,6 +3008,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2889,6 +3035,7 @@ describe('cli-sessions-v2-router', () => {
         number: 999,
         state: 'unknown',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -3248,6 +3395,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: 'abc123',
         reviewDecision: 'approved',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
 

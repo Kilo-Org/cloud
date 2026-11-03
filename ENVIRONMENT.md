@@ -18,6 +18,10 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Admin MFA step-up
+
+- `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. the literal string `true` enforces step-up (any other value, including `TRUE`, is off) on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
+
 ### Code review health monitor
 
 `CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
@@ -133,6 +137,11 @@ ordinary local startup does not require this credential.
 - `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Cloud Agent Next request control and workflow control tokens; requires the master and exact `true`. [SERVER]
 - `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
 - `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
+- `WORKER_ADMIN_LEGACY_CLAIM_ISSUANCE` - `on` by default. Controls whether `/api/gastown/token`, `/api/wasteland/token`, Wasteland server resolution, and the admin Gastown REST client still put `isAdmin` on the ordinary Worker identity token. Set to `off` only during the legacy drain; Workers independently cap any legacy `isAdmin` claim at one hour and reject dateless claims. [SERVER]
+- `WORKER_ADMIN_CAPABILITY_ISSUANCE` - Default off; requires exact `on`. Enables minting short-lived ES256 Worker admin capabilities from a browser session endpoint. Must stay off until session-bound MFA step-up (PR2) is live; the interim actor adapter always fails closed. [SERVER]
+- `WORKER_ADMIN_CAPABILITY_PRIVATE_JWK` - `[SECRET]` ES256 private JWK (with `kid`) used to sign Worker admin capabilities. Never commit a private key; rotate by publishing a new `kid` before signing with it. [SECRET]
+- `WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS` - Worker-side JSON JWKS (`{"keys":[...]}`) of public capability keys, including retired keys during rotation. [SERVER]
+- `LEGACY_ADMIN_CLAIM_MODE` - Worker-side `honor` (default), `observe`, or `reject`. `honor` keeps legacy `isAdmin` support access; `observe` grants but emits `observe_would_deny`; `reject` stops granting legacy admin. Applies to both Gastown and Wasteland. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
@@ -460,6 +469,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
+- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; Vercel objects use `vercel/<generation_id>.json` and gateway routing decisions use `kilo/<microdollar_usage id>.json`. [SERVER]
+- `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID` - Dedicated R2 access key ID for the AI provider metadata bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
+- `R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID`. `[SECRET]`
 
 ## AI Gateway Secure Proxy (apps/ai-gateway-secure-proxy)
 
@@ -522,7 +534,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
-- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. Empty or unset disables snapshots. Personal accounts and `*` are excluded. Native-container enrollment is also required. Removing an organization stops its active builds and prevents restore of its existing snapshots. [SERVER]
+- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. `*` includes every organization and personal account; production and development default to `*`. Empty or unset disables snapshots. Native-container enrollment and repository authorization are also required. Personal-owned Bitbucket environments cannot build snapshots because managed Bitbucket access requires an organization; personal GitHub and GitLab environments are supported. Removing an owner from enrollment stops its active builds and prevents restore of its existing snapshots. [SERVER]
 - `SESSION_SNAPSHOT_ORG_IDS` - Comma-separated explicit organization IDs enrolled in private Cloud Agent session disk capture and restore, independent of environment snapshots. Empty or unset is off; `*` is not supported. Only isolated single-session native Cloudflare Containers are eligible. Capture uses the existing idle signal after two minutes. Snapshots may contain session secrets. Production and dev Wrangler defaults are empty. [SERVER]
 - `SESSION_SNAPSHOT_USER_IDS` - Comma-separated explicit user IDs enrolled in private Cloud Agent session disk snapshots, including personal sessions. Same scope and retention rules as `SESSION_SNAPSHOT_ORG_IDS`; empty or unset is off and `*` is not supported. Either matching allowlist enables the feature. [SERVER]
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]

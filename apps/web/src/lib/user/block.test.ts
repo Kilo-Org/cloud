@@ -6,7 +6,10 @@ import {
   device_sessions,
   device_refresh_tokens,
   native_attested_keys,
+  passkey_credentials,
+  session_step_up_proofs,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { blockUser } from '@/lib/user/block';
@@ -273,5 +276,38 @@ describe('blockUser (integration)', () => {
       where: eq(device_auth_requests.id, request.id),
     });
     expect(afterRequest?.status).toBe('pending');
+  });
+
+  test('revokes live step-up proofs in the same transaction', async () => {
+    const user = await insertTestUser();
+    const [credential] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: user.id,
+        credential_id: `block-credential-${crypto.randomUUID()}`,
+        public_key: 'unused',
+      })
+      .returning();
+    const [proof] = await db
+      .insert(session_step_up_proofs)
+      .values({
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('block-session'),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+      })
+      .returning();
+
+    await blockUser({ kiloUserId: user.id, reason: 'blocked with proof' });
+
+    const [stored] = await db
+      .select()
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.id, proof!.id));
+    expect(stored?.revoked_reason).toBe('blocked');
+    expect(stored?.revoked_at).not.toBeNull();
   });
 });

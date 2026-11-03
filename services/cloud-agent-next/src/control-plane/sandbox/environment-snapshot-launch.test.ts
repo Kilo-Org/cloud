@@ -81,6 +81,56 @@ describe('environmentLaunchCandidate', () => {
   });
 });
 
+describe('environmentLaunchCandidate for a V2 environment', () => {
+  const member = (repoFullName: string) => ({
+    identity: { platform: 'github' as const, repoFullName },
+    repoFullName,
+    leaf: repoFullName.slice(repoFullName.indexOf('/') + 1),
+    branch: 'kilo/session',
+  });
+  const v2 = (...names: string[]): SessionEnvironmentReference => ({
+    environmentId: REFERENCE.environmentId,
+    owner: REFERENCE.owner,
+    configurationRevision: 2,
+    repositories: names.map(member),
+  });
+  const routeAt = (directory: string, environment: SessionEnvironmentReference) =>
+    route({ spec: { ...route().spec, directory }, environment });
+
+  it.each([
+    ['one repository', '/workspace/widgets', ['acme/widgets']],
+    ['several repositories', '/workspace', ['acme/widgets', 'acme/gadgets']],
+  ])('expects the route at the cwd of %s', (_label, directory, names) => {
+    const environment = v2(...names);
+    expect(environmentLaunchCandidate([routeAt(directory, environment)])).toEqual({
+      candidate: { reference: environment, actorUserId: 'user-1' },
+    });
+  });
+
+  it.each([
+    ['revision', { configurationRevision: 3 }],
+    ['environment', { environmentId: '0bd1c8b6-0e6c-4b0e-9d6a-8d5f0f5f4b11' }],
+    ['owner', { owner: { type: 'user' as const, id: 'user-2' } }],
+  ])('does not share a snapshot between V2 routes that differ by %s', (_label, change) => {
+    const environment = v2('acme/widgets', 'acme/gadgets');
+    expect(
+      environmentLaunchCandidate([
+        routeAt('/workspace', environment),
+        { ...routeAt('/workspace', { ...environment, ...change }), sessionId: 'workspace_2' },
+      ])
+    ).toEqual({ reason: 'multiple_environments' });
+  });
+
+  it('starts from the image for a V2 route that is not at its layout cwd', () => {
+    expect(environmentLaunchCandidate([routeAt('/workspace/app', v2('acme/widgets'))])).toEqual({
+      reason: 'not_isolated',
+    });
+    expect(
+      environmentLaunchCandidate([routeAt('/workspace/app', v2('acme/widgets', 'acme/gadgets'))])
+    ).toEqual({ reason: 'not_isolated' });
+  });
+});
+
 describe('previousSnapshotStartFailed', () => {
   it('starts fresh once after a snapshot start that never connected or failed preparation', () => {
     expect(previousSnapshotStartFailed(undefined)).toBe(false);

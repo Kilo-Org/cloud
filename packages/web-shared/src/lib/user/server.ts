@@ -10,6 +10,7 @@ import {
   verifyRuntimeProxyAttestation,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -29,7 +30,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -45,8 +46,14 @@ import {
   routeFromHeaders,
   userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  deriveCredentialKind,
+  StepUpRequiredError,
+  type PrivilegedCredentialKind,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -98,6 +105,7 @@ export const sessionAuthOptions = {
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
+      session.webSessionId = castToken.webSessionId;
       session.isNewUser = castToken.isNewUser || false;
       session.authProvider = castToken.authProvider;
       session.authenticatedAt = castToken.authenticatedAt;
@@ -156,6 +164,14 @@ export type RequiredPermissions = {
   /** The actual Request method when the caller has one; preferred over headers. */
   requestMethod?: string;
   requestHeaders?: Headers;
+  /** How this admin read arrived; server components are not REST routes. */
+  stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * Layout-only escape hatch: authenticate the admin but let the caller render
+   * the verification interstitial instead of returning a 403. Never use on a
+   * data route.
+   */
+  skipStepUpGuard?: boolean;
 };
 
 type GetAuthResponse =
@@ -173,12 +189,16 @@ type GetAuthResponse =
        */
       credentialsRejected?: boolean;
       isNewUser?: undefined;
-      organizationId?: undefined;
-      internalApiUse?: undefined;
-      botId?: undefined;
-      tokenSource?: undefined;
-      deviceSessionId?: undefined;
-      cloudAgentAuthority?: undefined;
+      organizationId?: Organization['id'];
+      internalApiUse?: boolean;
+      botId?: string;
+      tokenSource?: string;
+      deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: undefined;
+      webSessionId?: undefined;
+      webSessionPepper?: undefined;
+      authenticatedAt?: undefined;
     }
   | {
       user: User;
@@ -191,6 +211,13 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: PrivilegedCredentialKind;
+      /** Server-only per-session id for MFA step-up; never sent to the browser. */
+      webSessionId?: string;
+      /** Server-only pepper the session was minted with, for primary re-reads. */
+      webSessionPepper?: string | null;
+      /** Unix seconds when the browser session signed in. */
+      authenticatedAt?: number;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -202,7 +229,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: 'rest',
+      surface: opts.stepUpSurface ?? 'rest',
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
@@ -218,6 +245,45 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       userAgentProduct: userAgentProductFromHeaders(headersList),
       ip: clientIpFromHeaders(headersList),
     });
+  }
+
+  if (opts.adminOnly === true && result.user) {
+    const credential = deriveCredentialKind({
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+      const surface = opts.stepUpSurface ?? 'rest';
+      const route = routeFromHeaders(headersList);
+      const method = methodFromHeaders(headersList, opts.requestMethod);
+      const { actionClass } = actionClassForRoute({
+        surface,
+        route: route ?? '',
+        method,
+      });
+      try {
+        await runStepUpGuard({
+          userId: result.user.id,
+          credential,
+          webSessionId: result.webSessionId,
+          actionClass,
+          enabled: true,
+          route,
+          method,
+          surface,
+        });
+      } catch (error) {
+        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          return authError(403, error.cause.code, result.user.id);
+        }
+        // Fail closed. The guard normally converts evaluation failures itself;
+        // this covers anything unexpected around it.
+        reportStepUpFailure('admin_step_up_rest', error);
+        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
+      }
+    }
   }
 
   if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
@@ -251,6 +317,17 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     });
   }
 
+  if (result.user) {
+    return {
+      ...result,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
+    };
+  }
   return result;
 }
 
@@ -261,6 +338,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
   }
 
   return resolveUserFromSession({ adminOnly: false }, db);
+}
+
+/**
+ * Session-only read for MFA step-up. It refuses any bearer credential and
+ * reads the primary so a proof minted a moment ago is usable immediately. The
+ * caller still enforces the route's Origin check before trusting the session.
+ */
+export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession({ adminOnly: true }, db);
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -313,18 +404,14 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
-  const result = await validateUserAuthorization(
-    auth.userId,
+  const result = await validateUserAuthorization({
+    kiloUserId: auth.userId,
     user,
-    { adminOnly: false },
-    false,
-    undefined,
-    undefined,
-    db,
-    undefined,
-    undefined,
-    auth.claims.deviceSessionId
-  );
+    opts: { adminOnly: false },
+    isNewUser: false,
+    fromDb: db,
+    deviceSessionId: auth.claims.deviceSessionId,
+  });
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -382,10 +469,15 @@ async function resolveUserFromAuth(
       });
     }
 
+    const internalApiUse = authorizationValidationResult.internalApiUse;
+    const tokenSource = authorizationValidationResult.tokenSource;
     const scope = authorizationValidationResult.cloudAgentAuthority;
     if (scope && opts.adminOnly) {
       return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const fromDb = scope ? db : readDb;
@@ -400,7 +492,12 @@ async function resolveUserFromAuth(
             authorizationValidationResult.apiTokenPepper
           ))
     ) {
-      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
+      return authError(401, 'Invalid API token', user.id, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -408,31 +505,36 @@ async function resolveUserFromAuth(
     if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
       return authError(403, 'Scoped organization mismatch', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const organizationId = scope
       ? (scope.organizationId ?? undefined)
       : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
-    const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
-    const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    const result = await validateUserAuthorization(
-      authorizationValidationResult.kiloUserId,
+    const result = await validateUserAuthorization({
+      kiloUserId: authorizationValidationResult.kiloUserId,
       user,
       opts,
-      false,
+      isNewUser: false,
       organizationId,
       internalApiUse,
       fromDb,
       botId,
       tokenSource,
-      deviceSessionId
-    );
+      deviceSessionId,
+      cloudAgentAuthority: scope,
+    });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     return result.user ? { ...result, cloudAgentAuthority: scope } : result;
@@ -457,15 +559,18 @@ async function resolveUserFromSession(
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
-  return await validateUserAuthorization(
-    maybeKiloUserId,
+  return await validateUserAuthorization({
+    kiloUserId: maybeKiloUserId,
     user,
     opts,
-    session.isNewUser,
-    undefined,
-    undefined,
-    fromDb
-  );
+    isNewUser: session.isNewUser,
+    fromDb,
+    webSession: {
+      id: session.webSessionId,
+      pepper: session.webSessionPepper,
+      authenticatedAt: session.authenticatedAt,
+    },
+  });
 }
 
 export async function getUserFromAuthOrRedirect(
@@ -504,36 +609,77 @@ function authError(
   status: number,
   error: string,
   kiloUserId: string,
-  options?: { credentialsRejected?: boolean }
+  options?: {
+    credentialsRejected?: boolean;
+    internalApiUse?: boolean;
+    tokenSource?: string;
+    cloudAgentAuthority?: CloudAgentAuthority;
+  }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
+    internalApiUse: options?.internalApiUse,
+    tokenSource: options?.tokenSource,
+    cloudAgentAuthority: options?.cloudAgentAuthority,
   };
 }
 
-async function validateUserAuthorization(
-  kiloUserId: string,
-  user: User | undefined,
-  opts: RequiredPermissions,
-  isNewUser?: boolean,
-  organizationId?: Organization['id'],
-  internalApiUse?: boolean,
-  fromDb: typeof db = db,
-  botId?: string,
-  tokenSource?: string,
-  deviceSessionId?: string
-): Promise<GetAuthResponse> {
+type ValidateUserAuthorizationParams = {
+  kiloUserId: string;
+  user: User | undefined;
+  opts: RequiredPermissions;
+  isNewUser?: boolean;
+  organizationId?: Organization['id'];
+  internalApiUse?: boolean;
+  fromDb?: typeof db;
+  botId?: string;
+  tokenSource?: string;
+  deviceSessionId?: string;
+  cloudAgentAuthority?: CloudAgentAuthority;
+  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+};
+
+async function validateUserAuthorization({
+  kiloUserId,
+  user,
+  opts,
+  isNewUser,
+  organizationId,
+  internalApiUse,
+  fromDb = db,
+  botId,
+  tokenSource,
+  deviceSessionId,
+  cloudAgentAuthority,
+  webSession,
+}: ValidateUserAuthorizationParams): Promise<GetAuthResponse> {
   if (!user) {
-    return authError(401, 'User not found', kiloUserId);
+    return authError(401, 'User not found', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (await isUserBlacklistedByDomain(user)) {
-    return authError(403, 'Access denied (R0)', kiloUserId);
+    return authError(403, 'Access denied (R0)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
-    return report_blocked_user(kiloUserId);
+    return authError(403, 'Access denied (R1)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (opts.adminOnly && !user.is_admin) {
-    return authError(403, 'Access denied (nonadmin)', kiloUserId);
+    return authError(403, 'Access denied (nonadmin)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   }
 
   // A credential bound to a device session is only valid while that session is
@@ -552,6 +698,9 @@ async function validateUserAuthorization(
       // not degrade into an anonymous request.
       return authError(401, 'Device session is no longer active', kiloUserId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
       });
     }
   }
@@ -559,11 +708,19 @@ async function validateUserAuthorization(
   if (organizationId) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
-      return authError(400, 'Invalid organization ID format', kiloUserId);
+      return authError(400, 'Invalid organization ID format', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
     }
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
     if (!isMember) {
-      return authError(403, 'Access denied (not a member of the organization)', kiloUserId);
+      return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
     }
   }
 
@@ -576,6 +733,9 @@ async function validateUserAuthorization(
     botId,
     tokenSource,
     deviceSessionId,
+    webSessionId: webSession?.id,
+    webSessionPepper: webSession?.pepper,
+    authenticatedAt: webSession?.authenticatedAt,
   };
 }
 

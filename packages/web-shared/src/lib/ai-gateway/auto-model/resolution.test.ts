@@ -22,10 +22,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
 
 import type * as AutoModelResolution from './resolution';
 import {
+  AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
+  KILO_AUTO_SMALL_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -70,6 +72,26 @@ const sampleDecision: AutoRoutingDecision = {
   tableVersion: 'v1',
   sticky: false,
 };
+
+describe('resolveAutoModel Auto Small', () => {
+  it.each([
+    { balance: 1, target: AUTO_SMALL_TARGET_MODELS.paid },
+    { balance: 0, target: AUTO_SMALL_TARGET_MODELS.free },
+    { balance: -1, target: AUTO_SMALL_TARGET_MODELS.free },
+  ])('routes balance $balance to $target', async ({ balance, target }) => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_SMALL_MODEL.id,
+        apiKind: 'chat_completions',
+      },
+      nullUserPromise,
+      Promise.resolve(balance)
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: target } });
+  });
+});
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {

@@ -309,20 +309,24 @@ export type AdminStepUpEvidence = { status: 'absent' } | { status: 'fresh'; veri
  * Narrow step-up port so PR3 stays independent of the session-bound MFA work in
  * PR2. PR5 supplies an adapter over `requirePrivilegedActor`.
  */
+export type SupportStepUpCredential =
+  | 'session'
+  | 'human_bearer'
+  | 'delegated_workload'
+  | 'service_assertion';
+
 export type SupportStepUpPort = {
   requireFresh(params: {
     userId: string;
-    action: 'support_read_request' | 'support_write_request' | 'support_approval';
+    action:
+      | 'support_read_request'
+      | 'support_write_request'
+      | 'support_approval'
+      | 'support_emergency_issue';
+    credential?: SupportStepUpCredential;
+    webSessionId?: string | null;
+    route?: string | null;
+    method?: string | null;
+    surface?: SupportSurface;
   }): Promise<{ evidence: AdminStepUpEvidence }>;
-};
-
-/**
- * Interim adapter used until PR2's privileged-actor guard lands. It records no
- * step-up and never blocks because PR2 is not in this branch yet; the caller
- * seam stays in place so the guard can be wired without touching call sites.
- */
-export const interimSupportStepUp: SupportStepUpPort = {
-  async requireFresh() {
-    return { evidence: { status: 'absent' } };
-  },
 };

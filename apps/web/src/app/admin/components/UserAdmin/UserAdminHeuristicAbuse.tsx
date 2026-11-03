@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import type { UserDetailProps } from '@/types/admin';
@@ -322,7 +324,7 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
         ? `/admin/api/users/heuristic-analysis/raw?userId=${id}&page=${page}&limit=40&onlyAbuse=${onlyAbuse}&since=${timeWindow}`
         : `/admin/api/users/heuristic-analysis/grouped?userId=${id}&groupBy=${buildGroupBy()}&since=${timeWindow}`;
 
-      const response = await fetch(endpoint);
+      const response = await adminFetch(endpoint);
       if (!response.ok) {
         throw new Error('Failed to fetch heuristic analysis data');
       }

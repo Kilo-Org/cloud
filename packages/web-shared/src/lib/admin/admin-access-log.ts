@@ -80,7 +80,9 @@ export type KiloAdminElevationReason =
   /** A token carrying `isAdmin` was minted for a downstream service. */
   | 'service_token_mint'
   /** A delegated resource token carrying `isAdmin` was minted for a Worker. */
-  | 'delegated_resource_token_mint';
+  | 'delegated_resource_token_mint'
+  /** A short-lived Worker admin capability was minted for a service. */
+  | 'worker_capability_mint';
 
 /** Fields every `admin_access` event carries, whatever produced it. */
 export type AdminAccessAttribution = {
@@ -117,6 +119,8 @@ export type AdminAccessAttribution = {
   wouldBlock: boolean;
   /** First product token of the User-Agent only, never the full string. */
   userAgentProduct: string | null;
+  /** Capability issuance id (`jti`) when the event records a capability mint. */
+  issuanceId: string | null;
   /**
    * Best-effort route identifier. For tRPC this is the exact procedure path;
    * for REST and server components it is the concrete pathname (`x-pathname`)
@@ -238,6 +242,7 @@ export type AdminAccessEventInput = {
       user: AdminAccessUser;
       reason: KiloAdminElevationReason;
       target: string;
+      issuanceId?: string | null;
     }
   | {
       kind: 'privileged_access';
@@ -307,6 +312,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         ...transport,
         reason: params.reason,
         target: params.target,
+        issuanceId: params.issuanceId ?? null,
       });
     } else if (params.kind === 'privileged_access') {
       currentSink({
@@ -315,6 +321,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         kind: 'privileged_access',
         ...nullableAttributionFor(params.user),
         ...transport,
+        issuanceId: null,
         credential: params.credential,
         outcome: params.outcome,
         actionClass: params.actionClass,
@@ -328,6 +335,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         kind: 'admin_guard',
         ...attributionFor(params.user),
         ...transport,
+        issuanceId: null,
         reason: null,
         target: null,
       });
@@ -436,6 +444,7 @@ export async function recordKiloAdminElevation(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
   if (ctx.trpcPath === undefined) {
@@ -460,6 +469,7 @@ export async function recordKiloAdminElevation(
       supportGrantId: params.supportGrantId,
       supportActionId: params.supportActionId,
       inventoryId: params.inventoryId,
+      issuanceId: params.issuanceId,
     });
     return;
   }
@@ -489,6 +499,7 @@ export async function recordKiloAdminElevation(
     supportGrantId: params.supportGrantId,
     supportActionId: params.supportActionId,
     inventoryId: params.inventoryId,
+    issuanceId: params.issuanceId ?? null,
   });
   if (ctx.authViaToken) {
     emitPrivilegedAccessEvent({
@@ -529,6 +540,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
     /** See {@link organizationTarget} and {@link UNSCOPED_TARGET}. */
     target: string;
     grant: TGrant;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<TGrant> {
   await recordKiloAdminElevation(ctx, {
@@ -536,6 +548,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
     target: params.target,
     membershipRole: params.membershipRole,
     wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
+    issuanceId: params.issuanceId,
   });
   return params.grant;
 }
@@ -573,6 +586,7 @@ export async function recordKiloAdminElevationForRequest(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
   let headersList = params.headersList;
@@ -601,6 +615,7 @@ function recordKiloAdminElevationFromHeaders(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): void {
   const authViaToken = authViaTokenFromHeaders(params.headersList);
@@ -632,6 +647,7 @@ function recordKiloAdminElevationFromHeaders(
     supportGrantId: params.supportGrantId,
     supportActionId: params.supportActionId,
     inventoryId: params.inventoryId,
+    issuanceId: params.issuanceId ?? null,
   });
   if (authViaToken) {
     emitPrivilegedAccessEvent({
@@ -670,6 +686,7 @@ function actionClassForElevation(
       return 'support_write';
     case 'service_token_mint':
     case 'delegated_resource_token_mint':
+    case 'worker_capability_mint':
       return 'worker_admin';
   }
 }

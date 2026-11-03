@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useEffect, useRef, useState } from 'react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -159,7 +161,7 @@ function useControllerTelemetryDiskUsage(sandboxId: string) {
   return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
     queryKey: ['kiloclaw-controller-telemetry', 'disk-usage', sandboxId],
     queryFn: async () => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/kiloclaw-controller-telemetry?sandboxId=${encodeURIComponent(sandboxId)}`
       );
       if (!response.ok) {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import AdminPage from '@/app/admin/components/AdminPage';
@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { useStepUpActive } from '@/components/admin/step-up/StepUpProvider';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
@@ -29,6 +31,8 @@ export default function ApiRequestLogPage() {
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const stepUpActive = useStepUpActive();
   const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
   const summaryQuery = useQuery(
     trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
@@ -36,7 +40,7 @@ export default function ApiRequestLogPage() {
     })
   );
 
-  function handleDownload() {
+  async function handleDownload() {
     const params = new URLSearchParams();
     if (id.trim()) {
       params.set('id', id.trim());
@@ -67,6 +71,19 @@ export default function ApiRequestLogPage() {
     }
     if (errorsOnly) {
       params.set('errorsOnly', 'true');
+    }
+
+    // A gated read runs through the tRPC link first, so an expired proof opens
+    // the dialog before the browser navigates to the streaming download.
+    if (stepUpActive) {
+      try {
+        await queryClient.fetchQuery(
+          trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
+        );
+      } catch {
+        toast.error('Could not verify access before download. Try again.');
+        return;
+      }
     }
 
     // Navigate directly to preserve server-side streaming
@@ -260,7 +277,7 @@ export default function ApiRequestLogPage() {
               </Label>
             </div>
 
-            <Button onClick={handleDownload} className="w-full">
+            <Button onClick={() => void handleDownload()} className="w-full">
               <Download className="mr-2 h-4 w-4" />
               Download ZIP
             </Button>

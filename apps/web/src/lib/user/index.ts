@@ -1,3 +1,4 @@
+import { deleteStepUpRowsForUser } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
@@ -26,6 +27,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
   todo_lists,
   enrichment_data,
   source_embeddings,
@@ -1189,6 +1191,7 @@ export async function anonymizeCloudUserData(
       can_export_api_request_logs: false,
       customer_source: null,
       signup_ip: null,
+      external_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1248,6 +1251,7 @@ export async function anonymizeCloudUserData(
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
   await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
+  await tx.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })
@@ -1315,6 +1319,9 @@ export async function anonymizeCloudUserData(
   // expire. Consumed tickets are removed too: their `kilo_user_id` still names
   // the deleted account.
   await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  // Step-up challenges and proofs are PII and session-bound; a deleted account
+  // must not leave either behind.
+  await deleteStepUpRowsForUser(tx, userId);
 
   // Remove from organizations
   await tx

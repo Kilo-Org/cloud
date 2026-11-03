@@ -2,11 +2,17 @@ import { describe, expect, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { and, eq } from 'drizzle-orm';
-import { support_access_grant_events, support_access_grants } from '@kilocode/db/schema';
+import {
+  passkey_credentials,
+  session_step_up_proofs,
+  support_access_grant_events,
+  support_access_grants,
+} from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 
 async function insertRequester(overrides: Parameters<typeof insertTestUser>[0] = {}) {
   return insertTestUser({
@@ -334,5 +340,141 @@ describe('support grant database invariants', () => {
     const source = fs.readFileSync(servicePath, 'utf8');
     expect(source).not.toMatch(/\.update\(support_access_grant_events\)/);
     expect(source).not.toMatch(/\.delete\(support_access_grant_events\)/);
+  });
+});
+
+const supportStepUpSessionId = 'support-access-step-up-test';
+
+async function grantFreshStepUp(userId: string) {
+  const [credential] = await db
+    .insert(passkey_credentials)
+    .values({
+      kilo_user_id: userId,
+      credential_id: `support-step-up-${crypto.randomUUID()}`,
+      public_key: 'unused-public-key',
+    })
+    .returning();
+  const now = new Date();
+  await db.insert(session_step_up_proofs).values({
+    kilo_user_id: userId,
+    session_id_hash: hashWebSessionId(supportStepUpSessionId),
+    method: 'webauthn_uv',
+    passkey_credential_id: credential!.id,
+    purpose: 'session',
+    verified_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + 15 * 60_000).toISOString(),
+  });
+}
+
+async function stepUpCaller(userId: string) {
+  await grantFreshStepUp(userId);
+  return createSessionCallerForUser(userId, { webSessionId: supportStepUpSessionId });
+}
+
+function enableSupportAccessForStepUp(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
+function setAdminStepUp(enabled: boolean) {
+  if (enabled) process.env.ADMIN_STEP_UP_ENABLED = 'true';
+  else delete process.env.ADMIN_STEP_UP_ENABLED;
+}
+
+describe('support write step-up', () => {
+  const originalSupport = process.env.SUPPORT_ACCESS_ENABLED;
+  const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
+
+  afterEach(() => {
+    if (originalSupport === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+    else process.env.SUPPORT_ACCESS_ENABLED = originalSupport;
+    if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+    else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
+  });
+
+  test('ON with admin step-up off refuses write request, approval, and emergency issue', async () => {
+    enableSupportAccessForStepUp(true);
+    setAdminStepUp(false);
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const superadmin = await insertSuperadmin();
+    const { organization, owner } = await orgWithOwner();
+
+    await expect(
+      (await createCallerForUser(requester.id)).admin.supportAccess.request({
+        organizationId: organization.id,
+        actionClass: 'support_write',
+        reason: 'fixing a broken organization setting',
+      })
+    ).rejects.toThrow('Step-up must be enabled');
+
+    // Read grants do not need step-up.
+    const read = await (
+      await createCallerForUser(requester.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+    expect(read.status).toBe('active');
+
+    const [directPending] = await db
+      .insert(support_access_grants)
+      .values({
+        actor_kilo_user_id: owner.id,
+        organization_id: organization.id,
+        action_class: 'support_write',
+        status: 'pending',
+        reason: 'direct pending grant for step-up test',
+        requested_duration_seconds: 600,
+        request_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      })
+      .returning();
+
+    await expect(
+      (await createCallerForUser(approver.id)).admin.supportAccess.approve({
+        grantId: directPending!.id,
+      })
+    ).rejects.toThrow('Step-up must be enabled');
+
+    await expect(
+      (await createCallerForUser(superadmin.id)).admin.supportAccess.emergencyIssue({
+        organizationId: organization.id,
+        reason: 'production incident mitigation',
+      })
+    ).rejects.toThrow('Step-up must be enabled');
+  });
+
+  test('ON with admin step-up on accepts write request, approval, and emergency issue with fresh proofs', async () => {
+    enableSupportAccessForStepUp(true);
+    setAdminStepUp(true);
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const superadmin = await insertSuperadmin();
+    const { organization } = await orgWithOwner();
+
+    const pending = await (
+      await stepUpCaller(requester.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    expect(pending.status).toBe('pending');
+
+    const approved = await (
+      await stepUpCaller(approver.id)
+    ).admin.supportAccess.approve({
+      grantId: pending.id,
+    });
+    expect(approved.status).toBe('active');
+
+    const emergency = await (
+      await stepUpCaller(superadmin.id)
+    ).admin.supportAccess.emergencyIssue({
+      organizationId: organization.id,
+      reason: 'production incident mitigation',
+    });
+    expect(emergency.status).toBe('active');
   });
 });

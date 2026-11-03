@@ -142,12 +142,17 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
+  cloud_agent_pr_watch_activity,
   todo_items,
   todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
+  session_step_up_challenges,
+  session_step_up_proofs,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -247,6 +252,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
     await db.delete(todo_lists);
@@ -2071,6 +2077,31 @@ describe('User', () => {
           kilo_user_id: user.id,
           expires_at: new Date().toISOString(),
         });
+        const [stepUpCredential] = await db
+          .insert(passkey_credentials)
+          .values({
+            kilo_user_id: user.id,
+            credential_id: `step-up-credential-${randomUUID()}`,
+            public_key: 'public-key',
+          })
+          .returning();
+        await db.insert(session_step_up_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          purpose: 'session',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+        await db.insert(session_step_up_proofs).values({
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          method: 'webauthn_uv',
+          passkey_credential_id: stepUpCredential!.id,
+          purpose: 'session',
+          verified_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -2114,6 +2145,18 @@ describe('User', () => {
             .select()
             .from(passkey_credentials)
             .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_challenges)
+            .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_proofs)
+            .where(eq(session_step_up_proofs.kilo_user_id, user.id))
         ).toHaveLength(0);
         expect(
           await db
@@ -2473,6 +2516,143 @@ describe('User', () => {
         .from(support_access_grant_events)
         .where(eq(support_access_grant_events.grant_id, grant.id));
       expect(events).toEqual([expect.objectContaining({ event_type: 'revoked' })]);
+    });
+
+    it('removes session step-up rows', async () => {
+      const user = await insertTestUser();
+      const [credential] = await db
+        .insert(passkey_credentials)
+        .values({
+          kilo_user_id: user.id,
+          credential_id: `soft-delete-step-up-${randomUUID()}`,
+          public_key: 'public-key',
+        })
+        .returning();
+      await db.insert(session_step_up_challenges).values({
+        id: randomUUID(),
+        challenge: `challenge-${randomUUID()}`,
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        purpose: 'session',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await db.insert(session_step_up_proofs).values({
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(session_step_up_challenges)
+          .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(session_step_up_proofs)
+          .where(eq(session_step_up_proofs.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
+
+    it('deletes OAuth-owned PR watch policy and activity without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|watch-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: otherUser.id,
+          platform: 'github',
+          integration_type: 'app',
+        })
+        .returning();
+      if (!integration) throw new Error('Missing integration fixture');
+      const policy = {
+        version: 1 as const,
+        model: 'anthropic/claude-sonnet-4.6',
+        profileId: null,
+        categories: { reviews: true, failedChecks: true, baseUpdates: false },
+        branchStrategy: 'merge' as const,
+        historyRewriteConsent: false,
+        maxAttemptsPerProblem: 2,
+        maxTotalAttempts: 10,
+        observationOnlyConsent: true as const,
+        futureEventsOnlyConsent: true as const,
+        noHardSpendCapConsent: true as const,
+      };
+      const watches = await db
+        .insert(cloud_agent_pr_watches)
+        .values(
+          [user, otherUser].map((owner, index) => ({
+            kilo_user_id: owner.id,
+            integration_id: integration.id,
+            installation_id: '123',
+            github_app_type: 'standard' as const,
+            repository_id: '123',
+            repo_url: 'https://github.com/kilo/watch-privacy',
+            pr_number: index + 1,
+            source_session_id: `ses_${randomUUID()}`,
+            source_cloud_agent_session_id: `workspace_${randomUUID()}`,
+            worktree_id: `worktree_${randomUUID()}`,
+            head_ref: 'fix',
+            base_ref: 'main',
+            head_sha: 'a'.repeat(40),
+            base_sha: 'b'.repeat(40),
+            policy,
+            projection: { privateFeedback: 'Customer-sensitive feedback' },
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
+          }))
+        )
+        .returning();
+      const ownedWatch = watches.find(watch => watch.kilo_user_id === user.id);
+      const otherWatch = watches.find(watch => watch.kilo_user_id === otherUser.id);
+      if (!ownedWatch || !otherWatch) throw new Error('Missing watch fixtures');
+      await db.insert(cloud_agent_pr_watch_activity).values([
+        {
+          watch_id: ownedWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Private feedback' },
+        },
+        {
+          watch_id: otherWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Keep this feedback' },
+        },
+      ]);
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.kilo_user_id, user.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, ownedWatch.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.id, otherWatch.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, otherWatch.id))
+      ).toHaveLength(1);
     });
 
     it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
@@ -3444,6 +3624,7 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        external_id: 'ext-abc-123',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
         blocked_reason: 'manual block',
@@ -3480,6 +3661,7 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
+      expect(softDeleted!.external_id).toBeNull();
       expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
       expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
       expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));

@@ -200,3 +200,23 @@ describe('kiloAuthMiddleware', () => {
     expect(downstreamCalls()).toBe(0);
   });
 });
+
+describe('kiloAuthMiddleware with worker admin capability header', () => {
+  it('leaves capability verification to the worker admin middleware', async () => {
+    const { app, downstreamCalls } = createApp();
+    const token = await signToken();
+    const response = await app.request(
+      '/api/whoami',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Kilo-Worker-Capability': 'not-yet-verified',
+        },
+      },
+      { NEXTAUTH_SECRET: TEST_SECRET } as never
+    );
+    expect(response.status).toBe(200);
+    expect(downstreamCalls()).toBe(1);
+    await expect(response.json()).resolves.toMatchObject({ kiloUserId: 'user-abc' });
+  });
+});

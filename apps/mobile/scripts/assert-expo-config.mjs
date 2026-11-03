@@ -229,9 +229,21 @@ check(
 // exercises app.config.ts's real module resolution and the JSON import.
 const localizations = config.ios?.infoPlist?.CFBundleLocalizations ?? [];
 const locales = config.locales ?? {};
+const localeTags = Object.keys(locales);
+// The loop below is the assertion set. A config that stopped emitting the list
+// would run none of the per-locale checks and still print "OK", so the list has
+// to stand on its own before the loop starts.
 check(
-  Object.keys(locales).length === localizations.length,
-  `top-level locales must cover every CFBundleLocalization (${localizations.length})`
+  localizations.length > 0,
+  'ios.infoPlist.CFBundleLocalizations must list the supported language tags'
+);
+// Exact tags, not a count: swapping one tag for another keeps the length equal
+// while dropping one language's prompts and checking another's.
+const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
+const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
+check(
+  unlocalizedTags.length === 0 && unlistedTags.length === 0,
+  `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
 );
 for (const tag of localizations) {
   check(

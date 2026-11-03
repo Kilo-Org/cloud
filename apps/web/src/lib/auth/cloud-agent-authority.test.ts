@@ -205,6 +205,20 @@ describe('verified scoped web authentication', () => {
     expect(auth.cloudAgentAuthority).toEqual(scope);
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+  it('allows models.list discovery on scoped HTTP paths for personal and signed-org authority', async () => {
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+    const orgScope = { ...scope, organizationId };
+    mockHeaders.mockResolvedValue(
+      bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }))
+    );
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+  });
   it.each([
     undefined,
     '/api/gastown/token',
@@ -212,6 +226,8 @@ describe('verified scoped web authentication', () => {
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
+    '/api/trpc/models.preferred',
+    '/api/trpc/models.list,user.getMe',
   ])('denies direct REST and unrelated procedure paths %s', async requestPathname => {
     const headers = bearer();
     headers.set('x-pathname', '/api/user');
@@ -256,8 +272,9 @@ describe('verified scoped web authentication', () => {
     headers.set('cookie', 'next-auth.session-token=fixture');
     headers.set('x-pathname', '/api/user');
     mockHeaders.mockResolvedValue(headers);
-    expect((await mintGastownToken()).status).toBe(401);
-    expect((await mintWastelandToken()).status).toBe(401);
+    const directMintRequest = new Request('https://kilo.ai/api/gastown/token', { method: 'POST' });
+    expect((await mintGastownToken(directMintRequest)).status).toBe(401);
+    expect((await mintWastelandToken(directMintRequest)).status).toBe(401);
     expect(mockOrgMemberships).not.toHaveBeenCalled();
     expect(mockGastownEnabled).not.toHaveBeenCalled();
     expect(mockGetServerSession).not.toHaveBeenCalled();
@@ -403,7 +420,6 @@ describe('scope-preserving control token exchange', () => {
     const result = await createControlTokenForRequest(user, 'cloud-agent-next', {
       headers: bearer(),
       expiresIn: 100_000,
-      extra: { isAdmin: true },
     });
     const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({

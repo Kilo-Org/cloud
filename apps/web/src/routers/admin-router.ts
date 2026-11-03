@@ -73,9 +73,10 @@ import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-pro
 import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
-import { adminEnkryptGuardrailChargesRouter } from '@/routers/admin/enkrypt-guardrail-charges-router';
+import { adminEnkryptUsageRouter } from '@/routers/admin/enkrypt-usage-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
+import { adminServiceFeeRollbackRouter } from '@/routers/admin/service-fee-rollback-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
@@ -124,6 +125,7 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -2031,6 +2033,9 @@ export const adminRouter = createTRPCRouter({
                 performedByKiloUserId: actor.id,
               });
             }
+            // The session pepper and API pepper rotated above, so every step-up
+            // proof bound to the old credentials is no longer usable.
+            await revokeStepUpProofs(target.id, 'role_change', tx);
 
             await tx.insert(user_admin_notes).values({
               kilo_user_id: target.id,
@@ -2161,6 +2166,8 @@ export const adminRouter = createTRPCRouter({
               message: 'Failed to update target user',
             });
           }
+
+          await revokeStepUpProofs(target.id, 'permission_change', tx);
 
           const notes = [
             changes.is_super_admin !== undefined &&
@@ -2790,9 +2797,10 @@ export const adminRouter = createTRPCRouter({
   customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
-  enkryptGuardrailCharges: adminEnkryptGuardrailChargesRouter,
+  enkryptUsage: adminEnkryptUsageRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  serviceFeeRollback: adminServiceFeeRollbackRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
   actionAuditLogs: adminActionAuditLogsRouter,

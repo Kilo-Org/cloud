@@ -13,6 +13,7 @@ import {
   cleanupExpiredPasskeySignInTickets,
 } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
+import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
@@ -72,6 +73,14 @@ export async function GET(request: Request) {
     const installStatesDeleted = await cleanupExpiredInstallStates();
     sentryLogger('cron', 'info')(`Cleaned up ${installStatesDeleted} expired install states`);
 
+    const stepUpDeleted = await cleanupExpiredSessionStepUpRows();
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${stepUpDeleted.challenges} expired step-up challenges and ${stepUpDeleted.proofs} proofs`
+    );
+
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_device_auth_request_count: deletedCount,
@@ -81,6 +90,8 @@ export async function GET(request: Request) {
         deleted_passkey_sign_in_ticket_count: passkeySignInTicketsDeleted,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
+        deleted_step_up_challenge_count: stepUpDeleted.challenges,
+        deleted_step_up_proof_count: stepUpDeleted.proofs,
       })
     );
 
@@ -93,6 +104,8 @@ export async function GET(request: Request) {
       passkeySignInTicketsDeleted,
       accessCodesDeleted,
       installStatesDeleted,
+      stepUpChallengesDeleted: stepUpDeleted.challenges,
+      stepUpProofsDeleted: stepUpDeleted.proofs,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

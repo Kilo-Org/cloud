@@ -11,6 +11,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
@@ -33,10 +34,6 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
-import {
-  recordKiloAdminElevationForRequest,
-  serviceTarget,
-} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -96,7 +93,6 @@ export type CreateControlTokenOptions = {
   extra?: {
     botId?: string;
     createdOnPlatform?: string;
-    isAdmin?: boolean;
     gastownAccess?: boolean;
     orgMemberships?: Array<{
       orgId: string;
@@ -162,10 +158,7 @@ export async function canIssueLegacyOrganizationToken(
 }
 
 function tokenFromHeaders(requestHeaders: Headers): string | null {
-  const value = requestHeaders.get('authorization');
-  if (!value || !value.toLowerCase().startsWith('bearer ')) return null;
-  const token = value.slice(7).trim();
-  return token || null;
+  return extractBearerToken(requestHeaders.get('authorization'));
 }
 
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
@@ -364,16 +357,6 @@ export async function isModernResourceDelegationRequest(requestHeaders: Headers)
   return verified.claims.tokenPurpose !== undefined;
 }
 
-function mintsWorkerAdminToken(
-  resource: ControlResource,
-  authority: ResourceDelegationAuthority,
-  options?: CreateControlTokenOptions
-): boolean {
-  return (
-    resource !== 'cloud-agent-next' && options?.extra?.isAdmin === true && authority.user.is_admin
-  );
-}
-
 async function createModernControlToken(
   authority: ResourceDelegationAuthority,
   resource: ControlResource,
@@ -389,15 +372,6 @@ async function createModernControlToken(
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
   const memberships =
     resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
-  if (mintsWorkerAdminToken(resource, authority, options)) {
-    await recordKiloAdminElevationForRequest({
-      user: authority.user,
-      tokenSource: options?.tokenSource ?? authority.tokenSource,
-      reason: 'delegated_resource_token_mint',
-      target: serviceTarget(resource),
-      headersList: options?.headers,
-    });
-  }
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,
@@ -413,7 +387,6 @@ async function createModernControlToken(
       deviceSessionId: authority.deviceSessionId,
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
-      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
       gastownAccess: options?.extra?.gastownAccess,
       orgMemberships: memberships,
       ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
@@ -505,15 +478,6 @@ export async function createControlTokenForRequest(
     const expiresIn =
       options?.legacyExpiresIn ??
       (resource === 'cloud-agent-next' ? TOKEN_EXPIRY.default : ONE_HOUR_SECONDS);
-    if (mintsWorkerAdminToken(resource, authority, options)) {
-      await recordKiloAdminElevationForRequest({
-        user: authority.user,
-        tokenSource: options?.tokenSource,
-        reason: 'delegated_resource_token_mint',
-        target: serviceTarget(resource),
-        headersList: options?.headers,
-      });
-    }
     const token = generateApiToken(
       authority.user,
       {
@@ -521,10 +485,7 @@ export async function createControlTokenForRequest(
         tokenSource: options?.tokenSource,
         ...(resource === 'cloud-agent-next'
           ? {}
-          : {
-              isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-              orgMemberships: await membershipsFor(authority.user.id),
-            }),
+          : { orgMemberships: await membershipsFor(authority.user.id) }),
       },
       { expiresIn }
     );

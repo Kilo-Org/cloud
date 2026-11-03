@@ -280,6 +280,25 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
+  test('batch observation honors required roles instead of any membership', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'member',
+    });
+
+    await getOrganizationsAccessRoles(ctxFor(admin), [organization.id], ['owner']);
+
+    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+      kind: 'kilo_admin_elevation',
+      reason: 'organization_access_batch',
+      membershipRole: null,
+      wouldPassWithoutAdmin: false,
+    });
+  });
+
   test('ensureOrganizationAccessAndFetchOrg records the org an admin fetched', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const organization = await orgOwnedByAnotherUser();

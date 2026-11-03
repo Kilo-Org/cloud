@@ -7,8 +7,9 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
-  interimSupportStepUp,
+  isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
+import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
@@ -55,11 +56,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await interimSupportStepUp.requireFresh({
-        userId: ctx.user.id,
-        action:
-          input.actionClass === 'support_read' ? 'support_read_request' : 'support_write_request',
-      });
+      if (input.actionClass === 'support_write' && isSupportAccessEnabled()) {
+        await supportStepUpPort.requireFresh({
+          userId: ctx.user.id,
+          action: 'support_write_request',
+          credential: ctx.credential,
+          webSessionId: ctx.webSessionId ?? null,
+          route: ctx.trpcPath ?? null,
+          method: ctx.trpcType ?? null,
+          surface: 'trpc',
+        });
+      }
       const grant = await requestSupportGrant({
         actorKiloUserId: ctx.user.id,
         organizationId: input.organizationId,
@@ -93,10 +100,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await interimSupportStepUp.requireFresh({
-        userId: ctx.user.id,
-        action: 'support_approval',
-      });
+      if (isSupportAccessEnabled()) {
+        await supportStepUpPort.requireFresh({
+          userId: ctx.user.id,
+          action: 'support_approval',
+          credential: ctx.credential,
+          webSessionId: ctx.webSessionId ?? null,
+          route: ctx.trpcPath ?? null,
+          method: ctx.trpcType ?? null,
+          surface: 'trpc',
+        });
+      }
       const grant = await approveSupportGrant({
         approverKiloUserId: ctx.user.id,
         grantId: input.grantId,
@@ -173,6 +187,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       if (!(await dbUserIsSuperadmin(ctx.user.id))) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
+      }
+      if (isSupportAccessEnabled()) {
+        await supportStepUpPort.requireFresh({
+          userId: ctx.user.id,
+          action: 'support_emergency_issue',
+          credential: ctx.credential,
+          webSessionId: ctx.webSessionId ?? null,
+          route: ctx.trpcPath ?? null,
+          method: ctx.trpcType ?? null,
+          surface: 'trpc',
+        });
       }
       const grant = await emergencyIssueSupportGrant({
         superadminKiloUserId: ctx.user.id,

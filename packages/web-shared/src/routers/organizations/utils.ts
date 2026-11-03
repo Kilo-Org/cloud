@@ -20,7 +20,6 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   findSupportAllowEntry,
-  interimSupportStepUp,
   isSupportAccessEnabled,
   supportStandInRole,
   type OrganizationAccess,
@@ -195,6 +194,7 @@ export type OrganizationAccessContext = Pick<
   | 'headersList'
   | 'trpcPath'
   | 'trpcType'
+  | 'webSessionId'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
@@ -414,10 +414,6 @@ export async function resolveOrganizationAccess(
 
   if (evaluation.access) {
     if (evaluation.access.actionClass === 'support_write') {
-      await interimSupportStepUp.requireFresh({
-        userId: ctx.user.id,
-        action: 'support_write_request',
-      });
       await recordSupportWriteUse({
         grantId: evaluation.access.grantId,
         actorKiloUserId: ctx.user.id,
@@ -428,8 +424,8 @@ export async function resolveOrganizationAccess(
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',
       target: organizationTarget(organizationId),
-      membershipRole: null,
-      wouldPassWithoutAdmin: null,
+      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
+      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
       supportDecision: evaluation.decision,
       supportGrantId: evaluation.grantId,
       supportActionId,
@@ -452,8 +448,8 @@ export async function resolveOrganizationAccess(
   await recordKiloAdminElevation(ctx, {
     reason: options.auditReason ?? 'organization_access',
     target: organizationTarget(organizationId),
-    membershipRole: null,
-    wouldPassWithoutAdmin: null,
+    membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
+    wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
     supportDecision: evaluation.decision,
     supportGrantId: evaluation.grantId,
     supportActionId,
@@ -630,7 +626,8 @@ async function loadBatchMembershipRoles(
 
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
-  organizationIds: Organization['id'][]
+  organizationIds: Organization['id'][],
+  roles?: OrganizationRole[]
 ): Promise<Map<string, OrganizationRole>> {
   const uniqueIds = Array.from(new Set(organizationIds));
   const result = new Map<string, OrganizationRole>();
@@ -665,7 +662,16 @@ export async function getOrganizationsAccessRoles(
       target: organizationsTarget(liveIds),
       grant: 'owner',
       membershipRole: null,
-      wouldPassWithoutAdmin: rolesByOrg === null ? null : liveIds.every(id => rolesByOrg.has(id)),
+      wouldPassWithoutAdmin:
+        rolesByOrg === null
+          ? null
+          : liveIds.every(
+              id =>
+                effectiveMembershipRole(
+                  (rolesByOrg.get(id) ?? []).map(role => ({ role })),
+                  roles
+                ) !== null
+            ),
     });
     for (const id of liveIds) result.set(id, grant);
     return result;
@@ -688,7 +694,7 @@ export async function ensureOrganizationsAccess(
   organizationIds: Organization['id'][],
   roles?: OrganizationRole[]
 ): Promise<void> {
-  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds);
+  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
   const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);

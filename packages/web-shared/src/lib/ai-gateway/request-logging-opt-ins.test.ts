@@ -110,6 +110,25 @@ describe('request logging opt-ins', () => {
       })
     ).toBe('errors_only');
   });
+
+  test('disables all logging when more than ten opt-ins are stored', () => {
+    const params = { accountId: 'account-1', organizationId: null };
+    const atLimit = [
+      optIns[0],
+      ...Array.from({ length: 9 }, (_, index) => ({
+        ...optIns[1],
+        id: `3412d528-081a-492f-be96-c50f8c4e6b${String(index).padStart(2, '0')}`,
+      })),
+    ];
+
+    expect(resolveRequestLoggingMode(atLimit, params)).toBe('all');
+    expect(
+      resolveRequestLoggingMode(
+        [...atLimit, { ...optIns[1], id: '99b6f9d5-1c2f-4b4e-8b3a-2f0a1c6d4e5f' }],
+        params
+      )
+    ).toBeNull();
+  });
 });
 
 describe('request logging opt-in persistence', () => {

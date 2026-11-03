@@ -38,6 +38,8 @@ export default function RequestLoggingOptInsContent() {
   const [expiresAt, setExpiresAt] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const now = useNowTicker(10_000);
+  const optInCount = optIns?.length ?? 0;
+  const isOverCapacity = optInCount > 10;
   const activeOptInCount =
     optIns?.filter(entry => !entry.expires_at || new Date(entry.expires_at).getTime() > now)
       .length ?? 0;
@@ -195,6 +197,12 @@ export default function RequestLoggingOptInsContent() {
               ? 'Delete an active opt-in or wait for one to expire to enable logging.'
               : 'Expired opt-ins do not count toward this limit.'}
           </p>
+          {isOverCapacity && (
+            <p className="text-destructive mt-2 text-sm" role="status">
+              Request logging is disabled while {optInCount} opt-ins are stored. Delete opt-ins
+              until 10 or fewer remain.
+            </p>
+          )}
         </CardContent>
       </Card>
 

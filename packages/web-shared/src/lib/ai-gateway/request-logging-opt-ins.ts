@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
@@ -25,11 +26,16 @@ export type RequestLoggingMode = 'all' | 'errors_only';
 
 const REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 10_000;
 
+export function exceedsRequestLoggingOptInLimit(optIns: RequestLoggingOptIn[]): boolean {
+  return optIns.length > MAX_REQUEST_LOGGING_OPT_INS;
+}
+
 /** A matching opt-in that logs all requests takes precedence over an errors-only one. */
 export function resolveRequestLoggingMode(
   optIns: RequestLoggingOptIn[],
   params: { accountId: string | null; organizationId: string | null }
 ): RequestLoggingMode | null {
+  if (exceedsRequestLoggingOptInLimit(optIns)) return null;
   const now = Date.now();
   const matching = optIns.filter(
     entry =>
@@ -151,6 +157,12 @@ export async function getDynamicRequestLoggingMode(params: {
 }): Promise<RequestLoggingMode | null> {
   try {
     const optIns = await getCachedRequestLoggingOptIns();
+    if (exceedsRequestLoggingOptInLimit(optIns)) {
+      warnExceptInTest(
+        `[request-logging-opt-ins] skipped request logging because ${optIns.length} opt-ins are stored, above the limit of ${MAX_REQUEST_LOGGING_OPT_INS}`
+      );
+      return null;
+    }
     return resolveRequestLoggingMode(optIns, params);
   } catch {
     return null;

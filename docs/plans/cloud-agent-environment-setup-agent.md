@@ -808,8 +808,7 @@ These follow the Failure UX rules in the root `AGENTS.md`.
   - a fixture repository whose setup exceeds 16,000 characters, to exercise the
     PR flow.
 
-## Remaining open questions
+## Open questions
 
-1. **High-privilege secret patterns.** Is a warning enough, or should some names
-   (for example cloud root credentials) be refused for setup-run requests and
-   allowed only through manual editing?
+None. Every value is entered in the environment editor, so high-privilege names
+get a warning there and are not blocked (see "Secrets").

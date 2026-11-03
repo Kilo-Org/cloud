@@ -59,9 +59,13 @@ export class ScimSyncDO extends DurableObject<Env> {
    */
   async poll(): Promise<PollResult> {
     const at = new Date().toISOString();
-    const cursor = this.cursor();
+    // Declared before the `try` so the failure path can log it, but read
+    // inside, so nothing outside the guard can throw past this method's
+    // promise to report failures rather than raise them.
+    let cursor: string | null = null;
 
     try {
+      cursor = this.cursor();
       const workos = new WorkOS(await this.env.WORKOS_API_KEY.get(), {
         clientId: await this.env.WORKOS_CLIENT_ID.get(),
         // The SDK retries 4xx-adjacent and 5xx responses internally. Leaving
@@ -95,15 +99,27 @@ export class ScimSyncDO extends DurableObject<Env> {
     }
   }
 
-  /** `vars` are strings, so an unparseable value must not reach `setAlarm`. */
+  /**
+   * `vars` are strings, so a blank or unparseable value must not reach
+   * `setAlarm`. Blank is checked before parsing because `Number('')` is `0`,
+   * which is finite and would clamp to the floor rather than the default.
+   */
   private pollIntervalSeconds(): number {
-    const parsed = Number(this.env.SCIM_POLL_INTERVAL_SECONDS);
+    const raw = (this.env.SCIM_POLL_INTERVAL_SECONDS ?? '').trim();
+    if (raw === '') return DEFAULT_INTERVAL_SECONDS;
+
+    const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return DEFAULT_INTERVAL_SECONDS;
     return Math.min(Math.max(Math.trunc(parsed), MIN_INTERVAL_SECONDS), MAX_INTERVAL_SECONDS);
   }
 
+  /**
+   * Total by construction: `poll` promises to report failures rather than
+   * throw, and `alarm` relies on that to reach `setAlarm`, so a missing var
+   * must not throw out of here.
+   */
   private cursor(): string | null {
-    const configured = this.env.WORKOS_EVENT_CURSOR.trim();
+    const configured = (this.env.WORKOS_EVENT_CURSOR ?? '').trim();
     return configured === '' ? null : configured;
   }
 }

@@ -39,10 +39,11 @@
     // interval would keep the Durable Object from hibernating and bill
     // continuously for its 128 MB allocation.
     "SCIM_POLL_INTERVAL_SECONDS": "60",
-    // Optional `after` cursor, hardcoded for this iteration. Empty enters the
-    // stream at the current instant. Nothing is persisted, so every poll
-    // re-reads this value and re-logs the same events until it is changed and
-    // redeployed; the last event ID is logged so it can be copied forward.
+    // Optional `after` cursor. Empty omits `after`, and the Events API returns
+    // the oldest retained events first, not current ones. Nothing is
+    // persisted, so every poll re-reads this value and re-logs the same events
+    // until it is changed and redeployed; the last event ID is logged so it
+    // can be copied forward.
     "WORKOS_EVENT_CURSOR": "",
   },
   "secrets_store_secrets": [

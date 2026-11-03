@@ -25,9 +25,9 @@ The cron only re-arms a loop that died, for example an eviction whose alarm
 retries were exhausted. `ensureScheduled()` leaves a live alarm untouched.
 
 The interval is read on every alarm, so changing it takes effect on the first
-tick after a deploy. The 10-second floor exists because a shorter interval would
-leave no idle window for hibernation, billing the object's full 128 MB
-allocation continuously.
+tick after a deploy. A blank or unparseable value falls back to 60 seconds. The
+10-second floor exists because a shorter interval would leave no idle window for
+hibernation, billing the object's full 128 MB allocation continuously.
 
 ## Cursor
 
@@ -37,8 +37,7 @@ the request is made without `after`, which returns the oldest available events.
 **The cursor does not advance.** It is re-read from configuration on every
 tick, so the same events are logged repeatedly until the value is changed and
 the Worker redeployed. Each poll logs `lastEventId`, and `/status` reports it, so
-the value can be copied forward by hand. Persisting the cursor is the next
-iteration's work.
+the value can be copied forward by hand.
 
 ## HTTP surface
 

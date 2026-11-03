@@ -317,8 +317,17 @@ describe('getProvider with public custom LLMs', () => {
     expect(body.plugins).toEqual([{ id: 'web' }]);
   });
 
-  test('keeps paid server features in a private custom LLM request', async () => {
+  test('strips paid server features from a free private custom LLM request', async () => {
     const body = await upstreamBody('acme/private-model-free', user, ORG_ID);
+
+    expect(body).not.toHaveProperty('plugins');
+    expect(body.tools).toEqual([
+      { type: 'function', function: { name: 'read_file', parameters: {} } },
+    ]);
+  });
+
+  test('keeps paid server features in a private custom LLM request without a free id', async () => {
+    const body = await upstreamBody('acme/unpriced-private-model', user, ORG_ID);
 
     expect(body.plugins).toEqual([{ id: 'web' }]);
     expect(body.tools).toHaveLength(2);

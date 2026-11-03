@@ -389,7 +389,7 @@ async function resolveCustomLlmProvider(
 /**
  * A public custom LLM serves anyone on Kilo's credential, so like free models it
  * drops paid server features before the definition's own `extra_body` applies,
- * even when it sets pricing. Private custom LLMs keep them.
+ * even when it sets pricing. Private custom LLMs keep them unless their id is free.
  */
 function withoutPaidServerFeatures(provider: Provider): Provider {
   return {

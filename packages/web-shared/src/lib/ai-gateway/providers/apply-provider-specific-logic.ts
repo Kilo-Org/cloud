@@ -321,14 +321,8 @@ export async function applyProviderSpecificLogic(
   const usesUserGatewayKey =
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
-  // Custom LLM providers handle paid server features in `getProvider`.
-  const isCustomLlmProvider = provider.type === 'custom' || provider.type === 'custom-public';
-
   removeModelsFallback(requestedModel, requestToMutate);
-  if (
-    (!isCustomLlmProvider && isFreeModel(requestedModel)) ||
-    (userByok !== null && !usesUserGatewayKey)
-  ) {
+  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

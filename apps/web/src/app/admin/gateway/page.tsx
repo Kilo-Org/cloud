@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -155,8 +156,10 @@ export default function AdminGatewayPage() {
                   Model IDs the gateway hides from the catalog and rejects for direct requests,
                   stored in the <code>unavailable_models</code> column of{' '}
                   <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
-                  listed here.
+                  Auto Small&apos;s free fallback, <code>{AUTO_SMALL_TARGET_MODELS.free}</code>, is
+                  internal-only: it is always hidden and rejected for direct requests, independently
+                  of this list. Kilo serves it through <code>{AUTO_SMALL_TARGET_MODELS.paid}</code>{' '}
+                  for users without balance.
                 </>
               }
             />

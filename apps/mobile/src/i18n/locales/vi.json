@@ -1049,6 +1049,7 @@
       "prOpened": "Đã mở pull request cho REVIEW.md",
       "alreadyPresent": "Hướng dẫn đã có trong REVIEW.md",
       "status": {
+        "open": "Còn mở",
         "edited": "Đã chỉnh sửa",
         "opening_change_request": "Đang mở PR",
         "change_request_failed": "Không thể mở PR",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "Tất cả nội dung",
       "nSelected": "Đã chọn {{displayCount}}",
+      "nSelected_one": "Đã chọn {{displayCount}}",
+      "nSelected_other": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "Cơ sở phân loại",
       "watchInCloudAgent": "Theo dõi trong Trợ lý đám mây",
       "whereFound": "Vị trí phát hiện ({{displayCount}})",
+      "whereFound_one": "Vị trí phát hiện ({{displayCount}})",
+      "whereFound_other": "Vị trí phát hiện ({{displayCount}})",
       "yes": "Có",
       "action": {
         "analyzeCodebase": "Phân tích cơ sở mã",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} trung bình và thấp",
       "dueThisWeek": "Đến hạn trong tuần này",
       "dueThisWeekDetail": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail_one": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail_other": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
       "noDeadline": "Không có hạn chót",
       "reviewSlaAssignment": "Rà soát việc đặt hạn chót SLA",
       "allOpenFindingsTracked": "Đang theo dõi tất cả vấn đề chưa xử lý"
@@ -2714,6 +2721,8 @@
       "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
       "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
       "reconnectTitle": "Kết nối lại GitHub",
+      "reconnectTitleGitLab": "Kết nối lại GitLab",
+      "reconnectTitleBitbucket": "Kết nối lại Bitbucket",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi.",
       "gitlabDescription": "Rà soát merge request trên điện thoại",
       "gitlabInstanceMismatchTitle": "Kết nối GitLab dành cho một máy chủ khác",
@@ -2993,7 +3002,6 @@
         "squash": "Gộp bản ghi"
       },
       "terminal": {
-        "alreadyMerged": "Đã hợp nhất",
         "closed": "PR này đã đóng",
         "closedMergeRequest": "Merge request này đã đóng"
       },
@@ -3010,7 +3018,6 @@
         "requiredReviewsTitle": "Thiếu các đánh giá bắt buộc",
         "requiredReviewsDetail": "Chưa có phê duyệt từ những người bắt buộc phải đánh giá.",
         "failingChecksTitle": "Các bước kiểm tra bắt buộc không đạt",
-        "failingChecksDetail": "Các bước kiểm tra trạng thái bắt buộc không đạt yêu cầu.",
         "unstableTitle": "Một số bước kiểm tra không đạt",
         "unstableDetail": "Các bước kiểm tra không bắt buộc không đạt yêu cầu. Kết quả này không ngăn việc hợp nhất.",
         "draftTitle": "Yêu cầu hợp nhất nháp",
@@ -3117,7 +3124,12 @@
       "pendingComment_other": "bình luận chưa gửi",
       "pendingComment_one": "bình luận chờ gửi",
       "summaryOptional": "Tóm tắt (tùy chọn)",
-      "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedFresh": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedFresh_one": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedFresh_other": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedStale": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedStale_one": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedStale_other": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi kết quả rà soát",
       "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",

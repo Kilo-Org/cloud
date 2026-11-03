@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.mdのプルリクエストを作成しました",
       "alreadyPresent": "指針はすでにREVIEW.mdに記載されています",
       "status": {
+        "open": "オープン",
         "edited": "編集済み",
         "opening_change_request": "PRを作成中",
         "change_request_failed": "PR作成失敗",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "すべての領域",
       "nSelected": "{{displayCount}}件選択中",
+      "nSelected_one": "{{displayCount}}件選択中",
+      "nSelected_other": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "set": "設定済み",
       "notSet": "未設定"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
+      "whereFound_one": "検出場所（{{displayCount}}）",
+      "whereFound_other": "検出場所（{{displayCount}}）",
       "yes": "はい",
       "action": {
         "analyzeCodebase": "コードベースを分析",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "中・低：{{displayCount}}件",
       "dueThisWeek": "今週が期限",
       "dueThisWeekDetail": "このうち{{exploitable}}件が悪用可能と確認済み",
+      "dueThisWeekDetail_one": "このうち{{exploitable}}件が悪用可能と確認済み",
+      "dueThisWeekDetail_other": "このうち{{exploitable}}件が悪用可能と確認済み",
       "noDeadline": "期限なし",
       "reviewSlaAssignment": "SLA期限の設定を確認",
       "allOpenFindingsTracked": "未解決の検出結果はすべて追跡中"
@@ -2714,6 +2721,8 @@
       "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
       "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
       "reconnectTitle": "GitHubに再接続",
+      "reconnectTitleGitLab": "GitLabに再接続",
+      "reconnectTitleBitbucket": "Bitbucketに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。",
       "gitlabDescription": "モバイルでマージリクエストをレビュー",
       "gitlabInstanceMismatchTitle": "GitLabの接続先が別のインスタンスです",
@@ -2993,7 +3002,6 @@
         "squash": "スカッシュ"
       },
       "terminal": {
-        "alreadyMerged": "マージ済み",
         "closed": "プルリクエストはクローズ済み",
         "closedMergeRequest": "マージリクエストはクローズ済み"
       },
@@ -3010,7 +3018,6 @@
         "requiredReviewsTitle": "必須レビューが未完了",
         "requiredReviewsDetail": "必須レビュアーからの承認がまだそろっていません。",
         "failingChecksTitle": "必須チェックが失敗しています",
-        "failingChecksDetail": "必須のステータスチェックが失敗しています。",
         "unstableTitle": "一部のチェックが失敗しています",
         "unstableDetail": "必須ではないチェックが失敗していますが、マージは可能です。",
         "draftTitle": "下書きのプルリクエスト",
@@ -3117,7 +3124,12 @@
       "pendingComment_other": "未送信のコメント",
       "pendingComment_one": "未送信のコメント",
       "summaryOptional": "総評（任意）",
-      "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedFresh": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedFresh_one": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedFresh_other": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedStale": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",

@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.md के लिए पुल रिक्वेस्ट खोली गई",
       "alreadyPresent": "दिशानिर्देश REVIEW.md में पहले से मौजूद हैं",
       "status": {
+        "open": "खुला है",
         "edited": "संपादित",
         "opening_change_request": "PR खोली जा रही है",
         "change_request_failed": "PR खोलना विफल रहा",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "सभी क्षेत्र",
       "nSelected": "{{displayCount}} चयनित",
+      "nSelected_one": "{{displayCount}} चयनित",
+      "nSelected_other": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",
       "set": "तय है",
       "notSet": "तय नहीं है"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "प्राथमिक जाँच का तर्क",
       "watchInCloudAgent": "क्लाउड एजेंट में देखें",
       "whereFound": "समस्या मिलने की जगहें ({{displayCount}})",
+      "whereFound_one": "समस्या मिलने की जगहें ({{displayCount}})",
+      "whereFound_other": "समस्या मिलने की जगहें ({{displayCount}})",
       "yes": "हाँ",
       "action": {
         "analyzeCodebase": "कोडबेस का विश्लेषण करें",
@@ -1348,6 +1353,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} मध्यम और निम्न",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
       "dueThisWeekDetail": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
+      "dueThisWeekDetail_one": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
+      "dueThisWeekDetail_other": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
       "reviewSlaAssignment": "तय की गई SLA समय सीमाओं की समीक्षा करें",
       "allOpenFindingsTracked": "सभी अनसुलझी समस्याओं की निगरानी जारी"
@@ -2052,9 +2059,9 @@
       "detailRetryingClone": "क्लोन की फिर से कोशिश हो रही है ({{total}} में से {{attempt}} प्रयास)",
       "detailSetupCommandFailed": "सेटअप आदेश {{index}} विफल रहा",
       "detailSetupCommandTimedOut": "सेटअप आदेश {{index}} का समय समाप्त हो गया",
-      "detailColdRestore": "कोल्ड रिस्टोर, स्नैपशॉट लागू हुआ, {{total}} में से {{applied}} फ़ाइलें रिस्टोर हुईं",
+      "detailColdRestore": "कोल्ड रिस्टोर, स्नैपशॉट लागू, रिस्टोर की गई फ़ाइलें: {{total}} में से {{applied}}",
       "detailProgressPercent": "{{percent}}% पूरा हुआ",
-      "detailRestoreIncompleteReport": "सेशन रिस्टोर अधूरा रहा: {{total}} में से {{skipped}} फ़ाइलें रिस्टोर नहीं हुईं ({{reasons}})।",
+      "detailRestoreIncompleteReport": "सेशन रिस्टोर अधूरा रहा: रिस्टोर नहीं हुई फ़ाइलें — {{total}} में से {{skipped}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "गायब: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} और {{omitted}} और",
       "detailReasonPatchFailed": "पैच लागू नहीं हुआ",
@@ -2721,6 +2728,8 @@
       "checkFailedTitleBitbucket": "Bitbucket कनेक्शन की जाँच नहीं हो सकी।",
       "providerCheckFailedMessage": "लोड होने तक कनेक्शन की स्थिति उपलब्ध नहीं है।",
       "reconnectTitle": "GitHub को फिर से कनेक्ट करें",
+      "reconnectTitleGitLab": "GitLab को फिर से कनेक्ट करें",
+      "reconnectTitleBitbucket": "Bitbucket को फिर से कनेक्ट करें",
       "reconnectDescription": "आपका GitHub कनेक्शन रद्द कर दिया गया।",
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट की समीक्षा करें",
       "gitlabInstanceMismatchTitle": "GitLab कनेक्शन किसी अन्य इंस्टेंस के लिए है",
@@ -3000,7 +3009,6 @@
         "squash": "स्क्वैश"
       },
       "terminal": {
-        "alreadyMerged": "पहले से मर्ज",
         "closed": "यह पुल रिक्वेस्ट बंद है",
         "closedMergeRequest": "यह मर्ज रिक्वेस्ट बंद है"
       },
@@ -3017,7 +3025,6 @@
         "requiredReviewsTitle": "आवश्यक समीक्षाएँ बाकी हैं",
         "requiredReviewsDetail": "आवश्यक समीक्षकों से मंज़ूरी नहीं मिली है या अभी लंबित है।",
         "failingChecksTitle": "आवश्यक जाँचें विफल",
-        "failingChecksDetail": "आवश्यक स्थिति जाँचें विफल हो रही हैं।",
         "unstableTitle": "कुछ जाँचें विफल हो रही हैं",
         "unstableDetail": "वैकल्पिक जाँचें विफल हो रही हैं। इनसे मर्ज नहीं रुकेगा।",
         "draftTitle": "ड्राफ़्ट पुल रिक्वेस्ट",
@@ -3124,7 +3131,12 @@
       "pendingComment_other": "लंबित टिप्पणियाँ",
       "pendingComment_one": "लंबित टिप्पणी",
       "summaryOptional": "सारांश (वैकल्पिक)",
-      "partialPostedMessage": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। {{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
+      "partialPostedFresh": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
+      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
+      "partialPostedFresh_other": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
+      "partialPostedStale": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
+      "partialPostedStale_one": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
+      "partialPostedStale_other": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
       "submitCountOfTotal": "{{displayTotalCount}} में से {{displayFreshCount}} टिप्पणियाँ भेजें",
       "submitReview": "समीक्षा भेजें",
       "blockedRequestChanges": "बदलाव का अनुरोध करने के लिए सारांश या कम से कम एक टिप्पणी जोड़ें।",

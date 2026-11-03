@@ -58,6 +58,7 @@ async function mount(scope: ProviderPrScope) {
 type ButtonInstance = {
   props: {
     onPress: () => void;
+    variant?: string;
     children: { props: { children: string } };
   };
 };
@@ -83,6 +84,14 @@ describe('PrReviewUnavailableActions', () => {
     }
     expect(retryButton.props.children.props.children).toBe('Retry');
     expect(checkButton.props.children.props.children).toBe('Check connection');
+    // One filled primary carries the recovery; the provider check stays the
+    // outlined secondary under it, so the state does not offer two equal
+    // choices.
+    expect(retryButton.props.variant ?? 'default').toBe('default');
+    expect(checkButton.props.variant).toBe('outline');
+    expect(
+      buttons.filter(button => (button.props.variant ?? 'default') === 'default')
+    ).toHaveLength(1);
     act(() => {
       retryButton.props.onPress();
     });

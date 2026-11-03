@@ -70,7 +70,6 @@ export const NO_AGREEMENT = new Map([
     'chat.reactions.accessibility',
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
-  ['codeReviewer.overview.nSelected', 'participle: "{{displayCount}} selected" has no count form'],
   [
     'codeReviewer.repos.allModeCount',
     'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
@@ -83,10 +82,6 @@ export const NO_AGREEMENT = new Map([
   [
     'securityAgent.auditReport.severityCount',
     'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
-  ],
-  [
-    'securityAgent.analysis.whereFound',
-    'bare count in parentheses: "Where this was found ({{displayCount}})"',
   ],
   [
     'securityAgent.remediation.attemptHistory',

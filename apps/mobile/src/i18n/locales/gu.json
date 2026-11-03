@@ -442,7 +442,6 @@
         "rebase": "રીબેઝ"
       },
       "terminal": {
-        "alreadyMerged": "પહેલેથી મર્જ થયેલી",
         "closed": "આ પુલ રિક્વેસ્ટ બંધ છે",
         "closedMergeRequest": "આ મર્જ રિક્વેસ્ટ બંધ છે"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "જરૂરી સમીક્ષાઓ બાકી છે",
         "requiredReviewsDetail": "જરૂરી સમીક્ષકોની મંજૂરી મળી નથી અથવા હજી બાકી છે.",
         "failingChecksTitle": "નિષ્ફળ થતી જરૂરી તપાસો",
-        "failingChecksDetail": "સ્થિતિની જરૂરી તપાસો નિષ્ફળ થઈ રહી છે.",
         "unstableTitle": "કેટલીક તપાસો નિષ્ફળ થઈ રહી છે",
         "unstableDetail": "ફરજિયાત ન હોય તેવી તપાસો નિષ્ફળ થઈ રહી છે. તે મર્જ થતું રોકશે નહીં.",
         "draftTitle": "ડ્રાફ્ટ પુલ રિક્વેસ્ટ",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket કનેક્શન તપાસી શકાયું નહીં.",
       "providerCheckFailedMessage": "આ લોડ થાય ત્યાં સુધી કનેક્શનની સ્થિતિ ઉપલબ્ધ નથી.",
       "reconnectTitle": "GitHub સાથે ફરી કનેક્ટ કરો",
+      "reconnectTitleGitLab": "GitLab સાથે ફરી કનેક્ટ કરો",
+      "reconnectTitleBitbucket": "Bitbucket સાથે ફરી કનેક્ટ કરો",
       "reconnectDescription": "તમારું GitHub કનેક્શન રદ થયું છે.",
       "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરો",
       "gitlabInstanceMismatchTitle": "GitLab કનેક્શન બીજા ઇન્સ્ટન્સ માટે છે",
@@ -708,7 +708,12 @@
       "pendingComment_other": "મોકલવાની બાકી ટિપ્પણીઓ",
       "submitCountOfTotal": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
       "submitReview": "સમીક્ષા મોકલો",
-      "partialPostedMessage": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. {{displayStaleCount}} ટિપ્પણી(ઓ) જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
+      "partialPostedFresh": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
+      "partialPostedStale": "{{displayStaleCount}} ટિપ્પણી(ઓ) જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
+      "partialPostedStale_one": "{{displayStaleCount}} ટિપ્પણી(ઓ) જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
+      "partialPostedStale_other": "{{displayStaleCount}} ટિપ્પણી(ઓ) જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
       "blockedRequestChanges": "ફેરફારો માંગવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો.",
       "blockedComment": "ટિપ્પણી સાથે સમીક્ષા મોકલવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md માટે પુલ રિક્વેસ્ટ ખોલાઈ",
       "alreadyPresent": "માર્ગદર્શિકા REVIEW.md માં પહેલેથી જ છે",
       "status": {
+        "open": "ખુલ્લું",
         "edited": "સંપાદિત",
         "opening_change_request": "PR ખોલાઈ રહી છે",
         "change_request_failed": "PR ખોલવામાં નિષ્ફળતા",
@@ -1614,6 +1620,8 @@
       "set": "ગોઠવેલું",
       "notSet": "ગોઠવેલું નથી",
       "nSelected": "{{displayCount}} પસંદ કરેલ",
+      "nSelected_one": "{{displayCount}} પસંદ કરેલ",
+      "nSelected_other": "{{displayCount}} પસંદ કરેલ",
       "proposedReviewMdGuidance": "REVIEW.md માટે સૂચવેલી માર્ગદર્શિકા"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "દુરુપયોગની શક્યતા અંગેનો તર્ક",
       "suggestedFix": "સૂચવેલ સુધારો",
       "whereFound": "તારણ મળ્યું હોય તેવાં સ્થાન ({{displayCount}})",
+      "whereFound_one": "તારણ મળ્યું હોય તેવાં સ્થાન ({{displayCount}})",
+      "whereFound_other": "તારણ મળ્યું હોય તેવાં સ્થાન ({{displayCount}})",
       "fullReport": "તૈયાર કરેલો સંપૂર્ણ અહેવાલ",
       "yes": "હા",
       "no": "ના",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} મધ્યમ અને ઓછી",
       "dueThisWeek": "આ અઠવાડિયે સમયમર્યાદા",
       "dueThisWeekDetail": "આમાંથી {{exploitable}} દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
+      "dueThisWeekDetail_one": "આમાંથી {{exploitable}} દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
+      "dueThisWeekDetail_other": "આમાંથી {{exploitable}} દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
       "noDeadline": "કોઈ સમયમર્યાદા નથી",
       "reviewSlaAssignment": "SLA સોંપણીની સમીક્ષા કરો",
       "allOpenFindingsTracked": "બધાં ખુલ્લાં તારણો પર નજર રખાય છે"
@@ -2612,9 +2624,9 @@
       "detailRetryingClone": "ક્લોનનો ફરી પ્રયાસ (કુલ {{total}}માંથી પ્રયાસ {{attempt}})",
       "detailSetupCommandFailed": "સેટઅપ આદેશ {{index}} નિષ્ફળ ગયો",
       "detailSetupCommandTimedOut": "સેટઅપ આદેશ {{index}} ટાઇમ આઉટ થયો",
-      "detailColdRestore": "કોલ્ડ પુનઃસ્થાપન, સ્નેપશોટ લાગુ થયો, કુલ {{total}} ફાઇલોમાંથી {{applied}} પુનઃસ્થાપિત થઈ",
+      "detailColdRestore": "કોલ્ડ પુનઃસ્થાપન, સ્નેપશોટ લાગુ છે, પુનઃસ્થાપિત ફાઇલો: કુલ {{total}} માંથી {{applied}}",
       "detailProgressPercent": "{{percent}}% પૂર્ણ",
-      "detailRestoreIncompleteReport": "સેશન પુનઃસ્થાપન અધૂરું: કુલ {{total}} ફાઇલોમાંથી {{skipped}} પુનઃસ્થાપિત થઈ નહીં ({{reasons}}).",
+      "detailRestoreIncompleteReport": "સેશન પુનઃસ્થાપન અધૂરું — પુનઃસ્થાપિત ન થયેલી ફાઇલો: કુલ {{total}} માંથી {{skipped}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "ખૂટે છે: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} અને {{omitted}} વધુ",
       "detailReasonPatchFailed": "પેચ લાગુ થઈ શક્યો નથી",

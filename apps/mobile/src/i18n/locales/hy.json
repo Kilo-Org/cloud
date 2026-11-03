@@ -442,7 +442,6 @@
         "rebase": "Վերաբազավորում"
       },
       "terminal": {
-        "alreadyMerged": "Արդեն միավորված է",
         "closed": "Այս միավորման հարցումը փակ է",
         "closedMergeRequest": "Այս միաձուլման հարցումը փակ է"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Պարտադիր վերանայումները բացակայում են",
         "requiredReviewsDetail": "Պարտադիր վերանայողների հաստատումները բացակայում են կամ դեռ սպասման մեջ են։",
         "failingChecksTitle": "Պարտադիր ստուգումները ձախողվում են",
-        "failingChecksDetail": "Կարգավիճակի պարտադիր ստուգումները ձախողվում են։",
         "unstableTitle": "Որոշ ստուգումներ ձախողվում են",
         "unstableDetail": "Ոչ պարտադիր ստուգումները ձախողվում են։ Դրանք չեն խանգարի միավորմանը։",
         "draftTitle": "Միավորման սևագիր հարցում",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը։",
       "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
+      "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
+      "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։",
       "gitlabDescription": "Ստուգել միաձուլման հարցումները բջջային սարքում",
       "gitlabInstanceMismatchTitle": "GitLab-ի միացումը այլ ինստանսի համար է",
@@ -708,7 +708,12 @@
       "pendingComment_other": "չուղարկված մեկնաբանություն",
       "submitCountOfTotal": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
       "submitReview": "Ուղարկել ստուգման արդյունքը",
-      "partialPostedMessage": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ {{displayStaleCount}} մեկնաբանություն վերաբերում է ավելի հին կոմիտի և մնացել է քո հերթում։",
+      "partialPostedFresh": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
+      "partialPostedFresh_one": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
+      "partialPostedFresh_other": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
+      "partialPostedStale": "{{displayStaleCount}} մեկնաբանություն վերաբերում է ավելի հին կոմիտի և մնացել է քո հերթում։",
+      "partialPostedStale_one": "{{displayStaleCount}} մեկնաբանություն վերաբերում է ավելի հին կոմիտի և մնացել է քո հերթում։",
+      "partialPostedStale_other": "{{displayStaleCount}} մեկնաբանություն վերաբերում է ավելի հին կոմիտի և մնացել է քո հերթում։",
       "blockedRequestChanges": "Փոփոխություններ պահանջելու համար ավելացրու ամփոփում կամ առնվազն մեկ մեկնաբանություն։",
       "blockedComment": "Մեկնաբանությամբ վերանայում հրապարակելու համար ավելացրու ամփոփում կամ առնվազն մեկ մեկնաբանություն։"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md-ի pull request-ը բացված է",
       "alreadyPresent": "Հրահանգներն արդեն կան REVIEW.md-ում",
       "status": {
+        "open": "Բաց է",
         "edited": "Խմբագրված է",
         "opening_change_request": "Բացվում է PR-ը",
         "change_request_failed": "Չհաջողվեց բացել PR-ը",
@@ -1614,6 +1620,8 @@
       "set": "Սահմանված է",
       "notSet": "Սահմանված չէ",
       "nSelected": "Ընտրված է {{displayCount}}",
+      "nSelected_one": "Ընտրված է {{displayCount}}",
+      "nSelected_other": "Ընտրված է {{displayCount}}",
       "proposedReviewMdGuidance": "Առաջարկվող հրահանգներ REVIEW.md-ի համար"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Հարձակման համար օգտագործելիության հիմնավորում",
       "suggestedFix": "Առաջարկվող շտկում",
       "whereFound": "Հայտնաբերման տեղեր ({{displayCount}})",
+      "whereFound_one": "Հայտնաբերման տեղեր ({{displayCount}})",
+      "whereFound_other": "Հայտնաբերման տեղեր ({{displayCount}})",
       "fullReport": "Ստեղծված ամբողջական հաշվետվություն",
       "yes": "Այո",
       "no": "Ոչ",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} միջին և ցածր",
       "dueThisWeek": "Վերջնաժամկետն այս շաբաթ է",
       "dueThisWeekDetail": "Դրանցից {{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
+      "dueThisWeekDetail_one": "Դրանցից {{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
+      "dueThisWeekDetail_other": "Դրանցից {{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
       "noDeadline": "Վերջնաժամկետ չկա",
       "reviewSlaAssignment": "Վերանայել SLA-ի վերջնաժամկետերի սահմանումը",
       "allOpenFindingsTracked": "Բոլոր բաց խնդիրները վերահսկվում են"
@@ -2612,9 +2624,9 @@
       "detailRetryingClone": "Կլոնավորման կրկնակի փորձ (փորձ {{attempt}}-ը {{total}}-ից)",
       "detailSetupCommandFailed": "Կարգավորման {{index}} հրամանը ձախողվեց",
       "detailSetupCommandTimedOut": "Կարգավորման {{index}} հրամանի ժամանակը սպառվեց",
-      "detailColdRestore": "Սառը վերականգնում, կիրառվել է սնապշոտ, վերականգնվել է {{total}} ֆայլից {{applied}}-ը",
+      "detailColdRestore": "Սառը վերականգնում, սնապշոտը կիրառված է, վերականգնված ֆայլեր՝ {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% ավարտված է",
-      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է՝ {{total}} ֆայլից {{skipped}}-ը վերականգնված չեն ({{reasons}})։",
+      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է․ չվերականգնված ֆայլեր՝ {{skipped}} / {{total}} ({{reasons}})։",
       "detailRestoreIncompleteMissing": "Բացակայում են՝ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} և ևս {{omitted}}",
       "detailReasonPatchFailed": "patch-ը չկիրառվեց",

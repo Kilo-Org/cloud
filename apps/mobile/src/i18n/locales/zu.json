@@ -442,7 +442,6 @@
         "rebase": "Isisekelo esisha"
       },
       "terminal": {
-        "alreadyMerged": "Sekuhlanganisiwe",
         "closed": "Lesi sicelo sokuhlanganisa sivaliwe",
         "closedMergeRequest": "Lesi sicelo sokuhlanganisa sivaliwe"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Ukubuyekezwa okudingekayo akukho",
         "requiredReviewsDetail": "Izimvume zababuyekezi abadingekayo azikho noma zisalindwe.",
         "failingChecksTitle": "Izihlolo ezidingekayo ziyehluleka",
-        "failingChecksDetail": "Izihlolo zesimo ezidingekayo ziyehluleka.",
         "unstableTitle": "Ezinye izihlolo ziyehluleka",
         "unstableDetail": "Izihlolo ezingaphoqelekile ziyehluleka. Ngeke zivimbe ukuhlanganisa.",
         "draftTitle": "I-PR esalungiswa",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Asikwazanga ukuhlola ukuxhumana kwe-Bitbucket.",
       "providerCheckFailedMessage": "Isimo sokuxhumana asitholakali kuze kulayishwe lokhu.",
       "reconnectTitle": "Xhuma kabusha i-GitHub",
+      "reconnectTitleGitLab": "Xhuma kabusha i-GitLab",
+      "reconnectTitleBitbucket": "Xhuma kabusha i-Bitbucket",
       "reconnectDescription": "Ukuxhumana kwakho kwe-GitHub kuhoxisiwe.",
       "gitlabDescription": "Hlola izicelo zokuhlanganisa kuselula",
       "gitlabInstanceMismatchTitle": "Ukuxhumana kwe-GitLab kwenzelwe isikhungo esinye",
@@ -708,7 +708,12 @@
       "pendingComment_other": "amazwana angakathunyelwa",
       "submitCountOfTotal": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
       "submitReview": "Thumela umbiko wokuhlola",
-      "partialPostedMessage": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. Amazwana angu-{{displayStaleCount}} abhekisela erekhodini elidala lezinguquko futhi asohlwini lwakho lokulindile.",
+      "partialPostedFresh": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
+      "partialPostedStale": "Amazwana angu-{{displayStaleCount}} abhekisela erekhodini elidala lezinguquko futhi asohlwini lwakho lokulindile.",
+      "partialPostedStale_one": "Amazwana angu-{{displayStaleCount}} abhekisela erekhodini elidala lezinguquko futhi asohlwini lwakho lokulindile.",
+      "partialPostedStale_other": "Amazwana angu-{{displayStaleCount}} abhekisela erekhodini elidala lezinguquko futhi asohlwini lwakho lokulindile.",
       "blockedRequestChanges": "Engeza isifinyezo noma okungenani amazwana awodwa ukuze ucele izinguquko.",
       "blockedComment": "Engeza isifinyezo noma okungenani amazwana awodwa ukuze uthumele ukubuyekeza ngamazwana."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "I-PR ye-REVIEW.md ivuliwe",
       "alreadyPresent": "Imihlahlandlela isivele ikhona ku-REVIEW.md",
       "status": {
+        "open": "Kuvulekile",
         "edited": "Kuhlelwe",
         "opening_change_request": "Kuvulwa i-PR",
         "change_request_failed": "I-PR yehlulekile",
@@ -1614,6 +1620,8 @@
       "set": "Kusethiwe",
       "notSet": "Akukho okusethiwe",
       "nSelected": "Kukhethwe: {{displayCount}}",
+      "nSelected_one": "Kukhethwe: {{displayCount}}",
+      "nSelected_other": "Kukhethwe: {{displayCount}}",
       "proposedReviewMdGuidance": "Imihlahlandlela ephakanyisiwe ye-REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Izizathu zokuthi kungenzeka yini kusetshenziswe ekuhlaseleni",
       "suggestedFix": "Ukulungisa okuphakanyisiwe",
       "whereFound": "Lapho lokhu kutholakale khona ({{displayCount}})",
+      "whereFound_one": "Lapho lokhu kutholakale khona ({{displayCount}})",
+      "whereFound_other": "Lapho lokhu kutholakale khona ({{displayCount}})",
       "fullReport": "Umbiko ogcwele owakhiwe",
       "yes": "Yebo",
       "no": "Cha",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} obumaphakathi nobuphansi",
       "dueThisWeek": "Kufanele kwenziwe kuleli sonto",
       "dueThisWeekDetail": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
+      "dueThisWeekDetail_one": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
+      "dueThisWeekDetail_other": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
       "noDeadline": "Awukho umnqamulajuqu",
       "reviewSlaAssignment": "Hlola ukwabiwa kwe-SLA",
       "allOpenFindingsTracked": "Konke okutholakele okungakaxazululwa kuyalandelwa"
@@ -2612,9 +2624,9 @@
       "detailRetryingClone": "Kuzanywa kabusha ukukopisha (isizamo {{attempt}} kwengu-{{total}})",
       "detailSetupCommandFailed": "Umyalo wokusetha {{index}} wehlulekile",
       "detailSetupCommandTimedOut": "Umyalo wokusetha {{index}} uphele isikhathi",
-      "detailColdRestore": "Ukubuyisa okubandayo, isithombe-simo sisetshenzisiwe, {{applied}} kwengu-{{total}} amafayela abuyisiwe",
+      "detailColdRestore": "Ukubuyisa okubandayo, isithombe-simo sisetshenzisiwe, amafayela abuyisiwe: {{applied}} kwengu-{{total}}",
       "detailProgressPercent": "{{percent}}% kuqediwe",
-      "detailRestoreIncompleteReport": "Ukubuyiswa kweseshini akuphelele: {{skipped}} kwengu-{{total}} amafayela abuyiswanga ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Ukubuyiswa kweseshini akuphelele, amafayela abuyiswanga: {{skipped}} kwengu-{{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ayitholakali: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} kanye nokunye okungu-{{omitted}}",
       "detailReasonPatchFailed": "isiphuculo asizange sisebenze",

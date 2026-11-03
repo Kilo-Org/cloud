@@ -165,6 +165,7 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
+    id: usageContext.usageId ?? randomUUID(),
     kilo_user_id: usageContext.kiloUserId,
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,
@@ -224,13 +225,19 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
 
 export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
-  usageContextInfo: UsageContextInfo,
-  id: string = randomUUID()
+  usageContextInfo: UsageContextInfo
 ): Promise<CoreUsageWithMetaData> {
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
-    usageContextInfo;
+  const {
+    id,
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    ...metadataFromContext
+  } = usageContextInfo;
 
   const core: MicrodollarUsage = {
     id,
@@ -371,11 +378,7 @@ async function logMicrodollarUsageWithTransport(
 ): Promise<UsageAccountingResult | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
-  const { core, metadata } = await toInsertableDbUsageRecord(
-    usageStats,
-    contextInfo,
-    usageContext.usageId
-  );
+  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
   const payload: UsageRecordRequest = {
     core,

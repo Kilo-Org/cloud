@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { recordEnkryptUsageLocally } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   EnkryptUsageWriteSchema,
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error('[enkrypt-guardrail] failed to record usage in the primary region', {
       usage_id: parsed.data.id,
-      error: error instanceof Error ? error.message : String(error),
+      error: describeDatabaseError(error),
     });
     return NextResponse.json({ error: 'Usage write failed' }, { status: 500 });
   }

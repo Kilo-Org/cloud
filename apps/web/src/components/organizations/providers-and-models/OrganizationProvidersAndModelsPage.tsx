@@ -41,6 +41,7 @@ import {
   modelTrains,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
+import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
 import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
@@ -64,20 +65,6 @@ function EnterpriseOnlyMessage() {
 
 function formatPriceCompact(raw: string): string {
   return formatPrice(raw).replace('/1M tokens', '/1M');
-}
-
-function normalizeProviderIconUrl(rawUrl: string): string {
-  // OpenRouter provider icon URLs are sometimes returned as absolute paths (e.g. "/img/...").
-  // In that case, they should be resolved relative to https://openrouter.ai.
-  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-    return rawUrl;
-  }
-
-  if (rawUrl.startsWith('/')) {
-    return `https://openrouter.ai${rawUrl}`;
-  }
-
-  return `https://openrouter.ai/${rawUrl}`;
 }
 
 type RecommendedThenSourceIndexSortKey = {
@@ -289,7 +276,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       offerings.push({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         byokOnly: provider.byokOnly,
@@ -341,7 +328,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       rows.push({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         modelCount: providerModels.length,
         trains: provider.dataPolicy.training,
         retainsPrompts: provider.dataPolicy.retainsPrompts,

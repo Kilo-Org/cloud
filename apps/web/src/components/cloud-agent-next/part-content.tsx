@@ -16,6 +16,9 @@ import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { ApplyPatchToolCard } from './ApplyPatchToolCard';
 import { WebFetchToolCard } from './WebFetchToolCard';
 import { ToolErrorCard } from './ToolErrorCard';
+import { getToolArguments, getToolInputPath } from './toolCardUtils';
+import { readApplyPatchInputPaths } from './toolDiffUtils';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { ToolMarkdown } from './ToolOutput';
 import { shouldRenderToolPart } from './message-presentation';
 import { getReasoningHeader, getReasoningPresentation } from './reasoning-presentation';
@@ -229,7 +232,19 @@ export function ToolPartRenderer({ part }: { part: Extract<Part, { type: 'tool' 
     part.state.status === 'error' &&
     !['question', 'suggest', 'chart', 'permission'].includes(part.tool)
   ) {
-    return <ToolErrorCard toolName={part.tool} error={part.state.error} />;
+    return (
+      <ToolErrorCard
+        toolName={part.tool}
+        error={part.state.error}
+        context={
+          part.tool === 'apply_patch'
+            ? readApplyPatchInputPaths(part.state.input?.patchText)
+                .map(cloudAgentFileLabel)
+                .join(', ')
+            : getToolInputPath(getToolArguments(part))
+        }
+      />
+    );
   }
 
   if (

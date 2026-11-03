@@ -45,13 +45,19 @@ describe('selectPartialSubmitMessage', () => {
 
   it('reports the posted and kept counts when some items are stale', () => {
     expect(selectPartialSubmitMessage({ freshCount: 2, staleCount: 3 })).toBe(
-      'Posted 2 comment(s). 3 comment(s) point at an older commit and stayed in your queue.'
+      'Posted 2 comments. 3 comments point at an older commit and stayed in your queue.'
+    );
+  });
+
+  it('agrees with a single posted comment and a single stale one', () => {
+    expect(selectPartialSubmitMessage({ freshCount: 1, staleCount: 1 })).toBe(
+      'Posted 1 comment. 1 comment points at an older commit and stayed in your queue.'
     );
   });
 
   it('reports zero posted comments when every item is stale', () => {
     expect(selectPartialSubmitMessage({ freshCount: 0, staleCount: 4 })).toBe(
-      'Posted 0 comment(s). 4 comment(s) point at an older commit and stayed in your queue.'
+      'Posted 0 comments. 4 comments point at an older commit and stayed in your queue.'
     );
   });
 });

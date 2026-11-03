@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { resolveProfileLayers } from './profile-resolution';
+import { appliesImplicitProfiles, resolveProfileLayers } from './profile-resolution';
 
 // Short fake UUIDs, only identity matters in this pure-logic test.
 const REPO_P = 'repo-profile';
@@ -145,5 +145,18 @@ describe('resolveProfileLayers', () => {
       base: null,
       top: { profileId: EXPLICIT_P, source: 'explicit' },
     });
+  });
+});
+
+describe('appliesImplicitProfiles', () => {
+  test('applies with no environment and for a V1 environment', () => {
+    expect(appliesImplicitProfiles(undefined)).toBe(true);
+    expect(appliesImplicitProfiles(null)).toBe(true);
+    expect(appliesImplicitProfiles({})).toBe(true);
+  });
+
+  test('does not apply for a V2 environment, whatever its repository count', () => {
+    expect(appliesImplicitProfiles({ repositories: [] })).toBe(false);
+    expect(appliesImplicitProfiles({ repositories: [{}, {}] })).toBe(false);
   });
 });

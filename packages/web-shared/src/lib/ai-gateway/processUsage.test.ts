@@ -1066,6 +1066,26 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.session_id).toBe('task-abc123');
   });
 
+  test('stores the usage and metadata rows under the id chosen before the request', async () => {
+    const user = await insertTestUser({ microdollars_used: 0 });
+    const usageId = crypto.randomUUID();
+
+    const usageIdentity = await logMicrodollarUsage(
+      { ...BASE_USAGE_STATS, messageId: `test-msg-${usageId}` },
+      { ...createBaseUsageContext(user), usageId }
+    );
+
+    expect(usageIdentity?.usageId).toBe(usageId);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, usageId),
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, usageId),
+    });
+    expect(usageRecord?.kilo_user_id).toBe(user.id);
+    expect(metadataRecord?.message_id).toBe(`test-msg-${usageId}`);
+  });
+
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-2',

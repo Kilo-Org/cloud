@@ -18,7 +18,7 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primary: '#111111' }),
+  useThemeColors: () => ({ primary: '#111111', mutedForeground: '#222222' }),
 }));
 
 const OPTIONS = [
@@ -30,13 +30,13 @@ const OPTIONS = [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderGroup() {
+function renderGroup(disabled = false) {
   act(() => {
     const element = createElement(PillGroup, {
       label: 'Minimum severity',
       options: OPTIONS,
       value: 'high',
-      disabled: false,
+      disabled,
       onChange: () => undefined,
     });
     if (renderer) {
@@ -54,6 +54,58 @@ function renderGroup() {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+});
+
+describe('PillGroup disabled cue', () => {
+  // Regression: a disabled group halved the whole option row on top of the
+  // muted label, which lands the text near 2:1 on the row's `secondary` surface
+  // in both schemes — under the 4.5:1 text floor, so a member who cannot manage
+  // the setting could not read which option was set. The cue is the muted
+  // token, applied once; no row carries a second dim on top of it.
+  it('dims a read-only group by token, never by row opacity', () => {
+    const rows = renderGroup(true).findAll(node => Object.is(node.type, 'Pressable'));
+
+    expect(rows).toHaveLength(OPTIONS.length);
+    for (const row of rows) {
+      const tokens = String(row.props.className).split(/\s+/);
+      expect(tokens).toContain('active:opacity-70');
+      expect(tokens).not.toContain('opacity-50');
+    }
+  });
+
+  // Regression: a read-only list once kept its selected label on the full
+  // `foreground` ink, so the brightest line in a group the member cannot change
+  // was the option itself and the list read as editable. Every label of a
+  // read-only group sits on the muted token; the selected row keeps only its
+  // weight and its check to say which option is set.
+  it('dims every read-only label, the selected one included', () => {
+    const labels = renderGroup(true).findAll(node => Object.is(node.type, 'Text'));
+    const byText = new Map(labels.map(label => [String(label.props.children), label]));
+
+    for (const option of ['Severe', 'High', 'Medium', 'Low']) {
+      const tokens = String(byText.get(option)?.props.className).split(/\s+/);
+      expect(tokens).toContain('text-muted-foreground');
+      expect(tokens).not.toContain('text-foreground');
+    }
+    const selected = String(byText.get('High')?.props.className).split(/\s+/);
+    expect(selected).toContain('font-medium');
+  });
+
+  it('mutes the check of a read-only group off the accent', () => {
+    const [check] = renderGroup(true).findAll(node => Object.is(node.type, 'Check'));
+
+    expect(check?.props.color).toBe('#222222');
+  });
+
+  it('keeps an editable group on the full-strength selected label and accent', () => {
+    const [label] = renderGroup(false).findAll(
+      node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'High')
+    );
+    const [check] = renderGroup(false).findAll(node => Object.is(node.type, 'Check'));
+
+    expect(String(label?.props.className).split(/\s+/)).toContain('text-foreground');
+    expect(check?.props.color).toBe('#111111');
+  });
 });
 
 describe('PillGroup touch target', () => {

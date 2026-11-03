@@ -64,6 +64,7 @@ export function ProviderDetailsDialog({
               <img
                 src={infoProvider.providerIconUrl}
                 alt=""
+                referrerPolicy="no-referrer"
                 className="h-6 w-6 shrink-0 object-contain"
               />
             ) : null}

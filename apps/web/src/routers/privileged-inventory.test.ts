@@ -12,7 +12,7 @@ import {
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const APP_ROOT = path.join(REPO_ROOT, 'apps/web/src/app');
 
-const BROAD_WILDCARDS = new Set(['organizations.*', 'codeIndexing.*', 'codingPlans.*']);
+const BROAD_WILDCARDS = new Set(['organizations.*', 'codeIndexing.*']);
 
 type ProcedureDef = {
   _def?: {
@@ -398,10 +398,14 @@ describe('privileged inventory covers branch-level admin reads', () => {
     return [...files].sort();
   }
 
-  function occurrencesIn(relativeFile: string): number {
-    return (
-      fs.readFileSync(path.join(REPO_ROOT, relativeFile), 'utf8').match(/\bis_admin\b/g) ?? []
-    ).length;
+  function isAdminReadsIn(relativeFile: string): number {
+    const source = fs.readFileSync(path.join(REPO_ROOT, relativeFile), 'utf8');
+    const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const withoutStrings = withoutComments
+      .replace(/'(?:\\.|[^'\\])*'/g, "''")
+      .replace(/"(?:\\.|[^"\\])*"/g, '""')
+      .replace(/`(?:\\.|[^`\\])*`/g, '``');
+    return (withoutStrings.match(/\.\s*is_admin\b/g) ?? []).length;
   }
 
   test('every is_admin read is classified with a reviewed occurrence count', () => {
@@ -409,7 +413,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
     const problems: string[] = [];
 
     for (const file of serverFiles()) {
-      const actual = occurrencesIn(file);
+      const actual = isAdminReadsIn(file);
       if (actual === 0) continue;
       const expected = counts.get(file);
       if (expected === undefined) {
@@ -427,7 +431,7 @@ describe('privileged inventory covers branch-level admin reads', () => {
 
     for (const site of internalElevationSites) {
       const absolute = path.join(REPO_ROOT, site.file);
-      if (!fs.existsSync(absolute) || occurrencesIn(site.file) !== site.occurrences) {
+      if (!fs.existsSync(absolute) || isAdminReadsIn(site.file) !== site.occurrences) {
         stale.push(site.file);
       }
     }

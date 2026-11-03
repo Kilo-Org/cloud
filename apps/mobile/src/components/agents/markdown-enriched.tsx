@@ -1,10 +1,11 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
-import { Platform } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
+import { rtlBlockTextAlign } from '@/lib/rtl-text';
 
 import {
   type MarkdownCopyCodeHandler,
@@ -36,10 +37,16 @@ type MarkdownEnrichedProps = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
-function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette, isRtl: boolean): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
+  // The native renderer resolves each paragraph's direction from its first
+  // strong character, so an English reply stays at the left edge of a
+  // right-to-left interface while the Thought row and the failure block around
+  // it sit on the start edge. Naming the interface start keeps the assistant
+  // turn in one column; the run inside the line still reads left to right.
+  const blockTextAlign = rtlBlockTextAlign(isRtl);
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -48,6 +55,7 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
       fontWeight: style.fontWeight,
       marginTop: style.marginTop,
       marginBottom: style.marginBottom,
+      ...blockTextAlign,
     };
   };
   return {
@@ -55,7 +63,14 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
     // spacer line, and its measure reads any second line as wrapped text and
     // takes the full width, so a short user bubble filled its maximum width.
     // The bottom margin alone keeps the gap between paragraphs.
-    paragraph: { color: textColor, fontSize: 16, lineHeight: 24, marginTop: 0, marginBottom: 4 },
+    paragraph: {
+      color: textColor,
+      fontSize: 16,
+      lineHeight: 24,
+      marginTop: 0,
+      marginBottom: 4,
+      ...blockTextAlign,
+    },
     h1: heading('h1'),
     h2: heading('h2'),
     h3: heading('h3'),
@@ -144,7 +159,7 @@ export function MarkdownEnriched({
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
+  const markdownStyle = useMemo(() => enrichedStyle(palette, I18nManager.isRTL), [palette]);
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.

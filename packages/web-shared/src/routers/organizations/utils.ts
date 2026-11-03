@@ -264,7 +264,8 @@ async function loadBatchMembershipRoles(
 
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
-  organizationIds: Organization['id'][]
+  organizationIds: Organization['id'][],
+  roles?: OrganizationRole[]
 ): Promise<Map<string, OrganizationRole>> {
   const uniqueIds = Array.from(new Set(organizationIds));
   const result = new Map<string, OrganizationRole>();
@@ -290,7 +291,16 @@ export async function getOrganizationsAccessRoles(
       target: organizationsTarget(liveIds),
       grant: 'owner',
       membershipRole: null,
-      wouldPassWithoutAdmin: rolesByOrg === null ? null : liveIds.every(id => rolesByOrg.has(id)),
+      wouldPassWithoutAdmin:
+        rolesByOrg === null
+          ? null
+          : liveIds.every(
+              id =>
+                allowedRole(
+                  (rolesByOrg.get(id) ?? []).map(role => ({ role })),
+                  roles
+                ) !== null
+            ),
     });
     for (const id of liveIds) result.set(id, grant);
     return result;
@@ -313,7 +323,7 @@ export async function ensureOrganizationsAccess(
   organizationIds: Organization['id'][],
   roles?: OrganizationRole[]
 ): Promise<void> {
-  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds);
+  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
   const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);

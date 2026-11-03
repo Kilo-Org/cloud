@@ -1731,6 +1731,17 @@ describe('normalize', () => {
   });
 
   describe('autocommit_completed', () => {
+    it('preserves the repository on commit events', () => {
+      expect(
+        normalize(
+          createRaw('autocommit_completed', {
+            messageId: 'msg-1',
+            success: true,
+            repository: 'acme/web',
+          })
+        )
+      ).toMatchObject({ repository: 'acme/web' });
+    });
     it('normalizes with all fields', () => {
       const data = {
         messageId: 'msg-1',

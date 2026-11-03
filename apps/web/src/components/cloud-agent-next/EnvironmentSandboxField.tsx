@@ -15,6 +15,8 @@ type EnvironmentSandboxFieldProps = {
   value: SelectableSandboxAllocation | null;
   disabled: boolean;
   onChange: (value: SelectableSandboxAllocation | null) => void;
+  /** Hides the sizes the environment cannot use. All sizes are offered by default. */
+  isAllowed?: (allocation: SelectableSandboxAllocation) => boolean;
 };
 
 /**
@@ -27,6 +29,7 @@ export function EnvironmentSandboxField({
   value,
   disabled,
   onChange,
+  isAllowed = () => true,
 }: EnvironmentSandboxFieldProps) {
   const labelId = useId();
   const trpc = useTRPC();
@@ -50,7 +53,9 @@ export function EnvironmentSandboxField({
       </Label>
       <SandboxSelect
         value={value}
-        choices={getEligibleAllocationChoices(capabilities)}
+        choices={getEligibleAllocationChoices(capabilities).filter(choice =>
+          isAllowed(choice.allocation)
+        )}
         unavailableReason={undefined}
         noneLabel="Use default size"
         noneDescription={describeDefaultSandbox(

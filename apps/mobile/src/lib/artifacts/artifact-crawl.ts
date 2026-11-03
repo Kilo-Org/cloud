@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the crawl reads the session tree, bounds and materializes bytes, and assembles the mirror entries as one cohesive module */
-import { File } from 'expo-file-system';
+import { type File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 
 import { parseCloudAgentAttachmentUrl } from '@/components/agents/file-part-preview';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/artifacts/artifact-mirror-manifest';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { trpcClient } from '@/lib/trpc';
+import { parseHttpUrlAuthority } from '@/lib/url-authority';
 
 /**
  * Reads the signed-in user's cloud-agent sessions and turns them into mirror
@@ -31,6 +32,22 @@ export const MIRROR_SESSION_LIMIT = 50;
 
 /** Largest artifact the mirror will hold; a bigger one is reported, not kept. */
 export const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
+
+/**
+ * The only network origin family a stored artifact URL may name: R2's S3 API
+ * host, which is what every Kilo presign client mints
+ * (`https://<account id>.r2.cloudflarestorage.com/<bucket>/<key>`). A stored URL
+ * names a hosted artifact only on that family; any other origin reports
+ * `unsupported`, so the mirror skips it and makes no request for it.
+ */
+const ARTIFACT_HOST_SUFFIX = '.r2.cloudflarestorage.com';
+
+/** An R2 account id is the endpoint's only host label: 32 lowercase hex digits. */
+const R2_ACCOUNT_LABEL = /^[0-9a-f]{32}$/;
+
+/** Redirect hops a probe or a download follows before the artifact fails. */
+const MAX_ARTIFACT_REDIRECTS = 5;
+
 
 /** One artifact discovered in a session's stored messages. */
 export type CrawledArtifact = {
@@ -147,7 +164,7 @@ export type ArtifactCrawlDeps = {
 
 /* eslint-disable @typescript-eslint/promise-function-async -- production passthroughs hand the tRPC/File promise back untouched */
 const DEFAULT_DEPS: ArtifactCrawlDeps = {
-  downloadFile: (url, target) => File.downloadFileAsync(url, target, { idempotent: true }),
+  downloadFile: downloadAllowedArtifact,
   getSessionMessagesPage: input => trpcClient.cliSessionsV2.getSessionMessagesPage.query(input),
   listSessions: input => trpcClient.cliSessionsV2.list.query(input),
   presignAttachmentDownload: input =>
@@ -163,17 +180,18 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
  * Request one byte and read the total from Content-Range, not the partial body's
  * Content-Length. Expo's streaming fetch lets us abort at the headers even if a
  * server ignores Range and sends a full response. Unknown lengths still get the
- * post-download size check below.
+ * post-download size check below. A probe whose redirect chain leaves the
+ * allowed origins reports nothing.
  */
 async function probeContentLength(url: string): Promise<number | null> {
   const controller = new AbortController();
   try {
-    const response = await fetch(url, {
+    const response = await fetchAllowedArtifact(url, {
       method: 'GET',
       headers: { Range: 'bytes=0-0' },
       signal: controller.signal,
     });
-    if (!response.ok) {
+    if (response === null || !response.ok) {
       return null;
     }
     const header =
@@ -190,6 +208,118 @@ async function probeContentLength(url: string): Promise<number | null> {
   } finally {
     controller.abort();
   }
+}
+
+/** True only for an `https` URL on the artifact storage origin family. */
+function isAllowedArtifactUrl(url: string): boolean {
+  const authority = parseHttpUrlAuthority(url);
+  if (authority?.protocol !== 'https' || authority.hasUserInfo) {
+    return false;
+  }
+  // A non-default port would reach a service this allowlist says nothing about.
+  if (authority.port !== '' && authority.port !== '443') {
+    return false;
+  }
+  if (!authority.hostname.endsWith(ARTIFACT_HOST_SUFFIX)) {
+    return false;
+  }
+  const accountLabel = authority.hostname.slice(
+    0,
+    authority.hostname.length - ARTIFACT_HOST_SUFFIX.length
+  );
+  return R2_ACCOUNT_LABEL.test(accountLabel);
+}
+
+/**
+ * The URL a redirect's `Location` points at, or null when it must not be
+ * followed.
+ *
+ * An absolute target is adjudicated on its own. A relative one keeps the host
+ * of the URL it came from — the hop's only variable is its path — so the origin
+ * is taken from the already-validated URL and the target can never leave it.
+ */
+function allowedRedirectTarget(from: string, location: string | null): string | null {
+  if (location === null) {
+    return null;
+  }
+  const target = location.trim();
+  if (target === '') {
+    return null;
+  }
+  // A scheme-relative reference names its own host, so it is adjudicated like
+  // an absolute one.
+  if (target.startsWith('//')) {
+    const absolute = `https:${target}`;
+    return isAllowedArtifactUrl(absolute) ? absolute : null;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    return isAllowedArtifactUrl(target) ? target : null;
+  }
+  const origin = parseHttpUrlAuthority(from);
+  if (origin === null) {
+    return null;
+  }
+  const authority = origin.port === '' ? origin.hostname : `${origin.hostname}:${origin.port}`;
+  return `https://${authority}/${target.replace(/^[/\\]+/, '')}`;
+}
+
+/**
+ * Issue a GET to the origin the artifact came from: `url` is either one
+ * {@link isAllowedArtifactUrl} accepted or the signed URL the presign call just
+ * returned for the caller's own message, and each redirect the response answers
+ * with is adjudicated by {@link allowedRedirectTarget} before it is followed.
+ * Null means the artifact is not fetched; every request in the chain then names
+ * a host the allowlist covers.
+ */
+async function fetchAllowedArtifact(
+  url: string,
+  init: RequestInit,
+  hop = 0
+): Promise<Response | null> {
+  const response = await fetch(url, { ...init, redirect: 'manual' });
+  const isRedirect =
+    response.status === 301 ||
+    response.status === 302 ||
+    response.status === 303 ||
+    response.status === 307 ||
+    response.status === 308;
+  if (!isRedirect) {
+    return response;
+  }
+  const next =
+    hop < MAX_ARTIFACT_REDIRECTS
+      ? allowedRedirectTarget(url, response.headers.get('location'))
+      : null;
+  await response.body?.cancel();
+  return next === null ? null : fetchAllowedArtifact(next, init, hop + 1);
+}
+
+/**
+ * Download an allowed artifact URL into `target`, following only redirects that
+ * stay on the allowed origins; a refused hop leaves no bytes behind. The body is
+ * piped through the file handle, so a download never sits in memory whole while
+ * it is written.
+ */
+async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
+  const response = await fetchAllowedArtifact(url, { method: 'GET' });
+  if (response === null) {
+    throw new Error('Artifact download address is not an allowed origin');
+  }
+  if (!response.ok) {
+    throw new Error(`Artifact download failed with status ${response.status}`);
+  }
+  // `writableStream()` opens a write-only handle: iOS throws when the file does
+  // not exist, and neither platform truncates there. Creating it first makes the
+  // staging path a fresh empty file, so a leftover of the same name cannot leave
+  // a tail behind the new bytes.
+  target.create({ intermediates: true, overwrite: true });
+  try {
+    await (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream());
+  } catch (error) {
+    deleteQuietly(target);
+    throw error;
+  }
+  return target;
 }
 
 // `messages` comes off tRPC as a trusted-shaped but statically unknown payload,
@@ -366,8 +496,9 @@ function resolveDeps(deps?: Partial<ArtifactCrawlDeps>): ArtifactCrawlDeps {
 
 /**
  * Turn a stored URL into something downloadable: presign a sandbox reference,
- * accept an `http(s)` URL as-is, and report anything else as unsupported. A
- * failed presign is a download failure, not an unsupported URL.
+ * accept a URL on the artifact storage origin family, and report any other value
+ * as unsupported. A failed presign is a download failure, not an unsupported
+ * URL. Those two sources are the hosted artifacts the mirror materializes.
  */
 async function resolveDownloadUrl(
   url: string,
@@ -385,7 +516,7 @@ async function resolveDownloadUrl(
       return { failure: 'download-failed' };
     }
   }
-  if (isHttpUrl(url)) {
+  if (isAllowedArtifactUrl(url)) {
     return { url };
   }
   return { failure: 'unsupported' };
@@ -461,10 +592,6 @@ function toMirrorFile(artifact: MaterializedArtifact): ArtifactMirrorFile {
     mime: artifact.mime,
     size: artifact.size,
   };
-}
-
-function isHttpUrl(url: string): boolean {
-  return url.startsWith('http://') || url.startsWith('https://');
 }
 
 /** Decoded byte count of a base64 payload, from its length and padding. */

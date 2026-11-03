@@ -30,6 +30,7 @@ import { sentryRootSpan } from '../getRootSpan';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
+  OpenRouterError,
   PromptInfo,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -50,6 +51,7 @@ import {
   extractVercelIsByok,
   providerReportsIsByok,
   readResponseText,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -1034,6 +1036,7 @@ type FimStreamChunk = {
     finish_reason: string | null;
   }>;
   usage?: FimUsage;
+  error?: OpenRouterError;
 };
 
 function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
@@ -1057,17 +1060,21 @@ function parseMistralFimUsageFromString(
   provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = JSON.parse(response) as MistralFimCompletion;
-  const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
+  const json = parseUsageResponse(response, statusCode) as Partial<MistralFimCompletion>;
+  const usage = json.usage;
+  if (!usage && statusCode < 400) {
+    throw new Error('SUSPICIOUS: No FIM usage information');
+  }
+  const cost_mUsd = usage ? computeFimMicrodollarCost(usage, provider) : 0;
 
   return {
-    messageId: json.id,
-    model: json.model,
-    responseContent: json.choices[0]?.text || '',
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: json.choices?.[0]?.text || '',
     hasError: !json.model || statusCode >= 400,
     inference_provider: provider,
-    inputTokens: json.usage.prompt_tokens,
-    outputTokens: json.usage.completion_tokens,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd,
@@ -1088,6 +1095,7 @@ async function parseMistralFimUsageFromStream(
   requestSpan: Span | undefined,
   provider: ProviderType,
   statusCode: number,
+  usesUserCredentials: boolean,
   requestStartedAt: number | undefined
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
@@ -1104,6 +1112,7 @@ async function parseMistralFimUsageFromStream(
   let model: string | null = null;
   let responseContent = '';
   let reportedError = statusCode >= 400;
+  let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: FimUsage | undefined;
@@ -1120,6 +1129,19 @@ async function parseMistralFimUsageFromStream(
     try {
       const json = JSON.parse(event.data) as FimStreamChunk;
 
+      if (json.error) {
+        reportedError = true;
+        if (typeof json.error.code === 'number') effectiveStatusCode = json.error.code;
+        reportUpstreamStreamError({
+          label: 'FIM upstream error',
+          source: 'fim_sse_processing',
+          error: json.error,
+          usesUserCredentials,
+          logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
+          sentryExtra: { json, event },
+        });
+      }
+
       model = json.model ?? model;
       messageId = json.id ?? messageId;
       usage = json.usage ?? usage;
@@ -1131,10 +1153,12 @@ async function parseMistralFimUsageFromStream(
       }
     } catch (e) {
       reportedError = true;
-      captureException(e, {
-        tags: { source: 'fim_sse_parsing' },
-        extra: { eventData: event.data },
-      });
+      if (statusCode < 400) {
+        captureException(e, {
+          tags: { source: 'fim_sse_parsing' },
+          extra: { eventData: event.data },
+        });
+      }
     }
   };
 
@@ -1146,7 +1170,7 @@ async function parseMistralFimUsageFromStream(
   );
   if (!firstTokenReceived) timeToFirstTokenSpan.end();
 
-  if (!usage && !wasAborted) {
+  if (!usage && !reportedError && !wasAborted) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {
       level: 'error',
       tags: { source: 'fim_usage_processing' },
@@ -1173,7 +1197,7 @@ async function parseMistralFimUsageFromStream(
     generation_time: timing.generation_time,
     streamed: null,
     cancelled: null,
-    status_code: statusCode,
+    status_code: effectiveStatusCode,
   };
 }
 
@@ -1195,6 +1219,7 @@ export function countAndStoreFimUsage(
           requestSpan,
           usageContext.provider,
           statusCode,
+          usageContext.user_byok,
           requestStartedAt
         )
       : readResponseText(clonedResponse.body, requestStartedAt)
@@ -1203,21 +1228,25 @@ export function countAndStoreFimUsage(
             ...timing,
           }))
           .catch(error => {
-            captureException(error, {
-              tags: { source: 'fim_usage_processing' },
-              extra: { statusCode },
-            });
+            if (statusCode < 400) {
+              captureException(error, {
+                tags: { source: 'fim_usage_processing' },
+                extra: { statusCode },
+              });
+            }
             return null;
           });
 
   after(
     usageStatsPromise.then(usageStats => {
       if (!usageStats) {
-        captureMessage('SUSPICIOUS: No FIM usage information', {
-          level: 'error',
-          tags: { source: 'fim_usage_processing' },
-          extra: { usageContext },
-        });
+        if (statusCode < 400) {
+          captureMessage('SUSPICIOUS: No FIM usage information', {
+            level: 'error',
+            tags: { source: 'fim_usage_processing' },
+            extra: { usageContext },
+          });
+        }
         return;
       }
 
@@ -1297,7 +1326,7 @@ export function parseEditUsageFromResponse(
   provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = JSON.parse(response) as MercuryEditCompletionResponse;
+  const json = parseUsageResponse(response, statusCode) as MercuryEditCompletionResponse;
   const usage = json.usage;
   const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
   return {
@@ -1341,10 +1370,12 @@ export function countAndStoreEditUsage(
           ...timing,
         }))
         .catch(error => {
-          captureException(error, {
-            tags: { source: 'edit_usage_processing' },
-            extra: { statusCode },
-          });
+          if (statusCode < 400) {
+            captureException(error, {
+              tags: { source: 'edit_usage_processing' },
+              extra: { statusCode },
+            });
+          }
           return null;
         });
 
@@ -1352,11 +1383,13 @@ export function countAndStoreEditUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
-        captureMessage('SUSPICIOUS: No edit usage information', {
-          level: 'error',
-          tags: { source: 'edit_usage_processing' },
-          extra: { usageContext },
-        });
+        if (statusCode < 400) {
+          captureMessage('SUSPICIOUS: No edit usage information', {
+            level: 'error',
+            tags: { source: 'edit_usage_processing' },
+            extra: { usageContext },
+          });
+        }
         return;
       }
 
@@ -1415,9 +1448,9 @@ type TranscriptionResponse = {
 // An upstream error can arrive without a JSON body, such as an empty 429 or an
 // HTML error page from an edge proxy. It still carries no usage, so treat it like
 // a JSON error body. A successful response that is not JSON stays a parse failure.
-function parseEmbeddingResponse(responseText: string, statusCode: number): EmbeddingResponse {
+function parseUsageResponse(responseText: string, statusCode: number): unknown {
   try {
-    return JSON.parse(responseText) as EmbeddingResponse;
+    return JSON.parse(responseText);
   } catch (error) {
     if (statusCode >= 400) return {};
     throw error;
@@ -1434,7 +1467,7 @@ export function parseEmbeddingUsageFromResponse(
   statusCode: number,
   provider: ProviderType
 ): MicrodollarUsageStats {
-  const json = parseEmbeddingResponse(responseText, statusCode);
+  const json = parseUsageResponse(responseText, statusCode) as EmbeddingResponse;
   const usage = json.usage;
   const hasError = !json.model || statusCode >= 400;
 
@@ -1501,7 +1534,7 @@ export function parseTranscriptionUsageFromResponse(
   provider: ProviderType,
   generationId: string | null
 ): MicrodollarUsageStats {
-  const json = JSON.parse(responseText) as TranscriptionResponse;
+  const json = parseUsageResponse(responseText, statusCode) as TranscriptionResponse;
   const messageId = json.id ?? generationId;
   const base = {
     messageId,
@@ -1571,11 +1604,13 @@ export function countAndStoreEmbeddingUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
-        captureMessage('SUSPICIOUS: No embedding usage information', {
-          level: 'error',
-          tags: { source: 'embedding_usage_processing' },
-          extra: { usageContext },
-        });
+        if (statusCode < 400) {
+          captureMessage('SUSPICIOUS: No embedding usage information', {
+            level: 'error',
+            tags: { source: 'embedding_usage_processing' },
+            extra: { usageContext },
+          });
+        }
         return;
       }
 
@@ -1618,11 +1653,13 @@ export function countAndStoreTranscriptionUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
-        captureMessage('SUSPICIOUS: No transcription usage information', {
-          level: 'error',
-          tags: { source: 'transcription_usage_processing' },
-          extra: { usageContext },
-        });
+        if (statusCode < 400) {
+          captureMessage('SUSPICIOUS: No transcription usage information', {
+            level: 'error',
+            tags: { source: 'transcription_usage_processing' },
+            extra: { usageContext },
+          });
+        }
         return;
       }
 

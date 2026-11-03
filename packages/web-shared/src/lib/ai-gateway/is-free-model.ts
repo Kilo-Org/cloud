@@ -1,5 +1,4 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
@@ -33,7 +32,6 @@ export async function isFreeGatewayModel(modelId: string): Promise<boolean> {
 export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
   return (
-    isKiloExclusiveModel(modelId) ||
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -21,6 +22,7 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -420,7 +422,8 @@ export async function handleLlmProxyRequest(
   const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
-  // work and is awaited just before the upstream call.
+  // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
+  // never awaited.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
       if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
@@ -940,6 +943,7 @@ export async function handleLlmProxyRequest(
   const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
 
+  const usageId = randomUUID();
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -953,6 +957,7 @@ export async function handleLlmProxyRequest(
     getAllowedProviders: accessCheckResolver.getAllowedProviders,
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
+    onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -1080,7 +1085,9 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`);
+  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`, {
+    byokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
+  });
 
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
@@ -1115,6 +1122,7 @@ export async function handleLlmProxyRequest(
     ttfb_ms: null,
     requestStartedAt,
     clientRequestId,
+    usageId,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
@@ -75,6 +75,32 @@ export function PrReviewOverview({
   const isMergeRequest = queries.platform === 'gitlab';
 
   const pr = useQuery(queries.overviewOptions());
+
+  // The checks card below the description grows downward from whatever frame
+  // it first paints: a head with no runs renders one copy line (plus the
+  // view-on-provider button when the screen published a URL), a head with runs
+  // renders a count header plus one row per status group. The Review button and
+  // PrMergeSection sit below it, so a card that painted a placeholder first and
+  // its body later pushed them down by the difference (30.9 dp on
+  // dev/pr-review-copy-fixture/overview, design gate at b3b389e1), and a
+  // placeholder that reserved the tallest shape pulled them ~100 dp upward
+  // whenever the head had no checks (`pr-review-acme-widgets-1`). No single
+  // placeholder height holds in all three states, so the body paints only once
+  // this read has settled: the card's first frame is its final one and the two
+  // actions never move. The read is enabled by the overview's own answer (it
+  // needs the head SHA), and a failed read settles here too, so the error arm
+  // and the empty/terminal states paint at once.
+  //
+  // The key carries the head SHA, so a refresh that returns a new commit starts
+  // a new read. `keepPreviousData` keeps the card that is already on screen
+  // until that read answers: without it the settled body would fall back to the
+  // skeleton on every head change, and the card's own answer would arrive into
+  // an empty page.
+  const headSha = pr.data?.headSha;
+  const checks = useQuery({
+    ...queries.checksOptions(headSha ?? '', headSha !== undefined),
+    placeholderData: keepPreviousData,
+  });
 
   const handleOpenReviewSubmit = useCallback(() => {
     const href: Href = {
@@ -223,7 +249,7 @@ export function PrReviewOverview({
   }
 
   const data = pr.data;
-  if (!data) {
+  if (!data || checks.isLoading) {
     return (
       <DetailScreenScrollView
         className="flex-1"
@@ -282,13 +308,14 @@ export function PrReviewOverview({
         )}
       </View>
 
-      <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
+      <PrReviewChecksSection owner={owner} repo={repo} number={number} checks={checks} />
 
-      {isGitHub ? (
+      {isGitHub && data.state === 'open' ? (
         // The ScreenHeader already carries the primary Submit-review CTA
         // (same route). This section is its secondary re-entry, so it must
         // not be a second olive primary: the merge section below owns the
-        // overview body's single primary action.
+        // overview body's single primary action. A merged or closed review
+        // takes no review, so its body offers none.
         <Button
           variant="outline"
           onPress={handleOpenReviewSubmit}

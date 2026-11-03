@@ -40,7 +40,6 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { isFreeVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
@@ -79,9 +78,8 @@ type ResolveAutoModelParams = {
  *
  * Other free models are only eligible when they appear in the OpenRouter
  * models cache, or when they are free Vercel-only models and Kilo currently
- * routes them to Vercel. Kilo-exclusive models are always eligible. Public
- * custom LLMs are eligible when they serve the current `apiKind`; when
- * `apiKind` is null no API-kind filtering is applied.
+ * routes them to Vercel. Public custom LLMs are eligible when they serve the
+ * current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
  */
 async function getEligibleAutoFreeModels(
   apiKind: GatewayRequest['kind'] | null
@@ -101,7 +99,6 @@ async function getEligibleAutoFreeModels(
       return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
     return (
-      isKiloExclusiveModel(model) ||
       openRouterModels.has(model) ||
       (routingConfig.vercelEnabled &&
         !routingConfig.vercelOptOutModels.has(model) &&

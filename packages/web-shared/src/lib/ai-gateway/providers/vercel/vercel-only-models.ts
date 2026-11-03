@@ -4,7 +4,6 @@ import {
   type StoredModel,
   type VercelCatalog,
 } from '@kilocode/db/schema-types';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
   extractVercelInferenceProviderIdsFromModel,
@@ -34,7 +33,7 @@ export type VercelOnlyModel = {
 };
 
 /**
- * The Vercel chat models that no OpenRouter or Kilo-exclusive model routes to, under the
+ * The Vercel chat models that no OpenRouter model routes to, under the
  * OpenRouter-style IDs that route back to them. Only models in the stored Vercel metadata count,
  * because routing checks that list.
  */
@@ -48,9 +47,7 @@ export function findVercelOnlyModels({
   overrides: VercelModelIdOverrides;
 }): VercelOnlyModel[] {
   const coveredVercelModelIds = new Set(
-    [...openRouterModelIds, ...kiloExclusiveModels.map(model => model.public_id)].map(id =>
-      mapResolvedModelIdToVercel(id, overrides)
-    )
+    [...openRouterModelIds].map(id => mapResolvedModelIdToVercel(id, overrides))
   );
   return Object.values(vercelMetadata).flatMap(storedModel => {
     const { catalog } = storedModel;

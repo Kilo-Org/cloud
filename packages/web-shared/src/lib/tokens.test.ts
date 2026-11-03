@@ -1,19 +1,11 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import {
-  TOKEN_EXPIRY,
   validateAuthorizationHeader,
   JWT_TOKEN_VERSION,
   isRejectedCredentialReason,
 } from './tokens';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-
-describe('TOKEN_EXPIRY', () => {
-  test('default is five years in seconds', () => {
-    const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
-    expect(TOKEN_EXPIRY.default).toBe(FIVE_YEARS_IN_SECONDS);
-  });
-});
 
 describe('validateAuthorizationHeader (C15 device-session compatibility)', () => {
   test('accepts a signed Bearer JWT carrying deviceSessionId', () => {

@@ -7,6 +7,7 @@
     "getHostedWorkspaceStatus": "query",
     "createHostedWorkspace": "mutation",
     "createHostedWorkspaceSession": "mutation",
+    "continueHostedWorkspace": "mutation",
     "deleteHostedWorkspaceSession": "mutation",
     "deleteWorktree": "mutation"
   },
@@ -76,6 +77,28 @@
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "sessionId": "workspace_11111111-1111-4111-8111-111111111111",
         "operationKey": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      }
+    },
+    {
+      "procedure": "continueHostedWorkspace",
+      "fields": [
+        "activeSourceKiloSessionId",
+        "clientProvenance",
+        "operationKey",
+        "repository",
+        "sessions"
+      ],
+      "example": {
+        "operationKey": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "clientProvenance": "agent-manager",
+        "repository": { "type": "github", "repo": "Kilo-Org/cloud", "branch": "main" },
+        "activeSourceKiloSessionId": "ses_12345678901234567890123456",
+        "sessions": [
+          {
+            "sourceKiloSessionId": "ses_12345678901234567890123456",
+            "agent": { "mode": "code", "model": "anthropic/claude-sonnet-4" }
+          }
+        ]
       }
     },
     {
@@ -204,6 +227,23 @@
         "success": true,
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "sessionId": "workspace_11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "procedure": "continueHostedWorkspace",
+      "fields": ["activeKiloSessionId", "replayed", "sessions", "workspaceId"],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "sessions": [
+          {
+            "sourceKiloSessionId": "ses_12345678901234567890123456",
+            "kiloSessionId": "ses_12345678901234567890123456",
+            "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
+            "agent": { "mode": "code", "model": "anthropic/claude-sonnet-4" },
+            "modeFallback": false
+          }
+        ],
+        "activeKiloSessionId": "ses_12345678901234567890123456"
       }
     },
     {

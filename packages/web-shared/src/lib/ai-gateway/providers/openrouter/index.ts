@@ -1,12 +1,6 @@
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
-import {
-  convertFromKiloExclusiveModel,
-  findKiloExclusiveModel,
-  isKiloExclusiveModel,
-  kiloExclusiveModels,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
@@ -163,13 +157,10 @@ export function pickerModelPricing(
 
 /**
  * The catalog entry the picker adds for an id that the OpenRouter response
- * does not carry: a Kilo-exclusive model or one of Kilo's own Auto models.
+ * does not carry: one of Kilo's own Auto models.
  */
 export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
-  const exclusive = findKiloExclusiveModel(modelId);
-  return exclusive
-    ? convertFromKiloExclusiveModel(exclusive)
-    : buildAutoModels().find(model => model.id === modelId);
+  return buildAutoModels().find(model => model.id === modelId);
 }
 
 async function enhancedModelList(models: OpenRouterModel[], countryCode: string | null) {
@@ -210,9 +201,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
   const isListableGatewayModelId = (modelId: string) =>
     // OpenRouter may add a model after a custom LLM claimed its id, and
     // routing serves the custom LLM.
-    !customLlmsById.has(modelId.toLowerCase()) &&
-    !isKiloExclusiveModel(modelId) &&
-    !unavailableModelIds.has(modelId);
+    !customLlmsById.has(modelId.toLowerCase()) && !unavailableModelIds.has(modelId);
   const [vercelOnlyCatalogModels, summaries] = await Promise.all([
     getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
     getTerminalBenchSummaries(),
@@ -239,18 +228,12 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
       };
     })
     .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
-    .concat(
-      kiloExclusiveModels
-        .filter(m => !unavailableModelIds.has(m.public_id))
-        .map(model => convertFromKiloExclusiveModel(model))
-    )
     .concat(autoModels)
     .map(model => applyCustomPricingToModel(customPricingConfig, model))
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
-  const providerLookupId = (model: OpenRouterModel) =>
-    findKiloExclusiveModel(model.id)?.internal_id ?? model.alias_target ?? model.id;
+  const providerLookupId = (model: OpenRouterModel) => model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
   const enhancedModels = await Promise.all(
     catalogModels.map(async (model: OpenRouterModel) => {

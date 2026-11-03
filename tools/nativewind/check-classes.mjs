@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { endOfComment, endOfQuoted, endOfQuotedOrComment, endOfTemplate } from '../lib/js-scan.mjs';
+import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
@@ -261,17 +261,13 @@ function ownClassStrings(attributes) {
   const strings = [];
   let depth = 0;
   for (let index = 0; index < attributes.length; index++) {
+    const skipped = endOfQuotedOrComment(attributes, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = attributes[index];
-    if (char === '"' || char === "'") {
-      index = endOfQuoted(attributes, index) - 1;
-    } else if (char === '`') {
-      // A template's `${…}` may nest another template; `endOfQuoted` would stop
-      // at the inner backtick and read the rest of the attributes as code.
-      index = endOfTemplate(attributes, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(attributes, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '{') {
+    if (char === '{') {
       depth++;
     } else if (char === '}') {
       depth--;
@@ -308,7 +304,7 @@ function ownClassStrings(attributes) {
   return strings;
 }
 
-export function checkScrollPadding(relative, text) {
+export function checkScrollPadding(relative, text, index = lineIndex(text)) {
   const problems = [];
   for (const match of text.matchAll(SCROLL_TAG)) {
     let attributesStart = match.index + match[0].length;
@@ -326,7 +322,7 @@ export function checkScrollPadding(relative, text) {
       .flatMap(classes => classes.split(/\s+/))
       .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {
-      const line = text.slice(0, match.index).split('\n').length;
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
@@ -370,14 +366,15 @@ const RAW_TEXT_EXEMPT = new Set([
 /**
  * Whether one named specifier brings the runtime component in: a bare `Text`
  * and `Text as <name>` do, while `type Text` and `type Text as <name>` are the
- * annotations callers type refs with.
+ * annotations callers type refs with. The `as` split leaves that leading
+ * `type` in the imported name, so the name comparison alone excludes them.
  */
 function importsRuntimeText(specifier) {
   const [imported] = specifier.split(/\s+as\s+/);
-  return imported.trim() === 'Text' && !specifier.trim().startsWith('type ');
+  return imported.trim() === 'Text';
 }
 
-export function checkRawText(relative, text) {
+export function checkRawText(relative, text, index = lineIndex(text)) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
     return problems;
@@ -388,7 +385,7 @@ export function checkRawText(relative, text) {
     const runtime =
       !typeOnly && match[2].split(',').some(specifier => importsRuntimeText(specifier));
     if (runtime) {
-      const line = text.slice(0, match.index).split('\n').length;
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
@@ -505,7 +502,7 @@ function codeMatches(text, pattern, index) {
 
 /**
  * `index` is the file's line index when the caller already built one, so
- * `checkSourceFile` pays for it once for both whole-text scans.
+ * `checkSourceFile` pays for it once for every whole-text scan.
  */
 export function checkDirectIntl(relative, absolute, text, index = lineIndex(text)) {
   const problems = [];
@@ -603,14 +600,14 @@ export function checkCompilerStillDropsThese() {
  * `relative` is the path from the repository root without a leading separator;
  * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
  * prefix test and diagnostic below reads the same spelling of the path. The
- * file's line index is built here too and shared by the two whole-text scans.
+ * file's line index is built here too and shared by every whole-text scan.
  */
 export function checkSourceFile(relative, absolute, text) {
   const path = relative.replace(/^(?:\.?\/)+/, '');
   const index = lineIndex(text);
   return [
-    ...checkScrollPadding(path, text),
-    ...checkRawText(path, text),
+    ...checkScrollPadding(path, text, index),
+    ...checkRawText(path, text, index),
     ...checkDirectIntl(path, absolute, text, index),
     ...checkRules(path, text, index),
   ];

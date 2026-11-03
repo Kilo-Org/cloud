@@ -1,0 +1,1 @@
+DROP TABLE "enkrypt_guardrail_charges" CASCADE;

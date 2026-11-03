@@ -1,5 +1,4 @@
 import pLimit from 'p-limit';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getRawOpenRouterModels,
   normalizeModelId,
@@ -258,8 +257,6 @@ async function syncProviders(params: {
   applyFreeEndpointDataPolicy({
     providerModelData,
     openRouterFreeEndpoints,
-    kiloExclusiveModelIds: kiloExclusiveModels.map(model => model.public_id),
-    unavailableModelIds,
   });
 
   injectVirtualModels({

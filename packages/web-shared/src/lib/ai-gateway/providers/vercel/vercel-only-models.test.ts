@@ -8,10 +8,6 @@ import {
   findVercelOnlyModels,
   getVercelOnlyCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import type * as GatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
@@ -32,8 +28,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
   ),
   getVercelModelIdOverrides: jest.fn(),
 }));
-
-useKiloExclusiveModel();
 
 function catalog(overrides: Partial<VercelCatalog> = {}): VercelCatalog {
   return {
@@ -163,18 +157,6 @@ describe('findVercelOnlyModels', () => {
 
     expect(ids(models)).toContain('openai/gpt-5-priority');
     expect(ids(models)).not.toContain('openai/gpt-5-fast');
-  });
-
-  it('treats the internal id of a Kilo-exclusive model as covered', () => {
-    const models = findVercelOnlyModels({
-      openRouterModelIds: [],
-      vercelMetadata: {
-        [kiloExclusiveModelFixture.internal_id]: storedModel(kiloExclusiveModelFixture.internal_id),
-      },
-      overrides: new Map(),
-    });
-
-    expect(models).toEqual([]);
   });
 
   it('skips ids with uppercase letters, which the proxy cannot route', () => {

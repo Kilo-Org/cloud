@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -212,4 +214,81 @@ describe('organizationProviderPreferences', () => {
       ).toEqual({ kind: 'allowed', provider: { data_collection: 'deny' } });
     }
   );
+});
+
+describe('gatewayUsageContextBase', () => {
+  function request(headers: Record<string, string> = {}) {
+    return new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST', headers });
+  }
+
+  it('derives the shared usage fields from the headers and the signed-in caller', () => {
+    const base = gatewayUsageContextBase(
+      request({
+        'x-kilocode-projectid': 'https://github.com/Kilo-Org/handbook.git',
+        'x-kilocode-editorname': 'vscode',
+        'x-kilocode-machineid': 'machine-1',
+        'x-kilocode-mode': 'code',
+        'x-kilocode-taskid': 'task-1',
+        'x-kilo-session': 'session-1',
+      }),
+      { kind: 'signed-in', user, organizationId: 'org-1' },
+      { requestStartedAt: 42 }
+    );
+
+    expect(base.context).toEqual({
+      kiloUserId: 'user-1',
+      organizationId: 'org-1',
+      fraudHeaders: expect.any(Object),
+      project_id: 'handbook',
+      editor_name: 'vscode',
+      machine_id: 'machine-1',
+      mode: 'code',
+      session_id: 'task-1',
+      posthog_distinct_id: 'user@example.com',
+      prior_microdollar_usage: 5,
+      requestStartedAt: 42,
+      custom_llm_pricing: null,
+      max_tokens: null,
+      has_middle_out_transform: null,
+      reasoning_setting: null,
+      status_code: null,
+      auto_model: null,
+      ttfb_ms: null,
+    });
+  });
+
+  it('falls back to the session header and leaves anonymous callers unattributed', () => {
+    const anonymous = createAnonymousContext('192.0.2.1');
+
+    const { context } = gatewayUsageContextBase(
+      request({ 'x-kilo-session': 'session-1' }),
+      { kind: 'anonymous', user: anonymous },
+      { requestStartedAt: 0 }
+    );
+
+    expect(context).toMatchObject({
+      kiloUserId: anonymous.id,
+      organizationId: undefined,
+      posthog_distinct_id: undefined,
+      prior_microdollar_usage: 0,
+      session_id: 'session-1',
+      mode: null,
+      editor_name: null,
+    });
+  });
+
+  it.each<{ headers: Record<string, string>; clientAttributed: boolean }>([
+    { headers: {}, clientAttributed: false },
+    { headers: { 'x-kilocode-feature': 'not-a-feature' }, clientAttributed: false },
+    { headers: { 'x-kilocode-feature': 'vscode-extension' }, clientAttributed: true },
+    { headers: { 'x-kilocode-version': '5.0.0' }, clientAttributed: true },
+  ])('attributes a Kilo client from its own headers: %j', ({ headers, clientAttributed }) => {
+    const base = gatewayUsageContextBase(
+      request(headers),
+      { kind: 'signed-in', user, organizationId: undefined },
+      { requestStartedAt: 0 }
+    );
+
+    expect(base.clientAttributed).toBe(clientAttributed);
+  });
 });

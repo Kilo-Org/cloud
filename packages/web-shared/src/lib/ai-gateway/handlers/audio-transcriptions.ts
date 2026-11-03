@@ -13,8 +13,6 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
   countAndStoreTranscriptionUsage,
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
   wrapInSafeNextResponse,
@@ -37,6 +35,7 @@ import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsag
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
+  gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -198,13 +197,13 @@ export async function handleAudioTranscriptionsRequest(
     return modelDoesNotExistResponse();
   }
 
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const { provider, userByok } = await getTranscriptionProvider();
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(ipAddress),
-    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
     userId: user.id,
     organizationId,
     feature,
@@ -223,36 +222,19 @@ export async function handleAudioTranscriptionsRequest(
   }
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'audio_transcriptions',
-    kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
-    custom_llm_pricing: null,
     promptInfo,
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
     feature,
-    session_id: null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
-    requestStartedAt,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // Audio carries no user text, so there is no prompt to hash.

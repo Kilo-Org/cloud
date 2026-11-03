@@ -52,7 +52,6 @@ import {
   accountForMicrodollarUsage,
   getOrganizationProviderPrivacy,
   dataCollectionRequiredResponse,
-  extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
   invalidRequestResponse,
@@ -93,6 +92,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  gatewayUsageContextBase,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
@@ -713,9 +713,10 @@ export async function handleLlmProxyRequest(
   const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
   const botId = caller.kind === 'signed-in' ? caller.botId : undefined;
 
-  // Fraud/project headers are pure header parsing; resolve them once here so
-  // decide, usage, and the classifier-overhead billing below share one read.
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  // Resolve the header-derived usage fields once here so decide, usage, and the
+  // classifier-overhead billing below share one read.
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
+  const { fraudHeaders } = usageBase.context;
 
   // Start the one decide alongside balance and provider work; it is awaited just before the
   // upstream call. The event id is generated server-side so decide and usage share one identity
@@ -743,7 +744,6 @@ export async function handleLlmProxyRequest(
   // New workers persist classifier usage themselves and return zero. Retain
   // positive-cost billing only for workers still running the previous protocol.
   if (legacyClassifierCostUsd > 0 && !isAnonymousContext(user)) {
-    const priorMicrodollarUsage = user.microdollars_used;
     after(
       (async () => {
         try {
@@ -769,24 +769,17 @@ export async function handleLlmProxyRequest(
             is_byok: false,
           };
           const classifierContext: MicrodollarUsageContext = {
+            ...usageBase.context,
             api_kind: requestBodyParsed.kind,
-            kiloUserId: user.id,
-            fraudHeaders,
-            organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
             is_free: false,
-            custom_llm_pricing: null,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
               user_prompt_prefix: '',
             },
-            max_tokens: null,
-            has_middle_out_transform: null,
-            reasoning_setting: null,
             isStreaming: false,
-            prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
             // the generic first_usage / first_microdollar_usage lifecycle
             // events (those are gated on posthog_distinct_id in processUsage).
@@ -794,17 +787,11 @@ export async function handleLlmProxyRequest(
             // mis-attribute `auto-routing/classifier` as the user's first model.
             // DB billing is unaffected — it keys on kiloUserId.
             posthog_distinct_id: undefined,
-            project_id: projectId,
             status_code: 200,
-            editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-            machine_id: machineIdHeader,
             user_byok: false,
             has_tools: false,
             feature,
-            session_id: taskId ?? sessionHeader ?? null,
-            mode: modeHeader,
             auto_model: autoModel,
-            ttfb_ms: null,
             clientRequestId,
           };
           await logMicrodollarUsage(classifierStats, classifierContext);
@@ -1043,8 +1030,8 @@ export async function handleLlmProxyRequest(
   // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: requestBodyParsed.kind,
-    kiloUserId: user.id,
     provider: effectiveProviderContext.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: effectiveProviderContext.isFree,
@@ -1053,30 +1040,16 @@ export async function handleLlmProxyRequest(
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
-    fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: machineIdHeader,
     user_byok: !!effectiveProviderContext.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     feature,
-    session_id: taskId ?? sessionHeader ?? null,
-    mode: modeHeader,
     auto_model: autoModel,
-    ttfb_ms: null,
-    requestStartedAt,
     clientRequestId,
     usageId,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed:
-        validateFeatureHeader(request.headers.get(FEATURE_HEADER)) !== null ||
-        Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
       samples: requestedSamples(requestBodyParsed.body),
       // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the

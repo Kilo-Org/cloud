@@ -13,12 +13,10 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreFimUsage,
   extractFimPromptInfo,
-  extractFraudAndProjectHeaders,
   invalidRequestResponse,
   malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
-  extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -27,7 +25,10 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
-import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  gatewayUsageContextBase,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   findSupportedFimModel,
   type FimProvider,
@@ -141,14 +142,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     return temporarilyUnavailableResponse();
   }
 
-  // Use new shared helper for fraud & project headers
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(rawClientIp(request)),
-    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
     userId: user.id,
     organizationId,
     feature,
@@ -168,36 +167,20 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     .find(entry => entry !== undefined);
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'fim_completions',
-    kiloUserId: user.id,
     provider: fimProvider,
     requested_model: requestBody.model,
     is_free: isFreeModelExcludingCustomLlms(requestBody.model),
-    custom_llm_pricing: null,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
-    has_middle_out_transform: null, // N/A for FIM
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: requestBody.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    session_id: taskId ?? null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
-    requestStartedAt,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // FIM feeds volume rules only, which do not read a prompt hash.

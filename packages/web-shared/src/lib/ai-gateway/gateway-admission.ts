@@ -1,5 +1,7 @@
-import type { NextResponse } from 'next/server';
+import type { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
+import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   createAnonymousContext,
   type AnonymousUserContext,
@@ -19,6 +21,8 @@ import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gatew
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   creditsBlockedResponse,
+  extractFraudAndProjectHeaders,
+  extractHeaderAndLimitLength,
   getOrganizationProviderPrivacy,
   invalidTokenResponse,
   modelNotAllowedResponse,
@@ -139,4 +143,45 @@ export function organizationProviderPreferences(params: {
       ...(only && { only }),
     },
   };
+}
+
+/**
+ * The usage context fields every inference route derives the same way, from the
+ * request headers and the caller. Routes add their own fields on top.
+ *
+ * `clientAttributed` marks a Kilo client for bouncer. It reads only the client's
+ * own feature or version header, never a route's fallback feature.
+ */
+export function gatewayUsageContextBase(
+  request: NextRequest,
+  caller: SignedInGatewayCaller | AnonymousGatewayCaller,
+  opts: { requestStartedAt: number }
+) {
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const context = {
+    kiloUserId: caller.user.id,
+    organizationId: caller.kind === 'signed-in' ? caller.organizationId : undefined,
+    fraudHeaders,
+    project_id: projectId,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+    mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
+    session_id:
+      extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ??
+      extractHeaderAndLimitLength(request, 'x-kilo-session'),
+    posthog_distinct_id: caller.kind === 'signed-in' ? caller.user.google_user_email : undefined,
+    prior_microdollar_usage: caller.user.microdollars_used,
+    requestStartedAt: opts.requestStartedAt,
+    custom_llm_pricing: null,
+    max_tokens: null,
+    has_middle_out_transform: null,
+    reasoning_setting: null,
+    status_code: null,
+    auto_model: null,
+    ttfb_ms: null,
+  } satisfies Partial<MicrodollarUsageContext>;
+  const clientAttributed =
+    validateFeatureHeader(request.headers.get(FEATURE_HEADER)) !== null ||
+    Boolean(xKiloCodeVersion);
+  return { context, clientAttributed };
 }

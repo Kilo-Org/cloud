@@ -10,12 +10,9 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
-  wrapInSafeNextResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import {
+  gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   resolveGatewayCaller,
@@ -190,7 +187,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 
   // Resolve bouncer's identity once for this request. System One is always signed
   // in, so its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
@@ -202,7 +199,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+    ja4: normalizeJa4(usageBase.context.fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       userId: user.id,
@@ -212,7 +209,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   });
 
   const kiloUserId = user.id;
-  const mode = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  const { mode } = usageBase.context;
   function emitMetrics(statusCode: number, ttfbMs: number, inferenceProvider?: string | null) {
     emitGatewayApiMetrics({
       kiloUserId,
@@ -237,43 +234,25 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
 
-  const editorName = extractHeaderAndLimitLength(request, 'x-kilocode-editorname');
-  const machineId = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
-  const sessionId = extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId');
-
   const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
+    ...usageBase.context,
     api_kind: 'systemone',
-    kiloUserId: user.id,
     provider: 'openrouter',
     requested_model: requestedModel,
     is_free: isFree,
-    custom_llm_pricing: null,
     promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
     status_code: statusCode,
-    editor_name: editorName,
-    machine_id: machineId,
     user_byok: false,
     has_tools: false,
     feature,
-    session_id: sessionId,
-    mode,
-    auto_model: null,
     ttfb_ms: ttfb,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(startedAtMs),
       accountId: bouncerAccountId(user.id, organizationId),
       clientIp: payerSharingIp(bouncerIp, feature),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // System One input is a typed classification payload, not a conversation,

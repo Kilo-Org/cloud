@@ -16,8 +16,6 @@ import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cust
 import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
   invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
@@ -32,6 +30,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
@@ -152,8 +151,7 @@ export async function handleEmbeddingsRequest(
     return modelDoesNotExistResponse();
   }
 
-  // Extract fraud/project headers
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
 
   const organizationDecision =
     !isAnonymousContext(user) && organizationId
@@ -175,12 +173,9 @@ export async function handleEmbeddingsRequest(
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
-  // Attribution must not inherit the billing fallback. A Kilo client is shown only
-  // by a genuine feature value or a Kilo client version header.
-  const attributionFeature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncerIp = bareIpLiteral(ipAddress);
-  const ja4Digest = fraudHeaders.http_x_vercel_ja4_digest;
+  const ja4Digest = usageBase.context.fraudHeaders.http_x_vercel_ja4_digest;
   const bouncer = isAnonymousContext(user)
     ? anonymousBouncerRequest({ ip: bouncerIp, ja4Digest })
     : signedInBouncerRequest({
@@ -195,35 +190,19 @@ export async function handleEmbeddingsRequest(
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'embeddings',
-    kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFree,
-    custom_llm_pricing: null,
     promptInfo,
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
     feature,
-    session_id: null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: attributionFeature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // Embedding input is not read by any bouncer rule, so no hash is computed.

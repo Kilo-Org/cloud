@@ -1,9 +1,13 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import {
+  CURRENT_CAPABILITY_PREFIX,
+  LEGACY_CAPABILITY_PREFIX,
+} from '@kilocode/worker-utils/scm-capability-contract';
 
-const LEGACY_CAPABILITY_PREFIX = 'kgh1.';
-const BOUND_CAPABILITY_PREFIX = 'kgh2.';
+const LEGACY_PREFIX = LEGACY_CAPABILITY_PREFIX.github;
+const BOUND_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.github;
 const CAPABILITY_PURPOSE = 'github_scm_session';
 const MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
 const MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
@@ -56,7 +60,10 @@ const GitHubLegacySessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsB
 const GitHubBoundSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
   version: z.literal(2),
   outboundContainerId: z.string().min(1),
-}).strict();
+  permissionScope: z.literal('repository').optional(),
+})
+  .strict()
+  .refine(claims => claims.permissionScope === undefined || claims.source === 'installation');
 const GitHubSessionCapabilityClaimsSchema = z
   .discriminatedUnion('version', [
     GitHubLegacySessionCapabilityClaimsSchema,
@@ -73,6 +80,7 @@ export type GitHubSessionIdentity = z.infer<typeof GitHubSessionIdentitySchema>;
 export type GitHubSessionCapabilitySubject = {
   userId: string;
   outboundContainerId?: string;
+  permissionScope?: 'repository';
   orgId?: string;
   integrationId?: string;
   accessPurpose?: 'workflow' | 'agent';
@@ -142,7 +150,7 @@ export class GitHubSessionCapabilityCodec {
     if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
 
     try {
-      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_PREFIX;
       return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitHubSessionCapabilityError('capability_configuration_error');
@@ -150,8 +158,8 @@ export class GitHubSessionCapabilityCodec {
   }
 
   decode(capability: string): GitHubSessionCapabilityClaims {
-    const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
-      ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
+    const format = capability.startsWith(LEGACY_PREFIX)
+      ? { prefix: LEGACY_PREFIX, version: 1 as const }
       : capability.startsWith(BOUND_CAPABILITY_PREFIX)
         ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
         : null;

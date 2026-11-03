@@ -87,8 +87,11 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { verifiedVercelSandboxIdentityContract } from './scm-broker/vercel-identity.js';
 
 const app = new Hono<HonoContext>();
+if (verifiedVercelSandboxIdentityContract) registerVercelScmBrokerRoute(app);
 
 const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
 const SnapshotBuildStartInputSchema = z

@@ -473,15 +473,10 @@ describe('runtime credential proxy', () => {
     const base = 'https://worker.example.test/runtime';
     const handle = 'opaque-handle';
     const policy = buildVercelCredentialNetworkPolicy({
-      kilo: {
-        token: 'raw-secret',
-        placeholder: 'placeholder',
-        targets,
-        rootSessionIds: [root],
-        runtimeProxy: {
-          targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
-          members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
-        },
+      rootSessionIds: [root],
+      runtimeProxy: {
+        targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
+        members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
       },
     });
     const rules = policy.injectionRules ?? [];
@@ -507,7 +502,6 @@ describe('runtime credential proxy', () => {
         })
       ).toBeUndefined();
     }
-    expect(JSON.stringify(rules)).not.toContain('raw-secret');
   });
 
   it('requires exact identity and strict JSON for session creation', () => {

@@ -540,11 +540,10 @@ describe('Vercel contained-credential policy wiring', () => {
 
   it('creates with unrestricted egress and no credential injections for an empty grant set', async () => {
     const body = (await createBodyFor([])) as {
-      networkPolicy: { allowedDomains: string[]; injectionRules: unknown[] };
+      networkPolicy: unknown;
     };
     expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([]));
-    expect(body.networkPolicy.allowedDomains).toEqual(['*']);
-    expect(body.networkPolicy.injectionRules).toEqual([]);
+    expect(body.networkPolicy).toEqual({ allow: { '*': [] } });
   });
 
   it('never calls the provider when the grants reader fails', async () => {

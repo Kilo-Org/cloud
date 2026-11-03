@@ -240,13 +240,14 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason;
+      reason: GitHubRepositoryAuthorizationFailureReason | 'repository_permissions_unavailable';
     };
 
 type IssueGitHubSessionCapabilityResult =
   | {
       success: true;
       capability: string;
+      permissionScope?: 'repository';
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -257,7 +258,10 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason | 'capability_configuration_error';
+      reason:
+        | GitHubRepositoryAuthorizationFailureReason
+        | 'capability_configuration_error'
+        | 'repository_permissions_unavailable';
     };
 
 type RedeemGitHubSessionCapabilityResult =
@@ -281,6 +285,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'repository_mismatch'
         | 'invalid_upstream_request'
         | 'source_unavailable'
+        | 'repository_permissions_unavailable'
         | 'identity_mismatch'
         | 'integration_mismatch';
     };
@@ -388,50 +393,6 @@ type RedeemBitbucketSessionCapabilityResult =
         | 'source_unavailable';
     };
 
-export type KiloSessionCapabilityTargets = {
-  backendBaseUrl: string;
-  providerBaseUrl: string;
-  sessionIngestBaseUrl: string;
-};
-
-export type KiloCapabilityRouteClass =
-  | 'provider_model'
-  | 'organization_models'
-  | 'backend_api'
-  | 'session_ingest';
-
-type IssueKiloSessionCapabilityResult =
-  | { success: true; capability: string }
-  | {
-      success: false;
-      reason:
-        | 'invalid_targets'
-        | 'invalid_capability'
-        | 'expired_capability'
-        | 'capability_configuration_error';
-    };
-
-type RedeemKiloSessionCapabilityResult =
-  | {
-      success: true;
-      authorization: string;
-      routeClass: KiloCapabilityRouteClass;
-      sessionIngestScope?: {
-        cloudAgentSessionId: string;
-        rootKiloSessionId: string;
-      };
-    }
-  | {
-      success: false;
-      reason:
-        | 'invalid_capability'
-        | 'expired_capability'
-        | 'capability_configuration_error'
-        | 'container_mismatch'
-        | 'invalid_upstream_url'
-        | 'upstream_not_allowed';
-    };
-
 export type GitTokenService = {
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
@@ -447,7 +408,10 @@ export type GitTokenService = {
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
   issueGitHubSessionCapability(
-    params: ManagedGitHubAuthParams & { outboundContainerId: string }
+    params: ManagedGitHubAuthParams & {
+      outboundContainerId: string;
+      permissionScope?: 'repository';
+    }
   ): Promise<IssueGitHubSessionCapabilityResult>;
   redeemGitHubSessionCapability(params: {
     capability: string;
@@ -497,22 +461,6 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemBitbucketSessionCapabilityResult>;
-  issueKiloSessionCapability(params: {
-    userId: string;
-    cloudAgentSessionId: string;
-    kiloSessionId: string;
-    outboundContainerId: string;
-    userToken: string;
-    targets: KiloSessionCapabilityTargets;
-  }): Promise<IssueKiloSessionCapabilityResult>;
-  redeemKiloSessionCapability(params: {
-    capability: string;
-    outboundContainerId: string;
-    requestMethod: string;
-    requestUrl: string;
-    bootstrapKiloSessionId?: string;
-    sessionIngestProxyVersion?: 1;
-  }): Promise<RedeemKiloSessionCapabilityResult>;
 };
 
 export type Env = {
@@ -613,6 +561,7 @@ export type Env = {
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
+  /** Obsolete input accepted for compatibility; cannot disable containment. */
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See

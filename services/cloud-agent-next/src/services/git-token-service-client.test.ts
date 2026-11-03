@@ -5,7 +5,6 @@ import {
   issueCloudAgentBitbucketSessionCapability,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
-  issueCloudAgentKiloSessionCapability,
   authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveGitHubTokenForRepo,
@@ -50,8 +49,6 @@ function createGitTokenService() {
     redeemGitHubSessionCapability: vi.fn(),
     issueGitLabSessionCapability: vi.fn(),
     redeemGitLabSessionCapability: vi.fn(),
-    issueKiloSessionCapability: vi.fn(),
-    redeemKiloSessionCapability: vi.fn(),
   } satisfies GitTokenService;
 }
 
@@ -104,21 +101,6 @@ describe('broker exception safety', () => {
         resolveGitHubTokenForRepo(env, { userId: params.userId, githubRepo: 'acme/repo' }),
     ],
     [
-      'Kilo issuance',
-      (env: ReturnType<typeof createEnv>) =>
-        issueCloudAgentKiloSessionCapability(env, {
-          ...params,
-          cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          kiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
-          userToken: BROKER_ERROR_SECRET,
-          targets: {
-            backendBaseUrl: 'https://backend.example.com',
-            providerBaseUrl: 'https://provider.example.com',
-            sessionIngestBaseUrl: 'https://ingest.example.com',
-          },
-        }),
-    ],
-    [
       'GitLab issuance',
       (env: ReturnType<typeof createEnv>) =>
         issueCloudAgentGitLabSessionCapability(env, {
@@ -146,7 +128,6 @@ describe('broker exception safety', () => {
       .mockRejectedValue(new Error(`Broker rejected Bearer ${BROKER_ERROR_SECRET}`));
     const env = createEnv({
       getTokenForRepo: rejectedRpc,
-      issueKiloSessionCapability: rejectedRpc,
       issueGitLabSessionCapability: rejectedRpc,
       issueBitbucketSessionCapability: rejectedRpc,
       getGitLabToken: rejectedRpc,
@@ -331,6 +312,30 @@ describe('resolveManagedGitLabToken', () => {
 });
 
 describe('issueCloudAgentGitHubSessionCapability', () => {
+  it('preserves the recoverable permission lookup failure without falling back to raw credentials', async () => {
+    const service = createGitTokenService();
+    service.issueGitHubSessionCapability.mockResolvedValue({
+      success: false,
+      reason: 'repository_permissions_unavailable',
+    });
+    expect(
+      await issueCloudAgentGitHubSessionCapability(createEnv(service), {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'allocation-test',
+        allowUserAuthorization: false,
+        permissionScope: 'repository',
+      })
+    ).toEqual({
+      success: false,
+      error: {
+        reason: 'repository_permissions_unavailable',
+        message: 'GitHub managed auth lookup failed (repository_permissions_unavailable)',
+      },
+    });
+    expect(service.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
   it('fails closed without raw authentication when the capability RPC is not deployed yet', async () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
@@ -403,6 +408,35 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       },
     });
   });
+
+  it.each([{ source: 'installation' }, { source: 'user', permissionScope: 'repository' }])(
+    'rejects an issuer that cannot confirm repository-only installation authority: %j',
+    async authority => {
+      const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
+        success: true,
+        capability: 'kgh2.opaque',
+        ...authority,
+      });
+      const getCloudAgentAuthForRepo = vi.fn();
+      const getTokenForRepo = vi.fn();
+      const result = await issueCloudAgentGitHubSessionCapability(
+        createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
+        {
+          githubRepo: 'acme/repo',
+          userId: 'user_1',
+          outboundContainerId: 'allocation-test',
+          allowUserAuthorization: false,
+          permissionScope: 'repository',
+        }
+      );
+      expect(result).toMatchObject({
+        success: false,
+        error: { reason: 'capability_configuration_error' },
+      });
+      expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+      expect(getTokenForRepo).not.toHaveBeenCalled();
+    }
+  );
 
   it('forwards the expected integration id through capability issuance', async () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({

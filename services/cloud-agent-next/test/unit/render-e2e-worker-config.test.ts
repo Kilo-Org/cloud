@@ -39,8 +39,6 @@ const OMITTED_MIGRATION_CLASSES = [
   'SandboxSmall',
   'SandboxDIND',
   'SandboxCodeReview',
-  'SandboxContainment',
-  'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
   'SandboxContainers',
 ];
@@ -405,7 +403,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
-    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 

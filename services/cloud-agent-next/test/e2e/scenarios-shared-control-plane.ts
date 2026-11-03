@@ -22,6 +22,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto';
+import { parseControlPlaneCredential } from '../../src/shared/control-plane-credential.js';
 import http from 'node:http';
 import type { IncomingHttpHeaders, IncomingMessage } from 'node:http';
 import {
@@ -94,9 +95,8 @@ const RAW_CREDENTIAL_MARKERS = [
   'github_pat_',
   'glpat-',
   'ATATT',
-  'x-access-token:',
 ] as const;
-/** Token-named env vars that must not exist at all in a contained container. */
+/** Token-named variables may contain scoped SCM aliases, never upstream tokens. */
 const RAW_CREDENTIAL_ENV_NAMES =
   /^(GH_TOKEN|GITHUB_TOKEN|GIT_TOKEN|GITLAB_TOKEN|BITBUCKET_TOKEN|GITHUB_APP_INSTALLATION_TOKEN)$/i;
 
@@ -782,9 +782,8 @@ async function runAttachment(
 }
 
 /**
- * Contained-credentials run (spec §11 scenario 7). Containment is read from the
- * Worker `.dev.vars`, so the scenario only runs when the Worker actually has it
- * enabled. A pass requires clone + model + checkout read to complete and proves
+ * Contained-credentials run (spec §11 scenario 7). Containment is mandatory.
+ * A pass requires clone + model + checkout read to complete and proves
  * the negative: no raw SCM credential in the container environment or the git
  * remote. The harness cannot observe the credential lookup itself; a failure of
  * either check is the signal that containment did not apply.
@@ -821,7 +820,9 @@ async function runContainedCredentials(
       boot.deadline,
       boot.scenarioConfig,
       boot.session.cloudAgentSessionId,
-      fakeDirective(`file:read:contained-${runId}:README`),
+      fakeDirective(
+        `file:read:contained-${runId}:${conversation === '_' ? 'README' : conversation}`
+      ),
       'contained checkout read',
       TURN_BUDGET_MS
     );
@@ -837,7 +838,8 @@ async function runContainedCredentials(
     };
     const environment = await runtime.containerEnvironment(allocationRef);
     for (const [name, value] of Object.entries(environment)) {
-      if (RAW_CREDENTIAL_ENV_NAMES.test(name)) {
+      const alias = parseControlPlaneCredential(value);
+      if (RAW_CREDENTIAL_ENV_NAMES.test(name) && (!alias || alias.purpose === 'kilo')) {
         throw new Error(`contained container exposes a raw credential env var ${name}`);
       }
       const marker = RAW_CREDENTIAL_MARKERS.find(candidate => value.includes(candidate));
@@ -850,7 +852,28 @@ async function runContainedCredentials(
     const remoteUrl = await runtime.gitRemoteUrl(allocationRef);
     if (remoteUrl !== null) {
       const marker = RAW_CREDENTIAL_MARKERS.find(candidate => remoteUrl.includes(candidate));
-      if (marker !== undefined || /^[^/]*:[^@/]*@/.test(remoteUrl.replace(/^[a-z]+:\/\//i, ''))) {
+      if (marker !== undefined) {
+        throw new Error('contained git remote still embeds a raw credential');
+      }
+    }
+    // SSH and scp-style remotes carry a login, not a credential; only HTTP(S) userinfo can.
+    if (remoteUrl !== null && /^https?:\/\//i.test(remoteUrl)) {
+      const remote = new URL(remoteUrl);
+      const password = decodeURIComponent(remote.password);
+      const alias = parseControlPlaneCredential(password);
+      const expectedUsername =
+        alias?.purpose === 'github'
+          ? 'x-access-token'
+          : alias?.purpose === 'gitlab'
+            ? 'oauth2'
+            : alias?.purpose === 'bitbucket'
+              ? 'x-token-auth'
+              : undefined;
+      const scopedRemote =
+        alias &&
+        expectedUsername === remote.username &&
+        Object.values(environment).includes(password);
+      if ((remote.username || remote.password) && !scopedRemote) {
         throw new Error('contained git remote still embeds a raw credential');
       }
     }

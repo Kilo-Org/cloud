@@ -1271,7 +1271,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
 
     expect(provider.createInputs[0]?.billing).toEqual(billing);
-    expect(provider.createInputs[0]?.containment).toEqual({ kilocode: true });
+    expect(provider.createInputs[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
   });
 
   it('stops the sandbox when the wrapper never connects within the first-connect window', async () => {

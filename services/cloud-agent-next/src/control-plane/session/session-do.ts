@@ -853,7 +853,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -915,7 +915,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -1115,11 +1115,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    const containment = this.registration?.sandboxSelection?.containment;
-    const contained =
-      containment === undefined
-        ? this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
-        : containment.kilocode || containment.github;
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
@@ -1127,7 +1122,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       authorization: authorization.success ? authorization.data : null,
       fence,
       token,
-      mode: contained ? 'contained' : 'direct',
+      mode: 'contained',
     });
   }
 

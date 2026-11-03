@@ -936,14 +936,9 @@ export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation
   };
 }
 
-/**
- * Mirror the Worker's containment parsing exactly
- * (`session-registration.ts`: `!== 'false'`, so an absent value is enabled) so
- * the harness reads the same `.dev.vars` source and there is no second flag to
- * keep in sync.
- */
-export function credentialContainmentEnabled(devVars: Record<string, string>): boolean {
-  return devVars.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+/** Credential containment is mandatory, including local scenarios. */
+export function credentialContainmentEnabled(_devVars: Record<string, string>): boolean {
+  return true;
 }
 
 export function createLocalScenarioEnvironment(options?: {

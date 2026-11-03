@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cloud Agent — one credential flow, two sandbox adapters</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172c3a;
+        --muted: #526775;
+        --line: #ced9dc;
+        --paper: #f6f7f3;
+        --shared: #0c655a;
+        --shared-bg: #e8f4ef;
+        --adapter: #9b4f17;
+        --adapter-bg: #fff4e7;
+        --state: #365f91;
+        --state-bg: #edf3fb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          15px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      main {
+        max-width: 1220px;
+        margin: auto;
+        padding: 48px 32px 64px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font:
+          500 clamp(30px, 4vw, 48px)/1.12 Georgia,
+          serif;
+        letter-spacing: -1.3px;
+        max-width: 800px;
+        margin: 12px 0 18px;
+      }
+      h2 {
+        font-size: 22px;
+        line-height: 1.3;
+        letter-spacing: -0.4px;
+      }
+      h3 {
+        font-size: 16px;
+        line-height: 1.4;
+      }
+      p {
+        max-width: 85ch;
+      }
+      code {
+        font:
+          0.85em/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: var(--shared);
+        text-underline-offset: 4px;
+      }
+      .eyebrow {
+        font:
+          600 11px/1.5 ui-monospace,
+          Menlo,
+          monospace;
+        letter-spacing: 1.7px;
+        text-transform: uppercase;
+        color: var(--shared);
+      }
+      .intro {
+        color: var(--muted);
+        font-size: 17px;
+      }
+      .status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 24px;
+      }
+      .badge {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-size: 12px;
+        background: white;
+      }
+      .badge.proposed {
+        background: var(--ink);
+        color: white;
+        border-color: var(--ink);
+      }
+      nav {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        padding: 22px 0;
+        margin-top: 20px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+      }
+      section {
+        margin-top: 44px;
+        scroll-margin-top: 24px;
+      }
+      .section-title {
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        margin-bottom: 10px;
+      }
+      .index {
+        color: var(--shared);
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        background: white;
+        border-radius: 10px;
+        padding: 24px;
+        margin-top: 20px;
+      }
+      .map {
+        display: grid;
+        grid-template-columns: 1fr 1.35fr 1fr;
+        gap: 30px;
+        align-items: stretch;
+        margin-top: 24px;
+      }
+      .box {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        background: #fff;
+      }
+      .box p {
+        margin-top: 8px;
+        font-size: 13px;
+      }
+      .box .eyebrow {
+        margin-bottom: 10px;
+        font-size: 10px;
+      }
+      .box ul {
+        margin: 12px 0 0;
+        padding-left: 17px;
+        font-size: 13px;
+      }
+      .box li + li {
+        margin-top: 6px;
+      }
+      .adapters {
+        display: grid;
+        gap: 12px;
+        position: relative;
+      }
+      .adapter {
+        border-color: #dcba93;
+        background: var(--adapter-bg);
+      }
+      .adapter .eyebrow {
+        color: var(--adapter);
+      }
+      .shared {
+        background: var(--shared-bg);
+        border-color: #91bbae;
+      }
+      .state {
+        background: var(--state-bg);
+        border-color: #afc3dd;
+      }
+      .state .eyebrow {
+        color: var(--state);
+      }
+      .adapters::after {
+        content: '→';
+        position: absolute;
+        right: -25px;
+        top: 46%;
+        color: var(--adapter);
+        font-size: 23px;
+      }
+      .map > .shared::after {
+        content: '↔';
+        position: absolute;
+        right: -25px;
+        top: 46%;
+        color: var(--state);
+        font-size: 23px;
+      }
+      .boundary {
+        border-top: 1px solid #b6d4c6;
+        margin-top: 16px;
+        padding-top: 12px;
+        font-size: 12px;
+      }
+      .rule {
+        padding: 16px 20px;
+        border-left: 3px solid var(--shared);
+        margin-top: 18px;
+        background: #edf2ed;
+        font-size: 14px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .switch {
+        display: flex;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 4px;
+        gap: 4px;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--muted);
+        padding: 8px 16px;
+      }
+      button[aria-pressed='true'] {
+        background: var(--ink);
+        color: #fff;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #c06a26;
+        outline-offset: 4px;
+      }
+      .transport {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        gap: 14px;
+        align-items: center;
+      }
+      .transport .box {
+        min-height: 156px;
+      }
+      .arrow {
+        color: var(--muted);
+        font-size: 24px;
+      }
+      .merge {
+        text-align: center;
+        color: var(--shared);
+        padding: 16px 0;
+        font:
+          12px/1.6 ui-monospace,
+          Menlo,
+          monospace;
+      }
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        counter-reset: flow;
+      }
+      .step {
+        border: 1px solid #bad3c9;
+        border-top: 3px solid var(--shared);
+        border-radius: 6px;
+        background: var(--shared-bg);
+        padding: 16px;
+      }
+      .step::before {
+        counter-increment: flow;
+        content: '0' counter(flow);
+        display: block;
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+        color: var(--shared);
+        margin-bottom: 12px;
+      }
+      .step h3 {
+        font-size: 14px;
+      }
+      .step p {
+        font-size: 12px;
+        margin-top: 8px;
+      }
+      .return {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+      .sequence {
+        overflow-x: auto;
+        margin-top: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+      .sequence svg {
+        display: block;
+        width: 100%;
+        min-width: 830px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        margin-top: 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .legend span::before {
+        content: '';
+        display: inline-block;
+        width: 20px;
+        border-top: 2px solid var(--shared);
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .legend span:last-child::before {
+        border-top: 2px dashed var(--muted);
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      ol {
+        margin: 16px 0 0;
+        padding-left: 22px;
+      }
+      ol li {
+        padding-left: 6px;
+        font-size: 14px;
+      }
+      ol li + li {
+        margin-top: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 20px;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      td,
+      th {
+        border-bottom: 1px solid var(--line);
+        padding: 13px 12px;
+        vertical-align: top;
+      }
+      td:first-child {
+        width: 27%;
+        font-weight: 600;
+      }
+      details {
+        border-bottom: 1px solid var(--line);
+        padding: 16px 0;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      details p {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      footer {
+        margin-top: 40px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      @media (max-width: 850px) {
+        .map {
+          grid-template-columns: 1fr;
+          gap: 30px;
+        }
+        .adapters {
+          grid-template-columns: 1fr 1fr;
+        }
+        .adapters::after,
+        .map > .shared::after {
+          content: '↓';
+          top: auto;
+          bottom: -29px;
+          right: 50%;
+        }
+        .pipeline {
+          grid-template-columns: 1fr 1fr;
+        }
+        .transport {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .transport .box {
+          min-height: 0;
+        }
+        .arrow {
+          text-align: center;
+          transform: rotate(90deg);
+        }
+      }
+      @media (max-width: 560px) {
+        main {
+          padding: 28px 16px 40px;
+        }
+        .panel {
+          padding: 16px;
+        }
+        .two-col,
+        .adapters,
+        .pipeline {
+          grid-template-columns: 1fr;
+        }
+        nav {
+          gap: 14px;
+        }
+        .section-title {
+          gap: 10px;
+        }
+        h2 {
+          font-size: 20px;
+        }
+        td,
+        th {
+          padding: 10px 6px;
+        }
+        button {
+          padding: 8px 12px;
+        }
+      }
+      @media print {
+        body {
+          background: white;
+        }
+        main {
+          padding: 10px;
+        }
+        nav,
+        .switch {
+          display: none;
+        }
+        section {
+          break-inside: avoid;
+        }
+        .sequence svg {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Cloud Agent / Shared credential architecture</div>
+        <h1>One credential flow.<br />Different sandbox adapters.</h1>
+        <p class="intro">
+          Cloudflare and Vercel use the same business logic. Each adapter translates its platform’s
+          identity and network interface.
+        </p>
+        <div class="status">
+          <span class="badge proposed">Implemented locally · not deployed</span>
+          <span class="badge">Policy baseline: current Cloudflare production behavior</span>
+          <span class="badge">Vercel: not used in production</span>
+        </div>
+        <nav aria-label="Page sections">
+          <a href="#ownership">Ownership</a><a href="#request">Git request</a
+          ><a href="#lifecycle">Prepare &amp; renew</a><a href="#runtime">Kilo requests</a
+          ><a href="#changes">Code changes</a>
+        </nav>
+      </header>
+
+      <section id="ownership">
+        <div class="section-title">
+          <span class="index">01</span>
+          <h2>Separate transport, policy, and state</h2>
+        </div>
+        <p class="note">
+          One shared SCM module inside the existing Worker codebase. SandboxControl supplies durable
+          state and serialized operations.
+        </p>
+        <div class="map">
+          <div class="adapters">
+            <article class="box adapter">
+              <div class="eyebrow">Platform interface</div>
+              <h3>Cloudflare adapter</h3>
+              <p>
+                Accept the intercepted request and platform-supplied container identity. Apply
+                native network rules.
+              </p>
+            </article>
+            <article class="box adapter">
+              <div class="eyebrow">Platform interface</div>
+              <h3>Vercel adapter</h3>
+              <p>
+                Verify forwarded sandbox identity. Reconstruct the original request. Translate
+                network rules for Vercel.
+              </p>
+            </article>
+          </div>
+          <article class="box shared">
+            <div class="eyebrow">One business-logic owner</div>
+            <h3>Shared SCM credential module</h3>
+            <ul>
+              <li>Parse authorization and select the grant.</li>
+              <li>Check ownership, expiry, allocation, and target.</li>
+              <li>Issue or renew bound capabilities.</li>
+              <li>Redeem through git-token-service.</li>
+              <li>Forward requests and apply common retry rules.</li>
+            </ul>
+            <div class="boundary">
+              Admission runs with the DO’s serialized state access. HTTP forwarding runs in the
+              Worker. Both use the same module.
+            </div>
+          </article>
+          <article class="box state">
+            <div class="eyebrow">Durable coordinator</div>
+            <h3>SandboxControl</h3>
+            <ul>
+              <li>Own allocation and wrapper lifecycle.</li>
+              <li>Store grants and session membership.</li>
+              <li>Serialize reads and updates.</li>
+              <li>Reject operations for replaced allocations.</li>
+            </ul>
+            <p>Small entry points delegate credential decisions to the shared module.</p>
+          </article>
+        </div>
+        <div class="rule">
+          <strong>One policy for both providers.</strong> Issuance and renewal use Cloudflare’s
+          configured authorization behavior, including permitted user-authorization fallback.
+          Vercel-only permission overrides are removed.
+        </div>
+        <p class="note" style="margin-top: 10px">
+          git-token-service remains the authority for GitHub, GitLab, and Bitbucket token issuance
+          and redemption. Sandbox adapters do not select permissions.
+        </p>
+      </section>
+
+      <section id="request">
+        <div class="section-title">
+          <span class="index">02</span>
+          <h2>A Git request follows one shared path</h2>
+        </div>
+        <p class="note">
+          Switch providers to see which steps change. The four shared steps below stay the same.
+        </p>
+        <div class="panel">
+          <div class="toolbar">
+            <h3>Example: git push</h3>
+            <div class="switch" role="group" aria-label="Sandbox provider">
+              <button type="button" data-provider="cloudflare" aria-pressed="true">
+                Cloudflare</button
+              ><button type="button" data-provider="vercel" aria-pressed="false">Vercel</button>
+            </div>
+          </div>
+          <div class="transport" aria-live="polite" aria-atomic="true">
+            <div class="box">
+              <div class="eyebrow">Inside the sandbox</div>
+              <h3>Git sends the alias</h3>
+              <p>
+                <code>POST /owner/repo.git/git-receive-pack</code><br /><code
+                  >Basic x-access-token:&lt;alias&gt;</code
+                >
+              </p>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="box adapter">
+              <div class="eyebrow">Provider transport</div>
+              <h3 id="transport-title">Cloudflare outbound proxy</h3>
+              <p id="transport-body">
+                Intercept the Git request. Supply the container identity through the platform
+                binding.
+              </p>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="box adapter">
+              <div class="eyebrow">Provider adapter</div>
+              <h3 id="identity-title">Accept platform identity</h3>
+              <p id="identity-body">
+                Normalize the request and trusted container identity for the shared module.
+              </p>
+            </div>
+          </div>
+          <div class="merge">↓ normalized request + verified sandbox identity ↓</div>
+          <div class="pipeline">
+            <article class="step">
+              <h3>Authorize</h3>
+              <p>
+                Use current allocation and grant state from SandboxControl. Check the alias,
+                ownership, expiry, and target.
+              </p>
+            </article>
+            <article class="step">
+              <h3>Resolve or renew</h3>
+              <p>
+                Resolve the alias to a bound capability. Renew when needed. Recheck current state
+                before saving changes.
+              </p>
+            </article>
+            <article class="step">
+              <h3>Redeem</h3>
+              <p>
+                git-token-service checks capability expiry, sandbox binding, method, and URL. It
+                returns upstream authorization.
+              </p>
+            </article>
+            <article class="step">
+              <h3>Forward</h3>
+              <p>
+                Replace managed authorization and stream the request. Use common redirect and
+                bounded retry rules.
+              </p>
+            </article>
+          </div>
+          <p class="return">
+            SCM response → shared forwarder → provider adapter → Git in the sandbox
+          </p>
+        </div>
+        <div class="sequence" id="sequence"></div>
+        <div class="legend">
+          <span>Request / operation</span><span>Return value / response</span>
+        </div>
+        <p class="note" style="margin-top: 10px">
+          A denied managed request stops before upstream forwarding. It never falls back to an
+          unmanaged request. Git push is not retried automatically.
+        </p>
+      </section>
+
+      <section id="lifecycle">
+        <div class="section-title">
+          <span class="index">03</span>
+          <h2>Preparation and renewal use the same owner</h2>
+        </div>
+        <div class="two-col">
+          <article class="panel">
+            <div class="eyebrow">Session preparation</div>
+            <h3>Create a grant once</h3>
+            <ol>
+              <li>SandboxControl selects the allocation and calls the shared credential module.</li>
+              <li>
+                The module applies the common repository policy and requests a bound capability from
+                git-token-service.
+              </li>
+              <li>
+                SandboxControl persists the grant: alias, capability, membership, expiry, and
+                sandbox binding.
+              </li>
+              <li>
+                The provider interface installs the required network interception or forwarding.
+              </li>
+              <li>The wrapper receives the SCM alias and the separate Kilo runtime handle.</li>
+            </ol>
+          </article>
+          <article class="panel">
+            <div class="eyebrow">Renewal and retirement</div>
+            <h3>Keep durable state authoritative</h3>
+            <ol>
+              <li>The shared module checks whether the capability needs renewal.</li>
+              <li>It renews through git-token-service with the same policy on either provider.</li>
+              <li>
+                It checks the current allocation and grant again before persisting the replacement.
+              </li>
+              <li>The alias remains stable during capability renewal.</li>
+              <li>
+                After allocation retirement, new requests using the old binding are rejected.
+                Already admitted requests can finish.
+              </li>
+            </ol>
+          </article>
+        </div>
+        <table aria-label="Credential locations">
+          <thead>
+            <tr>
+              <th>Value</th>
+              <th>Where it lives</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SCM alias <code>kcp.…</code></td>
+              <td>Sandbox and durable grant</td>
+              <td>Reference a grant; never reveal the upstream token.</td>
+            </tr>
+            <tr>
+              <td>Capability <code>kgh2 / kgl2 / kbb1</code></td>
+              <td>Durable grant and trusted Worker path</td>
+              <td>Carry encrypted, bounded authority for redemption.</td>
+            </tr>
+            <tr>
+              <td>Real SCM token</td>
+              <td>Trusted token service and outbound request path</td>
+              <td>Authenticate with GitHub, GitLab, or Bitbucket.</td>
+            </tr>
+            <tr>
+              <td>Kilo runtime handle</td>
+              <td>Sandbox as <code>KILOCODE_TOKEN</code></td>
+              <td>Call the runtime credential proxy; separate from SCM capabilities.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="runtime">
+        <div class="section-title">
+          <span class="index">04</span>
+          <h2>Kilo requests keep their own shared flow</h2>
+        </div>
+        <p class="note">
+          The SCM module handles Git and SCM API authorization. Kilo model requests use the runtime
+          credential proxy on every sandbox provider.
+        </p>
+        <div class="panel">
+          <div class="transport">
+            <div class="box">
+              <h3>Kilo in the sandbox</h3>
+              <p>Send a request with the session-bound runtime handle.</p>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="box shared">
+              <h3>Runtime credential proxy</h3>
+              <p>
+                Use Session DO authorization and the current SandboxControl allocation binding to
+                resolve or renew authorization.
+              </p>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+            <div class="box">
+              <h3>Kilo gateway</h3>
+              <p>
+                Receive real authorization from the trusted proxy. Stream the response back to Kilo.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="changes">
+        <div class="section-title">
+          <span class="index">05</span>
+          <h2>Where the shared behavior lives</h2>
+        </div>
+        <table aria-label="Refactor responsibilities">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Implemented responsibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>scm-broker/admission.ts</code></td>
+              <td>
+                Own common grant admission and renewal decisions. Use shared authorization parsing
+                and forwarding. Read and persist state through SandboxControl.
+              </td>
+            </tr>
+            <tr>
+              <td><code>sandbox-outbound.ts</code><br /><code>vercel-route.ts</code></td>
+              <td>
+                Thin transport adapters. Produce the same normalized request and verified identity
+                contract.
+              </td>
+            </tr>
+            <tr>
+              <td><code>vercel-admission.ts</code></td>
+              <td>
+                Verify Vercel identity outside the lifecycle queue. Delegate grant and request
+                checks to shared admission.
+              </td>
+            </tr>
+            <tr>
+              <td><code>session-credentials.ts</code></td>
+              <td>
+                Use one issuance and renewal policy. Compute-provider conditions no longer select
+                GitHub permissions.
+              </td>
+            </tr>
+            <tr>
+              <td><code>sandbox-do.ts</code></td>
+              <td>
+                Keep durable state, serialization, and lifecycle coordination. Delegate credential
+                decisions through small entry points.
+              </td>
+            </tr>
+            <tr>
+              <td>Behavioral tests</td>
+              <td>
+                Run the same admission, renewal, rejection, and forwarding cases through both
+                adapters. Test identity and network translation separately.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <details>
+          <summary>Why does the current class say SandboxControlV2?</summary>
+          <p>
+            The name came from the control-plane replacement. Production already exports it as
+            <code>SandboxControl</code>. This refactor preserves the internal name, deployed
+            bindings, and migration history.
+          </p>
+        </details>
+        <details>
+          <summary>What remains different between sandbox providers?</summary>
+          <p>
+            Identity evidence, proxy transport, network configuration, and provider lifecycle API
+            calls. Cloudflare also retains its existing direct capability entry for compatibility.
+            Vercel accepts aliases and requires verified provider identity. Native restricted egress
+            keeps its existing port restrictions.
+          </p>
+        </details>
+        <details>
+          <summary>Does Cloudflare behavior change?</summary>
+          <p>
+            Configured GitHub permissions remain unchanged. Shared admission adds current
+            membership, target, and allocation checks to native alias requests. Mixed managed and
+            caller-owned authorization now fails before forwarding. Denied managed requests never
+            fall back to caller-owned authorization.
+          </p>
+        </details>
+        <details>
+          <summary>Is this already running?</summary>
+          <p>
+            The refactor is implemented in this worktree and verified with local unit and Workers
+            tests. It has not been deployed. Provider identity tests use synthetic evidence; this
+            task did not verify live provider interception or remote Git operations. Vercel is not
+            used in production.
+          </p>
+        </details>
+      </section>
+      <footer>
+        Shared SCM implementation for <code>eshurakov/mighty-falcon</code> · Local verification is
+        separate from deployment and live provider verification.
+      </footer>
+    </main>
+    <script>
+      const providerDetails = {
+        cloudflare: {
+          transportTitle: 'Cloudflare outbound proxy',
+          transportBody:
+            'Intercept the Git request. Supply the container identity through the platform binding.',
+          identityTitle: 'Accept platform identity',
+          identityBody:
+            'Normalize the request and trusted container identity for the shared module.',
+        },
+        vercel: {
+          transportTitle: 'Vercel network forwarding',
+          transportBody:
+            'Forward the request to the Worker with the sandbox identity token and original target metadata.',
+          identityTitle: 'Verify forwarded identity',
+          identityBody:
+            'Verify the token against the expected allocation. Reconstruct and sanitize the original request for the shared module.',
+        },
+      };
+      document.querySelectorAll('[data-provider]').forEach(button => {
+        button.addEventListener('click', () => {
+          const selected = providerDetails[button.dataset.provider];
+          document
+            .querySelectorAll('[data-provider]')
+            .forEach(candidate =>
+              candidate.setAttribute('aria-pressed', String(candidate === button))
+            );
+          for (const [id, key] of [
+            ['transport-title', 'transportTitle'],
+            ['transport-body', 'transportBody'],
+            ['identity-title', 'identityTitle'],
+            ['identity-body', 'identityBody'],
+          ]) {
+            document.getElementById(id).textContent = selected[key];
+          }
+        });
+      });
+      const ns = 'http://www.w3.org/2000/svg';
+      function svgElement(tag, attributes, text) {
+        const node = document.createElementNS(ns, tag);
+        for (const [key, value] of Object.entries(attributes))
+          node.setAttribute(key, String(value));
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+      const diagram = svgElement('svg', {
+        viewBox: '0 0 1120 630',
+        role: 'img',
+        'aria-labelledby': 'sequence-title sequence-description',
+      });
+      diagram.append(
+        svgElement('title', { id: 'sequence-title' }, 'Shared managed SCM request sequence')
+      );
+      diagram.append(
+        svgElement(
+          'desc',
+          { id: 'sequence-description' },
+          'The provider adapter calls shared admission through SandboxControl. The DO supplies current state and serialization. Shared forwarding redeems a capability through git-token-service and sends the upstream request.'
+        )
+      );
+      const actors = [
+        ['Provider adapter', 'Transport + verified identity', '#fff4e7', '#9b4f17'],
+        ['Shared SCM module', 'Admission + forwarding', '#e8f4ef', '#0c655a'],
+        ['SandboxControl', 'Durable state + serialization', '#edf3fb', '#365f91'],
+        ['git-token-service', 'Issue + redeem', '#e8f4ef', '#0c655a'],
+        ['SCM upstream', 'GitHub / GitLab / Bitbucket', '#f4f5f5', '#526775'],
+      ];
+      const positions = [115, 337, 559, 781, 1003];
+      actors.forEach(([name, description, fill, stroke], index) => {
+        const x = positions[index];
+        diagram.append(
+          svgElement('line', {
+            x1: x,
+            y1: 86,
+            x2: x,
+            y2: 594,
+            stroke,
+            'stroke-dasharray': '3 5',
+            opacity: 0.35,
+          })
+        );
+        diagram.append(
+          svgElement('rect', { x: x - 101, y: 20, width: 202, height: 64, rx: 6, fill, stroke })
+        );
+        diagram.append(
+          svgElement(
+            'text',
+            {
+              x,
+              y: 45,
+              'text-anchor': 'middle',
+              'font-size': 14,
+              'font-weight': 600,
+              fill: stroke,
+            },
+            name
+          )
+        );
+        diagram.append(
+          svgElement(
+            'text',
+            { x, y: 65, 'text-anchor': 'middle', 'font-size': 10, fill: '#526775' },
+            description
+          )
+        );
+      });
+      const exchanges = [
+        [0, 1, '1  Normalized request + verified identity', false],
+        [1, 2, '2  Enter serialized admission; read current state', false],
+        [2, 1, 'Allocation, ownership, grant, membership', true],
+        [1, 3, '3  Renew capability if needed; apply common policy', false],
+        [3, 1, 'Bound capability', true],
+        [1, 2, '4  Recheck current state; persist any renewal', false],
+        [2, 1, 'Admission result', true],
+        [1, 3, '5  Redeem capability for method + URL', false],
+        [3, 1, 'Real upstream authorization', true],
+        [1, 4, '6  Forward request with real authorization', false],
+        [4, 1, 'Stream response', true],
+        [1, 0, 'Return through the provider transport', true],
+      ];
+      exchanges.forEach(([from, to, label, reply], index) => {
+        const y = 126 + index * 42;
+        const direction = to > from ? 1 : -1;
+        const start = positions[from],
+          end = positions[to];
+        const color = reply ? '#526775' : '#0c655a';
+        diagram.append(
+          svgElement('line', {
+            x1: start,
+            y1: y,
+            x2: end - direction * 8,
+            y2: y,
+            stroke: color,
+            'stroke-width': 1.5,
+            ...(reply ? { 'stroke-dasharray': '5 4' } : {}),
+          })
+        );
+        diagram.append(
+          svgElement('path', { d: `M ${end} ${y} l ${-direction * 8} -4 l 0 8 z`, fill: color })
+        );
+        const middle = (start + end) / 2;
+        const width = label.length * 5.8 + 12;
+        diagram.append(
+          svgElement('rect', {
+            x: middle - width / 2,
+            y: y - 22,
+            width,
+            height: 18,
+            rx: 3,
+            fill: 'white',
+          })
+        );
+        diagram.append(
+          svgElement(
+            'text',
+            { x: middle, y: y - 9, 'text-anchor': 'middle', 'font-size': 11, fill: color },
+            label
+          )
+        );
+      });
+      diagram.append(
+        svgElement(
+          'text',
+          { x: 24, y: 618, 'font-size': 11, fill: '#526775' },
+          'Module calls are code boundaries, not extra services. Admission uses the DO queue; forwarding happens after admission.'
+        )
+      );
+      document.getElementById('sequence').append(diagram);
+    </script>
+  </body>
+</html>

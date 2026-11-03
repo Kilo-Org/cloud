@@ -245,12 +245,6 @@ export function selectDefaultSandboxProvider(input: {
   return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
 
-export function credentialContainmentEnabled(env: {
-  CREDENTIAL_CONTAINMENT_ENABLED?: string;
-}): boolean {
-  return env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
-}
-
 /**
  * New control-plane sessions run on the native containers runtime at 2 vCPU /
  * 8 GiB. `cloudflare-single` is a compatibility alias for that same size.
@@ -352,7 +346,7 @@ export async function selectSandboxForNewSession(
     userId: input.userId,
     sessionId: input.sessionId,
     requestedAllocation: input.sandboxAllocation,
-    contained: credentialContainmentEnabled(input.env),
+    contained: true,
   });
   const sandboxId = await generateSandboxId(
     input.env.PER_SESSION_SANDBOX_ORG_IDS,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
+import type { VercelProviderLocator } from '../sandbox-control/vercel-provider.js';
 import type * as CredentialResolverModule from './vercel-credential-resolver.js';
 import {
   VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG,
@@ -49,7 +50,7 @@ const config = {
 const intent = { intentId: 'create_customer', createdAt: 1 };
 const sandboxName = 'ses-customer';
 
-function adapter() {
+function adapter(persistRuntimeLocator?: (locator: VercelProviderLocator) => Promise<void>) {
   return createByocVercelProviderAdapter({
     env: Object.assign({} as Env, {
       WORKER_URL: 'http://worker.test',
@@ -57,6 +58,7 @@ function adapter() {
     }),
     source,
     sandboxName,
+    persistRuntimeLocator,
     readContainedGrants: async () => [],
   });
 }
@@ -112,6 +114,33 @@ afterEach(() => {
 });
 
 describe('BYOC Vercel provider on the current control plane', () => {
+  it('persists the resolved allocation identity before contacting the provider', async () => {
+    let persisted: VercelProviderLocator | undefined;
+    vi.stubGlobal('fetch', async () => {
+      expect(persisted).toEqual({
+        teamId: config.teamId,
+        projectId: config.projectId,
+        snapshotId: config.snapshotId,
+        runtimeBuildId: config.runtimeBuildId,
+        runtime: 'node24',
+      });
+      return Response.json(createdSandbox());
+    });
+    await adapter(async locator => {
+      persisted = locator;
+    }).create(intent);
+    expect(persisted).not.toHaveProperty('accessToken');
+  });
+  it('does not create a sandbox if allocation identity cannot be persisted', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await expect(
+      adapter(async () => {
+        throw new Error('allocation changed');
+      }).create(intent)
+    ).rejects.toThrow('allocation changed');
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('creates with the customer token, project, and snapshot instead of platform credentials', async () => {
     const requests: { url: string; authorization: string | null; body: unknown }[] = [];
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {

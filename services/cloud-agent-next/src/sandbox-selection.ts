@@ -16,6 +16,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
+import { verifiedVercelSandboxIdentityContract } from './scm-broker/vercel-identity.js';
 import type { Env } from './types.js';
 
 export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-allocation';
@@ -84,19 +85,18 @@ export function sandboxAllocationUnavailableReason(
   }
 }
 
-/**
- * Repository-compatibility gate for an allocation. Contained Vercel resolves
- * Git credentials only for GitHub, so a saved Vercel choice is ineligible for a
- * GitLab/Bitbucket/Git repository and must fall through to the next candidate.
- */
 export function sandboxAllocationRepositoryUnavailableReason(
   allocation: SandboxAllocation,
   repositoryType: SessionRepositoryType
 ): string | undefined {
-  if (getSandboxAllocationProvider(allocation) === 'vercel' && repositoryType !== 'github') {
-    return 'Vercel sandboxes support GitHub repositories only';
+  if (
+    getSandboxAllocationProvider(allocation) !== 'vercel' ||
+    verifiedVercelSandboxIdentityContract ||
+    repositoryType === 'git'
+  ) {
+    return undefined;
   }
-  return undefined;
+  return 'Vercel sandboxes do not support repository credentials yet';
 }
 
 export function getSandboxSelectionCapabilities(

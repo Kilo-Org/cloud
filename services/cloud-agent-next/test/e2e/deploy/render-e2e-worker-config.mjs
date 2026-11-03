@@ -197,7 +197,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
-    CREDENTIAL_CONTAINMENT_ENABLED: 'true',
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];

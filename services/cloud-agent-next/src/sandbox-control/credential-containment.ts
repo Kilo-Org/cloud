@@ -16,10 +16,6 @@ export const WORKTREE_CREDENTIAL_CONTAINMENT = {
   worktreeScoped: true,
 } satisfies CredentialContainmentRequirements;
 
-export function getWorktreeCredentialContainment(
-  enabled: boolean
-): CredentialContainmentRequirements {
-  return enabled
-    ? WORKTREE_CREDENTIAL_CONTAINMENT
-    : { kilocode: false, github: false, worktreeScoped: true };
+export function getWorktreeCredentialContainment(): CredentialContainmentRequirements {
+  return WORKTREE_CREDENTIAL_CONTAINMENT;
 }

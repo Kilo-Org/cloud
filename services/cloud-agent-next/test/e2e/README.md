@@ -35,45 +35,46 @@ cloud-agent-next refactor.
 
 ## Credential containment
 
-Control-plane sessions (`workspace_*`) respect `CREDENTIAL_CONTAINMENT_ENABLED`.
-Only the literal `false` disables containment; local dev defaults to `false`.
-The choice is persisted when a worktree is created and inherited by sibling chats.
-Changing the environment does not switch an existing worktree or running sandbox
-between contained and direct credentials.
+Containment is mandatory for all sandbox providers, including local development.
+The obsolete `CREDENTIAL_CONTAINMENT_ENABLED` setting has no effect.
+Sandboxes receive scoped aliases and runtime proxy handles, never platform-managed upstream tokens.
+Provider adapters authenticate sandbox requests; shared services authorize and forward them.
+Missing containment support fails preparation instead of selecting direct credentials.
 
-When enabled, Cloudflare uses contained sandbox classes and the existing credential
-broker; Vercel uses native network policies. Each worktree has stable credential
-aliases shared by its registered Kilo roots, while different worktrees have
-separate Kilo authentication contexts. Containment failures never fall back to
-raw credentials. When disabled, a session whose token has modern runtime
-authorization uses the session-bound runtime credential proxy; managed SCM
-credentials may still be resolved directly for the repository scope. A session
-without either safe Kilo path is refused rather than receiving a native user
-token. Control-plane ownership, attachment scope, terminal authorization, and
-billing checks still apply.
+Cloudflare's outbound handler intercepts ports 80 and 443. Sandbox-facing endpoints
+must traverse that handler. Start `cloudflare-git-token-service` with its capability
+encryption configuration. Modern resource-token issuance is required.
+Vercel uses its verified team issuer and physical session ID for managed SCM admission.
 
-Cloudflare's native outbound handler intercepts ports 80 and 443. With containment
-enabled, local targets such as `http://host.docker.internal:<offset-port>` can
-bypass interception and reject aliases with HTTP 401. Contained E2E runs therefore
-need sandbox-facing endpoints that traverse the native handler, plus the running
-`cloudflare-git-token-service` and its capability-encryption configuration. Local
-development requires modern resource-token issuance in either containment mode
-so sessions receive a runtime credential proxy. Direct Kilo tokens and
-legacy Kilo broker capabilities are not supported execution paths.
+Saved non-contained allocations must stop before a contained replacement starts.
+Old grants remain readable for cleanup but cannot authorize execution or renewal.
 
-For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
-GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
-is enabled unless this variable is set to `false`. Local `dev` defaults to
-`false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Enable modern resource-token issuance for the
-runtime credential proxy in either containment mode. Devcontainer support is
-retired; existing sessions can be stopped or deleted but cannot start or resume.
+For a repository without `README`, pass an existing file path to the containment scenario:
+`run.ts contained-credentials package.json`. The default `_` reads `README`.
 
-Legacy containment flags are persisted at session creation, so changing the
-variable affects new legacy sessions, not existing ones. Existing sessions without
-modern runtime authorization fail on start/restore/resume, including contained
-sessions. Their metadata remains readable for viewing, Stop, deletion, and
-cleanup. Start a new session to continue execution.
+### Portable SCM broker checks
+
+Run the local Workers checks without starting a sandbox or shared services:
+
+```bash
+KOJO_SLOT=2 pnpm --filter cloud-agent-next exec vitest run --config vitest.workers.config.ts test/integration/scm-broker-parity.test.ts test/integration/scm-broker-admission.test.ts test/integration/sandbox-control-v2-credentials.test.ts
+```
+
+The parity suite calls both adapters, alias resolution, and real token-service redemption.
+Credential stores, Vercel identity contracts, namespace transport, and upstream responses are synthetic.
+GitLab uses integration OAuth identity/version pins; Bitbucket uses an OAuth credential identity pin.
+The tests cover project/repository operations, identity/traversal denial, manual redirects, and a
+2,097,169-byte GitLab push. The lifecycle suite uses real DO storage and synthetic provider adapters.
+It verifies reconstruction, mixed scopes, all-request admission, release, and failed policy publication.
+Registered Vercel routes and native unrestricted cases cover configured GitLab port 8443 and wrong-port denial.
+Native restricted egress keeps its existing non-default-port denial.
+
+Live Vercel GitHub checks passed for clone, fetch, push dry-run, and a model-backed
+checkout read. Invalid aliases, missing identity, and a foreign sandbox identity
+were rejected. See [local setup evidence](../../scripts/setup-local-vercel.md).
+GitLab and Bitbucket parity checks remain synthetic. Maximum ingress sizes and
+long-duration forwarding remain unverified. Native HTTP/high-port startup guards
+remain required; host Docker routing is not a containment substitute.
 
 ## Running
 
@@ -924,7 +925,7 @@ continues. HTTP profiles report `unsupported` when they cannot inspect that runt
 | `control-plane-callbacks` | Boots a `workspace_*` session, proves the new plane, registers the callback target through the internal `updateSession` endpoint (the public grouped `start` rejects `callbackTarget`), and requires one warm turn to produce both a terminal callback (`status: completed`) and a persisted `cloud_agent_session_runs` report row with `status: completed`. Needs `callbacks` + `reports`. |
 | `command` | Sends a `/compact` command through `sendMessageV2` (the unified `send` accepts prompts and attachments only; after C1 that endpoint resolves the `workspace_*` session to the new plane and the DO stores a command intent). Requires the turn to complete **and** the live Kilo history summary count to increase, so a completed turn without summarization fails. |
 | `attachment` | Requires the `attachments` seeding capability (no profile provides R2 write access yet, so the whole scenario is `unsupported` without it) and proves the new plane. Stages an attachment, sends it, and requires its content to appear in the fake LLM's last user prompt — the content must reach the model, not just be read from disk. |
-| `contained-credentials` | Requires `credentialContainment`, advertised from the Worker's own `.dev.vars` `CREDENTIAL_CONTAINMENT_ENABLED` (not a second harness flag). Proves the new plane, requires clone + model + a real checkout read to complete, and proves the negative: no raw SCM credential marker in the container environment and no credential in the git remote. The harness cannot observe the credential lookup itself; a failed negative check is the signal that containment did not apply. |
+| `contained-credentials` | Requires mandatory `credentialContainment`. Proves the new plane, requires clone + model + a real checkout read to complete, and proves the negative: no raw SCM credential marker in the container environment and no credential in the git remote. The harness cannot observe the credential lookup itself; a failed negative check is the signal that containment did not apply. |
 | `kilo-kill-recovery` | Holds a turn with `write-then-gate` (a real write tool call, so the turn made progress), then `SIGKILL`s the captured `kilo serve` process. Requires the held message to fail with `agent_restarted` (not be resubmitted) and a follow-up to complete in the same container. |
 | `wrapper-kill-recovery` | Same tool-progress hold, then `SIGKILL`s the captured new-plane control wrapper. Requires `agent_restarted`, proves the old Kilo pid is gone, and requires a follow-up to complete in the same container. |
 | `kilo-hang-recovery` | `SIGSTOP`s Kilo while the fake LLM holds the first token (`first-token:<tag>`). Waits for a correlated native assistant delta before freezing. Requires a new Kilo pid, the progressed turn failing `agent_restarted`, and a fresh follow-up completing in the same allocation. The original user message must appear exactly once in Kilo history (text parts == 1). Pre-progress retry remains a separate wrapper regression contract. |

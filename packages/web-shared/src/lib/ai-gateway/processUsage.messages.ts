@@ -150,7 +150,6 @@ export async function parseMessagesMicrodollarUsageFromStream(
     const json = JSON.parse(event.data) as
       | Anthropic.Messages.MessageStreamEvent
       | MessagesApiStreamErrorEvent;
-    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -158,6 +157,13 @@ export async function parseMessagesMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const meta = (
+      (json.type === 'message_start' ? json.message : json) as
+        | MaybeHasVercelProviderMetadata
+        | undefined
+    )?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if (json.type === 'error') {
       reportedError = true;
@@ -181,12 +187,6 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (openRouterProvider) {
         inference_provider = openRouterProvider;
       }
-      const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        model = getVercelResolvedModel(meta) ?? model;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-      }
     }
 
     if (
@@ -200,12 +200,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
     if (json.type === 'message_delta') {
       finish_reason = json.delta.stop_reason;
       deltaUsage = json.usage ?? deltaUsage;
-      const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        model = getVercelResolvedModel(meta) ?? model;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-      }
+    }
+
+    if (meta && (json.type === 'message_start' || json.type === 'message_delta')) {
+      providerMetadata = meta;
+      model = getVercelResolvedModel(meta) ?? model;
+      inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
     }
   };
 
@@ -254,10 +254,9 @@ export function parseMessagesMicrodollarUsageFromString(
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
     | null;
-  metadataCapture?.captureVercelMetadata(responseJson);
-
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;
+  metadataCapture?.captureVercelMetadata(responseJson);
   const inference_provider =
     providerMetadata?.gateway?.routing?.finalProvider ?? responseJson?.provider ?? null;
 

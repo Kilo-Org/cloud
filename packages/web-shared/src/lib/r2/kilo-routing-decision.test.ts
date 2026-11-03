@@ -58,7 +58,7 @@ async function runScheduledUpload() {
 
 function archivedRecord() {
   return KiloRoutingDecisionRecordSchema.parse(
-    JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${USAGE_ID}.json`) ?? '')
+    JSON.parse(fakeR2.objects.get(`test-provider-metadata/${USAGE_ID}.json`) ?? '')
   );
 }
 
@@ -119,7 +119,7 @@ test('uploads a route-only decision after the response, keyed by the usage id', 
     accessKeyId: 'test-metadata-access-key',
     secretAccessKey: 'test-metadata-secret-key',
   });
-  expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/kilo/${USAGE_ID}.json`]);
+  expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${USAGE_ID}.json`]);
   expect(archivedRecord()).toEqual({
     schema_version: 1,
     usage_id: USAGE_ID,
@@ -135,6 +135,7 @@ test('uploads a route-only decision after the response, keyed by the usage id', 
 test('combines full metadata fidelity and routing fields in exactly one PutObject', async () => {
   const metadata = {
     gateway: {
+      generationId: 'vercel-generation-123',
       routing: {
         modelAttempts: [
           {
@@ -149,14 +150,12 @@ test('combines full metadata fidelity and routing fields in exactly one PutObjec
     },
     upstream: { additionalField: 'retained', array: [null, false, 4, 'unknown'] },
   };
-  const historicalKey = 'test-provider-metadata/vercel/gen_historical.json';
-  fakeR2.objects.set(historicalKey, '{"unchanged":true}');
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   capture?.captureRoutingDecision(decision);
   capture?.captureRoutingDecision({ ...decision, requested_model: 'ignored-repeat' });
-  capture?.captureVercelMetadata({ id: 'gen_initial', provider_metadata: { superseded: true } });
+  capture?.captureVercelMetadata({ provider_metadata: { superseded: true } });
   capture?.captureVercelMetadata({ providerMetadata: metadata });
-  capture?.captureVercelMetadata({ id: 'gen_final', choices: [] });
+  capture?.captureVercelMetadata({ choices: [] });
   expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(fakeR2.send).not.toHaveBeenCalled();
 
@@ -169,24 +168,14 @@ test('combines full metadata fidelity and routing fields in exactly one PutObjec
     usage_id: USAGE_ID,
     created_at: expect.any(String),
     ...decision,
-    vercel: { generation_id: 'gen_final', metadata },
+    vercel: { metadata },
   });
-  expect(KiloRoutingDecisionRecordSchema.omit({ vercel: true }).parse(archivedRecord())).toEqual({
-    schema_version: 1,
-    usage_id: USAGE_ID,
-    created_at: expect.any(String),
-    ...decision,
-  });
-  expect(fakeR2.objects.get(historicalKey)).toBe('{"unchanged":true}');
-  expect([...fakeR2.objects.keys()]).toEqual([
-    historicalKey,
-    `test-provider-metadata/kilo/${USAGE_ID}.json`,
-  ]);
+  expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${USAGE_ID}.json`]);
 });
 
 test('does not register an archive from metadata or parser settlement without routing', async () => {
   const capture = createAiProviderMetadataCapture(USAGE_ID);
-  capture?.captureVercelMetadata({ id: 'gen_unused', provider_metadata: { captured: true } });
+  capture?.captureVercelMetadata({ provider_metadata: { captured: true } });
   capture?.waitFor(Promise.resolve());
   await Promise.resolve();
   expect(mockedAfter).not.toHaveBeenCalled();
@@ -199,22 +188,19 @@ test('defers serialization until the raw parser installed after routing settles'
   const toJSON = jest.fn(() => ({ complete: true }));
   capture?.captureRoutingDecision(decision);
   capture?.waitFor(parsing.promise);
-  capture?.captureVercelMetadata({ id: 'gen_delayed', provider_metadata: { toJSON } });
+  capture?.captureVercelMetadata({ provider_metadata: { toJSON } });
   expect(toJSON).not.toHaveBeenCalled();
 
   const upload = runScheduledUpload();
   await Promise.resolve();
   expect(fakeR2.send).not.toHaveBeenCalled();
   expect(toJSON).not.toHaveBeenCalled();
-  capture?.captureVercelMetadata({ id: 'gen_complete' });
+  capture?.captureVercelMetadata({});
   parsing.resolve({ billing: 'unchanged' });
   await upload;
 
   expect(toJSON).toHaveBeenCalledTimes(1);
-  expect(archivedRecord().vercel).toEqual({
-    generation_id: 'gen_complete',
-    metadata: { complete: true },
-  });
+  expect(archivedRecord().vercel).toEqual({ metadata: { complete: true } });
   await expect(parsing.promise).resolves.toEqual({ billing: 'unchanged' });
 });
 
@@ -223,17 +209,14 @@ test('normalizes rejected parsing without changing its rejection or dropping par
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   capture?.captureRoutingDecision(decision);
   capture?.waitFor(parsing.promise);
-  capture?.captureVercelMetadata({ id: 'gen_partial', provider_metadata: { partial: true } });
+  capture?.captureVercelMetadata({ provider_metadata: { partial: true } });
   const upload = runScheduledUpload();
   const error = new Error('sensitive parsing failure');
   parsing.reject(error);
 
   await expect(upload).resolves.toBeUndefined();
   await expect(parsing.promise).rejects.toBe(error);
-  expect(archivedRecord().vercel).toEqual({
-    generation_id: 'gen_partial',
-    metadata: { partial: true },
-  });
+  expect(archivedRecord().vercel).toEqual({ metadata: { partial: true } });
   expect(errorExceptInTest).not.toHaveBeenCalled();
 });
 
@@ -262,7 +245,7 @@ test.each([
     const capture = createAiProviderMetadataCapture(USAGE_ID);
     capture?.captureRoutingDecision({ ...decision, api_kind });
     capture?.waitFor(parsing.promise);
-    capture?.captureVercelMetadata({ id: 'gen_before', provider_metadata: { before: true } });
+    capture?.captureVercelMetadata({ provider_metadata: { before: true } });
     const upload = runScheduledUpload();
     await Promise.resolve();
     expect(fakeR2.send).not.toHaveBeenCalled();
@@ -270,15 +253,15 @@ test.each([
     capture?.captureVercelMetadata(
       typeof terminal === 'string'
         ? terminal
-        : { ...terminal, id: 'gen_terminal', provider_metadata: { terminal: true } }
+        : { ...terminal, provider_metadata: { terminal: true } }
     );
-    capture?.captureVercelMetadata({ id: 'gen_ignored', provider_metadata: { ignored: true } });
+    capture?.captureVercelMetadata({ provider_metadata: { ignored: true } });
     await upload;
 
     expect(archivedRecord().vercel).toEqual(
       typeof terminal === 'string'
-        ? { generation_id: 'gen_before', metadata: { before: true } }
-        : { generation_id: 'gen_terminal', metadata: { terminal: true } }
+        ? { metadata: { before: true } }
+        : { metadata: { terminal: true } }
     );
     expect(fakeR2.send).toHaveBeenCalledTimes(1);
     parsing.reject(new Error('later accounting failure'));
@@ -287,24 +270,24 @@ test.each([
   }
 );
 
-test('omits the Vercel envelope when there is only a generation id or invalid metadata', async () => {
+test('omits the Vercel envelope when metadata is invalid', async () => {
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   capture?.captureRoutingDecision(decision);
   for (const metadata of [undefined, null, false, 42, 'invalid', []]) {
-    capture?.captureVercelMetadata({ id: 'gen_no_metadata', provider_metadata: metadata });
+    capture?.captureVercelMetadata({ provider_metadata: metadata });
   }
   await runScheduledUpload();
 
   expect(archivedRecord()).not.toHaveProperty('vercel');
 });
 
-test('archives metadata without a generation id', async () => {
+test('archives metadata without a response id', async () => {
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   capture?.captureRoutingDecision(decision);
   capture?.captureVercelMetadata({ provider_metadata: {} });
   await runScheduledUpload();
 
-  expect(archivedRecord().vercel).toEqual({ generation_id: null, metadata: {} });
+  expect(archivedRecord().vercel).toEqual({ metadata: {} });
 });
 
 test('contains upload failures without logging the decision or the upstream error text', async () => {
@@ -384,7 +367,7 @@ test('reports a scheduling failure once without throwing or retrying registratio
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   expect(() => capture?.captureRoutingDecision(decision)).not.toThrow();
   expect(() => capture?.captureRoutingDecision(decision)).not.toThrow();
-  capture?.captureVercelMetadata({ id: 'gen_test', provider_metadata: {} });
+  capture?.captureVercelMetadata({ provider_metadata: {} });
   expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(errorExceptInTest).toHaveBeenCalledTimes(1);
   expect(fakeR2.send).not.toHaveBeenCalled();

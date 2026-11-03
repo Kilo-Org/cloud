@@ -39,11 +39,11 @@ export function createAiProviderMetadataCapture(
         target,
         logSource: LOG_SOURCE,
         logContext: { usageId },
-        key: `kilo/${usageId}.json`,
+        key: `${usageId}.json`,
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();
-          return JSON.stringify({ ...record, ...(metadata ? { vercel: metadata } : {}) });
+          return JSON.stringify({ ...record, ...(metadata ? { vercel: { metadata } } : {}) });
         },
       });
     },

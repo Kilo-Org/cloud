@@ -892,10 +892,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(usageId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
-    expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/kilo/${usageId}.json`]);
-    expect(
-      JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${usageId}.json`) ?? '')
-    ).toEqual({
+    expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${usageId}.json`]);
+    expect(JSON.parse(fakeR2.objects.get(`test-provider-metadata/${usageId}.json`) ?? '')).toEqual({
       schema_version: 1,
       usage_id: usageId,
       created_at: expect.any(String),
@@ -939,7 +937,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       },
     };
     const vercelFrame = {
-      id: 'vercel-generation-123',
       provider_metadata: { request_id: 'vercel-request-456', region: 'iad1' },
     };
     mockedGetProvider.mockImplementation(async ({ onDecision }) => {
@@ -986,7 +983,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(usageId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
-    const key = `test-provider-metadata/kilo/${usageId}.json`;
+    const key = `test-provider-metadata/${usageId}.json`;
     expect([...fakeR2.objects.keys()]).toEqual([key]);
     expect(JSON.parse(fakeR2.objects.get(key) ?? '')).toEqual({
       schema_version: 1,
@@ -994,7 +991,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       created_at: expect.any(String),
       ...decision,
       vercel: {
-        generation_id: vercelFrame.id,
         metadata: vercelFrame.provider_metadata,
       },
     });
@@ -1065,7 +1061,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     expect(fakeR2.objects.size).toBe(1);
     const [key] = [...fakeR2.objects.keys()];
-    expect(key).toMatch(/^test-provider-metadata\/kilo\/[0-9a-f-]+\.json$/);
+    expect(key).toMatch(/^test-provider-metadata\/[0-9a-f-]+\.json$/);
     const archived = JSON.parse(fakeR2.objects.get(key ?? '') ?? '');
     expect(archived).toEqual({
       schema_version: 1,

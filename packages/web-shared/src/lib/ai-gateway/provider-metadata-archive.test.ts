@@ -57,6 +57,7 @@ type JsonObject = Record<string, unknown>;
 
 const metadata = {
   gateway: {
+    generationId: 'vercel-generation-123',
     cost: '0.002',
     marketCost: '0.002',
     routing: { finalProvider: 'Synthetic', futureRoutingField: ['opaque', { retained: true }] },
@@ -203,14 +204,10 @@ function runArchive() {
   return callbacks[0]();
 }
 
-function expectArchive(
-  decision: ProviderRoutingDecision,
-  expectedMetadata?: unknown,
-  id: string | null = GENERATION_ID
-) {
+function expectArchive(decision: ProviderRoutingDecision, expectedMetadata?: unknown) {
   expect(fakeR2.send).toHaveBeenCalledTimes(1);
   expect(fakeR2.send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
-  const key = `${BUCKET}/kilo/${USAGE_ID}.json`;
+  const key = `${BUCKET}/${USAGE_ID}.json`;
   expect([...fakeR2.objects.keys()]).toEqual([key]);
   const record = JSON.parse(fakeR2.objects.get(key) ?? '');
   expect(record).toEqual({
@@ -218,9 +215,7 @@ function expectArchive(
     usage_id: USAGE_ID,
     created_at: expect.any(String),
     ...decision,
-    ...(expectedMetadata === undefined
-      ? {}
-      : { vercel: { generation_id: id, metadata: expectedMetadata } }),
+    ...(expectedMetadata === undefined ? {} : { vercel: { metadata: expectedMetadata } }),
   });
   expect(KiloRoutingDecisionRecordSchema.parse(record)).toEqual(record);
 }
@@ -439,70 +434,61 @@ describe('raw provider metadata archive with usage accounting', () => {
     }
   );
 
-  test.each(API_KINDS)(
-    '%s retains latest metadata and a generation id arriving in a separate event',
-    async apiKind => {
-      const { context, decision } = createRequest(apiKind, true);
-      await countAndStoreUsage(
-        new Response(
-          sse(
-            metadataFrame(apiKind, { staleOnly: true, gateway: { staleGatewayOnly: true } }),
-            ...initialFrames(apiKind),
-            metadataFrame(apiKind, metadata),
-            metadataFrame(apiKind, null),
-            metadataFrame(apiKind, ['not an object']),
-            '[DONE]'
-          )
-        ),
-        context,
-        undefined
-      );
+  test.each(API_KINDS)('%s retains latest metadata across separate events', async apiKind => {
+    const { context, decision } = createRequest(apiKind, true);
+    await countAndStoreUsage(
+      new Response(
+        sse(
+          metadataFrame(apiKind, { staleOnly: true, gateway: { staleGatewayOnly: true } }),
+          ...initialFrames(apiKind),
+          metadataFrame(apiKind, metadata),
+          metadataFrame(apiKind, null),
+          metadataFrame(apiKind, ['not an object']),
+          '[DONE]'
+        )
+      ),
+      context,
+      undefined
+    );
 
-      await runArchive();
-      expectArchive(decision, metadata);
-      expectBilling();
-    }
-  );
+    await runArchive();
+    expectArchive(decision, metadata);
+    expectBilling();
+  });
 
-  test.each(API_KINDS)(
-    '%s archives valid metadata even without usage or a generation id',
-    async apiKind => {
-      const { context, decision } = createRequest(apiKind, false);
-      const body = jsonBody(apiKind, false);
-      delete body.id;
-      await countAndStoreUsage(
-        Response.json({ ...body, provider_metadata: metadata }),
-        context,
-        undefined
-      );
+  test.each(API_KINDS)('%s archives metadata without usage or a response id', async apiKind => {
+    const { context, decision } = createRequest(apiKind, false);
+    const body = jsonBody(apiKind, false);
+    delete body.id;
+    await countAndStoreUsage(
+      Response.json({ ...body, provider_metadata: metadata }),
+      context,
+      undefined
+    );
 
-      await runArchive();
-      expectArchive(decision, metadata, null);
-      expect(mockedEnqueueUsage.mock.calls[0]?.[0].core).toEqual(
-        expect.objectContaining({ id: USAGE_ID, input_tokens: 0, output_tokens: 0 })
-      );
-    }
-  );
+    await runArchive();
+    expectArchive(decision, metadata);
+    expect(mockedEnqueueUsage.mock.calls[0]?.[0].core).toEqual(
+      expect.objectContaining({ id: USAGE_ID, input_tokens: 0, output_tokens: 0 })
+    );
+  });
 
-  test.each(API_KINDS)(
-    '%s SSE archives metadata without usage when its generation id arrives later',
-    async apiKind => {
-      const { context, decision } = createRequest(apiKind, true);
-      await countAndStoreUsage(
-        new Response(
-          sse(metadataFrame(apiKind, metadata), ...initialFrames(apiKind, false), '[DONE]')
-        ),
-        context,
-        undefined
-      );
+  test.each(API_KINDS)('%s SSE archives metadata without usage', async apiKind => {
+    const { context, decision } = createRequest(apiKind, true);
+    await countAndStoreUsage(
+      new Response(
+        sse(metadataFrame(apiKind, metadata), ...initialFrames(apiKind, false), '[DONE]')
+      ),
+      context,
+      undefined
+    );
 
-      await runArchive();
-      expectArchive(decision, metadata);
-      expect(mockedEnqueueUsage.mock.calls[0]?.[0].core).toEqual(
-        expect.objectContaining({ id: USAGE_ID, input_tokens: 0, output_tokens: 0 })
-      );
-    }
-  );
+    await runArchive();
+    expectArchive(decision, metadata);
+    expect(mockedEnqueueUsage.mock.calls[0]?.[0].core).toEqual(
+      expect.objectContaining({ id: USAGE_ID, input_tokens: 0, output_tokens: 0 })
+    );
+  });
 
   test.each(API_KINDS)('%s preserves a route-only archive with an absent body', async apiKind => {
     const { context, decision } = createRequest(apiKind, false);
@@ -680,7 +666,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       );
 
       await runArchive();
-      expectArchive(decision, metadata, null);
+      expectArchive(decision, metadata);
       expect(mockedEnqueueUsage.mock.calls[0]?.[0].core).toEqual(
         expect.objectContaining({ cost: 0, has_error: true })
       );

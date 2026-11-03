@@ -1,25 +1,16 @@
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
-type VercelProviderMetadata = {
-  generation_id: string | null;
-  metadata: Record<string, unknown>;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function createVercelProviderMetadataCollector() {
   let metadata: Record<string, unknown> | undefined;
-  let generationId: string | null = null;
   let terminal = false;
   const { promise: completed, resolve: complete } = Promise.withResolvers<void>();
 
   const captureNode = (value: unknown) => {
     if (!isRecord(value)) return;
-    if (typeof value.id === 'string' && value.id.length > 0) {
-      generationId = value.id;
-    }
     const candidate = value.provider_metadata ?? value.providerMetadata;
     if (isRecord(candidate)) metadata = candidate;
   };
@@ -62,8 +53,8 @@ export function createVercelProviderMetadataCollector() {
             value.type === 'error'));
       if (terminal) complete();
     },
-    snapshot(): VercelProviderMetadata | undefined {
-      return metadata === undefined ? undefined : { generation_id: generationId, metadata };
+    snapshot(): Record<string, unknown> | undefined {
+      return metadata;
     },
   };
 }

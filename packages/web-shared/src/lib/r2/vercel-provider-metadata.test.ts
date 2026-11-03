@@ -1,12 +1,11 @@
 import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 
-test('walks Chat JSON root then every choice message, preserving the raw object', () => {
+test('walks Chat JSON root then every choice message and preserves the raw object', () => {
   const collector = createVercelProviderMetadataCollector();
   const json = {
-    id: 'gen_root',
     provider_metadata: { root: true },
     choices: [
-      { message: { id: 'gen_first', provider_metadata: { first: true } } },
+      { message: { provider_metadata: { first: true } } },
       { message: { providerMetadata: { final: { unknown: [null, false, 'retained'] } } } },
     ],
   };
@@ -14,10 +13,7 @@ test('walks Chat JSON root then every choice message, preserving the raw object'
 
   collector.capture(json, 'chat_completions');
 
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_first',
-    metadata: { final: { unknown: [null, false, 'retained'] } },
-  });
+  expect(collector.snapshot()).toEqual({ final: { unknown: [null, false, 'retained'] } });
   expect(json).toEqual(original);
 });
 
@@ -25,35 +21,31 @@ test('walks every Chat stream delta before the root', () => {
   const collector = createVercelProviderMetadataCollector();
   collector.capture(
     {
-      id: 'gen_root',
       providerMetadata: { root: true },
       choices: [
-        { delta: { id: 'gen_first', provider_metadata: { first: true } } },
-        { delta: { id: 'gen_second', provider_metadata: { second: true } } },
+        { delta: { provider_metadata: { first: true } } },
+        { delta: { provider_metadata: { second: true } } },
       ],
     },
     'chat_completions'
   );
 
-  expect(collector.snapshot()).toEqual({ generation_id: 'gen_root', metadata: { root: true } });
+  expect(collector.snapshot()).toEqual({ root: true });
 });
 
-test('retains metadata from a later Chat choice even without usage or top-level metadata', () => {
+test('retains metadata from a later Chat choice without usage or top-level metadata', () => {
   const collector = createVercelProviderMetadataCollector();
   collector.capture(
     {
       choices: [
-        { delta: { id: 'gen_first', provider_metadata: { first: true } } },
-        { delta: { id: 'gen_second', providerMetadata: { second: true } } },
+        { delta: { provider_metadata: { first: true } } },
+        { delta: { providerMetadata: { second: true } } },
       ],
     },
     'chat_completions'
   );
 
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_second',
-    metadata: { second: true },
-  });
+  expect(collector.snapshot()).toEqual({ second: true });
 });
 
 test('walks Messages start message before root and captures top-level metadata on every event', () => {
@@ -61,25 +53,19 @@ test('walks Messages start message before root and captures top-level metadata o
   collector.capture(
     {
       type: 'message_start',
-      message: { id: 'gen_nested', provider_metadata: { nested: true } },
+      message: { provider_metadata: { nested: true } },
       providerMetadata: { root: true },
     },
     'messages'
   );
-  expect(collector.snapshot()).toEqual({ generation_id: 'gen_nested', metadata: { root: true } });
+  expect(collector.snapshot()).toEqual({ root: true });
 
   for (const type of ['content_block_start', 'content_block_delta', 'message_delta']) {
     collector.capture({ type, provider_metadata: { latest: type } }, 'messages');
-    expect(collector.snapshot()).toEqual({
-      generation_id: 'gen_nested',
-      metadata: { latest: type },
-    });
+    expect(collector.snapshot()).toEqual({ latest: type });
   }
   collector.capture({ type: 'message_stop', providerMetadata: { stopped: true } }, 'messages');
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_nested',
-    metadata: { stopped: true },
-  });
+  expect(collector.snapshot()).toEqual({ stopped: true });
 });
 
 test('ignores Messages nested message outside message_start', () => {
@@ -87,7 +73,7 @@ test('ignores Messages nested message outside message_start', () => {
   collector.capture(
     {
       type: 'message_delta',
-      message: { id: 'not-a-generation', provider_metadata: { invalid: true } },
+      message: { provider_metadata: { invalid: true } },
     },
     'messages'
   );
@@ -100,54 +86,38 @@ test('walks every Responses nested response before top-level metadata', () => {
     collector.capture(
       {
         type,
-        response: { id: `gen_${type}`, providerMetadata: { nested: true } },
+        response: { providerMetadata: { nested: true } },
         provider_metadata: { latest: type },
       },
       'responses'
     );
-    expect(collector.snapshot()).toEqual({
-      generation_id: `gen_${type}`,
-      metadata: { latest: type },
-    });
+    expect(collector.snapshot()).toEqual({ latest: type });
   }
   collector.capture(
     {
       type: 'response.completed',
-      response: { id: 'gen_terminal', provider_metadata: { terminal: { retained: true } } },
+      response: { provider_metadata: { terminal: { retained: true } } },
     },
     'responses'
   );
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_terminal',
-    metadata: { terminal: { retained: true } },
-  });
+  expect(collector.snapshot()).toEqual({ terminal: { retained: true } });
 });
 
 test.each(['messages', 'responses'] as const)(
   'captures %s non-stream JSON root metadata',
   apiKind => {
     const collector = createVercelProviderMetadataCollector();
-    collector.capture({ id: 'gen_json', provider_metadata: { unknown: 'retained' } }, apiKind);
-    expect(collector.snapshot()).toEqual({
-      generation_id: 'gen_json',
-      metadata: { unknown: 'retained' },
-    });
+    collector.capture({ provider_metadata: { unknown: 'retained' } }, apiKind);
+    expect(collector.snapshot()).toEqual({ unknown: 'retained' });
   }
 );
 
-test('replaces metadata instead of merging and retains the last nonempty id on metadata-free frames', () => {
+test('replaces metadata instead of merging and retains it across metadata-free frames', () => {
   const collector = createVercelProviderMetadataCollector();
-  collector.capture({ id: 'gen_initial' }, 'chat_completions');
   collector.capture({ provider_metadata: { first: true } }, 'chat_completions');
   collector.capture({ providerMetadata: { second: true } }, 'chat_completions');
-  collector.capture({ id: 'gen_latest', choices: [] }, 'chat_completions');
-  for (const id of ['', null, false, 42, undefined]) {
-    collector.capture({ id }, 'chat_completions');
-  }
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_latest',
-    metadata: { second: true },
-  });
+  collector.capture({ choices: [] }, 'chat_completions');
+  expect(collector.snapshot()).toEqual({ second: true });
 });
 
 test('prefers valid snake_case metadata to valid camelCase metadata', () => {
@@ -156,7 +126,7 @@ test('prefers valid snake_case metadata to valid camelCase metadata', () => {
     { provider_metadata: { snake: true }, providerMetadata: { camel: true } },
     'chat_completions'
   );
-  expect(collector.snapshot()).toEqual({ generation_id: null, metadata: { snake: true } });
+  expect(collector.snapshot()).toEqual({ snake: true });
 });
 
 test.each([undefined, null, false, 42, 'invalid', []])(
@@ -168,7 +138,7 @@ test.each([undefined, null, false, 42, 'invalid', []])(
       { provider_metadata: invalid, providerMetadata: invalid },
       'chat_completions'
     );
-    expect(collector.snapshot()).toEqual({ generation_id: null, metadata: { retained: true } });
+    expect(collector.snapshot()).toEqual({ retained: true });
   }
 );
 
@@ -180,7 +150,7 @@ test.each([undefined, null])(
       { provider_metadata: invalid, providerMetadata: { valid: true } },
       'chat_completions'
     );
-    expect(collector.snapshot()).toEqual({ generation_id: null, metadata: { valid: true } });
+    expect(collector.snapshot()).toEqual({ valid: true });
   }
 );
 
@@ -193,7 +163,7 @@ test.each([false, 42, 'invalid', []])(
       { provider_metadata: invalid, providerMetadata: { ignored: true } },
       'chat_completions'
     );
-    expect(collector.snapshot()).toEqual({ generation_id: null, metadata: { retained: true } });
+    expect(collector.snapshot()).toEqual({ retained: true });
   }
 );
 
@@ -223,23 +193,20 @@ test('does not treat a finish_reason or mismatched protocol event as metadata co
   await Promise.resolve();
   expect(completed).not.toHaveBeenCalled();
 
-  collector.capture({ id: 'gen_late', provider_metadata: { retained: true } }, 'chat_completions');
+  collector.capture({ provider_metadata: { retained: true } }, 'chat_completions');
   collector.capture('[DONE]', 'chat_completions');
   await collector.completed;
   expect(completed).toHaveBeenCalledTimes(1);
-  expect(collector.snapshot()).toEqual({ generation_id: 'gen_late', metadata: { retained: true } });
+  expect(collector.snapshot()).toEqual({ retained: true });
 });
 
 test('captures a terminal error envelope before freezing and ignores all subsequent metadata', async () => {
   const collector = createVercelProviderMetadataCollector();
   collector.capture(
-    { type: 'error', id: 'gen_error', provider_metadata: { error: { unknown: 'retained' } } },
+    { type: 'error', provider_metadata: { error: { unknown: 'retained' } } },
     'messages'
   );
-  collector.capture({ id: 'gen_ignored', provider_metadata: { ignored: true } }, 'messages');
+  collector.capture({ provider_metadata: { ignored: true } }, 'messages');
   await collector.completed;
-  expect(collector.snapshot()).toEqual({
-    generation_id: 'gen_error',
-    metadata: { error: { unknown: 'retained' } },
-  });
+  expect(collector.snapshot()).toEqual({ error: { unknown: 'retained' } });
 });

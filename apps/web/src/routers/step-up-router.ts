@@ -27,6 +27,7 @@ export const stepUpRouter = createTRPCRouter({
         sessionBound: Boolean(ctx.webSessionId),
         fresh: false,
         status: { status: 'absent' as const },
+        unavailable: false,
       };
     }
 
@@ -42,6 +43,7 @@ export const stepUpRouter = createTRPCRouter({
         sessionBound: Boolean(ctx.webSessionId),
         fresh: evaluation.state.status === 'fresh',
         status: evaluation.state,
+        unavailable: false,
       };
     } catch (error) {
       reportStepUpFailure('admin_step_up_status', error);

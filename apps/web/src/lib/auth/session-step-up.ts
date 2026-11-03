@@ -19,11 +19,7 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PrivilegedActionClass } from '@kilocode/web-shared/lib/admin/privileged-access';
 import type { User } from '@kilocode/db/schema';
-import {
-  hashStepUpActionBinding,
-  hashWebSessionId,
-  type StepUpActionBinding,
-} from '@kilocode/web-shared/lib/admin/step-up-store';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   STEP_UP_CHALLENGE_TTL_MS,
   stepUpPolicyFor,
@@ -42,7 +38,6 @@ export type StepUpErrorCode =
   | 'CHALLENGE_ALREADY_USED'
   | 'WRONG_CHALLENGE'
   | 'UNKNOWN_CREDENTIAL'
-  | 'ACTION_BINDING_MISMATCH'
   | 'SESSION_CHANGED'
   | 'VERIFICATION_FAILED';
 
@@ -63,20 +58,6 @@ export type StepUpOptionsResult = {
 
 type ChallengePurpose = StepUpProofPurpose;
 
-function actionBindingHashFor(
-  actionClass: PrivilegedActionClass,
-  actionBinding: StepUpActionBinding | null | undefined
-): string | null {
-  const policy = stepUpPolicyFor(actionClass);
-  if (policy.purpose !== 'operation') return null;
-  if (!actionBinding) {
-    // A sensitive action must name its binding; an unbound proof could be
-    // replayed against another sensitive action.
-    throw new StepUpVerificationError('ACTION_BINDING_MISMATCH');
-  }
-  return hashStepUpActionBinding(actionBinding);
-}
-
 /**
  * Mint UV-required authentication options for the actor's own passkeys and
  * store the challenge bound to this browser session. The challenge is the only
@@ -86,14 +67,12 @@ export async function createStepUpOptions(params: {
   userId: string;
   webSessionId: string | null | undefined;
   actionClass: PrivilegedActionClass;
-  actionBinding?: StepUpActionBinding | null;
 }): Promise<StepUpOptionsResult> {
   if (!params.webSessionId) {
     throw new StepUpVerificationError('SESSION_UNBOUND');
   }
 
   const policy = stepUpPolicyFor(params.actionClass);
-  const actionBindingHash = actionBindingHashFor(params.actionClass, params.actionBinding);
   const { rpId } = getWebRelyingParty();
 
   const credentials = await db
@@ -124,7 +103,7 @@ export async function createStepUpOptions(params: {
     kilo_user_id: params.userId,
     session_id_hash: hashWebSessionId(params.webSessionId),
     purpose: policy.purpose,
-    action_binding_hash: actionBindingHash,
+    action_binding_hash: null,
     expires_at: new Date(Date.now() + STEP_UP_CHALLENGE_TTL_MS).toISOString(),
   });
 
@@ -142,7 +121,7 @@ async function consumeChallenge(params: {
   userId: string;
   sessionIdHash: string;
   purpose: ChallengePurpose;
-}): Promise<{ challenge: string; actionBindingHash: string | null }> {
+}): Promise<{ challenge: string }> {
   const [consumed] = await db
     .update(session_step_up_challenges)
     .set({ consumed_at: sql`NOW()` })
@@ -158,11 +137,10 @@ async function consumeChallenge(params: {
     )
     .returning({
       challenge: session_step_up_challenges.challenge,
-      action_binding_hash: session_step_up_challenges.action_binding_hash,
     });
 
   if (consumed) {
-    return { challenge: consumed.challenge, actionBindingHash: consumed.action_binding_hash };
+    return { challenge: consumed.challenge };
   }
 
   const [existing] = await db
@@ -227,7 +205,6 @@ export async function verifyStepUp(params: {
   challengeId: string;
   response: AuthenticationResponseJSON;
   actionClass: PrivilegedActionClass;
-  actionBinding?: StepUpActionBinding | null;
 }): Promise<SessionStepUpProof> {
   if (!params.webSessionId) {
     throw new StepUpVerificationError('SESSION_UNBOUND');
@@ -239,7 +216,6 @@ export async function verifyStepUp(params: {
   }
 
   const policy = stepUpPolicyFor(params.actionClass);
-  const expectedBindingHash = actionBindingHashFor(params.actionClass, params.actionBinding);
   const sessionIdHash = hashWebSessionId(params.webSessionId);
   const { rpId, expectedOrigin } = getWebRelyingParty();
 
@@ -249,10 +225,6 @@ export async function verifyStepUp(params: {
     sessionIdHash,
     purpose: policy.purpose,
   });
-
-  if (challenge.actionBindingHash !== expectedBindingHash) {
-    throw new StepUpVerificationError('ACTION_BINDING_MISMATCH');
-  }
 
   const presentedChallenge = readPresentedChallenge(params.response);
   if (presentedChallenge !== null && presentedChallenge !== challenge.challenge) {
@@ -338,7 +310,7 @@ export async function verifyStepUp(params: {
         method: 'webauthn_uv',
         passkey_credential_id: credential.id,
         purpose: policy.purpose,
-        action_binding_hash: expectedBindingHash,
+        action_binding_hash: null,
         verified_at: verifiedAt.toISOString(),
         expires_at: expiresAt.toISOString(),
       })

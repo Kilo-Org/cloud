@@ -498,5 +498,6 @@ export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || 
  * not depend on PostHog.
  */
 export function isAdminStepUpEnabled(): boolean {
-  return getEnvVariable('ADMIN_STEP_UP_ENABLED').trim().toLowerCase() === 'true';
+  // Exact match: no trimming or casing variants, so a typo stays off.
+  return getEnvVariable('ADMIN_STEP_UP_ENABLED') === 'true';
 }

@@ -10,7 +10,8 @@ jest.mock('@/lib/trpc/utils', () => ({
 }));
 jest.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
-    data: { enrolled: true, status: { status: 'required' } },
+    data: { enrolled: true, sessionBound: true, status: { status: 'required' } },
+    isSuccess: true,
     isLoading: false,
   }),
 }));

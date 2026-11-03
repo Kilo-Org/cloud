@@ -11,7 +11,6 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type {
   AdminStepUpState,
   PrivilegedActionClass,
-  PrivilegedTarget,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   STEP_UP_RETENTION_AFTER_EXPIRY_MS,
@@ -31,8 +30,6 @@ export type StepUpEvaluationParams = {
   userId: string;
   webSessionId?: string | null;
   actionClass: PrivilegedActionClass;
-  /** Required for a single-use sensitive operation proof. */
-  actionBinding?: StepUpActionBinding | null;
   now?: Date;
 };
 
@@ -42,24 +39,8 @@ export type StepUpEvaluation = {
   passkeyCount: number;
 };
 
-export type StepUpActionBinding = {
-  inventoryId: string | null;
-  target: PrivilegedTarget;
-};
-
-const ACTION_BINDING_VERSION = 'v1';
-
 export function hashWebSessionId(webSessionId: string): string {
   return createHash('sha256').update(webSessionId).digest('hex');
-}
-
-export function hashStepUpActionBinding(binding: StepUpActionBinding): string {
-  const target = binding.target;
-  return createHash('sha256')
-    .update(
-      [ACTION_BINDING_VERSION, binding.inventoryId ?? '', target.kind, target.id ?? ''].join('|')
-    )
-    .digest('hex');
 }
 
 async function countPasskeys(userId: string, fromDb: typeof db): Promise<number> {
@@ -70,11 +51,7 @@ async function countPasskeys(userId: string, fromDb: typeof db): Promise<number>
   return row?.count ?? 0;
 }
 
-/**
- * Evaluate the strongest proof available for one session and action class.
- * This is a read only: it never consumes an operation proof, so an observe-mode
- * guard cannot change the outcome of a later enforced check.
- */
+/** Read the live proof state for one browser session and action class. */
 export async function evaluateStepUp(
   params: StepUpEvaluationParams,
   fromDb: typeof db = db
@@ -87,23 +64,6 @@ export async function evaluateStepUp(
   const nowIso = now.toISOString();
   const sessionIdHash = hashWebSessionId(params.webSessionId);
   const policy = stepUpPolicyFor(params.actionClass);
-  const actionBindingHash =
-    policy.purpose === 'operation' && params.actionBinding
-      ? hashStepUpActionBinding(params.actionBinding)
-      : null;
-
-  if (policy.purpose === 'operation' && actionBindingHash === null) {
-    // A sensitive action needs an operation-bound proof, and this call has no
-    // binding to match. Report enrollment so the client knows whether a proof
-    // is even possible.
-    const passkeyCount = await countPasskeys(params.userId, fromDb);
-    return {
-      state: passkeyCount === 0 ? { status: 'not_enrolled' } : { status: 'required' },
-      proof: null,
-      passkeyCount,
-    };
-  }
-
   const passkeyCount = await countPasskeys(params.userId, fromDb);
 
   const proofFilters = [
@@ -117,9 +77,6 @@ export async function evaluateStepUp(
       session_step_up_proofs.verified_at,
       new Date(now.getTime() - policy.maxAgeMs).toISOString()
     ),
-    ...(actionBindingHash === null
-      ? []
-      : [eq(session_step_up_proofs.action_binding_hash, actionBindingHash)]),
   ];
 
   const [liveProof] = await fromDb
@@ -152,10 +109,7 @@ export async function evaluateStepUp(
       and(
         eq(session_step_up_proofs.kilo_user_id, params.userId),
         eq(session_step_up_proofs.session_id_hash, sessionIdHash),
-        eq(session_step_up_proofs.purpose, policy.purpose),
-        ...(actionBindingHash === null
-          ? []
-          : [eq(session_step_up_proofs.action_binding_hash, actionBindingHash)])
+        eq(session_step_up_proofs.purpose, policy.purpose)
       )
     )
     .orderBy(desc(session_step_up_proofs.verified_at))

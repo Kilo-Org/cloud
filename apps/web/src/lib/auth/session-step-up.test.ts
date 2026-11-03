@@ -475,15 +475,10 @@ describe('session step-up ceremony', () => {
     const user = await createAdmin();
     const authenticator = createTestAuthenticator();
     await insertCredential(user.id, authenticator);
-    const actionBinding = {
-      inventoryId: 'trpc.admin.users',
-      target: { kind: 'user' as const, id: 'target-user' },
-    };
     const { challengeId, options } = await createStepUpOptions({
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
-      actionBinding,
     });
 
     const proof = await verifyStepUp(
@@ -494,7 +489,7 @@ describe('session step-up ceremony', () => {
           challenge: options.challenge,
           counter: 1,
         }),
-        { actionClass: 'sensitive_write', actionBinding }
+        { actionClass: 'sensitive_write' }
       )
     );
     expect(proof.purpose).toBe('session');

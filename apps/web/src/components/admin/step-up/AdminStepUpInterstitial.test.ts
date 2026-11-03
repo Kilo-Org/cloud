@@ -3,17 +3,12 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('./StepUpDialog', () => ({
-  StepUpDialog: (props: { open: boolean; dismissible?: boolean; requirement: unknown }) =>
-    React.createElement(
-      'div',
-      {
-        'data-testid': 'dialog',
-        'data-open': String(props.open),
-        'data-dismissible': String(props.dismissible),
-        'data-code': (props.requirement as { code: string }).code,
-      },
-      null
-    ),
+  StepUpCeremonyContent: (props: { dismissible?: boolean; requirement: unknown }) =>
+    React.createElement('div', {
+      'data-testid': 'ceremony',
+      'data-dismissible': String(props.dismissible),
+      'data-code': (props.requirement as { code: string }).code,
+    }),
 }));
 
 import type { AdminStepUpInterstitial as InterstitialComponent } from './AdminStepUpInterstitial';
@@ -33,7 +28,6 @@ describe('AdminStepUpInterstitial', () => {
     );
 
     expect(markup).toContain('Verify it is you');
-    expect(markup).toContain('data-open="true"');
     expect(markup).toContain('data-dismissible="false"');
     expect(markup).toContain('data-code="MFA_REQUIRED"');
   });

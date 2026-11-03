@@ -1,9 +1,8 @@
 'use client';
 
-import React from 'react';
-import { KeyRound, Loader2, ShieldCheck } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import {
   startAuthentication,
   type PublicKeyCredentialRequestOptionsJSON,
@@ -13,7 +12,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -75,17 +73,15 @@ function errorMessage(code?: string): string {
 }
 
 /**
- * Session-bound step-up dialog. The only interaction is the browser's own
- * passkey sheet; the challenge, session binding, and proof stay server-side.
+ * The verification UI itself. Rendered inside the global Dialog on admin
+ * pages and inline in the full-page interstitial.
  */
-export function StepUpDialog({
-  open,
+export function StepUpCeremonyContent({
   requirement,
   onVerified,
   onCancel,
   dismissible = true,
 }: {
-  open: boolean;
   requirement: StepUpRequirement | null;
   onVerified: () => void;
   onCancel: () => void;
@@ -98,15 +94,16 @@ export function StepUpDialog({
   const errorRef = useRef<HTMLParagraphElement | null>(null);
   const statusQuery = useQuery({
     ...trpc.stepUp.getStatus.queryOptions(),
-    enabled: open,
     staleTime: 0,
   });
   const current = requirement ?? { code: 'MFA_REQUIRED' as const };
+  const statusKnown = statusQuery.isSuccess;
+  const unavailable = statusQuery.data?.unavailable === true;
   const needsSignIn =
     current.code === 'SESSION_UNBOUND' ||
     current.code === 'BEARER_NOT_ALLOWED' ||
     current.code === 'REAUTH_REQUIRED' ||
-    statusQuery.data?.sessionBound === false;
+    (statusKnown && statusQuery.data?.sessionBound === false);
 
   async function runCeremony() {
     if (isRunning) return;
@@ -154,64 +151,99 @@ export function StepUpDialog({
   }, [error]);
 
   const enrolled = statusQuery.data?.enrolled ?? false;
-  const actionLabel =
-    current.code === 'NOT_ENROLLED' || !enrolled ? 'Add a passkey' : 'Verify with passkey';
+  const actionLabel = !statusKnown
+    ? 'Checking your passkeys...'
+    : unavailable
+      ? 'Verification unavailable'
+      : enrolled
+        ? 'Verify with passkey'
+        : 'Add a passkey';
+  const actionDisabled = isRunning || !statusKnown || unavailable;
 
+  return (
+    <div>
+      <DialogHeader>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-full bg-muted">
+            {needsSignIn ? (
+              <KeyRound className="size-4" aria-hidden="true" />
+            ) : (
+              <ShieldCheck className="size-4" aria-hidden="true" />
+            )}
+          </span>
+          <DialogTitle>{stepUpDialogTitle(current)}</DialogTitle>
+        </div>
+        <DialogDescription>{stepUpDialogDescription(current)}</DialogDescription>
+      </DialogHeader>
+
+      {!statusKnown ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="status">
+          Checking your passkeys...
+        </p>
+      ) : unavailable ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="status">
+          Verification is temporarily unavailable. Try again in a moment.
+        </p>
+      ) : null}
+
+      {error ? (
+        <p ref={errorRef} tabIndex={-1} className="mt-4 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        {needsSignIn || reauthRequired ? (
+          <StepUpSignInAgainButton size="default" />
+        ) : (
+          <Button onClick={() => void runCeremony()} disabled={actionDisabled}>
+            {isRunning ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Waiting for your passkey...
+              </>
+            ) : (
+              actionLabel
+            )}
+          </Button>
+        )}
+        {dismissible ? (
+          <Button variant="outline" onClick={onCancel} disabled={isRunning}>
+            Cancel
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function StepUpDialog({
+  open,
+  requirement,
+  onVerified,
+  onCancel,
+  dismissible = true,
+}: {
+  open: boolean;
+  requirement: StepUpRequirement | null;
+  onVerified: () => void;
+  onCancel: () => void;
+  dismissible?: boolean;
+}) {
   return (
     <Dialog
       open={open}
       onOpenChange={next => {
-        if (!next && !isRunning && dismissible) onCancel();
+        if (!next && dismissible) onCancel();
       }}
     >
       <DialogContent>
-        <DialogHeader>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-muted">
-              {needsSignIn ? (
-                <KeyRound className="size-4" aria-hidden="true" />
-              ) : (
-                <ShieldCheck className="size-4" aria-hidden="true" />
-              )}
-            </span>
-            <DialogTitle>{stepUpDialogTitle(current)}</DialogTitle>
-          </div>
-          <DialogDescription>{stepUpDialogDescription(current)}</DialogDescription>
-        </DialogHeader>
-
-        {statusQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            Checking your passkeys...
-          </p>
-        ) : null}
-
-        {error ? (
-          <p ref={errorRef} tabIndex={-1} className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <DialogFooter>
-          {needsSignIn || reauthRequired ? (
-            <StepUpSignInAgainButton size="default" />
-          ) : (
-            <Button onClick={() => void runCeremony()} disabled={isRunning}>
-              {isRunning ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Waiting for your passkey...
-                </>
-              ) : (
-                actionLabel
-              )}
-            </Button>
-          )}
-          {dismissible ? (
-            <Button variant="outline" onClick={onCancel} disabled={isRunning}>
-              Cancel
-            </Button>
-          ) : null}
-        </DialogFooter>
+        <StepUpCeremonyContent
+          requirement={requirement}
+          onVerified={onVerified}
+          onCancel={onCancel}
+          dismissible={dismissible}
+        />
       </DialogContent>
     </Dialog>
   );

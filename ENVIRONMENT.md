@@ -20,7 +20,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Admin MFA step-up
 
-- `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. `true` enforces step-up on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
+- `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. the literal string `true` enforces step-up (any other value, including `TRUE`, is off) on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
 
 ### Code review health monitor
 

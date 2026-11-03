@@ -10,6 +10,7 @@ import { SessionProvider } from 'next-auth/react';
 import type { PropsWithChildren } from 'react';
 import { useState } from 'react';
 import { SignInHintEmailSyncer } from '@/components/auth/SignInHintEmailSyncer';
+import { stepUpRequirementFromError } from '@/components/admin/step-up/step-up-error';
 
 export function Providers({ children }: PropsWithChildren) {
   const [queryClient] = useState(
@@ -18,7 +19,10 @@ export function Providers({ children }: PropsWithChildren) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000, // 1 minute
-            retry: 1,
+            // Step-up refusals are handled by the tRPC link/dialog. Retrying
+            // one here would re-open the dialog after the user cancelled.
+            retry: (failureCount, error) =>
+              stepUpRequirementFromError(error) === null && failureCount < 1,
           },
         },
       })

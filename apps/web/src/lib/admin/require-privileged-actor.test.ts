@@ -72,6 +72,12 @@ function contextFor(user: Awaited<ReturnType<typeof adminUser>>) {
   };
 }
 
+function causeOf(error: unknown): StepUpRequiredError | null {
+  return error instanceof TRPCError && error.cause instanceof StepUpRequiredError
+    ? error.cause
+    : null;
+}
+
 async function refusal(promise: Promise<unknown>): Promise<StepUpRequiredError | null> {
   const error = await promise.then(
     () => null,
@@ -314,6 +320,40 @@ describe('requirePrivilegedActor', () => {
       const caller = await createSessionCallerForUser(user.id, { webSessionId });
 
       await expect(caller.admin.getPermissions()).resolves.toBeDefined();
+    });
+
+    it('denies multiple concurrent admin operations with the same code', async () => {
+      const { user } = await setup();
+      const caller = await createSessionCallerForUser(user.id);
+
+      const results = await Promise.allSettled([
+        caller.admin.getPermissions(),
+        caller.admin.getPermissions(),
+      ]);
+
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') {
+          expect(causeOf(result.reason)?.code).toBe('MFA_REQUIRED');
+        }
+      }
+    });
+
+    it('denies multiple concurrent bearer admin operations', async () => {
+      const { user } = await setup();
+      const caller = await createCallerForUser(user.id);
+
+      const results = await Promise.allSettled([
+        caller.admin.getPermissions(),
+        caller.admin.getPermissions(),
+      ]);
+
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') {
+          expect(causeOf(result.reason)?.code).toBe('BEARER_NOT_ALLOWED');
+        }
+      }
     });
 
     it('denies a bearer admin procedure', async () => {

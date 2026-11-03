@@ -90,9 +90,9 @@ export async function assertPrivilegedPermission(
 
 /**
  * PR1's privileged actor, now with step-up assurance. Always re-reads the
- * permission on the primary. In observe mode step-up is measured and emitted
- * but never denies; when the caller is a procedure chained on adminProcedure,
- * the measurement from the admin middleware is reused.
+ * permission on the primary. When step-up is enabled it denies a missing or
+ * stale proof; when the caller is chained on adminProcedure, the decision from
+ * the admin middleware is reused instead of evaluating twice.
  */
 export async function requirePrivilegedActor(
   params: {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
   getSandboxAllocationProvider,
@@ -49,7 +50,7 @@ export type ControlPlaneSandboxDecision = {
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
 export async function selectControlPlaneSandbox(input: {
-  env: SandboxSelectionEnv & CodeReviewContainersEnv;
+  env: SandboxSelectionEnv & CodeReviewContainersEnv & Pick<Env, 'CREDENTIAL_CONTAINMENT_ENABLED'>;
   sessionId: string;
   userId: string;
   orgId?: string;
@@ -70,6 +71,15 @@ export async function selectControlPlaneSandbox(input: {
             userId: input.userId,
             isolated: sandboxKind === 'isolated',
           });
+  if (
+    provider === 'cloudflare' &&
+    (sandboxKind === 'code-review' || input.env.CREDENTIAL_CONTAINMENT_ENABLED === 'false')
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
+    });
+  }
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
 }
 

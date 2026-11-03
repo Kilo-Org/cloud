@@ -143,19 +143,21 @@ describe('selectControlPlaneSandbox', () => {
     expect(personal.sandboxId).toBe(sha256Key('control-shared-v2:user:user-1__user-1'));
   });
 
-  it('isolates code review per session on Cloudflare', async () => {
-    const decision = await selectControlPlaneSandbox({
-      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
-      sessionId: SESSION_ID,
-      userId: 'user-1',
-      orgId: 'org-1',
-      codeReview: true,
-    });
-
-    expect(decision).toEqual({
-      sandboxId: sha256Key(`control-isolated-v1:${SESSION_ID}`),
-      provider: 'cloudflare',
-      sandboxKind: 'code-review',
+  it.each([
+    { codeReview: true, env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' } },
+    { codeReview: false, env: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' } },
+  ])('rejects retired runtime selections: %j', async ({ codeReview, env }) => {
+    await expect(
+      selectControlPlaneSandbox({
+        env,
+        sessionId: SESSION_ID,
+        userId: 'user-1',
+        orgId: 'org-1',
+        codeReview,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
     });
   });
 

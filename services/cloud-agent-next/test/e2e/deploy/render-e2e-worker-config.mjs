@@ -54,7 +54,8 @@ const HISTORICALLY_OMITTED_CLASSES = new Set([
 ]);
 const E2E_RUNTIME_MIGRATION = {
   tag: 'v15-e2e',
-  new_sqlite_classes: [...E2E_CONTAINER_CLASSES],
+  // This applied migration must stay fixed when the current container set changes.
+  new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
 };
 
 const E2E_CALLBACK_CLASS = 'E2eCallbackSink';

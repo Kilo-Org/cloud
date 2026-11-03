@@ -3180,6 +3180,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
       zod:
         specifier: 'catalog:'
         version: 4.6.7

@@ -163,12 +163,12 @@ export function AutoMergeEnabledBanner({
 }: Readonly<{ method: string; onDisable: () => void; isDisabling: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg bg-accent-soft p-4">
+    <View className="gap-3 rounded-lg border border-accent-soft-tint-foreground bg-accent-soft-tint p-4">
       <View className="gap-1">
-        <Text className="text-sm font-medium text-accent-soft-foreground">
+        <Text className="text-sm font-medium text-foreground">
           {t('prReview.merge.autoMergeOn')}
         </Text>
-        <Text className="text-xs text-accent-soft-foreground">
+        <Text className="text-xs text-accent-soft-tint-foreground">
           {t('prReview.merge.autoMergeDescription', { method: prMergeMethodName(method) })}
         </Text>
       </View>

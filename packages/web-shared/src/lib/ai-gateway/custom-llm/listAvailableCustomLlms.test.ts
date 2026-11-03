@@ -32,7 +32,7 @@ describe('convertCustomLlmToCatalogModel pricing', () => {
     const model = convertCustomLlmToCatalogModel('acme/free-model', customLlmDefinition());
 
     expect(model.isFree).toBe(true);
-    expect(model.mayTrainOnYourPrompts).toBe(false);
+    expect(model.mayTrainOnYourPrompts).toBe(true);
     expect(model.pricing).toEqual(FREE_PRICING);
   });
 

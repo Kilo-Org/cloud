@@ -23,6 +23,7 @@ export function buildPublicCustomLlmSnapshotModels(
       return [];
     }
     const shortRequestPricing = definition.pricing?.[0].pricing;
+    const training = definition.pricing === undefined || definition.may_train_on_prompts === true;
     const model: OpenRouterModel = {
       slug: normalizeModelId(public_id),
       name: definition.display_name,
@@ -42,18 +43,18 @@ export function buildPublicCustomLlmSnapshotModels(
               completion: formatPricePerToken(shortRequestPricing.completion_per_million),
             }
           : { prompt: '0', completion: '0' },
-        data_policy: { training: definition.may_train_on_prompts ?? false, retainsPrompts: true },
+        data_policy: { training, retainsPrompts: true },
       },
     };
     return [...new Set(definition.public.inference_providers)].map(slug => {
       let provider = providers.get(slug);
       if (provider) {
-        provider.training ||= definition.may_train_on_prompts ?? false;
+        provider.training ||= training;
       } else {
         provider = {
           slug,
           name: slug.toUpperCase(),
-          training: definition.may_train_on_prompts ?? false,
+          training,
           retainsPrompts: true,
         };
         providers.set(slug, provider);

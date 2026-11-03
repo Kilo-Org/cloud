@@ -54,9 +54,9 @@ describe('isFreeModel', () => {
     expect(isFreeModelExcludingCustomLlms('acme/priced-custom-model')).toBe(false);
   });
 
-  test('defaults unpriced custom LLMs to not requiring data collection', async () => {
+  test('assumes unpriced custom LLMs require data collection', async () => {
     await expect(hasBestEffortGuessDataCollectionRequirement('acme/custom-model')).resolves.toBe(
-      false
+      true
     );
     await expect(hasBestEffortGuessDataCollectionRequirement('openai/gpt-4o')).resolves.toBe(false);
   });

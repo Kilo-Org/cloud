@@ -29,7 +29,7 @@ const privateCustomLlm: CustomLlm = {
 };
 
 describe('buildPublicCustomLlmSnapshotModels', () => {
-  test('lists a free public custom LLM once per provider and defaults training to false', () => {
+  test('lists a free public custom LLM once per provider and defaults training to true', () => {
     const models = buildPublicCustomLlmSnapshotModels(
       [publicCustomLlm, privateCustomLlm],
       new Set(),
@@ -37,8 +37,8 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
     );
 
     expect(models.map(entry => entry.provider)).toEqual([
-      { slug: 'acme', name: 'ACME', training: false, retainsPrompts: true },
-      { slug: 'together', name: 'TOGETHER', training: false, retainsPrompts: true },
+      { slug: 'acme', name: 'ACME', training: true, retainsPrompts: true },
+      { slug: 'together', name: 'TOGETHER', training: true, retainsPrompts: true },
     ]);
     expect(models[0].model).toEqual({
       slug: 'acme/model',
@@ -54,7 +54,7 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
         provider_display_name: 'Other',
         is_free: true,
         pricing: { prompt: '0', completion: '0' },
-        data_policy: { training: false, retainsPrompts: true },
+        data_policy: { training: true, retainsPrompts: true },
       },
     });
   });
@@ -101,21 +101,21 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
           provider_display_name: 'Other',
           is_free: false,
           pricing: { prompt: '0.000002000000', completion: '0.000008000000' },
-          data_policy: { training: mayTrainOnPrompts ?? false, retainsPrompts: true },
+          data_policy: { training: mayTrainOnPrompts === true, retainsPrompts: true },
         },
         {
           provider_display_name: 'Other',
           is_free: false,
           pricing: { prompt: '0.000002000000', completion: '0.000008000000' },
-          data_policy: { training: mayTrainOnPrompts ?? false, retainsPrompts: true },
+          data_policy: { training: mayTrainOnPrompts === true, retainsPrompts: true },
         },
       ]);
       expect(models.map(entry => entry.provider)).toEqual([
-        { slug: 'acme', name: 'ACME', training: mayTrainOnPrompts ?? false, retainsPrompts: true },
+        { slug: 'acme', name: 'ACME', training: mayTrainOnPrompts === true, retainsPrompts: true },
         {
           slug: 'together',
           name: 'TOGETHER',
-          training: mayTrainOnPrompts ?? false,
+          training: mayTrainOnPrompts === true,
           retainsPrompts: true,
         },
       ]);
@@ -172,7 +172,7 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
           retainsPrompts: true,
         });
         expect(entry.model.endpoint?.data_policy).toEqual({
-          training: entry.model.slug === 'acme/training',
+          training: entry.model.slug !== 'acme/no-training',
           retainsPrompts: true,
         });
       }

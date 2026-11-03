@@ -31,6 +31,11 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
 
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
   const customLlm = await findCustomLlm(model);
-  if (customLlm) return customLlm.definition.may_train_on_prompts ?? false;
+  if (customLlm) {
+    return (
+      customLlm.definition.pricing === undefined ||
+      customLlm.definition.may_train_on_prompts === true
+    );
+  }
   return isFreeModelExcludingCustomLlms(model);
 }

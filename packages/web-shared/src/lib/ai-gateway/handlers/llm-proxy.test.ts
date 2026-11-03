@@ -3592,7 +3592,7 @@ describe('custom LLM requests', () => {
     });
   }
 
-  it.each([false, true])('rejects ZDR for a custom LLM with public=%s', async isPublic => {
+  it.each([false, true])('rejects ZDR for a free custom LLM with public=%s', async isPublic => {
     mockCustomLlm(customLlm('acme/custom-model', isPublic));
     resolveCustomProvider(true, !isPublic);
 
@@ -3607,17 +3607,17 @@ describe('custom LLM requests', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, false, true])(
-    'rejects ZDR independently of may_train_on_prompts=%s',
-    async mayTrainOnPrompts => {
-      const model = pricedCustomLlm('acme/custom-model', true);
-      model.definition.may_train_on_prompts = mayTrainOnPrompts;
-      mockCustomLlm(model);
-      setBalance(1000);
-      resolveCustomProvider(false, false);
+  it.each([false, true])(
+    'rejects data collection deny for a free custom LLM with public=%s',
+    async isPublic => {
+      mockCustomLlm(customLlm('acme/custom-model', isPublic));
+      resolveCustomProvider(true, !isPublic);
 
       const response = await handleLlmProxyRequest(
-        makeRequest({ ...makeBody('acme/custom-model'), provider: { zdr: true } }) as never
+        makeRequest({
+          ...makeBody('acme/custom-model'),
+          provider: { data_collection: 'deny' },
+        }) as never
       );
 
       expect(response.status).toBe(400);

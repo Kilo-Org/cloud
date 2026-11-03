@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import {
   BenchmarkJobMessageSchema,
   buildClassifierMessages,
-  chunkArray,
   computeEngineIdentity,
   deciderCasesForRouter,
   getDeciderContainerInstanceName,
@@ -373,34 +373,6 @@ describe('computeEngineIdentity', () => {
         `${router}:v1:${(hash >>> 0).toString(16).padStart(8, '0')}`
       );
     }
-  });
-});
-
-describe('chunkArray', () => {
-  it('splits into 5-per-chunk with a partial final chunk', () => {
-    const items = Array.from({ length: 13 }, (_, i) => i);
-    const chunks = chunkArray(items, 5);
-    expect(chunks).toHaveLength(3);
-    expect(chunks[0]).toHaveLength(5);
-    expect(chunks[1]).toHaveLength(5);
-    expect(chunks[2]).toHaveLength(3);
-  });
-
-  it('round-trips caseIds: flatten equals the original order', () => {
-    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'];
-    const chunks = chunkArray(ids, 10);
-    expect(chunks).toHaveLength(2);
-    expect(chunks.flat()).toEqual(ids);
-  });
-
-  it('returns a single full chunk when items fit exactly', () => {
-    const chunks = chunkArray([1, 2, 3, 4, 5], 5);
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toEqual([1, 2, 3, 4, 5]);
-  });
-
-  it('returns no chunks for an empty array', () => {
-    expect(chunkArray([], 10)).toEqual([]);
   });
 });
 

@@ -279,7 +279,7 @@ export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null,
-  dataRegion: OrganizationDataRegion | null = null
+  dataRegion: OrganizationDataRegion | null
 ) {
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;

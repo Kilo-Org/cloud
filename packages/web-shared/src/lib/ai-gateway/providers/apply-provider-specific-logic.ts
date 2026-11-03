@@ -315,7 +315,7 @@ export async function applyProviderSpecificLogic(
   sessionId: string | null,
   taskId: string | null,
   isNonTrialEnterprise: boolean,
-  dataRegion: OrganizationDataRegion | null = null
+  dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the

@@ -475,10 +475,15 @@ describe('applyVercelSettings BYOK pinning', () => {
     const request = byokRequest([]);
     request.body.provider = { sort: sort as OpenRouterProviderConfig['sort'] };
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [
+        { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+        { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+      ],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway).toEqual({
       sort: expected,
@@ -509,9 +514,12 @@ describe('applyVercelSettings BYOK pinning', () => {
       },
     };
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', byok, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      byok,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
     const managedOptions = convertProviderOptions(managed, null).gateway;
     if (!managedOptions) {
       throw new Error('convertProviderOptions did not produce managed gateway options');
@@ -537,10 +545,15 @@ describe('applyVercelSettings BYOK pinning', () => {
     const request = byokRequest([]);
     request.body.provider = { zdr: true, data_collection: 'deny' };
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [
+        { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+        { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+      ],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway).toMatchObject({
       zeroDataRetention: true,
@@ -558,9 +571,12 @@ describe('applyVercelSettings BYOK pinning', () => {
     const request = byokRequest([]);
     request.body.provider = { data_collection: 'allow' };
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.zeroDataRetention).toBeUndefined();
     expect(request.body.providerOptions?.gateway?.disallowPromptTraining).toBeUndefined();
@@ -569,10 +585,15 @@ describe('applyVercelSettings BYOK pinning', () => {
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [
+        { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+        { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+      ],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
@@ -586,9 +607,12 @@ describe('applyVercelSettings BYOK pinning', () => {
   it('keeps BYOK credentials when the caller ignores every provider it holds keys for', async () => {
     const request = byokRequest(['anthropic']);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       anthropic: [{ apiKey: 'sk-anthropic' }],
@@ -600,9 +624,12 @@ describe('applyVercelSettings BYOK pinning', () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
     const request = byokRequest([]);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       anthropic: [{ apiKey: 'sk-anthropic' }],
@@ -631,9 +658,12 @@ describe('applyVercelSettings BYOK pinning', () => {
     },
   ])('forwards Bedrock API key credentials for $kind', async request => {
     const credentials = { apiKey: 'bedrock-api-key', region: 'eu-west-1' };
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
     expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
@@ -642,9 +672,12 @@ describe('applyVercelSettings BYOK pinning', () => {
   it('retains a Bedrock API key when the caller ignores its only BYOK provider', async () => {
     const request = byokRequest(['amazon-bedrock']);
     const credentials = { apiKey: 'bedrock-api-key', region: 'us-east-1' };
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
     expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
@@ -653,9 +686,12 @@ describe('applyVercelSettings BYOK pinning', () => {
   it('forwards structured Azure credentials', async () => {
     const request = byokRequest([]);
 
-    await applyVercelSettings('openai/gpt-5.4-nano', request, [
-      { decryptedAPIKey: azureCredentials, providerId: 'azure' },
-    ]);
+    await applyVercelSettings(
+      'openai/gpt-5.4-nano',
+      request,
+      [{ decryptedAPIKey: azureCredentials, providerId: 'azure' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       azure: [JSON.parse(azureCredentials)],
@@ -665,9 +701,12 @@ describe('applyVercelSettings BYOK pinning', () => {
 
   it('rejects malformed Azure credentials without including credential contents', async () => {
     await expect(
-      applyVercelSettings('openai/gpt-5.4-nano', byokRequest([]), [
-        { decryptedAPIKey: '{"apiKey":"secret"}', providerId: 'azure' },
-      ])
+      applyVercelSettings(
+        'openai/gpt-5.4-nano',
+        byokRequest([]),
+        [{ decryptedAPIKey: '{"apiKey":"secret"}', providerId: 'azure' }],
+        null
+      )
     ).rejects.toEqual(new Error('Failed to parse Azure credentials'));
   });
 
@@ -678,18 +717,24 @@ describe('applyVercelSettings BYOK pinning', () => {
     '{"apiKey":"bedrock-secret","region":"us-east-1","accessKeyId":"AKIAEXAMPLE","secretAccessKey":"secret"}',
   ])('rejects malformed Bedrock credentials without exposing secrets: %s', async credentials => {
     await expect(
-      applyVercelSettings('anthropic/claude-sonnet-4.5', byokRequest([]), [
-        { decryptedAPIKey: credentials, providerId: 'bedrock' },
-      ])
+      applyVercelSettings(
+        'anthropic/claude-sonnet-4.5',
+        byokRequest([]),
+        [{ decryptedAPIKey: credentials, providerId: 'bedrock' }],
+        null
+      )
     ).rejects.toEqual(new Error('Failed to parse AWS credentials'));
   });
 
   it('uses one Vertex credential key for Anthropic models served by Vertex', async () => {
     const request = byokRequest([]);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: vertexCredentials, providerId: 'vertex' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: vertexCredentials, providerId: 'vertex' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       vertex: [
@@ -710,9 +755,12 @@ describe('applyVercelSettings BYOK pinning', () => {
     const request = byokRequest([]);
 
     await expect(
-      applyVercelSettings('google/gemini-2.5-flash-lite', request, [
-        { decryptedAPIKey: '{"privateKey":"secret"}', providerId: 'vertex' },
-      ])
+      applyVercelSettings(
+        'google/gemini-2.5-flash-lite',
+        request,
+        [{ decryptedAPIKey: '{"privateKey":"secret"}', providerId: 'vertex' }],
+        null
+      )
     ).rejects.toThrow('Failed to parse Google Vertex credentials');
   });
 
@@ -735,9 +783,12 @@ describe('applyVercelSettings BYOK pinning', () => {
   it('forwards user OpenAI BYOK credentials', async () => {
     const request = byokRequest([]);
 
-    await applyVercelSettings('openai/gpt-5', request, [
-      { decryptedAPIKey: 'sk-user-openai', providerId: 'openai' },
-    ]);
+    await applyVercelSettings(
+      'openai/gpt-5',
+      request,
+      [{ decryptedAPIKey: 'sk-user-openai', providerId: 'openai' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       openai: [{ apiKey: 'sk-user-openai' }],
@@ -753,9 +804,12 @@ describe('applyVercelSettings BYOK pinning', () => {
       },
     };
 
-    await applyVercelSettings('cohere/command-a', request, [
-      { decryptedAPIKey: 'cohere-user-key', providerId: 'cohere' },
-    ]);
+    await applyVercelSettings(
+      'cohere/command-a',
+      request,
+      [{ decryptedAPIKey: 'cohere-user-key', providerId: 'cohere' }],
+      null
+    );
 
     expect(request.body.model).toBe('cohere/command-a');
     expect(request.body.providerOptions?.gateway).toMatchObject({
@@ -944,7 +998,7 @@ describe('applyVercelSettings session affinity', () => {
     const applySettings = await loadApplyVercelSettings();
     const request = requestWithConversationId(kind, conversationId);
 
-    await applySettings('anthropic/claude-sonnet-4.5', request, null);
+    await applySettings('anthropic/claude-sonnet-4.5', request, null, null);
 
     expect(request.body.providerOptions?.gateway).toMatchObject({
       sessionId: conversationId,
@@ -956,9 +1010,12 @@ describe('applyVercelSettings session affinity', () => {
   it.each(kinds)('sends the conversation ID for BYOK %s requests', async kind => {
     const request = requestWithConversationId(kind, conversationId);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applyVercelSettings(
+      'anthropic/claude-sonnet-4.5',
+      request,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
 
     expect(request.body.providerOptions?.gateway).toMatchObject({
       sessionId: conversationId,
@@ -971,10 +1028,13 @@ describe('applyVercelSettings session affinity', () => {
     const managed = requestWithConversationId(kind, undefined);
     const byok = requestWithConversationId(kind, '');
 
-    await applySettings('anthropic/claude-sonnet-4.5', managed, null);
-    await applySettings('anthropic/claude-sonnet-4.5', byok, [
-      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
-    ]);
+    await applySettings('anthropic/claude-sonnet-4.5', managed, null, null);
+    await applySettings(
+      'anthropic/claude-sonnet-4.5',
+      byok,
+      [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+      null
+    );
 
     for (const request of [managed, byok]) {
       expect(request.body.providerOptions?.gateway?.sessionAffinity).toBe(true);

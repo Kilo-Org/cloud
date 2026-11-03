@@ -256,7 +256,8 @@ describe('getProvider with public custom LLMs', () => {
       organizationId ?? null,
       null,
       null,
-      false
+      false,
+      null
     );
     return request.body;
   }

@@ -163,12 +163,16 @@ export function AutoMergeEnabledBanner({
 }: Readonly<{ method: string; onDisable: () => void; isDisabling: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg border border-accent-soft-tint-foreground bg-accent-soft-tint p-4">
+    // The notice is secondary: the accent tints the surface and the hairline,
+    // while the copy stays on the muted foreground. Taking the accent as ink
+    // here (as the soft accent button does) turned the sentence into a second
+    // saturated accent next to the filled merge action, worst in dark mode.
+    <View className="gap-3 rounded-lg border border-accent-soft-tint-foreground bg-accent-soft-tint p-4 dark:border-accent-soft-tint">
       <View className="gap-1">
         <Text className="text-sm font-medium text-foreground">
           {t('prReview.merge.autoMergeOn')}
         </Text>
-        <Text className="text-xs text-accent-soft-tint-foreground">
+        <Text className="text-xs text-muted-foreground">
           {t('prReview.merge.autoMergeDescription', { method: prMergeMethodName(method) })}
         </Text>
       </View>

@@ -135,6 +135,58 @@ describe('getAuthorizedOrgContext', () => {
       });
     });
 
+    test('observe derives the decision from the admin real membership', async () => {
+      setSupportAccessModeForTest('observe');
+      const adminUser = await insertTestUser({ is_admin: true });
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganizationId,
+        kilo_user_id: adminUser.id,
+        role: 'owner',
+        invited_by: 'test-admin',
+      });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+      const originalSelect = db.select.bind(db);
+      const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+        const builder = originalSelect(...args);
+        return new Proxy(builder, {
+          get(target, property, receiver) {
+            if (property === 'from') {
+              return (table: Parameters<typeof target.from>[0]) => {
+                if (table === support_access_grants) {
+                  throw new Error('grant lookup must not run for a real member');
+                }
+                return target.from(table);
+              };
+            }
+            const value = Reflect.get(target, property, receiver);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        });
+      });
+      try {
+        const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.user.role).toBe('owner');
+          expect(result.data.access).toMatchObject({
+            kind: 'legacy_admin',
+            wouldBe: 'member',
+          });
+        }
+      } finally {
+        selectSpy.mockRestore();
+        setAdminAccessSinkForTest(null);
+      }
+      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+        membershipRole: 'owner',
+        wouldPassWithoutAdmin: true,
+        supportDecision: 'member',
+      });
+    });
+
     test('observe continues as legacy owner when the grant lookup fails', async () => {
       setSupportAccessModeForTest('observe');
       const adminUser = await insertTestUser({

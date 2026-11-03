@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
+import { maxSupportDurationMinutes, parseSupportDurationMinutes } from './duration';
 
 type ActionClass = 'support_read' | 'support_write';
 
@@ -128,9 +129,12 @@ export function SupportAccessContent() {
     })
   );
 
-  const durationSeconds = durationMinutes.trim()
-    ? Math.round(Number(durationMinutes) * 60)
-    : undefined;
+  const parsedDuration = parseSupportDurationMinutes(durationMinutes, actionClass);
+  const durationSeconds =
+    parsedDuration.valid && parsedDuration.minutes !== undefined
+      ? parsedDuration.minutes * 60
+      : undefined;
+  const maxDurationMinutes = maxSupportDurationMinutes(actionClass);
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -169,10 +173,22 @@ export function SupportAccessContent() {
             <Input
               id="support-duration"
               inputMode="numeric"
+              aria-invalid={!parsedDuration.valid}
+              aria-describedby="support-duration-help"
               value={durationMinutes}
               onChange={event => setDurationMinutes(event.target.value)}
               placeholder={actionClass === 'support_read' ? '60' : '15'}
             />
+            <p
+              id="support-duration-help"
+              className={
+                parsedDuration.valid ? 'text-muted-foreground text-xs' : 'text-destructive text-xs'
+              }
+            >
+              {parsedDuration.valid
+                ? `Optional; at most ${maxDurationMinutes} minutes. Longer values are clamped.`
+                : parsedDuration.error}
+            </p>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="support-ticket">Ticket reference (optional)</Label>
@@ -195,7 +211,12 @@ export function SupportAccessContent() {
           </div>
           <div className="md:col-span-2">
             <Button
-              disabled={request.isPending || !organizationId || reason.trim().length < 10}
+              disabled={
+                request.isPending ||
+                !organizationId ||
+                reason.trim().length < 10 ||
+                !parsedDuration.valid
+              }
               onClick={() =>
                 request.mutate({
                   organizationId,

@@ -26,6 +26,7 @@ import {
   supportStandInRole,
   type OrganizationAccess,
   type SupportActionClass,
+  type SupportDecision,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { TRPCError } from '@trpc/server';
@@ -109,8 +110,13 @@ export async function getAuthorizedOrgContext(
       () => loadEffectiveMembershipRows(user.id, organizationId),
       roles
     );
+    const membershipDecision: SupportDecision | null = observation.wouldPassWithoutAdmin
+      ? 'member'
+      : observation.membershipRole !== null
+        ? 'deny_actor_permission'
+        : null;
     const evaluation =
-      mode === 'observe'
+      mode === 'observe' && membershipDecision === null
         ? await evaluateSupportAccessForObserve({
             actorKiloUserId: user.id,
             organizationId,
@@ -123,6 +129,7 @@ export async function getAuthorizedOrgContext(
             supportActionId: options.supportKey ?? null,
           })
         : null;
+    const supportDecision = membershipDecision ?? evaluation?.decision ?? null;
     await recordKiloAdminElevation(
       {
         user,
@@ -136,7 +143,7 @@ export async function getAuthorizedOrgContext(
         reason: 'organization_access_rest',
         target: organizationTarget(organizationId),
         ...observation,
-        supportDecision: evaluation?.decision ?? null,
+        supportDecision,
         supportGrantId: evaluation?.grantId ?? null,
         supportActionId: options.supportKey ?? null,
         inventoryId: null,
@@ -156,7 +163,7 @@ export async function getAuthorizedOrgContext(
         access: {
           kind: 'legacy_admin',
           role: 'owner',
-          wouldBe: evaluation?.decision ?? null,
+          wouldBe: supportDecision,
         },
       },
     });

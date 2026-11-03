@@ -687,6 +687,40 @@ describe('mode-aware support organization access', () => {
     await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
   });
 
+  test('a superadmin can use an emergency write grant without the requester permission', async () => {
+    setSupportAccessModeForTest('enforce');
+    const { organization } = await orgAndAdmin();
+    const superadmin = await insertTestUser({
+      is_admin: true,
+      is_super_admin: true,
+      can_request_support_org_access: false,
+    });
+    const now = new Date();
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: superadmin.id,
+      organization_id: organization.id,
+      action_class: 'support_write',
+      grant_kind: 'emergency',
+      status: 'active',
+      reason: 'production incident mitigation',
+      requested_duration_seconds: 600,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+      review_required: true,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: superadmin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).resolves.toBe('admin');
+  });
+
   test('enforce denies a support read grant on a write procedure', async () => {
     setSupportAccessModeForTest('enforce');
     const { organization, admin } = await orgAndAdmin();

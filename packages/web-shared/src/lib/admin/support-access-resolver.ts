@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   kilocode_users,
   organizations,
@@ -60,7 +60,13 @@ async function findUsableGrant(params: {
           ? eq(support_access_grants.action_class, 'support_write')
           : inArray(support_access_grants.action_class, ['support_read', 'support_write']),
         eq(kilocode_users.is_admin, true),
-        eq(kilocode_users.can_request_support_org_access, true),
+        or(
+          eq(kilocode_users.can_request_support_org_access, true),
+          and(
+            eq(kilocode_users.is_super_admin, true),
+            eq(support_access_grants.grant_kind, 'emergency')
+          )
+        ),
         isNull(kilocode_users.blocked_reason),
         isNull(organizations.deleted_at)
       )

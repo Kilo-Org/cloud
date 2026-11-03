@@ -35,6 +35,15 @@ describe('cloudAgentFileLabel', () => {
     expect(cloudAgentFileLabel('/workspace/app/src/a.ts')).toBe('src/a.ts');
   });
 
+  it('strips the public session namespace without losing the file suffix', () => {
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc/src/nested/a.ts')).toBe(
+      'src/nested/a.ts'
+    );
+    expect(cloudAgentFileLabel(String.raw`\cloud-agent\sessions\ses_abc\src\a.ts`)).toBe(
+      'src/a.ts'
+    );
+  });
+
   it('strips a relative session or worktree prefix', () => {
     expect(cloudAgentFileLabel('sessions/ses_abc/src/a.ts')).toBe('src/a.ts');
     expect(cloudAgentFileLabel('worktrees/worktree_9b1deb4d/src/a.ts')).toBe('src/a.ts');
@@ -72,6 +81,8 @@ describe('cloudAgentFileLabel', () => {
     expect(cloudAgentFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d')).toBe('.');
     expect(cloudAgentFileLabel('/workspace/app')).toBe('.');
     expect(cloudAgentFileLabel('sessions/ses_abc')).toBe('.');
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc')).toBe('.');
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc/')).toBe('.');
   });
 
   it('leaves a path outside a cloud workspace untouched', () => {

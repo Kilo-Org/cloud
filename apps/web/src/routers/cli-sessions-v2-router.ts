@@ -56,6 +56,7 @@ import {
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -124,6 +125,9 @@ function isSessionNotFoundError(err: unknown): boolean {
 }
 
 const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
   'path',
   'file',
   'activeFile',
@@ -131,6 +135,9 @@ const privateTranscriptPathFields = new Set([
   'absolutePath',
   'filePath',
   'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
@@ -152,13 +159,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
 
   for (const [key, current] of Object.entries(value)) {
     if (typeof current === 'string') {
-      if (
-        key === 'directory' ||
-        key === 'cwd' ||
-        key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
-      ) {
-        Reflect.set(value, key, directory);
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
         Reflect.set(value, key, '');
       }
@@ -169,7 +171,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
         if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
-          current[index] = directory;
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
         }

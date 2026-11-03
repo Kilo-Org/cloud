@@ -337,8 +337,8 @@ export type GetProviderInput = {
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
   /** The provider routing settings, from the organization or group policy and otherwise the
-   * request's own `provider`. Resolved only when selecting a managed gateway. Direct BYOK and
-   * custom LLM routes do not use it. */
+   * request's own `provider`. Decides whether the Vercel AI Gateway key serves and which gateway
+   * Kilo's route uses. Direct BYOK and custom LLM routes do not use it. */
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>;
   /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
    * They apply to routes Kilo pays for, never to a user's own gateway key. */

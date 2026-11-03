@@ -229,12 +229,12 @@ async function planKeySteps(inputs: RoutePlanInputs): Promise<KeyPlanStep[]> {
 
   const keys = await inputs.loadKeys();
   const rank = createByokRouteRank(keys);
-  const steps: KeyPlanStep[] = catalogModels.flatMap(catalogModel => {
+  const steps = catalogModels.flatMap<KeyPlanStep>(catalogModel => {
     const key = keys.find(candidate => candidate.providerId === catalogModel.provider.id);
     if (!key) return [];
     return [
       {
-        route: 'direct-byok' as const,
+        route: 'direct-byok',
         ...catalogModel,
         key,
         routeOrder: rank(key.providerId),

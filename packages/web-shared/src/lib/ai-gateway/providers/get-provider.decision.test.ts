@@ -782,6 +782,35 @@ describe('getProvider route order with a ChatGPT connection', () => {
     }
   );
 
+  test('keeps the ChatGPT connection below a serving catalog key when a gateway key ranked first cannot serve', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'openrouter', priority: 0 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 1 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(chatGptProvider);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+    expect(decision.byok_candidates).toEqual([
+      candidate('gateway-byok', 'openrouter', 0, 'skipped', {
+        priority: 0,
+        reason: 'model-unavailable',
+      }),
+      candidate('direct-byok', 'zai-coding', 1, 'selected', { priority: 1 }),
+    ]);
+  });
+
   test('checks the ChatGPT connection once, even when the keys ranked below it are deleted', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [

@@ -30,7 +30,7 @@ export function SupportAccessContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
-  const currentUserId = session?.user?.id;
+  const currentUserId = session?.kiloUserId;
   const [revokeReasons, setRevokeReasons] = useState<Record<string, string>>({});
   const [organizationId, setOrganizationId] = useState('');
   const [actionClass, setActionClass] = useState<ActionClass>('support_read');

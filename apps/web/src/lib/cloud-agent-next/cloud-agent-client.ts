@@ -383,6 +383,7 @@ export type GetSessionOutput = {
   worktreeId?: string | null;
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
+  parentCloudAgentSessionId?: string;
 
   githubRepo?: string;
   gitUrl?: string;

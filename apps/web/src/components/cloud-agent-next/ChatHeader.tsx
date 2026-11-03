@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { CornerUpLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
+import Link from 'next/link';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 import type { SessionUsage } from './session-token-usage';
@@ -23,6 +24,7 @@ import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 type ChatHeaderProps = {
   /** The signed-in user: worktree caches are partitioned by user. */
   currentUserId: string;
+  parentSessionHref?: string;
   cloudAgentSessionId: string;
   changesCloudAgentSessionId?: string;
   worktreeId?: string;
@@ -54,6 +56,7 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   currentUserId,
+  parentSessionHref,
   cloudAgentSessionId,
   changesCloudAgentSessionId = cloudAgentSessionId,
   worktreeId,
@@ -166,6 +169,17 @@ export function ChatHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {parentSessionHref && (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href={parentSessionHref}>
+                    <CornerUpLeft aria-hidden="true" />
+                    Open parent session
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
               Share or Fork
             </DropdownMenuItem>

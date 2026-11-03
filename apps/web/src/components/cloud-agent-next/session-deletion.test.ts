@@ -62,6 +62,11 @@ function createFixture() {
     worktreeIds: ['worktree_12345678-1234-4234-9234-123456789abc'],
     organizationId: null,
   });
+  const parentKey = trpc.cliSessionsV2.worktreeParent.queryKey({
+    worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc',
+    organizationId: null,
+  });
+  const worktreeParentKey = [[...parentKey[0], 'owner'], parentKey[1]];
   const sessions = ['ses_a', 'ses_b', 'ses_c'].map(makeSession);
   const persisted = new Set(sessions.map(session => session.session_id));
   const seedSessions = (rows: ApiSession[]) => {
@@ -102,6 +107,11 @@ function createFixture() {
     },
   });
   queryClient.setQueryData(['unrelated'], { cliSessions: sessions });
+  queryClient.setQueryData(worktreeParentKey, {
+    session_id: 'ses_parent',
+    title: 'Parent workspace',
+    organization_id: null,
+  });
 
   const context = {
     queryClient,
@@ -121,6 +131,7 @@ function createFixture() {
     activeKey,
     recentKey,
     worktreeDetailsKey,
+    worktreeParentKey,
     seedSessions,
   };
 }
@@ -280,6 +291,7 @@ describe('session deletion', () => {
       activeKey,
       recentKey,
       worktreeDetailsKey,
+      worktreeParentKey,
     } = fixture;
     await removeDeletedSession({ ...context, sessionId: 'ses_b' });
     seedSessions([
@@ -287,7 +299,14 @@ describe('session deletion', () => {
       sessions[2],
       makeSession('ses_new'),
     ]);
-    const keys: QueryKey[] = [...listKeys, ...searchKeys, activeKey, recentKey, worktreeDetailsKey];
+    const keys: QueryKey[] = [
+      ...listKeys,
+      ...searchKeys,
+      activeKey,
+      recentKey,
+      worktreeDetailsKey,
+      worktreeParentKey,
+    ];
     const currentData = keys.map(key => context.queryClient.getQueryData(key));
 
     await invalidateSessionQueries(context);

@@ -38,6 +38,7 @@ export function invalidateSessionQueries({ queryClient, trpc }: SessionQueryCont
     queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
+    queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
     queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter()),
   ]);
 }

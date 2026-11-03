@@ -163,9 +163,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',
     TOOL_CGROUP_CPU_WEIGHT: '50',
-    CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
-    CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
-    CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',

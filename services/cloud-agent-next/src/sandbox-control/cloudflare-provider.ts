@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { ExecResult } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
-  configureSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
   getSandboxBillingRuntimeStatus,
   isSandboxBillingBlocked,
@@ -22,7 +21,6 @@ import { ProviderCreationError } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { shellQuote } from '../kilo/utils.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
-import { withDORetry } from '../utils/do-retry.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
 
@@ -102,7 +100,7 @@ export function createCloudflareProviderAdapter(deps: {
     ref,
     billing
   ) => {
-    if (!billing) return;
+    if (!billing) throw new ProviderCreationError('invalid_configuration');
     const parsed = decodeOwnedProviderRef(ref);
     if (!parsed) throw new ProviderCreationError('invalid_configuration');
     let input: ReturnType<typeof parseSandboxBillingInput>;
@@ -111,19 +109,12 @@ export function createCloudflareProviderAdapter(deps: {
     } catch {
       throw new ProviderCreationError('invalid_configuration');
     }
-    const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
-    const blocked = await isSandboxBillingBlocked(sandbox, input.enforcementRequested);
-    if (input.enforcementRequested || blocked) {
-      const admission = await ensureSandboxBillingAdmissionInput(sandbox, input);
-      if (!admission.success) {
-        throw new ProviderCreationError(admission.code);
-      }
-    } else {
-      await withDORetry(
-        () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
-        sandbox => configureSandboxBillingInput(sandbox, input),
-        'configureSandboxBilling'
-      );
+    const admission = await ensureSandboxBillingAdmissionInput(
+      () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
+      input
+    );
+    if (!admission.success) {
+      throw new ProviderCreationError(admission.code);
     }
   };
 
@@ -132,7 +123,7 @@ export function createCloudflareProviderAdapter(deps: {
     async isBillingBlocked(ref) {
       const parsed = ref === null ? null : decodeCloudflareProviderRef(ref);
       if (parsed?.sandboxId !== deps.sandboxId) return false;
-      return isSandboxBillingBlocked(deps.getSandbox(parsed.sandboxId, parsed));
+      return isSandboxBillingBlocked(() => deps.getSandbox(parsed.sandboxId, parsed));
     },
     async getBillingProjection() {
       return getSandboxBillingRuntimeStatus(

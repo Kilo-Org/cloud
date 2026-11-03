@@ -91,7 +91,15 @@ What this means for the design:
 2. **Form:**
    - Repositories: the existing `EnvironmentRepositoriesField`, prefilled.
    - Requirements: a required free-form textarea, at most 8,000 characters.
-   - Model: the existing picker. Normal balance rules apply.
+   - Model and variant: the existing picker, preselected with the same default
+     as the new-session form. Normal balance rules apply. This is the only
+     agent choice:
+     - The mode is fixed to `code`.
+     - The agent's behavior comes from the built-in `environment-setup` skill
+       and prompt.
+     - No profile or custom agent is selectable, so the session's tools and
+       instructions stay predictable.
+     - The test sessions use the same model (§6).
    - Optional name.
    - Optional **Secrets**: the same `KEY=value` editor as the environment
      editor's Variables page, for credentials the user already knows are needed.
@@ -454,6 +462,8 @@ There are two levels. The UI never overstates what was proven.
      - When supported, the child also runs with `egressAudit: true`.
    - The child's prompt asks it to run the agent's smoke checks and reply in a
      fixed structured format.
+   - The child uses the run's model and variant. The server sets them, and
+     `verify_environment_draft` takes no model argument.
    - **Facts the platform verifies** (read from the child session's state, not
      from the agent): whether preparation succeeded; the admitted
      `EnvironmentReference.configurationRevision`; the setup duration; the safe

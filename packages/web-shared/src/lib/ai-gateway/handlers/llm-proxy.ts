@@ -63,6 +63,7 @@ import {
   extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
+  extractInferenceRegion,
   invalidRequestResponse,
   malformedJsonResponse,
   invalidTokenResponse,
@@ -1119,10 +1120,7 @@ export async function handleLlmProxyRequest(
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
-    inference_region:
-      effectiveProviderContext.provider.type === 'vercel'
-        ? organizationGatewaySettings.dataRegion
-        : null,
+    inference_region: null,
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,
@@ -1289,6 +1287,7 @@ export async function handleLlmProxyRequest(
     requestStartedAt
   );
   usageContext.status_code = response.status;
+  usageContext.inference_region = extractInferenceRegion(requestBodyParsed.body);
   const userByokProviderIds =
     effectiveProviderContext.userByok === null
       ? null

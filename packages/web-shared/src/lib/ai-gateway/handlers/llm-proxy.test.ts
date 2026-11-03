@@ -1592,6 +1592,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(
         mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
       ).toEqual({ scope: 'zone', geoRegion: 'jp' });
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBe('jp');
     });
 
     it('keeps OpenRouter requests on the global base URL when a data region is set', async () => {
@@ -1604,6 +1605,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider.apiUrl).toBe(
         'https://openrouter.ai/api/v1'
       );
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].inference_region).toBeNull();
     });
   });
 

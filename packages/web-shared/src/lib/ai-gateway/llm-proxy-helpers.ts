@@ -955,6 +955,15 @@ function reasoningBudgetBucket(value: unknown): string | null {
   return 'gt64k';
 }
 
+/**
+ * The Vercel inference region set on the upstream request. Clients cannot send `providerOptions`,
+ * so the value always comes from `applyVercelSettings` and stays within the known regions.
+ */
+export function extractInferenceRegion(body: GatewayRequest['body']): string | null {
+  const inferenceRegion = body.providerOptions?.gateway?.inferenceRegion;
+  return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
+}
+
 function isReasoningObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

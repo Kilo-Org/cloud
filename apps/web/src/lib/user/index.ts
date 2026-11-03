@@ -137,8 +137,6 @@ import {
   agent_briefing_context_preferences,
   agent_briefing_preferences,
   cli_sessions_v2,
-  support_access_grants,
-  support_access_grant_events,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -149,6 +147,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -1195,35 +1194,10 @@ export async function anonymizeCloudUserData(
     })
     .where(eq(kilocode_users.id, userId));
 
-  const revokedGrants = await tx
-    .update(support_access_grants)
-    .set({
-      status: 'revoked',
-      revoked_at: sql`now()`,
-      revoke_reason: 'actor account soft-deleted',
-    })
-    .where(
-      and(
-        eq(support_access_grants.actor_kilo_user_id, userId),
-        inArray(support_access_grants.status, ['pending', 'active'])
-      )
-    )
-    .returning({
-      id: support_access_grants.id,
-      organizationId: support_access_grants.organization_id,
-      actionClass: support_access_grants.action_class,
-    });
-  if (revokedGrants.length > 0) {
-    await tx.insert(support_access_grant_events).values(
-      revokedGrants.map(grant => ({
-        grant_id: grant.id,
-        event_type: 'revoked' as const,
-        organization_id: grant.organizationId,
-        action_class: grant.actionClass,
-        metadata: { cause: 'actor_soft_deleted' },
-      }))
-    );
-  }
+  await revokeOpenSupportGrants(tx, {
+    actorKiloUserId: userId,
+    reason: 'actor account soft-deleted',
+  });
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));

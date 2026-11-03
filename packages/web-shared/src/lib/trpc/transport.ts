@@ -92,7 +92,7 @@ export function trpcSuccessResponseJsonSchema(dataSchema: JsonSchema): JsonSchem
 
 export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] &
   z.infer<typeof TrpcErrorDataSchema> & {
-    /** Client-visible reason for an enforce-mode support access denial. */
+    /** Client-visible reason for a support access denial. */
     supportAccessReason?: string;
   };
 

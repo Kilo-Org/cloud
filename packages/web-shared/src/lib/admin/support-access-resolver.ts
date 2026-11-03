@@ -9,6 +9,9 @@ import {
   type SupportAccessActionClass,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+
+const warnWriteEvidenceFailure = sentryLogger('support_access_write_evidence', 'warning');
 import { findPrivilegedInventoryEntry } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   findSupportAllowEntry,
@@ -193,6 +196,6 @@ export async function recordSupportWriteUse(params: {
       metadata: { supportActionId: params.supportActionId },
     });
   } catch {
-    // Evidence is not a gate.
+    warnWriteEvidenceFailure('Support write evidence could not be recorded; continuing');
   }
 }

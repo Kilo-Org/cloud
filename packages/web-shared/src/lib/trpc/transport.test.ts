@@ -38,7 +38,7 @@ function shapeFor(error: TRPCError) {
 }
 
 describe('trpcErrorFormatter support access reason', () => {
-  test('surfaces the enforce-mode denial reason to the client', () => {
+  test('surfaces the support access denial reason to the client', () => {
     expect(format({ supportAccessReason: 'support_grant_expired' }).data).toMatchObject({
       supportAccessReason: 'support_grant_expired',
     });

@@ -29,9 +29,11 @@ export const supportStepUpPort: SupportStepUpPort = {
       });
     }
 
-    const state = await runStepUpGuard({
+    // A missing credential is treated as non-session, so bearer or unknown
+    // callers are refused rather than silently assumed to have a passkey.
+    await runStepUpGuard({
       userId: params.userId,
-      credential: params.credential ?? 'session',
+      credential: params.credential ?? 'human_bearer',
       webSessionId: params.webSessionId ?? null,
       actionClass: 'platform_write',
       enabled: true,
@@ -39,12 +41,5 @@ export const supportStepUpPort: SupportStepUpPort = {
       method: params.method ?? null,
       surface: params.surface ?? 'trpc',
     });
-
-    return {
-      evidence:
-        state.status === 'fresh'
-          ? { status: 'fresh', verifiedAt: state.verifiedAt }
-          : { status: 'absent' },
-    };
   },
 };

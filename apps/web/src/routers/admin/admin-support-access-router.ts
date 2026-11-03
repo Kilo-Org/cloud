@@ -32,6 +32,16 @@ const ReasonSchema = z.string().trim().min(10).max(2000);
 const TicketReferenceSchema = z.string().trim().max(200).optional();
 const ActionClassSchema = z.enum(['support_read', 'support_write']);
 
+function assertSupportAccessEnabled(): void {
+  if (!isSupportAccessEnabled()) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Support access is disabled',
+      cause: { supportAccessReason: 'support_access_disabled' },
+    });
+  }
+}
+
 async function dbUserIsSuperadmin(userId: string): Promise<boolean> {
   const user = await db.query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, userId),
@@ -56,7 +66,8 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (input.actionClass === 'support_write' && isSupportAccessEnabled()) {
+      assertSupportAccessEnabled();
+      if (input.actionClass === 'support_write') {
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
           action: 'support_write_request',
@@ -100,6 +111,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      assertSupportAccessEnabled();
       if (isSupportAccessEnabled()) {
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
@@ -126,6 +138,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
     }),
 
   deny: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
+    assertSupportAccessEnabled();
     const grant = await denySupportGrant({
       approverKiloUserId: ctx.user.id,
       grantId: input.grantId,
@@ -140,6 +153,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
   }),
 
   cancel: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
+    assertSupportAccessEnabled();
     const grant = await cancelSupportGrant({
       actorKiloUserId: ctx.user.id,
       grantId: input.grantId,
@@ -185,20 +199,19 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      assertSupportAccessEnabled();
       if (!(await dbUserIsSuperadmin(ctx.user.id))) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
       }
-      if (isSupportAccessEnabled()) {
-        await supportStepUpPort.requireFresh({
-          userId: ctx.user.id,
-          action: 'support_emergency_issue',
-          credential: ctx.credential,
-          webSessionId: ctx.webSessionId ?? null,
-          route: ctx.trpcPath ?? null,
-          method: ctx.trpcType ?? null,
-          surface: 'trpc',
-        });
-      }
+      await supportStepUpPort.requireFresh({
+        userId: ctx.user.id,
+        action: 'support_emergency_issue',
+        credential: ctx.credential,
+        webSessionId: ctx.webSessionId ?? null,
+        route: ctx.trpcPath ?? null,
+        method: ctx.trpcType ?? null,
+        surface: 'trpc',
+      });
       const grant = await emergencyIssueSupportGrant({
         superadminKiloUserId: ctx.user.id,
         organizationId: input.organizationId,
@@ -216,6 +229,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
     }),
 
   review: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
+    assertSupportAccessEnabled();
     if (!(await dbUserIsSuperadmin(ctx.user.id))) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
     }

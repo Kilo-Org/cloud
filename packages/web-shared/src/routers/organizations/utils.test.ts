@@ -530,6 +530,41 @@ describe('binary support organization access', () => {
     expect(event).toMatchObject({ supportDecision: null });
   });
 
+  test('OFF records the elevation before rethrowing an organization lookup failure', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    const originalSelect = db.select.bind(db);
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === organizations) {
+                const failing = {
+                  where: () => failing,
+                  limit: () => Promise.reject(new Error('organization lookup failed')),
+                };
+                return failing as never;
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toThrow(
+        'organization lookup failed'
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ reason: 'organization_access' });
+  });
+
   test('ON denies an admin without a grant with a specific code', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();

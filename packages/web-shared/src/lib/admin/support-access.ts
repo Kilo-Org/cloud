@@ -303,11 +303,9 @@ export function isSupportAccessEnabled(): boolean {
   return process.env.SUPPORT_ACCESS_ENABLED === 'true';
 }
 
-export type AdminStepUpEvidence = { status: 'absent' } | { status: 'fresh'; verifiedAt: string };
-
 /**
- * Narrow step-up port so PR3 stays independent of the session-bound MFA work in
- * PR2. PR5 supplies an adapter over `requirePrivilegedActor`.
+ * Narrow step-up port. The implementation lives in `support-step-up.ts` and
+ * delegates to PR2's session-bound guard.
  */
 export type SupportStepUpCredential =
   | 'session'
@@ -328,5 +326,5 @@ export type SupportStepUpPort = {
     route?: string | null;
     method?: string | null;
     surface?: SupportSurface;
-  }): Promise<{ evidence: AdminStepUpEvidence }>;
+  }): Promise<void>;
 };

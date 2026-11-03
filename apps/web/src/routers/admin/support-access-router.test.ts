@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { and, eq } from 'drizzle-orm';
@@ -9,6 +9,7 @@ import {
   support_access_grants,
 } from '@kilocode/db/schema';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -70,7 +71,7 @@ describe('admin.supportAccess request', () => {
   test('every platform admin can request without an extra permission', async () => {
     const admin = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await stepUpCaller(admin.id);
 
     const grant = await caller.admin.supportAccess.request({
       organizationId: organization.id,
@@ -82,7 +83,7 @@ describe('admin.supportAccess request', () => {
 
   test('rejects a missing or deleted organization', async () => {
     const requester = await insertRequester();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     await expect(
       caller.admin.supportAccess.request({
@@ -96,7 +97,7 @@ describe('admin.supportAccess request', () => {
   test('a read request is active immediately and records requested and issued events', async () => {
     const requester = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     const grant = await caller.admin.supportAccess.request({
       organizationId: organization.id,
@@ -119,7 +120,7 @@ describe('admin.supportAccess request', () => {
     const requester = await insertRequester();
     const approver = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     const grant = await caller.admin.supportAccess.request({
       organizationId: organization.id,
@@ -134,7 +135,7 @@ describe('admin.supportAccess request', () => {
       code: 'BAD_REQUEST',
     });
 
-    const approverCaller = await createCallerForUser(approver.id);
+    const approverCaller = await stepUpCaller(approver.id);
     const approved = await approverCaller.admin.supportAccess.approve({ grantId: grant.id });
     expect(approved.status).toBe('active');
     expect(approved.approvedByKiloUserId).toBe(approver.id);
@@ -156,7 +157,7 @@ describe('admin.supportAccess request', () => {
     const second = await insertRequester();
     const { organization } = await orgWithOwner();
     const pending = await (
-      await createCallerForUser(requester.id)
+      await stepUpCaller(requester.id)
     ).admin.supportAccess.request({
       organizationId: organization.id,
       actionClass: 'support_write',
@@ -164,10 +165,10 @@ describe('admin.supportAccess request', () => {
     });
 
     const results = await Promise.allSettled([
-      (await createCallerForUser(first.id)).admin.supportAccess.approve({
+      (await stepUpCaller(first.id)).admin.supportAccess.approve({
         grantId: pending.id,
       }),
-      (await createCallerForUser(second.id)).admin.supportAccess.approve({
+      (await stepUpCaller(second.id)).admin.supportAccess.approve({
         grantId: pending.id,
       }),
     ]);
@@ -183,7 +184,7 @@ describe('admin.supportAccess request', () => {
   test('concurrent requests produce exactly one open grant', async () => {
     const requester = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     const results = await Promise.allSettled([
       caller.admin.supportAccess.request({
@@ -229,7 +230,7 @@ describe('admin.supportAccess request', () => {
         request_expires_at: past,
       })
       .returning();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     const grant = await caller.admin.supportAccess.request({
       organizationId: organization.id,
@@ -249,7 +250,7 @@ describe('admin.supportAccess emergency issue and review', () => {
   test('superadmin issues a 15-minute emergency write grant that needs review', async () => {
     const superadmin = await insertSuperadmin();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await stepUpCaller(superadmin.id);
 
     const grant = await caller.admin.supportAccess.emergencyIssue({
       organizationId: organization.id,
@@ -267,7 +268,7 @@ describe('admin.supportAccess emergency issue and review', () => {
     });
 
     const reviewer = await insertSuperadmin();
-    const reviewerCaller = await createCallerForUser(reviewer.id);
+    const reviewerCaller = await stepUpCaller(reviewer.id);
     const reviewed = await reviewerCaller.admin.supportAccess.review({ grantId: grant.id });
     expect(reviewed.reviewedAt).not.toBeNull();
   });
@@ -275,7 +276,7 @@ describe('admin.supportAccess emergency issue and review', () => {
   test('a non-superadmin cannot issue an emergency grant', async () => {
     const requester = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(requester.id);
+    const caller = await stepUpCaller(requester.id);
 
     await expect(
       caller.admin.supportAccess.emergencyIssue({
@@ -343,6 +344,21 @@ describe('support grant database invariants', () => {
   });
 });
 
+const originalSupportAccess = process.env.SUPPORT_ACCESS_ENABLED;
+const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
+
+beforeEach(() => {
+  process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  process.env.ADMIN_STEP_UP_ENABLED = 'true';
+});
+
+afterAll(() => {
+  if (originalSupportAccess === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+  else process.env.SUPPORT_ACCESS_ENABLED = originalSupportAccess;
+  if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+  else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
+});
+
 const supportStepUpSessionId = 'support-access-step-up-test';
 
 async function grantFreshStepUp(userId: string) {
@@ -401,7 +417,7 @@ describe('support write step-up', () => {
     const { organization, owner } = await orgWithOwner();
 
     await expect(
-      (await createCallerForUser(requester.id)).admin.supportAccess.request({
+      (await stepUpCaller(requester.id)).admin.supportAccess.request({
         organizationId: organization.id,
         actionClass: 'support_write',
         reason: 'fixing a broken organization setting',
@@ -410,7 +426,7 @@ describe('support write step-up', () => {
 
     // Read grants do not need step-up.
     const read = await (
-      await createCallerForUser(requester.id)
+      await stepUpCaller(requester.id)
     ).admin.supportAccess.request({
       organizationId: organization.id,
       actionClass: 'support_read',
@@ -432,13 +448,13 @@ describe('support write step-up', () => {
       .returning();
 
     await expect(
-      (await createCallerForUser(approver.id)).admin.supportAccess.approve({
+      (await stepUpCaller(approver.id)).admin.supportAccess.approve({
         grantId: directPending!.id,
       })
     ).rejects.toThrow('Step-up must be enabled');
 
     await expect(
-      (await createCallerForUser(superadmin.id)).admin.supportAccess.emergencyIssue({
+      (await stepUpCaller(superadmin.id)).admin.supportAccess.emergencyIssue({
         organizationId: organization.id,
         reason: 'production incident mitigation',
       })
@@ -476,5 +492,88 @@ describe('support write step-up', () => {
       reason: 'production incident mitigation',
     });
     expect(emergency.status).toBe('active');
+  });
+});
+
+describe('support access lifecycle switch and step-up failures', () => {
+  test('OFF refuses every lifecycle mutation and makes no step-up calls', async () => {
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+    delete process.env.ADMIN_STEP_UP_ENABLED;
+    const { supportStepUpPort } = await import('@kilocode/web-shared/lib/admin/support-step-up');
+    const stepUpSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    const admin = await insertRequester();
+    const caller = await createCallerForUser(admin.id);
+    const { organization } = await orgWithOwner();
+    const grantId = crypto.randomUUID();
+
+    const calls = [
+      () =>
+        caller.admin.supportAccess.request({
+          organizationId: organization.id,
+          actionClass: 'support_write',
+          reason: 'fixing a broken organization setting',
+        }),
+      () => caller.admin.supportAccess.approve({ grantId }),
+      () => caller.admin.supportAccess.deny({ grantId }),
+      () => caller.admin.supportAccess.cancel({ grantId }),
+      () =>
+        caller.admin.supportAccess.emergencyIssue({
+          organizationId: organization.id,
+          reason: 'production incident mitigation',
+        }),
+      () => caller.admin.supportAccess.review({ grantId }),
+    ];
+
+    for (const call of calls) {
+      await expect(call()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ supportAccessReason: 'support_access_disabled' }),
+      });
+    }
+    expect(stepUpSpy).not.toHaveBeenCalled();
+    stepUpSpy.mockRestore();
+  });
+
+  test('ON refuses a bearer write request even with step-up enabled', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.supportAccess.request({
+        organizationId: organization.id,
+        actionClass: 'support_write',
+        reason: 'fixing a broken organization setting',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.any(StepUpRequiredError),
+    });
+  });
+
+  test('ON with an enrolled session but no fresh proof returns MFA_REQUIRED', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    // A passkey exists, but no proof for this session: the guard distinguishes
+    // this from "not enrolled".
+    await db.insert(passkey_credentials).values({
+      kilo_user_id: admin.id,
+      credential_id: `support-no-proof-${crypto.randomUUID()}`,
+      public_key: 'unused-public-key',
+    });
+    const caller = await createSessionCallerForUser(admin.id, {
+      webSessionId: 'support-access-no-proof',
+    });
+
+    await expect(
+      caller.admin.supportAccess.request({
+        organizationId: organization.id,
+        actionClass: 'support_write',
+        reason: 'fixing a broken organization setting',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
+    });
   });
 });

@@ -26,6 +26,8 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  /** The session's environment. A V2 environment skips the binding and the implicit default. */
+  environment?: { repositories?: unknown } | null;
 };
 
 export function ProfilePickerPopover({
@@ -34,6 +36,7 @@ export function ProfilePickerPopover({
   onOverrideProfileSelect,
   repoFullName,
   platform,
+  environment,
 }: ProfilePickerPopoverProps) {
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
@@ -67,6 +70,7 @@ export function ProfilePickerPopover({
     selectedOverrideProfileId,
     repoFullName,
     platform,
+    environment,
   });
   const topSource = layers.top?.source ?? null;
 

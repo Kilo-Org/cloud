@@ -79,7 +79,7 @@ import {
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
@@ -1682,7 +1682,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each([gemma_4_26b_a4b_it_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
+  it.each([GEMMA_4_26B_A4B_IT_FREE_ID, 'test/free-model:free', 'openrouter/free'])(
     'applies free-model rate limiting per IP to anonymous callers of the free model %s',
     async modelId => {
       setAnonymousAuth();
@@ -1717,7 +1717,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+      makeRequest(makeBody(GEMMA_4_26B_A4B_IT_FREE_ID), {
         authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
         ...headers,
       }) as never
@@ -1777,7 +1777,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
+      makeRequest(makeBody(GEMMA_4_26B_A4B_IT_FREE_ID)) as never
     );
 
     expect(response.status).toBe(429);
@@ -1803,7 +1803,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+      makeRequest(makeBody(GEMMA_4_26B_A4B_IT_FREE_ID), {
         authorization: `Bearer ${token()}`,
       }) as never
     );
@@ -1820,7 +1820,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+      makeRequest(makeBody(GEMMA_4_26B_A4B_IT_FREE_ID), {
         'x-forwarded-for': '104.16.0.1',
         'x-kilocode-feature': 'cloud-agent',
       }) as never

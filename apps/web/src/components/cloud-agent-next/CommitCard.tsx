@@ -20,6 +20,7 @@ export function CommitDetails({ commit }: { commit: SessionCommit }) {
   return (
     <div className="flex flex-col gap-3 wrap-anywhere">
       <div className="space-y-2">
+        {commit.repository && <p className="text-muted-foreground text-xs">{commit.repository}</p>}
         <p className="text-sm leading-5 font-medium">{subject || 'Empty commit message'}</p>
         {body && (
           <p className="text-muted-foreground text-xs leading-5 whitespace-pre-wrap">{body}</p>
@@ -70,12 +71,25 @@ export function CommitCard({ commit }: { commit: SessionCommit }) {
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring my-1 flex min-h-6 min-w-0 max-w-full items-center gap-1.5 rounded-sm text-left text-xs focus-visible:ring-2 focus-visible:outline-none [@media(any-pointer:coarse)]:min-h-11"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring my-1 flex min-h-6 min-w-0 max-w-full items-center gap-2 rounded-sm text-left text-xs focus-visible:ring-2 focus-visible:outline-none [@media(any-pointer:coarse)]:min-h-11"
               data-commit-hash={commit.commitHash}
               aria-label={`Commit ${shortHash} details`}
             >
               <GitCommitHorizontal className="size-3.5 shrink-0" aria-hidden="true" />
+              {commit.repository && (
+                <>
+                  <span className="min-w-0 truncate" title={commit.repository}>
+                    {commit.repository}
+                  </span>
+                  <span className="shrink-0 opacity-50" aria-hidden="true">
+                    ·
+                  </span>
+                </>
+              )}
               <code className="shrink-0">{shortHash}</code>
+              <span className="shrink-0 opacity-50" aria-hidden="true">
+                ·
+              </span>
               <span className="min-w-0 truncate">{subject || 'Empty commit subject'}</span>
             </button>
           </PopoverTrigger>

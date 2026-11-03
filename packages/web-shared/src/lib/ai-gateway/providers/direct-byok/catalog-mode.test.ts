@@ -32,9 +32,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
-  isKiloExclusiveModel: (modelId: string) => modelId === 'stealth/exclusive',
-}));
 
 function mockProvider(
   id: string,
@@ -67,7 +64,6 @@ jest.mock('./direct-byok-definitions', () => ({
       mockModel('hf:moonshotai/Kimi-K2.6', 'moonshotai/kimi-k2.6'),
       mockModel('hf:moonshotai/Kimi-K2.6-fast', 'moonshotai/kimi-k2.6'),
       mockModel('hf:example/finetune'),
-      mockModel('hf:stealth/exclusive', 'stealth/exclusive'),
       mockModel('hf:moonshotai/retired', 'moonshotai/retired'),
     ]),
     mockProvider(
@@ -90,7 +86,6 @@ const mockedStoredModels = jest.mocked(getOpenRouterModelsMetadataFromDatabase);
 const ALIAS_TARGETS: Record<string, string> = {
   '~moonshotai/kimi-latest': 'moonshotai/kimi-k2.6',
   '~z-ai/glm-latest': 'z-ai/glm-5.2',
-  '~stealth/exclusive-latest': 'stealth/exclusive',
   '~moonshotai/retired-latest': 'moonshotai/retired',
   '~example/unknown-latest': 'example/unknown',
 };
@@ -210,9 +205,8 @@ describe('findDirectByokCatalogModels', () => {
     ]);
   });
 
-  test('ignores unmapped, Kilo-exclusive and retired catalog ids', async () => {
+  test('ignores unmapped and retired catalog ids', async () => {
     await expect(findDirectByokCatalogModels('example/unknown')).resolves.toEqual([]);
-    await expect(findDirectByokCatalogModels('stealth/exclusive')).resolves.toEqual([]);
     mockedIsValid.mockResolvedValueOnce(false);
     await expect(findDirectByokCatalogModels('z-ai/glm-5.2')).resolves.toEqual([]);
   });
@@ -226,10 +220,9 @@ describe('findDirectByokCatalogModels', () => {
     ]);
   });
 
-  test('ignores unknown, unmapped, Kilo-exclusive, retired and retired-target aliases', async () => {
+  test('ignores unknown, unmapped, retired and retired-target aliases', async () => {
     await expect(findDirectByokCatalogModels('~moonshotai/unknown-latest')).resolves.toEqual([]);
     await expect(findDirectByokCatalogModels('~example/unknown-latest')).resolves.toEqual([]);
-    await expect(findDirectByokCatalogModels('~stealth/exclusive-latest')).resolves.toEqual([]);
     await expect(findDirectByokCatalogModels('~moonshotai/retired-latest')).resolves.toEqual([]);
     mockedIsValid.mockImplementation(async modelId => modelId !== '~z-ai/glm-latest');
     await expect(findDirectByokCatalogModels('~z-ai/glm-latest')).resolves.toEqual([]);

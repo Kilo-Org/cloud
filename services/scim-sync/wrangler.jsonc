@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // NOTE: Base config is for PRODUCTION environment
+  // Use --env dev for development deployments
+  "name": "cloudflare-scim-sync",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  // Capped at the newest date the pinned miniflare/workerd binary supports, so
+  // `wrangler dev` runs the same runtime as production. Raise it with the
+  // wrangler/miniflare catalog bump.
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  // No public URL: `/status` reaches the Durable Object, and an unauthenticated
+  // caller on a `*.workers.dev` hostname could create the instance and drive
+  // billable Durable Object requests. With no `routes`, cron trigger, or
+  // service binding either, nothing reaches this Worker once deployed: use
+  // `wrangler dev` locally, and expect a production deploy to prove only that
+  // the script and the `v1` migration were accepted. See README.md.
+  "workers_dev": false,
+  "dev": {
+    "port": 8819,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "logpush": true,
+  "vars": {
+    "ENVIRONMENT": "production",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SCIM_SYNC_DO",
+        "class_name": "ScimSyncDO",
+      },
+    ],
+  },
+  // SQLite-backed from the start: switching a deployed class's storage backend
+  // later is not supported, and this class will need storage.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ScimSyncDO"],
+    },
+  ],
+  // ============================================
+  // DEVELOPMENT ENVIRONMENT
+  // Deploy with: wrangler deploy --env dev
+  // ============================================
+  "env": {
+    "dev": {
+      "name": "cloudflare-scim-sync-dev",
+      "workers_dev": false,
+      "vars": {
+        "ENVIRONMENT": "development",
+      },
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SCIM_SYNC_DO",
+            "class_name": "ScimSyncDO",
+          },
+        ],
+      },
+    },
+  },
+}

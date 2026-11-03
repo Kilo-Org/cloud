@@ -20,7 +20,7 @@ import {
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
@@ -92,8 +92,8 @@ describe('removeUnsupportedRequestServiceTier', () => {
       reason: 'non-fallback custom pricing',
     },
     {
-      model: gemma_4_26b_a4b_it_free_model.public_id,
-      reason: 'Kilo-exclusive model',
+      model: GEMMA_4_26B_A4B_IT_FREE_ID,
+      reason: 'auto small free model',
     },
   ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
     const request = makeRequest(model);

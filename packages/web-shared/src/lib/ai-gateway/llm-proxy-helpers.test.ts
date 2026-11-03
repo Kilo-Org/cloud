@@ -47,10 +47,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-import {
   captureProxyError,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
@@ -75,8 +71,6 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
-
-useKiloExclusiveModel();
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -1979,23 +1973,6 @@ describe('makeErrorReadable', () => {
     const result = await makeErrorReadable({
       provider: 'custom',
       requestedModel: 'kilo-internal/custom-endpoint',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
-
-    expect(result).toBeUndefined();
-  });
-
-  it('does not redact errors for Kilo-exclusive models', async () => {
-    const response = Response.json(
-      { error: { message: 'Upstream vendor error' } },
-      { status: 502 }
-    );
-
-    const result = await makeErrorReadable({
-      provider: 'openrouter',
-      requestedModel: kiloExclusiveModelFixture.public_id,
       request,
       response,
       userByokProviderIds: null,

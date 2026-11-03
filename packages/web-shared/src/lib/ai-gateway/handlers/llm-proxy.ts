@@ -59,7 +59,6 @@ import {
   extractReasoningSetting,
   invalidRequestResponse,
   malformedJsonResponse,
-  invalidTokenResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -98,11 +97,11 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
-  createAnonymousContext,
-  isAnonymousContext,
-  type AnonymousUserContext,
-} from '@kilocode/web-shared/lib/anonymous';
+  resolveGatewayCaller,
+  type GatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   freeModelRateLimitKey,
   isFreeModelRateLimited,
@@ -229,14 +228,12 @@ function validatePath(
  */
 async function resolveFreeModelRateLimitSubject(
   ipAddress: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
+  callerPromise: Promise<GatewayCaller>
 ): Promise<NextResponseType<unknown> | FreeModelRateLimitSubject> {
-  const { user, authFailedResponse, credentialsRejected } = await authPromise;
-  if (authFailedResponse && credentialsRejected) {
-    return invalidTokenResponse();
-  }
-  return user && !authFailedResponse
-    ? { kind: 'account', kiloUserId: user.id }
+  const caller = await callerPromise;
+  if (caller.kind === 'rejected') return caller.response;
+  return caller.kind === 'signed-in'
+    ? { kind: 'account', kiloUserId: caller.user.id }
     : { kind: 'ip', ipAddress };
 }
 
@@ -247,14 +244,14 @@ async function resolveFreeModelRateLimitSubject(
  */
 async function catalogModeModelForRoutedModel(
   model: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
+  callerPromise: Promise<GatewayCaller>
 ): Promise<string | null> {
   const { provider } = await getDirectByokModel(model.toLowerCase());
   if (!provider || !supportsCatalogMode(provider.id)) return null;
-  const { user, authFailedResponse, organizationId } = await authPromise;
-  if (!user || authFailedResponse) return null;
+  const caller = await callerPromise;
+  if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(user.id, organizationId)
+    byokOwner(caller.user.id, caller.organizationId)
   );
   const resolved = await resolveReference(model);
   return resolved === model ? null : resolved;
@@ -301,10 +298,12 @@ export async function handleLlmProxyRequest(
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
-  const authPromise = getUserFromAuth({
+  // Free models also serve anonymous callers, so a missing credential resolves to
+  // an anonymous caller here; paid models reject it once the model is known.
+  const callerPromise = getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  }).then(auth => resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress }));
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {
@@ -375,28 +374,28 @@ export async function handleLlmProxyRequest(
     settings: undefined,
     plan: undefined,
   };
-  const balanceAndSettingsPromise = authPromise.then(async res =>
-    res.user
+  const balanceAndSettingsPromise = callerPromise.then(async caller =>
+    caller.kind === 'signed-in'
       ? getBalanceAndOrgSettings(
-          res.organizationId,
-          res.user,
+          caller.organizationId,
+          caller.user,
           readDb,
           (await isFreeModel(requestedModelLowerCased)) ? undefined : 'usage'
         )
       : anonymousBalance
   );
-  const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
-    ([auth, balanceAndSettings]) => ({
-      organizationId: auth.organizationId,
+  const organizationContextPromise = Promise.all([callerPromise, balanceAndSettingsPromise]).then(
+    ([caller, balanceAndSettings]) => ({
+      organizationId: caller.kind === 'signed-in' ? caller.organizationId : undefined,
       settings: balanceAndSettings.settings,
       plan: balanceAndSettings.plan,
     })
   );
-  const organizationGroupPolicyPromise = authPromise.then(async auth => {
-    if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
+  const organizationGroupPolicyPromise = callerPromise.then(async caller => {
+    if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
     const context = await getOrganizationGroupPolicyContext({
-      organizationId: auth.organizationId,
-      subject: { type: 'member', kiloUserId: auth.user.id },
+      organizationId: caller.organizationId,
+      subject: { type: 'member', kiloUserId: caller.user.id },
       fromDb: readDb,
     });
     return evaluateEffectiveModelAccessPolicy(context);
@@ -423,14 +422,14 @@ export async function handleLlmProxyRequest(
   // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
   // never awaited.
   const enkryptGuardrail = startEnkryptInputGuardrail(
-    Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
-      if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
-      const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
+    Promise.all([callerPromise, balanceAndSettingsPromise]).then(([caller, { settings }]) => {
+      if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
+      const config = resolveEnkryptInputGuardrail(caller.organizationId, settings);
       if (!config) return null;
       return {
         sessionId: taskId ?? sessionHeader ?? null,
-        organizationId: auth.organizationId,
-        kiloUserId: auth.user.id,
+        organizationId: caller.organizationId,
+        kiloUserId: caller.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
         text: extractRequestText(requestBodyParsed, {
@@ -494,10 +493,10 @@ export async function handleLlmProxyRequest(
   // Custom routers and signed CLI decisions bill an account, so they never fall through to
   // anonymous handling.
   const authenticatedRoutingCaller = async () => {
-    const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
-    if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
-    if (!user || authFailedResponse) return paidModelAuthRequiredResponse();
-    return { userId: user.id, organizationId: organizationId ?? null };
+    const caller = await callerPromise;
+    if (caller.kind === 'rejected') return caller.response;
+    if (caller.kind === 'anonymous') return paidModelAuthRequiredResponse();
+    return { userId: caller.user.id, organizationId: caller.organizationId ?? null };
   };
   const autoRoutingDenials = async (
     fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
@@ -565,11 +564,11 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
     const decisionForRouter = async (router: AutoRouter) => {
-      const { user, authFailedResponse, organizationId } = await authPromise;
+      const caller = await callerPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
-      if (!user || authFailedResponse) return null;
-      const owner = { userId: user.id, organizationId: organizationId ?? null };
+      if (caller.kind !== 'signed-in') return null;
+      const owner = { userId: caller.user.id, organizationId: caller.organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
         policy => collectDeniedAutoRoutingModelIds(policy, router),
         () => collectDataCollectionRequiredAutoRoutingModelIds(router)
@@ -640,7 +639,7 @@ export async function handleLlmProxyRequest(
         },
       },
       requestBodyParsed,
-      authPromise.then(res => res.user),
+      callerPromise.then(caller => (caller.kind === 'signed-in' ? caller.user : null)),
       balanceAndSettingsPromise.then(res => res.balance)
     );
     if (autoResult.kind === 'no_free_models_available') {
@@ -661,7 +660,7 @@ export async function handleLlmProxyRequest(
     // the catalog id then goes through the organization policy check below.
     const catalogModelId = await catalogModeModelForRoutedModel(
       requestBodyParsed.body.model,
-      authPromise
+      callerPromise
     );
     if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
   }
@@ -692,7 +691,7 @@ export async function handleLlmProxyRequest(
   const clientIp = bareIpLiteral(ipAddress);
 
   if (isPubliclyFreeModel) {
-    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
+    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, callerPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
     // Private custom LLMs are exempt for signed-in callers, even when their id
@@ -715,41 +714,13 @@ export async function handleLlmProxyRequest(
 
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId: authOrganizationId,
-    botId: authBotId,
-  } = await authPromise;
+  const caller = await callerPromise;
   authSpan.end();
-
-  let user: typeof maybeUser | AnonymousUserContext;
-  let organizationId: string | undefined = authOrganizationId;
-  let botId: string | undefined = authBotId;
-
-  if (authFailedResponse) {
-    // A caller that presented a credential we could not verify is not the same
-    // as a caller that presented none. Answering for it as anonymous would
-    // silently drop its account, organization, BYOK keys and credits, and would
-    // hide from the client that its stored token is broken. Fail the request so
-    // the client re-authenticates.
-    if (credentialsRejected) {
-      return invalidTokenResponse();
-    }
-
-    // No valid auth
-    if (!isPubliclyFreeModel) {
-      return paidModelAuthRequiredResponse();
-    }
-
-    // Anonymous access for free model (rate-limited above when configured)
-    user = createAnonymousContext(ipAddress);
-    organizationId = undefined;
-    botId = undefined;
-  } else {
-    user = maybeUser;
-  }
+  if (caller.kind === 'rejected') return caller.response;
+  if (caller.kind === 'anonymous' && !isPubliclyFreeModel) return paidModelAuthRequiredResponse();
+  const { user } = caller;
+  const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
+  const botId = caller.kind === 'signed-in' ? caller.botId : undefined;
 
   // Fraud/project headers are pure header parsing; resolve them once here so
   // decide, usage, and the classifier-overhead billing below share one read.
@@ -1187,7 +1158,7 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
   const requestLogging = {
-    user: maybeUser,
+    user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
     session_id: usageContext.session_id,
     vercel_request_id: vercelRequestId,

@@ -24,7 +24,6 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
-  invalidTokenResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -41,11 +40,8 @@ import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import {
-  createAnonymousContext,
-  isAnonymousContext,
-  type AnonymousUserContext,
-} from '@kilocode/web-shared/lib/anonymous';
+import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -71,8 +67,6 @@ import type {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 async function embeddingProxyRequest(params: {
   body: Record<string, unknown>;
@@ -146,47 +140,15 @@ export async function handleEmbeddingsRequest(
     );
   }
 
-  // Auth check
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId: authOrganizationId,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: isFreeModelExcludingCustomLlms(requestedModelLowerCased), ipAddress }
+  );
   authSpan.end();
-
-  let user: typeof maybeUser | AnonymousUserContext;
-  let organizationId: string | undefined = authOrganizationId;
-
-  if (authFailedResponse) {
-    // A credential we could not verify is not the absence of one. Fail the
-    // request rather than answering as anonymous; see `invalidTokenResponse`.
-    if (credentialsRejected) {
-      return invalidTokenResponse();
-    }
-
-    if (!isFreeModelExcludingCustomLlms(requestedModelLowerCased)) {
-      return NextResponse.json(
-        {
-          error: {
-            code: PAID_MODEL_AUTH_REQUIRED,
-            message: 'You need to sign in to use this model.',
-          },
-          error_type: ProxyErrorType.paid_model_auth_required,
-        },
-        { status: 401 }
-      );
-    }
-
-    user = createAnonymousContext(ipAddress);
-    organizationId = undefined;
-  } else {
-    user = maybeUser;
-  }
+  if (caller.kind === 'rejected') return caller.response;
+  const { user } = caller;
+  const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
 
   // Custom LLMs are served only through chat routes; never forward their ids
   // elsewhere for signed-in callers. Anonymous callers can only send ids the

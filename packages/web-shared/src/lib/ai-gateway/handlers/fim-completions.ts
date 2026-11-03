@@ -15,7 +15,6 @@ import {
   extractFimPromptInfo,
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
-  invalidTokenResponse,
   malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
@@ -28,6 +27,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   findSupportedFimModel,
   type FimProvider,
@@ -94,19 +94,13 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const requesBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
   authSpan.end();
-  if (authFailedResponse) return credentialsRejected ? invalidTokenResponse() : authFailedResponse;
-
-  const user = maybeUser;
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
   const requestBodyText = await requesBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 

@@ -17,7 +17,6 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
-  invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   creditsBlockedResponse,
@@ -47,14 +46,13 @@ import {
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 async function transcriptionProxyRequest(params: {
   body: Record<string, unknown> | FormData;
@@ -191,40 +189,19 @@ export async function handleAudioTranscriptionsRequest(
   }
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId: authOrganizationId,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false }
+  );
   authSpan.end();
-
-  const organizationId: string | undefined = authOrganizationId;
-
-  if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
-  if (authFailedResponse || !maybeUser) {
-    return NextResponse.json(
-      {
-        error: {
-          code: PAID_MODEL_AUTH_REQUIRED,
-          message: 'You need to sign in to use speech-to-text.',
-        },
-        error_type: ProxyErrorType.paid_model_auth_required,
-      },
-      { status: 401 }
-    );
-  }
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
 
   // Custom LLMs are served only through chat routes; never forward their ids
   // elsewhere. Checked after auth so anonymous callers cannot probe for them.
   if (await isCustomLlm(requestedModelLowerCased)) {
     return modelDoesNotExistResponse();
   }
-
-  const user = maybeUser;
 
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
   const { provider, userByok } = await getTranscriptionProvider();

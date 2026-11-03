@@ -16,10 +16,10 @@ import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
-  invalidTokenResponse,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -108,12 +108,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
   if (await isGatewayAccountRateLimited(request, gatewayRateLimitKey(request.headers, ipAddress))) {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
-
-  const { user, authFailedResponse, credentialsRejected, organizationId } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
-  if (authFailedResponse) return credentialsRejected ? invalidTokenResponse() : authFailedResponse;
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
 
   let body: unknown;
   try {

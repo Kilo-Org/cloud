@@ -295,6 +295,19 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
         installationId: platformAccountId,
       });
     },
+    async createAttachmentUrlFetcher({ platformIntegration }) {
+      const platformAccountId = platformIntegration.platform_account_id;
+      if (!platformAccountId) return undefined;
+
+      const installation = await slackAdapter.getInstallation(platformAccountId);
+      if (!installation) return undefined;
+
+      const botToken = installation.botToken;
+      return url =>
+        fetch(url, {
+          headers: { Authorization: `Bearer ${botToken}` },
+        });
+    },
     async getConversationContext({ thread, triggerMessage }) {
       return await getSlackConversationContext(thread, triggerMessage);
     },

@@ -29,9 +29,9 @@ beforeEach(() => {
   jest.replaceProperty(process, 'env', {
     ...process.env,
     R2_ACCOUNT_ID: 'test-metadata-account',
-    R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
-    R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
-    R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+    R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+    R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
   });
   mockedAfter.mockReset();
   jest.spyOn(console, 'debug').mockImplementation(() => {});
@@ -43,9 +43,9 @@ afterEach(() => jest.restoreAllMocks());
 
 test.each([
   'R2_ACCOUNT_ID',
-  'R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME',
-  'R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID',
-  'R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY',
+  'R2_AI_PROVIDER_METADATA_BUCKET_NAME',
+  'R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID',
+  'R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY',
 ])('disables capture without %s', name => {
   delete process.env[name];
   expect(createVercelProviderMetadataCapture()).toBeUndefined();
@@ -55,9 +55,9 @@ test.each([
     '[vercel-provider-metadata] capture disabled: missing configuration',
     {
       accountConfigured: name !== 'R2_ACCOUNT_ID',
-      bucketConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME',
-      accessKeyIdConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID',
-      secretAccessKeyConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY',
+      bucketConfigured: name !== 'R2_AI_PROVIDER_METADATA_BUCKET_NAME',
+      accessKeyIdConfigured: name !== 'R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID',
+      secretAccessKeyConfigured: name !== 'R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY',
     }
   );
 });
@@ -99,7 +99,7 @@ test('uploads the latest metadata once, after the response, keyed by generation 
     secretAccessKey: 'test-metadata-secret-key',
   });
   expect([...fakeR2.objects]).toEqual([
-    ['test-provider-metadata/gen_test.json', JSON.stringify(metadata)],
+    ['test-provider-metadata/vercel/gen_test.json', JSON.stringify(metadata)],
   ]);
   expect(console.debug).toHaveBeenCalledTimes(2);
   expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] archived metadata', {
@@ -123,7 +123,7 @@ test('retains metadata received before the generation ID', async () => {
   capture?.(undefined, 'gen_late_id');
   await runScheduledUpload();
 
-  expect(fakeR2.objects.get('test-provider-metadata/gen_late_id.json')).toBe(
+  expect(fakeR2.objects.get('test-provider-metadata/vercel/gen_late_id.json')).toBe(
     JSON.stringify(metadata)
   );
 });

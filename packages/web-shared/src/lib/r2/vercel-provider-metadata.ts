@@ -10,9 +10,9 @@ let client: S3Client | undefined;
 
 export function createVercelProviderMetadataCapture(): VercelProviderMetadataCapture | undefined {
   const accountId = getEnvVariable('R2_ACCOUNT_ID');
-  const bucket = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME');
-  const accessKeyId = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID');
-  const secretAccessKey = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY');
+  const bucket = getEnvVariable('R2_AI_PROVIDER_METADATA_BUCKET_NAME');
+  const accessKeyId = getEnvVariable('R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID');
+  const secretAccessKey = getEnvVariable('R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY');
   if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
     console.debug('[vercel-provider-metadata] capture disabled: missing configuration', {
       accountConfigured: Boolean(accountId),
@@ -75,7 +75,7 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
           await client.send(
             new PutObjectCommand({
               Bucket: bucket,
-              Key: `${capturedGenerationId}.json`,
+              Key: `vercel/${capturedGenerationId}.json`,
               Body: JSON.stringify(capturedMetadata),
               ContentType: 'application/json',
             })

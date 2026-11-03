@@ -2069,9 +2069,9 @@ describe('Vercel provider metadata archival', () => {
   beforeEach(() => {
     jest.replaceProperty(process, 'env', {
       ...process.env,
-      R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME: 'test-vercel-metadata',
-      R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
-      R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-ai-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
     });
     fakeR2.objects.clear();
   });
@@ -2085,7 +2085,9 @@ describe('Vercel provider metadata archival', () => {
     if (typeof callback !== 'function') throw new Error('Expected an after callback');
     await callback();
     expect(fakeR2.objects.size).toBe(1);
-    return JSON.parse(fakeR2.objects.get('test-vercel-metadata/gen_metadata_test.json') ?? '');
+    return JSON.parse(
+      fakeR2.objects.get('test-ai-provider-metadata/vercel/gen_metadata_test.json') ?? ''
+    );
   }
 
   describe.each(usageShapes)('$kind', shape => {

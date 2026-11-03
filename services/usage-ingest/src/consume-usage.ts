@@ -7,6 +7,15 @@ import { usageRetryDelaySeconds } from './retry-policy';
 const INVOCATION_BUDGET_MS = 840_000;
 const MIN_LAUNCH_REMAINING_MS = 180_000;
 
+// Select a stable baseline without consuming the randomness used by retry policy.
+function sampleDelivery(messageId: string, attempts: number): boolean {
+  let hash = 0;
+  for (const char of `${messageId}:${attempts}`) {
+    hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
+  }
+  return hash % 100 === 0;
+}
+
 type Diagnostics = { batch_size: number; handler_entry_at_ms: number };
 
 function diagnosticFields(
@@ -47,7 +56,9 @@ async function processQueue(
           batch,
           diagnostics,
           batchId,
-          lastLaunchAtMs
+          lastLaunchAtMs,
+          entryAtMs,
+          startedAtMs
         );
         acknowledged = result.acknowledged;
         retryDelaySeconds = result.retryDelaySeconds;
@@ -86,9 +97,14 @@ async function processMessage(
   batch: MessageBatch<unknown>,
   diagnostics: Diagnostics | undefined,
   batchId: string | undefined,
-  lastLaunchAtMs: number
+  lastLaunchAtMs: number,
+  entryAtMs: number,
+  startedAtMs: number
 ) {
-  const queueWaitMs = Math.max(0, Date.now() - message.timestamp.getTime());
+  const slotWaitMs = Math.max(0, Math.round(performance.now() - startedAtMs));
+  const timestampMs = message.timestamp.getTime();
+  const queueWaitMs = Math.max(0, Date.now() - timestampMs);
+  const handlerEntryQueueAgeMs = Math.max(0, entryAtMs - timestampMs);
   const parsed = UsageRecordRequestSchema.safeParse(message.body);
   if (diagnostics !== undefined)
     logSafely('info', () => ({
@@ -160,6 +176,10 @@ async function processMessage(
     queue_message_id: message.id,
     delivery_attempts: message.attempts,
     queue_wait_ms: queueWaitMs,
+    ...(Math.max(handlerEntryQueueAgeMs, queueWaitMs, slotWaitMs, writerDurationMs ?? 0) >= 1000 ||
+    sampleDelivery(message.id, message.attempts)
+      ? { handler_entry_queue_age_ms: handlerEntryQueueAgeMs, slot_wait_ms: slotWaitMs }
+      : {}),
     ...(parsed.success
       ? {
           usage_id: parsed.data.core.id,

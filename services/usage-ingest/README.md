@@ -82,7 +82,27 @@ invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
 
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
-of handling that message, independently of writer duration. Shared direct and
+of handling that message, independently of writer duration. Selected existing processing
+outcomes also include `handler_entry_queue_age_ms`, the non-negative wall-clock
+age of the queue message at invocation entry, and `slot_wait_ms`, the rounded
+monotonic time from invocation entry until that message starts processing in a
+slot. Queue age crosses clocks and may include skew; it is not an exact transport
+duration. Slot wait includes local scheduling as well as time behind other messages.
+The fields appear when entry age, queue wait, slot wait, or writer duration reaches
+1,000 ms, or when a stable hash of queue message ID and attempt falls in a nominal
+1% bucket. Actual coverage depends on the message ID distribution.
+This enriches existing outcomes without adding a log stream; the baseline is
+repeatable and is not a uniform random sample of distinct usage IDs.
+
+For an individual delivery, find `usage_ingest_processing` by exact `usage_id`
+and retain `queue_message_id` and `delivery_attempts` to distinguish redeliveries.
+Read its entry age, slot wait, and `writer_duration_ms` together; correlate the
+same usage ID with `usage_record_completion` for the writer's persistence time.
+Multiple attempts may exist; usage ID alone cannot uniquely match a writer attempt.
+Do not subtract subgroup percentiles to infer a
+phase duration, or treat timestamps from different hosts as exact.
+
+Shared direct and
 HTTP-writer persistence attempts emit `usage_record_completion` logs with
 outcome, duration, event age, execution region and finite caller context. See the
 completion sampling policy below and the

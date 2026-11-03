@@ -48,6 +48,88 @@ afterEach(() => {
 });
 
 describe('usage consumer', () => {
+  it('captures handler entry and slot wait for a later mixed-batch message', async () => {
+    const { fetch, processingLogs } = setup();
+    let monotonic = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonic);
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const held = Promise.withResolvers<Response>();
+    fetch.mockReturnValueOnce(held.promise).mockImplementationOnce(async () => {
+      monotonic = 1400;
+      return new Response(null, { status: 429 });
+    });
+    const later = { ...usage, core: { ...usage.core, id: '4f2504e0-4f89-11d3-9a0c-0305e82c3302' } };
+    const messages = [message(), { ...message(later), id: 'queue-2', attempts: 3 }];
+    messages.forEach(msg => {
+      msg.timestamp = new Date(9_000);
+    });
+    let finished = false;
+    const work = Promise.resolve(worker.queue(batch(messages), env)).then(
+      () => {
+        finished = true;
+      },
+      error => {
+        finished = true;
+        return error;
+      }
+    );
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(finished).toBe(false);
+    monotonic = 1350;
+    wall.mockReturnValue(10_200);
+    held.resolve(acknowledgement());
+    expect(await work).toMatchObject({ message: 'Usage writer overloaded (HTTP 429/503)' });
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[1].retry).toHaveBeenCalledOnce();
+    expect(processingLogs().find(log => log.usage_id === later.core.id)).toMatchObject({
+      queue_message_id: 'queue-2',
+      delivery_attempts: 3,
+      handler_entry_queue_age_ms: 1000,
+      slot_wait_ms: 1250,
+      queue_wait_ms: 1200,
+      writer_duration_ms: 50,
+    });
+  });
+
+  it('adds phase fields only to sampled or slow outcomes', async () => {
+    const { fetch, processingLogs } = setup();
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    fetch.mockResolvedValue(acknowledgement());
+    const sampled = { ...message(), id: 'queue-92', timestamp: new Date(10_000) };
+    const other = { ...message(), id: 'queue-1', timestamp: new Date(10_000) };
+    await worker.queue(batch([sampled, other]), env);
+    const logs = processingLogs();
+    expect(logs[0]).toMatchObject({ handler_entry_queue_age_ms: 0, slot_wait_ms: 0 });
+    expect(logs[1]).not.toHaveProperty('handler_entry_queue_age_ms');
+    expect(logs[1]).not.toHaveProperty('slot_wait_ms');
+  });
+
+  it('selects a slow queue wait even when its components are below the threshold', async () => {
+    const { fetch, processingLogs } = setup();
+    let monotonic = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonic);
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const held = Promise.withResolvers<Response>();
+    fetch.mockReturnValueOnce(held.promise).mockResolvedValueOnce(acknowledgement());
+    const messages = [message(), message()];
+    messages.forEach(msg => {
+      msg.timestamp = new Date(9_400);
+    });
+    const work = worker.queue(batch(messages), env);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    monotonic = 600;
+    wall.mockReturnValue(10_600);
+    held.resolve(acknowledgement());
+    await work;
+    expect(processingLogs()[1]).toMatchObject({
+      handler_entry_queue_age_ms: 600,
+      slot_wait_ms: 500,
+      queue_wait_ms: 1200,
+      writer_duration_ms: 0,
+    });
+  });
+
   it('waits for each validated acknowledgement before ACK and the next write', async () => {
     const { fetch, logs, processingLogs } = setup();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
@@ -164,6 +246,7 @@ describe('usage consumer', () => {
     async failure => {
       const { fetch, logs, processingLogs } = setup();
       vi.spyOn(performance, 'now')
+        .mockReturnValueOnce(0)
         .mockReturnValueOnce(0)
         .mockReturnValueOnce(0)
         .mockReturnValueOnce(100)

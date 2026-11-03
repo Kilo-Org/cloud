@@ -126,6 +126,7 @@ jest.mock(
   () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/auto-model'),
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () => ({

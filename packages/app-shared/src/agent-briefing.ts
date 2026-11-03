@@ -230,13 +230,10 @@ const HEADER_VALUE = new RegExp(
   String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\n,;"'&\]})]+)`
 );
 // A command-line flag that names a credential carries its value in the following
-// whitespace-separated argument, which no assignment separator marks.
-const CREDENTIAL_FLAG = new RegExp(
-  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` +
-    QUOTED_VALUE +
-    String.raw`|(?!\\?["'])(?!--)[^\s,;"'&]+)`,
-  'g'
-);
+// whitespace-separated argument, which no assignment separator marks. The capture
+// groups are: the leading boundary, the flag, the gap, and the value.
+const CREDENTIAL_FLAG_SOURCE =
+  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'&]+)`;
 // Credential value shapes that carry no key name of their own. An opaque run is 48
 // characters or more, or 32 or more when it mixes letters with digits, so file paths,
 // words, and short identifiers in evidence survive.
@@ -311,6 +308,27 @@ function credentialValue(name: string, text: string, from: number): string | und
 }
 
 /**
+ * Every credential flag in the text, with the position and text of the value it carries.
+ * A flag that does not name a credential is not consumed, so a credential flag that
+ * follows it is examined on its own.
+ */
+function credentialFlagSites(text: string): Array<{ valueStart: number; value: string }> {
+  const pattern = new RegExp(CREDENTIAL_FLAG_SOURCE, 'g');
+  const sites: Array<{ valueStart: number; value: string }> = [];
+  let searchFrom = 0;
+  for (;;) {
+    pattern.lastIndex = searchFrom;
+    const match = pattern.exec(text);
+    if (!match) return sites;
+    const flag = match[2] ?? '';
+    const value = match[4] ?? '';
+    const valueStart = match.index + match[0].length - value.length;
+    searchFrom = Math.max(valueStart - 1, match.index + 1);
+    if (isCredentialKeyName(flag.replace(/^-+/, ''))) sites.push({ valueStart, value });
+  }
+}
+
+/**
  * True when screening leaves credential material in an excerpt: a value it cannot
  * resolve, or an opaque token that continues a credential past the value it replaces.
  */
@@ -330,10 +348,9 @@ function briefingExcerptCarriesCredential(text: string): boolean {
     if (tail === undefined) continue;
     if (value === undefined || isOpaque(tail)) return true;
   }
-  for (const match of text.matchAll(CREDENTIAL_FLAG)) {
-    const flag = match[2];
-    if (!flag || !isCredentialKeyName(flag.replace(/^-+/, ''))) continue;
-    const tail = tailAfter((match.index ?? 0) + match[0].length);
+  for (const { valueStart, value } of credentialFlagSites(text)) {
+    if (REDACTION_PLACEHOLDER.test(value)) continue;
+    const tail = tailAfter(valueStart + value.length);
     if (tail !== undefined && isOpaque(tail)) return true;
   }
   return false;
@@ -341,14 +358,16 @@ function briefingExcerptCarriesCredential(text: string): boolean {
 
 /** Replaces the value of every credential flag. */
 function redactCredentialFlags(text: string): string {
-  return text.replace(
-    CREDENTIAL_FLAG,
-    (match: string, lead: string, flag: string, gap: string, value: string) => {
-      if (!isCredentialKeyName(flag.replace(/^-+/, ''))) return match;
-      if (REDACTION_PLACEHOLDER.test(value)) return match;
-      return `${lead}${flag}${gap}[redacted credential]`;
-    }
-  );
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const { valueStart, value } of credentialFlagSites(text)) {
+    if (valueStart < cursor || REDACTION_PLACEHOLDER.test(value)) continue;
+    pieces.push(text.slice(cursor, valueStart), '[redacted credential]');
+    cursor = valueStart + value.length;
+  }
+  if (pieces.length === 0) return text;
+  pieces.push(text.slice(cursor));
+  return pieces.join('');
 }
 
 /** Replaces the value of every credential assignment. */

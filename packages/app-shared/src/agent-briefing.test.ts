@@ -117,6 +117,7 @@ describe('briefing evidence screening', () => {
       ['run --verbose --password ' + 'hunter' + '2', `run --verbose --password ${redacted}`],
       ['run -v --password ' + 'hunter' + '2', `run -v --password ${redacted}`],
       ['run --password -' + 'hunter' + '2', `run --password ${redacted}`],
+      ['run --password --' + 'hunter' + '2', `run --password ${redacted}`],
     ];
     for (const [command, screened] of cases) {
       expect(redactBriefingExcerpt(command)).toBe(screened);

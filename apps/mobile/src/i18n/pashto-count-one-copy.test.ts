@@ -118,7 +118,7 @@ describe('Pashto count-one copy', () => {
         reasons: 'the patch did not apply',
       })
     ).toBe(
-      'د غونډې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)'
+      'د ناستې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)'
     );
   });
 });

@@ -504,6 +504,11 @@ Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the is
 publish environment snapshots. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
 snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Environment snapshots".
 
+- **Enrollment.** `ENVIRONMENT_SNAPSHOT_ORG_IDS` controls build and restore access independently of
+  startup selection. Production and development set `*` for all organizations and personal accounts;
+  native-container enrollment and repository authorization still apply. Personal GitHub and GitLab
+  environments are supported. Bitbucket builds require an organization-owned environment because
+  managed Bitbucket repository access is organization-scoped.
 - **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
   looks up the owner's one environment for the repository and stores
   `{ environmentId, owner, repository, configurationRevision }` on the session metadata and on the
@@ -554,10 +559,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
-  startup. Snapshot enrollment controls builder access independently of the interactive session cohort.
+  startup. Snapshot enrollment controls builder access independently of session startup selection.
   Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
   Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
-  cohort-selected image; an `app` session starts from its image instead of a split-image snapshot.
+  selected image; an `app` session starts from its image instead of a split-image snapshot.
   Downloaded startup uses the current runtime installer and its named builder or supervisor target,
   including on snapshot restore. The installed control bundle includes the builder. A preinstalled
   launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
@@ -1070,12 +1075,15 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- Roll out through a production `interactiveOrgIds` cohort: one test organization on `downloaded`
-  runtime-free first, then a wider cohort after qualification. Roll back by image or by mode.
+- The catalog defaults all targets to `downloaded` runtime-free with no `interactiveOrgIds`
+  restriction, including organization and personal sessions. SDK pins remain preinstalled.
+  Optional cohorts can restrict a future target. Roll back by image or by mode; a full mode rollback
+  changes the default to preinstalled/all-in-one, not merely removes a production override.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
-  from it. Real-provider qualification remains an explicit approval gate; see `runtime-rollout.md`.
+  from it. Real-provider qualification evidence remains pending and is not implied by the broader
+  configuration; see `runtime-rollout.md` for the checks and rollback procedure.
 
 ### Runtime credential proxy
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import {
-  autoSmallFreeModelUpstreamId,
+  AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
   isAutoSmallFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -22,15 +22,6 @@ describe('isAutoSmallFreeModel', () => {
   );
 });
 
-describe('autoSmallFreeModelUpstreamId', () => {
-  test('maps the free model to the paid model', () => {
-    expect(AUTO_SMALL_TARGET_MODELS.paid).toBe(paidModelId);
-    expect(autoSmallFreeModelUpstreamId(freeModelId)).toBe(paidModelId);
-  });
-
-  test('keeps other model ids', () => {
-    expect(autoSmallFreeModelUpstreamId('anthropic/claude-sonnet-4')).toBe(
-      'anthropic/claude-sonnet-4'
-    );
-  });
+test('serves the auto small free model as the paid model kilo-auto/small targets', () => {
+  expect(AUTO_SMALL_FREE_MODEL_UPSTREAM_ID).toBe(AUTO_SMALL_TARGET_MODELS.paid);
 });

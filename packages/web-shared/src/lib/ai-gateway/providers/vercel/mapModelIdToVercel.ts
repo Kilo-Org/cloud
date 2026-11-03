@@ -3,7 +3,10 @@ import { VercelModelIdOverridesConfigSchema } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { autoSmallFreeModelUpstreamId } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import {
+  AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
+  isAutoSmallFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
 export type VercelModelIdOverrides = ReadonlyMap<string, string>;
@@ -37,7 +40,7 @@ export const getVercelModelIdOverrides = createCachedFetch<VercelModelIdOverride
 
 /** The Vercel model ID derived from the built-in rules, ignoring admin overrides. */
 export function mapResolvedModelIdToVercelWithoutOverrides(modelId: string): string {
-  const internalId = autoSmallFreeModelUpstreamId(modelId);
+  const internalId = isAutoSmallFreeModel(modelId) ? AUTO_SMALL_FREE_MODEL_UPSTREAM_ID : modelId;
 
   const slashIndex = internalId.indexOf('/');
   if (slashIndex < 0) {

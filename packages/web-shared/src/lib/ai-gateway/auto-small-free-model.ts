@@ -14,8 +14,6 @@ export function isAutoSmallFreeModel(model: string): boolean {
   return model === GEMMA_4_26B_A4B_IT_FREE_ID;
 }
 
-export function autoSmallFreeModelUpstreamId(model: string): string {
-  return isAutoSmallFreeModel(model) ? GEMMA_4_26B_A4B_IT_ID : model;
-}
+export const AUTO_SMALL_FREE_MODEL_UPSTREAM_ID = GEMMA_4_26B_A4B_IT_ID;
 
 export const AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH = 262144;

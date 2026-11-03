@@ -1,17 +1,19 @@
 import { z } from 'zod';
-import {
-  runtimeStartupConfigSchema,
-  type RuntimeStartupConfig,
-} from '../src/shared/runtime-startup-config.js';
+import { runtimeStartupConfigSchema } from '../src/shared/runtime-startup-config.js';
 
 const targetName = z.string().regex(/^[a-z][a-z0-9-]*$/);
+export const runtimeTargetConfigSchema = runtimeStartupConfigSchema.extend({
+  /** BYOC Vercel sessions always download the published runtime release. */
+  vercel: z.boolean().optional(),
+});
+export type RuntimeTargetConfig = z.infer<typeof runtimeTargetConfigSchema>;
 export const runtimeTargetsSchema = z
   .object({
-    default: runtimeStartupConfigSchema,
-    targets: z.record(targetName, runtimeStartupConfigSchema),
+    default: runtimeTargetConfigSchema,
+    targets: z.record(targetName, runtimeTargetConfigSchema),
   })
   .strict();
-export function selectRuntimeTarget(raw: unknown, environment: string): RuntimeStartupConfig {
+export function selectRuntimeTarget(raw: unknown, environment: string): RuntimeTargetConfig {
   targetName.parse(environment);
   const targets = runtimeTargetsSchema.parse(raw);
   return Object.hasOwn(targets.targets, environment)
@@ -99,15 +101,23 @@ export type RuntimeTargetRelease = {
   baseImage: string;
   bucket: string;
 };
+
+function enrolledVercel(vars: Record<string, unknown>): boolean {
+  const value = vars.BYOC_VERCEL_IDS;
+  return typeof value === 'string' && value.split(',').some(entry => entry.trim() !== '');
+}
+
 /** The target catalog owns both Worker vars and the native image selection. */
 export function renderRuntimeTarget(input: {
   config: unknown;
   environment: string;
-  startup: RuntimeStartupConfig;
+  startup: RuntimeTargetConfig;
   release?: RuntimeTargetRelease;
 }) {
-  const startup = runtimeStartupConfigSchema.parse(input.startup);
+  const startup = runtimeTargetConfigSchema.parse(input.startup);
   const { root, target, vars, native } = validateRuntimeTarget(input.config, input.environment);
+  if (enrolledVercel(vars) && startup.vercel !== true)
+    throw new Error('Runtime configuration drift: Vercel support belongs in runtime-targets.json');
   target.vars = {
     ...vars,
     RUNTIME_STARTUP_MODE: startup.mode,

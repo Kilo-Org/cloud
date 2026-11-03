@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 const shaPattern = /^[a-f0-9]{40}$/;
 const catalogPath = 'services/cloud-agent-next/runtime-targets.json';
 
+/** Every valid catalog needs publication; only downloaded runtime-free targets are supported. */
 export function catalogNeedsPublication(catalog) {
   if (
     !catalog?.default ||
@@ -12,15 +13,16 @@ export function catalogNeedsPublication(catalog) {
     Array.isArray(catalog.targets)
   )
     throw new Error('Invalid runtime target catalog');
-  if (
-    [catalog.default, ...Object.values(catalog.targets)].some(
-      target =>
-        target?.mode !== 'downloaded' ||
-        target?.image !== 'runtime-free' ||
-        target.interactiveOrgIds !== undefined
+  for (const target of [catalog.default, ...Object.values(catalog.targets)]) {
+    if (
+      target?.mode !== 'downloaded' ||
+      target?.image !== 'runtime-free' ||
+      target.interactiveOrgIds !== undefined
     )
-  )
-    throw new Error('Invalid runtime target: only downloaded runtime-free startup is supported');
+      throw new Error('Invalid runtime target: only downloaded runtime-free startup is supported');
+    if (target.vercel !== undefined && typeof target.vercel !== 'boolean')
+      throw new Error('Invalid runtime target catalog');
+  }
   return true;
 }
 

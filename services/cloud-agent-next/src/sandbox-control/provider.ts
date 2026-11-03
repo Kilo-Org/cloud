@@ -91,7 +91,15 @@ export type ProviderAllocationIntent = {
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
+  snapshot?: ProviderSnapshotStart;
 };
+
+export class ProviderSnapshotCreationError extends Error {
+  constructor(readonly reason: SnapshotStartFailureReason) {
+    super(`Snapshot creation failed: ${reason}`);
+    this.name = 'ProviderSnapshotCreationError';
+  }
+}
 
 export type ProviderObservation = {
   status: ObserveResult;
@@ -109,6 +117,8 @@ export type ProviderSnapshotStart = {
   snapshotId: string;
   /** The image the snapshot was captured from. */
   baseImage: string;
+  /** The provider that captured it; absent only for callers that predate BYOC. */
+  provider?: 'cloudflare-containers' | 'vercel';
 };
 
 export type ProviderLaunchOptions = {

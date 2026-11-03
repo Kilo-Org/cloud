@@ -26,11 +26,8 @@ import type {
   EnvironmentBuildStatus,
 } from '../shared/environment-build-status.js';
 import { environmentActorAccess, resolveBuilderGitSource } from './access.js';
-import {
-  builderRuntimeUnsupportedReason,
-  builderSandboxId,
-  createBuilderProvider,
-} from './builder-provider.js';
+import { builderSandboxId, createBuilderProvider } from './builder-provider.js';
+import { resolveEnvironmentBuildTarget, snapshotsRuntimeUnsupportedReason } from './target.js';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -131,11 +128,32 @@ export class EnvironmentBuild extends DurableObject<Env> {
           return access;
         },
         gitSource: input => resolveBuilderGitSource(env, input),
+        buildTarget: input =>
+          resolveEnvironmentBuildTarget({
+            env,
+            db: getPgDb(env),
+            reference: input.reference,
+            repoFullName: input.repoFullName,
+            commands: input.commands,
+            sandboxAllocation: input.sandboxAllocation,
+          }),
       },
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,
         env,
       }),
+      lifecycle: buildId => {
+        const key = `environment-build:lifecycle:v1:${buildId}`;
+        return {
+          get: () => storage.get(key),
+          set: async value => {
+            await storage.put(key, value);
+          },
+          clear: async () => {
+            await storage.delete(key);
+          },
+        };
+      },
       runnerUrl: (environmentId, buildId) => {
         const base = env.WORKER_URL?.replace(/\/$/, '');
         return base ? `${base}/environment-build/${environmentId}/${buildId}` : null;
@@ -164,10 +182,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
         };
       },
       builderSandboxId: sandboxId,
-      unsupportedReason: () => {
-        if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
-        return builderRuntimeUnsupportedReason(env);
-      },
+      unsupportedReason: () => snapshotsRuntimeUnsupportedReason(env),
       log: (message, fields) => logger.withFields(fields).info(message),
     };
   }

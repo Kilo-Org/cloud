@@ -45,7 +45,7 @@ const publishedSnapshotCommonSchema = z.object({
   environmentId: z.string().uuid(),
   owner: environmentOwnerSchema,
   revision: z.number().int().positive(),
-  provider: z.literal('cloudflare-containers'),
+  provider: z.enum(['cloudflare-containers', 'vercel']),
   baseImage: z.string().min(1),
   runtimeAbi: z.string().min(1),
   runtimeRelease: z.string().min(1).nullable(),
@@ -91,11 +91,14 @@ export const publishedSnapshotSchema = z.union([
 export type PublishedSnapshot = z.infer<typeof publishedSnapshotSchema>;
 
 /**
- * The launch image and runtime ABI a session would start with now. `baseImage`
- * is null when it could not be read; the container DO still refuses another
- * image, so an unknown image never blocks a start.
+ * The provider, account/base identity and runtime ABI a session would start
+ * with now. `baseImage` is null when it could not be read. For native containers
+ * the container DO still refuses another image, so an unknown image never
+ * blocks a start. Vercel has no such guard: an account that cannot be read is
+ * incompatible, because restoring across accounts is never safe.
  */
 export type SnapshotCompatibility = {
+  provider: PublishedSnapshot['provider'];
   baseImage: string | null;
   runtimeAbi: string;
 };
@@ -104,21 +107,27 @@ export type SnapshotCompatibility = {
 export type SnapshotImageCompatibility = 'current' | 'previous' | 'incompatible';
 
 /**
- * Only split-image snapshots with a downloaded runtime can serve sessions. A
- * runtime ABI change is always incompatible. A snapshot from an earlier base
- * image stays usable while its replacement builds: the disk restore does not
- * use the old image and the current runtime is installed over it, so only the
- * base userspace and installed tools differ.
+ * Only snapshots from the same provider, with the same runtime ABI and a
+ * downloaded runtime, can serve sessions. For native containers a snapshot from
+ * an earlier base image stays usable while its replacement builds: the disk
+ * restore does not use the old image and the current runtime is installed over
+ * it, so only the base userspace and installed tools differ. Vercel has no such
+ * guard, so a different base or an unreadable account is incompatible.
  */
 export function snapshotImageCompatibility(
   published: PublishedSnapshot,
   current: SnapshotCompatibility
 ): SnapshotImageCompatibility {
-  if (published.runtimeAbi !== current.runtimeAbi || published.runtimeRelease === null) {
+  if (published.provider !== current.provider) return 'incompatible';
+  if (published.runtimeAbi !== current.runtimeAbi) return 'incompatible';
+  if (published.provider === 'cloudflare-containers' && published.runtimeRelease === null) {
     return 'incompatible';
   }
-  if (current.baseImage === null || published.baseImage === current.baseImage) return 'current';
-  return 'previous';
+  if (current.baseImage === null) {
+    return published.provider === 'vercel' ? 'incompatible' : 'current';
+  }
+  if (published.baseImage === current.baseImage) return 'current';
+  return published.provider === 'vercel' ? 'incompatible' : 'previous';
 }
 
 export function compatibleWith(

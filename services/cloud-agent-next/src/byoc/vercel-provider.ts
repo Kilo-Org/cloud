@@ -1,6 +1,7 @@
 import type { ByocVercelOwner } from './vercel-owner.js';
 import type { Env } from '../types.js';
 import type { ProviderAdapter } from '../sandbox-control/provider.js';
+import { ProviderSnapshotCreationError } from '../sandbox-control/provider.js';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SessionCredentialGrant } from '../sandbox-control/session-credentials.js';
 import {
@@ -8,6 +9,7 @@ import {
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
 import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
 import {
   ByocCredentialMissingError,
   ByocVercelNotReadyError,
@@ -53,6 +55,7 @@ export function createByocVercelProviderAdapter(deps: {
   }
 
   return {
+    environmentSnapshots: true,
     ensureBillingAdmission: async () => {},
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -71,7 +74,28 @@ export function createByocVercelProviderAdapter(deps: {
           ...deps,
           config: { ...config, resources: deps.resources },
         });
-        return await adapter.create(intent);
+        const requested = intent.snapshot;
+        const compatible =
+          requested?.provider === 'vercel' &&
+          requested.baseImage ===
+            vercelSnapshotBaseImage({
+              ...config,
+              credentialId: deps.source.credentialId,
+              baseSnapshotId: config.snapshotId,
+            });
+        if (requested !== undefined && !compatible)
+          throw new ProviderSnapshotCreationError('image_mismatch');
+        try {
+          return await adapter.create(intent);
+        } catch (error) {
+          if (
+            requested !== undefined &&
+            error instanceof VercelSandboxRestError &&
+            (error.status === 400 || error.status === 404 || error.status === 410)
+          )
+            throw new ProviderSnapshotCreationError('missing');
+          throw error;
+        }
       } catch (error) {
         if (error instanceof ByocCredentialMissingError)
           throw new ByocVercelProviderError(error.code);

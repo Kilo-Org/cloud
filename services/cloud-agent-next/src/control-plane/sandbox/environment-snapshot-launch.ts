@@ -131,7 +131,11 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
     resolution.snapshot.stale === 'image'
       ? (resolution.currentBaseImage ?? resolution.snapshot.baseImage)
       : resolution.snapshot.baseImage;
-  return { snapshotId: resolution.snapshot.snapshotId, baseImage };
+  return {
+    snapshotId: resolution.snapshot.snapshotId,
+    baseImage,
+    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+  };
 }
 
 export type EnvironmentSnapshotBlockReason =

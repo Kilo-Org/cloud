@@ -18,6 +18,7 @@ import {
   type AutoAttempt,
   type PublishedSnapshot,
 } from './policy.js';
+import { environmentBuildTargetSchema } from './target.js';
 import { environmentScopeV1Schema, environmentScopeV2Schema } from './reference.js';
 
 /**
@@ -50,7 +51,9 @@ export function isTerminal(state: BuildState): state is BuildOutcome {
  * The stored build input JSON. The reference is the environment scope, because a
  * builder clones every repository at its default branch. A V1 build stores
  * `repoFullName`, the path the clone URL is built from. A V2 build stores its
- * repositories in the reference. Exactly one alternative.
+ * repositories in the reference. Exactly one alternative. `target` pins the
+ * provider and account at admission; it is absent only for builds admitted
+ * before provider selection existed.
  */
 export const buildInputRecordSchema = z.union([
   z
@@ -59,6 +62,7 @@ export const buildInputRecordSchema = z.union([
       repoFullName: z.string().min(1),
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
+      target: environmentBuildTargetSchema.optional(),
     })
     .strict(),
   z
@@ -67,6 +71,7 @@ export const buildInputRecordSchema = z.union([
       repoFullName: z.undefined().optional(),
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
+      target: environmentBuildTargetSchema.optional(),
     })
     .strict(),
 ]);

@@ -67,7 +67,8 @@ Publication requires these approved and provisioned resources:
   registry. The publisher reuses the existing deploy token.
 
 The admission job reads `runtime-targets.json` through the GitHub API for the exact source SHA and
-requires downloaded/runtime-free for every target. Preinstalled and all-in-one selections are rejected. Every
+requires downloaded/runtime-free for every target. Preinstalled and all-in-one selections are rejected.
+A target marked `vercel: true` declares BYOC Vercel support and requires the published release. Every
 eligible successful main-push CI run publishes its exact-SHA handoff, even without runtime changes.
 The publisher reuses a verified cached base when its inputs have not changed.
 
@@ -81,7 +82,7 @@ credentials or deploy the Worker.
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.
 
-Downloaded deployment preparation uses the exact checked-out source SHA. The same downloaded catalog
+Downloaded and Vercel deployment preparation use the exact checked-out source SHA. The same downloaded catalog
 starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
 without holding the publisher's concurrency lock. Publication runs are titled with their source SHA,
 so preparation reads their state with the deploy's read-only token. While any run for the SHA is

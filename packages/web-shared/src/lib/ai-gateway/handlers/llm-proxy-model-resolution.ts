@@ -68,7 +68,7 @@ import type {
   ValidatedGatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 
-export type AutoRoutingFailure =
+type AutoRoutingFailure =
   | { kind: 'invalid_token' }
   | { kind: 'auth_required' }
   | { kind: 'decision_secret_missing' }
@@ -78,7 +78,7 @@ export type AutoRoutingFailure =
   | { kind: 'custom_router'; code: CustomRouterErrorCode; message: string }
   | { kind: 'unavailable' };
 
-export type ModelResolution =
+type ModelResolution =
   | { kind: 'direct' }
   | {
       kind: 'routed';
@@ -408,7 +408,7 @@ export function billLegacyClassifierCost(params: {
   headers: LlmProxyRequestHeaders;
 }): void {
   const { resolution, user, usage, headers } = params;
-  if (resolution.kind === 'direct' || resolution.classifierCostUsd <= 0) return;
+  if (resolution.kind === 'direct' || !(resolution.classifierCostUsd > 0)) return;
   const costMicrodollars = toMicrodollars(resolution.classifierCostUsd);
   const priorMicrodollarUsage = user.microdollars_used;
   after(

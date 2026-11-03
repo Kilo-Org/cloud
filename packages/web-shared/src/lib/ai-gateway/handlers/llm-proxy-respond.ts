@@ -3,6 +3,7 @@ import type { Span } from '@sentry/nextjs';
 import type { User } from '@kilocode/db';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { recordBriefingUsage } from '@kilocode/web-shared/lib/agent-briefing-usage';
+import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import {
   accountForMicrodollarUsage,
@@ -21,7 +22,7 @@ import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/uti
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 type RespondInput = {
-  upstream: { response: Response; toolsAvailable: string[]; toolsUsed: string[] };
+  upstream: Extract<Awaited<ReturnType<typeof sendUpstreamAttempt>>, { type: 'success' }>;
   /** The request as sent upstream; provider transforms may have removed its model. */
   request: GatewayRequest;
   /** The resolved model id, lowercased. */

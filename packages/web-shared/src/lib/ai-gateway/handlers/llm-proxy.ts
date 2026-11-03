@@ -184,6 +184,9 @@ export async function handleLlmProxyRequest(
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
   });
+  // Invalid requests return before anything awaits auth. Keep those paths from
+  // surfacing auth failures as unhandled rejections.
+  void authPromise.catch(() => {});
   debugSaveProxyRequest(requestBodyText);
   const parsed = parseLlmProxyRequest(path, requestBodyText, rawIpAddress);
   if (!parsed.ok) return parsed.response;

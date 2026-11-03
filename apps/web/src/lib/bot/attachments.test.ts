@@ -150,7 +150,7 @@ describe('extractAndUploadAttachments', () => {
       ],
       declinedFilenames: [],
     });
-    expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(4);
+    expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(8);
     expect(mockSend).toHaveBeenCalledTimes(4);
     expect(commandInput(0)).toMatchObject({
       Key: `user-1/cloud-agent/${MESSAGE_UUID}/${IMAGE_ID}.png`,
@@ -208,9 +208,11 @@ describe('extractAndUploadAttachments', () => {
     mockRandomUUID
       .mockReturnValueOnce(MESSAGE_UUID)
       .mockReturnValueOnce(IMAGE_ID)
-      .mockReturnValueOnce(MARKDOWN_ID)
+      .mockReturnValueOnce(OTHER_IDS[0])
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(OTHER_IDS[1])
       .mockReturnValueOnce(CSV_ID)
-      .mockReturnValueOnce(FRESH_IDS[0]);
+      .mockReturnValueOnce(OTHER_IDS[2]);
     const preflightFetch = jest.fn(async () => Buffer.from('not-fetched'));
     const oversizedDownloadFetch = jest.fn(async () => Buffer.alloc(MAX_SIZE_BYTES + 1));
 
@@ -243,6 +245,12 @@ describe('extractAndUploadAttachments', () => {
     expect(oversizedDownloadFetch).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).toHaveBeenCalledTimes(2);
+    // The declared size refuses before the ledger is asked for capacity.
+    expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(3);
+    // The body the cap refused gives its reserved capacity straight back.
+    expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
+      `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+    ]);
   });
 
   it('continues uploading when an individual attachment upload fails', async () => {
@@ -304,7 +312,7 @@ describe('extractAndUploadAttachments', () => {
     expect(result?.declinedFilenames.join()).not.toContain(IMAGE_ID);
   });
 
-  it('admits each upload with its exact size before writing it', async () => {
+  it('records each upload with its exact size before writing it', async () => {
     mockRandomUUID
       .mockReturnValueOnce(MESSAGE_UUID)
       .mockReturnValueOnce(IMAGE_ID)
@@ -320,6 +328,9 @@ describe('extractAndUploadAttachments', () => {
       'user-1'
     );
 
+    expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(4);
+    // Each file reserves capacity before its body is read, then records the
+    // size the body turned out to have on the same key.
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -327,11 +338,24 @@ describe('extractAndUploadAttachments', () => {
         messageUuid: MESSAGE_UUID,
         attachmentId: IMAGE_ID,
         objectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${IMAGE_ID}.png`,
-        byteSize: 5,
+        freshObjectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${FRESH_IDS[0]}.png`,
+        byteSize: 0,
       })
     );
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
       2,
+      expect.objectContaining({
+        attachmentId: IMAGE_ID,
+        freshObjectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${FRESH_IDS[0]}.png`,
+        byteSize: 5,
+      })
+    );
+    expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ attachmentId: MARKDOWN_ID, byteSize: 0 })
+    );
+    expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
+      4,
       expect.objectContaining({
         attachmentId: MARKDOWN_ID,
         objectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md`,
@@ -341,7 +365,9 @@ describe('extractAndUploadAttachments', () => {
     const admitOrder = mockAdmitPendingUpload.mock.invocationCallOrder;
     const writeOrder = mockSend.mock.invocationCallOrder;
     expect(admitOrder[0]).toBeLessThan(writeOrder[0] ?? Number.POSITIVE_INFINITY);
-    expect(admitOrder[1]).toBeLessThan(writeOrder[1] ?? Number.POSITIVE_INFINITY);
+    expect(admitOrder[1]).toBeLessThan(writeOrder[0] ?? Number.POSITIVE_INFINITY);
+    expect(admitOrder[2]).toBeLessThan(writeOrder[1] ?? Number.POSITIVE_INFINITY);
+    expect(admitOrder[3]).toBeLessThan(writeOrder[1] ?? Number.POSITIVE_INFINITY);
   });
 
   it('skips a file the account ceiling refuses and keeps the others', async () => {
@@ -408,7 +434,10 @@ describe('extractAndUploadAttachments', () => {
   });
 
   it('still reports the declined files of a message that forwarded nothing', async () => {
-    mockRandomUUID.mockReturnValueOnce(MESSAGE_UUID).mockReturnValueOnce(IMAGE_ID);
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(IMAGE_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
     mockAdmitPendingUpload.mockRejectedValue(
       new TRPCError({
         code: 'BAD_REQUEST',
@@ -434,7 +463,7 @@ describe('extractAndUploadAttachments', () => {
       .mockReturnValueOnce(MESSAGE_UUID)
       .mockReturnValueOnce(IMAGE_ID)
       .mockReturnValueOnce(FRESH_IDS[0]);
-    mockAdmitPendingUpload.mockResolvedValueOnce(
+    mockAdmitPendingUpload.mockResolvedValue(
       `user-1/cloud-agent/${MESSAGE_UUID}/${OTHER_IDS[0]}.png`
     );
 
@@ -448,5 +477,177 @@ describe('extractAndUploadAttachments', () => {
     });
     expect(result?.objectKeys).toEqual([`user-1/cloud-agent/${MESSAGE_UUID}/${OTHER_IDS[0]}.png`]);
     expect(result?.attachments?.files).toEqual([`${OTHER_IDS[0]}.png`]);
+  });
+
+  it('stops reading a streamed body as soon as it passes the size limit', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+    const chunkBytes = 8 * 1024 * 1024;
+    const totalChunks = 10;
+    let pulledChunks = 0;
+    let cancelled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulledChunks === totalChunks) {
+          controller.close();
+          return;
+        }
+        pulledChunks += 1;
+        controller.enqueue(new Uint8Array(chunkBytes));
+      },
+      cancel() {
+        cancelled += 1;
+      },
+    });
+    const fetchAttachmentUrl = jest.fn(
+      async (_url: string) =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        })
+    );
+    const adapterFetch = jest.fn(async () => Buffer.from('adapter'));
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'big.txt',
+          mimeType: 'text/plain',
+          url: 'https://files.example/big.txt',
+          fetchData: adapterFetch,
+        },
+      ]),
+      'user-1',
+      { fetchAttachmentUrl }
+    );
+
+    expect(fetchAttachmentUrl).toHaveBeenCalledWith('https://files.example/big.txt');
+    // 20MB cap: the third 8MB chunk crosses it, so the rest is never read. The
+    // stream may have one chunk queued ahead, but 10 are available.
+    expect(pulledChunks).toBeLessThanOrEqual(4);
+    expect(pulledChunks).toBeLessThan(totalChunks);
+    expect(cancelled).toBe(1);
+    expect(adapterFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({ objectKeys: [], declinedFilenames: ['big.txt'] });
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
+      `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+    ]);
+  });
+
+  it('starts no retrieval for a file the account ceiling refuses', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(IMAGE_ID)
+      .mockReturnValueOnce(FRESH_IDS[0])
+      .mockReturnValueOnce(MARKDOWN_ID)
+      .mockReturnValueOnce(FRESH_IDS[1]);
+    mockAdmitPendingUpload.mockRejectedValueOnce(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Maximum 25 uploads allowed per account' })
+    );
+    const fetchAttachmentUrl = jest.fn(
+      async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'text/plain' } })
+    );
+    const refusedFetch = jest.fn(async () => Buffer.from('refused'));
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'refused.txt',
+          mimeType: 'text/plain',
+          url: 'https://files.example/refused.txt',
+          fetchData: refusedFetch,
+        },
+        createAttachment({ type: 'file', name: 'saved.md', mimeType: 'text/plain' }),
+      ]),
+      'user-1',
+      { fetchAttachmentUrl }
+    );
+
+    expect(result).toEqual({
+      attachments: { path: MESSAGE_UUID, files: [`${MARKDOWN_ID}.md`] },
+      objectKeys: [`user-1/cloud-agent/${MESSAGE_UUID}/${MARKDOWN_ID}.md`],
+      declinedFilenames: ['refused.txt'],
+    });
+    // Refused before any body work: neither the URL nor the adapter is read.
+    expect(fetchAttachmentUrl).not.toHaveBeenCalled();
+    expect(refusedFetch).not.toHaveBeenCalled();
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockReleasePendingUploads).not.toHaveBeenCalled();
+  });
+
+  it('records the exact size of a streamed body and forwards it', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(CSV_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('abc'));
+        controller.enqueue(new TextEncoder().encode('de'));
+        controller.close();
+      },
+    });
+    const fetchAttachmentUrl = jest.fn(
+      async () => new Response(stream, { status: 200, headers: { 'content-type': 'text/csv' } })
+    );
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'rows.csv',
+          mimeType: 'text/csv',
+          url: 'https://files.example/rows.csv',
+        },
+      ]),
+      'user-1',
+      { fetchAttachmentUrl }
+    );
+
+    expect(result?.attachments?.files).toEqual([`${CSV_ID}.csv`]);
+    expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ attachmentId: CSV_ID, byteSize: 5 })
+    );
+    expect(commandInput(0)).toMatchObject({
+      Key: `user-1/cloud-agent/${MESSAGE_UUID}/${CSV_ID}.csv`,
+      ContentLength: 5,
+      Body: Buffer.from('abcde'),
+    });
+  });
+
+  it('falls back to the adapter fetch when the attachment URL is not readable', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+    const fetchAttachmentUrl = jest.fn(async () => new Response('login required', { status: 403 }));
+    const adapterFetch = jest.fn(async () => Buffer.from('from-adapter'));
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'notes.txt',
+          mimeType: 'text/plain',
+          url: 'https://files.example/notes.txt',
+          fetchData: adapterFetch,
+        },
+      ]),
+      'user-1',
+      { fetchAttachmentUrl }
+    );
+
+    expect(fetchAttachmentUrl).toHaveBeenCalledTimes(1);
+    expect(adapterFetch).toHaveBeenCalledTimes(1);
+    expect(result?.attachments?.files).toEqual([`${TEXT_ID}.txt`]);
+    expect(commandInput(0)).toMatchObject({ ContentLength: 12 });
   });
 });

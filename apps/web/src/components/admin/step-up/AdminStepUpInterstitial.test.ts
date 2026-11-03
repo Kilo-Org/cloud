@@ -77,6 +77,22 @@ describe('AdminStepUpInterstitial', () => {
     expect(render({ code: 'SESSION_UNBOUND' })).toContain('Sign out and sign in again');
   });
 
+  it('uses an h1 and page landmark variant when replacing the shell', () => {
+    mockQueryState = {
+      isSuccess: true,
+      isLoading: false,
+      isError: false,
+      data: { enrolled: true, sessionBound: true },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(AdminStepUpInterstitial, {
+        requirement: { code: 'MFA_REQUIRED' },
+        variant: 'page',
+      })
+    );
+    expect(html).toContain('<h1');
+  });
+
   it('shows a retry when the status read fails', () => {
     const refetch = jest.fn();
     mockQueryState = { isSuccess: false, isLoading: false, isError: true, refetch };

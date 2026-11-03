@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { useStepUpActive } from '@/components/admin/step-up/StepUpProvider';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
@@ -30,6 +32,7 @@ export default function ApiRequestLogPage() {
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const stepUpActive = useStepUpActive();
   const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
   const summaryQuery = useQuery(
     trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
@@ -72,12 +75,15 @@ export default function ApiRequestLogPage() {
 
     // A gated read runs through the tRPC link first, so an expired proof opens
     // the dialog before the browser navigates to the streaming download.
-    try {
-      await queryClient.fetchQuery(
-        trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
-      );
-    } catch {
-      return;
+    if (stepUpActive) {
+      try {
+        await queryClient.fetchQuery(
+          trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
+        );
+      } catch {
+        toast.error('Could not verify access before download. Try again.');
+        return;
+      }
     }
 
     // Navigate directly to preserve server-side streaming

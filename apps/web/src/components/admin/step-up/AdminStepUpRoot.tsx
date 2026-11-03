@@ -5,8 +5,9 @@ import { useSession } from 'next-auth/react';
 import { StepUpProvider } from './StepUpProvider';
 
 /**
- * Mounts the global step-up dialog only for an authenticated admin when the
- * switch is on. Non-admins and OFF mode get the children untouched.
+ * Mounts the step-up provider with a stable element tree. `active` is true only
+ * for an authenticated admin when the server says the switch is on; otherwise
+ * the provider registers no handler and renders no dialog or query.
  */
 export function AdminStepUpRoot({
   enabled,
@@ -16,8 +17,6 @@ export function AdminStepUpRoot({
   children: React.ReactNode;
 }) {
   const { status, data } = useSession();
-  if (!enabled || status !== 'authenticated' || data?.isAdmin !== true) {
-    return <>{children}</>;
-  }
-  return <StepUpProvider>{children}</StepUpProvider>;
+  const active = enabled && status === 'authenticated' && data?.isAdmin === true;
+  return <StepUpProvider active={active}>{children}</StepUpProvider>;
 }

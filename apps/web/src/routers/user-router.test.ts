@@ -1,4 +1,8 @@
-import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -2833,7 +2837,7 @@ describe('user router - passkeys', () => {
     ],
   ])('refuses %s through a bearer token', async (_label, invoke) => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const bearerCaller = await createCallerForUser(owner.id);
+    const bearerCaller = await createBearerCallerForUser(owner.id);
 
     await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
       code: 'FORBIDDEN',

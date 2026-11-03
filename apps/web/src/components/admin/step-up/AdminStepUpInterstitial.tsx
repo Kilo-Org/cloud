@@ -5,7 +5,13 @@ import { StepUpCeremonyContent } from './StepUpDialog';
 import { setStepUpInterstitialVisible } from './step-up-interstitial-state';
 import type { StepUpRequirement } from './step-up-error';
 
-export function AdminStepUpInterstitial({ requirement }: { requirement: StepUpRequirement }) {
+export function AdminStepUpInterstitial({
+  requirement,
+  variant = 'embedded',
+}: {
+  requirement: StepUpRequirement;
+  variant?: 'page' | 'embedded';
+}) {
   useEffect(() => {
     setStepUpInterstitialVisible(true);
     return () => setStepUpInterstitialVisible(false);
@@ -20,6 +26,7 @@ export function AdminStepUpInterstitial({ requirement }: { requirement: StepUpRe
           onCancel={() => {}}
           dismissible={false}
           headings="plain"
+          headingLevel={variant === 'page' ? 'h1' : 'h2'}
         />
       </div>
     </section>

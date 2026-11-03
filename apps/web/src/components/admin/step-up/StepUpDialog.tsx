@@ -76,12 +76,14 @@ export function StepUpCeremonyContent({
   onCancel,
   dismissible = true,
   headings = 'dialog',
+  headingLevel = 'h2',
 }: {
   requirement: StepUpRequirement | null;
   onVerified: () => void;
   onCancel: () => void;
   dismissible?: boolean;
   headings?: 'dialog' | 'plain';
+  headingLevel?: 'h1' | 'h2';
 }) {
   const trpc = useTRPC();
   const [isRunning, setIsRunning] = useState(false);
@@ -148,16 +150,21 @@ export function StepUpCeremonyContent({
   }, [error]);
 
   const enrolled = statusQuery.data?.enrolled ?? false;
+  const retrying = statusQuery.isRefetching;
   const actionLabel = !statusKnown
     ? statusFailed
-      ? 'Retry status check'
+      ? retrying
+        ? 'Checking...'
+        : 'Retry status check'
       : 'Checking your passkeys...'
     : unavailable
-      ? 'Retry status check'
+      ? retrying
+        ? 'Checking...'
+        : 'Retry status check'
       : enrolled
         ? 'Verify with passkey'
         : 'Add a passkey';
-  const actionDisabled = isRunning || (!statusKnown && !statusFailed);
+  const actionDisabled = isRunning || (!statusKnown && !statusFailed) || retrying;
 
   return (
     <div>
@@ -171,6 +178,8 @@ export function StepUpCeremonyContent({
         </span>
         {headings === 'dialog' ? (
           <DialogTitle>{stepUpDialogTitle(current)}</DialogTitle>
+        ) : headingLevel === 'h1' ? (
+          <h1 className="text-lg font-semibold">{stepUpDialogTitle(current)}</h1>
         ) : (
           <h2 className="text-lg font-semibold">{stepUpDialogTitle(current)}</h2>
         )}
@@ -207,10 +216,10 @@ export function StepUpCeremonyContent({
             }
             disabled={actionDisabled}
           >
-            {isRunning ? (
+            {isRunning || retrying ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                Waiting for your passkey...
+                {retrying ? 'Checking...' : 'Waiting for your passkey...'}
               </>
             ) : (
               actionLabel

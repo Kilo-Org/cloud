@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -10,25 +10,34 @@ import { StepUpRequestQueue } from './step-up-requests';
 import { isStepUpInterstitialVisible } from './step-up-interstitial-state';
 import { StepUpDialog } from './StepUpDialog';
 
+const StepUpActiveContext = createContext(false);
+
+/** True only for an authenticated admin while the switch is ON. */
+export function useStepUpActive(): boolean {
+  return useContext(StepUpActiveContext);
+}
+
 /**
- * Owns the single verification dialog for the admin app. The tRPC link asks
- * this provider to verify, then retries the refused operation once.
+ * Owns the single verification dialog for the app. The element tree is stable
+ * whether or not step-up is active, so a session load never remounts the app.
  */
-export function StepUpProvider({ children }: { children: ReactNode }) {
+export function StepUpProvider({ active, children }: { active: boolean; children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [requirement, setRequirement] = useState<StepUpRequirement | null>(null);
   const queue = useRef(new StepUpRequestQueue());
 
-  const requestStepUp = useCallback((nextRequirement: StepUpRequirement) => {
-    // The full-page interstitial owns the only verification UI while it is
-    // showing; do not stack a second dialog over it.
-    if (isStepUpInterstitialVisible()) return Promise.resolve(false);
-    const started = !queue.current.hasPending();
-    const pending = queue.current.begin();
-    if (started) setRequirement(nextRequirement);
-    return pending;
-  }, []);
+  const requestStepUp = useCallback(
+    (nextRequirement: StepUpRequirement) => {
+      if (!active) return Promise.resolve(false);
+      if (isStepUpInterstitialVisible()) return Promise.resolve(false);
+      const started = !queue.current.hasPending();
+      const pending = queue.current.begin();
+      if (started) setRequirement(nextRequirement);
+      return pending;
+    },
+    [active]
+  );
 
   const settle = useCallback((verified: boolean) => {
     setRequirement(null);
@@ -36,9 +45,10 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!active) return;
     registerStepUpHandler(next => requestStepUp(next));
     return () => registerStepUpHandler(null);
-  }, [requestStepUp]);
+  }, [active, requestStepUp]);
 
   const onVerified = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -48,14 +58,16 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
   }, [queryClient, settle, trpc]);
 
   return (
-    <>
+    <StepUpActiveContext.Provider value={active}>
       {children}
-      <StepUpDialog
-        open={requirement !== null}
-        requirement={requirement}
-        onVerified={onVerified}
-        onCancel={() => settle(false)}
-      />
-    </>
+      {active ? (
+        <StepUpDialog
+          open={requirement !== null}
+          requirement={requirement}
+          onVerified={onVerified}
+          onCancel={() => settle(false)}
+        />
+      ) : null}
+    </StepUpActiveContext.Provider>
   );
 }

@@ -49,7 +49,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // One verification surface only: when the session needs step-up, render the
   // interstitial without the sidebar so no admin query opens a second dialog.
   if (stepUpRequirement) {
-    return <AdminStepUpInterstitial requirement={stepUpRequirement} />;
+    return (
+      <main id="main-content" tabIndex={-1}>
+        <AdminStepUpInterstitial requirement={stepUpRequirement} variant="page" />
+      </main>
+    );
   }
 
   return (

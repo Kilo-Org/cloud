@@ -9,6 +9,8 @@ import {
   validateEnvironmentName,
 } from '@kilocode/cloud-agent-profile';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogClose,
@@ -19,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
+import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   useCloudAgentEnvironment,
   useCloudAgentEnvironmentMutations,
@@ -37,6 +40,12 @@ import {
   formatEnvironmentVariables,
 } from './environment-variables';
 import { describeEnvironmentProfileImpact } from './environment-profile-impact';
+import { EnvironmentRepositoriesField } from './EnvironmentRepositoriesField';
+import {
+  repositoriesForEnvironment,
+  repositoryName,
+  sameRepositories,
+} from './environment-repositories';
 import { EnvironmentSandboxField } from './EnvironmentSandboxField';
 import { EnvironmentScriptsEditor } from './EnvironmentScriptsEditor';
 import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
@@ -112,27 +121,31 @@ function EnvironmentForm({
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
   const [page, setPage] = useState<EditorPage>('overview');
-  const fullName =
-    existing?.repoFullName ??
-    repositoryLabel ??
-    (repository?.platform === 'gitlab' ? repository.projectPath : repository?.fullName) ??
-    '';
-  const name =
-    existing?.name ??
-    splitRepositoryName(fullName).name.slice(0, ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
+  const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
+    existing ? repositoriesForEnvironment(existing) : repository ? [repository] : []
+  );
+  const [repositories, setRepositories] = useState(initialRepositories);
+  const repositoriesChanged = !sameRepositories(initialRepositories, repositories);
+  const isMultiRepository = !existing || existing.repositories !== undefined || repositoriesChanged;
+  const launchName = repositories[0] ? repositoryName(repositories[0]) : (repositoryLabel ?? '');
+  const defaultName = splitRepositoryName(launchName).name.slice(
+    0,
+    ENVIRONMENT_LIMITS.MAX_NAME_LENGTH
+  );
+  const [name, setName] = useState(existing?.name ?? '');
+  const savedName = name.trim() || defaultName;
   const [initialSandboxAllocation] = useState(() =>
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
   const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
-  const sandboxRepository = existing
-    ? { platform: existing.platform, fullName }
-    : repository
-      ? { platform: repository.platform, fullName }
-      : undefined;
+  const sandboxRepository = repositories[0]
+    ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
+    : undefined;
   const profileQuery = useEnvironmentProfiles({
     organizationId,
     repository: sandboxRepository,
     selectedProfileId,
+    environment: isMultiRepository ? { repositories } : null,
   });
   const [initialScript] = useState(() => toEnvironmentScript(existing?.commands ?? []));
   const [script, setScript] = useState(initialScript);
@@ -147,14 +160,16 @@ function EnvironmentForm({
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
   const [variablesText, setVariablesText] = useState(initialVariablesText);
-  const hasUnsavedChanges = hasEnvironmentFormChanges(
-    {
-      script: initialScript,
-      variablesText: initialVariablesText,
-      sandboxAllocation: initialSandboxAllocation,
-    },
-    { script, variablesText, sandboxAllocation }
-  );
+  const hasUnsavedChanges =
+    hasEnvironmentFormChanges(
+      {
+        name: existing?.name ?? defaultName,
+        script: initialScript,
+        variablesText: initialVariablesText,
+        sandboxAllocation: initialSandboxAllocation,
+      },
+      { name: savedName, script, variablesText, sandboxAllocation }
+    ) || repositoriesChanged;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
   let variablesError: string | null = null;
@@ -168,7 +183,7 @@ function EnvironmentForm({
     variablesError = caught instanceof Error ? caught.message : 'Check the environment variables.';
   }
   const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
-  const scriptCount = script.trim() ? 1 : 0;
+  const hasScript = script.trim().length > 0;
   const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
   const changePage = (next: EditorPage) => {
     setError(null);
@@ -183,12 +198,14 @@ function EnvironmentForm({
     }
     setError(null);
     try {
-      validateEnvironmentName(name);
+      validateEnvironmentName(savedName);
       validateEnvironmentCommands(commands);
       if (existing) {
         await updateEnvironment.mutateAsync({
           organizationId,
           environmentId: existing.id,
+          name: savedName,
+          repositories: repositoriesChanged ? repositories : undefined,
           plainVars: variables.plainVars,
           secrets: variables.secrets,
           commands,
@@ -196,7 +213,7 @@ function EnvironmentForm({
         });
         onSaved(existing.id);
       } else {
-        if (!repository) {
+        if (repositories.length === 0) {
           setError('Select a repository first.');
           return;
         }
@@ -207,8 +224,8 @@ function EnvironmentForm({
         );
         const created = await createEnvironment.mutateAsync({
           organizationId,
-          name,
-          repository,
+          name: savedName,
+          repositories,
           plainVars: variables.plainVars,
           secrets,
           commands,
@@ -258,7 +275,9 @@ function EnvironmentForm({
                   : 'Set up environment'}
           </DialogTitle>
         </div>
-        <DialogDescription className="break-all">{fullName}</DialogDescription>
+        <DialogDescription className="sr-only">
+          Configure repositories, setup scripts, and environment variables.
+        </DialogDescription>
         {!canManage && (
           <p className="text-muted-foreground text-xs">
             View only. Organization owners and admins can edit this environment.
@@ -269,6 +288,26 @@ function EnvironmentForm({
         <fieldset disabled={isSaving || deleteEnvironment.isPending} className="min-w-0 space-y-5">
           {page === 'overview' && (
             <>
+              <div className="grid gap-2">
+                <Label htmlFor="environment-name" className="text-xs">
+                  Name (optional)
+                </Label>
+                <Input
+                  id="environment-name"
+                  value={name}
+                  readOnly={!canManage}
+                  onChange={event => setName(event.target.value)}
+                  placeholder={defaultName}
+                  maxLength={ENVIRONMENT_LIMITS.MAX_NAME_LENGTH}
+                />
+              </div>
+              <fieldset disabled={!canManage} className="min-w-0">
+                <EnvironmentRepositoriesField
+                  organizationId={organizationId}
+                  repositories={repositories}
+                  onChange={setRepositories}
+                />
+              </fieldset>
               {sandboxRepository && (
                 <EnvironmentSandboxField
                   organizationId={organizationId}
@@ -276,6 +315,7 @@ function EnvironmentForm({
                   value={sandboxAllocation}
                   disabled={!canManage || isSaving}
                   onChange={setSandboxAllocation}
+                  isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
                 />
               )}
               <div className="space-y-3">
@@ -283,8 +323,8 @@ function EnvironmentForm({
                   icon={<Terminal className="size-4" />}
                   label="Setup script"
                   detail={
-                    scriptCount
-                      ? `${scriptCount} ${scriptCount === 1 ? 'script' : 'scripts'}`
+                    hasScript
+                      ? 'Configure your setup script'
                       : 'Install dependencies and prepare your repository'
                   }
                   onClick={() => changePage('scripts')}
@@ -350,7 +390,7 @@ function EnvironmentForm({
                   ? 'Profile setup commands are skipped'
                   : 'Profile setup commands will not run'}
                 : {impact.commandProfiles.join(', ')}.{' '}
-                {scriptCount === 0
+                {!hasScript
                   ? 'No setup script will run.'
                   : 'Only the environment scripts will run.'}
               </p>
@@ -379,7 +419,7 @@ function EnvironmentForm({
         <div>
           {canManage && existing && page === 'overview' && (
             <EnvironmentDeleteDialog
-              repositoryName={fullName}
+              repositoryName={repositories.map(repositoryName).join(', ')}
               onDelete={handleDelete}
               isDeleting={deleteEnvironment.isPending}
               disabled={isSaving}

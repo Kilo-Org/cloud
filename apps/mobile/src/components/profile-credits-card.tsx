@@ -348,8 +348,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 amount's column. */}
             <View
               className={cn(
-                'min-w-0 flex-1',
-                stackBalance ? 'flex-row items-center gap-1' : 'gap-1'
+                'min-w-0',
+                // `flex-1` is the row's width share only while this View is the
+                // column's child on a wide card. On a stacked card this View is
+                // the amount row inside the column, where `flex-1` sets a 0
+                // vertical basis and the row measured 0 dp tall on the first
+                // layout pass (Android compact cell, 2026-11-03); the card's
+                // `items-stretch` already gives it the full width.
+                stackBalance ? 'flex-row items-center gap-1' : 'flex-1 gap-1'
               )}
             >
               <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>

@@ -68,7 +68,11 @@ it('renders both real Wrangler targets without publication credentials', async (
     });
     const target = environment === 'production' ? output : output.env?.dev;
     expect(target).toMatchObject({
-      vars: { RUNTIME_STARTUP_MODE: 'preinstalled', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+      vars: {
+        RUNTIME_STARTUP_MODE: 'preinstalled',
+        NATIVE_RUNTIME_IMAGE: 'all-in-one',
+        ENVIRONMENT_SNAPSHOT_ORG_IDS: '*',
+      },
     });
   }
 });

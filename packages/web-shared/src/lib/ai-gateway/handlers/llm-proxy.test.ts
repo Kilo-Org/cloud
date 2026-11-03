@@ -833,7 +833,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       '@kilocode/web-shared/lib/r2/create-client'
     );
     fakeR2.objects.clear();
-    jest.replaceProperty(process, 'env', {
+    const env = jest.replaceProperty(process, 'env', {
       ...process.env,
       R2_ACCOUNT_ID: 'test-metadata-account',
       R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
@@ -875,11 +875,16 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-    expect(fakeR2.objects.size).toBe(0);
-    await Promise.all(
-      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
-    );
+    let response: Response;
+    try {
+      response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      expect(fakeR2.objects.size).toBe(0);
+      await Promise.all(
+        jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+      );
+    } finally {
+      env.restore();
+    }
 
     expect(response.status).toBe(200);
     const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;

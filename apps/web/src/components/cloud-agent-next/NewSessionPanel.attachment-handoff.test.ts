@@ -8,6 +8,7 @@ import type { NewSessionPanel as NewSessionPanelComponent } from './NewSessionPa
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 const mockRouterPush = jest.fn();
+const mockRepositoryQueryOptions = jest.fn<(options: unknown) => void>();
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
@@ -60,6 +61,9 @@ const mockRepository = {
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
+  if (kind.endsWith('Repositories') || kind.endsWith('bitbucket.getStatus')) {
+    mockRepositoryQueryOptions(options);
+  }
   const base = {
     data: undefined as unknown,
     isLoading: false,
@@ -385,6 +389,31 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
         );
       });
       await waitForStartButton(dom.container);
+
+      const repositoryScope = scenario.organizationId
+        ? 'organizations.cloudAgentNext'
+        : 'cloudAgentNext';
+      for (const provider of ['GitHub', 'GitLab']) {
+        expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect.objectContaining({
+            __testKind: `${repositoryScope}.list${provider}Repositories`,
+            staleTime: 5 * 60_000,
+            input: {
+              forceRefresh: false,
+              ...(scenario.organizationId ? { organizationId: scenario.organizationId } : {}),
+            },
+          })
+        );
+      }
+      for (const procedure of ['cloudAgentNext.listBitbucketRepositories', 'bitbucket.getStatus']) {
+        expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect.objectContaining({
+            __testKind: `organizations.${procedure}`,
+            staleTime: 5 * 60_000,
+            enabled: Boolean(scenario.organizationId),
+          })
+        );
+      }
 
       act(() => {
         changeFileInput(dom.container, [

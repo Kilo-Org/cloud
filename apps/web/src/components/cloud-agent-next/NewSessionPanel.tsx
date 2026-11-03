@@ -95,6 +95,7 @@ import {
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
+  CLOUD_AGENT_METADATA_STALE_TIME,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
@@ -187,7 +188,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  const { data: modelsData } = useModelSelectorList(organizationId);
+  const { data: modelsData } = useModelSelectorList(organizationId, true, 'member', {
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
@@ -442,32 +445,34 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     isLoading: isLoadingGitHubRepos,
     error: githubRepoError,
     refetch: refetchGitHubRepositories,
-  } = useQuery(
-    organizationId
+  } = useQuery({
+    ...(organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
       : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
           forceRefresh: false,
-        })
-  );
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
 
   const {
     data: gitlabRepoData,
     isLoading: isLoadingGitLabRepos,
     error: gitlabRepoError,
     refetch: refetchGitLabRepositories,
-  } = useQuery(
-    organizationId
+  } = useQuery({
+    ...(organizationId
       ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
       : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
           forceRefresh: false,
-        })
-  );
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
 
   const {
     data: bitbucketRepoData,
@@ -480,12 +485,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       forceRefresh: false,
     }),
     enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
   const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
     ...trpc.organizations.bitbucket.getStatus.queryOptions({
       organizationId: organizationId ?? '',
     }),
     enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
 
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);

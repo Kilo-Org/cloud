@@ -4,10 +4,7 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import {
-  findCustomLlm,
-  isCustomLlm,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 /** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
 export async function isFreeModel(modelId: string): Promise<boolean> {
@@ -32,7 +29,8 @@ export function isFreeModelExcludingCustomLlms(model: string): boolean {
   );
 }
 
-/** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (await isCustomLlm(model)) || isFreeModelExcludingCustomLlms(model);
+  const customLlm = await findCustomLlm(model);
+  if (customLlm) return customLlm.definition.may_train_on_prompts ?? false;
+  return isFreeModelExcludingCustomLlms(model);
 }

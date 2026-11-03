@@ -2891,8 +2891,16 @@ export const CustomLlmDefinitionSchema = z
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
     /** What Kilo bills users, in the custom pricing tier format. Without it the model is free. */
     pricing: CustomPricingTiersSchema.optional(),
+    may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
+    if (definition.may_train_on_prompts !== undefined && definition.pricing === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['may_train_on_prompts'],
+        message: 'may_train_on_prompts may only be set when pricing is set',
+      });
+    }
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
     if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
       ctx.addIssue({

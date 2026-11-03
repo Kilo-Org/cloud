@@ -32,6 +32,7 @@ describe('convertCustomLlmToCatalogModel pricing', () => {
     const model = convertCustomLlmToCatalogModel('acme/free-model', customLlmDefinition());
 
     expect(model.isFree).toBe(true);
+    expect(model.mayTrainOnYourPrompts).toBe(false);
     expect(model.pricing).toEqual(FREE_PRICING);
   });
 
@@ -63,6 +64,7 @@ describe('convertCustomLlmToCatalogModel pricing', () => {
     );
 
     expect(model.isFree).toBe(false);
+    expect(model.mayTrainOnYourPrompts).toBe(false);
     expect(model.pricing).toEqual({
       ...FREE_PRICING,
       prompt: '0.000002000000',
@@ -95,6 +97,28 @@ describe('convertCustomLlmToCatalogModel pricing', () => {
     expect(model.pricing.completion).toBe('0.000003000000');
     expect(model.pricing.input_cache_read).toBeUndefined();
     expect(model.pricing.input_cache_write).toBeUndefined();
+  });
+
+  test.each([true, false])('lists the configured prompt training policy: %s', mayTrainOnPrompts => {
+    const model = convertCustomLlmToCatalogModel(
+      'acme/priced-model',
+      customLlmDefinition({
+        may_train_on_prompts: mayTrainOnPrompts,
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 1,
+              completion_per_million: 3,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+      })
+    );
+
+    expect(model.mayTrainOnYourPrompts).toBe(mayTrainOnPrompts);
   });
 });
 

@@ -322,6 +322,86 @@ describe('adminCustomLlmRouter', () => {
       expect(row?.definition.pricing).toEqual(pricingTiers);
     });
 
+    it.each([true, false])(
+      'stores the prompt training flag when priced: %s',
+      async mayTrainOnPrompts => {
+        const caller = await createCallerForUser(admin.id);
+        const publicId = 'kilo-internal/test-model-training';
+
+        const result = await caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: {
+            ...validDefinition,
+            pricing: pricingTiers,
+            may_train_on_prompts: mayTrainOnPrompts,
+          },
+          credentials,
+        });
+
+        expect(result.definition.may_train_on_prompts).toBe(mayTrainOnPrompts);
+        const [row] = await db
+          .select()
+          .from(custom_llm2)
+          .where(eq(custom_llm2.public_id, publicId));
+        expect(row?.definition.may_train_on_prompts).toBe(mayTrainOnPrompts);
+      }
+    );
+
+    it.each([
+      ['private', true, validDefinition],
+      ['private', false, validDefinition],
+      ['public', true, publicDefinition],
+      ['public', false, publicDefinition],
+    ] as const)(
+      'rejects an unpriced %s model with prompt training set to %s',
+      async (_access, mayTrainOnPrompts, definition) => {
+        const caller = await createCallerForUser(admin.id);
+        const publicId = 'kilo-internal/test-model-unpriced-training';
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: publicId,
+            definition: { ...definition, may_train_on_prompts: mayTrainOnPrompts },
+            credentials,
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining(
+            'may_train_on_prompts may only be set when pricing is set'
+          ),
+        });
+
+        const [row] = await db
+          .select()
+          .from(custom_llm2)
+          .where(eq(custom_llm2.public_id, publicId));
+        expect(row).toBeUndefined();
+      }
+    );
+
+    it('requires removing the prompt training flag when removing pricing', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-remove-pricing';
+      const definition = { ...validDefinition, pricing: pricingTiers, may_train_on_prompts: true };
+      await caller.admin.customLlm.upsert({ public_id: publicId, definition, credentials });
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: { ...validDefinition, may_train_on_prompts: true },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.definition).toEqual(definition);
+
+      const updated = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+      });
+      expect(updated.definition).not.toHaveProperty('may_train_on_prompts');
+      expect(updated.definition).not.toHaveProperty('pricing');
+    });
+
     it('rejects pricing whose first tier does not start at context length 0', async () => {
       const caller = await createCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-bad-pricing';

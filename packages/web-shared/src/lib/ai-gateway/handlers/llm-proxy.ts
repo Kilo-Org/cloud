@@ -1135,8 +1135,9 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
-    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
+    (customLlm !== null && effectivePrivacy.zdr === true) ||
+    ((await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
+      isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider))
   ) {
     return dataCollectionRequiredResponse();
   }

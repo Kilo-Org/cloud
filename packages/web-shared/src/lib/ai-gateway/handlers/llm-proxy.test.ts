@@ -3592,6 +3592,60 @@ describe('custom LLM requests', () => {
     });
   }
 
+  it.each([false, true])('rejects ZDR for a custom LLM with public=%s', async isPublic => {
+    mockCustomLlm(customLlm('acme/custom-model', isPublic));
+    resolveCustomProvider(true, !isPublic);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/custom-model'), provider: { zdr: true } }) as never
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, false, true])(
+    'rejects ZDR independently of may_train_on_prompts=%s',
+    async mayTrainOnPrompts => {
+      const model = pricedCustomLlm('acme/custom-model', true);
+      model.definition.may_train_on_prompts = mayTrainOnPrompts;
+      mockCustomLlm(model);
+      setBalance(1000);
+      resolveCustomProvider(false, false);
+
+      const response = await handleLlmProxyRequest(
+        makeRequest({ ...makeBody('acme/custom-model'), provider: { zdr: true } }) as never
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, false, true])(
+    'honors data collection deny with may_train_on_prompts=%s',
+    async mayTrainOnPrompts => {
+      const model = pricedCustomLlm('acme/custom-model', true);
+      model.definition.may_train_on_prompts = mayTrainOnPrompts;
+      mockCustomLlm(model);
+      setBalance(1000);
+      resolveCustomProvider(false, false);
+
+      const response = await handleLlmProxyRequest(
+        makeRequest({
+          ...makeBody('acme/custom-model'),
+          provider: { data_collection: 'deny' },
+        }) as never
+      );
+
+      expect(response.status).toBe(mayTrainOnPrompts ? 400 : 200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(mayTrainOnPrompts ? 0 : 1);
+    }
+  );
+
   it('blocks a user without balance from a private custom LLM with pricing', async () => {
     setBalance(0);
     mockCustomLlm(pricedCustomLlm('acme/private-model', false));

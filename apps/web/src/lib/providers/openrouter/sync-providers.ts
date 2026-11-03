@@ -159,7 +159,7 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   return providers;
 }
 
-async function syncProviders(params: {
+export async function syncProviders(params: {
   providers: OpenRouterProvider[];
   openRouterModels: Record<string, StoredModel>;
   openRouterCatalogModels: CatalogModel[];
@@ -218,18 +218,6 @@ async function syncProviders(params: {
     new Date().toISOString()
   );
 
-  for (const extraModel of mappedExtraModels) {
-    const providerData = providerModelData.find(
-      data => data.provider.slug === extraModel.provider.slug
-    );
-    if (providerData) {
-      console.log(
-        `Found existing ${extraModel.provider.slug} provider from OpenRouter, adding extra model ${extraModel.model.slug}`
-      );
-      providerData.models.splice(0, 0, extraModel.model);
-    }
-  }
-
   injectSupportedFimModels(providerModelData);
 
   applyFreeEndpointDataPolicy({
@@ -245,7 +233,11 @@ async function syncProviders(params: {
   });
 
   // Filter out providers with no models
-  const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);
+  const filteredProviderModelData = providerModelData.filter(
+    data =>
+      data.models.length > 0 ||
+      mappedExtraModels.some(({ provider }) => provider.slug === data.provider.slug)
+  );
 
   // Create simplified structure with providers containing their models directly
   const normalizedProviders: NormalizedProvider[] = filteredProviderModelData.map(data => {
@@ -256,6 +248,12 @@ async function syncProviders(params: {
       const normalizedModel = withWorstProviderDataPolicy(model, data.provider.dataPolicy);
       uniqueModelsMap.set(normalizeModelId(model.slug), normalizedModel);
     });
+    const extraModels = mappedExtraModels.filter(
+      ({ provider }) => provider.slug === data.provider.slug
+    );
+    for (const { model } of extraModels) {
+      uniqueModelsMap.set(normalizeModelId(model.slug), model);
+    }
     const uniqueModels = Array.from(uniqueModelsMap.values());
 
     // Sort models by name
@@ -266,8 +264,12 @@ async function syncProviders(params: {
       displayName: data.provider.displayName,
       slug: data.provider.slug,
       dataPolicy: {
-        training: data.provider.dataPolicy.training,
-        retainsPrompts: data.provider.dataPolicy.retainsPrompts,
+        training:
+          data.provider.dataPolicy.training ||
+          extraModels.some(({ provider }) => provider.training),
+        retainsPrompts:
+          data.provider.dataPolicy.retainsPrompts ||
+          extraModels.some(({ provider }) => provider.retainsPrompts),
         canPublish: data.provider.dataPolicy.canPublish,
         termsOfServiceURL: data.provider.dataPolicy.termsOfServiceURL,
         privacyPolicyURL: data.provider.dataPolicy.privacyPolicyURL,

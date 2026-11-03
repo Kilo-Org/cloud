@@ -12,16 +12,12 @@ export type SnapshotExtraModel = {
   provider: { slug: string; name: string; training: boolean; retainsPrompts: boolean };
 };
 
-/**
- * Lists each available public custom LLM under every inference provider it
- * declares. Public custom LLMs are assumed to train on and retain prompts, even
- * when they set pricing.
- */
 export function buildPublicCustomLlmSnapshotModels(
   customLlms: readonly CustomLlm[],
   unavailableModelIds: ReadonlySet<string>,
   updatedAt: string
 ): SnapshotExtraModel[] {
+  const providers = new Map<string, SnapshotExtraModel['provider']>();
   return customLlms.flatMap(({ public_id, definition }) => {
     if (!isPublicCustomLlm(definition) || unavailableModelIds.has(public_id.toLowerCase())) {
       return [];
@@ -46,12 +42,23 @@ export function buildPublicCustomLlmSnapshotModels(
               completion: formatPricePerToken(shortRequestPricing.completion_per_million),
             }
           : { prompt: '0', completion: '0' },
-        data_policy: { training: true, retainsPrompts: true },
+        data_policy: { training: definition.may_train_on_prompts ?? false, retainsPrompts: true },
       },
     };
-    return [...new Set(definition.public.inference_providers)].map(slug => ({
-      model,
-      provider: { slug, name: slug.toUpperCase(), training: true, retainsPrompts: true },
-    }));
+    return [...new Set(definition.public.inference_providers)].map(slug => {
+      let provider = providers.get(slug);
+      if (provider) {
+        provider.training ||= definition.may_train_on_prompts ?? false;
+      } else {
+        provider = {
+          slug,
+          name: slug.toUpperCase(),
+          training: definition.may_train_on_prompts ?? false,
+          retainsPrompts: true,
+        };
+        providers.set(slug, provider);
+      }
+      return { model, provider };
+    });
   });
 }

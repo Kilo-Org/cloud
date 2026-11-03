@@ -491,7 +491,7 @@ describe('GET /api/v1/models', () => {
       name: 'Custom acme/public-model',
       description: 'Public custom model',
       isFree: true,
-      mayTrainOnYourPrompts: true,
+      mayTrainOnYourPrompts: false,
     });
     expect(responseData.data.some(item => item.id === 'acme/private-model')).toBe(false);
     // Routing serves a definition without opencode settings over Chat Completions,

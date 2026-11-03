@@ -48,7 +48,7 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
     isFree: model.pricing === undefined,
-    mayTrainOnYourPrompts: true,
+    mayTrainOnYourPrompts: model.may_train_on_prompts ?? false,
     opencode: opencode && withLegacyVariants(opencode),
   };
 }

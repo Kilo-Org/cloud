@@ -641,9 +641,12 @@ export function CustomLlmsContent() {
                 Custom LLMs are free for users unless the definition sets <code>pricing</code>, a
                 list of tiers in the same format as a custom pricing entry&apos;s{' '}
                 <code>pricing</code>. Priced custom LLMs bill users like other paid models and are
-                not available to signed-out users. To make the model available to every user, or
-                every signed-in user when it sets <code>pricing</code>, replace{' '}
-                <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                not available to signed-out users. Set <code>may_train_on_prompts</code> to{' '}
+                <code>true</code> if the provider may train on prompts. It defaults to{' '}
+                <code>false</code> and may only be set when <code>pricing</code> is set. To make the
+                model available to every user, or every signed-in user when it sets{' '}
+                <code>pricing</code>, replace <code>organization_ids</code> and{' '}
+                <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
                   &quot;description&quot;: &quot;…&quot; {'}'}

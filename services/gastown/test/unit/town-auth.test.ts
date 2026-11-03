@@ -110,7 +110,7 @@ describe('townAuthMiddleware', () => {
   });
 
   it('derives a user target for user-scoped events routes', async () => {
-    config({ owner_type: 'user', owner_user_id: 'owner-2' });
+    config({ owner_type: 'user', owner_user_id: 'user-target' });
     const { app: a, decide } = app({ userId: 'admin-1', decision: { allowed: true } });
     const response = await a.request(
       `http://localhost/api/users/user-target/towns/${town}/events`,
@@ -122,6 +122,30 @@ describe('townAuthMiddleware', () => {
       kind: 'user',
       id: 'user-target',
     });
+  });
+
+  it("rejects a user-target capability for another user's town", async () => {
+    config({ owner_type: 'user', owner_user_id: 'owner-2' });
+    const { app: a, decide } = app({ userId: 'admin-1', decision: { allowed: true } });
+    const response = await a.request(
+      `http://localhost/api/users/user-target/towns/${town}/events`,
+      {},
+      {} as never
+    );
+    expect(response.status).toBe(403);
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it('rejects a user-target capability for an org-owned town', async () => {
+    config({ owner_type: 'org', organization_id: 'org-1' });
+    const { app: a, decide } = app({ userId: 'admin-1', decision: { allowed: true } });
+    const response = await a.request(
+      `http://localhost/api/users/user-target/towns/${town}/events`,
+      {},
+      {} as never
+    );
+    expect(response.status).toBe(403);
+    expect(decide).not.toHaveBeenCalled();
   });
 
   it('restores admin bypass for a town with no owner id', async () => {

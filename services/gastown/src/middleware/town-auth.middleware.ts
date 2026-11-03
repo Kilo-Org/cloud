@@ -36,7 +36,7 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   const targetKind = capabilityTargetKind(GASTOWN_ADMIN_AUDIENCE, action) ?? 'town';
   const target =
     targetKind === 'user'
-      ? { kind: 'user' as const, id: c.req.param('userId') ?? townId }
+      ? { kind: 'user' as const, id: c.req.param('userId') ?? '' }
       : targetKind === 'service'
         ? { kind: 'service' as const, id: 'gastown' }
         : { kind: 'town' as const, id: townId };
@@ -68,6 +68,17 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   }
 
   let denyStatus: 403 | 404 | 500 = 403;
+
+  if (targetKind === 'user') {
+    // `/api/users/:userId/towns/:townId/*` must only expose that user's own
+    // personal town. A user-target capability is bound to :userId, so a town
+    // owned by someone else (or an org) must not be reachable through it.
+    const targetUserId = c.req.param('userId');
+    const ownerId = config.owner_id ?? config.owner_user_id;
+    if (!targetUserId || config.owner_type === 'org' || !ownerId || ownerId !== targetUserId) {
+      return c.json(resError('Forbidden'), 403);
+    }
+  }
 
   if (!config.owner_type || config.owner_type === 'user') {
     const ownerId = config.owner_id ?? config.owner_user_id;

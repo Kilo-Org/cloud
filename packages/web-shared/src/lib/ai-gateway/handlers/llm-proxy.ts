@@ -501,25 +501,14 @@ export async function handleLlmProxyRequest(
   };
   const autoRoutingDenials = async (
     fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-    fromPrivacy: () => Promise<string[]>,
-    candidateIds: ReadonlyArray<string> = []
+    fromPrivacy: () => Promise<string[]>
   ) => {
-    const { settings, plan } = await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
-    const deniedSettings = new Set(
-      !groupPolicy && plan === 'enterprise'
-        ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-        : []
-    );
-    const deniedFromSettings = [
-      ...deniedSettings,
-      ...candidateIds.filter(modelId => deniedSettings.has(normalizeModelId(modelId))),
-    ];
     const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
       groupPolicy ? fromPolicy(groupPolicy) : [],
       isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
     ]);
-    return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
+    return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy])];
   };
   const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
     apiKind: requestBodyParsed.kind,
@@ -598,8 +587,7 @@ export async function handleLlmProxyRequest(
         deniedModelIds: candidateIds =>
           autoRoutingDenials(
             policy => deniedAutoRoutingCandidates(policy, candidateIds),
-            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds),
-            candidateIds
+            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds)
           ),
         decide: async (router, deniedModelIds) => {
           const outcome = await fetchCustomRouterDecision({

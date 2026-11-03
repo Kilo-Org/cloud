@@ -206,6 +206,7 @@
         "services/model-eval-ingest/**/*.ts",
         "services/notifications/**/*.ts",
         "services/o11y/**/*.ts",
+        "services/scim-sync/**/*.ts",
         "services/security-auto-analysis/**/*.ts",
         "services/security-sync/**/*.ts",
         "services/session-ingest/**/*.ts",

@@ -370,14 +370,6 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
         return toFetchedSessionData(kiloSessionId, sessionResult);
       },
 
-      onKiloSessionCreated: (kiloSessionId: KiloSessionId) => {
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.set('sessionId', kiloSessionId);
-          window.history.replaceState(window.history.state, '', url.toString());
-        }
-      },
-
       onRemoteSessionOpened: ({ kiloSessionId }) => {
         posthogRef.current?.capture('remote_session_opened', {
           feature: 'remote-session',

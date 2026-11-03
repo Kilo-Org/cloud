@@ -1254,6 +1254,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
       expect(refreshed.worktrees[WORKTREE_ID].prSession?.associatedPr).toMatchObject({
         reviewDecision: 'approved',
         reviewDecisionPending: false,
+        observations: null,
       });
       expect(afterCallbacks).toHaveLength(0);
     }
@@ -1331,6 +1332,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
         state: 'unknown',
         title: null,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       },
     });
@@ -1456,6 +1458,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
         headSha: 'abc123',
         reviewDecision: 'approved',
         reviewDecisionPending: true,
+        observations: null,
         lastSyncedAt: isoTimestamp,
         platform: 'github',
       },
@@ -1502,6 +1505,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
       state: 'unknown',
       title: null,
       reviewDecisionPending: false,
+      observations: null,
     });
   });
 

@@ -102,13 +102,7 @@ function describeStepReason(
     case 'vercel-byok': {
       const title = `${keyLabel(step.providerIds.map(getProviderName))} via Vercel AI Gateway`;
       if (step.reason === 'disabled') return { title, detail: 'Skipped: the key is disabled.' };
-      return {
-        title,
-        detail:
-          step.providerIds.length > 1
-            ? 'Vercel AI Gateway tries these keys in unspecified order.'
-            : 'Serves this model with the key.',
-      };
+      return { title, detail: 'Serves this model with the key.' };
     }
     case 'gateway-byok': {
       const title = keyLabel([getProviderName(step.providerId)]);
@@ -117,8 +111,6 @@ function describeStepReason(
           return { title, detail: 'Serves this model through your gateway account.' };
         case 'disabled':
           return { title, detail: 'Skipped: the key is disabled.' };
-        case 'provider-key-preferred':
-          return { title, detail: 'Skipped: a provider key above serves this model.' };
         case 'model-unavailable':
           return { title, detail: 'Skipped: this gateway does not offer the model.' };
         case 'provider-settings':
@@ -308,7 +300,7 @@ export function BYOKRoutingPreview({
         <p className="text-muted-foreground text-xs">
           {organizationId
             ? 'Organization model and provider policies still apply: they can block the model or change which gateway serves it.'
-            : 'Provider preferences sent with a request can change which gateway serves it.'}
+            : 'A request that ignores a provider uses the next key that serves it.'}
         </p>
       </CardContent>
     </Card>

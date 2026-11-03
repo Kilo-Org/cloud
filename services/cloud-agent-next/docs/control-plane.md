@@ -504,6 +504,11 @@ Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the is
 publish environment snapshots. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
 snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Environment snapshots".
 
+- **Enrollment.** `ENVIRONMENT_SNAPSHOT_ORG_IDS` controls build and restore access independently of
+  startup selection. Production and development set `*` for all organizations and personal accounts;
+  native-container enrollment and repository authorization still apply. Personal GitHub and GitLab
+  environments are supported. Bitbucket builds require an organization-owned environment because
+  managed Bitbucket repository access is organization-scoped.
 - **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
   looks up the owner's one environment for the repository and stores
   `{ environmentId, owner, repository, configurationRevision }` on the session metadata and on the
@@ -554,10 +559,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
-  startup. Snapshot enrollment controls builder access independently of the interactive session cohort.
+  startup. Snapshot enrollment controls builder access independently of session startup selection.
   Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
   Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
-  cohort-selected image; an `app` session starts from its image instead of a split-image snapshot.
+  selected image; an `app` session starts from its image instead of a split-image snapshot.
   Downloaded startup uses the current runtime installer and its named builder or supervisor target,
   including on snapshot restore. The installed control bundle includes the builder. A preinstalled
   launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
@@ -661,22 +666,35 @@ providers retain their current recovery behavior.
 
 ### Preparation (`session.prepare`, idempotent per session)
 
-The wrapper owns the step timeouts and retries:
+The route `directory` is the working directory (cwd): where Kilo starts and setup runs. The frame's
+optional `roots` list the git roots, one for each repository of a V2 environment
+(`{ directory, repoFullName, git: { url, platform }, branch, branchMode? }`, no credential). Every
+root is the route directory or a path under it. A frame without `roots` (every V1 route, and any
+frame from an older Worker) has one root at `directory`. With one root the cwd is that root. With
+several, the cwd is `/workspace`, which is not itself a git root: it is never emptied, stamped or
+checked out. Setup runs there and can write into it.
+
+The wrapper owns the step timeouts and retries. Clone, checkout, restore and stamp run once for
+each root, in order. The clone and restore bounds are totals for the whole preparation, not for each
+root, so a slow second repository still fails with its own subtype before the Sandbox DO's route
+attempt deadline:
 
 | Step | Bound | Retry |
 |---|---|---|
-| Clone or fetch | 6 min total | Network errors: 3 attempts with backoff |
-| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; failures preserve the workspace and fail preparation |
+| Clone or fetch | 6 min total for all roots | Network errors: 3 attempts with backoff |
+| Use a prepared repository (`restore`) | 2 min total for all roots | Network errors: 3 attempts; failures preserve the workspace and fail preparation |
 | Checkout, branch restore | In the clone budget | No |
-| Setup commands | Current per-command limits | No; a failure fails preparation |
+| Setup commands | Current per-command limits; once, at the route directory, after every root is in place | No; a failure fails preparation |
 | Kilo runtime start | 2 min | 1 retry |
 | Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
-Each step sends progress. Long steps also send a short, throttled `detail` line within the step
-(git clone and checkout percentages, clone retries, session history loading); the detail is display
-text, not route state. A route already prepared in this process (checkout present, Kilo session
-open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
-including a new Kilo restart budget.
+Each step sends progress. With several roots, the `detail` of a clone, checkout or restore line
+starts with the repository (`acme/web: ...`). A failure is logged with the repository name, while
+the `session.failed` frame keeps its closed step and subtype. Long steps also send a short,
+throttled `detail` line within the step (git clone and checkout percentages, clone retries, session
+history loading); the detail is display text, not route state. A route already prepared in this
+process (checkout present, Kilo session open) returns `session.ready` at once. A `session.prepare`
+for a failed route starts fresh, including a new Kilo restart budget.
 
 Every in-sandbox git process authenticates through the platform's read-only credential helper
 (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`), which reads the per-session
@@ -702,9 +720,10 @@ The options are command arguments, not Git config.
 
 #### Workspace stamp
 
-A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit }`; beside the
-directory when there is no repository). The reader also accepts the older `capturedAt` and
-`generation` fields. At `session.prepare` the wrapper decides from the filesystem alone:
+Every root of a prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit }`;
+beside the root when there is no repository). The route directory of several roots has none. The
+reader also accepts the older `capturedAt` and `generation` fields. At `session.prepare` the wrapper
+decides from the filesystem alone, for each root:
 
 | Found | Meaning | Work |
 |---|---|---|
@@ -713,24 +732,31 @@ directory when there is no repository). The reader also accepts the older `captu
 | Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
 | Stamp from another allocation | A restored environment snapshot | **Adopt** |
 
-Adopt preserves the prepared workspace and selects the route's starting ref explicitly:
+The workspace is `same` (`session.ready` reports `workspace: 'same'`, with no setup) only when every
+root has a stamp from this allocation. Otherwise a `same` root is left as it is, the others are
+cloned, checked out or adopted, and setup runs once, at the route directory, for the whole
+workspace. The stamps are written after setup, one for each root, so a root cloned before a later failure has
+none and the retry reuses its clone.
+
+Adopt preserves each prepared root and selects the route's starting ref explicitly:
 
 1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`. An explicit branch starts from its current remote ref, not a cached local branch.
 3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
 4. Check out the target directly, without an intermediate checkout or deleting other local branches.
    Review refs retain their dedicated fetch and checkout path. Set the git author.
-5. Run the setup commands, then write the stamp.
+5. Run the setup commands once for the workspace, then write the stamp of each root.
 
 Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
 use the bounded git retry policy; missing branches, authentication failures and checkout conflicts
 fail preparation without cloning. Checkout never forces away conflicting setup changes.
-The Kilo session step is unchanged: the builder
-starts no Kilo runtime, so nothing stale shadows the restore from session-ingest. HOME of a
-`worktree` runtime is `/home/<sha256(directory)>`, the same path the builder uses, so caches that
-setup wrote (`~/.cache`, toolchains) are present after restore. An allocation that keeps
-`runtimeIsolation: per-session` keeps its per-session HOME under `$TMPDIR/kilo-worktrees`; the log
-uploader reads both roots. `session.ready` reports
+The Kilo session step is unchanged: the builder starts no Kilo runtime, so nothing stale shadows the
+restore from session-ingest. HOME of a `worktree` runtime is `/home/<sha256(directory)>`. The
+builder uses the same path for any environment (`environmentWorkspace` decides it for both, so a
+one-repository V2 build and session both run at `/workspace/<leaf>`), so caches that setup wrote
+(`~/.cache`, toolchains) are present after restore. An
+allocation that keeps `runtimeIsolation: per-session` keeps its per-session HOME under
+`$TMPDIR/kilo-worktrees`; the log uploader reads both roots. `session.ready` reports
 `workspace: 'cloned' | 'same' | 'adopted'`.
 
 Before starting Kilo, materialize the session's profile skills (including companion files) into
@@ -1049,12 +1075,15 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- Roll out through a production `interactiveOrgIds` cohort: one test organization on `downloaded`
-  runtime-free first, then a wider cohort after qualification. Roll back by image or by mode.
+- The catalog defaults all targets to `downloaded` runtime-free with no `interactiveOrgIds`
+  restriction, including organization and personal sessions. SDK pins remain preinstalled.
+  Optional cohorts can restrict a future target. Roll back by image or by mode; a full mode rollback
+  changes the default to preinstalled/all-in-one, not merely removes a production override.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
-  from it. Real-provider qualification remains an explicit approval gate; see `runtime-rollout.md`.
+  from it. Real-provider qualification evidence remains pending and is not implied by the broader
+  configuration; see `runtime-rollout.md` for the checks and rollback procedure.
 
 ### Runtime credential proxy
 
@@ -1396,6 +1425,7 @@ failure monitors keep working.
 |---|---|
 | `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |
 | `workspace_setup_failed` with the failed step's subtype | `pre_dispatch` / `workspace_setup_failed` |
+| `repository_access_failed` (a repository of a multi-repository environment cannot be issued a credential; the route diagnostic stage `member_credential_failed:<repository>` names it) | `pre_dispatch` / `workspace_setup_failed` |
 | `billing_blocked` (actual compute credit denial) | `pre_dispatch` / `payment_required` |
 | `billing_unavailable` (existing Vercel admission failure) | `pre_dispatch` / `admission_billing_unavailable` |
 | `invalid_configuration` (proven provider configuration failure) | `pre_dispatch` / `sandbox_connect_failed` |

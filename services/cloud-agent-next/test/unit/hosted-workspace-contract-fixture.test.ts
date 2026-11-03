@@ -20,6 +20,10 @@ import {
   DeleteHostedWorkspaceSessionOutput,
 } from '../../src/router/handlers/hosted-workspace-mutations.js';
 import {
+  ContinueHostedWorkspaceOutput,
+  ContinueHostedWorkspaceRequestSchema,
+} from '../../src/router/handlers/hosted-workspace-continuation.js';
+import {
   getHostedWorkspaceInput,
   getHostedWorkspaceOutput,
   listHostedWorkspacesInput,
@@ -103,6 +107,7 @@ const requestSchemas: Record<string, unknown> = {
   getHostedWorkspaceStatus: getHostedWorkspaceStatusInput,
   createHostedWorkspace: CreateHostedWorkspaceInput,
   createHostedWorkspaceSession: CreateHostedWorkspaceSessionInput,
+  continueHostedWorkspace: ContinueHostedWorkspaceRequestSchema,
   deleteHostedWorkspaceSession: DeleteHostedWorkspaceSessionInput,
   deleteWorktree: DeleteWorktreeInput,
 };
@@ -113,6 +118,7 @@ const responseSchemas: Record<string, unknown> = {
   getHostedWorkspaceStatus: getHostedWorkspaceStatusOutput,
   createHostedWorkspace: CreateHostedWorkspaceOutput,
   createHostedWorkspaceSession: CreateHostedWorkspaceSessionOutput,
+  continueHostedWorkspace: ContinueHostedWorkspaceOutput,
   deleteHostedWorkspaceSession: DeleteHostedWorkspaceSessionOutput,
   deleteWorktree: DeleteWorktreeOutput,
 };

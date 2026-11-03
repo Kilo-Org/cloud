@@ -2596,6 +2596,69 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     reconnected.close();
   });
 
+  it('carries the roots of a V2 registration through the Session DO to the wrapper frame', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = unique('sbx__session_v2');
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const roots = ['widgets', 'gadgets'].map(leaf => ({
+      directory: `/workspace/${leaf}`,
+      repoFullName: `acme/${leaf}`,
+      git: { url: `https://github.com/acme/${leaf}.git`, platform: 'github' as const },
+      branch: 'kilo/session',
+      branchMode: 'working' as const,
+    }));
+    const base = registration(sandboxId, sessionId);
+    const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+    await sessionStub.registerSession({
+      ...base,
+      spec: { ...base.spec, directory: '/workspace', roots },
+      environment: {
+        environmentId: '33333333-3333-4333-8333-333333333333',
+        owner: { type: 'user', id: SESSION_OWNER_ID },
+        configurationRevision: 1,
+        repositories: roots.map(root => ({
+          identity: { platform: 'github', repoFullName: root.repoFullName },
+          repoFullName: root.repoFullName,
+          leaf: root.directory.slice('/workspace/'.length),
+          branch: root.branch,
+        })),
+      },
+    });
+    await sessionStub.send(promptPayload('m1'));
+
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launchEnv = provider.launchEnvs[0];
+    if (!launchEnv) throw new Error('provider.launch was not called');
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL ?? '',
+    });
+    await wrapper.hello({
+      wrapperId: 'wr_1',
+      allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID ?? '',
+    });
+    const prepareFrame = await wrapper.next();
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(prepareFrame.spec.directory).toBe('/workspace');
+    expect(prepareFrame.spec.roots).toEqual(roots);
+    wrapper.close();
+  });
+
   it('delivers on the old grant and retries the re-issue on the next send when deliver cannot re-issue credentials', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');

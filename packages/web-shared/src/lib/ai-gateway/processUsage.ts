@@ -165,6 +165,7 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
+    id: usageContext.usageId ?? randomUUID(),
     kilo_user_id: usageContext.kiloUserId,
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,
@@ -226,11 +227,17 @@ export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
 ): Promise<CoreUsageWithMetaData> {
-  const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
-    usageContextInfo;
+  const {
+    id,
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    ...metadataFromContext
+  } = usageContextInfo;
 
   const core: MicrodollarUsage = {
     id,
@@ -844,8 +851,8 @@ function scheduleKiloPassBonusIfNeeded(
  * make callers treat billed usage as unrecorded and skip dependent writes.
  *
  * The row's presence under this user is the proof, not the PostgreSQL error code:
- * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
- * only be visible if a delivery of this exact record committed its whole
+ * `id` is generated once per usage record, and the row can only be visible if a
+ * delivery of this exact record committed its whole
  * transaction. A deadlock victim that is retried into the collision therefore
  * recovers the same way a plain primary-key violation does.
  *

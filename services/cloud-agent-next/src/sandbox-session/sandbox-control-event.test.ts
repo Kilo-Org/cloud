@@ -160,3 +160,31 @@ describe('session event public projection', () => {
     expect(stored.properties).toEqual(properties);
   });
 });
+
+describe('auto-commit completion storage', () => {
+  function store(properties: Record<string, unknown>) {
+    const eventQueries = {
+      insert: vi.fn().mockReturnValue(1),
+      upsert: vi.fn().mockReturnValue(1),
+      insertUnique: vi.fn().mockReturnValue(1),
+    };
+    persistSandboxControlSessionEvent({
+      sessionId: 'workspace_fixture',
+      payload: { type: 'autocommit_completed', properties },
+      eventQueries,
+      broadcast: vi.fn(),
+    });
+    return eventQueries.upsert.mock.calls.map(([call]) => call.entityId);
+  }
+
+  it('keeps one completion for a message that names no repository', () => {
+    expect(store({ messageId: 'a1', success: true, skipped: true })).toEqual(['autocommit/a1']);
+  });
+
+  it('keeps a completion for each repository of the same message', () => {
+    const first = store({ messageId: 'a1', success: false, repository: 'acme/web' });
+    const second = store({ messageId: 'a1', success: true, skipped: true, repository: 'acme/api' });
+    expect(first).toEqual(['autocommit/a1/acme/web']);
+    expect(second).toEqual(['autocommit/a1/acme/api']);
+  });
+});

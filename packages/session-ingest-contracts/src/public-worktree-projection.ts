@@ -1,3 +1,15 @@
+export function projectKnownCloudAgentPath(
+  path: string,
+  publicDirectory: string
+): string | undefined {
+  const root =
+    /^\/workspace\/(?:(?:[^/]+\/){1,2}(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+|app)(?=\/|$)/.exec(
+      path
+    )?.[0];
+  if (!root || path.split('/').includes('..')) return undefined;
+  return publicDirectory + path.slice(root.length);
+}
+
 export function projectPrivateWorktreePaths<T extends object>(
   value: T,
   metadata: readonly unknown[],

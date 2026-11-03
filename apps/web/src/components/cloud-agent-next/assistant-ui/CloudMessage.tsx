@@ -160,7 +160,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
         />
       ))}
       {presentation.commits.map(commit => (
-        <CommitCard key={commit.commitHash} commit={commit} />
+        <CommitCard key={JSON.stringify([commit.repository, commit.commitHash])} commit={commit} />
       ))}
     </MessageErrorBoundary>
   );

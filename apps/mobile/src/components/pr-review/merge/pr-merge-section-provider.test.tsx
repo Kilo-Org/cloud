@@ -148,18 +148,22 @@ describe('PrMergeSectionProvider (s6)', () => {
     renderer.unmount();
   });
 
-  it.each<['closed' | 'merged', string]>([
-    ['merged', 'Already merged'],
-    ['closed', 'This merge request is closed'],
-  ])(
-    'renders only the terminal chip with provider wording on a %s GitLab merge request',
-    async (state, label) => {
-      const renderer = await mount(GITLAB_REF, state);
-      expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
-      expect(
-        renderer.root.findAll(node => String(node.type) === 'Text' && node.props.children === label)
-      ).toHaveLength(1);
-      renderer.unmount();
-    }
-  );
+  it('renders only the closed sentence with provider wording on a closed GitLab merge request', async () => {
+    const renderer = await mount(GITLAB_REF, 'closed');
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node =>
+          String(node.type) === 'Text' && node.props.children === 'This merge request is closed'
+      )
+    ).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('renders nothing for a merged GitLab merge request', async () => {
+    const renderer = await mount(GITLAB_REF, 'merged');
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
+    renderer.unmount();
+  });
 });

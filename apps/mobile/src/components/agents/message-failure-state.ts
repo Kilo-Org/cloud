@@ -40,6 +40,23 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
 ];
 
 /**
+ * Whether the gateway itself marked the failure terminal. An `APIError` carries
+ * the retryability it decided (a billing refusal, a rejected credential), so a
+ * Retry on it only spends another round trip on the same refusal. Only an
+ * explicit `false` is terminal: a session written before the field existed has
+ * no value, and unknown retryability keeps the row's only recovery action
+ * rather than silently removing it.
+ */
+function assistantErrorMarkedNonRetryable(
+  error: Extract<MessageInfo, { role: 'assistant' }>['error']
+): boolean {
+  if (error?.name !== 'APIError') {
+    return false;
+  }
+  return Object.is(error.data.isRetryable, false);
+}
+
+/**
  * The catalog key for a known assistant error name's fixed, safe detail line.
  * An unknown name has no line of its own: the title already states that the
  * response failed, so the footer adds no detail rather than repeating the title
@@ -211,8 +228,12 @@ export function selectMessageFailure(input: {
   }
 
   if (info.role === 'assistant' && info.error) {
-    const errorName = info.error.name;
+    const { error } = info;
+    const errorName = error.name;
     const detailKey = assistantDetailKey(errorName);
+    // A terminal gateway verdict drops the Retry; the name set still covers the
+    // errors whose class is terminal on every transport.
+    const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
     return {
       kind: 'assistant',
       titleKey: 'agentChat.messageFailure.assistantTitle',
@@ -220,7 +241,7 @@ export function selectMessageFailure(input: {
       detailKey,
       detail: detailKey === null ? null : i18n.t(detailKey),
       copyDetail: '',
-      canRetry: !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      canRetry: retryableByProvider && !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,
     };
   }

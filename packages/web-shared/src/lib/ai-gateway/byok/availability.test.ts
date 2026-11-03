@@ -3,10 +3,6 @@ import type { StoredModel } from '@kilocode/db';
 import type { StoredModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
@@ -27,6 +23,7 @@ import {
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
@@ -35,10 +32,6 @@ import {
   hasInferenceProviderUserByokForModel,
   isInferenceProviderUserByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-
-const EXCLUSIVE_MODEL_ID = kiloExclusiveModelFixture.public_id;
-
-useKiloExclusiveModel();
 
 const mockedGetVercelModelsMetadata = jest.mocked(getVercelModelsMetadataFromDatabase);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
@@ -68,7 +61,7 @@ const metadata: StoredModelMap = {
   'anthropic/claude-fixture': storedModel('anthropic/claude-fixture', ['anthropic', 'bedrock']),
   'openai/gpt-fixture': storedModel('openai/gpt-fixture', ['openai']),
   'mistral/codestral-fixture': storedModel('mistral/codestral-fixture', ['mistral']),
-  [EXCLUSIVE_MODEL_ID]: storedModel(EXCLUSIVE_MODEL_ID, ['anthropic']),
+  [GEMMA_4_26B_A4B_IT_FREE_ID]: storedModel(GEMMA_4_26B_A4B_IT_FREE_ID, ['anthropic']),
 };
 
 beforeEach(() => {
@@ -86,7 +79,6 @@ describe('addUserByokAvailability', () => {
       makeModel('anthropic/claude-fixture'),
       makeModel('openai/gpt-fixture'),
       makeModel('mistral/codestral-fixture'),
-      makeModel(EXCLUSIVE_MODEL_ID),
       makeModel('absent/model'),
     ];
 
@@ -97,7 +89,6 @@ describe('addUserByokAvailability', () => {
       ['anthropic/claude-fixture', true],
       ['openai/gpt-fixture', false],
       ['mistral/codestral-fixture', true],
-      [EXCLUSIVE_MODEL_ID, false],
       ['absent/model', false],
     ]);
     expect(result.map(model => model.name)).toEqual(models.map(model => model.name));
@@ -125,9 +116,9 @@ describe('addUserByokAvailability', () => {
 
   test('reports no availability when the Vercel metadata is empty', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
-    const models = [makeModel('anthropic/claude-fixture'), makeModel(EXCLUSIVE_MODEL_ID)];
+    const models = [makeModel('anthropic/claude-fixture'), makeModel('openai/gpt-fixture')];
 
-    const result = await addUserByokAvailability(models, ['anthropic']);
+    const result = await addUserByokAvailability(models, ['anthropic', 'openai']);
 
     expect(mockedGetVercelModelsMetadata).toHaveBeenCalledTimes(1);
     expect(result.map(model => model.hasUserByokAvailable)).toEqual([false, false]);
@@ -215,12 +206,13 @@ describe('hasInferenceProviderUserByokForModel', () => {
     expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
   });
 
-  test('keeps Kilo-exclusive models on Kilo accounts', async () => {
+  test('keeps the auto small free model on Kilo accounts', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
-      hasInferenceProviderUserByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'])
+      hasInferenceProviderUserByokForModel(GEMMA_4_26B_A4B_IT_FREE_ID, ['anthropic'])
     ).resolves.toBe(false);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
   });
 
   test('does not count keys for an id a custom LLM owns, which routing serves first', async () => {

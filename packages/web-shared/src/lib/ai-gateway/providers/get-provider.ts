@@ -18,7 +18,7 @@ import {
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import {
   byokOwner,
   getBYOKforOrganization,
@@ -371,8 +371,8 @@ async function getGatewayRoutedByokCandidateProviders(
   requestedModel: string,
   { includeGatewayKeys }: { includeGatewayKeys: boolean }
 ): Promise<UserByokProviderId[]> {
-  // Kilo-exclusive models stay on Kilo's own accounts, like in `getModelGatewayUserByokProviders`.
-  if (isKiloExclusiveModel(requestedModel)) return [];
+  // Kilo pays for the auto small free model, so no user key may serve it.
+  if (isAutoSmallFreeModel(requestedModel)) return [];
   return [
     ...(await getModelInferenceUserByokProviders(requestedModel)),
     ...(includeGatewayKeys && isGatewayUserByokEligibleModel(requestedModel)

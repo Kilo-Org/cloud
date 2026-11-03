@@ -57,7 +57,7 @@ const WORDING_EXCEPTIONS = JSON.parse(
 const TWO_SENSE_COPY = new Map([
   [
     'open',
-    'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice',
+    'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice, versus the state of a review-memory proposal awaiting a decision',
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],

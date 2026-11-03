@@ -1571,6 +1571,7 @@
       "prOpened": "Pull request pre REVIEW.md bol otvorený",
       "alreadyPresent": "Pokyny už sú v súbore REVIEW.md",
       "status": {
+        "open": "Otvorené",
         "edited": "Upravené",
         "opening_change_request": "Otvára sa PR",
         "change_request_failed": "PR zlyhal",

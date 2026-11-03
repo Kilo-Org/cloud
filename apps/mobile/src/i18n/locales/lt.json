@@ -1571,6 +1571,7 @@
       "prOpened": "Atidaryta REVIEW.md PR",
       "alreadyPresent": "Gairės jau yra REVIEW.md faile",
       "status": {
+        "open": "Atviras",
         "edited": "Redaguota",
         "opening_change_request": "Atidaroma PR",
         "change_request_failed": "Nepavyko atidaryti PR",

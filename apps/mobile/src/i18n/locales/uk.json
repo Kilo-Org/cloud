@@ -1055,6 +1055,7 @@
       "prOpened": "Пулреквест для REVIEW.md відкрито",
       "alreadyPresent": "Настанови вже є в REVIEW.md",
       "status": {
+        "open": "Відкрито",
         "edited": "Відредаговано",
         "opening_change_request": "Відкриття PR",
         "change_request_failed": "Не вдалося відкрити PR",

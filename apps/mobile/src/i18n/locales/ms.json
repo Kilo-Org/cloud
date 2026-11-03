@@ -1527,6 +1527,7 @@
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada dalam REVIEW.md",
       "status": {
+        "open": "Terbuka",
         "edited": "Disunting",
         "opening_change_request": "Membuka PR",
         "change_request_failed": "PR gagal",

@@ -1527,6 +1527,7 @@
       "prOpened": "داواکاری ڕاکێشان بۆ REVIEW.md کرایەوە",
       "alreadyPresent": "ڕێنماییەکە پێشتر لە REVIEW.md هەیە",
       "status": {
+        "open": "کراوە",
         "edited": "دەستکاری کراو",
         "opening_change_request": "کردنەوەی PR",
         "change_request_failed": "PR شکستی هێنا",

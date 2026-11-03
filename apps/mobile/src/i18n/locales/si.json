@@ -1527,6 +1527,7 @@
       "prOpened": "REVIEW.md සඳහා pull request එකක් විවෘත කරන ලදී",
       "alreadyPresent": "මාර්ගෝපදේශ දැනටමත් REVIEW.md තුළ ඇත",
       "status": {
+        "open": "විවෘතයි",
         "edited": "සංස්කරණය කරන ලදී",
         "opening_change_request": "PR විවෘත කරමින් පවතී",
         "change_request_failed": "PR අසාර්ථක විය",

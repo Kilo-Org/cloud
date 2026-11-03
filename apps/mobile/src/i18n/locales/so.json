@@ -1527,6 +1527,7 @@
       "prOpened": "Pull request-ka REVIEW.md waa la furay",
       "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
       "status": {
+        "open": "Furan",
         "edited": "Wax laga beddelay",
         "opening_change_request": "Waa la furayaa PR",
         "change_request_failed": "PR wuu fashilmay",

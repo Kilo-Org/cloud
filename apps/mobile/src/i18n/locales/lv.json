@@ -1549,6 +1549,7 @@
       "prOpened": "Atvērts PR failam REVIEW.md",
       "alreadyPresent": "Norādījumi jau ir REVIEW.md failā",
       "status": {
+        "open": "Atvērts",
         "edited": "Rediģēts",
         "opening_change_request": "Tiek atvērts PR",
         "change_request_failed": "Neizdevās atvērt PR",

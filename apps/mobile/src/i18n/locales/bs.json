@@ -1549,6 +1549,7 @@
       "prOpened": "Pull request za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u REVIEW.md",
       "status": {
+        "open": "Otvoreno",
         "edited": "Uređeno",
         "opening_change_request": "Otvaranje PR-a",
         "change_request_failed": "PR nije uspio",

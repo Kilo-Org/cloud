@@ -1049,6 +1049,7 @@
       "prOpened": "Pull request voor REVIEW.md geopend",
       "alreadyPresent": "De richtlijnen staan al in REVIEW.md",
       "status": {
+        "open": "Open",
         "edited": "Bewerkt",
         "opening_change_request": "PR openen",
         "change_request_failed": "PR mislukt",

@@ -1049,6 +1049,7 @@
       "prOpened": "Pull-Request für REVIEW.md geöffnet",
       "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
       "status": {
+        "open": "Offen",
         "edited": "Bearbeitet",
         "opening_change_request": "PR wird geöffnet",
         "change_request_failed": "PR fehlgeschlagen",

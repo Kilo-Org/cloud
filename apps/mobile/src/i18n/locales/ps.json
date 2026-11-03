@@ -225,8 +225,8 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
-    "hideBalance": "بیلانس پټ کړه",
-    "showBalance": "بیلانس ښکاره کړه",
+    "hideBalance": "بیلانس پټ کړئ",
+    "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
@@ -255,9 +255,9 @@
     "passkeyAddedOn": "{{date}} اضافه شوه",
     "passkeyLastUsedOn": "وروستی کارول {{date}}",
     "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
-    "passkeyAddFailed": "د ننوتلو کیلي اضافه نشو. بیا هڅه وکړئ.",
+    "passkeyAddFailed": "د ننوتلو کیلي اضافه نشوه. بیا هڅه وکړئ.",
     "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",
-    "passkeyAddCancelled": "د ننوتلو کیلي جوړول لغوه شول.",
+    "passkeyAddCancelled": "د ننوتلو کیلي جوړول لغوه شو.",
     "passkeyRemoved": "د ننوتلو کیلي لیرې شوه.",
     "passkeyRemoveFailed": "هغه د ننوتلو کیلي لیرې نشوه. بیا هڅه وکړئ.",
     "passkeyRenamed": "د ننوتلو کیلي نوم بدل شو.",
@@ -265,7 +265,7 @@
     "renamePasskey": "د ننوتلو کیلي نوم بدل کړئ",
     "removePasskey": "د ننوتلو کیلي لیرې کړئ",
     "removePasskeyTitle": "د ننوتلو کیلي لیرې شي؟",
-    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ونشئ کولای."
+    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ننوتل نشئ کولی."
   },
   "preferences": {
     "general": "عمومي",
@@ -879,7 +879,7 @@
       "agentUpdatesTitle": "د ایجنټ تازه معلومات",
       "agentUpdatesSubtitle": "د کار پر مهال د ایجنټ پیغامونه",
       "sessionStatusTitle": "د ناستې حالت",
-      "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
+      "sessionStatusSubtitle": "بشپړه شوې / ناکامه شوې / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
       "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
@@ -1527,6 +1527,7 @@
       "prOpened": "د REVIEW.md پل ریکوېسټ پرانیستل شو",
       "alreadyPresent": "لارښوونې لا دمخه په REVIEW.md کې شته",
       "status": {
+        "open": "پرانستی",
         "edited": "سمون شوی",
         "opening_change_request": "د PR پرانیستل",
         "change_request_failed": "PR پرانیستل نه شو",
@@ -3216,7 +3217,7 @@
       "selectDescriptionWithOrganizations": "تاسو د یو یا ډیرو سازمانونو غړی یاست. هغه حساب غوره کړئ چې دا سکرین باید یې وکاروي.",
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
-      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان نښتې نشي لوډ کېدلی.",
+      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان ناستې نشي لوډ کېدلی.",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
@@ -3259,7 +3260,7 @@
       "sharingUnavailable": "په دې وسیله شریکول ممکن نه دي.",
       "status": {
         "paid": "تادیه شوی",
-        "open": "خلاص",
+        "open": "نه تادیه شوی",
         "void": "لغوه شوی",
         "uncollectible": "نه وصولېدونکی"
       },
@@ -3332,7 +3333,7 @@
     },
     "hub": {
       "renameTitle": "د سازمان نوم بدل کړئ",
-      "renamePlaceholder": "د سازمان نوم",
+      "renamePlaceholder": "د سازمان نوم ولیکئ",
       "balance": "بیلانس",
       "organizationSeats": "د سازمان د غړیتوب ځایونه",
       "lowBalanceBelow": "له {{amount}} څخه کم"
@@ -3344,8 +3345,8 @@
       "creditProcessingDelayed": "د کریډیټ پروسس ځنډېدلی · په اتومات ډول بیا هڅه کېږي",
       "ended": "پای ته رسېدلی",
       "notSubscribed": "ګډون نه دی شوی",
-      "overallocated": "د Kilo Pass ګمارنې له هغو ځایونو زیاتې دي چې پیسې یې ورکړل شوې دي",
-      "paidSeat_one": "{{displayCount}} د غړیتوب ځای چې پیسې یې ورکړل شوې",
+      "overallocated": "د Kilo Pass ګمارنې له تادیه شوو ځایونو زیاتې دي",
+      "paidSeat_one": "{{displayCount}} تادیه شوی ځای",
       "paidSeat": "{{displayCount}} تادیه شوي ځایونه",
       "paidSeat_other": "{{displayCount}} تادیه شوي ځایونه",
       "paymentNeedsAttention": "تادیه پاملرنې ته اړتیا لري",

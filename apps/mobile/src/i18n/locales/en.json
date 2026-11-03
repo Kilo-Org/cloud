@@ -1594,6 +1594,7 @@
       "prOpened": "REVIEW.md pull request opened",
       "alreadyPresent": "Guidance is already present in REVIEW.md",
       "status": {
+        "open": "Open",
         "edited": "Edited",
         "opening_change_request": "Opening PR",
         "change_request_failed": "PR failed",

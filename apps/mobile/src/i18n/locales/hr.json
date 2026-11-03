@@ -1549,6 +1549,7 @@
       "prOpened": "Zahtjev za povlačenje za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u datoteci REVIEW.md",
       "status": {
+        "open": "Otvoreno",
         "edited": "Uređeno",
         "opening_change_request": "Otvaranje PR-a",
         "change_request_failed": "Otvaranje PR-a nije uspjelo",

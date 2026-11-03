@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.md के लिए पुल रिक्वेस्ट खोली गई",
       "alreadyPresent": "दिशानिर्देश REVIEW.md में पहले से मौजूद हैं",
       "status": {
+        "open": "खुला है",
         "edited": "संपादित",
         "opening_change_request": "PR खोली जा रही है",
         "change_request_failed": "PR खोलना विफल रहा",

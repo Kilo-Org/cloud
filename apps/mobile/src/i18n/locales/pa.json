@@ -1527,6 +1527,7 @@
       "prOpened": "REVIEW.md ਲਈ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੀ ਗਈ",
       "alreadyPresent": "ਹਦਾਇਤਾਂ REVIEW.md ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹਨ",
       "status": {
+        "open": "ਖੁੱਲ੍ਹਾ",
         "edited": "ਸੰਪਾਦਿਤ",
         "opening_change_request": "PR ਖੋਲ੍ਹੀ ਜਾ ਰਹੀ ਹੈ",
         "change_request_failed": "PR ਅਸਫਲ ਰਹੀ",

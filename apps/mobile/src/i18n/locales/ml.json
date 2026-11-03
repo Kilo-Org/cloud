@@ -1527,6 +1527,7 @@
       "prOpened": "REVIEW.md പുൾ റിക്വസ്റ്റ് തുറന്നു",
       "alreadyPresent": "മാർഗ്ഗനിർദ്ദേശങ്ങൾ REVIEW.md-ൽ ഇതിനകം ഉണ്ട്",
       "status": {
+        "open": "തുറന്നത്",
         "edited": "തിരുത്തി",
         "opening_change_request": "PR തുറക്കുന്നു",
         "change_request_failed": "PR പരാജയപ്പെട്ടു",

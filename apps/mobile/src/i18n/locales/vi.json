@@ -1049,6 +1049,7 @@
       "prOpened": "Đã mở pull request cho REVIEW.md",
       "alreadyPresent": "Hướng dẫn đã có trong REVIEW.md",
       "status": {
+        "open": "Còn mở",
         "edited": "Đã chỉnh sửa",
         "opening_change_request": "Đang mở PR",
         "change_request_failed": "Không thể mở PR",

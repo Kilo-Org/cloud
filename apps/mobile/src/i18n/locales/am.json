@@ -1527,6 +1527,7 @@
       "prOpened": "የREVIEW.md pull request ተከፍቷል",
       "alreadyPresent": "መመሪያዎቹ አስቀድመው በREVIEW.md ውስጥ አሉ",
       "status": {
+        "open": "ክፍት",
         "edited": "ተስተካክሏል",
         "opening_change_request": "PR በመክፈት ላይ",
         "change_request_failed": "PR አልተሳካም",

@@ -1527,6 +1527,7 @@
       "prOpened": "REVIEW.md-ի pull request-ը բացված է",
       "alreadyPresent": "Հրահանգներն արդեն կան REVIEW.md-ում",
       "status": {
+        "open": "Բաց է",
         "edited": "Խմբագրված է",
         "opening_change_request": "Բացվում է PR-ը",
         "change_request_failed": "Չհաջողվեց բացել PR-ը",

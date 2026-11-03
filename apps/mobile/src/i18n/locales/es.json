@@ -1052,6 +1052,7 @@
       "prOpened": "Pull request de REVIEW.md abierta",
       "alreadyPresent": "Las directrices ya están en REVIEW.md",
       "status": {
+        "open": "Pendiente",
         "edited": "Editada",
         "opening_change_request": "Abriendo PR",
         "change_request_failed": "PR fallida",

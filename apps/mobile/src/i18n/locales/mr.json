@@ -1527,6 +1527,7 @@
       "prOpened": "REVIEW.md साठी पुल रिक्वेस्ट उघडली",
       "alreadyPresent": "मार्गदर्शक सूचना REVIEW.md मध्ये आधीच आहेत",
       "status": {
+        "open": "उघडा",
         "edited": "संपादित",
         "opening_change_request": "PR उघडत आहे",
         "change_request_failed": "PR अयशस्वी झाली",

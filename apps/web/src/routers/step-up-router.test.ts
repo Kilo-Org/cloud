@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 
 const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
 const createdUserIds: string[] = [];
@@ -67,7 +67,7 @@ describe('stepUp.getStatus', () => {
   it('refuses a bearer credential', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
     const user = await admin();
-    const caller = await createCallerForUser(user.id);
+    const caller = await createBearerCallerForUser(user.id);
 
     await expect(caller.stepUp.getStatus()).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });

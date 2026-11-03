@@ -10,7 +10,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { hashWebSessionId, revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
 
 const webSessionId = 'guard-web-session';
@@ -341,7 +341,7 @@ describe('requirePrivilegedActor', () => {
 
     it('denies multiple concurrent bearer admin operations', async () => {
       const { user } = await setup();
-      const caller = await createCallerForUser(user.id);
+      const caller = await createBearerCallerForUser(user.id);
 
       const results = await Promise.allSettled([
         caller.admin.getPermissions(),
@@ -358,7 +358,7 @@ describe('requirePrivilegedActor', () => {
 
     it('denies a bearer admin procedure', async () => {
       const { user } = await setup();
-      const caller = await createCallerForUser(user.id);
+      const caller = await createBearerCallerForUser(user.id);
 
       const cause = await refusal(caller.admin.getPermissions());
 

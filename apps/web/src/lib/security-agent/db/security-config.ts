@@ -14,10 +14,7 @@ import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { TRPCError } from '@trpc/server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import { and, eq } from 'drizzle-orm';
-import {
-  mergeSecurityAgentConfigPatch,
-  parseSecurityAgentConfig,
-} from '../core/constants';
+import { mergeSecurityAgentConfigPatch, parseSecurityAgentConfig } from '../core/constants';
 import {
   type AutoAnalysisMinSeverity,
   type SecurityAgentConfig,

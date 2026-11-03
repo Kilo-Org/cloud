@@ -902,7 +902,6 @@ export function PermissionsSection({ data }: { data: Permissions }) {
                   <TableCell>{child.companyDomain ?? 'Not set'}</TableCell>
                   <TableCell className="max-w-72">
                     Usage limits: {child.featureSettings.enableUsageLimits === true ? 'on' : 'off'}{' '}
-                    / Indexing: {child.featureSettings.codeIndexingEnabled === true ? 'on' : 'off'}{' '}
                     / Projects: {child.featureSettings.projectsUiEnabled === true ? 'on' : 'off'} /
                     Data: {child.featureSettings.dataCollection ?? 'default'}
                   </TableCell>

@@ -51,7 +51,7 @@ const cloudflareAllocationRequestSchema = z
 
 const vercelAllocationRequestSchema = z
   .object({
-    provider: z.object({ id: z.literal('vercel'), account: z.enum(['kilo', 'byoc']) }).strict(),
+    provider: z.object({ id: z.literal('vercel'), account: z.literal('byoc') }).strict(),
     instanceType: z.enum(['small', 'large']),
   })
   .strict();
@@ -113,11 +113,11 @@ const allocationRequests = {
     instanceType: 'standard-4',
   },
   'vercel-small': {
-    provider: { id: 'vercel', account: 'kilo' },
+    provider: { id: 'vercel', account: 'byoc' },
     instanceType: 'small',
   },
   'vercel-large': {
-    provider: { id: 'vercel', account: 'kilo' },
+    provider: { id: 'vercel', account: 'byoc' },
     instanceType: 'large',
   },
 } as const satisfies Record<SandboxAllocation, SandboxAllocationRequest>;
@@ -136,7 +136,7 @@ export function getSandboxAllocationKey(
   return `${allocation.provider.id}:${allocation.provider.account}:${allocation.instanceType}`;
 }
 
-export function getKiloSandboxAllocation(
+export function getSandboxAllocation(
   request: SandboxAllocationRequest
 ): SandboxAllocation | undefined {
   const key = getSandboxAllocationKey(request);
@@ -202,6 +202,17 @@ export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
 }
 
 /**
+ * A multi-repository environment keeps every repository in one workspace, so it
+ * needs a sandbox that one session owns. The shared Cloudflare sandbox and Vercel
+ * cannot give it one.
+ */
+export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
+  return (
+    allocation !== 'cloudflare-shared' && getSandboxAllocationProvider(allocation) !== 'vercel'
+  );
+}
+
+/**
  * Vercel and DO-managed Cloudflare containers exist only on the control plane, so
  * their allocations force a control-plane session. Cloudflare allocations pick the
  * sandbox shape only and leave the plane decision to the session origin.
@@ -250,3 +261,20 @@ export const sandboxSelectionCapabilitiesSchema = z
   });
 
 export type SandboxSelectionCapabilities = z.infer<typeof sandboxSelectionCapabilitiesSchema>;
+
+export function isSandboxAllocationAvailable(
+  capabilities: SandboxSelectionCapabilities,
+  allocation: SandboxAllocation
+): boolean {
+  return (
+    capabilities.enabled &&
+    (allocation === 'isolated-standard' ||
+      allocation === 'cloudflare-single' ||
+      capabilities.options.some(
+        option =>
+          getSandboxAllocation(option.allocation) === allocation &&
+          option.unavailableReason === undefined &&
+          option.repositoryUnavailableReason === undefined
+      ))
+  );
+}

@@ -1,7 +1,13 @@
-import { type Href, Redirect, Stack, useLocalSearchParams } from 'expo-router';
+import {
+  type Href,
+  Redirect,
+  Stack,
+  useGlobalSearchParams,
+  useLocalSearchParams,
+} from 'expo-router';
 import { useMemo } from 'react';
 
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
@@ -51,6 +57,11 @@ type Params = {
  */
 export default function ProviderPrReviewLayout() {
   const params = useLocalSearchParams<Params>();
+  // The GitLab instance rides as a QUERY param (`?instance=`), and a layout's
+  // local params carry only its own path segments — the platform and the
+  // catch-all identity. Read the query from the global params, or the pasted
+  // self-managed host never reaches the scope the connect gate names it from.
+  const query = useGlobalSearchParams<{ instance?: string | string[] }>();
   const platform = parseParam(params.platform) ?? '';
   // A catch-all param is a fresh array on every render; the joined form is a
   // stable dependency, and a `/` inside a segment is percent-encoded by
@@ -58,7 +69,7 @@ export default function ProviderPrReviewLayout() {
   const identity = Array.isArray(params.identity)
     ? params.identity.join('/')
     : (parseParam(params.identity) ?? '');
-  const instance = parseParam(params.instance) ?? '';
+  const instance = parseParam(query.instance) ?? '';
   const { organizationId } = useOrganization();
   const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
   const { userId } = useCurrentUserId();
@@ -105,8 +116,8 @@ export default function ProviderPrReviewLayout() {
               never reach the authenticated queries and mutations below, and a
               Bitbucket personal scope gets the terminal org-only explanation
               instead of a retry that could not succeed. */}
-          <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
-            <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+          <PrReviewConnectGate platform={ref.platform} organizationId={organizationId} prRef={ref}>
+            <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
               {/* Register the overview first, exactly like the GitHub layout:
                   unregistered routes sort after registered siblings, so without
                   this the initial screen is the comment-composer formSheet

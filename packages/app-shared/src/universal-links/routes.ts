@@ -32,36 +32,36 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   { webPath: '/cloud/sessions/*', appPath: '/(app)/agent-chat/<1>' },
   {
     webPath: '/security-agent',
-    appPath: '/(app)/(tabs)/(3_profile)/security-agent/personal',
+    appPath: '/(app)/security-agent/personal',
   },
   {
     webPath: '/security-agent/findings',
-    appPath: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings',
+    appPath: '/(app)/security-agent/personal/findings',
   },
   {
     webPath: '/code-reviews',
-    appPath: '/(app)/(tabs)/(3_profile)/code-reviewer/personal',
+    appPath: '/(app)/code-reviewer/personal',
   },
   {
     webPath: '/code-reviews/*',
-    appPath: '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/<1>',
+    appPath: '/(app)/code-reviewer/personal/reviews/<1>',
     exclusions: ['review-md'],
   },
   {
     webPath: '/organizations/*/security-agent',
-    appPath: '/(app)/(tabs)/(3_profile)/security-agent/<1>',
+    appPath: '/(app)/security-agent/<1>',
   },
   {
     webPath: '/organizations/*/security-agent/findings',
-    appPath: '/(app)/(tabs)/(3_profile)/security-agent/<1>/findings',
+    appPath: '/(app)/security-agent/<1>/findings',
   },
   {
     webPath: '/organizations/*/code-reviews',
-    appPath: '/(app)/(tabs)/(3_profile)/code-reviewer/<1>',
+    appPath: '/(app)/code-reviewer/<1>',
   },
   {
     webPath: '/organizations/*/code-reviews/*',
-    appPath: '/(app)/(tabs)/(3_profile)/code-reviewer/<1>/reviews/<2>',
+    appPath: '/(app)/code-reviewer/<1>/reviews/<2>',
     exclusions: ['review-md'],
   },
   {

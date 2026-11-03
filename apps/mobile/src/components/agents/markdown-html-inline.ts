@@ -1,3 +1,5 @@
+import { characterEntities } from 'character-entities';
+
 import { type HtmlElement, type HtmlNode, type MaskRange } from './markdown-html-scan';
 import { toScriptText } from './markdown-html-script';
 
@@ -22,8 +24,9 @@ export type InlineOptions = {
  */
 export const HARD_BREAK = '\uE000';
 
-// Maps and sets, not object literals: tag and entity names come from the
-// message, and a name like `constructor` must not find an inherited member.
+// Maps and sets, not object literals: tag names come from the message, and a
+// name like `constructor` must not find an inherited member. Entity names are
+// looked up in the named-reference set with `Object.hasOwn` for the same reason.
 const EMPHASIS_DELIMITERS: ReadonlyMap<string, string> = new Map([
   ['b', '**'],
   ['strong', '**'],
@@ -39,14 +42,6 @@ const KEPT_ATTRIBUTES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['a', new Set(['href', 'title', 'target', 'rel'])],
   ['img', new Set(['src', 'alt', 'title'])],
 ]);
-const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map([
-  ['amp', '&'],
-  ['lt', '<'],
-  ['gt', '>'],
-  ['quot', '"'],
-  ['apos', "'"],
-  ['nbsp', '\u00A0'],
-]);
 const MAX_CODE_POINT = 1_114_111;
 
 const WHITESPACE_RUN = /\s+/g;
@@ -54,6 +49,31 @@ const ENTITY = /&(#\d{1,7}|#[xX][\da-fA-F]{1,6}|[a-zA-Z][a-zA-Z\d]*);/g;
 const SPACE = /\s/u;
 const PUNCTUATION = /[\p{P}\p{S}]/u;
 const EDGE_WHITESPACE = /^(\s*)([\s\S]*?)(\s*)$/;
+// The inline syntax markdown reads in ordinary text: an escape, a code span,
+// emphasis, strikethrough, a link or image label, and an HTML tag or autolink.
+const MARKDOWN_SYNTAX = /[\\`*_[\]~<]/g;
+// A bare URL or address the renderer links on its own. It is copied exactly:
+// a backslash inside it would become part of the link text and its target.
+const AUTOLINK_RUN =
+  /(?:https?:\/\/|www\.)[^\s<>]+|[a-zA-Z\d.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z\d-]+(?:\.[a-zA-Z\d-]+)+/g;
+
+/**
+ * Escapes the markdown syntax inside text copied out of HTML, so the characters
+ * render as the source element held them (`a*b*c` stays three asterisks). The
+ * delimiters the converter generates for real emphasis, code, links and images
+ * are added after this and stay unescaped, and a bare URL or address keeps the
+ * characters that make it a link.
+ */
+function escapeText(source: string): string {
+  let escaped = '';
+  let cursor = 0;
+  for (const match of source.matchAll(AUTOLINK_RUN)) {
+    const run = match[0];
+    escaped += source.slice(cursor, match.index).replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`) + run;
+    cursor = match.index + run.length;
+  }
+  return escaped + source.slice(cursor).replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`);
+}
 
 /**
  * A run of inline markdown. Emphasis keeps its delimiter apart until it is
@@ -64,7 +84,12 @@ type InlinePiece = { delimiter: string; lead: string; core: string; trail: strin
 
 const text = (core: string): InlinePiece => ({ delimiter: '', lead: '', core, trail: '' });
 
-/** Collapses whitespace as HTML does, except inside code spans, whose spaces markdown keeps. */
+/**
+ * Collapses whitespace as HTML does, except inside code spans, whose spaces
+ * markdown keeps. Every other run is escaped, so the markdown syntax a copied
+ * text node holds renders as the characters the source had; a code span the
+ * source already wrote in markdown keeps its backticks.
+ */
 function renderText(context: ConvertContext, start: number, end: number): string {
   const { value, masks } = context;
   let low = 0;
@@ -85,23 +110,23 @@ function renderText(context: ConvertContext, start: number, end: number): string
     }
     const maskStart = Math.max(mask.start, cursor);
     const maskEnd = Math.min(mask.end, end);
-    rendered += value.slice(cursor, maskStart).replace(WHITESPACE_RUN, ' ');
+    rendered += escapeText(value.slice(cursor, maskStart).replace(WHITESPACE_RUN, ' '));
     rendered += value.slice(maskStart, maskEnd).replaceAll('\n', ' ');
     cursor = maskEnd;
   }
-  return rendered + value.slice(cursor, end).replace(WHITESPACE_RUN, ' ');
+  return rendered + escapeText(value.slice(cursor, end).replace(WHITESPACE_RUN, ' '));
 }
 
-/** Decodes the entities code text needs as characters; null for one it does not know. */
+/** Decodes the entities code text needs as characters; null for a name the HTML set does not define. */
 export function decodeEntities(source: string): string | null {
   for (const [, body = ''] of source.matchAll(ENTITY)) {
-    if (!body.startsWith('#') && !NAMED_ENTITIES.has(body)) {
+    if (!body.startsWith('#') && !Object.hasOwn(characterEntities, body)) {
       return null;
     }
   }
   return source.replace(ENTITY, (entity, body: string) => {
     if (!body.startsWith('#')) {
-      return NAMED_ENTITIES.get(body) ?? entity;
+      return characterEntities[body] ?? entity;
     }
     const hex = body[1] === 'x' || body[1] === 'X';
     const codePoint = hex ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);

@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import {
-  findKiloExclusiveModel,
-  gemma_4_26b_a4b_it_free_model,
-  glyph_cluster_stealth_free_model,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -26,74 +26,33 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ExclusiveModelsModule>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  return {
-    ...actual,
-    findKiloExclusiveModel: jest.fn(actual.findKiloExclusiveModel),
-  };
-});
-
-const actualFindKiloExclusiveModel = jest.requireActual<typeof ExclusiveModelsModule>(
-  '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-).findKiloExclusiveModel;
-
 function configure(models: string[]) {
   jest
     .mocked(getConfiguredAutoFreeModels)
     .mockResolvedValue(models.map(model => ({ model, weight: 1, reasoning: { enabled: true } })));
 }
 
-function restrictGemmaToChatCompletions() {
-  jest.mocked(findKiloExclusiveModel).mockImplementation(model =>
-    model === gemma_4_26b_a4b_it_free_model.public_id
-      ? {
-          ...gemma_4_26b_a4b_it_free_model,
-          provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
-        }
-      : actualFindKiloExclusiveModel(model)
-  );
-}
-
 describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
-    jest.mocked(findKiloExclusiveModel).mockImplementation(actualFindKiloExclusiveModel);
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
-    configure([
-      gemma_4_26b_a4b_it_free_model.public_id,
-      glyph_cluster_stealth_free_model.public_id,
-      'test/present:free',
-      'test/absent:free',
-    ]);
+    configure([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free', 'test/absent:free']);
   });
 
   it.each(['chat_completions', 'messages', 'responses', null] as const)(
-    'includes hidden and public free models for %s without requiring catalog presence',
+    'includes only free models present in the OpenRouter catalog for %s',
     async apiKind => {
-      expect(await getAutoFreeCandidates(apiKind)).toEqual(
-        [
-          gemma_4_26b_a4b_it_free_model.public_id,
-          glyph_cluster_stealth_free_model.public_id,
-          'test/present:free',
-        ].toSorted()
-      );
+      expect(await getAutoFreeCandidates(apiKind)).toEqual(['test/present:free']);
     }
   );
 
-  it('filters using the model provider capabilities', async () => {
-    restrictGemmaToChatCompletions();
+  it('includes the kilo-auto/small free model when the OpenRouter catalog lists it', async () => {
+    jest
+      .mocked(getOpenRouterModelsFromDatabase)
+      .mockResolvedValue(new Set([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free']));
 
-    expect(await getAutoFreeCandidates('messages')).toEqual(
-      [glyph_cluster_stealth_free_model.public_id, 'test/present:free'].toSorted()
+    expect(await getAutoFreeCandidates('chat_completions')).toEqual(
+      [AUTO_SMALL_TARGET_MODELS.free, 'test/present:free'].toSorted()
     );
-  });
-
-  it('does not filter provider capabilities when the API kind is null', async () => {
-    restrictGemmaToChatCompletions();
-
-    expect(await getAutoFreeCandidates(null)).toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });
 
   it('skips configured models that are not free or need a non-default AI SDK provider', async () => {
@@ -105,6 +64,33 @@ describe('getAutoFreeCandidates', () => {
     configure(['test/present:free', 'test/paid', 'anthropic/claude-free:free', 'kilo-auto/free']);
 
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
+
+  describe('custom LLMs', () => {
+    const customLlmIds = ['acme/chat-free', 'acme/multi-free', 'acme/private-free'];
+
+    beforeEach(async () => {
+      await insertCustomLlmForTest('acme/chat-free', publicCustomLlmDefinition(['acme']));
+      await insertCustomLlmForTest(
+        'acme/multi-free',
+        publicCustomLlmDefinition(['acme'], { api_kinds: ['chat_completions', 'messages'] })
+      );
+      await insertCustomLlmForTest('acme/private-free', customLlmDefinition());
+      configure(customLlmIds);
+    });
+
+    afterEach(async () => {
+      for (const id of customLlmIds) await deleteCustomLlmForTest(id);
+    });
+
+    it.each([
+      ['chat_completions', ['acme/chat-free', 'acme/multi-free']],
+      ['messages', ['acme/multi-free']],
+      ['responses', ['openrouter/free']],
+      [null, ['acme/chat-free', 'acme/multi-free']],
+    ] as const)('includes public custom LLMs that serve %s', async (apiKind, expected) => {
+      expect(await getAutoFreeCandidates(apiKind)).toEqual(expected);
+    });
   });
 
   it('falls back to openrouter/free when nothing is configured or the config is invalid', async () => {

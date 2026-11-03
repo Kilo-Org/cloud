@@ -6,12 +6,14 @@ import {
   type ModeOption,
   visibleProfileAgents,
 } from '@/components/agents/mode-normalize';
+import { useAgentProfileAgents } from '@/lib/hooks/use-agent-profiles';
 import { useTRPC } from '@/lib/trpc';
 
-type EffectiveProfileCustomModes = {
+export type EffectiveProfileCustomModes = {
   customOptions: ModeOption[];
   profileAgents: ReturnType<typeof visibleProfileAgents>;
   isLoading: boolean;
+  settled: boolean;
 };
 
 /**
@@ -42,7 +44,7 @@ export function useEffectiveProfileCustomModes(
     : (list.data?.find(profile => profile.isDefault)?.id ?? null);
   const targetProfileId = profileId ?? effectiveId;
 
-  // Scope the `get` by the profile's own owner. In an org context the combined
+  // Scope the read by the profile's own owner. In an org context the combined
   // read carries both buckets, so a personal profile referenced from a session
   // is fetched without the organization id, exactly as an org profile is
   // fetched with it.
@@ -52,27 +54,33 @@ export function useEffectiveProfileCustomModes(
     (listCombined.data?.orgProfiles.some(profile => profile.id === targetProfileId) ?? false);
   const getOrg = isOrgProfile ? organizationId : undefined;
 
-  // An explicit `profileId` can enable the `get` before the combined read has
+  // An explicit `profileId` can enable the read before the combined read has
   // resolved, so its owner is not yet known. Firing then without the
   // organization id resolves the personal owner and throws `Profile not found`
   // for an org profile, projecting an empty role list until the query re-keys.
-  // Gate the `get` on the ownership lookup; a personal context has no such
+  // Gate the read on the ownership lookup; a personal context has no such
   // lookup and is always resolved.
   const ownershipResolved = !organizationId || listCombined.data !== undefined;
 
-  const get = useQuery(
-    trpc.agentProfiles.get.queryOptions(
-      { profileId: targetProfileId ?? '', ...(getOrg ? { organizationId: getOrg } : {}) },
-      { enabled: Boolean(targetProfileId) && ownershipResolved }
-    )
+  const agentsQuery = useAgentProfileAgents(
+    targetProfileId ?? '',
+    getOrg,
+    Boolean(targetProfileId) && ownershipResolved
   );
 
-  const profileAgents = visibleProfileAgents(get.data?.agents ?? []);
+  const profileAgents = visibleProfileAgents(agentsQuery.data ?? []);
   const customOptions = dedupeCustomModeOptions(customModeOptionsFromProfileAgents(profileAgents));
+  // True once the profile's agent list is known: the context lookup answered
+  // and the selected profile (if any) loaded. A failed read is not settled.
+  const contextResolved = organizationId
+    ? listCombined.isSuccess
+    : Boolean(profileId) || list.isSuccess;
+  const settled = contextResolved && (!targetProfileId || agentsQuery.isSuccess);
 
   return {
     customOptions,
     profileAgents,
-    isLoading: get.isLoading,
+    isLoading: agentsQuery.isLoading,
+    settled,
   };
 }

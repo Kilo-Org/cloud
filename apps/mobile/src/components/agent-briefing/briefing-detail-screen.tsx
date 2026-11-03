@@ -1,0 +1,204 @@
+import { briefingHasActivity } from '@kilocode/app-shared/agent-briefing';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, View } from 'react-native';
+import { toast } from 'sonner-native';
+
+import { BriefingScorecard } from './briefing-card';
+import { briefingSourceHref } from './briefing-session-href';
+import { BriefingSessionList } from './briefing-session-list';
+import { BriefingSummary } from './briefing-summary';
+import { BriefingPeriodLabel } from './briefing-period-label';
+import { formatBriefingTimestamp } from './briefing-window';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import {
+  BRIEFING_PATH,
+  useBriefingAccess,
+  useBriefingDismissals,
+  useBriefingInvalidation,
+} from '@/lib/agent-briefing';
+import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
+import { openExternalUrl } from '@/lib/external-link';
+import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { useOrganization } from '@/lib/organization-context';
+import { useTRPC } from '@/lib/trpc';
+
+const SOURCE_LABEL_KEYS = {
+  pull_request: 'common.pullRequest',
+  blocker: 'agentBriefing.sourceBlocker',
+  artifact: 'agentBriefing.sourceMetadata',
+} as const;
+
+export function BriefingDetailScreen() {
+  const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const { t, i18n } = useTranslation();
+  const { setOrganizationId } = useOrganization();
+  const access = useBriefingAccess();
+  const offline = useOfflineBannerState();
+  const dismissals = useBriefingDismissals();
+  const [goneReportId, setGoneReportId] = useState<string | null>(null);
+  const gone = goneReportId === reportId;
+  const query = useQuery({
+    ...trpc.agentBriefing.get.queryOptions({ reportId }),
+    enabled: access.enabled && Boolean(reportId) && !gone,
+    refetchInterval: state =>
+      state.state.data?.summary.status === 'pending' ||
+      state.state.data?.summary.status === 'running'
+        ? 15_000
+        : false,
+    retry: (failureCount, error) => !briefingReportMissing(error) && failureCount < 3,
+  });
+  useBriefingInvalidation(query.error);
+  const missing = gone || briefingReportMissing(query.error);
+  useEffect(() => {
+    if (!briefingReportMissing(query.error) || gone) {
+      return;
+    }
+    setGoneReportId(reportId);
+    queryClient.removeQueries({
+      queryKey: trpc.agentBriefing.get.queryKey({ reportId }),
+      exact: true,
+    });
+  }, [gone, query.error, queryClient, reportId, trpc]);
+  const report =
+    !missing &&
+    query.data &&
+    !briefingAccessDenied(query.error) &&
+    access.canRead(query.data.context.organizationId)
+      ? query.data
+      : undefined;
+  const read = useMutation(
+    trpc.agentBriefing.read.mutationOptions({
+      onError: () => {
+        toast.error(t('common.somethingWentWrong'));
+      },
+    })
+  );
+  const marked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!report || offline || report.readAt || marked.current === report.id) {
+      return;
+    }
+    marked.current = report.id;
+    read.mutate({ reportId: report.id });
+  }, [offline, read, report]);
+  const loading = !report && !missing && query.isPending && !offline;
+  const failure = !report && !loading;
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        title={t('agentBriefing.title')}
+        showBackButton
+        backFallback={BRIEFING_PATH as Href}
+      />
+      {loading && (
+        <View className="gap-4 p-4">
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </View>
+      )}
+      {failure && missing && <QueryError variant="not-found" />}
+      {failure && !missing && (
+        <QueryError
+          title={t('agentBriefing.loadError')}
+          variant={briefingAccessDenied(query.error) ? 'permission' : 'neutral'}
+          onRetry={() => {
+            void query.refetch();
+          }}
+        />
+      )}
+      {report && (
+        <ScrollView automaticallyAdjustKeyboardInsets contentContainerClassName="gap-4 p-4 pb-12">
+          <View className="gap-1">
+            <Text className="text-lg font-semibold">
+              {report.context.organizationId === null ? t('common.personal') : report.context.name}
+            </Text>
+            <BriefingPeriodLabel report={report} />
+            {offline || query.isError ? (
+              <Text className="text-xs text-muted-foreground">
+                {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
+              </Text>
+            ) : null}
+          </View>
+          <View className="overflow-hidden rounded-2xl border border-border bg-card">
+            <BriefingScorecard report={report} />
+          </View>
+          <Text className="text-xs text-muted-foreground">{t('agentBriefing.snapshotHint')}</Text>
+          {report.truncated ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('agentBriefing.snapshotTruncated')}
+            </Text>
+          ) : null}
+          {!briefingHasActivity(report.scorecard) ? (
+            <Text className="text-sm">{t('agentBriefing.quietSnapshot')}</Text>
+          ) : (
+            <>
+              <BriefingSummary report={report} />
+              <BriefingSessionList report={report} />
+              <View className="gap-2">
+                <Text className="font-semibold">{t('agentBriefing.sources')}</Text>
+                {report.sources.map(source => (
+                  <Pressable
+                    key={source.id}
+                    accessibilityRole="link"
+                    className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
+                    onPress={() => {
+                      const href = briefingSourceHref(report, source);
+                      if (href === null) {
+                        void openExternalUrl(source.url, { label: source.title });
+                        return;
+                      }
+                      setOrganizationId(report.context.organizationId);
+                      router.push(href);
+                    }}
+                  >
+                    <Text className="text-sm">
+                      {source.kind === 'activity'
+                        ? source.title
+                        : t(SOURCE_LABEL_KEYS[source.kind])}
+                    </Text>
+                    {source.excerpt ? (
+                      <Text className="text-sm text-muted-foreground" selectable>
+                        {source.excerpt}
+                      </Text>
+                    ) : null}
+                    <Text className="text-xs text-muted-foreground">
+                      {formatBriefingTimestamp(source.occurredAt, i18n.language, report.timezone)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+          <Button
+            variant="outline"
+            onPress={() => {
+              dismissals.dismiss(report);
+              router.back();
+            }}
+          >
+            <Text>{t('agentBriefing.dismiss')}</Text>
+          </Button>
+          <Button
+            variant="ghost"
+            onPress={() => {
+              router.push(`${BRIEFING_PATH}/settings` as Href);
+            }}
+          >
+            <Text>{t('agentBriefing.settings')}</Text>
+          </Button>
+        </ScrollView>
+      )}
+    </View>
+  );
+}

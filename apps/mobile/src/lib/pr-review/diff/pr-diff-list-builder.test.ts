@@ -1,15 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
-import { parsePatch } from '@/lib/pr-review/diff/parse-patch';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
-
-// Wraps the real parser in a spy so a test can count parse calls.
-vi.mock('@/lib/pr-review/diff/parse-patch', async importOriginal => {
-  const actual = await importOriginal<{ parsePatch: typeof parsePatch }>();
-  return { ...actual, parsePatch: vi.fn(actual.parsePatch) };
-});
 
 type FilePatchMissingItem = Extract<ListItem, { kind: 'file-patch-missing' }>;
 
@@ -144,7 +137,12 @@ describe('buildItems gap separators', () => {
     );
     const trailing = separatorFor(items, 1);
     expect(trailing).toMatchObject({ context: { gapIndex: 1, startLine: 8 }, state: 'idle' });
-    expect(Number.isFinite(trailing?.context.endLine ?? 0)).toBe(false);
+    // The trailing end is unknown, so the expand row must take its
+    // `isUnknownEnd` branch (default window, no Expand-all affordance).
+    // Asserted as the builder hands it over; the bounded half of the same
+    // contract is covered by `uses totalLines to bound the trailing gap once
+    // known`.
+    expect(trailing?.context.endLine).toBe(Infinity);
   });
 
   it('renders between-hunk separators for gaps larger than 3 lines', () => {
@@ -296,17 +294,5 @@ describe('buildItems trailing gap totalLines', () => {
       state: 'partial',
       context: { startLine: 9, endLine: 9 },
     });
-  });
-});
-
-describe('buildFileItems parsed patch cache', () => {
-  it('parses each file object once across two builds that differ only in viewed', () => {
-    const spy = vi.mocked(parsePatch);
-    spy.mockClear();
-    const args = baseArgs({ files: [makeFile(singleHunkPatch)], expanded: { 'a.ts': true } });
-    const build = (next: BuildItemsArgs) =>
-      buildItems(next).find((i): i is DiffLineListItem => i.kind === 'diff-line');
-    expect(build(args)?.parsed).toBe(build({ ...args, viewed: () => true })?.parsed);
-    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

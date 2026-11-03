@@ -324,7 +324,6 @@ describe('matchEnkryptScores', () => {
   it.each([
     'kilo/model',
     'kilocode/model',
-    'kilo-internal/model',
     'kilo-auto/model',
     'internal/model',
     'private/model',

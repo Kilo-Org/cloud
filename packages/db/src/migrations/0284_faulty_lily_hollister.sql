@@ -1,0 +1,1 @@
+ALTER TABLE "openai_chatgpt_connections" ADD COLUMN "usage_limit_error_code" text;

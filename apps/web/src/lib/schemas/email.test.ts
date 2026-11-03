@@ -43,6 +43,45 @@ describe('validateMagicLinkSignupEmail', () => {
     const result = validateMagicLinkSignupEmail('User+tag@kilocode.ai');
     expect(result).toEqual({ valid: false, error: MAGIC_LINK_EMAIL_ERRORS.LOWERCASE });
   });
+
+  it('should reject an address without a valid email format', () => {
+    const result = validateMagicLinkSignupEmail('not-an-email');
+    expect(result).toEqual({ valid: false, error: MAGIC_LINK_EMAIL_ERRORS.INVALID_FORMAT });
+  });
+
+  it('should reject an invalid format before the signup policy rules', () => {
+    const result = validateMagicLinkSignupEmail('NOT-AN-EMAIL');
+    expect(result).toEqual({ valid: false, error: MAGIC_LINK_EMAIL_ERRORS.INVALID_FORMAT });
+  });
+
+  it('should reject an uppercase address in a single-letter domain', () => {
+    const result = validateMagicLinkSignupEmail('A@b.com');
+    expect(result).toEqual({ valid: false, error: MAGIC_LINK_EMAIL_ERRORS.LOWERCASE });
+  });
+
+  it('should reject a plus address outside the kilocode.ai domain', () => {
+    const result = validateMagicLinkSignupEmail('a+b@example.com');
+    expect(result).toEqual({ valid: false, error: MAGIC_LINK_EMAIL_ERRORS.NO_PLUS });
+  });
+});
+
+describe('magic link signup email rule set', () => {
+  it.each([
+    'user@example.com',
+    'user+tag@kilocode.ai',
+    'a+b@example.com',
+    'A@b.com',
+    'not-an-email',
+    'NOT-AN-EMAIL',
+    '',
+    'user@',
+    '@example.com',
+    'user@example',
+  ])('applies the same verdict in both exports for %o', email => {
+    expect(validateMagicLinkSignupEmail(email).valid).toBe(
+      magicLinkSignupEmailSchema.safeParse(email).success
+    );
+  });
 });
 
 describe('magicLinkSignupEmailSchema', () => {

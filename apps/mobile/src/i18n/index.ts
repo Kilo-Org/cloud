@@ -47,3 +47,9 @@ void i18n
     initAsync: false,
     returnNull: false,
   });
+
+/** The active language tag as a plain value, for effect/memo dependencies that
+ * re-resolve captured copy when the app language changes. */
+export function getLanguageSnapshot(): string {
+  return i18n.language;
+}

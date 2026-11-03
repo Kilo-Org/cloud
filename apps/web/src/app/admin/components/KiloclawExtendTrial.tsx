@@ -70,8 +70,6 @@ function subscriptionStatusBadge(status: string | null) {
   );
 }
 
-// --- Component ---
-
 const ACTION_CONFIG = {
   extended: { label: 'Extended', icon: Clock, variant: 'default' as const },
   restarted: { label: 'Restarted', icon: RotateCcw, variant: 'secondary' as const },
@@ -85,23 +83,18 @@ export function KiloclawExtendTrial() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Input mode
   const [inputMode, setInputMode] = useState<InputMode>('paste');
   const [pastedText, setPastedText] = useState('');
 
-  // Step 1: CSV state
   const [csvData, setCsvData] = useState<CsvTableData | null>(null);
   const [selectedColumn, setSelectedColumn] = useState<string>('');
   const [trialDays, setTrialDays] = useState<string>('7');
   const [isDragging, setIsDragging] = useState(false);
 
-  // Step 2: Match state — null means "not yet submitted"; non-null triggers the query
   const [emailsToMatch, setEmailsToMatch] = useState<string[] | null>(null);
 
-  // Step 3: Results
   const [results, setResults] = useState<TrialResult[] | null>(null);
 
-  // Query — only fires once emailsToMatch is a non-empty array
   const matchUsersQuery = useQuery({
     ...trpc.admin.extendClawTrial.matchUsers.queryOptions({
       emails: emailsToMatch ?? [],
@@ -161,7 +154,6 @@ export function KiloclawExtendTrial() {
     })
   );
 
-  // File handling
   const handleFile = useCallback((file: File) => {
     setResults(null);
     setEmailsToMatch(null);
@@ -210,7 +202,6 @@ export function KiloclawExtendTrial() {
   );
   const csvEmailCount = extractedEmails.length;
 
-  // Actions
   const handleMatchUsers = () => {
     const emails =
       inputMode === 'csv' && csvData && selectedColumn
@@ -313,7 +304,6 @@ export function KiloclawExtendTrial() {
     downloadCsv(content, 'unmatched-emails.csv');
   };
 
-  // Computed
   const pastedEmails = useMemo(() => parseEmailList(pastedText), [pastedText]);
   const pastedEmailCount = pastedEmails.length;
 

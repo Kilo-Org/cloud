@@ -1,43 +1,27 @@
-/* eslint-disable max-lines -- the shared live feedback (Home and the Agents tab) and the Home section that places its notices share one state model */
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
-
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import {
-  GlanceableActiveCard,
-  GlanceableActiveCardSkeleton,
-} from '@/components/home/glanceable-active-card';
-import {
-  LiveSessionHeaderNotice,
-  useLiveSessionHeaderNotice,
-} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
   type LiveSessions,
 } from '@/components/home/live-session-state';
-import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
-
-// The trailing slash pins the index route.
-const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -66,6 +50,7 @@ export function LiveSessionFeedback({
   refreshControl,
   refresh,
   inlineNotices = true,
+  compact: compactSpacing = false,
 }: LiveSessionProps & {
   failureLabel: string;
   centered?: boolean;
@@ -78,6 +63,7 @@ export function LiveSessionFeedback({
    * announcements stay here either way.
    */
   inlineNotices?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -147,7 +133,7 @@ export function LiveSessionFeedback({
     let message: string | undefined = undefined;
     if (unavailable && context.organizationId !== null) {
       title = t('organization.boundary.organizationUnavailable');
-      message = t('organization.boundary.unavailableDescription');
+      message = t('organization.boundary.unavailableSessionsDescription');
     } else if (denied && code === 'NOT_FOUND') {
       variant = 'not-found';
     } else if (denied && code !== 'FORBIDDEN' && code !== 'UNAUTHORIZED') {
@@ -231,32 +217,59 @@ export function LiveSessionFeedback({
     }
   }
 
+  // The connection row paints only where the surface reports these inline (the
+  // Agents live tab): the offline line, the visible connection status, or the
+  // retry that backs it. Elsewhere — Home puts the same facts in its section
+  // header notice — the row was an empty child of the Home column's `gap-2`, so
+  // an invisible box still held the card 7 dp below the section label.
+  const offlineLine = inlineNotices && internet === 'offline';
+  const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
+  const connectionRetry =
+    inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
+  const connectionRow = offlineLine || connectionStatus || connectionRetry;
+
+  // Status only the screen reader consumes, mounted here rather than inside the
+  // visible column: the column is drawn and dropped with its content, and a
+  // remount starts the announcement dedupe from nothing and speaks an unchanged
+  // message again. One node per message, one position. When the connection row
+  // paints its own visible status that row is the channel, so this copy clears.
+  const announcements = (
+    <>
+      <AccessibleStatus
+        message={connectionStatus ? null : connectionLabel}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      <AccessibleStatus
+        message={content === 'pending' ? t('common.loading') : null}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
+        <AccessibleStatus
+          message={t('agents.sessionList.updating')}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+    </>
+  );
+
   const feedback = (
-    <View className={cn('gap-2', centered && 'px-6')}>
-      <View className="flex-row items-center gap-2">
-        {/* The app-wide OfflineBanner owns the offline announcement. */}
-        {internet === 'offline' ? (
-          inlineNotices && (
+    <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
+      {connectionRow ? (
+        <View className="flex-row items-center gap-2">
+          {/* The app-wide OfflineBanner owns the offline announcement. */}
+          {internet === 'offline' ? (
             <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
-          )
-        ) : (
-          <AccessibleStatus
-            message={connectionLabel}
-            tone="status"
-            className={cn(
-              'flex-1 text-xs',
-              (!reconnectExhausted || !inlineNotices) && 'absolute size-px overflow-hidden'
-            )}
-          />
-        )}
-        {inlineNotices &&
-          context.isReady &&
-          !isConnected &&
-          reconnectExhausted &&
-          !failureOwnsRetry && (
+          ) : (
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
+          )}
+          {connectionRetry && (
             <Button
               variant="ghost"
               size="sm"
+              className={STATE_ACTION_CLASS}
               accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
               onPress={() => {
                 connection.retryConnection();
@@ -265,14 +278,14 @@ export function LiveSessionFeedback({
               <Text>{t('common.retry')}</Text>
             </Button>
           )}
-      </View>
-      {refresh && content === 'rows' ? (
+        </View>
+      ) : null}
+      {refresh && content === 'rows' && (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
-        // failed. It takes the slot of the (layout-free) loading status so the
-        // column has the same children either way, and its height is allocated
-        // whenever rows are shown: a failure that arrives while the kept rows
-        // are on screen replaces empty space instead of pushing the rows down.
+        // failed. Its height is allocated whenever rows are shown: a failure
+        // that arrives while the kept rows are on screen replaces empty space
+        // instead of pushing the rows down.
         <View className="min-h-5">
           <SessionListRefreshStatus
             busy={refresh.busy}
@@ -281,78 +294,25 @@ export function LiveSessionFeedback({
             progressInBody={refresh.progressInBody}
           />
         </View>
-      ) : (
-        <AccessibleStatus
-          message={content === 'pending' ? t('common.loading') : null}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
-        <AccessibleStatus
-          message={t('agents.sessionList.updating')}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
       )}
       {failure}
     </View>
   );
-  return centered ? (
-    <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
-  ) : (
-    feedback
-  );
-}
-
-export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { reducedMotion } = useMotionPolicy();
-  const handleRowPress = useSessionRowPress();
-  const content = liveSessionContent(context, sessions);
-  const failureLabel = t('home.couldNotLoadActiveSessions');
-  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
+  // The column is dropped when it would paint nothing: Home's card column then
+  // holds one child, so the card starts on the header's content edge instead of
+  // 7 dp below an invisible box. The announcements above keep their position
+  // either way, so nothing is re-spoken when the column appears or goes.
+  const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
 
   return (
-    <View>
-      {/* The header row stays in every state, so settling never adds or
-          removes it. `See all` keeps its box but hides while nothing runs: it
-          would advertise the Agents live index for sessions that do not exist. */}
-      <SectionHeader
-        label={t('home.agentSessions')}
-        actionLabel={t('home.seeAll')}
-        actionHidden={content === 'empty'}
-        onActionPress={() => {
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
-        }}
-        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
-      />
-      <View className="mx-4 gap-2">
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={failureLabel}
-          inlineNotices={false}
-        />
-        {/* One card, not a row per session. The skeleton shares the loaded
-            card's minimum frame; scaled text can grow the loaded content. */}
-        <Animated.View layout={LinearTransition}>
-          {content === 'pending' && <GlanceableActiveCardSkeleton />}
-          {(content === 'empty' || content === 'rows') && (
-            <Animated.View
-              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-            >
-              <GlanceableActiveCard
-                sessions={sessions.activeSessions}
-                onPressSession={handleRowPress}
-              />
-            </Animated.View>
-          )}
-        </Animated.View>
-      </View>
-    </View>
+    <>
+      {announcements}
+      {hasVisibleContent &&
+        (centered ? (
+          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+        ) : (
+          feedback
+        ))}
+    </>
   );
 }

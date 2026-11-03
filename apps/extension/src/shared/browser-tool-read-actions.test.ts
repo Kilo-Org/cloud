@@ -1,4 +1,4 @@
-/* eslint-disable id-length, jest/no-conditional-in-test, max-lines, require-await, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake CDP session returns verbatim responses for assertions. */
+/* eslint-disable id-length, jest/no-conditional-in-test, jest/max-expects, max-lines, require-await, sort-keys, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake CDP session returns verbatim responses for assertions; masked-output tests assert many unrelated fields at once. */
 import { describe, expect, it } from 'vitest';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import {
@@ -597,7 +597,7 @@ describe('browser_network_requests', () => {
 });
 
 describe('browser_network_request', () => {
-  it('returns one request with headers and body', async () => {
+  it('returns one request with redacted headers and no request body by default', async () => {
     const { session } = createSession({
       requestsSinceLoad: [
         networkRequest('api', {
@@ -618,18 +618,67 @@ describe('browser_network_request', () => {
 
     expect(text).toContain('Request #1: POST https://example.com/api');
     expect(text).toContain('  x-test: 1');
-    expect(text).toContain('Request body: {"a":1}');
+    expect(text).toContain("(use part: 'request-body')");
+    expect(text).not.toContain('{"a":1}');
   });
 
-  it('honours part and fetches the response body', async () => {
+  it('replaces listed header values in the default view', async () => {
     const { session } = createSession({
-      requestsSinceLoad: [networkRequest('api', { resourceType: 'XHR', status: 200 })],
-      responseBody: { body: '{"ok":true}' },
+      requestsSinceLoad: [
+        networkRequest('authed', {
+          method: 'POST',
+          postData: 'user=ada&password=hunter2',
+          requestHeaders: {
+            authorization: 'Bearer fixture-auth-value',
+            cookie: 'session=fixture-cookie-1',
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          responseHeaders: { 'set-cookie': 'sid=response-fixture-cookie' },
+          status: 200,
+          url: 'https://example.com/login',
+        }),
+      ],
+    });
+
+    const result = await runReadBrowserTool('browser_network_request', { index: 1 }, session);
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('  authorization: [REDACTED]');
+    expect(text).toContain('  cookie: [REDACTED]');
+    expect(text).toContain('  set-cookie: [REDACTED]');
+    expect(text).toContain('  content-type: application/x-www-form-urlencoded');
+    expect(text).not.toContain('fixture-auth-value');
+    expect(text).not.toContain('fixture-cookie-1');
+    expect(text).not.toContain('hunter2');
+  });
+
+  it('replaces listed header values and request body fields for explicit parts', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [
+        networkRequest('authed', {
+          method: 'POST',
+          postData: 'user=ada&password=hunter2',
+          requestHeaders: { authorization: 'Bearer fixture-auth-value', 'x-test': '1' },
+          resourceType: 'XHR',
+          status: 200,
+        }),
+      ],
+      responseBody: { body: '{"ok":true,"refreshToken":"rt-fixture-1"}' },
     });
 
     const headers = await runReadBrowserTool(
       'browser_network_request',
       { index: 1, part: 'request-headers' },
+      session
+    );
+    const requestBody = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'request-body' },
+      session
+    );
+    const responseHeaders = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-headers' },
       session
     );
     const body = await runReadBrowserTool(
@@ -638,8 +687,86 @@ describe('browser_network_request', () => {
       session
     );
 
-    expect(String(headers.ok ? headers.value : '')).toContain('request-headers for request #1:');
-    expect(String(body.ok ? body.value : '')).toContain('{"ok":true}');
+    const headerText = String(headers.ok ? headers.value : '');
+
+    expect(headerText).toContain('request-headers for request #1:');
+    expect(headerText).toContain('  x-test: 1');
+    expect(headerText).toContain('  authorization: [REDACTED]');
+    expect(headerText).not.toContain('fixture-auth-value');
+
+    const requestBodyText = String(requestBody.ok ? requestBody.value : '');
+
+    expect(requestBodyText).toContain('user=ada');
+    expect(requestBodyText).toContain('password=[REDACTED]');
+    expect(requestBodyText).not.toContain('hunter2');
+
+    expect(String(responseHeaders.ok ? responseHeaders.value : '')).toContain(
+      'response-headers for request #1:'
+    );
+    const responseBodyText = String(body.ok ? body.value : '');
+
+    expect(responseBodyText).toContain('"refreshToken": "[REDACTED]"');
+    expect(responseBodyText).not.toContain('rt-fixture-1');
+  });
+
+  it('renders a base64 body with its marker', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('blob', { resourceType: 'XHR', status: 200 })],
+      responseBody: { base64Encoded: true, body: 'eyJvayI6dHJ1ZX0=' },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+
+    expect(String(result.ok ? result.value : '')).toContain('(base64) eyJvayI6dHJ1ZX0=');
+  });
+
+  it('replaces listed keys inside a base64 response body', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('blob', { resourceType: 'XHR', status: 200 })],
+      responseBody: {
+        base64Encoded: true,
+        body: btoa('{"ok":true,"refreshToken":"rt-base64-1"}'),
+      },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('(base64, decoded)');
+    expect(text).toContain('"refreshToken": "[REDACTED]"');
+    expect(text).not.toContain('rt-base64-1');
+  });
+
+  it('replaces listed keys in JSON request bodies returned for the explicit part', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [
+        networkRequest('login', {
+          method: 'POST',
+          postData: '{"email":"ada@example.com","apiKey":"ak-fixture-1"}',
+          resourceType: 'XHR',
+          status: 200,
+        }),
+      ],
+    });
+
+    const requestBody = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'request-body' },
+      session
+    );
+    const text = String(requestBody.ok ? requestBody.value : '');
+
+    expect(text).toContain('"email": "ada@example.com"');
+    expect(text).toContain('"apiKey": "[REDACTED]"');
+    expect(text).not.toContain('ak-fixture-1');
   });
 
   it('errors on an out-of-range number', async () => {

@@ -633,3 +633,74 @@ describe('ToolDiff bounds and escaping', () => {
     expect(html).not.toContain('<pre');
   });
 });
+
+describe('cloud workspace file labels', () => {
+  const workspaceFilePath = '/workspace/user-1/sessions/ses_abc123/src/nested/file.ts';
+
+  it.each(['edit', 'write'] as const)('shows the public path filename for %s', tool => {
+    expanded = false;
+    const html = renderTool(tool, {
+      filePath: '/cloud-agent/sessions/ses_abc123/src/nested/file.ts',
+    });
+    expect(html).toContain('file.ts');
+    expect(html).toContain('title="src/nested/file.ts"');
+    expect(html).not.toContain('ses_abc123');
+  });
+
+  it.each(['edit', 'write'] as const)(
+    '%s does not let redacted metadata hide an available input filename',
+    tool => {
+      const html = renderTool(
+        tool,
+        { filePath: '/cloud-agent/sessions/ses_abc123/src/nested/file.ts' },
+        { filediff: { file: '/cloud-agent/sessions/ses_abc123' } }
+      );
+      expect(html).toContain('title="src/nested/file.ts"');
+      expect(html).not.toContain('ses_abc123');
+    }
+  );
+
+  it('shows public paths for renamed patch files', () => {
+    const html = renderTool(
+      'apply_patch',
+      {},
+      {
+        files: [
+          {
+            filePath: '/cloud-agent/sessions/ses_abc123/src/old.ts',
+            movePath: '/cloud-agent/sessions/ses_abc123/src/new.ts',
+            type: 'move',
+          },
+        ],
+      }
+    );
+    expect(html).toContain('src/old.ts');
+    expect(html).toContain('src/new.ts');
+    expect(html).not.toContain('ses_abc123');
+  });
+
+  it('shows the repo-relative path for an edit card', () => {
+    const html = renderTool('edit', { filePath: workspaceFilePath });
+    expect(html).toContain('src/nested/file.ts');
+    expect(html).not.toContain('/workspace/user-1/sessions/ses_abc123');
+  });
+
+  it('shows the repo-relative path for an apply_patch file without relativePath', () => {
+    const html = renderTool(
+      'apply_patch',
+      {},
+      {
+        files: [
+          {
+            filePath: workspaceFilePath,
+            type: 'update',
+            additions: 1,
+            deletions: 1,
+          },
+        ],
+      }
+    );
+    expect(html).toContain('src/nested/file.ts');
+    expect(html).not.toContain('/workspace/user-1/sessions/ses_abc123');
+  });
+});

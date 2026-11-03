@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   backendUrlForSandbox,
   deriveKiloSandboxTargets,
+  deriveLoopbackFacadeTargets,
   providerBaseUrlEncodedInToken,
 } from './kilo-targets.js';
 import {
@@ -256,5 +257,36 @@ describe('deriveKiloSandboxTargets', () => {
       success: false,
       reason: 'invalid_target',
     });
+  });
+
+  it('derives host-fetchable loopback facade targets from local env only', () => {
+    expect(
+      deriveLoopbackFacadeTargets({
+        KILOCODE_BACKEND_BASE_URL: 'http://localhost:5900',
+        KILO_OPENROUTER_BASE: 'http://localhost:5900/api',
+        KILO_SESSION_INGEST_URL: 'http://host.docker.internal:11700',
+      })
+    ).toEqual({
+      backendBaseUrl: 'http://127.0.0.1:5900',
+      providerBaseUrl: 'http://127.0.0.1:5900/api',
+      sessionIngestBaseUrl: 'http://127.0.0.1:11700',
+    });
+  });
+
+  it('refuses facade targets when any env target is not loopback', () => {
+    expect(
+      deriveLoopbackFacadeTargets({
+        KILOCODE_BACKEND_BASE_URL: 'http://localhost:5900',
+        KILO_OPENROUTER_BASE: 'https://provider.example.com/api',
+        KILO_SESSION_INGEST_URL: 'http://localhost:11700',
+      })
+    ).toBeNull();
+    expect(
+      deriveLoopbackFacadeTargets({
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
+        KILO_OPENROUTER_BASE: 'https://provider.example.com/api',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
+      })
+    ).toBeNull();
   });
 });

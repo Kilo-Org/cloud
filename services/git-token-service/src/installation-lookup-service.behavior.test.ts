@@ -353,4 +353,23 @@ describe('InstallationLookupService', () => {
       expect(getWorkerDb).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    ['an empty owner', { userId: '' }],
+    ['a malformed organization', { userId: 'user-1', orgId: 'org-1' }],
+  ])('rejects an integration lookup for %s without querying', async (_label, owner) => {
+    const service = createService([
+      {
+        platform_installation_id: '100',
+        platform_account_login: 'owner',
+        github_app_type: 'standard',
+        owned_by_organization_id: null,
+      },
+    ]);
+
+    await expect(
+      service.findActiveAssociationById('00000000-0000-4000-8000-000000000002', owner)
+    ).resolves.toEqual({ success: false });
+    expect(getWorkerDb).not.toHaveBeenCalled();
+  });
 });

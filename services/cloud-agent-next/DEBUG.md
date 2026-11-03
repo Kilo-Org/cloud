@@ -4,17 +4,17 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 
 ## Log Locations
 
-- Worker, Durable Object, router, queue, stream, ingest, callback, and wrapper-client logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
-- The wrapper runs inside the sandbox container. Its durable debug log is written to `/tmp/kilocode-wrapper-<agentSessionId>-<timestamp>.log` via `WRAPPER_LOG_PATH`.
-- Kilo CLI logs inside the sandbox live under `/home/<agentSessionId>/.local/share/kilo/log/*.log`.
-- After `/session/ready` binds a wrapper session, the wrapper uploads a tarball containing the wrapper log plus Kilo CLI logs roughly every 30 seconds. Wrangler shows matching `PUT /sessions/.../logs/session/logs.tar.gz` traffic.
+- Worker, Durable Object, router, queue, stream, ingest, callback, and sandbox-control logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
+- The control wrapper runs inside the sandbox container. Its durable debug log is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`, configured through `WRAPPER_LOG_PATH`).
+- Kilo CLI logs inside the sandbox live under `/tmp/kilo-worktrees/<home>/.local/share/kilo/log/*.log`.
+- The wrapper uploads a bounded archive containing its own log plus the worktree Kilo logs every 30 seconds and again on shutdown. Wrangler shows matching R2 upload traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
 
 ## First Triage
 
-1. Capture the user-visible Kilo session ID (`ses_*`) and, if available, the Cloud Agent session ID (`agent_*`).
-2. Search the Worker log for the ID and walk forward from preparation or queue acknowledgement. If you only have `ses_*`, capture the associated `agent_*` from that log block; use it for sandbox lookup.
-3. If the Worker shows wrapper handoff or `/session/ready`, inspect the sandbox wrapper log immediately.
+1. Capture the user-visible Kilo session ID (`ses_*`) and the Cloud Agent session ID (`workspace_*`).
+2. Search the Worker log for the ID and walk forward from preparation or queue acknowledgement. If you only have `ses_*`, capture the associated `workspace_*` from that log block; use it for sandbox lookup.
+3. If the Worker shows wrapper handoff or `session.ready`, inspect the sandbox wrapper log immediately.
 4. If the wrapper reports Kilo server/session issues, inspect the Kilo CLI log in the same container.
 
 Useful Worker-log landmarks include:
@@ -22,8 +22,6 @@ Useful Worker-log landmarks include:
 - `Queueing cloud-agent message through Durable Object`
 - `Queued message event persisted and pending flush scheduled`
 - `Pending session message flush attempt starting`
-- `AgentRuntime delivering pending message to wrapper`
-- `ExecutionOrchestrator starting execution`
 - `Workspace warmth probe completed`
 - `Wrapper session readiness completed`
 - `Wrapper ingest WebSocket accepted`
@@ -43,14 +41,14 @@ tail -f dev/logs/cloud-agent-next.log
 Common correlations:
 
 - `ses_*` appears in prepare/import/session logs.
-- `agent_*` appears in Worker routing, WebSocket, sandbox, and callback logs.
+- `workspace_*` appears in Worker routing, WebSocket, sandbox, and callback logs.
 - `msg_*` is the durable message identity to follow across queueing, flush, wrapper delivery, and terminalization.
 
 When a session stalls, look for this sequence:
 
 1. Queue acknowledgement.
 2. Pending flush start.
-3. Wrapper handoff / bootstrap.
+3. Sandbox allocation / wrapper bootstrap.
 4. Wrapper ingest connection.
 5. Kilo events and terminalization.
 
@@ -64,7 +62,7 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare sandbox containers usually include `Sandbox` in the synthesized name or use a `cloudflare/sandbox` image. There may be a sibling `-proxy` container. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding `/tmp/kilocode-wrapper-<agentSessionId>-*.log` for the `agent_*` recovered from the Worker log.
+Cloudflare sandbox containers usually include `Sandbox` in the synthesized name or use a `cloudflare/sandbox` image. There may be a sibling `-proxy` container. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
 
 To inspect one candidate:
 
@@ -75,7 +73,7 @@ docker exec <container-id> ls /tmp
 To match one candidate to a specific Cloud Agent session:
 
 ```bash
-docker exec <container-id> sh -c 'ls /tmp/kilocode-wrapper-<agentSessionId>-*.log 2>/dev/null'
+docker exec <container-id> sh -c 'ps -eo pid,args | grep -F kilocode-control-plane-wrapper.js'
 ```
 
 To terminate that local sandbox, kill the matched primary container and its `-proxy` sibling when present, then re-list containers to confirm both disappeared:
@@ -87,11 +85,11 @@ docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 
 ## Read Wrapper Logs Inside the Sandbox
 
-The wrapper writes one or more log files under `/tmp`:
+The control wrapper writes one log file under `/tmp`:
 
 ```bash
-docker exec <container-id> sh -c 'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null'
-docker exec <container-id> sh -c 'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null | head -n 1 | xargs -r cat'
+docker exec <container-id> sh -c 'ls -t /tmp/kilocode-control-wrapper*.log 2>/dev/null'
+docker exec <container-id> sh -c 'tail -n 200 /tmp/kilocode-control-wrapper.log'
 ```
 
 High-value wrapper landmarks:
@@ -119,8 +117,8 @@ For stuck import/debugging, confirm all of these:
 ## Read Kilo CLI Logs Inside the Sandbox
 
 ```bash
-docker exec <container-id> sh -c 'ls -t /home/agent_*/.local/share/kilo/log/*.log 2>/dev/null'
-docker exec <container-id> sh -c 'ls -t /home/agent_*/.local/share/kilo/log/*.log 2>/dev/null | head -n 1 | xargs -r cat'
+docker exec <container-id> sh -c 'ls -t /tmp/kilo-worktrees/*/.local/share/kilo/log/*.log 2>/dev/null'
+docker exec <container-id> sh -c 'ls -t /tmp/kilo-worktrees/*/.local/share/kilo/log/*.log 2>/dev/null | head -n 1 | xargs -r cat'
 ```
 
 Use Kilo CLI logs when:
@@ -145,31 +143,16 @@ Cloudflare sandbox session directories often contain process stdout/stderr artif
 For longer inspection, copy logs out of the container:
 
 ```bash
-docker cp <container-id>:/tmp/kilocode-wrapper-<agentSessionId>-<timestamp>.log /tmp/cloud-agent-wrapper.log
+docker cp <container-id>:/tmp/kilocode-control-wrapper.log /tmp/cloud-agent-wrapper.log
 ```
 
 Kilo database or WAL files can also be copied when investigating persistence visibility, but do this only for local debugging and avoid treating copied state as authoritative after the container continues running.
 
-## Uploaded Log Archives
-
-Once the wrapper binds, it uploads:
-
-```text
-/sessions/<userId>/<agentSessionId>/logs/session/logs.tar.gz
-```
-
-Wrangler will show the `PUT` requests. The uploaded archive contains:
-
-- the wrapper log file configured by `WRAPPER_LOG_PATH`
-- the Kilo CLI log directory for the sandbox session
-
-The internal `getWrapperLogs` path also discovers these sandbox-side files directly by scanning `/tmp/kilocode-wrapper-*.log` and the Kilo CLI log directory.
-
 ## Control-plane Diagnostics
 
-Control-plane (`workspace_*`) sessions upload a bounded wrapper/Kilo file archive plus JSON records from the current wrapper: `wrapper.lifecycle`, `session.execution`, `control.workload`, `control.upload`, and `control.request` for worktree deletion only (`worktree.prepareDeletion`, `worktree.delete`, with `stage`, `worktreeId`, and `sessionCount`). Those records exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code, same as legacy session tarballs. `session.sync` and `accepted_reconciliation` are from the replaced wrapper and are not emitted for `workspace_*` sessions.
+Control-plane sessions upload a bounded wrapper/Kilo file archive plus JSON records from the current wrapper: `wrapper.lifecycle`, `session.execution`, `control.workload`, `control.upload`, and `control.request` for worktree deletion only (`worktree.prepareDeletion`, `worktree.delete`, with `stage`, `worktreeId`, and `sessionCount`). Those records exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code. `session.sync` and `accepted_reconciliation` are from the replaced wrapper and are not emitted.
 
-The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is still `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads that log plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
+The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads that log plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
 
 ```text
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
@@ -182,7 +165,7 @@ For a `no_progress` or `execution_limit` outcome, find the `session.execution` r
 
 `control.workload` records are per `scopeId`, so count distinct scopes to see whether the allocation was shared. `cpuUsageUsec`, `cpuThrottledUsec`, `cpuThrottleCount`, `ioReadBytes`, and `ioWriteBytes` are cumulative cgroup counters: compare consecutive samples from the same scope. Stats sample every 30 seconds, plus sooner (at most once per 10 seconds) when a throttle or memory-event counter increases or the group first crosses 90% of its memory cap (the pressure signal releases only below 80%), so consecutive samples may be farther apart than the old one-second cadence. `toolCpuUsageUsec`, `serverCpuUsageUsec`, `toolIoReadBytes`, and `toolIoWriteBytes` separate the tools subgroup from the Kilo server; they do not identify one command when several run together. `memoryMaxEvents` counts attempts to cross the memory limit and can rise without an OOM kill. `anonBytes`, `fileBytes`, and `shmemBytes` are the group `memory.stat` split, and `toolCurrentBytes`/`serverCurrentBytes` (with peaks) attribute the total to the tools subgroup or the Kilo server, so a full headroom can be traced to page cache from tool or Docker storage I/O (`file`) versus process memory (`anon`). Per-subgroup `toolAnonBytes`/`toolFileBytes`/`toolShmemBytes` and `server*` equivalents come from each subgroup's `memory.stat`. `*FileBytes` includes shmem; without swap only the rest is reclaimable. Memory a direct Kilo child allocates before the sweep moves it into tools stays charged to the server. A `workloadPhase: "protection"` record per scope reports the server's `memory.min` (`serverMinBytes`), or `phase: "failed"` when the kernel refused it. `wrapper.lifecycle` `kilo_memory_hold_started`/`kilo_memory_hold_ended` mark a hang restart held while the workload reclaimed at its cap, with `currentBytes`, `aggregateMaxBytes`, `memoryMaxEvents`, and on end `memoryHoldOutcome` and `elapsedMs`. `pressureAvailable` reports whether the kernel exposes `memory.pressure` (PSI); when it is false, rely on `memory.events` and `memory.stat`. A `health_probe_false` restart logs the latest snapshot for that runtime's own scope under the restart line's `workload` key, and a hang restart after an expired memory hold fails the turn as `sandbox_out_of_memory`. The Worker `container_launch_identity` diagnostic joins the physical allocation reference and sandbox name to Cloudflare's 64-character `containerInstanceId`, which can be queried in Cloudflare's historical Containers metrics. These counters show resource activity or contention, not useful tool progress.
 
-List and download these JSON batches and the overwriteable `files.tar.gz` object from R2 using local tooling and the key prefix above. Each wrapper incarnation keeps one file archive; later uploads replace it. Uploaded objects remain available after the container disappears, subject to the bucket's retention policy. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these control-plane archives.
+List and download these JSON batches and the overwriteable `files.tar.gz` object from R2 using local tooling and the key prefix above. Each wrapper incarnation keeps one file archive; later uploads replace it. Uploaded objects remain available after the container disappears, subject to the bucket's retention policy.
 
 Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
 
@@ -211,7 +194,7 @@ Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unre
     `ContainerControlConnection upgrade returned retryable status` (503),
     or `Container is not listening to port …` in
     `dev/logs/cloud-agent-next.log`, then read the wrapper log inside the
-    sandbox (`/tmp/kilocode-wrapper-*.log`) for bootstrap/import detail. The
+    sandbox (`/tmp/kilocode-control-wrapper.log`) for bootstrap/import detail. The
     503 from the container control connection means the Docker container's
     control plane isn't ready — this is an environmental issue under Docker
     Desktop load, not a code regression. If the failure is transient, suspect

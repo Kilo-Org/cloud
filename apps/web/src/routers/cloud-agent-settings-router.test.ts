@@ -12,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   getSandboxAllocationProvider,
   SELECTABLE_SANDBOX_ALLOCATIONS,
@@ -453,14 +453,14 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const result = await caller.cloudAgentSettings.get({});
       const gitlabVercel = result.capabilitiesByPlatform.gitlab.options.find(
-        option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(gitlabVercel?.repositoryUnavailableReason).toBe(
         'Vercel sandboxes support GitHub repositories only'
       );
       expect(gitlabVercel?.unavailableReason).toBeUndefined();
       const githubVercel = result.capabilitiesByPlatform.github.options.find(
-        option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(githubVercel?.repositoryUnavailableReason).toBeUndefined();
     });

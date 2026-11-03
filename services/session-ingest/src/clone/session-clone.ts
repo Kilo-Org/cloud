@@ -19,6 +19,7 @@ import {
   type InspectCloneStageResult,
   type StageCloneBatchResult,
 } from '../dos/SessionIngestDO';
+import { parsePartItemIdentity } from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
 
 const CLONE_BATCH_MAX_ROWS = 100;
@@ -103,13 +104,11 @@ function parseMessageItemId(itemId: string): string | null {
 }
 
 function parsePartItemId(itemId: string): { messageId: string; partId: string } | null {
-  const segments = itemId.split('/');
-  if (segments.length !== 2) return null;
-  const [messageId, partId] = segments;
-  if (!messageIdSchema.safeParse(messageId).success || !partIdSchema.safeParse(partId).success) {
-    return null;
-  }
-  return { messageId, partId };
+  const identity = parsePartItemIdentity(itemId);
+  if (identity === null) return null;
+  if (!messageIdSchema.safeParse(identity.messageId).success) return null;
+  if (!partIdSchema.safeParse(identity.partId).success) return null;
+  return identity;
 }
 
 const SESSION_INFO_ALLOWLIST = [

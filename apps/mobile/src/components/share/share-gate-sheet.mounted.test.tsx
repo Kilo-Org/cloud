@@ -9,13 +9,17 @@
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   remoteSpawnNonRetryableToast,
   remoteSpawnRetryableToast,
 } from '@/lib/remote-submit-outcome';
-import { __resetPendingShareNavigationForTests } from '@/lib/share-navigation';
+import {
+  __resetPendingShareNavigationForTests,
+  takePendingShareNavigation,
+} from '@/lib/share-navigation';
+import { i18n } from '@/i18n';
 import {
   __resetSharePayloadStoreForTests,
   peekSharePayload,
@@ -94,22 +98,43 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+const organizationMock = vi.hoisted(() => ({
+  current: { organizationId: null as string | null, isLoaded: true },
 }));
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => organizationMock.current,
+}));
+const organizationsListMock = vi.hoisted(() => ({
+  current: {
+    data: [{ organizationId: 'org-selected' }] as
+      | { organizationId: string; isTrialExpiredForEnforcement?: boolean }[]
+      | undefined,
+    isFetched: true,
+    isFetching: false,
+    isError: false,
+    isRefetchError: false,
+  },
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => organizationsListMock.current,
+}));
+const sessionsMock = vi.hoisted(() => ({
+  current: {
     storedSessions: [],
-    activeSessionIds: new Set(),
+    activeSessionIds: new Set<string>(),
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
     storedIsPaused: false,
+    storedErrorCode: undefined as string | undefined,
     activeIsError: false,
     activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
-  }),
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useAgentSessions: () => sessionsMock.current,
 }));
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   useRemoteInstanceSpawn: () => ({ spawn: spawnMock }),
@@ -419,6 +444,195 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
       .map(node => node.children.filter(child => typeof child === 'string').join(''));
     expect(subtitles).toEqual(['group/sub/repo!7']);
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('ShareGateSheet new-session organization', () => {
+  function memberships(input: {
+    data: { organizationId: string }[] | undefined;
+    isFetched?: boolean;
+    isFetching?: boolean;
+    isError?: boolean;
+    isRefetchError?: boolean;
+  }) {
+    organizationsListMock.current = {
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+      ...input,
+    };
+  }
+
+  beforeEach(() => {
+    routerBack.mockClear();
+    shareDestinationListProps.current = null;
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-selected' }] });
+    sessionsMock.current = {
+      ...sessionsMock.current,
+      storedErrorCode: undefined,
+    };
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  async function commitNewSession(shareId: string): Promise<string> {
+    const renderer = await mountGate(shareId);
+    const row = renderer.root.find(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === i18n.t('common.newSession')
+    );
+    const onPress: unknown = row.props.onPress;
+    if (typeof onPress !== 'function') {
+      throw new TypeError('the New session row has no press handler');
+    }
+    act(() => {
+      (onPress as () => void)();
+    });
+    await flushAsync();
+    const pending = takePendingShareNavigation();
+    act(() => {
+      renderer.unmount();
+    });
+    if (pending === null) {
+      throw new TypeError('the gate did not commit a destination');
+    }
+    return pending.href;
+  }
+
+  it('commits into the selected organization while the account holds it', async () => {
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?organizationId=org-selected');
+    expect(href).toContain(`shareId=${shareId}`);
+  });
+
+  it('commits into the account default when the selected organization denies access', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({
+      data: [{ organizationId: 'org-first' }, { organizationId: 'org-second' }],
+    });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-first');
+    expect(href).not.toContain('org-lost');
+  });
+
+  it('commits personal when the account holds no other organization', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [] });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'FORBIDDEN' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('/agent-chat/new?shareId=');
+    expect(href).not.toContain('organizationId=');
+  });
+
+  it('keeps the selection on a membership list miss without an access denial', async () => {
+    organizationMock.current = { organizationId: 'org-selected', isLoaded: true };
+    memberships({ data: [] });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'INTERNAL_SERVER_ERROR' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-selected');
+  });
+
+  it('keeps the selection while the membership list is unsettled', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: undefined, isFetched: false });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection while the membership list is refetching', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isFetching: true });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+
+  it('keeps the selection after a failed background refresh of the list', async () => {
+    organizationMock.current = { organizationId: 'org-lost', isLoaded: true };
+    memberships({ data: [{ organizationId: 'org-first' }], isRefetchError: true });
+    sessionsMock.current = { ...sessionsMock.current, storedErrorCode: 'UNAUTHORIZED' };
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+
+    const href = await commitNewSession(shareId);
+
+    expect(href).toContain('organizationId=org-lost');
+  });
+});
+
+describe('ShareGateSheet organization plan gate', () => {
+  beforeEach(() => {
+    spawnMock.mockClear();
+    toastError.mockClear();
+    shareDestinationListProps.current = null;
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  afterEach(() => {
+    organizationMock.current = { organizationId: null, isLoaded: true };
+    organizationsListMock.current = {
+      data: [{ organizationId: 'org-selected' }],
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+    };
+  });
+
+  it('refuses a remote spawn into an organization whose trial has lapsed', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: true },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('still spawns into an organization the gate keeps entitled', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: false },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
     act(() => {
       renderer.unmount();
     });

@@ -1,5 +1,20 @@
 export function getLowerDomainFromEmail(email: string): string | null {
-  return email?.split('@').pop()?.toLowerCase() || null;
+  const at = email.lastIndexOf('@');
+  if (at === -1) return null;
+  return email.slice(at + 1).toLowerCase() || null;
+}
+
+/**
+ * The mailbox an outbound message is delivered to, trimmed and lowercased.
+ *
+ * Unlike `normalizeEmail`, it keeps a `+` suffix and Gmail dots, so it is safe
+ * as the identity of a delivered credential: two addresses that differ in more
+ * than case are two identities here. Use `normalizeEmail` for duplicate
+ * detection and signup eligibility, never for deciding who a credential
+ * authenticates.
+ */
+export function getDeliveredEmailAddress(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 /**

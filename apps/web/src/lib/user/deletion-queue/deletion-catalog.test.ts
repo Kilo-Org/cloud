@@ -49,7 +49,7 @@ describe('deletion catalog v2', () => {
   });
 
   it('includes the completion email between Pylon finalize and contact cleanup', () => {
-    expect(USER_DELETION_CATALOG_V2).toHaveLength(13);
+    expect(USER_DELETION_CATALOG_V2).toHaveLength(12);
     expect(catalogForVersion(2).map(entry => entry.stepKey)).toEqual([
       UserDeletionStepKey.KiloclawDestroy,
       UserDeletionStepKey.Customerio,
@@ -63,7 +63,6 @@ describe('deletion catalog v2', () => {
       UserDeletionStepKey.PylonFinalize,
       UserDeletionStepKey.CompletionEmail,
       UserDeletionStepKey.PylonContact,
-      UserDeletionStepKey.CsaSupportDb,
     ]);
   });
 
@@ -75,7 +74,7 @@ describe('deletion catalog v2', () => {
     expect(teardownStepKeys(2)).toHaveLength(7);
   });
 
-  it('chains finalize after reply, then contact, then CSA support DB', () => {
+  it('chains finalize after reply, then contact', () => {
     expect(catalogEntryFor(2, UserDeletionStepKey.PylonFinalize).dependsOn).toEqual([
       UserDeletionStepKey.PylonReply,
     ]);
@@ -83,9 +82,17 @@ describe('deletion catalog v2', () => {
       UserDeletionStepKey.PylonFinalize,
       UserDeletionStepKey.CompletionEmail,
     ]);
-    expect(catalogEntryFor(2, UserDeletionStepKey.CsaSupportDb).dependsOn).toEqual([
-      UserDeletionStepKey.PylonContact,
-    ]);
+  });
+
+  it('still resolves historical CSA support DB rows without including them in new requests', () => {
+    expect(catalogEntryFor(2, UserDeletionStepKey.CsaSupportDb)).toMatchObject({
+      stepKey: UserDeletionStepKey.CsaSupportDb,
+      phase: 'finalize',
+      dependsOn: [UserDeletionStepKey.PylonContact],
+    });
+    expect(catalogForVersion(2).map(entry => entry.stepKey)).not.toContain(
+      UserDeletionStepKey.CsaSupportDb
+    );
   });
 
   it('does not select completion email before teardown and anonymize', () => {
@@ -176,10 +183,50 @@ describe('materialized deletion catalog validation', () => {
     expect(() => validateMaterializedStepKeys(2, stepKeys)).not.toThrow();
   });
 
+  it.each([true, false])(
+    'accepts historical v2 CSA rows with completion email present: %s',
+    includesCompletionEmail => {
+      const stepKeys = [
+        ...catalogForVersion(2)
+          .map(entry => entry.stepKey)
+          .filter(
+            stepKey => includesCompletionEmail || stepKey !== UserDeletionStepKey.CompletionEmail
+          ),
+        UserDeletionStepKey.CsaSupportDb,
+      ];
+
+      expect(() => validateMaterializedStepKeys(2, stepKeys)).not.toThrow();
+    }
+  );
+
+  it.each([1, 3])('rejects historical CSA rows in catalog version %i', version => {
+    const stepKeys = [
+      ...catalogForVersion(version).map(entry => entry.stepKey),
+      UserDeletionStepKey.CsaSupportDb,
+    ];
+
+    expect(() => catalogEntryFor(version, UserDeletionStepKey.CsaSupportDb)).toThrow(
+      `Unknown user deletion step ${UserDeletionStepKey.CsaSupportDb}`
+    );
+    expect(() => validateMaterializedStepKeys(version, stepKeys)).toThrow(
+      `Unknown user deletion step ${UserDeletionStepKey.CsaSupportDb}`
+    );
+  });
+
+  it('rejects duplicate historical CSA rows', () => {
+    const stepKeys = [
+      ...catalogForVersion(2).map(entry => entry.stepKey),
+      UserDeletionStepKey.CsaSupportDb,
+      UserDeletionStepKey.CsaSupportDb,
+    ];
+
+    expect(() => validateMaterializedStepKeys(2, stepKeys)).toThrow(/duplicate step/);
+  });
+
   it.each([
     UserDeletionStepKey.PylonReply,
     UserDeletionStepKey.PylonFinalize,
-    UserDeletionStepKey.CsaSupportDb,
+    UserDeletionStepKey.PylonContact,
   ])('rejects v2 requests missing the required %s task', missingStepKey => {
     const stepKeys = catalogForVersion(2)
       .map(entry => entry.stepKey)

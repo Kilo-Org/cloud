@@ -750,6 +750,50 @@ test('auto-creates event-service NEXTAUTH Secrets Store binding from .env.local'
   }
 });
 
+test('points the local auto routing worker at the local gateway and seeds its secrets', () => {
+  const autoRoutingDir = 'services/auto-routing';
+  const readRepoFile = (relPath: string) =>
+    fs.readFileSync(new URL(`../../../${relPath}`, import.meta.url), 'utf-8');
+  const repo = createRepo({
+    '.env.local': [
+      'NEXTAUTH_SECRET=local-nextauth-secret',
+      'INTERNAL_API_SECRET=local-internal-secret',
+      'AUTO_ROUTING_DECISION_SECRET=local-decision-secret',
+      '',
+    ].join('\n'),
+    [`${autoRoutingDir}/package.json`]: readRepoFile(`${autoRoutingDir}/package.json`),
+    [`${autoRoutingDir}/wrangler.jsonc`]: readRepoFile(`${autoRoutingDir}/wrangler.jsonc`),
+    [`${autoRoutingDir}/.dev.vars.example`]: readRepoFile(`${autoRoutingDir}/.dev.vars.example`),
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['auto-routing']));
+      const devVars = plan.devVarsChanges.find(change => change.workerDir === autoRoutingDir);
+      assert.match(
+        devVars?.newFileContent ?? '',
+        new RegExp(
+          `^KILO_AI_GATEWAY_BASE_URL=http://localhost:${getService('ai-gateway').port}$`,
+          'm'
+        )
+      );
+      const seeded = Object.fromEntries(
+        plan.secretStoreAutoCreates
+          .filter(create => create.workerDir === autoRoutingDir)
+          .map(create => [create.binding.secret_name, create.value])
+      );
+      assert.deepEqual(seeded, {
+        NEXTAUTH_SECRET_PROD: 'local-nextauth-secret',
+        INTERNAL_API_SECRET_PROD: 'local-internal-secret',
+        AUTO_ROUTING_DECISION_SECRET_PROD: 'local-decision-secret',
+        AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD: `http://localhost:${getService('redis-http').port}`,
+        AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD: 'example_token',
+      });
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev vars', () => {
   const repo = createRepo({
     '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',

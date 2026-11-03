@@ -30,7 +30,7 @@ function contract(
   );
 }
 
-suite('pinned Kilo 7.8.1 native activity contract', () => {
+suite('pinned Kilo native activity contract', () => {
   contract(
     'native execution stays in its saved directory when a prompt supplies another directory',
     async f => {

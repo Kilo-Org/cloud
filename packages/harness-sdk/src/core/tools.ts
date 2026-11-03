@@ -41,7 +41,7 @@ const refusal = (call: ToolCall, body: string): ToolResult => ({
  * every request of the session from then on.
  */
 const reasonOf = (cause: Cause.Cause<ToolFailure>): string =>
-  Option.match(Cause.failureOption(cause), {
+  Option.match(Cause.findErrorOption(cause), {
     onSome: (failure: ToolFailure) => String(failure.cause),
     onNone: () => String(Cause.squash(cause)),
   });
@@ -70,8 +70,8 @@ const stillRunning = (call: ToolCall): ToolResult => ({
 const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> =>
   tool.run(call).pipe(
     Effect.map((body): ToolResult => ({ callId: call.id, body, failed: false })),
-    Effect.catchAllCause(cause =>
-      Cause.isInterruptedOnly(cause)
+    Effect.catchCause(cause =>
+      Cause.hasInterruptsOnly(cause)
         ? Effect.interrupt
         : Effect.succeed(refusal(call, reasonOf(cause)))
     )
@@ -93,10 +93,20 @@ const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> =>
 const under = (wiring: Wiring, tool: Tool, asked: ToolCall): Effect.Effect<ToolResult> =>
   Effect.gen(function* () {
     const { wait: wanting, call } = wanted(asked);
-    const fiber = yield* Effect.forkIn(working(tool, call), wiring.scope);
     const release = yield* Deferred.make<boolean>();
-    const wait = Duration.decode(waitFor(wiring, tool, wanting));
-    const ended = yield* whileWaiting(wiring, { call, release }, waited(fiber, release, wait));
+    const wait = Duration.fromInputUnsafe(waitFor(wiring, tool, wanting));
+    /* The call joins `running` before it starts, so a caller who sees it start
+       can always send it away, whatever the fork's own scheduling. */
+    const { fiber, ended } = yield* whileWaiting(
+      wiring,
+      { call, release },
+      Effect.gen(function* () {
+        const started = yield* Effect.forkIn(working(tool, call), wiring.scope, {
+          startImmediately: true,
+        });
+        return { fiber: started, ended: yield* waited(started, release, wait) };
+      })
+    );
     return yield* Option.match(ended, {
       onSome: (exit: Exit.Exit<ToolResult>) => exit,
       onNone: () => later(wiring, call, fiber),
@@ -118,7 +128,7 @@ const lateText = (call: ToolCall, result: ToolResult): string =>
 const later = (
   wiring: Wiring,
   call: ToolCall,
-  fiber: Fiber.RuntimeFiber<ToolResult>
+  fiber: Fiber.Fiber<ToolResult>
 ): Effect.Effect<ToolResult> =>
   Effect.as(
     Effect.forkIn(
@@ -128,7 +138,8 @@ const later = (
           parts: [{ kind: 'text', body: lateText(call, result) }],
         })
       ),
-      wiring.scope
+      wiring.scope,
+      { startImmediately: true }
     ),
     stillRunning(call)
   );

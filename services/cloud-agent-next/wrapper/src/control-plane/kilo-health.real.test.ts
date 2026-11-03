@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 import { createKiloEventFeed } from './kilo-event-feed.js';
 import { createKiloRuntime } from './kilo-runtime.js';
 import { kiloClientConfig } from '../kilo-server-auth.js';
@@ -20,9 +21,9 @@ async function waitFor(condition: () => boolean, timeoutMs: number) {
 }
 
 suite('pinned Kilo default health supervision', () => {
-  it('responsive pinned Kilo 7.8.1 recovers native SSE silence without restart', async () => {
+  it('responsive pinned Kilo recovers native SSE silence without restart', async () => {
     if (!binary) throw new Error('KILO_781_BINARY is required');
-    expect(Bun.spawnSync([binary, '--version']).stdout.toString().trim()).toBe('7.8.1');
+    expect(Bun.spawnSync([binary, '--version']).stdout.toString().trim()).toBe(KILO_CLI_VERSION);
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-health-781-'));
     const release = Promise.withResolvers<void>();
     let modelRequests = 0;
@@ -106,7 +107,7 @@ suite('pinned Kilo default health supervision', () => {
       const client = createKiloClient(kiloClientConfig(wrapper.server, root));
       const before = await client.global.health({ signal: AbortSignal.timeout(5000) });
       expect(before.data?.healthy).toBe(true);
-      expect(before.data?.version).toBe('7.8.1');
+      expect(before.data?.version).toBe(KILO_CLI_VERSION);
       const created = await client.session.create({
         directory: root,
         title: 'Native silence health regression',

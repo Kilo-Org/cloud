@@ -4,7 +4,6 @@ import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
   BITBUCKET_REACTIONS_UNSUPPORTED_REASON,
-  BITBUCKET_STALE_HEAD_REASON,
   BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON,
   mergePullRequest,
   replyToComment,
@@ -12,7 +11,7 @@ import {
   submitReview,
   unresolveThread,
 } from './bitbucket-write';
-import { BitbucketReviewError } from './bitbucket-authorization';
+import { BITBUCKET_STALE_HEAD_REASON, BitbucketReviewError } from './bitbucket-authorization';
 
 const mockGetBitbucketWorkspaceAccessTokenStatus = jest.fn();
 const mockReadCachedRepositories = jest.fn();
@@ -886,6 +885,47 @@ describe('resolveThread', () => {
     expect(error.kind).toBe('not_found');
     expect(bitbucketCalls()).toEqual([]);
   });
+
+  it('fails retryably with the resolve copy when the task walk never reaches the target state', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({
+          status: 'available',
+          token: 'at-mock-token',
+          workspace: WORKSPACE,
+        });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/comments/101')) return jsonResponse({ id: 101 });
+      // The task belongs to another comment and every page offers another
+      // one: the bounded walk ends without ever seeing the comment's task.
+      return jsonResponse({
+        pagelen: 100,
+        values: [{ id: 6, resolved_on: null, comment: { id: 202 } }],
+        next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/tasks?pagelen=100&page=2',
+      });
+    });
+
+    const error = await captureRejection(
+      resolveThread({
+        owner: ORG_OWNER,
+        workspace: 'acme',
+        repoSlug: 'repo',
+        prId: 12,
+        threadId: '101',
+      })
+    );
+
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+    expect(error.message).toBe(
+      'The Bitbucket task list is too large to resolve this thread. Try again.'
+    );
+    expect(bitbucketCalls().some(call => call.init.method === 'PUT')).toBe(false);
+    // The walk stops at its page bound instead of crawling the collection.
+    expect(bitbucketCalls().filter(call => call.url.pathname.endsWith('/tasks'))).toHaveLength(10);
+  });
 });
 
 describe('unresolveThread', () => {
@@ -965,6 +1005,44 @@ describe('unresolveThread', () => {
 
     expect(result).toEqual({ done: true, replayed: true });
     expect(bitbucketCalls().some(call => call.init.method === 'PUT')).toBe(false);
+  });
+
+  it('fails retryably with the reopen copy when the task walk never reaches the target state', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({
+          status: 'available',
+          token: 'at-mock-token',
+          workspace: WORKSPACE,
+        });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/comments/101')) return jsonResponse({ id: 101 });
+      return jsonResponse({
+        pagelen: 100,
+        values: [{ id: 6, resolved_on: '2026-09-06T00:00:00.000Z', comment: { id: 202 } }],
+        next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/tasks?pagelen=100&page=2',
+      });
+    });
+
+    const error = await captureRejection(
+      unresolveThread({
+        owner: ORG_OWNER,
+        workspace: 'acme',
+        repoSlug: 'repo',
+        prId: 12,
+        threadId: '101',
+      })
+    );
+
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+    expect(error.message).toBe(
+      'The Bitbucket task list is too large to reopen this thread. Try again.'
+    );
+    expect(bitbucketCalls().some(call => call.init.method === 'PUT')).toBe(false);
+    expect(bitbucketCalls().filter(call => call.url.pathname.endsWith('/tasks'))).toHaveLength(10);
   });
 });
 

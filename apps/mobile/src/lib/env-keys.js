@@ -25,9 +25,13 @@ export const OPTIONAL_ENV_KEYS = {
   kiloMcpUrl: 'KILO_MCP_URL',
   googleWebClientId: 'GOOGLE_WEB_CLIENT_ID',
   googleIosClientId: 'GOOGLE_IOS_CLIENT_ID',
-  // Google Cloud project number for Play Integrity. Absent → Android skips
-  // admission and the server's counted legacy path decides.
+  // Google Cloud project number for Play Integrity. Absent in a non-production
+  // build → Android sends the dev sentinel; absent in production → every new
+  // native signup is refused, because admission is mandatory.
   playIntegrityProjectNumber: 'GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER',
+  // Non-production only: sends the fixed admission sentinel from a device that
+  // cannot attest. The server ignores it when it runs in production.
+  nativeAdmissionDevSentinel: 'NATIVE_ADMISSION_DEV_SENTINEL',
   e2eLatencySessionMs: 'E2E_LATENCY_SESSION_MS',
   e2eLatencyMessagesMs: 'E2E_LATENCY_MESSAGES_MS',
   e2eLatencyWsMs: 'E2E_LATENCY_WS_MS',

@@ -1,3 +1,4 @@
+import { byocVercelOwnerFields, VERCEL_BYOC_REQUIRED_MESSAGE } from '../byoc/vercel-owner.js';
 /**
  * Worker-side projections from the public grouped create/send inputs onto the
  * control-plane V2 Durable Object RPCs.
@@ -26,6 +27,7 @@ import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { createMessageId } from './message-id.js';
 import {
   buildSessionMetadataFromRegistration,
@@ -167,6 +169,21 @@ export function buildControlPlaneSandboxSelection(
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
   const allocation = metadata.workspace?.sandboxAllocation;
   const sandboxKind = metadata.workspace?.sandboxKind;
+  const binding = metadata.workspace?.sandboxProviderBinding;
+  const byoc =
+    binding?.kind === 'vercel' && binding.source.kind === 'byoc'
+      ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
+      : undefined;
+  if (provider === 'vercel') {
+    if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
+    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+    return {
+      provider,
+      configuration: resources === undefined ? { provider } : { provider, resources },
+      byoc,
+      ...(sandboxKind ? { sandboxKind } : {}),
+    };
+  }
   const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
   const billing = {
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
@@ -181,18 +198,16 @@ export function buildControlPlaneSandboxSelection(
     ...(metadata.workspace?.egressAllowlist === undefined
       ? {}
       : { egressAllowlist: metadata.workspace.egressAllowlist }),
+    ...(metadata.workspace?.egressAudit === undefined
+      ? {}
+      : { egressAudit: metadata.workspace.egressAudit }),
   };
   switch (provider) {
-    case 'vercel': {
-      const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-      return {
-        provider,
-        configuration: resources === undefined ? { provider } : { provider, resources },
-        ...pinned,
-      };
-    }
     case 'cloudflare-containers': {
-      const instance = getSandboxAllocationInstance(allocation);
+      const instance =
+        sandboxKind === 'code-review'
+          ? CODE_REVIEW_CONTAINERS_INSTANCE
+          : getSandboxAllocationInstance(allocation);
       return {
         provider,
         configuration: instance === undefined ? { provider } : { provider, instance },
@@ -219,7 +234,7 @@ async function buildMetadata(
   if (sandboxId === undefined || sandboxId.length === 0) {
     throw new ControlPlaneRegistrationError('Session metadata requires a sandboxId');
   }
-  return { metadata: built.metadata, sandboxId: sandboxId as SandboxId };
+  return { metadata: built.metadata, sandboxId: sandboxId };
 }
 
 /**

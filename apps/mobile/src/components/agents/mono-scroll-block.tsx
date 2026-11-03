@@ -123,7 +123,7 @@ export function MonoScrollBlock({
   );
 
   if (textMode === 'wrap') {
-    const wrapContentClasses = 'font-mono text-xs leading-4';
+    const wrapContentClasses = 'font-mono text-xs leading-[1rem]';
     return (
       <View className={containerClassName}>
         {inTranscript ? (
@@ -146,7 +146,7 @@ export function MonoScrollBlock({
       </View>
     );
   }
-  const contentClasses = 'shrink-0 self-start font-mono text-xs leading-4';
+  const contentClasses = 'shrink-0 self-start font-mono text-xs leading-[1rem]';
 
   return (
     <View className={containerClassName}>

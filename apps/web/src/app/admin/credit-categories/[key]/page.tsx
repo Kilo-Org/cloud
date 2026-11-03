@@ -24,7 +24,6 @@ export default async function CreditCategoryDetailPage({ params }: CreditCategor
   const { key } = await params;
   const decodedKey = decodeURIComponent(key);
 
-  // Find the specific credit category
   const category = promoCreditCategories.find(cat => cat.credit_category === decodedKey);
 
   const breadcrumbs = (

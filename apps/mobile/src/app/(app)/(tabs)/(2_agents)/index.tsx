@@ -80,6 +80,22 @@ export function buildGitHubInstallOutcomeAlert(
           buttons: [{ text: i18n.t('common.back') }],
         };
       }
+      if (result.code === 'installation_unavailable') {
+        return {
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.installationUnavailableMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
+        };
+      }
+      // The organization already holds a connection, so reinstalling from the
+      // same entry reaches the same refusal; a retry would only reopen it.
+      if (result.code === 'multiple_installations_disabled') {
+        return {
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.multipleInstallationsMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
+        };
+      }
       return {
         title: i18n.t('agents.githubInstall.didNotCompleteTitle'),
         message: i18n.t('agents.githubInstall.didNotCompleteMessage'),
@@ -119,7 +135,9 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
     Alert.alert(
       i18n.t('agents.githubInstall.couldNotOpenTitle'),
       i18n.t('agents.githubInstall.couldNotOpenMessage'),
-      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }]
+      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }],
+      // Android back dismisses; reopening the flow retries the same way.
+      { cancelable: true }
     );
   }
 }
@@ -132,7 +150,9 @@ export default function AgentSessionList() {
       void retryGitHubInstall(result?.organizationId);
     });
     if (alert) {
-      Alert.alert(alert.title, alert.message, alert.buttons);
+      // Android back dismisses; the outcome alerts are informational and the
+      // retry flow re-arms from the tab.
+      Alert.alert(alert.title, alert.message, alert.buttons, { cancelable: true });
     }
   }, []);
 
@@ -164,10 +184,10 @@ export default function AgentSessionList() {
     }, [])
   );
 
-  const segmentControl = <AgentsViewSegment value={view} onChange={setView} />;
+  const tabHeader = <AgentsViewSegment value={view} onChange={setView} />;
   return view === 'sessions' ? (
-    <AgentSessionListScreen segmentControl={segmentControl} />
+    <AgentSessionListScreen tabHeader={tabHeader} />
   ) : (
-    <TodoListsScreen segmentControl={segmentControl} />
+    <TodoListsScreen tabHeader={tabHeader} />
   );
 }

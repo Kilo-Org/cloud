@@ -58,16 +58,14 @@ export const posthogCustomStorage = {
     }
   },
 
-  // The `PostHogCustomStorage` interface allows `void | Promise<void>`.
-  // This implementation is synchronous — remove the `async` keyword instead
-  // of suppressing `require-await`.
+  // Synchronous writes finish before sealing and purging storage.
   setItem(key: string, value: string): void {
     if (sealed) {
       return;
     }
     try {
       const file = new File(Paths.cache, key);
-      file.write(value);
+      file.writeSync(value);
     } catch {
       // best-effort persistence — a failed write is lost queued events,
       // which is acceptable for optional analytics.

@@ -14,9 +14,10 @@
  * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
+import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
-import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -55,6 +56,9 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       repo: input.githubRepo,
       githubAccessPurpose: input.githubAccessPurpose ?? 'workflow',
       ...(input.githubIntegrationId ? { githubIntegrationId: input.githubIntegrationId } : {}),
+      ...(input.allowUserAuthorization === undefined
+        ? {}
+        : { allowUserAuthorization: input.allowUserAuthorization }),
       ...(input.githubPullRequestNumber !== undefined
         ? { pullRequestNumber: input.githubPullRequestNumber }
         : {}),
@@ -105,12 +109,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
             id: input.initialMessageId,
             command: input.initialPayload.command,
             arguments: input.initialPayload.arguments,
-            attachments: input.attachments ?? input.images,
+            attachments: input.attachments,
           }
         : {
             type: 'prompt',
             prompt: input.prompt,
-            attachments: input.attachments ?? input.images,
+            attachments: input.attachments,
             id: input.initialMessageId,
           };
 
@@ -125,11 +129,13 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     runtime:
       input.sandboxAllocation !== undefined ||
       input.egressMode !== undefined ||
-      input.egressAllowlist !== undefined
+      input.egressAllowlist !== undefined ||
+      input.egressAudit !== undefined
         ? {
             sandboxAllocation: input.sandboxAllocation,
             egressMode: input.egressMode,
             egressAllowlist: input.egressAllowlist,
+            egressAudit: input.egressAudit,
           }
         : undefined,
     clone: input.cloneFromKiloSessionId
@@ -156,6 +162,8 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       condenseOnComplete: input.condenseOnComplete,
       gateThreshold: input.gateThreshold,
     },
+    ...(input.requestedEnvironment ? { requestedEnvironment: input.requestedEnvironment } : {}),
+    ...(input.requireEnvironmentChoice ? { requireEnvironmentChoice: true as const } : {}),
     options: {
       callbackTarget: input.callbackTarget,
       kilocodeOrganizationId: input.kilocodeOrganizationId,
@@ -163,6 +171,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
+      kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
     },
   };
 }
@@ -187,8 +196,21 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
+      const request = prepareInputToSessionCreateRequest(input);
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL && !ctx.cloudAgentAuthority) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback requires a session launched by a Cloud Agent parent',
+        });
+      }
+      if (ctx.cloudAgentAuthority) {
+        request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
+        if (request.options?.operationKey === undefined) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'operation_key_required' });
+        }
+      }
       const requestWithProfile = await preflightSessionCreation(
-        prepareInputToSessionCreateRequest(input),
+        request,
         ctx,
         'prepareSession',
         resolvedRequest => {
@@ -211,8 +233,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
+        cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
-      const billingOrigin = { billingOrigin: input.createdOnPlatform };
+      const billingOrigin = { billingOrigin: requestWithProfile.options?.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an
       // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
       // key is ignored and the legacy split-flow behavior is preserved.
@@ -251,13 +274,19 @@ const updateSessionHandler = internalApiProtectedProcedure
   .output(UpdateSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'updateSession' }, async () => {
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+        });
+      }
       logger.setTags({
         cloudAgentSessionId: input.cloudAgentSessionId,
         userId: ctx.userId,
       });
       logger.info('Updating session');
 
-      const stub = resolveSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
+      const stub = getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
 
       const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 

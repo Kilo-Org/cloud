@@ -12,8 +12,14 @@ import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
-import { defaultErrorMessage, mapError } from '@/lib/auth/auth-error-messages';
-import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
+import {
+  type AuthErrorMessageKey,
+  defaultErrorMessage,
+  mapError,
+  mapErrorKey,
+  signupStepUpMessage,
+} from '@/lib/auth/auth-error-messages';
+import { hasStringCode, postAuth, type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import {
   buildChallengeEntry,
   parseEmailCodeResponse,
@@ -27,10 +33,9 @@ import {
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
-// `/api/auth/native/otp` validates the address with zod's email check and
-// answers 400 INVALID_REQUEST. The hook runs the same check first, so a
-// mistyped address shows the same inline error without a failed request.
-const emailAddressSchema = z.email();
+// Match the OTP route's syntax check and bound the mobile address length
+// before delivery, keeping validation beside the email field.
+const emailAddressSchema = z.email().max(254);
 
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
 // on every button press is pointless; upgrade to a re-configure path if client IDs
@@ -49,18 +54,40 @@ function ensureGoogleConfigured() {
   googleSignInConfigured = true;
 }
 
-type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
+/**
+ * A token-route refusal in the active language. A signup step-up names an allowed Apple or
+ * Google button only when this screen shows it; the Apple check is the one the screen makes.
+ */
+async function tokenRefusalMessage(
+  result: PostAuthFailure,
+  googleConfigured: boolean
+): Promise<string> {
+  if (result.errorCode !== 'SIGNUP-STEP-UP') {
+    return mapError(result.errorCode);
+  }
+  const apple =
+    Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync().catch(() => false));
+  return signupStepUpMessage(result.signupMethods, { apple, google: googleConfigured });
+}
+
+export type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
+
+/** Outcome of an email-code verification attempt: a token, or an inline refusal message. */
+type EmailCodeVerifyResult = { ok: true } | { ok: false; message: string };
+
+/** The email-field error keys the inline slot can carry; translated at render. */
+type EmailErrorKey = 'login.pleaseEnterEmail' | AuthErrorMessageKey;
 
 type NativeAuthResult = {
   busy: BusyAction;
-  emailError: string | undefined;
+  emailErrorKey: EmailErrorKey | undefined;
   clearEmailError: () => void;
   googleConfigured: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithPasskey: () => Promise<void>;
   requestEmailCode: (email: string) => Promise<boolean>;
-  verifyEmailCode: (email: string, code: string) => Promise<boolean>;
+  verifyEmailCode: (email: string, code: string) => Promise<EmailCodeVerifyResult>;
   ssoRecovery: SsoRecovery | null;
   clearSsoRecovery: () => void;
   handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
@@ -69,13 +96,13 @@ type NativeAuthResult = {
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
-  const [emailError, setEmailError] = useState<string | undefined>(undefined);
+  const [emailErrorKey, setEmailErrorKey] = useState<EmailErrorKey | undefined>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
   const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
 
   const clearEmailError = useCallback(() => {
-    setEmailError(undefined);
+    setEmailErrorKey(undefined);
   }, []);
 
   const startAction = useCallback(
@@ -233,14 +260,14 @@ export function useNativeAuth(): NativeAuthResult {
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
       } else {
-        toast.error(mapError(result.errorCode));
+        toast.error(await tokenRefusalMessage(result, googleConfigured));
       }
     } catch {
       toast.error(defaultErrorMessage());
     } finally {
       finishAction('google');
     }
-  }, [finishAction, handleSsoError, signIn, startAction]);
+  }, [finishAction, googleConfigured, handleSsoError, signIn, startAction]);
 
   const signInWithPasskey = useCallback(async () => {
     if (!startAction('passkey')) {
@@ -284,11 +311,11 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        setEmailError(i18n.t('login.pleaseEnterEmail'));
+        setEmailErrorKey('login.pleaseEnterEmail');
         return false;
       }
       if (!emailAddressSchema.safeParse(email).success) {
-        setEmailError(mapError('INVALID_REQUEST'));
+        setEmailErrorKey(mapErrorKey('INVALID_REQUEST'));
         return false;
       }
 
@@ -307,7 +334,7 @@ export function useNativeAuth(): NativeAuthResult {
             result.errorCode === 'INVALID_REQUEST' ||
             result.errorCode === 'INVALID_EMAIL'
           ) {
-            setEmailError(mapError(result.errorCode));
+            setEmailErrorKey(mapErrorKey(result.errorCode));
           } else {
             toast.error(mapError(result.errorCode));
           }
@@ -332,11 +359,10 @@ export function useNativeAuth(): NativeAuthResult {
   );
 
   const verifyEmailCode = useCallback(
-    async (rawEmail: string, code: string) => {
+    async (rawEmail: string, code: string): Promise<EmailCodeVerifyResult> => {
       const email = rawEmail.trim().toLowerCase();
       if (!startAction('otp-verify')) {
-        toast.error(i18n.t('login.couldNotCompleteSignIn'));
-        return false;
+        return { ok: false, message: i18n.t('login.couldNotCompleteSignIn') };
       }
       try {
         // Only send a challengeId when the email matches. A mismatched
@@ -347,7 +373,7 @@ export function useNativeAuth(): NativeAuthResult {
         try {
           admissionBody = await resolveAdmission();
         } catch {
-          return false;
+          return { ok: false, message: i18n.t('authErrors.retryableAdmission') };
         }
 
         const result = await postAuth('/api/auth/native/token', {
@@ -361,15 +387,17 @@ export function useNativeAuth(): NativeAuthResult {
         if (!result.ok) {
           if (result.errorCode === 'SSO_ERROR') {
             handleSsoError(email, result.ssoOrganizationId);
-          } else {
-            toast.error(mapError(result.errorCode));
           }
-          return false;
+          // Every other refusal surfaces inline on the code step: the form owns
+          // the message slot, so a wrong, spent, or contested code reads in the
+          // active language right where the input is. A toast here was the
+          // reported dead end — the screen kept its silence while the toast
+          // could land behind the keyboard or expire unnoticed.
+          return { ok: false, message: await tokenRefusalMessage(result, googleConfigured) };
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
-          return false;
+          return { ok: false, message: defaultErrorMessage() };
         }
         await signIn(
           parsed.token,
@@ -379,22 +407,21 @@ export function useNativeAuth(): NativeAuthResult {
         if (parsed.created === true) {
           announcingToast.success(i18n.t('login.accountCreated'));
         }
-        return true;
+        return { ok: true };
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
         console.error('[native-auth] verifyEmailCode signIn failed:', error);
-        toast.error(defaultErrorMessage());
-        return false;
+        return { ok: false, message: defaultErrorMessage() };
       } finally {
         finishAction('otp-verify');
       }
     },
-    [finishAction, handleSsoError, signIn, startAction]
+    [finishAction, googleConfigured, handleSsoError, signIn, startAction]
   );
 
   return {
     busy,
-    emailError,
+    emailErrorKey,
     clearEmailError,
     googleConfigured,
     signInWithApple,

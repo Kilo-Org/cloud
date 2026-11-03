@@ -7,6 +7,8 @@ import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionAutoApproveRow } from './session-auto-approve-row';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Text: 'Text',

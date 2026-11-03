@@ -492,11 +492,9 @@ export function useCloudAgentAttachmentUpload(
 
   /**
    * Build the attachment payload for the caller to submit. The pending-ledger
-   * rows are NOT linked here: the server links authoritatively only after the
-   * send or prepare succeeds (both the personal and organization routers call
-   * linkPendingUploads post-send). Linking client-side before the send would
-   * leave a failed or abandoned send with 'linked' rows that the reaper never
-   * deletes.
+   * rows are linked by the server as part of the send or prepare dispatch, so
+   * this side must not link them earlier: a row this side linked before a send
+   * that never happened would keep its object out of the reaper's reach.
    */
   const finalizeAttachments = useCallback(async (): Promise<CloudAgentAttachments | undefined> => {
     return getAttachmentsData();

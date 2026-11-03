@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeSessionsQueryKey,
   historyEmptyMessage,
   mapActiveSessionRow,
   mapHistorySessionRow,
-  sessionHistoryQueryKey,
-  sessionSearchQueryKey,
   sessionStatusBadge,
 } from './agents-session-list';
 
@@ -151,56 +148,6 @@ describe('mapHistorySessionRow()', () => {
   it('passes through null title', () => {
     const row = mapHistorySessionRow({ ...wireRow, title: null });
     expect(row.title).toBeNull();
-  });
-});
-
-describe('query key functions', () => {
-  describe('activeSessionsQueryKey()', () => {
-    it('produces the expected key for personal (null org)', () => {
-      expect(activeSessionsQueryKey(null)).toStrictEqual(['agents', 'active-sessions', null]);
-    });
-
-    it('produces the expected key for an organization', () => {
-      expect(activeSessionsQueryKey('org-123')).toStrictEqual([
-        'agents',
-        'active-sessions',
-        'org-123',
-      ]);
-    });
-  });
-
-  describe('sessionHistoryQueryKey()', () => {
-    it('produces the expected key for personal (null org)', () => {
-      expect(sessionHistoryQueryKey(null)).toStrictEqual(['agents', 'session-history', null]);
-    });
-
-    it('produces the expected key for an organization', () => {
-      expect(sessionHistoryQueryKey('org-456')).toStrictEqual([
-        'agents',
-        'session-history',
-        'org-456',
-      ]);
-    });
-  });
-
-  describe('sessionSearchQueryKey()', () => {
-    it('produces the expected key for personal (null org) with a query string', () => {
-      expect(sessionSearchQueryKey(null, 'test query')).toStrictEqual([
-        'agents',
-        'session-search',
-        null,
-        'test query',
-      ]);
-    });
-
-    it('produces the expected key for an organization with a query string', () => {
-      expect(sessionSearchQueryKey('org-789', 'search term')).toStrictEqual([
-        'agents',
-        'session-search',
-        'org-789',
-        'search term',
-      ]);
-    });
   });
 });
 

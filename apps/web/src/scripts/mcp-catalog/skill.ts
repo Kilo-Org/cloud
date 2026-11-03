@@ -4,11 +4,13 @@
  * The skill is derived from the committed `services/kilo-mcp/catalog.json` —
  * never hand-maintained — so it can never fall behind the catalog. The
  * how-to prose lives in the hand-edited template beside this file; the catalog
- * supplies the census (the prefix table and the sub-area lists). The census
- * stays a map, not a copy of the catalog: it carries counts only, never a
- * summary, a tag list or a procedure path. The same catalog always yields the
- * same bytes: no timestamp, commit sha, random value or inlined procedure path
- * enters the output.
+ * supplies the census: the sorted list of first path segments, one bullet per
+ * area. The census stays a map, not a copy of the catalog: it carries area
+ * names only, never a count, a summary, a tag list or a procedure path. That
+ * also keeps two concurrent pull requests byte-identical when both only add
+ * procedures inside existing areas, so the generated file cannot conflict. The
+ * same catalog always yields the same bytes: no timestamp, commit sha, random
+ * value or inlined procedure path enters the output.
  *
  * Usage (from apps/web):
  *   pnpm script src/scripts/mcp-catalog/skill.ts              # write or regenerate
@@ -48,139 +50,29 @@ export const SKILL_BYTE_LIMIT = 8_000;
 const CENSUS_TOKEN = '{{CENSUS}}';
 
 /**
- * The subset of a catalog row the census reads. The catalog is an object keyed
- * by procedure path; `readCatalogRows` lifts each entry into this shape. The
- * census needs nothing else — a row's summary and tags stay in the catalog,
- * where `kilo_search` reads them.
+ * The distinct first path segments, sorted alphabetically. The census derives
+ * nothing else: a count or a size ordering would change the rendered skill on
+ * almost every catalog edit, so two concurrent pull requests would conflict on
+ * this file. A path's summary and tags stay in the catalog, where `kilo_search`
+ * reads them.
  */
-export type SkillCatalogRow = {
-  path: string;
-  kind: string;
-};
-
-/** One sub-area bucket of a prefix: a second path segment or the direct bucket. */
-export type CensusSubArea = {
-  /** `organizations.kiloclaw`, or the prefix itself for the direct bucket. */
-  label: string;
-  total: number;
-};
-
-/** One prefix of the catalog census. */
-export type CensusPrefix = {
-  name: string;
-  total: number;
-  queries: number;
-  mutations: number;
-  /** Buckets, sorted; empty when the prefix has fewer than two of them. */
-  subAreas: CensusSubArea[];
-};
-
-/** The whole generated map: totals plus one entry per prefix. */
-export type Census = {
-  total: number;
-  queries: number;
-  mutations: number;
-  prefixes: CensusPrefix[];
-};
-
-/**
- * Sub-area buckets: the second path segment, plus a direct bucket named after
- * the prefix for paths with at most two segments. Emitted only when the prefix
- * has at least two distinct buckets; rows sorted count desc then name asc.
- */
-function buildSubAreas(prefix: string, prefixRows: SkillCatalogRow[]): CensusSubArea[] {
-  const counts = new Map<string, number>();
-  for (const row of prefixRows) {
-    const parts = row.path.split('.');
-    const label = parts.length <= 2 ? prefix : `${prefix}.${parts[1] ?? ''}`;
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-  if (counts.size < 2) return [];
-  return [...counts.entries()]
-    .map(([label, total]) => ({ label, total }))
-    .sort((a, b) => b.total - a.total || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+export function censusAreas(paths: string[]): string[] {
+  const areas = new Set<string>();
+  for (const path of paths) areas.add(path.split('.')[0] ?? path);
+  return [...areas].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 /**
- * Builds the census from catalog rows. Prefix = first path segment. Prefixes
- * are ordered total descending then name ascending; each carries its totals
- * and — when it has two or more buckets — its sub-areas. Deterministic for any
- * input order.
+ * Renders the census block that replaces `{{CENSUS}}` in the template: one
+ * bullet per area, so a new area adds one line instead of rewriting the block.
  */
-export function censusCatalog(rows: SkillCatalogRow[]): Census {
-  const byPrefix = new Map<string, SkillCatalogRow[]>();
-  for (const row of rows) {
-    const prefix = row.path.split('.')[0] ?? row.path;
-    const group = byPrefix.get(prefix);
-    if (group) group.push(row);
-    else byPrefix.set(prefix, [row]);
-  }
-  const prefixes: CensusPrefix[] = [];
-  let total = 0;
-  let queries = 0;
-  let mutations = 0;
-  for (const [name, prefixRows] of byPrefix) {
-    let prefixQueries = 0;
-    let prefixMutations = 0;
-    for (const row of prefixRows) {
-      if (row.kind === 'mutation') prefixMutations += 1;
-      else prefixQueries += 1;
-    }
-    total += prefixRows.length;
-    queries += prefixQueries;
-    mutations += prefixMutations;
-    prefixes.push({
-      name,
-      total: prefixRows.length,
-      queries: prefixQueries,
-      mutations: prefixMutations,
-      subAreas: buildSubAreas(name, prefixRows),
-    });
-  }
-  prefixes.sort((a, b) => b.total - a.total || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return { total, queries, mutations, prefixes };
+export function renderCensus(paths: string[]): string {
+  return censusAreas(paths)
+    .map(area => `- \`${area}\``)
+    .join('\n');
 }
 
-/** Renders the census block that replaces `{{CENSUS}}` in the template. */
-export function renderCensus(census: Census): string {
-  const lines: string[] = [
-    `**${census.total} procedures** — **${census.queries} queries**, **${census.mutations} mutations** — under **${census.prefixes.length} prefixes**.`,
-    '',
-    '| Prefix | Procedures | Queries | Mutations |',
-    '|---|---:|---:|---:|',
-  ];
-  for (const prefix of census.prefixes) {
-    // A raw pipe in a path key would split its own table row.
-    const name = prefix.name.replace(/\|/g, '\\|');
-    lines.push(`| \`${name}\` | ${prefix.total} | ${prefix.queries} | ${prefix.mutations} |`);
-  }
-  const withSubAreas = census.prefixes.filter(prefix => prefix.subAreas.length > 0);
-  if (withSubAreas.length > 0) {
-    lines.push(
-      '',
-      '### Sub-areas',
-      '',
-      'The second path segment of each area that splits, with procedure counts:'
-    );
-    for (const prefix of withSubAreas) {
-      const buckets = prefix.subAreas
-        .map(subArea => {
-          // The line is already scoped to the prefix, so name the second
-          // segment only. The direct bucket has no second segment.
-          const segment =
-            subArea.label === prefix.name
-              ? '(direct)'
-              : subArea.label.slice(prefix.name.length + 1);
-          return `\`${segment}\` ${subArea.total}`;
-        })
-        .join(', ');
-      lines.push('', `- \`${prefix.name}.*\` — ${prefix.total}: ${buckets}`);
-    }
-  }
-  return lines.join('\n');
-}
-
-function parseCatalogRows(catalogJsonText: string, catalogPath: string): SkillCatalogRow[] {
+function parseCatalogPaths(catalogJsonText: string, catalogPath: string): string[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(catalogJsonText);
@@ -198,27 +90,23 @@ function parseCatalogRows(catalogJsonText: string, catalogPath: string): SkillCa
         'The catalog is the source of truth for this skill — fix or restore it before regenerating.'
     );
   }
-  const rows: SkillCatalogRow[] = [];
-  for (const [path, value] of Object.entries(parsed as Record<string, unknown>)) {
-    const row = value as { kind?: unknown } | null | undefined;
-    rows.push({ path, kind: typeof row?.kind === 'string' ? row.kind : 'query' });
-  }
-  if (rows.length === 0) {
+  const paths = Object.keys(parsed as Record<string, unknown>);
+  if (paths.length === 0) {
     throw new Error(
       `The MCP catalog at ${catalogPath} has zero rows — refusing to emit an empty skill. ` +
         'The catalog is the source of truth for this skill; restore its rows before regenerating.'
     );
   }
-  return rows;
+  return paths;
 }
 
 /**
- * Reads the committed catalog and lifts it into census rows. Every failure —
- * missing, unreadable, invalid JSON, non-object or zero rows — throws naming
+ * Reads the committed catalog and lifts out its procedure paths. Every failure
+ * — missing, unreadable, invalid JSON, non-object or zero rows — throws naming
  * the catalog path, because the catalog is the source of truth and an empty
  * skill would be a lie.
  */
-export function readCatalogRows(catalogPath: string = CATALOG_JSON_PATH): SkillCatalogRow[] {
+export function readCatalogPaths(catalogPath: string = CATALOG_JSON_PATH): string[] {
   let raw: string;
   try {
     raw = readFileSync(catalogPath, 'utf8');
@@ -229,17 +117,17 @@ export function readCatalogRows(catalogPath: string = CATALOG_JSON_PATH): SkillC
         'The catalog is the source of truth for this skill — fix or restore it before regenerating.'
     );
   }
-  return parseCatalogRows(raw, catalogPath);
+  return parseCatalogPaths(raw, catalogPath);
 }
 
-function renderSkillFromCensus(census: Census, template: string): string {
+function renderSkillFromPaths(paths: string[], template: string): string {
   if (!template.includes(CENSUS_TOKEN)) {
     throw new Error(
       `The skill template at ${SKILL_TEMPLATE_PATH} does not contain the ${CENSUS_TOKEN} token. ` +
         'Add it where the generated census belongs — the generator has nowhere to put the census without it.'
     );
   }
-  return template.replace(CENSUS_TOKEN, () => renderCensus(census));
+  return template.replace(CENSUS_TOKEN, () => renderCensus(paths));
 }
 
 /**
@@ -252,14 +140,13 @@ export function renderSkill(
 ): string {
   const json =
     typeof catalogJsonText === 'string' ? catalogJsonText : catalogJsonText.toString('utf8');
-  const rows = parseCatalogRows(json, CATALOG_JSON_PATH);
-  return renderSkillFromCensus(censusCatalog(rows), template);
+  return renderSkillFromPaths(parseCatalogPaths(json, CATALOG_JSON_PATH), template);
 }
 
 /** Reads the catalog from disk and renders the full skill file. */
 export function buildSkillFromCatalog(catalogPath: string = CATALOG_JSON_PATH): string {
-  return renderSkillFromCensus(
-    censusCatalog(readCatalogRows(catalogPath)),
+  return renderSkillFromPaths(
+    readCatalogPaths(catalogPath),
     readFileSync(SKILL_TEMPLATE_PATH, 'utf8')
   );
 }

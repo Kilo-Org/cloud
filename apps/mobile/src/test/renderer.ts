@@ -320,5 +320,4 @@ export const TestRenderer = { create, act };
 export namespace TestRenderer {
   export type ReactTestInstance = Instance;
   export type ReactTestRenderer = Renderer;
-  export type ReactTestRendererJSON = JsonElement;
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { type BackendStoreCreditProduct, joinStoreCreditProducts } from './store-products';
+import {
+  type BackendStoreCreditProduct,
+  getStoreCreditExpiryMessageKey,
+  joinStoreCreditProducts,
+} from './store-products';
 
 const backendProducts: BackendStoreCreditProduct[] = [
   { amountUsd: 10, appleProductId: 'credits.usd10.v1', googleProductId: 'credits_usd10' },
@@ -87,5 +91,32 @@ describe('joinStoreCreditProducts', () => {
         storeProducts: [{ id: 'credits.usd10.v1', displayPrice: '$10.99' }],
       })
     ).toEqual([]);
+  });
+});
+
+describe('getStoreCreditExpiryMessageKey', () => {
+  const product = {
+    amountUsd: 10,
+    appleProductId: 'credits.usd10.v1',
+    googleProductId: 'credits_usd10_1year_v2',
+  };
+
+  it('always exempts App Store credit purchases', () => {
+    expect(
+      getStoreCreditExpiryMessageKey({ ...product, creditExpiryPolicy: 'one_year' }, 'app_store')
+    ).toBe('credits.appStoreExpiry');
+  });
+
+  it('discloses the backend policy for each Google Play pack', () => {
+    expect(
+      getStoreCreditExpiryMessageKey({ ...product, creditExpiryPolicy: 'one_year' }, 'play')
+    ).toBe('credits.playOneYearExpiry');
+    expect(
+      getStoreCreditExpiryMessageKey({ ...product, creditExpiryPolicy: 'never' }, 'play')
+    ).toBe('credits.playNonexpiring');
+  });
+
+  it('does not invent a deadline while the backend has no product policy', () => {
+    expect(getStoreCreditExpiryMessageKey(product, 'play')).toBeUndefined();
   });
 });

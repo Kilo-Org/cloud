@@ -1,22 +1,24 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
+import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { formatDate, formatMoney } from '@/lib/format';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -24,7 +26,7 @@ import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-que
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { cn, parseTimestamp } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const HIDDEN_BALANCE = '*****';
 
@@ -37,11 +39,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
-  // Reserve room for the amount, visibility toggle and purchase action in
-  // scaled text units, using the card's width rather than the display's.
-  const stackBalance = availableWidth === null || availableWidth / fontScale < 320;
+  // Stack the balance unless the expiry note keeps its two lines beside the
+  // amount, the visibility toggle and the purchase action. Measured on the
+  // standard matrix (Android, 2026-11-02): the note takes two lines from a
+  // 215 dp column and three lines below that, and the one-row siblings take
+  // 157 dp of the card, so the one-row layout holds from about 372 scaled card
+  // dp. The threshold stacks below 370 of them and uses the card's width rather
+  // than the display's; below it the note takes a row of its own at full width.
+  const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
   // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
@@ -75,24 +83,41 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
-    isFetching: balanceFetching,
+    isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
+    // The card must stop waiting while the online manager reports offline: a
+    // paused read is pending without fetching, so the skeleton below had no
+    // exit. This one either answers or fails once the control-plane deadline
+    // lands, and `balanceFailed` then offers the retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
-  const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
+  const { data: personalCreditData, isError: personalCreditsError } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
-  const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
+  const {
+    data: orgCreditData,
+    isError: orgCreditsError,
+    isPlaceholderData: orgCreditsPlaceholder,
+  } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
@@ -100,25 +125,30 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const balanceFailed = balanceQueryError || userIdError;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
-  const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
+  const creditsFailed = selectedOrgId ? orgCreditsError : personalCreditsError;
+  const creditsPending =
+    creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
-  // A paused query (offline/unknown connectivity, empty cache) is pending but
-  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
-  // is still undefined. Treat "no data yet" as loading so the card shows a
-  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  // One formatted amount for the painted value and its spoken label: a label
+  // that stops being passed keeps its old native value, so the shown amount
+  // would otherwise still be announced as the hidden one.
+  const balanceText = formatMoney(balanceDollars, i18n.language);
+  // A read that has not answered yet is pending without fetching while the
+  // owner is still unresolved (the balance query is gated on the identity), so
+  // `balanceLoading` (isLoading) is false while `balance` is still undefined.
+  // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
+  // on a cold launch. The read itself settles regardless of the online manager,
+  // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
+  // `keepPreviousData` keeps the last account's amount on screen while the next
+  // account's read runs, which would paint the previous account's balance under
+  // the newly selected account's name with no cue at all. The skeleton owns that
+  // window too, so a context switch never shows an amount that belongs to
+  // another account; the read either answers or lands on `balanceFailed`.
   const showBalanceSkeleton =
-    (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
-  const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
-  const expiringTotal = fromMicrodollars(
-    expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
-  );
-  const earliestExpiry = expiringBlocks
-    .map(b => b.expiry_date)
-    .filter((d): d is string => d !== null)
-    // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
-    .sort((a, b) => parseTimestamp(a).getTime() - parseTimestamp(b).getTime())[0];
+    (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
+    !balanceFailed;
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
@@ -134,6 +164,75 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // organization hub screen.
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
+
+  // The expiry note's slot: under the amount. No entrance fade — the caption
+  // holds a row of this block, so a fade that paints it late leaves it empty.
+  const expirySlot = (
+    <>
+      {creditsFailed && (
+        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+      )}
+      {!creditsFailed && creditsPending && (
+        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+      )}
+      {!creditsFailed && !creditsPending && (
+        <CreditExpiryNote
+          creditBlocks={creditData.creditBlocks}
+          hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+          emptyMessage={t('credits.noExpiringCredits')}
+        />
+      )}
+    </>
+  );
+
+  // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
+  // ScrollView defaults to `flexGrow: 1`, so inside a column it would take the
+  // spare height and push the note away from the amount.
+  const amountLine = (
+    <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
+      <Text
+        className="text-2xl font-bold tabular-nums"
+        accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
+      >
+        {hideBalance ? HIDDEN_BALANCE : balanceText}
+      </Text>
+    </ScrollView>
+  );
+
+  const visibilityToggle = (
+    <Pressable
+      className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
+      onPress={() => {
+        selectionHaptic();
+        setHideBalance(!hideBalance);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
+    >
+      {hideBalance ? (
+        <Eye size={18} color={colors.mutedForeground} />
+      ) : (
+        <EyeOff size={18} color={colors.mutedForeground} />
+      )}
+    </Pressable>
+  );
+
+  // The purchase action: in the trailing control column with the visibility
+  // toggle. No in-progress indicator sits beside it, because this row paints a
+  // balance that belongs to the selected account and a background refresh may
+  // legitimately take a while or never finish. The first load and a context
+  // switch own the skeleton above; a refresh that fails owns the retry surface.
+  // An indicator tied to every in-flight refresh spun for as long as a stalled
+  // one lasted (and announced itself as "In progress").
+  const addCreditsAction =
+    selectedOrgId == null ? (
+      <AddCreditsButton
+        className="h-auto min-h-11 max-w-full py-2"
+        onPress={() => {
+          router.push('/(app)/credits' as Href);
+        }}
+      />
+    ) : null;
 
   return (
     <View
@@ -185,7 +284,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             accessibilityState={{ busy: isSaving, disabled: isSaving }}
             disabled={isSaving}
             onPress={retry}
-            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+            className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
           >
             <Text className="text-sm text-primary">{t('common.retry')}</Text>
             {isSaving && <ActivityIndicator size="small" color={colors.mutedForeground} />}
@@ -230,71 +329,52 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         <View
           className={cn(
             'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            stackBalance ? 'items-stretch' : 'flex-row items-center'
+            // A stacked card ends on the Add credits button, whose own line
+            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
+            // it than the card's 7 dp top padding gives the amount above it, so
+            // the bottom edge does not read as tighter than the top.
+            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
           )}
         >
           <Animated.View
-            className={cn('min-w-0 justify-center', !stackBalance && 'flex-1')}
+            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
             layout={LinearTransition.duration(200)}
           >
-            <View className="flex-row items-center gap-1">
-              <ScrollView horizontal className="min-w-0 flex-1">
-                <Text
-                  className="text-2xl font-bold tabular-nums"
-                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
-                >
-                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
-                </Text>
-              </ScrollView>
-              <Pressable
-                className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setHideBalance(!hideBalance);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
-                }
-                hitSlop={4}
-              >
-                {hideBalance ? (
-                  <Eye size={18} color={colors.mutedForeground} />
-                ) : (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            </View>
-            {!hideBalance &&
-              (creditsLoading ? (
-                <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
-                </Animated.View>
+            {/* Row 1 holds the amount, and the toggle on a stacked card. Its
+                48 dp box carries `-my-[10px]`, so it reaches its touch target
+                without adding height: the row ends at the amount's own line and
+                the note below keeps the wide cells' 3.4 dp gap. On a wide card
+                the toggle is the row's sibling and the note stays in the
+                amount's column. */}
+            <View
+              className={cn(
+                'min-w-0',
+                // `flex-1` is the row's width share only while this View is the
+                // column's child on a wide card. On a stacked card this View is
+                // the amount row inside the column, where `flex-1` sets a 0
+                // vertical basis and the row measured 0 dp tall on the first
+                // layout pass (Android compact cell, 2026-11-03); the card's
+                // `items-stretch` already gives it the full width.
+                stackBalance ? 'flex-row items-center gap-1' : 'flex-1 gap-1'
+              )}
+            >
+              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
+              {stackBalance ? (
+                <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
               ) : (
-                expiringTotal > 0 &&
-                earliestExpiry != null && (
-                  <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                    <Text className="text-xs text-muted-foreground">
-                      {t('profile.bonusCreditsExpiring', {
-                        amount: formatMoney(expiringTotal, i18n.language),
-                        date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
-                      })}
-                    </Text>
-                  </Animated.View>
-                )
-              ))}
+                expirySlot
+              )}
+            </View>
+            {stackBalance ? expirySlot : visibilityToggle}
           </Animated.View>
-          <View className="max-w-full flex-row flex-wrap items-center gap-2">
-            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-            {selectedOrgId == null && (
-              <AddCreditsButton
-                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
-                onPress={() => {
-                  router.push('/(app)/credits' as Href);
-                }}
-              />
-            )}
-          </View>
+          {/* The purchase action keeps the card's trailing end in both
+              layouts: the trailing column on a wide card, its own row below
+              the note on a stacked one. */}
+          {addCreditsAction !== null && (
+            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
+              {addCreditsAction}
+            </View>
+          )}
         </View>
       )}
       {selectedOrgId != null &&
@@ -313,7 +393,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
+        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
       ) : null}
     </View>
   );

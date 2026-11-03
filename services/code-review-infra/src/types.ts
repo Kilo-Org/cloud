@@ -82,7 +82,7 @@ export interface CodeReview {
   totalTokensOut?: number;
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
-  skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
+  skipBalanceCheck?: boolean; // Skip the cloud agent balance check for a review that does not bill the Kilo balance
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;

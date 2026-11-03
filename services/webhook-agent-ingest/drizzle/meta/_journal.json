@@ -36,6 +36,20 @@
       "when": 1787867066482,
       "tag": "0004_bumpy_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792579956637,
+      "tag": "0005_open_morph",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792780347663,
+      "tag": "0006_noisy_daredevil",
+      "breakpoints": true
     }
   ]
 }

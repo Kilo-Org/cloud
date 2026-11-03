@@ -1,6 +1,8 @@
+import type { SessionId } from './types/ids.js';
+import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
-import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
@@ -9,6 +11,7 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
@@ -148,7 +151,7 @@ export const agentSandboxProviderSchema = z.enum(AGENT_SANDBOX_PROVIDERS);
 export type { AgentSandboxProvider };
 
 /** Unique identifier for a session within a sandbox */
-export type SessionId = `agent_${string}` | `workspace_${string}`;
+export type { SessionId } from './types/ids.js';
 
 export type SessionContext = {
   sandboxId: SandboxId;
@@ -266,7 +269,8 @@ type IssueGitHubSessionCapabilityResult =
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      /** Null means the request is forwarded anonymously. */
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';
@@ -518,6 +522,7 @@ export type GitTokenService = {
 };
 
 export type Env = {
+  AI?: Ai;
   CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
@@ -535,14 +540,16 @@ export type Env = {
   SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
+  VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
+  /** One environment build coordinator per repository environment id. */
+  ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -551,8 +558,6 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
-  /** Repository snapshot index for control-plane container starts; absent disables snapshots. */
-  REPO_SNAPSHOTS?: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -561,6 +566,14 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Optional until a downloaded target provisions its private artifact bucket. */
+  RUNTIME_RELEASE_BUCKET?: R2Bucket;
+  RUNTIME_STARTUP_MODE?: string;
+  NATIVE_RUNTIME_IMAGE?: string;
+  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  RUNTIME_INTERACTIVE_ORG_IDS?: string;
+  /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -579,8 +592,12 @@ export type Env = {
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;
+  /** Optional organization context for model catalog validation. */
+  KILOCODE_ORG_ID_OVERRIDE?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
+  /** Local-dev override for the scoped subagent-launch MCP endpoint; never set in deployed config */
+  CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
   /** Experimental default shell-tool timeout (ms) forwarded to the Kilo server */
@@ -608,14 +625,14 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
-  /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
-  CODE_REVIEW_CONTROL_PLANE_IDS?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
+  /** User or organization IDs enrolled in customer-paid Vercel compute. */
+  BYOC_VERCEL_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
-  /** Comma-separated user or org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
-  CONTAINER_REPO_SNAPSHOT_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).
@@ -626,18 +643,15 @@ export type Env = {
   TOOL_CGROUP_OOM_GROUP?: string;
   TOOL_CGROUP_CPU_WEIGHT?: string;
   TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
-  VERCEL_TOKEN?: string;
-  VERCEL_TEAM_ID?: string;
-  VERCEL_PROJECT_ID?: string;
-  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
-  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
-  VERCEL_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
+  /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
+  ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
+  SESSION_SNAPSHOT_ORG_IDS?: string;
+  SESSION_SNAPSHOT_USER_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */
@@ -668,6 +682,7 @@ export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
 
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
   userId: string;
   request: Request;

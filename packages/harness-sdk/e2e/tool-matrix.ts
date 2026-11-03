@@ -105,14 +105,14 @@ const tried = async (
   build: (kinds: readonly ApiKind[]) => Effect.Effect<Scored, unknown, never>
 ): Promise<Scored> => {
   const got = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       build(preferred).pipe(
         Effect.filterOrFail(decided, () => 'answered nothing at all' as const),
-        Effect.catchAll(() => build(['chat_completions']))
+        Effect.catch(() => build(['chat_completions']))
       )
     )
   );
-  return got._tag === 'Left' ? nothing : got.right;
+  return got._tag === 'Failure' ? nothing : got.success;
 };
 
 /* ---------------------------------------------------------------- question */

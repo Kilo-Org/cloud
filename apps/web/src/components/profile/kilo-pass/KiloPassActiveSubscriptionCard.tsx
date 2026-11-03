@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -47,6 +48,12 @@ export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSu
           <RenewInfoRow />
           <NextBillingDateRow />
           <BottomClarification />
+          <Link
+            href="/credits"
+            className="text-muted-foreground text-xs underline underline-offset-4"
+          >
+            View credit balances and expiration dates
+          </Link>
         </CardContent>
       </Card>
     </KiloPassSubscriptionInfoProvider>

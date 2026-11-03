@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
 import {
   enrollContributorChampion,
   getContributorChampionLeaderboard,
@@ -54,7 +55,7 @@ export const contributorChampionsRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  enroll: adminProcedure
+  enroll: creditManagerProcedure
     .input(
       z.object({
         contributorId: z.string().uuid(),
@@ -74,7 +75,7 @@ export const contributorChampionsRouter = createTRPCRouter({
       };
     }),
 
-  upgradeTier: adminProcedure
+  upgradeTier: creditManagerProcedure
     .input(
       z.object({
         contributorId: z.string().uuid(),
@@ -89,8 +90,8 @@ export const contributorChampionsRouter = createTRPCRouter({
       return {
         success: true,
         upgradedTier: result.upgradedTier,
-        creditDifferentialUsd: result.creditDifferentialUsd,
-        creditGranted: result.creditGranted,
+        creditGrantedUsd: result.creditGrantedUsd,
+        creditPendingUsd: result.creditPendingUsd,
       };
     }),
 
@@ -104,7 +105,7 @@ export const contributorChampionsRouter = createTRPCRouter({
       return searchKiloUsersByEmail(input.query);
     }),
 
-  manualEnroll: adminProcedure
+  manualEnroll: creditManagerProcedure
     .input(
       z.object({
         email: z.string().email(),

@@ -83,7 +83,7 @@ it('writes the columns the migration added to a session written before it', asyn
   );
 
   const read = await use(db, store =>
-    Effect.zipRight(
+    Effect.andThen(
       store.append({
         sessionId: 'ses_1',
         turns: [
@@ -221,7 +221,7 @@ it('refuses a turn whose session was never created', async () => {
 it('refuses a row the schema cannot explain rather than handing it back', async () => {
   const db = database();
   await use(db, store =>
-    Effect.zipRight(
+    Effect.andThen(
       store.create(session),
       store.append({
         sessionId: session.id,

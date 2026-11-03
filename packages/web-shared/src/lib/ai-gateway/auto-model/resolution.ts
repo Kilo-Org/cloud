@@ -1,4 +1,3 @@
-import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -9,17 +8,25 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import {
+  isCustomRouterModelId,
+  isVirtualAutoModelId,
+  parseCustomRouterModelId,
+  type AutoRoutingDecision,
+  type CustomRouterErrorCode,
+  type CustomRouterReference,
+} from '@kilocode/auto-routing-contracts';
+import {
+  CUSTOM_ROUTER_NOT_FOUND,
+  type CustomRouterResolution,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
 import {
   AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
-  modeSchema,
   KILO_AUTO_FRONTIER_MODEL,
-  FRONTIER_MODE_TO_MODEL,
-  FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -33,11 +40,9 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import {
-  findKiloExclusiveModel,
-  isKiloExclusiveFreeModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -49,7 +54,6 @@ import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 type ResolveAutoModelParams = {
   model: string;
   modeHeader: string | null;
-  featureHeader: FeatureValue | null;
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
@@ -57,6 +61,7 @@ type ResolveAutoModelParams = {
   // Decisions are lazy so only the selected router captures the request body.
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   frontierDecision?: () => Promise<AutoRoutingDecision | null>;
+  customRouterDecision?: (reference: CustomRouterReference) => Promise<CustomRouterResolution>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -64,22 +69,14 @@ type ResolveAutoModelParams = {
   }>;
 };
 
-function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
-  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
-  if (parsedMode.success) return parsedMode.data;
-  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
-  return null;
-}
-
 /**
  * Returns the eligible models for kilo-auto/free routing from the admin
  * configuration, falling back to `openrouter/free` when nothing is
  * configured, the configuration is invalid, or no configured model is eligible.
  *
- * Non-kilo-exclusive free models are only eligible when they appear in the
- * OpenRouter models cache. Kilo-exclusive free models are eligible when their
- * gateway supports the current `apiKind`; when `apiKind` is null no API-kind
- * filtering is applied.
+ * Other free models are only eligible when they appear in the OpenRouter
+ * models cache. Public custom LLMs are eligible when they serve the current `apiKind`; when `apiKind` is null no
+ * API-kind filtering is applied.
  */
 async function getEligibleAutoFreeModels(
   apiKind: GatewayRequest['kind'] | null
@@ -87,15 +84,15 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const openRouterModels = await getOpenRouterModelsFromDatabase();
+  const [openRouterModels, customLlmsById] = await Promise.all([
+    getOpenRouterModelsFromDatabase(),
+    getCustomLlmsById(),
+  ]);
   const eligibleModels = configuredModels.filter(({ model }) => {
-    if (!isAutoFreeEligibleModelId(model)) return false;
-    if (isKiloExclusiveFreeModel(model)) {
-      const kiloModel = findKiloExclusiveModel(model);
-      return (
-        kiloModel !== null &&
-        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
-      );
+    const customLlm = customLlmsById.get(model.toLowerCase());
+    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
+    if (customLlm) {
+      return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
     return openRouterModels.has(model);
   });
@@ -143,7 +140,9 @@ function resolveOrganizationAutoRouteTarget(
 export type ResolveAutoModelResult =
   | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
   | { kind: 'no_free_models_available' }
-  | { kind: 'organization_auto_configuration_error'; message: string };
+  | { kind: 'organization_auto_configuration_error'; message: string }
+  | { kind: 'custom_router_error'; code: CustomRouterErrorCode; message: string }
+  | { kind: 'auto_routing_unavailable' };
 
 async function resolveOrganizationAutoModel(
   params: ResolveAutoModelParams,
@@ -215,7 +214,10 @@ async function resolveOrganizationAutoModel(
     };
   }
 
-  if (isOrganizationAutoTargetModel(validation.modelId)) {
+  if (
+    isOrganizationAutoTargetModel(validation.modelId) ||
+    isCustomRouterModelId(validation.modelId)
+  ) {
     const nestedResult = await resolveAutoModel(
       {
         ...params,
@@ -239,22 +241,30 @@ async function resolveOrganizationAutoModel(
 
 /**
  * Resolve exact catalog variants, rejecting missing variants rather than
- * serving implicit defaults. Effort-only decisions support rolling deploys.
+ * serving implicit defaults.
  */
+export async function resolveCatalogVariant(
+  model: string,
+  variant: string | null
+): Promise<ResolvedAutoModel | null> {
+  if (variant === null) return { model };
+  const variants = await getModelVariants(model, true);
+  const variantSettings: OpenCodeVariant | undefined = variants?.[variant];
+  if (!variantSettings) {
+    return null;
+  }
+  return {
+    model,
+    ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
+    ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
+  };
+}
+
 async function resolveAutoRoutingDecisionModel(
   decision: AutoRoutingDecision
 ): Promise<ResolvedAutoModel | null> {
   if (decision.variant != null) {
-    const variants = await getModelVariants(decision.model, true);
-    const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
-    if (!variantSettings) {
-      return null;
-    }
-    return {
-      model: decision.model,
-      ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
-      ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
-    };
+    return await resolveCatalogVariant(decision.model, decision.variant);
   }
 
   // Legacy effort-only decisions (old workers during rolling deploy).
@@ -266,14 +276,40 @@ async function resolveAutoRoutingDecisionModel(
   };
 }
 
+async function resolveCustomRouterModel(
+  params: ResolveAutoModelParams,
+  reference: CustomRouterReference | null
+): Promise<ResolveAutoModelResult> {
+  const resolution =
+    reference && params.customRouterDecision
+      ? await params.customRouterDecision(reference)
+      : CUSTOM_ROUTER_NOT_FOUND;
+  if (resolution.kind === 'unavailable') return { kind: 'auto_routing_unavailable' };
+  if (resolution.kind === 'rejected') {
+    return { kind: 'custom_router_error', code: resolution.code, message: resolution.message };
+  }
+  const resolved = await resolveAutoRoutingDecisionModel(resolution.decision);
+  if (!resolved) {
+    return {
+      kind: 'custom_router_error',
+      code: 'custom_router_unavailable',
+      message: `The selected variant of ${resolution.decision.model} is not in the model catalog`,
+    };
+  }
+  return { kind: 'ok', resolved };
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {
-  const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
+  const { model, sessionId, apiKind, clientIp } = params;
   if (model === ORG_AUTO_MODEL.id) {
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
+  }
+  if (isCustomRouterModelId(model)) {
+    return await resolveCustomRouterModel(params, parseCustomRouterModelId(model));
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
     let candidates = await getEligibleAutoFreeModels(apiKind);
@@ -326,7 +362,14 @@ export async function resolveAutoModel(
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
-    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    let decision: AutoRoutingDecision | null = null;
+    if (params.efficientDecision) {
+      try {
+        decision = await params.efficientDecision();
+      } catch {
+        return { kind: 'auto_routing_unavailable' };
+      }
+    }
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveAutoRoutingDecisionModel(decision);
       if (resolvedFromDecision) {
@@ -348,11 +391,7 @@ export async function resolveAutoModel(
       }
     }
   }
-  const mode = resolveMode(modeHeader, featureHeader);
-  return {
-    kind: 'ok',
-    resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,
-  };
+  return { kind: 'auto_routing_unavailable' };
 }
 
 export async function applyResolvedAutoModel(
@@ -362,10 +401,13 @@ export async function applyResolvedAutoModel(
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {
   const result = await resolveAutoModel(params, userPromise, balancePromise);
-  if (result.kind !== 'ok') {
-    return result;
+  if (result.kind === 'ok') {
+    applyResolvedModel(request, result.resolved);
   }
-  const resolved = result.resolved;
+  return result;
+}
+
+export function applyResolvedModel(request: GatewayRequest, resolved: ResolvedAutoModel): void {
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
@@ -392,5 +434,4 @@ export async function applyResolvedAutoModel(
       request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
     }
   }
-  return result;
 }

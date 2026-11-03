@@ -6,9 +6,9 @@ export function findPreferenceRow(renderer: ReactTestRenderer): ReactTestInstanc
   const rows = renderer.root.findAll(
     node => typeof node.type === 'string' && (node.type as string) === 'PreferenceRow'
   );
-  const row = rows.find(item => item.props.title === 'Translate tool summaries');
+  const row = rows.find(item => item.props.title === 'Translate summaries');
   if (!row) {
-    throw new Error('PreferenceRow for Translate tool summaries not found');
+    throw new Error('PreferenceRow for Translate summaries not found');
   }
   return row;
 }

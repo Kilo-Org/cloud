@@ -1,4 +1,4 @@
-import { FiberRef } from 'effect';
+import { Context } from 'effect';
 
 /**
  * How many web searches one question may spend. Each search draws on the
@@ -18,4 +18,7 @@ export type QuestionSearches = { used: number };
  * question and a retry both start from zero. Outside an answer there is none,
  * and nothing is counted.
  */
-export const questionSearches = FiberRef.unsafeMake<QuestionSearches | undefined>(undefined);
+export const questionSearches = Context.Reference<QuestionSearches | undefined>(
+  'kilo/questionSearches',
+  { defaultValue: () => undefined }
+);

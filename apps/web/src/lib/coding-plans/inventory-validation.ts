@@ -105,7 +105,9 @@ async function validateBytePlusCodingPlanCredential(
   let output: Awaited<ReturnType<typeof generateText>>;
   try {
     output = await generateText({
-      model: createAiSdkProvider(byteplusCoding, apiKey)('bytedance-seed-code'),
+      model: (await createAiSdkProvider(byteplusCoding, apiKey, 'bytedance-seed-code'))(
+        'bytedance-seed-code'
+      ),
       prompt: 'Say hi',
       maxOutputTokens: 1,
     });

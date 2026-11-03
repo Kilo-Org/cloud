@@ -18,19 +18,25 @@ const SCHEMA_SQL = `
     error TEXT, engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL
   );
   CREATE TABLE scheduler_runs (run_id TEXT PRIMARY KEY);
+  CREATE TABLE benchmark_profiles (
+    router TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL,
+    engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL, invalidated_at TEXT
+  );
   CREATE TABLE case_results (
     run_id TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL,
     case_id TEXT NOT NULL, route_key TEXT, score REAL NOT NULL,
     latency_ms INTEGER NOT NULL, cost_usd REAL, error TEXT,
+    input_tokens INTEGER, cached_input_tokens INTEGER, output_tokens INTEGER, reasoning_tokens INTEGER,
     fallback_reason TEXT, route_hit INTEGER, retried INTEGER, exit_code INTEGER,
     output_prefix TEXT, event_count INTEGER, last_event_types TEXT,
-    rep INTEGER NOT NULL, timed_out INTEGER NOT NULL,
+    rep INTEGER NOT NULL, timed_out INTEGER NOT NULL, prompt_revision INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (run_id, model, variant, case_id, rep)
   );
   CREATE TABLE pending_decider_outputs (
     run_id TEXT NOT NULL REFERENCES benchmark_runs(id), model TEXT NOT NULL,
     variant TEXT NOT NULL, case_id TEXT NOT NULL, rep INTEGER NOT NULL,
-    payload TEXT NOT NULL, PRIMARY KEY (run_id, model, variant, case_id, rep)
+    payload TEXT NOT NULL, prompt_revision INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (run_id, model, variant, case_id, rep)
   );
 `;
 
@@ -117,6 +123,10 @@ function insertCase(
     score: 0.75,
     latency_ms: 123,
     cost_usd: 0.0123,
+    input_tokens: 120,
+    cached_input_tokens: 60,
+    output_tokens: 30,
+    reasoning_tokens: 10,
     error: null,
     fallback_reason: null,
     route_hit: null,
@@ -136,6 +146,10 @@ function pendingPayload(text: string): PendingDeciderOutput {
     result: {
       text,
       costUsd: 0.0234,
+      inputTokens: 240,
+      cachedInputTokens: 120,
+      outputTokens: 60,
+      reasoningTokens: 20,
       latencyMs: 456,
       exitCode: 0,
       stderrTail: 'diagnostic tail',
@@ -171,6 +185,8 @@ const reuseParams = {
   engineIdentity: 'dataset:engine',
   repetitions: 2,
   entries: [{ model: 'concrete/model', variant: 'high' }],
+  skipOldCaseIds: [],
+  promptRevision: 2,
 } as const;
 
 const gradedCaseResult: CaseResultRow = {
@@ -182,6 +198,10 @@ const gradedCaseResult: CaseResultRow = {
   score: 0.8,
   latency_ms: 123,
   cost_usd: 0.0123,
+  input_tokens: 120,
+  cached_input_tokens: 60,
+  output_tokens: 30,
+  reasoning_tokens: 10,
   error: null,
   fallback_reason: null,
   route_hit: null,
@@ -192,6 +212,7 @@ const gradedCaseResult: CaseResultRow = {
   last_event_types: '["text","completion"]',
   rep: 0,
   timed_out: 0,
+  prompt_revision: 2,
 };
 
 function results(db: DatabaseSync, runId: string) {
@@ -229,6 +250,12 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
 
     await upsertCaseResult(adapter.binding, gradedCaseResult);
     expect(results(sqlite, 'destination').map(row => row.score)).toEqual([0.8]);
+    expect(results(sqlite, 'destination')[0]).toMatchObject({
+      input_tokens: 120,
+      cached_input_tokens: 60,
+      output_tokens: 30,
+      reasoning_tokens: 10,
+    });
     const remaining = pending(sqlite, 'destination');
     expect(remaining).toHaveLength(3);
     expect(remaining.map(row => [row.case_id, row.variant, row.rep])).toEqual(
@@ -240,7 +267,20 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     );
 
     insertPending(sqlite, 'destination', 'graded');
-    await upsertCaseResult(adapter.binding, { ...gradedCaseResult, score: 0 });
+    await upsertCaseResult(adapter.binding, {
+      ...gradedCaseResult,
+      score: 0,
+      input_tokens: 0,
+      cached_input_tokens: null,
+      output_tokens: 50,
+      reasoning_tokens: 25,
+    });
+    expect(results(sqlite, 'destination')[0]).toMatchObject({
+      input_tokens: 0,
+      cached_input_tokens: null,
+      output_tokens: 50,
+      reasoning_tokens: 25,
+    });
     expect(results(sqlite, 'destination').map(row => row.score)).toEqual([0]);
     expect(pending(sqlite, 'destination')).toEqual(remaining);
   });
@@ -291,7 +331,14 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
       fallback_reason: 'preserved diagnostic',
       route_hit: 1,
     });
-    insertCase(sqlite, 'new-a', 'zero', { score: 0, cost_usd: null });
+    insertCase(sqlite, 'new-a', 'zero', {
+      score: 0,
+      cost_usd: null,
+      input_tokens: null,
+      cached_input_tokens: null,
+      output_tokens: null,
+      reasoning_tokens: null,
+    });
     insertCase(sqlite, 'new-a', 'retry', { error: 'CLI infrastructure failed', score: 0 });
     insertCase(sqlite, 'new-a', 'error', { error: '', score: 0 });
     insertCase(sqlite, 'new-a', 'timeout', { timed_out: 1 });
@@ -317,6 +364,12 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
       run_id: 'destination',
     });
     expect(copied.find(row => row.case_id === 'zero')?.cost_usd).toBeNull();
+    expect(copied.find(row => row.case_id === 'zero')).toMatchObject({
+      input_tokens: null,
+      cached_input_tokens: null,
+      output_tokens: null,
+      reasoning_tokens: null,
+    });
     expect(['old', 'new-a', 'new-z'].map(id => results(sqlite, id))).toEqual(sources);
     expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(0);
   });
@@ -398,6 +451,9 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     const timedOut = pendingPayload('timed out');
     timedOut.result.timedOut = true;
     insertPending(sqlite, 'new-z', 'timeout', JSON.stringify(timedOut));
+    const unavailable = pendingPayload('unavailable');
+    unavailable.result.unavailableModelId = 'concrete/model';
+    insertPending(sqlite, 'new-z', 'unavailable', JSON.stringify(unavailable));
     insertPending(sqlite, 'new-z', 'invalid-json', '{invalid');
     insertPending(sqlite, 'new-z', 'unrelated-json', '{"other":true}');
     const sourcePending = ['old', 'new-a', 'new-z'].map(id => pending(sqlite, id));
@@ -417,11 +473,51 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
         case_id: 'judge',
         rep: 0,
       })
-    ).toEqual(pendingPayload('new-z'));
+    ).toEqual({ ...pendingPayload('new-z'), promptRevision: 1 });
     expect(['old', 'new-a', 'new-z'].map(id => pending(sqlite, id))).toEqual(
       sourcePending.map(rows => rows.filter(row => row.case_id !== 'source-graded'))
     );
     expect(await reuseDeciderCaseResults(adapter.binding, reuseParams)).toBe(0);
+  });
+
+  it('copies older pending outputs and defaults missing token counts to null when loaded', async () => {
+    insertRun(sqlite, 'old', { status: 'failed' });
+    const legacyPayload = {
+      result: {
+        text: 'legacy output',
+        costUsd: null,
+        latencyMs: 456,
+        exitCode: 0,
+        stderrTail: '',
+        eventCount: 3,
+        lastEventTypes: ['text', 'completion'],
+        timedOut: false,
+      },
+      retried: false,
+    };
+    insertPending(sqlite, 'old', 'legacy', JSON.stringify(legacyPayload));
+
+    await reuseDeciderCaseResults(adapter.binding, reuseParams);
+
+    expect(
+      await getPendingDeciderOutput(adapter.binding, {
+        run_id: 'destination',
+        model: 'concrete/model',
+        variant: 'high',
+        case_id: 'legacy',
+        rep: 0,
+      })
+    ).toEqual({
+      ...legacyPayload,
+      result: {
+        ...legacyPayload.result,
+        inputTokens: null,
+        cachedInputTokens: null,
+        outputTokens: null,
+        reasoningTokens: null,
+      },
+      promptRevision: 1,
+    });
   });
 
   it('cleans legacy graded payloads only for the requested exact pair and full case key', async () => {

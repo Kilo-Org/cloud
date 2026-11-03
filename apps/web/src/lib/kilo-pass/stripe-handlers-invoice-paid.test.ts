@@ -41,7 +41,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, inArray } from 'drizzle-orm';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
 import { digestCardFingerprint } from '@/lib/kilo-pass/card-fingerprint-gate';
@@ -486,10 +486,12 @@ function attachSettledKiloPassLines(
               ],
         pricing: {
           type: 'price_details',
-          unit_amount_decimal: String(listProductMinor),
+          unit_amount_decimal: Stripe.Decimal.from(listProductMinor),
           price_details: { price: params.priceId, product: 'prod_kilo_pass' },
         },
         quantity: 1,
+        quantity_decimal: Stripe.Decimal.from(1),
+        subtotal: listProductMinor,
         subscription: null,
         taxes: null,
       } as Stripe.InvoiceLineItem,
@@ -519,6 +521,8 @@ function attachSettledKiloPassLines(
               ],
         pricing: null,
         quantity: 1,
+        quantity_decimal: Stripe.Decimal.from(1),
+        subtotal: listFeeMinor,
         subscription: null,
         taxes: null,
       } as Stripe.InvoiceLineItem,
@@ -530,20 +534,37 @@ function attachSettledKiloPassLines(
 function makeInvoicesListMock(params: {
   yearlyPeriodStartSeconds: number;
   yearlyPeriodEndSeconds: number;
-}): ReturnType<typeof jest.fn> {
+  tier?: KiloPassTier;
+  leadingLines?: Stripe.InvoiceLineItem[];
+  hasMore?: boolean;
+}) {
+  ensureKiloPassStripePriceIdEnv();
+  const priceId =
+    process.env[
+      `STRIPE_KILO_PASS_${(params.tier ?? KiloPassTier.Tier19).toUpperCase()}_YEARLY_PRICE_ID`
+    ];
+  if (!priceId) throw new Error('Missing yearly invoice fixture price');
+  const productLine = {
+    metadata: {},
+    pricing: { price_details: { price: priceId } },
+    parent: {
+      type: 'subscription_item_details',
+      subscription_item_details: { proration: false },
+    },
+    period: {
+      start: params.yearlyPeriodStartSeconds,
+      end: params.yearlyPeriodEndSeconds,
+    },
+  } as Stripe.InvoiceLineItem;
   return jest.fn(async () => ({
     data: [
       {
         id: `in_mock_yearly_${Math.random()}`,
         lines: {
-          data: [
-            {
-              period: {
-                start: params.yearlyPeriodStartSeconds,
-                end: params.yearlyPeriodEndSeconds,
-              },
-            },
-          ],
+          has_more: params.hasMore ?? false,
+          data: params.hasMore
+            ? (params.leadingLines ?? [])
+            : [...(params.leadingLines ?? []), productLine],
         },
       },
     ],
@@ -3283,145 +3304,180 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(baseTx[0]?.stripePaymentId).toBe(invoiceId);
   });
 
-  test('yearly: yearly→yearly tier upgrade issues remaining base credits within the current yearly cycle and releases the schedule', async () => {
-    const { handleKiloPassInvoicePaid } =
-      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+  test.each(['none', 'fee', 'proration', 'monthly', 'wrong-tier', 'paginated'] as const)(
+    'yearly: tier upgrade finds the annual product after %s lines and releases the schedule',
+    async leadingKind => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
-    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
 
-    const stripeSubId = `sub_${Math.random()}`;
-    const stripeScheduleId = `sched_${Math.random()}`;
-    const scheduledChangeId = randomUUID();
+      const stripeSubId = `sub_${Math.random()}`;
+      const stripeScheduleId = `sched_${Math.random()}`;
+      const scheduledChangeId = randomUUID();
 
-    const startedAt = '2024-01-01T00:00:00.000Z';
-    // Yearly cycle #2 started Jan 2025. By Apr 2025 (effectiveAt), 3 months of
-    // credits were issued (Jan, Feb, Mar). Remaining should be 12 - 3 = 9.
-    const effectiveAt = '2025-04-01T00:00:00.000Z';
+      const startedAt = '2024-01-01T00:00:00.000Z';
+      // Yearly cycle #2 started Jan 2025. By Apr 2025 (effectiveAt), 3 months of
+      // credits were issued (Jan, Feb, Mar). Remaining should be 12 - 3 = 9.
+      const effectiveAt = '2025-04-01T00:00:00.000Z';
 
-    const [sub] = await db
-      .insert(kilo_pass_subscriptions)
-      .values({
+      const [sub] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          provider_subscription_id: stripeSubId,
+          stripe_subscription_id: stripeSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Yearly,
+          status: 'active',
+          cancel_at_period_end: false,
+          started_at: startedAt,
+          ended_at: null,
+          current_streak_months: 0,
+          next_yearly_issue_at: '2025-04-01T00:00:00.000Z',
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+      if (!sub) throw new Error('Failed to insert subscription');
+
+      // Seed 3 monthly issuances in the current yearly cycle (Jan, Feb, Mar 2025)
+      for (const month of ['2025-01-01', '2025-02-01', '2025-03-01']) {
+        await seedBaseIssuance({
+          subscriptionId: sub.id,
+          kiloUserId: user.id,
+          issueMonth: month,
+          amountUsd: 19,
+        });
+      }
+
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
         kilo_user_id: user.id,
-        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Yearly,
-        status: 'active',
-        cancel_at_period_end: false,
-        started_at: startedAt,
-        ended_at: null,
-        current_streak_months: 0,
-        next_yearly_issue_at: '2025-04-01T00:00:00.000Z',
-      })
-      .returning({ id: kilo_pass_subscriptions.id });
-    if (!sub) throw new Error('Failed to insert subscription');
-
-    // Seed 3 monthly issuances in the current yearly cycle (Jan, Feb, Mar 2025)
-    for (const month of ['2025-01-01', '2025-02-01', '2025-03-01']) {
-      await seedBaseIssuance({
-        subscriptionId: sub.id,
-        kiloUserId: user.id,
-        issueMonth: month,
-        amountUsd: 19,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Yearly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Yearly,
+        stripe_schedule_id: stripeScheduleId,
+        effective_at: effectiveAt,
+        status: KiloPassScheduledChangeStatus.NotStarted,
       });
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        kiloPassScheduledChangeId: scheduledChangeId,
+      });
+
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_704_067_200, // 2024-01-01T00:00:00Z
+        metadata: meta,
+      });
+
+      const retrieve = jest.fn(async () => subscription);
+      const release = jest.fn(async (_scheduleId: string) => ({}));
+      const leadingPriceId = await getKiloPassPriceId({
+        tier: leadingKind === 'wrong-tier' ? KiloPassTier.Tier49 : KiloPassTier.Tier19,
+        cadence: leadingKind === 'monthly' ? KiloPassCadence.Monthly : KiloPassCadence.Yearly,
+      });
+      const isFee = leadingKind === 'fee' || leadingKind === 'paginated';
+      const leadingLines =
+        leadingKind === 'none'
+          ? []
+          : [
+              {
+                metadata: isFee ? buildServiceFeeLineMetadata('annual-upgrade-fee') : {},
+                pricing: { price_details: { price: isFee ? 'price_service_fee' : leadingPriceId } },
+                parent: isFee
+                  ? null
+                  : {
+                      type: 'subscription_item_details',
+                      subscription_item_details: { proration: leadingKind === 'proration' },
+                    },
+                period: isFee
+                  ? { start: 1_735_689_600, end: 1_735_776_000 }
+                  : { start: 1_733_011_200, end: 1_764_547_200 },
+              } as Stripe.InvoiceLineItem,
+            ];
+      const invoiceListParams = {
+        yearlyPeriodStartSeconds: 1_735_689_600,
+        yearlyPeriodEndSeconds: 1_767_225_600,
+        leadingLines,
+      };
+      const list = makeInvoicesListMock({
+        ...invoiceListParams,
+        hasMore: leadingKind === 'paginated',
+      });
+      const allLines = makeInvoicesListMock(invoiceListParams);
+      const stripe = {
+        subscriptions: {
+          retrieve,
+        },
+        subscriptionSchedules: {
+          release,
+        },
+        invoices: {
+          list,
+          listLineItems: jest.fn(async function* () {
+            const page = await allLines();
+            yield* page.data[0].lines.data;
+          }),
+        },
+      };
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+      });
+
+      const invoiceId = `inv_yearly_upgrade_${Math.random()}`;
+      const invoice = makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 49_00 * 12,
+        period_start_seconds: 1_743_465_600, // 2025-04-01T00:00:00Z
+        created_seconds: 1_743_465_600,
+        paid_seconds: 1_743_552_000, // 2025-04-02T00:00:00Z
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_test_yearly_upgrade',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
+
+      expect(release).toHaveBeenCalledWith(stripeScheduleId);
+
+      const scheduledChangeRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(scheduledChangeRow).toBeTruthy();
+      expect(scheduledChangeRow?.status).toBe(KiloPassScheduledChangeStatus.Released);
+      expect(scheduledChangeRow?.deleted_at).not.toBeNull();
+
+      const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+      const remainingTx = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+      });
+      expect(remainingTx).toBeTruthy();
+      expect(remainingTx?.amount_microdollars).toBe(171_000_000);
+
+      const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+        where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+      });
+      expect(remainingAuditLog?.action).toBe(KiloPassAuditLogAction.IssueYearlyRemainingCredits);
+      expect(remainingAuditLog?.stripe_event_id).toBe('evt_test_yearly_upgrade');
+      expect(remainingAuditLog?.payload_json).toEqual(
+        expect.objectContaining({
+          triggeringStripeInvoiceId: invoiceId,
+          remainingMonths: 9,
+        })
+      );
     }
-
-    await db.insert(kilo_pass_scheduled_changes).values({
-      id: scheduledChangeId,
-      kilo_user_id: user.id,
-      stripe_subscription_id: stripeSubId,
-      from_tier: KiloPassTier.Tier19,
-      from_cadence: KiloPassCadence.Yearly,
-      to_tier: KiloPassTier.Tier49,
-      to_cadence: KiloPassCadence.Yearly,
-      stripe_schedule_id: stripeScheduleId,
-      effective_at: effectiveAt,
-      status: KiloPassScheduledChangeStatus.NotStarted,
-    });
-
-    const meta = kiloPassMetadata({
-      kiloUserId: user.id,
-      tier: KiloPassTier.Tier49,
-      cadence: KiloPassCadence.Yearly,
-      kiloPassScheduledChangeId: scheduledChangeId,
-    });
-
-    const subscription = makeStripeSubscription({
-      id: stripeSubId,
-      start_date_seconds: 1_704_067_200, // 2024-01-01T00:00:00Z
-      metadata: meta,
-    });
-
-    const retrieve = jest.fn(async () => subscription);
-    const release = jest.fn(async (_scheduleId: string) => ({}));
-    // Yearly cycle started Jan 1 2025 (second year of subscription).
-    const list = makeInvoicesListMock({
-      yearlyPeriodStartSeconds: 1_735_689_600, // 2025-01-01T00:00:00Z
-      yearlyPeriodEndSeconds: 1_767_225_600, // 2026-01-01T00:00:00Z
-    });
-    const stripe = {
-      subscriptions: {
-        retrieve,
-      },
-      subscriptionSchedules: {
-        release,
-      },
-      invoices: {
-        list,
-      },
-    };
-
-    const priceId = await getKiloPassPriceId({
-      tier: KiloPassTier.Tier49,
-      cadence: KiloPassCadence.Yearly,
-    });
-
-    const invoiceId = `inv_yearly_upgrade_${Math.random()}`;
-    const invoice = makeStripeInvoice({
-      id: invoiceId,
-      amount_paid_cents: 49_00 * 12,
-      period_start_seconds: 1_743_465_600, // 2025-04-01T00:00:00Z
-      created_seconds: 1_743_465_600,
-      paid_seconds: 1_743_552_000, // 2025-04-02T00:00:00Z
-      priceId,
-      subscriptionIdOrExpanded: stripeSubId,
-      metadata: meta,
-    });
-
-    await handleKiloPassInvoicePaid({
-      eventId: 'evt_test_yearly_upgrade',
-      invoice,
-      stripe: stripe as unknown as Stripe,
-    });
-
-    expect(release).toHaveBeenCalledWith(stripeScheduleId);
-
-    const scheduledChangeRow = await db.query.kilo_pass_scheduled_changes.findFirst({
-      where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
-    });
-    expect(scheduledChangeRow).toBeTruthy();
-    expect(scheduledChangeRow?.status).toBe(KiloPassScheduledChangeStatus.Released);
-    expect(scheduledChangeRow?.deleted_at).not.toBeNull();
-
-    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
-      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
-    });
-    expect(remainingTx).toBeTruthy();
-    expect(remainingTx?.amount_microdollars).toBe(171_000_000);
-
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
-      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
-    });
-    expect(remainingAuditLog?.action).toBe(KiloPassAuditLogAction.IssueYearlyRemainingCredits);
-    expect(remainingAuditLog?.stripe_event_id).toBe('evt_test_yearly_upgrade');
-    expect(remainingAuditLog?.payload_json).toEqual(
-      expect.objectContaining({
-        triggeringStripeInvoiceId: invoiceId,
-        remainingMonths: 9,
-      })
-    );
-  });
+  );
 
   test('yearly: upgrade invoice appearing in invoices.list does not match as the billing cycle invoice (regression #1274)', async () => {
     // Stripe returns invoices newest-first from invoices.list. When a yearly
@@ -3527,6 +3583,14 @@ describe('handleKiloPassInvoicePaid', () => {
           lines: {
             data: [
               {
+                metadata: {},
+                pricing: {
+                  price_details: { price: process.env.STRIPE_KILO_PASS_TIER_19_YEARLY_PRICE_ID },
+                },
+                parent: {
+                  type: 'subscription_item_details',
+                  subscription_item_details: { proration: false },
+                },
                 period: {
                   start: originalYearlyPeriodStart,
                   end: originalYearlyPeriodEnd,
@@ -4242,6 +4306,7 @@ describe('handleKiloPassInvoicePaid', () => {
     const release = jest.fn(async (_scheduleId: string) => ({}));
     // The tier_49 yearly cycle started Mar 2025 (after first uptier reset the anchor).
     const list = makeInvoicesListMock({
+      tier: KiloPassTier.Tier49,
       yearlyPeriodStartSeconds: 1_740_787_200, // 2025-03-01
       yearlyPeriodEndSeconds: 1_772_323_200, // 2026-03-01
     });

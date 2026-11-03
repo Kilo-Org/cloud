@@ -6,9 +6,11 @@ import {
   type RemoteMcpClientDeps,
   type RemoteMcpError,
 } from './index.js';
+import { uiResourceUriOf } from './server.js';
 import { defaultCallTimeoutMs } from './http.js';
 import {
   callOf,
+  chartApp,
   deps,
   noTools,
   only,
@@ -104,7 +106,7 @@ describe('a remote server that says no', () => {
 describe('a call', () => {
   it('keeps its default deadline past the time it is waited on inline', async () => {
     const offered = await run(remoteMcpTools(serverFor('work', fixture.url, token), deps()));
-    const inline = Duration.toMillis(Duration.decode(only(offered).inlineFor ?? 0));
+    const inline = Duration.toMillis(Duration.fromInputUnsafe(only(offered).inlineFor ?? 0));
     expect(inline).toBeGreaterThan(0);
     expect(defaultCallTimeoutMs).toBeGreaterThan(inline);
   });
@@ -131,6 +133,72 @@ describe('a call', () => {
     const offered = await run(remoteMcpTools(serverFor('work', refusing.url, ''), deps()));
     const failed = await run(Effect.flip(only(offered).run(callOf('mcp_work_deny', '{}'))));
     expect(String(failed.cause)).toBe('the file is not there');
+  });
+});
+
+describe('a tool with an MCP Apps view', () => {
+  it('carries the server’s metadata through discovery, and reads the uri off it', async () => {
+    const served = await serve(chartApp);
+    const tools = await run(remoteMcpClient(serverFor('work', served.url, token), deps()).tools);
+    expect(tools[0]?._meta).toEqual({ ui: { resourceUri: 'ui://work/chart.html' } });
+    expect(uiResourceUriOf({ _meta: tools[0]?._meta })).toBe('ui://work/chart.html');
+  });
+
+  it('reads the deprecated flat metadata the same way', () => {
+    expect(uiResourceUriOf({ _meta: { 'ui/resourceUri': 'ui://work/old.html' } })).toBe(
+      'ui://work/old.html'
+    );
+  });
+
+  it('reads no view where the server named none', () => {
+    expect(uiResourceUriOf({ _meta: undefined })).toBeUndefined();
+    expect(uiResourceUriOf({ _meta: {} })).toBeUndefined();
+  });
+
+  it('reads no view out of metadata that names something else', () => {
+    expect(
+      uiResourceUriOf({ _meta: { 'ui/resourceUri': 'https://work/chart.html' } })
+    ).toBeUndefined();
+  });
+
+  it('keeps the model-facing tool untouched by any of it', async () => {
+    const served = await serve(chartApp);
+    const offered = await run(remoteMcpTools(serverFor('work', served.url, token), deps()));
+    const first = only(offered);
+    expect(first.definition.name).toBe('mcp_work_draw-chart');
+    expect(first.definition.parameters).toEqual(schema);
+    expect(first.definition.description).toBe('Draws a chart.');
+  });
+});
+
+describe('reading a resource off a remote server', () => {
+  it('answers the view the uri names, with the credential sent', async () => {
+    const served = await serve(chartApp);
+    served.seen.authorization.length = 0;
+    const read = await run(
+      remoteMcpClient(serverFor('work', served.url, token), deps()).resource('ui://work/chart.html')
+    );
+    expect(read).toEqual({
+      uri: 'ui://work/chart.html',
+      mimeType: 'text/html;profile=mcp-app',
+      text: '<h1>chart</h1>',
+      blob: undefined,
+      _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, permissions: {} } },
+    });
+    expect(served.seen.authorization).toContain(`Bearer ${token}`);
+  });
+
+  it('fails the read, not the session, when the server has no such resource', async () => {
+    const served = await serve(chartApp);
+    const error = await run(
+      Effect.flip(
+        remoteMcpClient(serverFor('work', served.url, token), deps()).resource(
+          'ui://work/gone.html'
+        )
+      )
+    );
+    expect(error.kind).toBe('protocol');
+    expect(error.serverId).toBe('work');
   });
 });
 

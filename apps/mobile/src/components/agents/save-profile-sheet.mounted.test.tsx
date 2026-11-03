@@ -6,6 +6,8 @@ import '@/i18n';
 import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
@@ -28,9 +30,29 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({ Lock: 'Lock' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: unknown) => {
+      confirmMock.current(request);
+    },
+    dialog: null,
+  }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
+
+const confirmMock = vi.hoisted(() => ({
+  current: (_request: unknown): void => undefined,
+}));
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
 
 function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSheetProps {
   return {
@@ -94,7 +116,7 @@ describe('SaveProfileSheet', () => {
     const renderer = mount();
 
     expect(header(renderer).props.title).toBe('Save as Profile');
-    expect(texts(renderer)).toContain('2 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
     expect(texts(renderer)).toContain('Secrets are encrypted before storage.');
     expect(renderer.root.findByType('Lock' as never)).toBeTruthy();
   });
@@ -106,14 +128,14 @@ describe('SaveProfileSheet', () => {
     expect(renderer.root.findAllByType('Lock' as never)).toHaveLength(0);
   });
 
-  it('refuses an empty name with the required error and creates nothing', async () => {
+  it('refuses an empty name with the profile copy and creates nothing', async () => {
     const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     const renderer = mount({ onSave });
 
     await submit(renderer);
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(field(renderer, 'Profile name').props.error).toBe('required');
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
   });
 
   it('refuses an over-long name with the matching error', async () => {
@@ -129,6 +151,29 @@ describe('SaveProfileSheet', () => {
 
     expect(onSave).not.toHaveBeenCalled();
     expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
+  });
+
+  it('follows the typed name after a refused submit, without waiting for another', async () => {
+    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const renderer = mount({ onSave });
+    const type = (value: string) => {
+      act(() => {
+        (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)(value);
+      });
+    };
+
+    await submit(renderer);
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
+
+    type('x'.repeat(101));
+    expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
+
+    type('My AWS');
+    expect(field(renderer, 'Profile name').props.error).toBeUndefined();
+
+    type('');
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('saves the trimmed fields and closes on success', async () => {
@@ -170,5 +215,45 @@ describe('SaveProfileSheet', () => {
     // The sheet is still mounted with the same field instance, so the typed
     // name is still on screen.
     expect(field(renderer, 'Profile name')).toBeTruthy();
+  });
+
+  it('closes an untouched sheet without asking', () => {
+    const onClose = vi.fn<() => void>();
+    const confirm = vi.fn();
+    confirmMock.current = request => {
+      confirm(request);
+    };
+    const renderer = mount({ onClose });
+
+    const onCancel = voidHandler(header(renderer).props.onCancel);
+    act(() => {
+      onCancel();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('asks before Cancel drops a half-typed profile', () => {
+    const onClose = vi.fn<() => void>();
+    const confirm = vi.fn();
+    confirmMock.current = request => {
+      confirm(request);
+    };
+    const renderer = mount({ onClose });
+
+    act(() => {
+      (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)('My AWS');
+      (header(renderer).props.onCancel as () => void)();
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Discard changes?',
+      message: 'Your changes will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
   });
 });

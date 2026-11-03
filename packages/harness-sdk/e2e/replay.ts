@@ -51,12 +51,15 @@ interface Answer {
 }
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: 4000 }), { said: '', thought: '' }, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'reasoning'
-        ? { ...held, thought: held.thought + event.text }
-        : held
+  Stream.runFold(
+    session.ask(text, { maxTokens: 4000 }),
+    () => ({ said: '', thought: '' }),
+    (held, event) =>
+      event.kind === 'delta'
+        ? { ...held, said: held.said + event.text }
+        : event.kind === 'reasoning'
+          ? { ...held, thought: held.thought + event.text }
+          : held
   );
 
 /**
@@ -94,7 +97,7 @@ const through = async (kind: ApiKind) => {
   );
 
   const reopened = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       Effect.scoped(
         Effect.provide(
           Effect.gen(function* () {
@@ -118,19 +121,19 @@ for (const { kind, seals } of shapes) {
   const { opened, reopened } = await through(kind);
   const written = sealOf(opened.parts);
 
-  if (reopened._tag === 'Left') {
+  if (reopened._tag === 'Failure') {
     console.log(`${kind.padEnd(18)}${String(written?.length ?? 'none').padEnd(14)}FAILED`);
     /* The whole point of the run. A seal the provider will not take back is a
        session that cannot be continued at all. */
-    fail(`${kind}: the reopened session was refused: ${why(reopened.left)}`);
+    fail(`${kind}: the reopened session was refused: ${why(reopened.failure)}`);
     continue;
   }
 
-  const read = sealOf(reopened.right.loaded);
+  const read = sealOf(reopened.success.loaded);
   console.log(
     `${kind.padEnd(18)}${String(written?.length ?? 'none').padEnd(14)}` +
       `${String(read?.length ?? 'none').padEnd(11)}` +
-      JSON.stringify(reopened.right.answer.said.slice(0, 28))
+      JSON.stringify(reopened.success.answer.said.slice(0, 28))
   );
 
   if (seals && written === undefined) {
@@ -139,13 +142,13 @@ for (const { kind, seals } of shapes) {
   if (read !== written) {
     fail(`${kind}: the seal read back is not the seal that was written`);
   }
-  if (seals && reopened.right.loaded.length !== opened.parts.length) {
+  if (seals && reopened.success.loaded.length !== opened.parts.length) {
     fail(
-      `${kind}: the store gave back ${String(reopened.right.loaded.length)} reasoning parts ` +
+      `${kind}: the store gave back ${String(reopened.success.loaded.length)} reasoning parts ` +
         `where ${String(opened.parts.length)} were written`
     );
   }
-  if (reopened.right.answer.said.length === 0) {
+  if (reopened.success.answer.said.length === 0) {
     fail(`${kind}: the reopened session answered with nothing`);
   }
 }

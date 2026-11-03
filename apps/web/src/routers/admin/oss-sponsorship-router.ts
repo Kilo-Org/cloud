@@ -20,6 +20,7 @@ import {
 } from '@kilocode/web-shared/lib/email';
 import { getAcceptInviteUrl } from '@kilocode/web-shared/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { TRPCError } from '@trpc/server';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
@@ -247,6 +248,19 @@ export const ossSponsorshipRouter = createTRPCRouter({
       for (const row of input) {
         const result = await processOssRow(ctx.user, row);
         results.push(result);
+        if (result.success && result.orgId) {
+          await recordAdminAction(ctx, {
+            action: 'oss_sponsorship.enroll',
+            target: organizationActionTarget(result.orgId),
+            message: `Created OSS sponsorship organization (tier ${row.tier})`,
+            metadata: {
+              source: 'csv',
+              githubUrl: row.githubUrl,
+              tier: row.tier,
+              initialCreditsUsd: row.creditsDollars,
+            },
+          });
+        }
       }
 
       return results;
@@ -545,6 +559,21 @@ export const ossSponsorshipRouter = createTRPCRouter({
             });
           }
         }
+      });
+
+      await recordAdminAction(ctx, {
+        action: 'oss_sponsorship.enroll',
+        target: organizationActionTarget(organizationId),
+        message: `Enrolled existing organization in OSS sponsorship (tier ${tier})`,
+        metadata: {
+          source: 'existing_organization',
+          tier,
+          previousPlan: existingOrg.plan,
+          previousRequireSeats: existingOrg.require_seats,
+          monthlyTopUpUsd: monthlyTopUpDollars,
+          initialCreditsUsd: addInitialGrant ? monthlyTopUpDollars : 0,
+          ownerEmailRequested: sendEmail,
+        },
       });
 
       // Send email to org owners if requested

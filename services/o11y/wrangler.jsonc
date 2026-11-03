@@ -55,8 +55,8 @@
    *     o11y_api_metrics_pipeline o11y_api_metrics_sink
    */
   "pipelines": [
-    { "pipeline": "70379355c2d741fc8b4527e69b501f52", "binding": "API_METRICS_STREAM" },
-    { "pipeline": "82c1fc4073bb4830a6670e920b9823c2", "binding": "SESSION_METRICS_STREAM" },
+    { "stream": "70379355c2d741fc8b4527e69b501f52", "binding": "API_METRICS_STREAM" },
+    { "stream": "82c1fc4073bb4830a6670e920b9823c2", "binding": "SESSION_METRICS_STREAM" },
   ],
   /**
    * KV Namespace — stores alert cooldown and lifecycle state

@@ -34,6 +34,7 @@ const EXPORT_ROLES_SQL = sql.join(
  *
  * Aliases are prefixed so the fragment can be embedded in a query that already names
  * `organizations` or `organization_memberships` without colliding.
+ * Inherited access requires an active parent organization; direct access is independent.
  *
  * Soft-deleted organizations are excluded here rather than at each call site:
  * membership rows outlive the organization, so without it a former admin could still
@@ -53,9 +54,12 @@ export function organizationExportAccess(input: { kiloUserId: string; organizati
         )
         OR EXISTS (
           SELECT 1 FROM organization_memberships export_access_parent
+          JOIN organizations export_access_parent_org
+            ON export_access_parent_org.id = export_access_parent.organization_id
           WHERE export_access_parent.organization_id = export_access_org.parent_organization_id
             AND export_access_parent.kilo_user_id = ${input.kiloUserId}
             AND export_access_parent.role IN (${EXPORT_ROLES_SQL})
+            AND export_access_parent_org.deleted_at IS NULL
         )
       )
   )`;

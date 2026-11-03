@@ -10,7 +10,8 @@
 // remain mounted.
 
 import { type PrIdentity } from './diff-selection-bridge';
-import { prFileNavSlot, prRouteKey } from '../route-registry';
+import { prFileNavSlot, prRouteKey, type RouteKey } from '../route-registry';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 export type FileNavigatorRequest = PrIdentity & {
   path: string;
@@ -18,8 +19,21 @@ export type FileNavigatorRequest = PrIdentity & {
 
 type Listener = (request: FileNavigatorRequest) => void;
 
+/**
+ * The bridge slot key for one PR identity: the same provider-scoped key the
+ * diff-selection bridge uses, so every slot resolves under the full provider
+ * identity (rule 17).
+ */
+function navigatorRouteKey(pr: PrIdentity): RouteKey {
+  const legacy = prRouteKey(pr);
+  if (!pr.ref || pr.ref.platform === 'github') {
+    return legacy;
+  }
+  return `${legacy}@${providerPrRefKey(pr.ref)}`;
+}
+
 export function requestScrollToFile(request: FileNavigatorRequest) {
-  const listeners = prFileNavSlot.get(prRouteKey(request));
+  const listeners = prFileNavSlot.get(navigatorRouteKey(request));
   if (!listeners) {
     return;
   }
@@ -29,7 +43,7 @@ export function requestScrollToFile(request: FileNavigatorRequest) {
 }
 
 export function subscribeFileNavigatorRequest(pr: PrIdentity, listener: Listener): () => void {
-  const routeKey = prRouteKey(pr);
+  const routeKey = navigatorRouteKey(pr);
   const existing = prFileNavSlot.get(routeKey);
   if (existing) {
     existing.add(listener);

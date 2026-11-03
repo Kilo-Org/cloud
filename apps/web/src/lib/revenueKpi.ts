@@ -2,6 +2,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { promoCreditCategories } from '@kilocode/web-shared/lib/promoCreditCategories';
 import { has_Payment } from '@kilocode/web-shared/lib/promoCustomerRequirement';
 import { sql } from 'drizzle-orm';
+import {
+  isPaidCreditReportingSql,
+  paidCreditPrincipalSql,
+} from '@kilocode/web-shared/lib/paidCreditReporting';
 
 const coreMultiplierCategories = [
   'multiplier-promo',
@@ -61,7 +65,11 @@ export async function getRevenueKpiData(
 ): Promise<RevenueKpiResponse> {
   const multiplierCategories = getMultiplierCategories(includeFirstTopupCategories);
   const query = sql`
-    WITH ranked_paid_multiplier_transactions AS (
+    WITH credit_rows AS (
+        SELECT *, ${isPaidCreditReportingSql} AS is_paid_reporting,
+            ${paidCreditPrincipalSql} AS paid_principal
+        FROM public.credit_transactions
+    ), ranked_paid_multiplier_transactions AS (
         SELECT
             pt.*,
             ft.id AS free_id,
@@ -71,7 +79,7 @@ export async function getRevenueKpiData(
                 PARTITION BY pt.id
                 ORDER BY pt.created_at DESC
             ) AS match_rank
-        FROM public.credit_transactions AS pt
+        FROM credit_rows AS pt
         JOIN public.credit_transactions AS ft
             ON ft.kilo_user_id = pt.kilo_user_id
             AND ft.is_free = true
@@ -81,7 +89,7 @@ export async function getRevenueKpiData(
               multiplierCategories.map(c => sql`${c}`),
               sql`, `
             )})
-        WHERE pt.is_free = false AND pt.amount_microdollars > 0
+        WHERE pt.is_paid_reporting AND pt.paid_principal > 0
     ),
     paid_but_multiplied_by_date AS (
         SELECT
@@ -96,9 +104,9 @@ export async function getRevenueKpiData(
         SELECT
             (pt.created_at)::date AS transaction_day,
             COUNT(*) AS transaction_count,
-            SUM(pt.amount_microdollars) / 1000000.0 AS total_dollars
-        FROM public.credit_transactions pt
-        WHERE pt.is_free = false
+            SUM(pt.paid_principal) / 1000000.0 AS total_dollars
+        FROM credit_rows pt
+        WHERE pt.is_paid_reporting
         GROUP BY transaction_day
     ),
     free_by_date AS (
@@ -107,7 +115,7 @@ export async function getRevenueKpiData(
             COUNT(*) AS transaction_count,
             SUM(ft.amount_microdollars) / 1000000.0 AS total_dollars
         FROM public.credit_transactions ft
-        WHERE ft.is_free = true
+        WHERE ft.is_free = true AND ft.paid_credit_policy IS NULL
         GROUP BY transaction_day
     ),
     service_fee_by_date AS (

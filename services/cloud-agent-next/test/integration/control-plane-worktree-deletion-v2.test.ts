@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -13,7 +14,7 @@ import {
   WorktreeDeletionIncompleteError,
 } from '../../src/control-plane/sandbox/worktree-deletion.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import type {
@@ -27,6 +28,7 @@ import {
   type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -81,7 +83,7 @@ function metadata(input: {
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -123,7 +125,7 @@ function createFakeProvider(): FakeProvider {
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -157,6 +159,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -351,6 +354,16 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
       kiloSessionId: kilo,
     } = await startConnectedSandbox();
 
+    await runInDurableObject(sandbox, (_instance, state) => {
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_changes`, { sentinel: true });
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_file:changed.txt`, {
+        sentinel: true,
+      });
+      state.storage.kv.put('worktree_changes/another-worktree/worktree_changes', {
+        sentinel: true,
+      });
+    });
+
     const result = await sandbox.deleteWorktreeResources(
       deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
     );
@@ -358,6 +371,14 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
     expect(provider.stopCalls).toHaveLength(1);
     expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      expect(
+        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktree}/` }))
+      ).toEqual([]);
+      expect(state.storage.kv.get('worktree_changes/another-worktree/worktree_changes')).toEqual({
+        sentinel: true,
+      });
+    });
     await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });

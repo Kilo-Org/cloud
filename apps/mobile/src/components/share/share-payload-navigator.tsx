@@ -9,6 +9,7 @@ import {
   shareDeliveryShareId,
   takePendingShareNavigation,
 } from '@/lib/share-navigation';
+import { useRootNavigationReady } from '@/lib/navigation-ready';
 
 /**
  * Invisible mount: when a pending share navigation exists and the gate route
@@ -16,15 +17,25 @@ import {
  * - Target not focused → router.push(href)
  * - Target already focused → router.setParams({ shareId, organizationId }) only
  * Never cross-presentation replace; back stack stays intact.
+ *
+ * Both `push` and `setParams` reach the readiness assert (queued ROUTER_LINK
+ * drains through getNavigateAction; setParams asserts directly), so both wait
+ * for the container's ready bit — the same `useRootNavigationReady` gate the
+ * root layout uses. A taken request is consumed by the effect once the gate
+ * opens; nothing re-fires it.
  */
 export function SharePayloadNavigator(): null {
   const router = useRouter();
   const pathname = usePathname();
   const rootState = useRootNavigationState();
+  const navigationReady = useRootNavigationReady();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
 
   useEffect(() => {
+    if (!navigationReady) {
+      return;
+    }
     if (navigationContainsShareGate(rootState)) {
       return;
     }
@@ -35,7 +46,7 @@ export function SharePayloadNavigator(): null {
     }
 
     deliver(pending, router, pathnameRef.current);
-  }, [rootState, router]);
+  }, [navigationReady, rootState, router]);
 
   return null;
 }

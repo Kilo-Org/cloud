@@ -6,7 +6,10 @@
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 
-import { dispatchQueuedBouncerCreditEvents } from '@/lib/bouncer/dispatch-credit-event-outbox';
+import {
+  deliverBouncerCreditEventNow,
+  dispatchQueuedBouncerCreditEvents,
+} from '@/lib/bouncer/dispatch-credit-event-outbox';
 import { deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -174,5 +177,61 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
       .from(bouncer_credit_event_outbox)
       .where(eq(bouncer_credit_event_outbox.status, 'pending'));
     expect(pending).toHaveLength(1);
+  });
+});
+
+describe('deliverBouncerCreditEventNow', () => {
+  beforeEach(async () => {
+    await db.delete(bouncer_credit_event_outbox).where(sql`true`);
+    mockDeliver.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(bouncer_credit_event_outbox).where(sql`true`);
+  });
+
+  async function rowFor(eventId: string) {
+    const [row] = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, eventId));
+    return row;
+  }
+
+  it('claims and delivers the row for the event id', async () => {
+    await insertPending({ event_id: 'charge:ch_immediate' });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    await expect(deliverBouncerCreditEventNow('charge:ch_immediate')).resolves.toBe(true);
+
+    expect(mockDeliver).toHaveBeenCalledWith(expect.objectContaining({ type: 'charge.failed' }));
+    expect((await rowFor('charge:ch_immediate'))?.status).toBe('delivered');
+  });
+
+  it('leaves a failed delivery to the cron drainer', async () => {
+    await insertPending({ event_id: 'charge:ch_retry' });
+    mockDeliver.mockResolvedValue({
+      delivered: false,
+      permanent: false,
+      status: 503,
+      error: 'http_503',
+    });
+
+    await expect(deliverBouncerCreditEventNow('charge:ch_retry')).resolves.toBe(false);
+
+    const row = await rowFor('charge:ch_retry');
+    expect(row?.status).toBe('pending');
+    expect(row?.attempts).toBe(1);
+  });
+
+  it('reports no delivery for a row the cron drainer holds', async () => {
+    await insertPending({
+      event_id: 'charge:ch_claimed',
+      status: 'sending',
+      claimed_at: new Date().toISOString(),
+    });
+
+    await expect(deliverBouncerCreditEventNow('charge:ch_claimed')).resolves.toBe(false);
+    expect(mockDeliver).not.toHaveBeenCalled();
   });
 });

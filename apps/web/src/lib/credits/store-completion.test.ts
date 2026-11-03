@@ -141,6 +141,53 @@ async function balanceOf(userId: string): Promise<number> {
 }
 
 describe('completeStoreCreditPurchase', () => {
+  it.each([
+    {
+      provider: KiloPassPaymentProvider.AppStore,
+      terms: 'one_year' as const,
+      policy: 'apple_exempt',
+      expiry: null,
+      source: 'apple',
+    },
+    {
+      provider: KiloPassPaymentProvider.GooglePlay,
+      terms: 'legacy' as const,
+      policy: 'legacy',
+      expiry: null,
+      source: 'google_play',
+    },
+    {
+      provider: KiloPassPaymentProvider.GooglePlay,
+      terms: 'one_year' as const,
+      policy: 'one_year',
+      expiry: '2029-02-28T09:00:00.000Z',
+      source: 'google_play',
+    },
+  ])(
+    'persists immutable $policy provider policy',
+    async ({ provider, terms, policy, expiry, source }) => {
+      const user = await insertTestUser();
+      const result = await completeStoreCreditPurchase({
+        user,
+        purchase: purchase({
+          paymentProvider: provider,
+          purchasedAtIso: '2028-02-29T09:00:00.000Z',
+          paidCreditTerms: terms,
+        }),
+      });
+      const row = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.id, result.creditTransactionId ?? ''),
+      });
+      expect(row).toMatchObject({
+        paid_credit_policy: policy,
+        credit_source: source,
+        amount_microdollars: 10_000_000,
+      });
+      expect(row?.expiry_date == null ? null : new Date(row.expiry_date).toISOString()).toBe(
+        expiry
+      );
+    }
+  );
   it('grants the catalog amount with the store idempotency key', async () => {
     const user = await insertTestUser();
     const providerTransactionId = `tx-${crypto.randomUUID()}`;

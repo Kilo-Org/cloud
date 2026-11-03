@@ -1,4 +1,4 @@
-import { type PushData } from '@kilocode/notifications';
+import { type PushData } from '@kilocode/notifications/schemas';
 
 import { chatConversationRoute, chatSandboxRoute } from './kilo-chat-routes';
 import { providerPrRoutePath } from './pr-review/provider-pr-ref';
@@ -29,6 +29,9 @@ export function notificationPathForData(data: PushData): string {
   // `via=push` marks the resulting session_viewed analytics event as
   // push-originated.
   switch (data.type) {
+    case 'agent_briefing': {
+      return '/(app)/agent-briefing?via=push';
+    }
     case 'cloud_agent_session': {
       return `/(app)/agent-chat/${data.cliSessionId}?via=push`;
     }

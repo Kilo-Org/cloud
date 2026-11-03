@@ -1,4 +1,5 @@
 import {
+  assertEncryptedEnvelope,
   decryptWithPrivateKey,
   encryptWithPublicKey,
   EncryptionConfigurationError,
@@ -6,9 +7,11 @@ import {
   type EncryptedEnvelope,
 } from './encryption';
 
+export const KEYED_ENVELOPE_VERSION = 1;
+
 export type KeyedEnvelope<Scheme extends string = string> = {
   scheme: Scheme;
-  version: 1;
+  version: typeof KEYED_ENVELOPE_VERSION;
   keyId: string;
   ciphertext: EncryptedEnvelope;
 };
@@ -55,7 +58,7 @@ export function parseKeyedEnvelope<Scheme extends string>(
     throw new EncryptionFormatError('Invalid keyed envelope: unsupported scheme');
   }
 
-  if (!('version' in parsed) || parsed.version !== 1) {
+  if (!('version' in parsed) || parsed.version !== KEYED_ENVELOPE_VERSION) {
     throw new EncryptionFormatError('Invalid keyed envelope: unsupported version');
   }
 
@@ -63,15 +66,14 @@ export function parseKeyedEnvelope<Scheme extends string>(
     throw new EncryptionFormatError('Invalid keyed envelope: missing keyId');
   }
 
-  if (!('ciphertext' in parsed) || !isEncryptedEnvelope(parsed.ciphertext)) {
-    throw new EncryptionFormatError('Invalid keyed envelope: malformed ciphertext');
-  }
+  const ciphertext = 'ciphertext' in parsed ? parsed.ciphertext : undefined;
+  assertEncryptedEnvelope(ciphertext);
 
   return {
     scheme: expectedScheme,
-    version: 1,
+    version: KEYED_ENVELOPE_VERSION,
     keyId: parsed.keyId,
-    ciphertext: parsed.ciphertext,
+    ciphertext,
   };
 }
 
@@ -87,7 +89,7 @@ export function encryptKeyedEnvelope<Scheme extends string>(
 
   return serializeKeyedEnvelope({
     scheme,
-    version: 1,
+    version: KEYED_ENVELOPE_VERSION,
     keyId: activeKey.keyId,
     ciphertext: encryptWithPublicKey(value, activeKey.publicKeyPem, aad),
   });
@@ -122,23 +124,4 @@ function selectPrivateKey(keyId: string, keys: EnvelopePrivateKeySlots): Envelop
   }
 
   throw new EncryptionFormatError(`Unknown keyed envelope key ID: ${keyId}`);
-}
-
-function isEncryptedEnvelope(value: unknown): value is EncryptedEnvelope {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-
-  return (
-    'algorithm' in value &&
-    value.algorithm === 'rsa-aes-256-gcm' &&
-    'version' in value &&
-    value.version === 1 &&
-    'encryptedData' in value &&
-    typeof value.encryptedData === 'string' &&
-    value.encryptedData.length > 0 &&
-    'encryptedDEK' in value &&
-    typeof value.encryptedDEK === 'string' &&
-    value.encryptedDEK.length > 0
-  );
 }

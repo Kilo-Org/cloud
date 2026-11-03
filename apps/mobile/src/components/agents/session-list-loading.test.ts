@@ -64,6 +64,7 @@ describe('selectSessionListIsLoading', () => {
   describe('cold-open body-surface decision', () => {
     const surfaceInput = {
       isError: false,
+      isRetrying: false,
       hasAnySessions: false,
       hasHistoryContent: false,
       // No active query and no rows delivered by this mount: the branch's

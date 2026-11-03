@@ -141,6 +141,26 @@ describe('event builders: property allowlists', () => {
     expect(failed.event).toBe('kilo_mcp_oauth_sign_in_failed');
     expectExactKeys(failed, [...BASE_AUTH, 'phase', 'reason']);
   });
+
+  it('oauthSignInEvent carries the failure detail only when one is given', () => {
+    const withDetail = buildCapturePayload(
+      oauthSignInEvent({
+        identity: null,
+        phase: 'failed',
+        reason: 'invalid_grant',
+        detail: 'client_id_mismatch',
+      }),
+      API_KEY
+    );
+    expect(withDetail.properties['detail']).toBe('client_id_mismatch');
+    expectExactKeys(withDetail, [...BASE_ANON, 'phase', 'reason', 'detail']);
+
+    const withoutDetail = buildCapturePayload(
+      oauthSignInEvent({ identity: null, phase: 'succeeded' }),
+      API_KEY
+    );
+    expect(withoutDetail.properties['detail']).toBeUndefined();
+  });
 });
 
 describe('identity binding', () => {

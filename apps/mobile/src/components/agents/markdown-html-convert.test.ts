@@ -45,7 +45,20 @@ describe('convertHtmlToMarkdown inline tags', () => {
 
   it('keeps code with markup or an unknown entity as HTML', () => {
     expect(convertHtmlToMarkdown('<code><b>x</b></code>')).toBe('<code><b>x</b></code>');
-    expect(convertHtmlToMarkdown('<code>&hellip;</code>')).toBe('<code>&hellip;</code>');
+    for (const html of [
+      '<code>&notarealentity;</code>',
+      '<code>&constructor;</code>',
+      '<code>&toString;</code>',
+    ]) {
+      expect(convertHtmlToMarkdown(html)).toBe(html);
+    }
+  });
+
+  it('decodes any named reference inside a code span', () => {
+    expect(convertHtmlToMarkdown('<code>a &rarr; b &hellip; &copy; &ne;</code>')).toBe(
+      '`a → b … © ≠`'
+    );
+    expect(convertHtmlToMarkdown('<code>&mdash;&rarr;&#8594;</code>')).toBe('`—→→`');
   });
 
   it('converts links with their title and wraps destinations with spaces', () => {
@@ -67,8 +80,11 @@ describe('convertHtmlToMarkdown inline tags', () => {
     expect(convertHtmlToMarkdown('<a href="https://x.dev" class="c">x</a>')).toBe(
       '<a href="https://x.dev" class="c">x</a>'
     );
+  });
+
+  it('converts a bracket in link text, which its escape keeps literal', () => {
     expect(convertHtmlToMarkdown('<a href="https://x.dev">a]b</a>')).toBe(
-      '<a href="https://x.dev">a]b</a>'
+      String.raw`[a\]b](https://x.dev)`
     );
   });
 
@@ -154,6 +170,18 @@ describe('convertHtmlToMarkdown block tags', () => {
     expect(convertHtmlToMarkdown('<pre>plain <b>x</b></pre>')).toBe('<pre>plain <b>x</b></pre>');
   });
 
+  it('decodes any named reference inside a code block', () => {
+    expect(
+      convertHtmlToMarkdown(
+        '<pre><code class="language-ts">a &rarr; b &hellip;\nlet ok = 1 &le; 2 &amp;&amp; 3 &ge; 2;\n</code></pre>'
+      )
+    ).toBe('```ts\na → b …\nlet ok = 1 ≤ 2 && 3 ≥ 2;\n```');
+    expect(convertHtmlToMarkdown('<pre>a &copy; &mdash; b</pre>')).toBe('```\na © — b\n```');
+    expect(convertHtmlToMarkdown('<pre>a &notarealentity;</pre>')).toBe(
+      '<pre>a &notarealentity;</pre>'
+    );
+  });
+
   it('converts a simple table into a GFM table', () => {
     expect(
       convertHtmlToMarkdown(
@@ -163,6 +191,22 @@ describe('convertHtmlToMarkdown block tags', () => {
     expect(convertHtmlToMarkdown('<table><tr><th>A</th></tr><tr><td>1</td></tr></table>')).toBe(
       '| A |\n| --- |\n| 1 |'
     );
+  });
+
+  it('keeps a pipe inside a table cell, escaped once', () => {
+    expect(convertHtmlToMarkdown('<table><tr><th>A</th></tr><tr><td>a|b</td></tr></table>')).toBe(
+      '| A |\n| --- |\n| a\\|b |'
+    );
+    expect(
+      convertHtmlToMarkdown(String.raw`<table><tr><th>A</th></tr><tr><td>a\|b</td></tr></table>`)
+    ).toBe(String.raw`| A |
+| --- |
+| a\\\|b |`);
+    expect(
+      convertHtmlToMarkdown(String.raw`<table><tr><th>A</th></tr><tr><td>a\\|b</td></tr></table>`)
+    ).toBe(String.raw`| A |
+| --- |
+| a\\\\\|b |`);
   });
 
   it('keeps tables markdown cannot express as HTML', () => {

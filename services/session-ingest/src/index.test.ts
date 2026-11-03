@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SignJWT } from 'jose';
+import { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
@@ -54,10 +57,14 @@ type TestBindings = {
 
 function makeDbFakes() {
   const selectResult = vi.fn<() => Promise<unknown[]>>(async () => []);
+  let whereCondition: unknown;
   const select = {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
-    where: vi.fn(() => select),
+    where: vi.fn((condition: unknown) => {
+      whereCondition = condition;
+      return select;
+    }),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
   };
@@ -66,7 +73,7 @@ function makeDbFakes() {
     select: vi.fn(() => select),
   };
 
-  return { db, selectResult };
+  return { db, selectResult, selectCondition: () => whereCondition };
 }
 
 const defaultEnv: TestBindings = {
@@ -273,8 +280,10 @@ describe('public session route', () => {
   });
 
   it('returns 404 for malformed share tokens', async () => {
-    const res = await app.request('/session/not-a-jwt', {}, defaultEnv);
-    expect(res.status).toBe(404);
+    const content = await app.request('/session/not-a-jwt', {}, defaultEnv);
+    const metadata = await app.request('/session/not-a-jwt/metadata', {}, defaultEnv);
+    expect(content.status).toBe(404);
+    expect(metadata.status).toBe(404);
   });
 
   it('returns 404 when the token generation is not found', async () => {
@@ -291,35 +300,286 @@ describe('public session route', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns a matching DO snapshot with no-store caching', async () => {
+  it('returns a matching shared snapshot at the token boundary with no-store caching', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    const token = await signSessionShareToken(defaultEnv, {
-      sessionId: 'ses_12345678901234567890123456',
-      publicId: '11111111-1111-4111-8111-111111111111',
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      const token = await signSessionShareToken(
+        defaultEnv,
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          publicId: '11111111-1111-4111-8111-111111111111',
+        },
+        { now: () => now }
+      );
+      selectResult.mockResolvedValueOnce([
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          kiloUserId: 'usr_123',
+          title: 'Shared title',
+          ownerName: 'Shared owner',
+        },
+      ]);
+
+      const stub = {
+        getSharedSessionStream: vi.fn(async () => new Response('{"ok":true}').body!),
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue(
+        stub as unknown as ReturnType<typeof getSessionIngestDO>
+      );
+
+      const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(await res.text()).toBe('{"ok":true}');
+      expect(stub.getSharedSessionStream).toHaveBeenCalledWith({
+        publicId: '11111111-1111-4111-8111-111111111111',
+        ingestedBeforeMs: now.getTime(),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 404 for a superseded capability and serves the current generation', async () => {
+    const { db, selectResult, selectCondition } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    const sessionId = 'ses_12345678901234567890123456';
+    const previousPublicId = '11111111-1111-4111-8111-111111111111';
+    const currentPublicId = '22222222-2222-4222-8222-222222222222';
+    const currentRow = {
+      sessionId,
+      kiloUserId: 'usr_123',
+      title: 'Shared title',
+      ownerName: 'Shared owner',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: '2026-08-19T10:00:00.000Z',
+    };
+
+    selectResult.mockImplementation(async () => {
+      const condition = selectCondition();
+      if (!(condition instanceof SQL)) throw new Error('Expected a resolution predicate');
+      const params = new PgDialect().sqlToQuery(condition).params;
+      return params[1] === currentPublicId ? [currentRow] : [];
     });
-    selectResult.mockResolvedValueOnce([
-      {
-        sessionId: 'ses_12345678901234567890123456',
-        kiloUserId: 'usr_123',
-        title: 'Shared title',
-        ownerName: 'Shared owner',
-      },
-    ]);
 
     const stub = {
-      getAllStream: vi.fn(async () => new Response('{"ok":true}').body!),
+      getSharedSessionStream: vi.fn(async () => new Response('{"ok":true}').body!),
     };
     vi.mocked(getSessionIngestDO).mockReturnValue(
       stub as unknown as ReturnType<typeof getSessionIngestDO>
     );
 
-    const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+    const previousToken = await signSessionShareToken(
+      defaultEnv,
+      { sessionId, publicId: previousPublicId },
+      { now: () => now }
+    );
+    const currentToken = await signSessionShareToken(
+      defaultEnv,
+      { sessionId, publicId: currentPublicId },
+      { now: () => new Date(now.getTime() + 1000) }
+    );
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(await res.text()).toBe('{"ok":true}');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      const previous = await app.request(
+        `/session/${encodeURIComponent(previousToken)}`,
+        {},
+        defaultEnv
+      );
+      const current = await app.request(
+        `/session/${encodeURIComponent(currentToken)}`,
+        {},
+        defaultEnv
+      );
+      const previousMetadata = await app.request(
+        `/session/${encodeURIComponent(previousToken)}/metadata`,
+        {},
+        defaultEnv
+      );
+      const currentMetadata = await app.request(
+        `/session/${encodeURIComponent(currentToken)}/metadata`,
+        {},
+        defaultEnv
+      );
+
+      expect(previous.status).toBe(404);
+      expect(current.status).toBe(200);
+      expect(await current.text()).toBe('{"ok":true}');
+      expect(previousMetadata.status).toBe(404);
+      expect(currentMetadata.status).toBe(200);
+      expect(stub.getSharedSessionStream).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 404 for an expired capability on both content and metadata endpoints', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const now = new Date('2026-08-19T10:00:00.000Z');
+    const token = await signSessionShareToken(
+      defaultEnv,
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        publicId: '11111111-1111-4111-8111-111111111111',
+      },
+      { now: () => now }
+    );
+    const afterExpiry = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000);
+    selectResult.mockResolvedValue([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        ownerName: 'Shared owner',
+        createdAt: '2026-08-19T10:00:00.000Z',
+      },
+    ]);
+    const stub = {
+      getSharedSessionStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    vi.useFakeTimers();
+    vi.setSystemTime(afterExpiry);
+    try {
+      const content = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+      const metadata = await app.request(
+        `/session/${encodeURIComponent(token)}/metadata`,
+        {},
+        defaultEnv
+      );
+
+      expect(content.status).toBe(404);
+      expect(metadata.status).toBe(404);
+      expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves original links as permanent live shares until revoked or replaced', async () => {
+    const { db, selectResult, selectCondition } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValue([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        createdAt: '2026-08-19T10:00:00.000Z',
+      },
+    ]);
+    const stub = {
+      getLiveSharedSessionStream: vi.fn(
+        async () => new Response('{"messages":["later message"]}').body!
+      ),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+    const legacyToken = await new SignJWT({
+      version: 1,
+      sub: 'ses_12345678901234567890123456',
+      jti: '11111111-1111-4111-8111-111111111111',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('kilo-session-ingest')
+      .setAudience('kilo-session-share')
+      .setIssuedAt(1)
+      .sign(new TextEncoder().encode('session-share-secret-for-tests-32-bytes'));
+    const path = `/session/${encodeURIComponent(legacyToken)}`;
+    const content = await app.request(path, {}, defaultEnv);
+    expect(content.status).toBe(200);
+    expect(await content.json()).toEqual({ messages: ['later message'] });
+    expect((await app.request(`${path}/metadata`, {}, defaultEnv)).status).toBe(200);
+    const condition = selectCondition();
+    if (!(condition instanceof SQL)) throw new Error('Expected generation condition');
+    expect(new PgDialect().sqlToQuery(condition).params).toContain(
+      '11111111-1111-4111-8111-111111111111'
+    );
+    selectResult.mockResolvedValue([]);
+    expect((await app.request(path, {}, defaultEnv)).status).toBe(404);
+    expect((await app.request(`${path}/metadata`, {}, defaultEnv)).status).toBe(404);
+    expect(stub.getLiveSharedSessionStream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])(
+    'serves a new permanent link with include_new_messages=%s',
+    async include_new_messages => {
+      const { db, selectResult } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      selectResult.mockResolvedValue([
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          kiloUserId: 'usr_123',
+        },
+      ]);
+      const stub = {
+        getLiveSharedSessionStream: vi.fn(async () => new Response('{"mode":"live"}').body!),
+        getSharedSessionStream: vi.fn(async () => new Response('{"mode":"snapshot"}').body!),
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+      const sharedAt = new Date('2020-01-01T00:00:00.000Z');
+      const token = await signSessionShareToken(
+        defaultEnv,
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          publicId: '11111111-1111-4111-8111-111111111111',
+          duration: 'forever',
+          include_new_messages,
+        },
+        { now: () => sharedAt }
+      );
+      const response = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ mode: include_new_messages ? 'live' : 'snapshot' });
+      if (include_new_messages) {
+        expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
+      } else {
+        expect(stub.getLiveSharedSessionStream).not.toHaveBeenCalled();
+        expect(stub.getSharedSessionStream).toHaveBeenCalledWith({
+          publicId: '11111111-1111-4111-8111-111111111111',
+          ingestedBeforeMs: sharedAt.getTime(),
+        });
+      }
+    }
+  );
+
+  it('returns 404 for a revoked capability on both content and metadata endpoints', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValue([]);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    const stub = {
+      getSharedSessionStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      stub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const content = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+    const metadata = await app.request(
+      `/session/${encodeURIComponent(token)}/metadata`,
+      {},
+      defaultEnv
+    );
+
+    expect(content.status).toBe(404);
+    expect(metadata.status).toBe(404);
+    expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
   });
 
   it('serializes created_at as UTC ISO at the HTTP boundary', async () => {

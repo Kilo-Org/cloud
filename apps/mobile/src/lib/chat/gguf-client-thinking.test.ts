@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/consistent-type-assertions, typescript-eslint/require-await, require-await -- a llama.rn context is a JSI object: a test double can only be built by asserting its shape */
 import { type ModelRequest } from '@kilocode/harness-sdk';
-import { Chunk, Effect, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { expect, it, vi } from 'vitest';
 
 import { type GgufContext, ggufModelClient } from './gguf-client';
@@ -42,9 +42,7 @@ it('streams the thinking apart from the answer when thinking is on', async () =>
     fileOf: () => ({ path: '/m/a.gguf', contextWindow: 2048, tools: false, projector: undefined }),
   });
 
-  const events = Chunk.toReadonlyArray(
-    await Effect.runPromise(Stream.runCollect(client.stream(request)))
-  );
+  const events = await Effect.runPromise(Stream.runCollect(client.stream(request)));
 
   expect(events.flatMap(event => (event.kind === 'reasoning' ? [event.text] : []))).toEqual(['Hm']);
   expect(events.flatMap(event => (event.kind === 'delta' ? [event.text] : []))).toEqual(['Hi']);

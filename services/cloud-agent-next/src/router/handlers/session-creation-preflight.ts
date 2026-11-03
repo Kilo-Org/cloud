@@ -1,10 +1,14 @@
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  loadEnvironmentForSession,
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
-  type ClientMcpServerValue,
+  type EnvironmentForSession,
+  type EnvironmentInlineArgs,
+  type EnvironmentOwner,
+  type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
@@ -12,21 +16,34 @@ import {
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { launchRepositoryIdentity } from '../../session/environment-launch.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import {
+  assertEnvironmentRepositoriesAccess,
+  assertRepositoryAccessBeforeSessionCreation,
+} from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import { assertRequestedRepositories } from './requested-environment-repositories.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { withDORetry } from '../../utils/do-retry.js';
+import { validateBalanceOnly } from '../../balance-validation.js';
+import { timingSafeEqual } from '@kilocode/encryption';
+import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+
+const WEB_ORIGIN = 'cloud-agent-web';
 
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
-  'cloud-agent-web',
+  WEB_ORIGIN,
   'slack',
   'github',
   'linear',
   'discord',
-  'app-builder',
   'webhook',
   'scheduled',
 ]);
@@ -55,21 +72,93 @@ function repoFullNameForBindingLookup(input: SessionCreateRequest): string | und
   return undefined;
 }
 
-async function resolveProfileForSessionCreateRequest(
+function environmentOwnerForSession(
+  ctx: Pick<TRPCContext, 'userId'>,
+  input: SessionCreateRequest
+): EnvironmentOwner {
+  const organizationId = input.options?.kilocodeOrganizationId;
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: ctx.userId };
+}
+
+/**
+ * The environment of the session's repository. It applies on the same origins
+ * as the implicit profile defaults; other origins (for example code review and
+ * the security agent) run without it.
+ *
+ * Several environments can contain the repository. A client that selected one
+ * names it in `requestedEnvironment`. Without a selection, a client that marks
+ * `requireEnvironmentChoice` gets a conflict that names the environments, and
+ * every other client runs with no environment.
+ */
+async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
   db?: WorkerDb
-): Promise<MergeProfileConfigurationResult | null> {
-  const shouldResolve =
-    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults';
-  if (!shouldResolve) return null;
+): Promise<EnvironmentForSession | null> {
+  if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
+  const repository = launchRepositoryIdentity(input.repository);
+  if (!repository) return null;
 
-  const owner: ProfileOwner = input.options?.kilocodeOrganizationId
-    ? { type: 'organization', id: input.options.kilocodeOrganizationId }
-    : { type: 'user', id: ctx.userId };
-  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
+  const resolution = await loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
+    owner: environmentOwnerForSession(ctx, input),
+    repository,
+    ...(input.requestedEnvironment ? { environmentId: input.requestedEnvironment.id } : {}),
+  });
+  switch (resolution.status) {
+    case 'match':
+      return resolution.environment;
+    case 'none':
+      return null;
+    case 'requested-not-found':
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'The selected environment was not found' });
+    case 'requested-without-repository':
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The selected environment does not contain this repository',
+      });
+    case 'conflict':
+      if (input.requireEnvironmentChoice !== true) return null;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: `Several environments contain this repository: ${resolution.environments
+          .map(environment => `"${environment.name}" (${environment.id})`)
+          .join(', ')}. Select one.`,
+      });
+  }
+}
+
+function inlineOverridesForResolution(input: SessionCreateRequest): EnvironmentInlineArgs {
   const overrides = input.profile?.overrides;
+  return {
+    envVars: overrides?.envVars,
+    setupCommands: overrides?.setupCommands,
+    encryptedSecrets: overrides?.encryptedSecrets,
+    mcpServers: overrides?.mcpServers,
+    runtimeSkills: overrides?.runtimeSkills,
+    runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
+  };
+}
+
+function shouldResolveProfile(
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy
+): boolean {
+  return (
+    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults'
+  );
+}
+
+async function resolveProfileForSessionCreateRequest(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  input: SessionCreateRequest,
+  environment: EnvironmentSessionLayer | undefined,
+  db?: WorkerDb
+): Promise<MergeProfileConfigurationResult> {
+  const owner: ProfileOwner = environmentOwnerForSession(ctx, input);
+  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
 
   try {
     return await mergeProfileConfiguration(db ?? getPgDb(ctx.env), {
@@ -83,12 +172,8 @@ async function resolveProfileForSessionCreateRequest(
           : input.repository.type === 'github'
             ? 'github'
             : undefined,
-      envVars: overrides?.envVars,
-      setupCommands: overrides?.setupCommands,
-      encryptedSecrets: overrides?.encryptedSecrets,
-      mcpServers: overrides?.mcpServers as Record<string, ClientMcpServerValue> | undefined,
-      runtimeSkills: overrides?.runtimeSkills,
-      runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
+      environment,
+      ...inlineOverridesForResolution(input),
     });
   } catch (err) {
     if (err instanceof ProfileNotFoundError) {
@@ -142,18 +227,66 @@ function applyProfileResolution(
   };
 }
 
+function assertResolvedConfigurationWithinSessionLimits(
+  resolved: SessionProfileBundle | undefined
+): void {
+  const parsed = SessionProfileBundleSchema.safeParse({
+    envVars: resolved?.envVars,
+    encryptedSecrets: resolved?.encryptedSecrets,
+    setupCommands: resolved?.setupCommands,
+  });
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'resolved configuration exceeds session limits',
+    });
+  }
+}
+
 export async function resolveEffectiveSessionConfiguration(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
   db?: WorkerDb
 ): Promise<SessionCreateRequest> {
-  const resolved = await resolveProfileForSessionCreateRequest(ctx, input, policy, db);
-  return applyProfileResolution(input, resolved);
+  const environment = await resolveEnvironment(ctx, input, policy, db);
+  assertRequestedRepositories({
+    environment: environment?.reference ?? null,
+    launch: launchRepositoryIdentity(input.repository),
+    requested: input.requestedEnvironment,
+  });
+  // An environment resolves only under the implicit-defaults policy, so the
+  // profile path always runs when one exists.
+  const resolved = shouldResolveProfile(input, policy)
+    ? await resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
+    : null;
+
+  const resolvedRequest = applyProfileResolution(input, resolved);
+  assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
+  // The reference and the allocation travel beside the merged configuration;
+  // a client cannot set them.
+  const {
+    environment: _clientEnvironment,
+    environmentSandboxAllocation: _clientAllocation,
+    ...withoutEnvironment
+  } = resolvedRequest;
+  if (!environment) return withoutEnvironment;
+  return {
+    ...withoutEnvironment,
+    environment: environment.reference,
+    ...(environment.sandboxAllocation
+      ? { environmentSandboxAllocation: environment.sandboxAllocation }
+      : {}),
+  };
 }
 
-export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
-  if (isBuiltinMode(mode)) return;
+export function assertModeAvailableForProfile(
+  mode: string,
+  profile: SessionProfileBundle,
+  allowRepositoryAgent: boolean
+): void {
+  // Automation repositories are cloned later; Kilo resolves their agent files at execution.
+  if (isBuiltinMode(mode) || allowRepositoryAgent) return;
   const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
   if (slugs.has(mode)) return;
 
@@ -163,15 +296,106 @@ export function assertModeAvailableForProfile(mode: string, profile: SessionProf
   });
 }
 
-type SessionCreationContext = Pick<TRPCContext, 'env' | 'userId' | 'authToken'>;
+/**
+ * Server-owned mode fallback for a continued session. A local mode is kept when
+ * it is a built-in or a runtimeAgents slug of the resolved profile; otherwise
+ * the session registers as `code` and reports `modeFallback`. This never fails
+ * the operation. Only the continuation handler uses it, so a normal create
+ * still rejects an unavailable user-picked mode.
+ */
+export function resolveContinuationMode(
+  requestedMode: string,
+  resolvedProfile: SessionProfileBundle
+): { mode: string; modeFallback: boolean } {
+  if (isBuiltinMode(requestedMode)) return { mode: requestedMode, modeFallback: false };
+  const slugs = new Set((resolvedProfile.runtimeAgents ?? []).map(a => a.slug));
+  if (slugs.has(requestedMode)) return { mode: requestedMode, modeFallback: false };
+  return { mode: 'code', modeFallback: true };
+}
+
+/**
+ * Per-call profile-resolution and mode policy.
+ *
+ * `includeWebDefaults` forces `include-web-defaults` for one create (the
+ * continuation first session), instead of widening the global origin allowlist.
+ * `continuationModeResolution` replaces an unavailable local mode with `code`
+ * after resolution, so the following `assertModeAvailableForProfile` passes.
+ * Only the continuation handler sets these.
+ */
+export type SessionCreationPolicyOptions = {
+  includeWebDefaults?: boolean;
+  continuationModeResolution?: boolean;
+};
+
+type SessionCreationContext = Pick<
+  TRPCContext,
+  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority'
+> &
+  Partial<Pick<TRPCContext, 'request'>>;
 type EndpointValidator = (request: SessionCreateRequest) => void | Promise<void>;
 
 export async function preflightSessionCreation(
   request: SessionCreateRequest,
   ctx: SessionCreationContext,
   procedure: string,
-  validateEndpoint?: EndpointValidator
+  validateEndpoint?: EndpointValidator,
+  policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
+  if (ctx.cloudAgentAuthority) {
+    const authority = ctx.cloudAgentAuthority;
+    if (
+      request.parentCloudAgentSessionId !== authority.parentSessionId ||
+      authority.ownerId !== ctx.userId ||
+      (request.options?.kilocodeOrganizationId ?? null) !== authority.organizationId
+    ) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
+    }
+    let token: string;
+    let parentCreatedOnPlatform: string | undefined;
+    try {
+      const parent = await withDORetry(
+        () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
+        stub => stub.getCloudAgentSpawnContext(authority),
+        'getCloudAgentSpawnContext'
+      );
+      token = parent.token;
+      parentCreatedOnPlatform = parent.createdOnPlatform;
+    } catch {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    }
+    if (!isInteractiveSessionOrigin(parentCreatedOnPlatform)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    }
+    request.options = {
+      ...request.options,
+      createdOnPlatform: parentCreatedOnPlatform,
+    };
+    const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
+    const skipBalance =
+      ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
+      typeof ctx.env.INTERNAL_API_SECRET === 'string' &&
+      internalApiKey !== undefined &&
+      internalApiKey !== null &&
+      timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET);
+    if (!skipBalance) {
+      const balance = await validateBalanceOnly(
+        token,
+        authority.organizationId ?? undefined,
+        ctx.env
+      );
+      if (!balance.success)
+        throw new TRPCError({
+          code: balance.status === 402 ? 'PAYMENT_REQUIRED' : 'INTERNAL_SERVER_ERROR',
+          message: balance.message,
+        });
+    }
+  }
   const organizationId = request.options?.kilocodeOrganizationId;
   let db: WorkerDb | undefined;
   if (organizationId) {
@@ -186,11 +410,39 @@ export async function preflightSessionCreation(
     repository: request.repository,
   });
 
-  const policy = profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
-  const resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
+    ? { defaultProfileResolution: 'include-web-defaults' }
+    : profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
+  let resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  if (policyOptions?.continuationModeResolution) {
+    // Replace the agent object instead of mutating it: the resolution result
+    // shares the caller's `agent` reference, and the continuation handler derives
+    // its request digest and per-source fallback from the caller's object.
+    resolvedRequest = {
+      ...resolvedRequest,
+      agent: {
+        ...resolvedRequest.agent,
+        mode: resolveContinuationMode(
+          resolvedRequest.agent.mode,
+          resolvedRequest.profile?.resolved ?? {}
+        ).mode,
+      },
+    };
+  }
+  // The environment resolves here, so its members are authorized after it.
+  await assertEnvironmentRepositoriesAccess({
+    env: ctx.env,
+    userId: ctx.userId,
+    orgId: organizationId,
+    createdOnPlatform: resolvedRequest.options?.createdOnPlatform,
+    repository: resolvedRequest.repository,
+    environment: resolvedRequest.environment,
+  });
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
-    resolvedRequest.profile?.resolved ?? {}
+    resolvedRequest.profile?.resolved ?? {},
+    procedure === 'prepareSession' &&
+      isRepositoryAgentOrigin(resolvedRequest.options?.createdOnPlatform)
   );
   await validateEndpoint?.(resolvedRequest);
 

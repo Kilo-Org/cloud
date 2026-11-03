@@ -171,7 +171,7 @@ describe('scrubEvent', () => {
     expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
   });
 
-  it('redacts the app payload context the exception integration does not own', () => {
+  it('rebuilds the app payload context from its allow-listed fields', () => {
     const event = {
       // The integration replaces `contexts[error.name]`; the payload lives
       // under a different key, so it survives to be redacted here.
@@ -179,15 +179,54 @@ describe('scrubEvent', () => {
       contexts: {
         NetworkError: {},
         [NETWORK_BODY_CONTEXT]: {
-          data: { code: 'UNAUTHORIZED', token: 'abcdefghijklmnopqrst' },
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'session.list',
+          message: 'alice@example.com signed in twice',
+          email: 'alice@example.com',
+          nested: { token: 'abcdefghijklmnopqrst' },
         },
       },
     };
 
     const result = scrubEvent(event);
 
-    expect(result.contexts[NETWORK_BODY_CONTEXT].data.code).toBe('UNAUTHORIZED');
-    expect(result.contexts[NETWORK_BODY_CONTEXT].data.token).toBe('[redacted]');
+    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'UNAUTHORIZED',
+      httpStatus: 401,
+      path: 'session.list',
+    });
+    expect(JSON.stringify(result.contexts)).not.toContain('alice@example.com');
+    expect(JSON.stringify(result.contexts)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('keeps declared payload fields of the declared type only', () => {
+    const scrub = (payload: Record<string, unknown>) =>
+      scrubEvent({
+        exception: { values: [{ type: 'NetworkError' }] },
+        contexts: { [NETWORK_BODY_CONTEXT]: payload },
+      }).contexts[NETWORK_BODY_CONTEXT];
+
+    expect(
+      scrub({ code: { text: 'UNAUTHORIZED' }, httpStatus: '401 a@b.example', path: ['a.b'] })
+    ).toEqual({});
+    // Word-chain codes and procedure paths stay readable, like the `trpc.*`
+    // tags; a token-shaped run is redacted at any depth.
+    expect(
+      scrub({
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'cliSessionsV2.getSessionMessagesPage',
+      })
+    ).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      httpStatus: 500,
+      path: 'cliSessionsV2.getSessionMessagesPage',
+    });
+    expect(scrub({ code: 'abcdefghijklmnopqrst', path: 'a.b' })).toEqual({
+      code: '[redacted]',
+      path: 'a.b',
+    });
   });
 
   it('leaves structured network and trace contexts intact', () => {

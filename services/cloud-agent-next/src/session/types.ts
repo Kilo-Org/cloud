@@ -1,32 +1,4 @@
-/**
- * Session types for WebSocket streaming execution management.
- *
- * These types define the structure of execution metadata stored in
- * the CloudAgentSession Durable Object's key-value storage.
- */
-
-import type { EventId, ExecutionId } from '../types/ids.js';
-import type { ExecutionStatus } from '../core/execution.js';
-import type { ExecutionMode, StreamingMode } from '../execution/types.js';
-
-export type ExecutionMetadata = {
-  executionId: ExecutionId;
-  status: ExecutionStatus;
-  startedAt: number;
-  completedAt?: number;
-  mode: ExecutionMode;
-  streamingMode: StreamingMode;
-  error?: string;
-  /** Process ID for long-running sandbox processes */
-  processId?: string;
-  lastHeartbeat?: number;
-  /** Timestamp of most recent non-heartbeat ingest event */
-  lastEventAt?: number;
-  /** Token for authenticating ingest WebSocket connections */
-  ingestToken?: string;
-  /** Message ID accepted by this execution, when available. */
-  messageId?: string;
-};
+import type { EventId } from '../types/ids.js';
 
 export type AssistantMessageInfo = Record<string, unknown> & {
   id: string;
@@ -43,36 +15,4 @@ export type LatestAssistantMessage = {
   timestamp: number;
   info: AssistantMessageInfo;
   parts: AssistantMessagePart[];
-};
-
-/**
- * Extended session state with WebSocket streaming support.
- * These fields are stored in the DO key-value storage alongside metadata.
- */
-export type CloudAgentSessionStateExtension = {
-  executions?: ExecutionMetadata[];
-  interruptRequested?: boolean;
-};
-
-export type AddExecutionParams = {
-  executionId: ExecutionId;
-  mode: ExecutionMode;
-  streamingMode: StreamingMode;
-  /** Token for authenticating ingest WebSocket connections */
-  ingestToken?: string;
-  /** Message ID accepted by this execution, when available. */
-  messageId?: string;
-};
-
-export type UpdateExecutionStatusParams = {
-  executionId: ExecutionId;
-  status: ExecutionStatus;
-  error?: string;
-  completedAt?: number;
-  gateResult?: 'pass' | 'fail';
-};
-
-export type UpdateExecutionHeartbeatParams = {
-  executionId: ExecutionId;
-  timestamp: number;
 };

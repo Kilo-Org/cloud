@@ -5,3 +5,5 @@ wrapper/dist/
 .dev.vars*
 !.dev.vars.example
 kilocode-cli.tgz
+
+wrangler.runtime-generated.json

@@ -33,7 +33,6 @@ export function OrganizationCombobox({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);

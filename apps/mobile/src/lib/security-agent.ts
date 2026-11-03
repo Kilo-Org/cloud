@@ -1,10 +1,16 @@
-import { isActiveSecurityCommand } from '@kilocode/app-shared/security-agent';
+import {
+  isActiveSecurityCommand,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
 import { type Href } from 'expo-router';
+import { z } from 'zod';
+
+import { parseParam } from '@/lib/route-params';
 
 type RouterInputs = inferRouterInputs<MobileRouter>;
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -25,8 +31,32 @@ export type SecurityCommand = NonNullable<RouterOutputs['securityAgent']['getCom
 export type SecurityCommandBatch = RouterOutputs['securityAgent']['getCommandStatuses'];
 
 export function getSecurityAgentPath(scope: string, suffix = ''): Href {
-  const path = `/(app)/(tabs)/(3_profile)/security-agent/${scope}`;
+  const path = `/(app)/security-agent/${scope}`;
   return (suffix ? `${path}/${suffix}` : path) as Href;
+}
+
+const ORGANIZATION_SCOPE_SCHEMA = z.uuid();
+
+/**
+ * Runtime validation for the `[scope]` segment shared by every Security Agent
+ * route. `parseParam` alone accepts any non-empty segment, and every read
+ * branches on `isPersonalSecurityScope`, so an unrecognized segment falls
+ * through to the organization procedures carrying a non-uuid owner id: the
+ * server rejects it, and the screens render a load failure whose Retry can
+ * never succeed. That state is reachable without a hand-built link — a
+ * navigation that lost its param serializes it as the literal `undefined`.
+ *
+ * A scope is the personal scope or an organization id.
+ */
+export function parseSecurityScope(rawScope: string | string[] | undefined): string | null {
+  const scope = parseParam(rawScope);
+  if (scope === null) {
+    return null;
+  }
+  if (isPersonalSecurityScope(scope)) {
+    return scope;
+  }
+  return ORGANIZATION_SCOPE_SCHEMA.safeParse(scope).success ? scope : null;
 }
 
 // The server batch procedure is bounded to 100 ids. The recovery source is
@@ -122,4 +152,53 @@ export function reconcileCommandStatuses(args: {
   });
 
   return { terminalCommands, unavailableIds };
+}
+
+/**
+ * The remediation fields the stale-analysis action reads, so both detail panels
+ * can pass their `getAnalysis` response without reshaping it.
+ */
+type SecurityRemediationSignal = Pick<
+  SecurityAnalysis,
+  'remediationAttempts' | 'remediationCapability' | 'remediationSummary'
+>;
+
+/** The server's own record that a remediation attempt already exists. */
+function hasRegisteredRemediationAttempt(analysis: SecurityRemediationSignal): boolean {
+  return (
+    analysis.remediationAttempts.length > 0 ||
+    Boolean(
+      analysis.remediationSummary?.latestAttemptId ?? analysis.remediationSummary?.latestAttempt?.id
+    )
+  );
+}
+
+/**
+ * Whether a stale analysis is the only thing blocking remediation, mirroring
+ * FindingDetailDialog.tsx's `remediationNeedsAnalysisRefresh`: a finding that
+ * never registered an attempt, whose capability rejects the start or the retry
+ * because the finding changed after the analysis that produced it.
+ */
+export function remediationNeedsAnalysisRefresh(analysis: SecurityRemediationSignal): boolean {
+  return (
+    !hasRegisteredRemediationAttempt(analysis) &&
+    (analysis.remediationCapability.startReason === 'stale_analysis' ||
+      analysis.remediationCapability.retryReason === 'stale_analysis')
+  );
+}
+
+/**
+ * Whether the finding's row offers the Analyze action: an open finding that was
+ * never analyzed or whose analysis failed, and whose remediation has not opened
+ * a PR (that row shows View PR instead). Eligibility only — whether the action
+ * can run right now is the separate capacity state.
+ */
+export function isSecurityFindingAnalyzable(finding: SecurityFinding): boolean {
+  const remediationPrUrl =
+    finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
+  return (
+    !remediationPrUrl &&
+    finding.status === 'open' &&
+    (!finding.analysis_status || finding.analysis_status === 'failed')
+  );
 }

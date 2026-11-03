@@ -17,6 +17,7 @@ import { z } from 'zod';
 
 import { type ChatUsage, parseChatUsage } from './chat-usage';
 import { effortOf } from './effort';
+import { derivedChatText } from './title';
 
 /** The tool names the SDK's store writes for a session: a JSON array of names. */
 const toolsSchema = z.array(z.string());
@@ -49,6 +50,8 @@ export type ChatSummary = {
 type SummaryRow = {
   readonly session_id: string;
   readonly model: string;
+  /** The name the person gave the chat, and nothing else: null until they set one. */
+  readonly stored_title: string | null;
   readonly title: string | null;
   readonly preview: string | null;
   readonly updated_at: number;
@@ -70,6 +73,7 @@ const LIST = `
     chats.session_id,
     sessions.model,
     chats.updated_at,
+    chats.title as stored_title,
     coalesce(chats.title, (
       select parts.body from parts
       join turns on parts.turn_id = turns.id
@@ -93,8 +97,11 @@ export function listChats(db: ChatDatabase, scope: string): ChatSummary[] {
   return db.getAllSync<SummaryRow>(LIST, [scope]).map(row => ({
     sessionId: row.session_id,
     model: row.model,
-    title: row.title ?? '',
-    preview: row.preview ?? '',
+    // A name someone gave the chat is theirs and is shown as typed; the first
+    // thing said stands in for a name, and that is a message body, so it is
+    // reduced to one short line rather than handed to the header whole.
+    title: row.stored_title ?? derivedChatText(row.title ?? ''),
+    preview: derivedChatText(row.preview ?? ''),
     updatedAt: row.updated_at,
   }));
 }

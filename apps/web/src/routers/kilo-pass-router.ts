@@ -1,4 +1,6 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -36,6 +38,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -139,6 +142,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
   id: z.string(),
   date: z.string(),
   amountUsd: z.number(),
+  expiryDate: z.string().nullable(),
   kind: z.enum([
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
@@ -166,16 +170,9 @@ const KiloPassTierSchema = z.enum(KiloPassTier);
 const KiloPassCadenceSchema = z.enum(KiloPassCadence);
 const KiloPassPaymentProviderSchema = z.enum(KiloPassPaymentProvider);
 
-const KiloPassSubscriptionStatusSchema = z.union([
-  z.literal('active'),
-  z.literal('canceled'),
-  z.literal('incomplete'),
-  z.literal('incomplete_expired'),
-  z.literal('past_due'),
-  z.literal('paused'),
-  z.literal('trialing'),
-  z.literal('unpaid'),
-]);
+// The provider reports subscription statuses as an open set, so the response
+// carries the stored value unchanged.
+const KiloPassSubscriptionStatusSchema = z.string();
 
 type KiloPassBonusKind =
   | KiloPassIssuanceItemKind.Bonus
@@ -283,6 +280,7 @@ type KiloPassCreditHistoryRow = {
   amountUsd: number;
   createdAt: string;
   description: string | null;
+  expiryDate: string | null;
 };
 
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
@@ -636,6 +634,7 @@ async function getKiloPassIssuanceCreditHistoryRows(
       amountUsd: kilo_pass_issuance_items.amount_usd,
       createdAt: credit_transactions.created_at,
       description: credit_transactions.description,
+      expiryDate: credit_transactions.expiry_date,
     })
     .from(kilo_pass_issuance_items)
     .innerJoin(
@@ -667,6 +666,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -703,6 +703,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -729,6 +730,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
     amountUsd: roundToCents(fromMicrodollars(row.amountMicrodollars)),
     createdAt: row.createdAt,
     description: row.description,
+    expiryDate: row.expiryDate,
   }));
 }
 
@@ -1251,7 +1253,9 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
+  paidCreditTerms?: PaidCreditTerms;
 }): Promise<CheckoutSessionLike & { amountCents: number }> {
+  const paidCreditTerms = params.paidCreditTerms ?? getPaidCreditTerms('pass', params.deps?.now);
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -1277,6 +1281,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     tier: params.tier,
     cadence: params.cadence,
     affiliateTrackingId: params.affiliateTrackingId,
+    paid_credit_policy: paidCreditTerms,
   };
   const sessionMetadata = mergeServiceFeeCommercialMetadata(
     productMetadata,
@@ -1289,6 +1294,14 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'subscription',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Each monthly base-credit allotment expires one year after issuance. Bonus-credit deadlines are unchanged.',
+          },
+        },
+      }),
       customer: params.stripeCustomerId,
       allow_promotion_codes: true,
       billing_address_collection: 'required',
@@ -2455,6 +2468,16 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
+        });
+      }
+
       const fromTier = subscription.tier;
       const fromCadence = subscription.cadence;
       const toTier = input.targetTier;
@@ -2746,6 +2769,7 @@ export const kiloPassRouter = createTRPCRouter({
         amountUsd: row.amountUsd,
         kind: row.kind,
         description: row.description ?? `${row.kind} credits`,
+        expiryDate: row.expiryDate,
       }));
 
       return {
@@ -2778,13 +2802,22 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
+        paid_credit_policy: paidCreditTerms,
       };
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,
@@ -2798,6 +2831,7 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
+            paidCreditTerms,
           }),
         // Enqueue inside the checkout transaction for the charged session, created or reused. The
         // stable id derived from the session id makes a retry or reuse idempotent.

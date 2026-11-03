@@ -1,4 +1,5 @@
 import { FileSearch } from 'lucide-react';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
@@ -11,7 +12,7 @@ type GrepToolCardProps = {
 export function GrepToolCard({ toolPart }: GrepToolCardProps) {
   const state = toolPart.state;
   const input = state.input;
-  const path = typeof input.path === 'string' ? input.path : '';
+  const path = typeof input.path === 'string' ? cloudAgentFileLabel(input.path) : '';
   const args: string[] = [];
   if (typeof input.pattern === 'string' && input.pattern) args.push(`pattern=${input.pattern}`);
   if (typeof input.include === 'string' && input.include) args.push(`include=${input.include}`);

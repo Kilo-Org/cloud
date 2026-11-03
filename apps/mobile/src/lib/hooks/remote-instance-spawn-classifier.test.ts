@@ -9,8 +9,8 @@ import {
 // The bare strings below are the CLI's pinned deliverable literals, written
 // out by hand (not read from `CLOUD_SESSION_*_LITERAL`). If a constant drifts
 // off its pinned string, the classifier no longer matches these inputs and
-// falls back to the import-failed key, so every assertion here fails on the
-// drift.
+// falls back to the import-failed key, so the literal-matching assertions here
+// catch the drift.
 describe('resolveCloneImportFailureKey', () => {
   it('maps cloud session not found to the not-found key', () => {
     expect(resolveCloneImportFailureKey('cloud session not found')).toBe('common.notFound');

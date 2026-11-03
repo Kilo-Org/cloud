@@ -1,22 +1,7 @@
-/**
- * Tests for event-processor.ts
- *
- * These tests verify the EventProcessor's ability to:
- * - Process cloud agent events and emit callbacks for streaming messages
- * - Handle message.updated events with pending parts queue
- * - Handle message.part.updated events
- * - Track child sessions (sessions with parentID) via callbacks
- * - Manage session status and streaming state via callbacks
- * - Fire onMessageCompleted when messages finish
- *
- * All assertions are callback-based - the processor has no getter methods.
- */
-
 import { createEventProcessor } from './event-processor';
 import type { EventProcessorCallbacks, ProcessedMessage } from './types';
 import type { CloudAgentEvent } from '../event-types';
 
-// Helper to create a CloudAgentEvent
 function createEvent(
   streamEventType: string,
   data: unknown,
@@ -32,7 +17,6 @@ function createEvent(
   };
 }
 
-// Helper to create a kilocode-wrapped event
 function createKilocodeEvent(
   type: string,
   properties: unknown,
@@ -41,7 +25,6 @@ function createKilocodeEvent(
   return createEvent('kilocode', { type, properties }, sessionId);
 }
 
-// Helper to create assistant message info (streaming - no completed time)
 function createAssistantInfo(id: string, sessionId = 'session-123', completed?: number) {
   return {
     id,
@@ -59,7 +42,6 @@ function createAssistantInfo(id: string, sessionId = 'session-123', completed?: 
   };
 }
 
-// Helper to create user message info
 function createUserInfo(id: string, sessionId = 'session-123') {
   return {
     id,
@@ -93,7 +75,7 @@ describe('createEventProcessor', () => {
           info: expect.objectContaining({ id: 'msg-1' }),
           parts: [],
         }),
-        null // parentSessionId is null for root session
+        null
       );
     });
 
@@ -103,18 +85,15 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First event (streaming - no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Second event still streaming (no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
       expect(callbacks.onMessageUpdated).toHaveBeenCalledTimes(2);
-      // Both calls should have the same message ID
       expect(callbacks.onMessageUpdated).toHaveBeenLastCalledWith(
         'session-123',
         'msg-1',
@@ -130,7 +109,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First event (streaming)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -138,7 +116,6 @@ describe('createEventProcessor', () => {
       expect(callbacks.onMessageUpdated).toHaveBeenCalledTimes(1);
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
 
-      // Second event with completed time
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-1', 'session-123', Date.now()),
@@ -150,7 +127,7 @@ describe('createEventProcessor', () => {
         'session-123',
         'msg-1',
         expect.objectContaining({ info: expect.objectContaining({ id: 'msg-1' }) }),
-        null // parentSessionId
+        null
       );
     });
 
@@ -214,11 +191,9 @@ describe('createEventProcessor', () => {
         createKilocodeEvent('message.updated', { info: createUserInfo('msg-1') })
       );
 
-      // User message is created but not completed yet
       expect(callbacks.onMessageUpdated).toHaveBeenCalledTimes(1);
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
 
-      // Session goes idle - user messages should complete
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -278,12 +253,10 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First create the message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Then add a part (no time.end = still streaming)
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -302,7 +275,7 @@ describe('createEventProcessor', () => {
         'msg-1',
         'part-1',
         expect.objectContaining({ id: 'part-1', text: 'Hello' }),
-        null // parentSessionId
+        null
       );
     });
 
@@ -313,7 +286,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Part arrives first (before message)
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -326,15 +298,12 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Part should be queued, not processed yet
       expect(callbacks.onPartUpdated).not.toHaveBeenCalled();
 
-      // Now the message arrives
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Pending part should now be applied
       expect(callbacks.onPartUpdated).toHaveBeenCalledTimes(1);
       expect(callbacks.onPartUpdated).toHaveBeenCalledWith(
         'session-123',
@@ -353,14 +322,12 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create streaming message (no completed time yet)
       processor.processEvent(
         createKilocodeEvent('message.updated', {
-          info: createAssistantInfo('msg-1', 'session-123'), // No completed time
+          info: createAssistantInfo('msg-1', 'session-123'),
         })
       );
 
-      // Add a streaming part (has time.start but no time.end)
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -369,21 +336,19 @@ describe('createEventProcessor', () => {
             messageID: 'msg-1',
             type: 'text',
             text: 'Hello',
-            time: { start: Date.now() }, // No end time = streaming
+            time: { start: Date.now() },
           },
         })
       );
 
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
 
-      // Update message to completed
       processor.processEvent(
         createKilocodeEvent('message.updated', {
-          info: createAssistantInfo('msg-1', 'session-123', Date.now()), // Now has completed time
+          info: createAssistantInfo('msg-1', 'session-123', Date.now()),
         })
       );
 
-      // Message should be complete now
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
       expect(callbacks.onMessageCompleted).toHaveBeenCalledWith(
         'session-123',
@@ -426,7 +391,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
 
-      // Late part update after completion — full replacement
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -461,7 +425,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create message with part
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -480,7 +443,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onPartUpdated).toHaveBeenCalledTimes(1);
 
-      // Remove the part
       processor.processEvent(
         createKilocodeEvent('message.part.removed', {
           sessionID: 'session-123',
@@ -489,12 +451,7 @@ describe('createEventProcessor', () => {
         })
       );
 
-      expect(callbacks.onPartRemoved).toHaveBeenCalledWith(
-        'session-123',
-        'msg-1',
-        'part-1',
-        null // parentSessionId
-      );
+      expect(callbacks.onPartRemoved).toHaveBeenCalledWith('session-123', 'msg-1', 'part-1', null);
     });
   });
 
@@ -524,7 +481,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First set to busy
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -532,7 +488,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Then set to idle — streaming should NOT stop yet
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -541,7 +496,6 @@ describe('createEventProcessor', () => {
       );
 
       expect(callbacks.onSessionStatusChanged).toHaveBeenLastCalledWith({ type: 'idle' });
-      // onStreamingChanged should only have been called once (busy=true)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
     });
@@ -553,7 +507,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First set to busy
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -561,7 +514,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Then set to retry
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -569,7 +521,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // onStreamingChanged should only be called once (for busy)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
     });
@@ -583,7 +534,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create a child session
       processor.processEvent(
         createKilocodeEvent('session.created', {
           info: {
@@ -601,7 +551,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onSessionCreated).toHaveBeenCalled();
 
-      // Now send a message to the child session
       processor.processEvent(
         createKilocodeEvent(
           'message.updated',
@@ -612,12 +561,11 @@ describe('createEventProcessor', () => {
         )
       );
 
-      // Should call onMessageUpdated with parentSessionId set
       expect(callbacks.onMessageUpdated).toHaveBeenCalledWith(
         'child-session-1',
         'child-msg-1',
         expect.objectContaining({ info: expect.objectContaining({ id: 'child-msg-1' }) }),
-        'session-123' // parentSessionId
+        'session-123'
       );
     });
 
@@ -627,7 +575,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create a child session
       processor.processEvent(
         createKilocodeEvent('session.created', {
           info: {
@@ -643,12 +590,10 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Add a message to root session
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('root-msg-1') })
       );
 
-      // Add a message to child session
       processor.processEvent(
         createKilocodeEvent(
           'message.updated',
@@ -657,26 +602,23 @@ describe('createEventProcessor', () => {
         )
       );
 
-      // Verify root session message has parentSessionId = null
       expect(callbacks.onMessageUpdated).toHaveBeenCalledWith(
         'session-123',
         'root-msg-1',
         expect.anything(),
-        null // root session
+        null
       );
 
-      // Verify child session message has parentSessionId = 'session-123'
       expect(callbacks.onMessageUpdated).toHaveBeenCalledWith(
         'child-session-1',
         'child-msg-1',
         expect.anything(),
-        'session-123' // child session
+        'session-123'
       );
     });
   });
 
   describe('child session event filtering', () => {
-    // Helper: register a child session
     function registerChildSession(
       processor: ReturnType<typeof createEventProcessor>,
       childId: string,
@@ -707,7 +649,6 @@ describe('createEventProcessor', () => {
 
       registerChildSession(processor, 'child-1', 'session-123');
 
-      // Child session goes busy
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'child-1',
@@ -718,7 +659,6 @@ describe('createEventProcessor', () => {
       expect(callbacks.onSessionStatusChanged).not.toHaveBeenCalled();
       expect(callbacks.onStreamingChanged).not.toHaveBeenCalled();
 
-      // Child session goes idle
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'child-1',
@@ -739,7 +679,6 @@ describe('createEventProcessor', () => {
 
       registerChildSession(processor, 'child-1', 'session-123');
 
-      // Root session goes busy (sets streaming = true)
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -753,7 +692,6 @@ describe('createEventProcessor', () => {
       // (neither root nor child idle stops streaming; only `complete` does)
       processor.processEvent(createKilocodeEvent('session.idle', { sessionID: 'child-1' }));
 
-      // onStreamingChanged should only have been called once (the busy=true)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
     });
 
@@ -767,7 +705,6 @@ describe('createEventProcessor', () => {
 
       registerChildSession(processor, 'child-1', 'session-123');
 
-      // Create a user message in the child session
       processor.processEvent(
         createKilocodeEvent(
           'message.updated',
@@ -778,7 +715,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
 
-      // Child session goes idle — user messages should still complete
       processor.processEvent(createKilocodeEvent('session.idle', { sessionID: 'child-1' }));
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
@@ -799,7 +735,6 @@ describe('createEventProcessor', () => {
 
       registerChildSession(processor, 'child-1', 'session-123');
 
-      // Root session goes busy
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -809,7 +744,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
 
-      // Child session error — should NOT toggle streaming
       processor.processEvent(
         createKilocodeEvent('session.error', {
           sessionID: 'child-1',
@@ -817,9 +751,7 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // onError should fire for child sessions
       expect(callbacks.onError).toHaveBeenCalledWith('Child failed', 'child-1');
-      // streaming should still be true (only 1 call: the busy=true)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
     });
 
@@ -834,7 +766,6 @@ describe('createEventProcessor', () => {
 
       registerChildSession(processor, 'child-1', 'session-123');
 
-      // Root session goes busy
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -842,7 +773,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message in the child session
       processor.processEvent(
         createKilocodeEvent(
           'message.updated',
@@ -851,7 +781,6 @@ describe('createEventProcessor', () => {
         )
       );
 
-      // Child turn closes with error
       processor.processEvent(
         createKilocodeEvent('session.turn.close', {
           sessionID: 'child-1',
@@ -859,11 +788,9 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Message should be force-completed
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
       // No ErrorBanner — the session is still alive
       expect(callbacks.onError).not.toHaveBeenCalled();
-      // streaming should still be true (only 1 call: the busy=true)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
     });
   });
@@ -876,7 +803,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -884,7 +810,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Error event
       processor.processEvent(
         createKilocodeEvent('session.error', {
           sessionID: 'session-123',
@@ -909,7 +834,6 @@ describe('createEventProcessor', () => {
 
       const now = Date.now();
 
-      // Add messages (both streaming - no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: { ...createAssistantInfo('msg-2'), time: { created: now + 1000 } },
@@ -932,12 +856,10 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Add streaming message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Add completed message
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-2', 'session-123', Date.now()),
@@ -964,7 +886,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Add some state
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -979,10 +900,8 @@ describe('createEventProcessor', () => {
       expect(callbacks.onMessageUpdated).toHaveBeenCalledTimes(1);
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
 
-      // Clear
       processor.clear();
 
-      // Process new events
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-2') })
       );
@@ -1004,7 +923,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Direct event without kilocode wrapper
       const event = createEvent('message.updated', {
         info: createUserInfo('msg-1'),
       });
@@ -1025,7 +943,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1033,14 +950,12 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message (no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
 
-      // Turn closes with error
       processor.processEvent(
         createKilocodeEvent('session.turn.close', {
           sessionID: 'session-123',
@@ -1048,7 +963,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Should force-complete the assistant message
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
       expect(callbacks.onMessageCompleted).toHaveBeenCalledWith(
         'session-123',
@@ -1074,12 +988,10 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create an in-flight assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Turn closes without error reason
       processor.processEvent(
         createKilocodeEvent('session.turn.close', {
           sessionID: 'session-123',
@@ -1087,7 +999,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Should not force-complete
       expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
       expect(callbacks.onError).not.toHaveBeenCalled();
     });
@@ -1100,17 +1011,14 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create a user message (won't have completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createUserInfo('user-msg-1') })
       );
 
-      // Create an assistant message (no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('assist-msg-1') })
       );
 
-      // Turn closes with error
       processor.processEvent(
         createKilocodeEvent('session.turn.close', {
           sessionID: 'session-123',
@@ -1118,7 +1026,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Both messages should be completed
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(2);
     });
   });
@@ -1132,7 +1039,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1140,7 +1046,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message (no completed time)
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -1173,19 +1078,16 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create a user message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createUserInfo('user-msg-1') })
       );
 
-      // Create an assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('assist-msg-1') })
       );
 
       processor.forceCompleteAll();
 
-      // Both should be completed
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(2);
     });
 
@@ -1197,7 +1099,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create an in-flight assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -1229,7 +1130,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create and complete an assistant message normally
       processor.processEvent(
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
@@ -1241,7 +1141,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
 
-      // forceCompleteAll should not re-complete it
       processor.forceCompleteAll();
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
@@ -1348,7 +1247,6 @@ describe('createEventProcessor', () => {
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Add a completed tool part
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -1370,7 +1268,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Add an already-errored tool part
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -1399,10 +1296,8 @@ describe('createEventProcessor', () => {
         p => p.type === 'tool' && p.id === 'tool-err'
       );
 
-      // Completed part should remain completed
       if (!completedPart || completedPart.type !== 'tool') throw new Error('Expected tool part');
       expect(completedPart.state.status).toBe('completed');
-      // Errored part should keep original error
       if (!erroredPart || erroredPart.type !== 'tool') throw new Error('Expected tool part');
       expect(erroredPart.state.status).toBe('error');
       if (erroredPart.state.status !== 'error') throw new Error('Expected error status');
@@ -1420,14 +1315,12 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Create an assistant message that is already completed (server sent time.completed)
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-1', 'session-123', Date.now()),
         })
       );
 
-      // Add a tool part still in running state (arrived after message completion)
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -1448,10 +1341,8 @@ describe('createEventProcessor', () => {
 
       processor.forceCompleteAll();
 
-      // Should NOT re-fire onMessageCompleted for already-completed message
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
 
-      // Should fire onMessageUpdated so the UI re-renders cleaned-up parts
       expect(callbacks.onMessageUpdated).toHaveBeenCalledTimes(1);
 
       const toolPart = updatedMessage?.parts.find(p => p.type === 'tool');
@@ -1574,7 +1465,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1582,14 +1472,12 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-1'),
         })
       );
 
-      // Interrupted event (top-level streamEventType, not kilocode-wrapped)
       processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
 
       expect(callbacks.onError).not.toHaveBeenCalled();
@@ -1606,7 +1494,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1614,14 +1501,12 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-1'),
         })
       );
 
-      // Wrapper disconnected event
       processor.processEvent(createEvent('wrapper_disconnected', { reason: 'container died' }));
 
       expect(callbacks.onError).not.toHaveBeenCalled();
@@ -1638,7 +1523,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1646,14 +1530,12 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Create an in-flight assistant message
       processor.processEvent(
         createKilocodeEvent('message.updated', {
           info: createAssistantInfo('msg-1'),
         })
       );
 
-      // Fatal error event
       processor.processEvent(createEvent('error', { error: 'Process killed', fatal: true }));
 
       expect(callbacks.onError).not.toHaveBeenCalled();
@@ -1668,7 +1550,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1676,7 +1557,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Interrupted event
       processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
 
       // session.error arrives as an aftershock (CLI dying)
@@ -1687,7 +1567,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // onError should NOT have been called — the session.error is an aftershock
       expect(callbacks.onError).not.toHaveBeenCalled();
     });
 
@@ -1698,7 +1577,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1706,7 +1584,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // session.error without any prior termination event
       processor.processEvent(
         createKilocodeEvent('session.error', {
           sessionID: 'session-123',
@@ -1724,7 +1601,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming, then interrupt
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1733,7 +1609,6 @@ describe('createEventProcessor', () => {
       );
       processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
 
-      // Clear and start fresh
       processor.clear();
       processor.processEvent(
         createKilocodeEvent('session.status', {
@@ -1742,7 +1617,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // session.error should now trigger onError again (terminated was reset)
       processor.processEvent(
         createKilocodeEvent('session.error', {
           sessionID: 'session-123',
@@ -1760,7 +1634,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // First execution: start streaming, then interrupt
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1769,7 +1642,6 @@ describe('createEventProcessor', () => {
       );
       processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
 
-      // Second execution: new busy status (user sent another message)
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1777,7 +1649,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // session.error from the NEW execution should NOT be suppressed
       processor.processEvent(
         createKilocodeEvent('session.error', {
           sessionID: 'session-123',
@@ -1799,7 +1670,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1809,7 +1679,6 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
 
-      // Complete event arrives (wrapper finished including autocommit)
       processor.processEvent(createEvent('complete', {}));
 
       expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
@@ -1822,7 +1691,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Start streaming
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1830,7 +1698,6 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Session goes idle (CLI finished, autocommit about to start)
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1838,11 +1705,9 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Streaming should still be true (only busy=true call so far)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
 
-      // Complete event arrives after autocommit
       processor.processEvent(createEvent('complete', {}));
 
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(2);
@@ -1855,7 +1720,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Complete without ever starting streaming
       processor.processEvent(createEvent('complete', {}));
 
       expect(callbacks.onStreamingChanged).not.toHaveBeenCalled();
@@ -1869,7 +1733,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // 1. Session starts
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -1878,25 +1741,20 @@ describe('createEventProcessor', () => {
       );
       expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(true);
 
-      // 2. CLI finishes, session goes idle
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
           status: { type: 'idle' },
         })
       );
-      // Still streaming
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
 
-      // 3. Autocommit starts
       processor.processEvent(
         createEvent('autocommit_started', { message: 'Committing...', messageId: 'msg-1' })
       );
       expect(callbacks.onAutocommitUpdated).toHaveBeenCalledTimes(1);
-      // Still streaming
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
 
-      // 4. Autocommit completes
       processor.processEvent(
         createEvent('autocommit_completed', {
           success: true,
@@ -1905,10 +1763,8 @@ describe('createEventProcessor', () => {
           commitHash: 'abc123',
         })
       );
-      // Still streaming (complete hasn't fired yet)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
 
-      // 5. Wrapper sends complete
       processor.processEvent(createEvent('complete', {}));
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(2);
       expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
@@ -2062,7 +1918,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Success without message
       processor.processEvent(
         createEvent('autocommit_completed', { success: true, messageId: 'msg-1' })
       );
@@ -2072,7 +1927,6 @@ describe('createEventProcessor', () => {
         expect.objectContaining({ status: 'completed', message: 'Changes committed' })
       );
 
-      // Failure without message
       processor.processEvent(
         createEvent('autocommit_completed', { success: false, messageId: 'msg-2' })
       );
@@ -2102,7 +1956,6 @@ describe('createEventProcessor', () => {
       };
       const processor = createEventProcessor({ callbacks });
 
-      // Invalid event missing required fields
       processor.processEvent({ invalid: true } as unknown as CloudAgentEvent);
 
       expect(callbacks.onMessageUpdated).not.toHaveBeenCalled();

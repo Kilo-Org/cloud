@@ -15,7 +15,6 @@ export const SNAPSHOT_RUNTIME = 'node24';
 export const PINNED_BUN_VERSION = RUNTIME_DISTRIBUTION.bun;
 export const SNAPSHOT_MANIFEST_PATH = '/usr/local/share/kilo/runtime-manifest.json';
 
-export const SNAPSHOT_WRAPPER_PATH = runtimeInstallPath(wrapperBundle('src/main.ts').installName);
 export const SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH = runtimeInstallPath(
   wrapperBundle('src/control-plane/main.ts').installName
 );
@@ -37,7 +36,6 @@ export type RuntimeManifest = {
   wrapperVersion: string;
   runtime: typeof SNAPSHOT_RUNTIME;
   bunVersion: string;
-  wrapperSha256: string;
   controlPlaneWrapperSha256: string;
   controlPlaneSupervisorSha256: string;
   artifacts: RuntimeManifestArtifact[];
@@ -58,13 +56,11 @@ const MANIFEST_SCALAR_KEYS = [
   'wrapperVersion',
   'runtime',
   'bunVersion',
-  'wrapperSha256',
   'controlPlaneWrapperSha256',
   'controlPlaneSupervisorSha256',
 ] as const satisfies readonly (keyof RuntimeManifest)[];
 
 const MANIFEST_REQUIRED_ARTIFACTS = [
-  'kilocode-wrapper.js',
   'kilocode-control-plane-wrapper.js',
   'kilocode-control-plane-supervisor.sh',
 ] as const;
@@ -102,7 +98,6 @@ export function sha256Hex(bytes: Uint8Array): string {
 export function createRuntimeManifest(input: {
   runtimeBuildId: string;
   wrapperVersion: string;
-  wrapperBytes: Uint8Array;
   controlPlaneWrapperBytes: Uint8Array;
   controlPlaneSupervisorBytes: Uint8Array;
   artifacts: readonly RuntimeManifestArtifact[];
@@ -127,7 +122,6 @@ export function createRuntimeManifest(input: {
     wrapperVersion: input.wrapperVersion,
     runtime: SNAPSHOT_RUNTIME,
     bunVersion: input.bunVersion ?? PINNED_BUN_VERSION,
-    wrapperSha256: sha256Hex(input.wrapperBytes),
     controlPlaneWrapperSha256: sha256Hex(input.controlPlaneWrapperBytes),
     controlPlaneSupervisorSha256: sha256Hex(input.controlPlaneSupervisorBytes),
     artifacts: [...input.artifacts],

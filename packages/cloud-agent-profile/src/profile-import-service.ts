@@ -62,7 +62,7 @@ export type PostImportSkill = {
   rawMarkdown: string;
   files: Record<string, string>;
   enabled: boolean;
-  sourceType: 'marketplace' | 'custom';
+  sourceType: 'marketplace' | 'custom' | 'skills-sh';
   sourceUrl: string | null;
 };
 

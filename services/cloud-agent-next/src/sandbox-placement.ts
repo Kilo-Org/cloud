@@ -14,6 +14,7 @@ import {
   type SandboxIdClass,
   type SandboxSelectionEnv,
 } from './sandbox-id.js';
+import { isCodeReviewContainersOwner, type CodeReviewContainersEnv } from './session-identity.js';
 import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
 
 /**
@@ -62,7 +63,7 @@ export type ControlPlaneSandboxDecision = {
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
 export async function selectControlPlaneSandbox(input: {
-  env: SandboxSelectionEnv;
+  env: SandboxSelectionEnv & CodeReviewContainersEnv;
   sessionId: string;
   userId: string;
   orgId?: string;
@@ -72,15 +73,17 @@ export async function selectControlPlaneSandbox(input: {
 }): Promise<ControlPlaneSandboxDecision> {
   const sandboxKind = controlPlaneSandboxKind(input);
   const provider =
-    input.sandboxAllocation === undefined
-      ? selectDefaultSandboxProvider({
-          env: input.env,
-          orgId: input.orgId,
-          userId: input.userId,
-          plane: 'control',
-          isolated: sandboxKind === 'isolated',
-        })
-      : getSandboxAllocationProvider(input.sandboxAllocation);
+    input.sandboxAllocation !== undefined
+      ? getSandboxAllocationProvider(input.sandboxAllocation)
+      : input.codeReview &&
+          isCodeReviewContainersOwner(input.env, { userId: input.userId, orgId: input.orgId })
+        ? 'cloudflare-containers'
+        : selectDefaultSandboxProvider({
+            env: input.env,
+            orgId: input.orgId,
+            userId: input.userId,
+            isolated: sandboxKind === 'isolated',
+          });
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
 }
 

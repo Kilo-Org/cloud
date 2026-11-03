@@ -1,8 +1,9 @@
-import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { DirectByokProviderId } from '@kilocode/worker-utils/direct-byok-model';
 
 // Client-safe display names for direct BYOK providers.
 export const DIRECT_BYOK_PROVIDERS_META = {
   'alibaba-token-plan': 'Alibaba Token Plan (Singapore)',
+  'bedrock-byok': 'Amazon Bedrock (direct)',
   'byteplus-coding': 'BytePlus Coding Plan',
   'chutes-byok': 'Chutes BYOK',
   edenai: 'Eden AI',
@@ -16,9 +17,10 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'opencode-go': 'OpenCode Go',
   orcarouter: 'OrcaRouter',
   synthetic: 'Synthetic',
+  'vertex-byok': 'Google Vertex AI (direct)',
   'xiaomi-token-plan-ams': 'Xiaomi Token Plan (Europe)',
   'xiaomi-token-plan-sgp': 'Xiaomi Token Plan (Singapore)',
   'zai-coding': 'Z.ai Coding Plan',
-} as const satisfies Record<Exclude<DirectUserByokInferenceProviderId, 'codestral'>, string>;
+} as const satisfies Record<DirectByokProviderId, string>;
 
 export type DirectByokProviderMetaId = keyof typeof DIRECT_BYOK_PROVIDERS_META;

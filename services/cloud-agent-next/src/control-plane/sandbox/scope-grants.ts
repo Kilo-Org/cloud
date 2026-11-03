@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import {
+  persistedSessionCredentialGrantSchema,
   removeSessionCredentialMembership,
-  sessionCredentialGrantSchema,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { retireAcceptedHandlesSync, type SyncAcceptedHandleStorage } from './accepted-handles.js';
@@ -10,13 +10,23 @@ import { scopeGrants } from './sqlite-schema.js';
 
 type GrantDatabase = Pick<ReturnType<typeof drizzle>, 'select' | 'insert' | 'delete'>;
 
+/** A readable persisted grant, or null for a row this version cannot interpret. */
+function parsePersistedGrant(raw: string): SessionCredentialGrant | null {
+  try {
+    const parsed = persistedSessionCredentialGrantSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export function scopeGrantId(grant: SessionCredentialGrant): string {
   return `${grant.scopeId}:${grant.kilo.runtimeProxy === undefined ? 'legacy' : 'runtime'}`;
 }
 
 export function readScopeGrant(db: GrantDatabase, id: string): SessionCredentialGrant | null {
   const row = db.select().from(scopeGrants).where(eq(scopeGrants.id, id)).get();
-  return row === undefined ? null : sessionCredentialGrantSchema.parse(JSON.parse(row.grant));
+  return row === undefined ? null : parsePersistedGrant(row.grant);
 }
 
 export function listScopeGrants(db: GrantDatabase): SessionCredentialGrant[] {
@@ -24,7 +34,10 @@ export function listScopeGrants(db: GrantDatabase): SessionCredentialGrant[] {
     .select()
     .from(scopeGrants)
     .all()
-    .map(row => sessionCredentialGrantSchema.parse(JSON.parse(row.grant)));
+    .flatMap(row => {
+      const grant = parsePersistedGrant(row.grant);
+      return grant === null ? [] : [grant];
+    });
 }
 
 export function writeScopeGrant(db: GrantDatabase, grant: SessionCredentialGrant): void {

@@ -1,36 +1,48 @@
+/* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Check, GitPullRequest } from '@/components/ui/icons';
+import { GitPullRequest } from '@/components/ui/icons';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
 
-import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
+import {
+  MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+  matchesCodeReviewUrlSuffix,
+} from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import {
-  PERSONAL_SCOPE,
   useGitHubStatus,
   useGitLabStatus,
   useReviewConfig,
+  useReviewerPermission,
 } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
+import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
+import { ManualReviewSkeleton } from './manual-review-skeleton';
+import { connectNoticeKey } from './connect-notice-key';
+import { manualReviewStartFailure } from './manual-review-start-error';
+import { ManualReviewStartFeedback } from './manual-review-start-feedback';
+import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
@@ -60,8 +72,37 @@ function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): bo
   return URL_HOST_PATTERN[platform].test(url) && matchesCodeReviewUrlSuffix(platform, url);
 }
 
+/**
+ * True when the failure is the client control-plane deadline firing, matched
+ * by error name down the cause chain: tRPC wraps the fetch rejection in a
+ * `TRPCClientError` whose `cause` carries the deadline error, and the
+ * deadline class's identity can be lost across module boundaries (its name
+ * survives). Same bounded walk as `isStalledTransportError`, name-based.
+ */
+function isDeadlineStall(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current.name === 'RequestDeadlineError') {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+// Breathing room kept above the URL section when the body scrolls back to it, so
+// the field label is not flush against the header.
+const FORM_EDGE_GAP = 16;
+
+// How close to the instructions bound the remaining-character count appears:
+// the same rule the chat composer uses, so an ordinary short note shows no
+// count and a long draft counts down. At the bound the count would read zero,
+// which the sentence stating the limit says instead.
+const INSTRUCTIONS_COUNTER_VISIBLE_REMAINING = 1_000;
+
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
@@ -71,14 +112,97 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const statusesLoading = githubStatus.isLoading || gitlabStatus.isLoading;
   const statusesError = githubStatus.isError || gitlabStatus.isError;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
+  const permission = useReviewerPermission(scope);
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
+  // The field names the request the selected platform serves: GitHub calls it a
+  // pull request and GitLab a merge request, and the placeholder and the start
+  // error already follow that split. One label feeds both the visible heading
+  // and the field's accessible name, so the two cannot disagree.
+  const urlLabel = t(
+    platform === 'gitlab'
+      ? 'codeReviewer.manualReview.mergeRequestUrl'
+      : 'codeReviewer.manualReview.pullRequestUrl'
+  );
   const urlRef = useRef('');
   const instructionsRef = useRef('');
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const urlSectionY = useRef(0);
   const [urlError, setUrlError] = useState<string | null>(null);
+  // The instructions box stays uncontrolled (its text lives in the ref), but
+  // the counter under it has to re-render on every edit.
+  const [instructionsLength, setInstructionsLength] = useState(0);
+  const instructionsRemaining = MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH - instructionsLength;
   const config = useReviewConfig(scope, platform);
-  const createReview = useCreateManualReview(scope);
-  const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
+  // The screen renders the create's failure inline (stall or settled error),
+  // so the hook's toast stays off for it. The watchdog fires at the
+  // control-plane deadline while the request is still pending, releases the
+  // busy button, and a late success still navigates.
+  const createReview = useCreateManualReview(scope, { silent: true });
+  const start = useDeadlineWatchedStart(
+    MANUAL_REVIEW_START_DEADLINE_MS,
+    () => createReview.isPending,
+    settle => {
+      const url = urlRef.current.trim();
+      if (!isValidManualReviewUrl(platform, url)) {
+        setUrlError(
+          t(
+            platform === 'gitlab'
+              ? 'codeReviewer.manualReview.invalidMergeRequestUrl'
+              : 'codeReviewer.manualReview.invalidUrl'
+          )
+        );
+        // The action is pinned outside the scroll body, so the URL section can
+        // be above the fold when Start is pressed (a short viewport, a raised
+        // keyboard). Bring that section back on screen with the message; the
+        // offset is measured, so a viewport too short for the platform group
+        // above it still reaches the field instead of stopping at the top.
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, urlSectionY.current - FORM_EDGE_GAP),
+          animated: true,
+        });
+        return false;
+      }
+      setUrlError(null);
+      if (!config.data) {
+        return false;
+      }
+      createReview.mutate(
+        {
+          platform,
+          url,
+          modelSlug: effectiveModel.modelSlug,
+          thinkingEffort: effectiveModel.thinkingEffort,
+          instructions: instructionsRef.current.trim() || undefined,
+        },
+        {
+          onSuccess: ({ reviewId }) => {
+            settle(null);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
+            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+          },
+          onError: error => {
+            // A client-deadline rejection is the stall, not a server reason:
+            // render the localized wait copy instead of the raw timeout text.
+            // Matched by error name, not instanceof: the deadline class can
+            // cross a module boundary where its identity is lost. Anything
+            // else settles with the copy for its tRPC error code — the
+            // server's own message is English and must not reach this
+            // localized screen.
+            if (isDeadlineStall(error)) {
+              // A wait that ran out its budget is retryable: the same draft
+              // may still start.
+              settle({ message: t('common.takingLonger'), retryable: true });
+              return;
+            }
+            settle(manualReviewStartFailure(error, platform));
+          },
+        }
+      );
+      return true;
+    }
+  );
+  const { models } = useReviewerModels(scope);
   const [modelChoice, setModelChoice] = useState<ModelChoice | null>(null);
   const effectiveModel = modelChoice ?? {
     modelSlug: config.data?.modelSlug ?? '',
@@ -86,35 +210,25 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   const onSubmit = () => {
-    const url = urlRef.current.trim();
-    if (!isValidManualReviewUrl(platform, url)) {
-      setUrlError(t('codeReviewer.manualReview.invalidUrl'));
-      return;
-    }
-    setUrlError(null);
-    if (!config.data) {
-      return;
-    }
-    createReview.mutate(
-      {
-        platform,
-        url,
-        modelSlug: effectiveModel.modelSlug,
-        thinkingEffort: effectiveModel.thinkingEffort,
-        instructions: instructionsRef.current.trim() || undefined,
-      },
-      {
-        onSuccess: ({ reviewId }) => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.replace(
-            `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${reviewId}` as Href
-          );
-        },
-      }
-    );
+    start.begin();
   };
 
-  if (!statusesLoading && statusesError && !isConnected('github') && !isConnected('gitlab')) {
+  if (statusesLoading) {
+    // Neither state can be rendered yet: the status decides between the
+    // connect state and the form, so the body holds the shape the status is
+    // about to fill instead of the form it may replace.
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('common.codeReviewer')}
+        />
+        <ManualReviewSkeleton />
+      </View>
+    );
+  }
+
+  if (statusesError && !isConnected('github') && !isConnected('gitlab')) {
     // A permission/not-found error can't be fixed by retrying — show the
     // permanent variant with no retry instead of a misleading "try again".
     const statusErrorCode =
@@ -123,7 +237,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <ReviewerHeader
           title={t('codeReviewer.manualReview.title')}
           eyebrow={t('common.codeReviewer')}
         />
@@ -145,30 +259,48 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
-  if (!statusesLoading && !statusesError && !isConnected('github') && !isConnected('gitlab')) {
+  if (!statusesError && !isConnected('github') && !isConnected('gitlab')) {
+    // The only way out of this state is installing the provider's app for the
+    // scope, which the server restricts to an organization-manage role
+    // (`githubApps.mintInstallState` takes `ORGANIZATION_MANAGE_ROLES`). A
+    // narrower role gets the same read-only notice the provider overview shows
+    // instead of a button whose destination refuses them with no action of its
+    // own. An unresolved permission keeps the button — `review-memory-screen`
+    // treats an unsettled permission the same way, and the provider procedures
+    // stay server-authorized.
+    const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <ReviewerHeader
           title={t('codeReviewer.manualReview.title')}
           eyebrow={t('common.codeReviewer')}
         />
         <EmptyState
           icon={GitPullRequest}
-          title={t('codeReviewer.manualReview.connectProvider')}
-          description={t('codeReviewer.manualReview.connectProviderDescription')}
+          title={t('common.connectProvider')}
+          description={
+            // With the action in place the title and the button already say
+            // what to do, and the old sentence repeated both; only the role
+            // notice, which the button cannot express, stays.
+            canConnect
+              ? undefined
+              : t(connectNoticeKey('github'), { platform: PLATFORM_CAPABILITIES.github.label })
+          }
           action={
-            // `mt-3 w-full` matches the near-identical PR-review connect gate
-            // (pr-review-connect-gate.tsx) and the Code Reviewer
-            // ProviderConnectCard, so the same Connect GitHub action is styled
-            // the same wherever it appears.
-            <Button
-              className="mt-3 w-full"
-              onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
-              }}
-            >
-              <Text>{t('common.connectGithub')}</Text>
-            </Button>
+            canConnect ? (
+              // `mt-3 w-full` matches the near-identical PR-review connect gate
+              // (pr-review-connect-gate.tsx) and the Code Reviewer
+              // ProviderConnectCard, so the same Connect GitHub action is styled
+              // the same wherever it appears.
+              <Button
+                className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
+                onPress={() => {
+                  pushOnce(`/(app)/code-reviewer/${scope}/github` as Href);
+                }}
+              >
+                <Text>{t('common.connectGithub')}</Text>
+              </Button>
+            ) : undefined
           }
         />
       </View>
@@ -177,12 +309,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ReviewerHeader
         title={t('codeReviewer.manualReview.title')}
         eyebrow={t('common.codeReviewer')}
       />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           contentContainerClassName="px-6 gap-6 pt-4 pb-4"
           automaticallyAdjustKeyboardInsets
@@ -193,78 +326,46 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('common.platform')}
             </Text>
-            {statusesLoading ? (
-              <View className="gap-2">
-                <Skeleton className="h-14 w-full rounded-lg" />
-                <Skeleton className="h-14 w-full rounded-lg" />
-              </View>
-            ) : (
-              <RadioGroup
-                label={t('common.platform')}
-                className="overflow-hidden rounded-lg bg-secondary"
-              >
-                {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
-                  const connected = isConnected(option);
-                  return (
-                    <Pressable
-                      key={option}
-                      disabled={!connected}
-                      className={cn(
-                        'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                        index < MANUAL_REVIEW_PLATFORMS.length - 1 &&
-                          'border-b-[0.5px] border-hair-soft',
-                        !connected && 'opacity-50'
-                      )}
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        urlRef.current = '';
-                        setUrlError(null);
-                        setPlatformChoice(option);
-                      }}
-                      {...radioItemA11y({
-                        label: PLATFORM_CAPABILITIES[option].label,
-                        checked: connected && platform === option,
-                        disabled: !connected,
-                      })}
-                    >
-                      <View>
-                        <Text className="text-sm font-medium">
-                          {PLATFORM_CAPABILITIES[option].label}
-                        </Text>
-                        {!connected && (
-                          <Text variant="muted" className="text-xs">
-                            {t('common.notConnected')}
-                          </Text>
-                        )}
-                      </View>
-                      <Check
-                        size={18}
-                        color={connected && platform === option ? colors.foreground : 'transparent'}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </RadioGroup>
-            )}
+            <ManualReviewPlatformPicker
+              isLoading={statusesLoading}
+              platform={platform}
+              isConnected={isConnected}
+              onSelect={option => {
+                urlRef.current = '';
+                setUrlError(null);
+                start.reset();
+                setPlatformChoice(option);
+              }}
+            />
           </View>
 
-          <View className="gap-3">
+          <View
+            className="gap-3"
+            onLayout={event => {
+              urlSectionY.current = event.nativeEvent.layout.y;
+            }}
+          >
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.manualReview.pullRequestUrl')}
+              {urlLabel}
             </Text>
             <Input
               key={platform}
               // The shared single-line box supplies the touch floor
               // (`min-h-[44px]`, never a fixed height); the field keeps its
-              // own chrome, horizontal inset and line box.
-              className="rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
+              // own chrome, horizontal inset and line box. An invalid URL adds
+              // the same destructive border the shared `FormField` gives its
+              // own field, so the error reads on the box as well as below it.
+              className={cn(
+                'rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground',
+                urlError && 'border-destructive'
+              )}
               placeholder={URL_PLACEHOLDER[platform]}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
               accessibilityLabel={formFieldA11y({
-                label: t('codeReviewer.manualReview.pullRequestUrl'),
+                label: urlLabel,
                 error: urlError,
               })}
               onChangeText={value => {
@@ -272,9 +373,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 if (urlError) {
                   setUrlError(null);
                 }
+                start.reset();
               }}
             />
-            {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
+            {/* The shared status renders the visible line and owns the
+                announcement: a polite live region on Android, one imperative
+                iOS announcement per new message. A bare `Text` showed the copy
+                but told a screen reader nothing. */}
+            <AccessibleStatus message={urlError} className="text-xs" />
           </View>
 
           <View className="gap-3">
@@ -282,15 +388,56 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('codeReviewer.manualReview.instructions')}
             </Text>
             <TextInput
-              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+              // The route caps this at the same constant (its zod schema), and
+              // the native input clips a longer value (a paste) at `maxLength`
+              // before the change reaches JS, so the form cannot produce the
+              // request the route would answer with its generic "can't be
+              // reviewed" line.
+              maxLength={MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH}
+              // The visible heading above is a separate `Text`, so without an
+              // explicit label a screen reader names this multiline field with
+              // the draft it contains. The name comes from the same catalog key
+              // the heading renders, like the URL field's does.
+              accessibilityLabel={formFieldA11y({
+                label: t('codeReviewer.manualReview.instructions'),
+              })}
+              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {
                 instructionsRef.current = value;
+                setInstructionsLength(value.length);
+                start.reset();
               }}
             />
+            {/* One line at a time: the room left while the draft nears the
+                bound, the bound itself once it is reached. The counted sentence
+                is the row's accessible name, so the number is not read alone. */}
+            {instructionsRemaining > 0 &&
+            instructionsRemaining <= INSTRUCTIONS_COUNTER_VISIBLE_REMAINING ? (
+              <View className="flex-row justify-end">
+                {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+                <Text
+                  className="text-xs font-normal text-muted-foreground"
+                  accessibilityLabel={t('agentChat.composer.charactersRemaining', {
+                    count: instructionsRemaining,
+                  })}
+                >
+                  {instructionsRemaining}
+                </Text>
+              </View>
+            ) : null}
+            {instructionsRemaining <= 0 ? (
+              <AccessibleStatus
+                message={t('codeReviewer.manualReview.instructionsAtLimit', {
+                  max: MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+                })}
+                tone="status"
+                className="text-xs"
+              />
+            ) : null}
           </View>
 
           <View className="gap-3">
@@ -303,8 +450,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 options={models}
                 value={effectiveModel.modelSlug}
                 variant={effectiveModel.thinkingEffort ?? ''}
+                acceptsVariant
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+                  start.reset();
                 }}
               />
             </View>
@@ -321,13 +470,18 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             trailing control left to reveal, and scrolling the body to its end
             would carry the focused URL field off screen. */}
         <ManualReviewActionFooter>
+          <ManualReviewStartFeedback
+            stalled={start.stalled}
+            failure={start.failure}
+            onRetry={onSubmit}
+          />
           <Button
-            loading={createReview.isPending}
+            loading={start.isPending}
             disabled={!config.data || !isConnected(platform)}
             onPress={onSubmit}
           >
             <Text>
-              {createReview.isPending
+              {start.isPending
                 ? t('codeReviewer.manualReview.starting')
                 : t('codeReviewer.manualReview.start')}
             </Text>

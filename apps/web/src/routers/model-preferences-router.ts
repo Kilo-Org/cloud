@@ -33,13 +33,18 @@ async function getAllowedModelIdsForOrg(
   if (!organizationId) {
     return null;
   }
-  const response = await getAvailableModelsForOrganization(organizationId, {
-    type: 'member',
-    kiloUserId,
-    // Callers reach this after `ensureOrganizationAccess`, which also admits Kilo
-    // admins and parent-organization owners without a membership row.
-    allowNonMember: true,
-  });
+  const response = await getAvailableModelsForOrganization(
+    organizationId,
+    {
+      type: 'member',
+      kiloUserId,
+      // Callers reach this after `ensureOrganizationAccess`, which also admits Kilo
+      // admins and parent-organization owners without a membership row.
+      allowNonMember: true,
+    },
+    'member',
+    { countryCode: null }
+  );
   if (!response) {
     return new Set();
   }

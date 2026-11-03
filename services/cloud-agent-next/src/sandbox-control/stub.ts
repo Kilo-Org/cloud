@@ -11,5 +11,5 @@ export function getSandboxControlStub(
   env: Pick<Env, 'SANDBOX_CONTROL'>,
   sandboxId: string
 ): DurableObjectStub<SandboxControlV2> {
-  return env.SANDBOX_CONTROL.getByName(sandboxId) as unknown as DurableObjectStub<SandboxControlV2>;
+  return env.SANDBOX_CONTROL.getByName(sandboxId);
 }

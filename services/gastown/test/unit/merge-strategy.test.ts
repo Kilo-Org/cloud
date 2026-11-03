@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../../src/types';
 import { resolveMergeStrategy } from '../../src/dos/town/config';
 import { parseGitUrl, buildPRBody, type QualityGateResult } from '../../src/util/platform-pr.util';
+
+vi.mock('../../src/dos/GastownUser.do', () => ({ getGastownUserStub: vi.fn() }));
+vi.mock('../../src/dos/GastownOrg.do', () => ({ getGastownOrgStub: vi.fn() }));
 
 describe('merge strategy', () => {
   describe('TownConfigSchema merge_strategy field', () => {

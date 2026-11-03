@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Lock, Plus, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,11 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
+import {
+  getGitHubRepositoryNotices,
+  githubIntegrationSettingsHref,
+} from '../github-repository-status';
 import { excludeListedRepositories } from './settings-options';
 
 export type RepositoryOption = {
@@ -76,6 +82,31 @@ export function RepositoryPicker({
   const hasBothPlatforms =
     (github.data?.repositories.length ?? 0) > 0 && (gitlab.data?.repositories.length ?? 0) > 0;
 
+  const githubNotices = getGitHubRepositoryNotices(
+    github.data,
+    githubIntegrationSettingsHref(organizationId)
+  );
+
+  // A partial list needs a provider read, not a cache read: the retry control
+  // forces the same refresh the new-session picker runs.
+  const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepositories } =
+    useRefreshRepositories({
+      getRefreshQueryOptions: () =>
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+              organizationId,
+              forceRefresh: true,
+            })
+          : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: true }),
+      getCacheQueryKey: () =>
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryKey({
+              organizationId,
+              forceRefresh: false,
+            })
+          : trpc.cloudAgentNext.listGitHubRepositories.queryKey({ forceRefresh: false }),
+    });
+
   const choose = (repository: RepositoryOption) => {
     setOpen(false);
     onSelect(repository);
@@ -92,6 +123,32 @@ export function RepositoryPicker({
       <PopoverContent className="w-80 p-0" align="end">
         <Command>
           <CommandInput placeholder="Search repositories..." />
+          {githubNotices.length > 0 && (
+            <div className="space-y-1 border-b px-3 py-2 text-xs">
+              {githubNotices.map(notice => (
+                <p key={notice.kind} className="text-amber-400">
+                  {notice.message}{' '}
+                  {notice.kind === 'reconnect' ? (
+                    <Link
+                      href={notice.settingsHref}
+                      className="text-link hover:text-link-hover underline underline-offset-4"
+                    >
+                      Review the GitHub connection
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void refreshGitHubRepositories()}
+                      disabled={isRefreshingGitHubRepositories}
+                      className="underline underline-offset-4 disabled:opacity-50"
+                    >
+                      {isRefreshingGitHubRepositories ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                  )}
+                </p>
+              ))}
+            </div>
+          )}
           <CommandList className="max-h-64 overflow-auto">
             {github.isLoading || gitlab.isLoading ? (
               <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-sm">

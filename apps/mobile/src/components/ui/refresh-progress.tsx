@@ -1,11 +1,12 @@
-import { type ScrollViewProps, View } from 'react-native';
+import { type ReactElement } from 'react';
+import { type RefreshControlProps, View } from 'react-native';
 
 import { Loader2 } from '@/components/ui/icons';
 import { useProvidedMotionPolicy } from '@/lib/a11y/motion-context';
 import { darkColors } from '@/lib/hooks/theme-colors.generated';
 
 type RefreshProgressProps = {
-  refreshControl: NonNullable<ScrollViewProps['refreshControl']>;
+  refreshControl: ReactElement<RefreshControlProps>;
 };
 
 /**

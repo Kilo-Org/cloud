@@ -106,14 +106,12 @@ const selectTurns = async (db: Db, sessionId: string): Promise<readonly Turn[]> 
     db.select().from(parts).where(eq(parts.sessionId, sessionId)).orderBy(asc(parts.id)),
   ]);
   const held = byTurn(assertParts(partRows));
-  return assertTurns(turnRows).map(
-    (turn): Turn => ({
-      id: turn.id,
-      sessionId: turn.sessionId,
-      role: turn.role,
-      parts: held.get(turn.id) ?? [],
-    })
-  );
+  return assertTurns(turnRows).map((turn): Turn => ({
+    id: turn.id,
+    sessionId: turn.sessionId,
+    role: turn.role,
+    parts: held.get(turn.id) ?? [],
+  }));
 };
 
 /**
@@ -135,7 +133,7 @@ const storeOn = (connection: Connection): SessionStoreService => {
     read: sessionId =>
       attempt('read', async () => {
         const rows = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
-        return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
+        return Option.map(Option.fromNullishOr(assertSessions(rows)[0]), asStoredSession);
       }),
 
     append: exchange => attempt('append', () => insertExchange(connection, db, exchange)),
@@ -150,19 +148,29 @@ const storeOn = (connection: Connection): SessionStoreService => {
  * Opens the store: migrates, then hands back the plugin. Migrating here rather
  * than on first use means a database that cannot be migrated fails when the
  * layer is built, not on the first question somebody asks.
+ *
+ * What the driver kept between calls is released here too, so a prepared
+ * statement lives exactly as long as the store that prepared it. A driver that
+ * keeps nothing says so by leaving `close` out.
  */
 const layerSqliteStore = (driver: SqlDriver): Layer.Layer<SessionStore, StoreError> =>
   Layer.suspend(() => {
     const connection = connectionOf(driver);
+    const { close } = driver;
     return Layer.effect(
       SessionStore,
-      Effect.map(
-        attempt('create', async () => {
+      Effect.gen(function* () {
+        /* The release is registered before the work that can fail, so a
+           migration that throws still hands back what the driver prepared. */
+        yield* Effect.acquireRelease(Effect.void, () =>
+          close === undefined ? Effect.void : Effect.ignore(Effect.tryPromise(() => close()))
+        );
+        return yield* attempt('create', async () => {
           await driver('PRAGMA foreign_keys = ON', [], 'run');
           await migrate(connection);
-        }),
-        () => storeOn(connection)
-      )
+          return storeOn(connection);
+        });
+      })
     );
   });
 

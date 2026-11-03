@@ -1,3 +1,4 @@
+import type { KiloSdkAssistantError } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 import type {
   CloudAgentAssistantFailureReason,
@@ -80,12 +81,61 @@ export function projectSafeAssistantError(source: unknown): string | undefined {
   return failure.providerOwnership === 'byok' ? `[BYOK] ${message}` : message;
 }
 
+const EXECUTION_STOPPED_MESSAGES = {
+  agent_unresponsive:
+    'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.',
+  agent_restarted: 'Execution stopped because the agent restarted. You can continue in this chat.',
+  no_progress: 'Execution stopped because it made no progress. You can continue in this chat.',
+  execution_limit:
+    'Execution stopped because it reached its time limit. You can continue in this chat.',
+} as const;
+
+export function executionStoppedMessage(
+  reason: keyof typeof EXECUTION_STOPPED_MESSAGES,
+  safeRetryMessage?: string
+): string {
+  return safeRetryMessage === undefined
+    ? EXECUTION_STOPPED_MESSAGES[reason]
+    : `Execution stopped while the model request kept retrying: ${safeRetryMessage}. You can continue in this chat.`;
+}
+
+const EXECUTION_RETRY_MESSAGES: ReadonlySet<string> = new Set(
+  [...Object.values(ASSISTANT_FAILURE_MESSAGES), BYOK_INVALID_REQUEST_MESSAGE].map(message =>
+    executionStoppedMessage('no_progress', message)
+  )
+);
+
+export function projectSafeSessionError(source: unknown, reason: unknown): string {
+  const safeError = projectSafeAssistantError(source) ?? classifyAssistantFailureMessage(source);
+  if (
+    typeof source === 'string' &&
+    (reason === 'agent_unresponsive' ||
+      reason === 'agent_restarted' ||
+      reason === 'no_progress' ||
+      reason === 'execution_limit') &&
+    (source === executionStoppedMessage(reason) ||
+      ((reason === 'no_progress' || reason === 'execution_limit') &&
+        EXECUTION_RETRY_MESSAGES.has(source)))
+  ) {
+    return source;
+  }
+  return safeError;
+}
+
 export function isAssistantInterrupt(source: unknown): boolean {
   if (typeof source === 'object' && source !== null && 'name' in source) {
     if (source.name === 'MessageAbortedError') return true;
   }
   return /messageabortederror|user[_ -]?interrupt|interrupted by the user/.test(
     assistantFailureText(source).toLocaleLowerCase()
+  );
+}
+
+export function missingAgentSlug(source: unknown): string | undefined {
+  const message = assistantFailureText(source).replace(/^\[BYOK\] /, '');
+  return (
+    /^Agent not found: "([a-z][a-z0-9-]{0,49})"\./.exec(message)?.[1] ??
+    /^Agent "([a-z][a-z0-9-]{0,49})" was not found in the repository or profile$/.exec(message)?.[1]
   );
 }
 
@@ -99,6 +149,14 @@ export function classifyAssistantFailure(
     /\[byok\]/i.test(message) || gatewayErrorType === 'byok_error'
       ? 'byok'
       : defaultProviderOwnership;
+  const missingAgent = missingAgentSlug(source);
+  if (missingAgent !== undefined) {
+    return {
+      reason: 'invalid_request',
+      safeMessage: `Agent "${missingAgent}" was not found in the repository or profile`,
+      providerOwnership,
+    };
+  }
   const messageReason = classifyAssistantFailureText(message);
   const specificMessageReason =
     messageReason !== 'unknown' &&
@@ -171,6 +229,17 @@ const providerErrorBodySchema = z.object({
   statusCode: optionalHttpStatus,
   code: optionalHttpStatus,
   name: optionalString,
+  // The provider timeout envelope nests its cause: the root tag is `error` and
+  // the inner object carries `type` "timeout" with `code` 504 (numeric or
+  // string). Each field is parsed independently so a wrong or missing sibling
+  // cannot make a partial shape look like a timeout.
+  type: asOptional(z.literal('error')),
+  error: asOptional(
+    z.object({
+      type: asOptional(z.literal('timeout')),
+      code: asOptional(z.union([z.literal(504), z.literal('504')])),
+    })
+  ),
 });
 
 type ProviderErrorBody = z.infer<typeof providerErrorBodySchema>;
@@ -239,6 +308,17 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
 
   const directStatus = httpStatusSchema.safeParse(data.statusCode);
   if (directStatus.success) {
+    // A direct 499 is unresolved by the status alone. The gateway can tag the
+    // bounded body with its recognized `upstream_error` origin, which names a
+    // model-serving failure that the generic 4xx `invalid_request` mapping
+    // would misattribute. Only this exact token bypasses the status mapping;
+    // every other status and every unrecognized body keeps the status result.
+    if (
+      directStatus.data === 499 &&
+      parseResponseBody(data.responseBody)?.error_type?.toLocaleLowerCase() === 'upstream_error'
+    ) {
+      return 'provider_unavailable';
+    }
     const reason = classifyHttpStatus(directStatus.data);
     if (reason !== undefined) return reason;
     // A well-formed but unmapped status (100–399) is authoritative: do not
@@ -260,7 +340,20 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
     if (reason !== undefined) return reason;
   }
 
-  return classifySdkErrorName({ name: responseBody.name });
+  const namedReason = classifySdkErrorName({ name: responseBody.name });
+  if (namedReason !== undefined) return namedReason;
+
+  // Last fallback: the provider's nested timeout envelope. The schema already
+  // validates each value, so a defined nested code is 504 or '504'.
+  if (
+    responseBody.type === 'error' &&
+    responseBody.error?.type === 'timeout' &&
+    responseBody.error.code !== undefined
+  ) {
+    return classifyHttpStatus(504);
+  }
+
+  return undefined;
 }
 
 /**
@@ -417,4 +510,53 @@ export function assistantReportsNoActionableOutput(parts: readonly unknown[]): b
   }
   const text = texts.join('\n');
   return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
+}
+
+export function projectSafeSdkAssistantError(source: unknown): KiloSdkAssistantError | undefined {
+  const message = projectSafeAssistantError(source);
+  if (message === undefined) return undefined;
+  if (isAssistantInterrupt(source)) return { name: 'MessageAbortedError', data: { message } };
+  if (typeof source === 'object' && source !== null && !Array.isArray(source) && 'name' in source) {
+    const data =
+      'data' in source &&
+      typeof source.data === 'object' &&
+      source.data !== null &&
+      !Array.isArray(source.data)
+        ? source.data
+        : {};
+    switch (source.name) {
+      case 'ProviderAuthError':
+        return { name: source.name, data: { providerID: 'unknown', message } };
+      case 'MessageOutputLengthError':
+      case 'ContextOverflowError':
+        return { name: source.name, data: { message } };
+      case 'APIError': {
+        if (!('isRetryable' in data) || typeof data.isRetryable !== 'boolean') break;
+        const statusCode = 'statusCode' in data ? data.statusCode : undefined;
+        return {
+          name: source.name,
+          data: {
+            message,
+            isRetryable: data.isRetryable,
+            ...(typeof statusCode === 'number' &&
+            Number.isInteger(statusCode) &&
+            statusCode >= 100 &&
+            statusCode <= 599
+              ? { statusCode }
+              : {}),
+          },
+        };
+      }
+      case 'StructuredOutputError':
+        if (
+          'retries' in data &&
+          typeof data.retries === 'number' &&
+          Number.isSafeInteger(data.retries) &&
+          data.retries >= 0
+        ) {
+          return { name: source.name, data: { message, retries: data.retries } };
+        }
+    }
+  }
+  return { name: 'UnknownError', data: { message } };
 }

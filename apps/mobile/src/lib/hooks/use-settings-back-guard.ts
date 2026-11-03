@@ -1,10 +1,9 @@
 import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
-import { useNavigation, useRouter } from 'expo-router';
-import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
+import { useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL_KEY = {
@@ -34,12 +33,24 @@ export function useSecurityAgentSettingsRedirect(
   }: Readonly<{ skipRedirect?: boolean; dirty?: boolean }> = {}
 ) {
   const router = useRouter();
-  // Undoing an edit must retry a disabled redirect that the dirty guard cancelled.
-  useEffect(() => {
-    if (isEnabled === false && !skipRedirect) {
-      router.replace(getSecurityAgentPath(scope, 'settings'));
-    }
-  }, [isEnabled, router, scope, skipRedirect, dirty]);
+  const settingsHref = getSecurityAgentPath(scope, 'settings');
+  const bounce = isEnabled === false && !skipRedirect;
+  // A focus effect, not an effect on the config alone: the config of a link
+  // that opens this screen can already be cached, so the bounce dispatches
+  // from the screen's first commit - before the link's own navigation lands.
+  // That navigation then focuses this route over the overview it replaced,
+  // and a config-keyed effect would never run again for an unchanged config,
+  // leaving the disabled screen focused and blank. Re-asserting the bounce on
+  // every focus (and on the deps below) recovers that, and any reader who
+  // returns to the route.
+  useFocusEffect(
+    useCallback(() => {
+      if (bounce) {
+        router.replace(settingsHref);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- `dirty` re-asserts the bounce after an edit is undone, which the guard cancelled while the draft was dirty
+    }, [bounce, dirty, router, settingsHref])
+  );
 }
 
 export type SettingsBackGuardResult = {
@@ -50,6 +61,11 @@ export type SettingsBackGuardResult = {
   /** The confirmation to render; null while none is pending. */
   dialog: ReactNode;
 };
+
+/** What a guarded save settled: `declined` means the caller asked its own
+ * destructive question and the reader backed out of it, so the draft stays
+ * unsaved and the screen stays where it is. */
+export type SettingsBackGuardSaveOutcome = 'saved' | 'declined';
 
 /**
  * Shared dirty-screen back handling for Security Agent settings screens.
@@ -63,7 +79,11 @@ export type SettingsBackGuardResult = {
  * so the native alert's destructive style would never reach the screen there
  * and Discard would lose its red affordance. It offers Keep editing
  * (the safe choice), Discard, and — while the draft is valid — Save, which
- * persists the draft and then replays the captured navigation action. The
+ * persists the draft and then replays the captured navigation action. An
+ * invalid draft has nothing valid to persist, so that confirmation offers
+ * only Keep editing and Discard and says so instead of asking to save. A save
+ * the caller's own confirmation declined settles as `declined`, which keeps
+ * the screen and its draft where they are instead of replaying the leave. The
  * caller renders the returned `dialog` node in its own tree.
  *
  * Not a general form framework: it only classifies dirty/valid into that
@@ -77,7 +97,7 @@ export function useSettingsBackGuard({
 }: Readonly<{
   dirty: boolean;
   valid: boolean;
-  onSave: () => Promise<void>;
+  onSave: () => Promise<SettingsBackGuardSaveOutcome>;
 }>): SettingsBackGuardResult {
   const navigation = useNavigation();
   const { confirm, dialog } = useConfirmDialog();
@@ -96,27 +116,56 @@ export function useSettingsBackGuard({
   // popping a spurious "Unsaved changes" confirm whose own Save button would
   // save a second time.
   const skipNextGuardRef = useRef(false);
+  // Counts every confirmed leave rather than a boolean: a leave that lands
+  // after the guard is already open must still replay its own action instead
+  // of overwriting a pending one the effect has already consumed.
+  const [leaveCount, setLeaveCount] = useState(0);
+  const leaveAllowed = leaveCount > 0;
+  // The removal this screen walked back, replayed once the guard below has
+  // actually disabled itself. `repeat()` clears the prevention through a React
+  // state setter and then dispatches the action immediately, so calling it from
+  // inside the callback races that state: the navigator still sees the route as
+  // prevented and drops the action, leaving the screen in place after a
+  // successful save. The effect replays it from a commit where
+  // `preventRemove` is already false.
+  const pendingLeaveRef = useRef<null | (() => void)>(null);
 
-  usePreventRemove(dirty, ({ data }) => {
+  usePreventRemove(dirty && !leaveAllowed, ({ repeat }) => {
+    const leave = () => {
+      pendingLeaveRef.current = repeat;
+      setLeaveCount(count => count + 1);
+    };
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
-      navigation.dispatch(data.action);
+      leave();
       return;
     }
-    const action = data.action;
     const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
+    // The message follows the buttons: a screen with nothing valid to persist
+    // would contradict a prompt that asks the user to save.
+    const saveOffered = options.includes('save');
     confirm({
       title: i18n.t('securityAgent.settingsSave.unsavedTitle'),
-      message: i18n.t('securityAgent.settingsSave.unsavedMessage'),
+      message: i18n.t(
+        saveOffered
+          ? 'securityAgent.settingsSave.unsavedMessage'
+          : 'securityAgent.settingsSave.unsavedInvalidMessage'
+      ),
       cancelLabel: i18n.t(BUTTON_LABEL_KEY['keep-editing']),
-      extraAction: options.includes('save')
+      extraAction: saveOffered
         ? {
             label: i18n.t(BUTTON_LABEL_KEY.save),
             onPress: () => {
               void (async () => {
                 try {
-                  await onSaveRef.current();
-                  navigation.dispatch(action);
+                  // A caller that asks its own destructive question answers
+                  // `declined` when the reader backs out of it there: the
+                  // draft stays unsaved and the screen stays, as with Keep
+                  // editing.
+                  if ((await onSaveRef.current()) === 'declined') {
+                    return;
+                  }
+                  leave();
                 } catch {
                   // The save mutation's centralized onError already toasted —
                   // stay on the screen so the user can retry or discard.
@@ -126,13 +175,23 @@ export function useSettingsBackGuard({
           }
         : undefined,
       confirmLabel: i18n.t(BUTTON_LABEL_KEY.discard),
-      onConfirm: () => {
-        navigation.dispatch(action);
-      },
+      onConfirm: leave,
       // These settings screens are plain stack screens with no sheet or modal
       // on them, so the portal dialog can never hide behind a presented surface.
     });
   });
+
+  useEffect(() => {
+    if (leaveCount === 0) {
+      return;
+    }
+    const replay = pendingLeaveRef.current;
+    if (!replay) {
+      return;
+    }
+    pendingLeaveRef.current = null;
+    replay();
+  }, [leaveCount]);
 
   return {
     onBack: () => {

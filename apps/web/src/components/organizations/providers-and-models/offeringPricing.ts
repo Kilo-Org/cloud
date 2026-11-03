@@ -1,4 +1,4 @@
-import type { OpenRouterPricing } from '@kilocode/db/schema-types';
+import type { CustomPricingConfig, OpenRouterPricing } from '@kilocode/db/schema-types';
 import {
   formatPricePerToken,
   getCustomPricing,
@@ -16,11 +16,12 @@ function listPriceIfDiscounted(listPrice: string, billedPrice: string): string |
  * pricing by requested model.
  */
 export function getOfferingPricing(
+  customPricingConfig: CustomPricingConfig,
   modelVariantId: string,
   endpointPricing: OpenRouterPricing
 ): OfferingPricing {
   const listPricing = getModelDisplayPricing(endpointPricing) ?? endpointPricing;
-  const customPricing = getCustomPricing(modelVariantId);
+  const customPricing = getCustomPricing(customPricingConfig, modelVariantId);
   if (!customPricing || customPricing.fallbackOnly) {
     return { promptPrice: listPricing.prompt, completionPrice: listPricing.completion };
   }

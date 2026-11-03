@@ -16,7 +16,9 @@ import {
   getSessionContainerMetricsForInfo,
 } from '@/routers/admin/session-container-telemetry';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { eq } from 'drizzle-orm';
 import {
+  admin_action_audit_logs,
   cliSessions,
   cli_sessions_v2,
   cloud_agent_sessions,
@@ -153,6 +155,22 @@ describe('admin.sessionTraces authorization', () => {
     ).resolves.toEqual({ history: [{ role: 'user', content: 'hello' }] });
     expect(mockGetBlobContent).toHaveBeenNthCalledWith(1, 'sessions/messages.json');
     expect(mockGetBlobContent).toHaveBeenNthCalledWith(2, 'sessions/history.json');
+
+    const audits = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, viewer.id));
+    expect(audits.map(audit => audit.action).sort()).toEqual([
+      'cloud_agent_session.api_history.view',
+      'cloud_agent_session.messages.view',
+    ]);
+    for (const audit of audits) {
+      expect(audit).toMatchObject({
+        target_type: 'user',
+        target_id: owner.id,
+        metadata: { sessionId: session.session_id },
+      });
+    }
   });
 
   test('a session viewer can resolve and read v2 metadata and messages', async () => {
@@ -190,6 +208,19 @@ describe('admin.sessionTraces authorization', () => {
       format: 'v2',
     });
     expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(sessionId, owner.id);
+
+    // v2 has no API history, so only the messages view is recorded; metadata
+    // reads (get, resolve) are not content views.
+    const audits = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, viewer.id));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'cloud_agent_session.messages.view',
+      target_id: owner.id,
+      metadata: { sessionId },
+    });
   });
 
   test('a session viewer can resolve a control-plane workspace_ session ID', async () => {

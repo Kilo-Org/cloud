@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { useState } from 'react';
-import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,18 +9,17 @@ import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
-import { renderProfileRowBody } from '@/components/agents/new-session-profile-row';
-import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { ChevronDown } from '@/components/ui/icons';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
@@ -53,7 +52,21 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
+   */
+  accountSection?: React.ReactNode;
 };
+
+/**
+ * Space the advanced configuration keeps above itself when its expansion
+ * scrolls the composer, so the disclosure row it just revealed does not sit
+ * flush against the frame's top edge.
+ */
+const ADVANCED_CONFIG_REVEAL_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -94,15 +107,18 @@ export function NewSessionConfigureForm({
   isFetchingInstances,
   onRefreshInstances,
   onChangeRunOnInstance,
+  pendingComputer,
   showInstanceDisconnectedNote,
   folderPath,
   onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
+  autoFocusPrompt = true,
   groups,
   isRetrying,
   onChangeRepo,
   onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -121,29 +137,34 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  accountSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
   startBlockedReason = null,
+  startBlockedAction = null,
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  planRefusal = null,
+  remoteSpawnFailure = null,
+  onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   // The footer reserves the platform inset. KeyboardAvoidingView lifts the
   // scroll body and footer together; the prompt yields height to the viewport.
-  // The scroll view retains focused-input keyboard inset adjustment.
+  // The scroll view takes no keyboard inset of its own: iOS sized that inset
+  // before the lift, so the frame was cleared twice and the content scrolled
+  // the composer's mode and model row out of view once the keyboard settled.
+  // A focused field below the fold still scrolls into view through the text
+  // input's own caret reveal. (The picker-sheet sliver of the e1 spot check is
+  // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
+  // up at its first layout and never re-anchors, so the keyboard must be
+  // dismissed before the sheet opens.)
   const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
-  // The ScrollView's keyboard-inset adjustment stays on for focused-field
-  // scroll-into-view; it sizes against the scroll view's own frame, which
-  // already ends above the footer, so the two never stack into a double lift.
-  // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
-  // triggers: a formSheet anchors over the keyboard that is up at its first
-  // layout and never re-anchors, so the keyboard must be dismissed before
-  // the sheet opens.)
   // The scroll frame's own height, reported by the ScrollView below. It already
   // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
   // parent; the prompt yields its minimum height to it so the whole composer
@@ -154,8 +175,11 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
-  const isRemote = runOnInstance !== null;
-  const isStarting = isRemote ? isSpawningRemote : isCreating;
+  // The remote surface (launch folder, remote hint, no repository section)
+  // covers both a bound computer and the tour's computer target with none
+  // connected yet — the target is the computer either way.
+  const isRemote = runOnInstance !== null || pendingComputer === true;
+  const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -165,12 +189,24 @@ export function NewSessionConfigureForm({
     setFrameHeight(current => (current === next ? current : next));
   }
 
+  // The composer's scroll body, so the advanced configuration can bring its
+  // expanded content into view instead of growing below the fold. The panel
+  // reports its own offset once per expansion, after that content has laid
+  // out; the clamp keeps a panel near the top from overshooting.
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const revealAdvancedConfig = useCallback((contentOffset: number) => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, contentOffset - ADVANCED_CONFIG_REVEAL_GAP),
+      animated: true,
+    });
+  }, []);
+
   const body = (
     <ScrollView
+      ref={scrollRef}
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
       onLayout={handleScrollFrameLayout}
     >
@@ -210,19 +246,32 @@ export function NewSessionConfigureForm({
           cardTop={composerTop}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
+          autoFocusOnMount={autoFocusPrompt}
         />
       </View>
 
-      <NewSessionRunTarget
-        showRunOnSelector={showRunOnSelector}
-        runOnInstance={runOnInstance}
-        instanceList={instanceList}
-        isLoadingInstances={isLoadingInstances}
-        isFetchingInstances={isFetchingInstances}
-        onChangeRunOnInstance={onChangeRunOnInstance}
-        onRefreshInstances={onRefreshInstances}
-        disabled={isStarting}
-      />
+      {/* The block under the card: the Account section when the entry point
+          renders one, then the Run on row and its refresh control. */}
+      <View>
+        {/* The plan refusal is known before the press, so it sits in the scroll
+            content under the composer rather than in the pinned footer: it
+            never takes height from the fields, the launch folder included. */}
+        {planRefusal !== null ? (
+          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
+        ) : null}
+        {accountSection}
+        <NewSessionRunTarget
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          isFetchingInstances={isFetchingInstances}
+          onChangeRunOnInstance={onChangeRunOnInstance}
+          onRefreshInstances={onRefreshInstances}
+          pendingComputer={pendingComputer}
+          disabled={isStarting}
+        />
+      </View>
 
       {isRemote ? (
         <LaunchFolderField
@@ -233,9 +282,11 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
-        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
-      </Text>
+      {isRemote ? (
+        <Text className="mt-2 text-sm text-muted-foreground">
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
+        </Text>
+      ) : null}
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
@@ -246,6 +297,7 @@ export function NewSessionConfigureForm({
           isRetrying={isRetrying}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           recents={recents}
@@ -302,6 +354,7 @@ export function NewSessionConfigureForm({
           onManualCommandsChange={onManualCommandsChange}
           disabled={isStarting}
           onRepoDefaults={onOpenRepoDefaults}
+          onRequestReveal={revealAdvancedConfig}
         />
       ) : null}
     </ScrollView>
@@ -325,12 +378,22 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
+      {isRemote && remoteSpawnFailure !== null ? (
+        <NewSessionRemoteSpawnFailure
+          failure={remoteSpawnFailure}
+          onRetry={onRetryRemoteSpawn}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
       <NewSessionStartButton
         isCloneEntry={isCloneEntry}
         isRemote={isRemote}
         isStartDisabled={isStartDisabled}
         isStarting={isStarting}
         startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
+        blockedByPlan={planRefusal !== null}
         onStartSession={onStartSession}
       />
     </View>
@@ -348,78 +411,5 @@ export function NewSessionConfigureForm({
       {body}
       {footer}
     </KeyboardAvoidingView>
-  );
-}
-
-type NewSessionProfileRowProps = {
-  profile: EffectiveAgentProfile | null;
-  isProfileLoading: boolean;
-  isProfileError: boolean;
-  /** The picked override no longer resolves to a profile. */
-  overrideNeedsAttention: boolean;
-  onRetryProfile: () => void;
-  /** Opens the profile picker sheet. */
-  onOpenProfilePicker: () => void;
-};
-
-/**
- * The new-session Environment row: a tappable summary of the effective profile.
- * Loading and failure keep the shared body's reserved lines, so the rows below
- * never move when the query settles and no default flashes before it does.
- * The settled row is the entry point that opens the profile picker.
- *
- * It lives with this screen rather than in `new-session-profile-row` because
- * the chevron reaches the app's icon barrel, which the mounted
- * suite that renders the read-only row cannot load.
- */
-export function NewSessionProfileRow({
-  profile,
-  isProfileLoading,
-  isProfileError,
-  overrideNeedsAttention,
-  onRetryProfile,
-  onOpenProfilePicker,
-}: Readonly<NewSessionProfileRowProps>) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-
-  return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
-      {isProfileLoading || isProfileError ? (
-        renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
-      ) : (
-        <Pressable
-          className="min-h-11 flex-row items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70"
-          onPress={onOpenProfilePicker}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.pickProfile')}
-        >
-          <View className="min-w-0 flex-1 gap-1">
-            {overrideNeedsAttention ? (
-              <Text className="text-sm text-warn">
-                {t('agentChat.newSession.configNeedsAttention')}
-              </Text>
-            ) : null}
-            <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-              {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
-            </Text>
-            {profile ? (
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {t('agentChat.newSession.environmentSummary', {
-                  commands: profile.commandCount,
-                  mcp: profile.mcpServerCount,
-                  skills: profile.skillCount,
-                  agents: profile.agentCount,
-                })}
-              </Text>
-            ) : null}
-          </View>
-          <ChevronDown size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-    </View>
   );
 }

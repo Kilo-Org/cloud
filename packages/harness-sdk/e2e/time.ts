@@ -83,9 +83,9 @@ const asked = async (model: string, kind: ApiKind): Promise<string | undefined> 
     return yield* said(session.ask('What is the date and time right now?'));
   });
   const answer = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withTools(kind))))
+    Effect.result(Effect.scoped(Effect.provide(program, withTools(kind))))
   );
-  return answer._tag === 'Left' ? undefined : answer.right;
+  return answer._tag === 'Failure' ? undefined : answer.success;
 };
 
 /**

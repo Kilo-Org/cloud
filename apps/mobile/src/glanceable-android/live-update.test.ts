@@ -78,6 +78,8 @@ describe('notification Open destination', () => {
         organizationId: null,
         userId: 'u1',
         recordedAt: NOW,
+        statusUpdatedAt: null,
+        boundPermissionId: 'perm_1',
       };
       const actions = buildNotificationActions(ask, key => key);
 
@@ -92,6 +94,26 @@ describe('notification Open destination', () => {
     const actions = buildNotificationActions(null, key => key);
 
     expect(resolveIncomingUrl(actions.openUrl)).toBe('/(app)/(tabs)/(2_agents)');
+    expect(actions.approveLabel).toBeNull();
+  });
+
+  it('offers Open but not Approve while the ask names no request', () => {
+    const actions = buildNotificationActions(
+      {
+        kiloSessionId: 'ses_1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: 'scope',
+        organizationId: null,
+        userId: 'u1',
+        recordedAt: NOW,
+        statusUpdatedAt: null,
+        boundPermissionId: null,
+      },
+      key => key
+    );
+
+    expect(resolveIncomingUrl(actions.openUrl)).toBe('/(app)/agent-chat/ses_1');
     expect(actions.approveLabel).toBeNull();
   });
 });

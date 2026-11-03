@@ -166,6 +166,18 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
   });
 
+  it('refuses a sign-in whose address has no domain before user settlement', async () => {
+    const result = await signIn({
+      user: { id: 'x', email: 'no-domain', name: 'No Domain', image: '' },
+      account: { provider: 'google', providerAccountId: 'no-domain-sub', type: 'oauth' },
+      profile: { email_verified: true, email: 'no-domain' },
+    } as never);
+
+    expect(result).toContain('/users/sign_in?error=USER-NOT-FOUND');
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('enforces ordinary-auth SSO before user settlement', async () => {
     mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
       status: 'required',

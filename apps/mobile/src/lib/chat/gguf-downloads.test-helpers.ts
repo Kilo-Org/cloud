@@ -35,10 +35,16 @@ export function harness(
     readonly freeBytes?: number;
     readonly inspection?: () => Promise<GgufInspection>;
     readonly failMove?: string;
+    /** A destination the first move attempt to it cannot reach. */
+    readonly failMoveOnce?: string;
     /** Hashes by file name; any other file hashes to the fixture's published value. */
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
     readonly unreadable?: string;
+    /** A task that refuses pause the way expo-file-system does once it is cancelled. */
+    readonly refusePause?: boolean;
+    /** A task whose cancel loses to a pause already under way: it reports itself paused. */
+    readonly cancelRacesPause?: boolean;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -48,6 +54,7 @@ export function harness(
   const inspected: string[] = [];
   const released: string[] = [];
   const projectors: (string | undefined)[] = [];
+  let failedMoveOnce = false;
 
   const storage: GgufStorage = {
     freeBytes: () => freeBytes,
@@ -64,6 +71,10 @@ export function harness(
     },
     move: (from, to) => {
       if (to === options.failMove) {
+        throw new Error('move failed');
+      }
+      if (to === options.failMoveOnce && !failedMoveOnce) {
+        failedMoveOnce = true;
         throw new Error('move failed');
       }
       const size = files.get(from) ?? 0;
@@ -104,9 +115,17 @@ export function harness(
           return current.promise;
         },
         pause: () => {
+          if (options.refusePause === true) {
+            throw new Error('Cannot call pause() in state "cancelled"');
+          }
           paused();
         },
         cancel: () => {
+          // A pause already under way answers the cancel: the task reports itself paused.
+          if (options.cancelRacesPause === true) {
+            current.resolve(null);
+            return;
+          }
           current.reject(new Error('download cancelled'));
         },
       } satisfies GgufDownloadTask;

@@ -231,7 +231,10 @@ export function ReviewConfigForm({
   });
 
   // Fetch available models
-  const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels } = useOrganizationModels(
+    organizationId,
+    'shared_services'
+  );
 
   // Local state
   const [isEnabled, setIsEnabled] = useState(false);

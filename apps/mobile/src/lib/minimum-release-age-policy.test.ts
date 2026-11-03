@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // Dependency-contract guard for the repository release-age policy in
-// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, the
-// container-runtime exemptions must each name one exact package@version (a
+// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, every
+// exemption added for a pinned version must name one exact package@version (a
 // name-only or wildcard entry would un-gate every future release), and every
 // pre-existing base exclusion must survive unchanged.
 const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
@@ -35,34 +35,19 @@ const BASE_EXCLUDE_ENTRIES = [
   'openclaw',
 ] as const;
 
-// The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
-// 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
-// exact version. Approved early-access exception; remove this group when 4.135.0
-// matures.
-const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
-  'wrangler@4.135.0',
-  'workerd@1.20260918.1',
-  'miniflare@5.20260918.0-alpha',
-  '@cloudflare/workerd-darwin-64@1.20260918.1',
-  '@cloudflare/workerd-darwin-arm64@1.20260918.1',
-  '@cloudflare/workerd-linux-64@1.20260918.1',
-  '@cloudflare/workerd-linux-arm64@1.20260918.1',
-  '@cloudflare/workerd-windows-64@1.20260918.1',
-] as const;
-
-// Four mobile pins must move without waiting out the gate: FlashList 2.3.3
+// Two mobile pins must move without waiting out the gate: FlashList 2.3.3
 // carries the EngagedIndicesTracker scroll-window fix the agent transcript list
-// depends on, react-native-keyboard-controller 1.22.6 carries the
-// KeyboardChatScrollView fixes the keyboard phase depends on (SDK 57 pins
-// 1.21.9), react-native-enriched-markdown 1.1.0 adds the image and code block
-// press events the transcript markdown wires, and react-native-reanimated 4.7.1
-// carries the stability fixes the app needs. One exact package@version each.
+// depends on, and react-native-reanimated 4.7.1 carries the stability fixes the
+// app needs. One exact package@version each.
 const MOBILE_EXACT_EXCLUDE_ENTRIES = [
   '@shopify/flash-list@2.3.3',
-  'react-native-keyboard-controller@1.22.6',
-  'react-native-enriched-markdown@1.1.0',
   'react-native-reanimated@4.7.1',
 ] as const;
+
+// Bun 1.4.4 rejects the compromised eMudhra chains, and the wrapper dev types
+// must equal the runtime the image-version contract test pins, so the types
+// pair moves with it. Types only: no runtime code and no install scripts.
+const BUN_TYPES_EXACT_EXCLUDE_ENTRIES = ['@types/bun@1.4.4', 'bun-types@1.4.4'] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,
 // wildcards, and future-version placeholders alike.
@@ -106,23 +91,19 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, then the
-    // remaining base entries, then the mobile exemptions — the base list with
-    // nothing dropped or changed.
+  it('excludes exactly the base list plus the mobile and Bun-types exact versions', () => {
     const expected = [
-      BASE_EXCLUDE_ENTRIES[0],
-      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
-      ...BASE_EXCLUDE_ENTRIES.slice(1),
+      ...BASE_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ];
     expect(excludeEntries).toEqual(expected);
   });
 
   it('scopes every new exclusion to one exact package@version', () => {
     expect(newExclusions).toEqual([
-      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);

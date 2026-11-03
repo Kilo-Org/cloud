@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { chatTargetKind } from '@/lib/chat/backend-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrganization } from '@/lib/organization-context';
@@ -91,6 +92,7 @@ export function CloudProviderChoice(selection: ProviderSelection) {
           <Button
             size="sm"
             variant="outline"
+            className={STATE_ACTION_CLASS}
             disabled={catalog.isFetching}
             onPress={() => void catalog.refetch()}
           >

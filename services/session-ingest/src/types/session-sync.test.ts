@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
+
 import { SessionItemSchema } from './session-sync';
 
 describe('SessionItemSchema agent_notification validation', () => {
@@ -178,6 +180,51 @@ describe('SessionItemSchema session_pr_link validation', () => {
 });
 
 describe('SessionItemSchema session_status validation', () => {
+  it('preserves the original transition tuple without dropping its causal identity', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        previousStatus: 'busy',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+        transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it.each(['not-an-id', 'Z1ARZ3NDEKTSV4RRFFQ69G5FAV', '01arz3ndektsv4rrffq69g5fav'])(
+    'rejects noncanonical or overflowing transition identity %s',
+    transitionId => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'session_status',
+          data: { status: 'question', transitionId },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('preserves an originating historical transition timestamp independently from scheduledAt', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it('rejects malformed originating timestamps instead of treating them as history', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'question', occurredAt: 'yesterday' },
+      }).success
+    ).toBe(false);
+  });
+
   it.each(['idle', 'busy', 'question', 'permission', 'retry'])(
     'parses the known %s status',
     status => {
@@ -231,6 +278,71 @@ describe('SessionItemSchema session_status validation', () => {
       data: { status: 'scheduled', scheduledAt: null },
     });
   });
+
+  // A status label is a short token; the length bound keeps the value set open while
+  // stopping one field from dominating the item (and its RPC projection).
+  it('accepts an unknown status label at the length bound', () => {
+    const status = 'x'.repeat(256);
+    expect(SessionItemSchema.safeParse({ type: 'session_status', data: { status } }).success).toBe(
+      true
+    );
+  });
+
+  it('rejects a status label past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'x'.repeat(257) },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a previous status past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'idle', previousStatus: 'x'.repeat(257) },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a wake time past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'scheduled', scheduledAt: 'x'.repeat(65) },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('SessionItemSchema kilo_meta validation', () => {
+  it('parses the producer metadata tuple', () => {
+    const item = {
+      type: 'kilo_meta',
+      data: {
+        platform: 'cloud-agent-web',
+        orgId: '11111111-1111-4111-8111-111111111111',
+        gitUrl: 'https://github.com/acme/widgets',
+        gitBranch: 'main',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it('accepts a platform label at the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'kilo_meta', data: { platform: 'x'.repeat(256) } })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects a platform label past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'kilo_meta', data: { platform: 'x'.repeat(257) } })
+        .success
+    ).toBe(false);
+  });
 });
 
 describe('SessionItemSchema storage key identity', () => {
@@ -281,5 +393,89 @@ describe('SessionItemSchema storage key identity', () => {
         data: { id: 'prt_parent\u0000child', messageID: 'msg_parent' },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a message ID at the cursor id byte limit', () => {
+    // Message ids become history cursor ids, so the cursor contract, not the
+    // 256-byte storage segment cap, is what a message id has to satisfy.
+    const idAtCursorLimit = `msg_${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 4)}`;
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: idAtCursorLimit } }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `${idAtCursorLimit}a` } }).success
+    ).toBe(false);
+  });
+
+  it('rejects a part ID or part message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(256)}`, messageID: 'msg_parent' },
+      }).success
+    ).toBe(false);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_child', messageID: `msg_${'a'.repeat(256)}` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a part identity with both segments exactly 256 characters', () => {
+    // The largest derived part identity is 256 + 1 + 256 bytes.
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(252)}`, messageID: `msg_${'a'.repeat(252)}` },
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('SessionItemSchema identity segments', () => {
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a part whose message id equals the %s root',
+    reserved => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'part',
+          data: { id: 'prt_child', messageID: reserved },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a message whose id equals the %s root',
+    reserved => {
+      expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts ordinary message and part identities', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: 'msg_42', role: 'assistant' },
+      }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_1', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a part id equal to an item-type root', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'message', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
   });
 });

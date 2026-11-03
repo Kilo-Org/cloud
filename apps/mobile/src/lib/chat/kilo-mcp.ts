@@ -199,7 +199,7 @@ async function connect(place: ChatPlace, timeoutMs: number, id: number): Promise
       onCallFailure: lostConnection(started),
     }).pipe(
       Effect.match({ onFailure: failed, onSuccess: ready }),
-      Effect.catchAllCause(cause =>
+      Effect.catchCause(cause =>
         Effect.succeed(
           failed(new RemoteMcpError({ serverId: SERVER_ID, kind: 'unreachable', cause }))
         )

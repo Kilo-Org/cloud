@@ -127,7 +127,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
     }
   }, [hasActiveRun]);
 
-  // Track the active run — prefer explicit state, fall back to latest running run
   const trackedRunId = activeRunId ?? (hasActiveRun ? latestRun.id : null);
 
   const { data: runStatus } = useQuery({
@@ -140,7 +139,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
     refetchInterval: trackedRunId ? 3_000 : false,
   });
 
-  // Clear activeRunId when the tracked run reaches a terminal state
   const trackedRunStatus = runStatus?.status ?? null;
   useEffect(() => {
     if (trackedRunStatus !== null && trackedRunStatus !== 'running') {

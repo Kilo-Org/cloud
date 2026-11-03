@@ -10,6 +10,7 @@ import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 const bashToolInputSchema = z.object({ command: z.string() });
 
@@ -30,7 +31,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-2">
       {command.length > 0 ? (
         <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-          <SelectableText className="font-mono text-xs leading-4 text-foreground">
+          <SelectableText className="font-mono text-xs leading-[1rem] text-foreground">
             {commandText}
           </SelectableText>
         </View>
@@ -55,7 +56,7 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

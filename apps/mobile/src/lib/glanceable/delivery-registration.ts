@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import { addPushToStartTokenListener } from 'expo-widgets';
 
-import { ActiveAgentsLiveActivity } from '@/glanceable-ios/active-agents-live-activity';
+import { getActiveAgentsLiveActivity } from '@/glanceable-ios/active-agents-live-activity';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import {
@@ -188,7 +188,7 @@ const delivery: GlanceableDelivery = {
       return;
     }
     try {
-      const current = instance ?? ActiveAgentsLiveActivity.getInstances().at(-1);
+      const current = instance ?? getActiveAgentsLiveActivity().getInstances().at(-1);
       if (current) {
         void observeActivity({
           observation,
@@ -218,7 +218,7 @@ const delivery: GlanceableDelivery = {
     let instance = observation.instance;
     if (Platform.OS === 'ios' && instance === null && activityToken === undefined) {
       try {
-        instance = ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
+        instance = getActiveAgentsLiveActivity().getInstances().at(-1) ?? null;
       } catch {
         // Recorded tokens remain available when native discovery fails.
       }

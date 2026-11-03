@@ -26,6 +26,8 @@ export function useAdminSessionMessages(sessionId: string | null, enabled = true
   return useQuery({
     ...trpc.admin.sessionTraces.getMessages.queryOptions({ session_id: sessionId ?? '' }),
     enabled: enabled && !!sessionId,
+    // Each fetch records an admin audit entry; avoid background refetches.
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -36,6 +38,8 @@ export function useAdminApiConversationHistory(sessionId: string | null, enabled
       session_id: sessionId ?? '',
     }),
     enabled: enabled && !!sessionId,
+    // Each fetch records an admin audit entry; avoid background refetches.
+    refetchOnWindowFocus: false,
   });
 }
 

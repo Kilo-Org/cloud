@@ -191,7 +191,7 @@ async function generateAutoTopUpOrgsNotification(
       id: 'auto-top-up-orgs-march-10',
       title: 'New: Auto Top-Ups For Organizations',
       message:
-        "Set your top-up amount once—we'll automatically add credits to your organization's balance when it drops below $50.",
+        "Set your top-up amount once—we'll automatically add credits to your organization's balance when it drops below the threshold you choose.",
       action: {
         actionText: 'Enable Auto Top-Ups',
         actionURL: 'https://app.kilo.ai/',

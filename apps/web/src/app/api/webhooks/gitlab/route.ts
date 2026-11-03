@@ -6,6 +6,7 @@ import { MergeRequestPayloadSchema } from '@/lib/integrations/platforms/gitlab/w
 import { findGitLabIntegrationByWebhookToken } from '@/lib/integrations/db/platform-integrations';
 import { handleMergeRequest } from '@/lib/integrations/platforms/gitlab/webhook-handlers';
 import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationActive } from '@/lib/integrations/core/health';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -40,19 +41,18 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Unauthorized - Invalid token', { status: 401 });
     }
 
-    // Get the expected token from integration metadata
-    const metadata = integration.metadata as { webhook_secret?: string } | null;
-    const expectedToken = metadata?.webhook_secret;
+    // Get the expected token from the resolved integration
+    const expectedToken = integration.webhook_secret;
 
-    // Verify the token matches (double-check)
+    // Verify the token matches (double-check with a constant-time comparison)
     if (!verifyGitLabWebhookToken(webhookToken, expectedToken)) {
       logExceptInTest('Webhook token verification failed');
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // 3. Check if integration is suspended
-    if (integration.suspended_at) {
-      logExceptInTest('Integration suspended, skipping event');
+    // 3. Only an active integration may act for its owner
+    if (!isPlatformIntegrationActive(integration)) {
+      logExceptInTest('Integration not active, skipping event');
       return NextResponse.json({ message: 'Integration suspended' }, { status: 200 });
     }
 

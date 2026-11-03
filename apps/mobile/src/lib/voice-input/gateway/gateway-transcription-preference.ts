@@ -53,7 +53,7 @@ enabledStore.preload();
 modelStore.preload();
 
 export function isGatewayTranscriptionEnabled(): boolean {
-  return enabledStore.get();
+  return enabledStore.getRequested();
 }
 
 /** Non-React subscription for module-scope consumers (e.g. the native binding). */
@@ -66,7 +66,7 @@ export function setGatewayTranscriptionEnabled(value: boolean): void {
 }
 
 export function readGatewayTranscriptionModel(): GatewayTranscriptionModel | null {
-  return modelStore.get();
+  return modelStore.getRequested();
 }
 
 /** Await the persisted model read. For callers with no React tree. */
@@ -85,7 +85,16 @@ export function useGatewayTranscriptionPreference() {
     enabledStore.get
   );
   const hasLoaded = useSyncExternalStore(enabledStore.subscribe, enabledStore.getHasLoaded);
-  return { gatewayTranscriptionEnabled, hasLoaded, setGatewayTranscriptionEnabled };
+  return {
+    gatewayTranscriptionEnabled,
+    hasLoaded,
+    setGatewayTranscriptionEnabled,
+    /**
+     * The state a press should flip: the newest chosen value while its write is
+     * still on its way to disk, otherwise the stored one.
+     */
+    getRequestedGatewayTranscriptionEnabled: enabledStore.getRequested,
+  };
 }
 
 /** Settings UI binding for the chosen transcription model. */

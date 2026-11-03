@@ -67,6 +67,16 @@ export function extractStatusFromItem(item: IngestBatch[number]): string | null 
   if (item.type !== 'session_status') return undefined;
   return normalizeOptionalString((item.data as { status?: unknown } | null | undefined)?.status);
 }
+export function extractStatusOccurredAtFromItem(
+  item: IngestBatch[number]
+): string | null | undefined {
+  return item.type === 'session_status' ? (item.data.occurredAt ?? null) : undefined;
+}
+export function extractStatusTransitionIdFromItem(
+  item: IngestBatch[number]
+): string | null | undefined {
+  return item.type === 'session_status' ? (item.data.transitionId ?? null) : undefined;
+}
 
 /**
  * The PR-link tuple, emitted atomically. `prNumber` is serialized to a string so it

@@ -22,8 +22,7 @@ export default function TopUpThankYouPage() {
               <div className="space-y-4 text-green-200">
                 <p>
                   <span className="mr-2">→</span>
-                  <strong>Use them in all popular IDEs</strong> (VS Code/JetBrains), CLI, Cloud, and
-                  App Builder
+                  <strong>Use them in all popular IDEs</strong> (VS Code/JetBrains), CLI, and Cloud
                 </p>
                 <p>
                   <span className="mr-2">→</span>
@@ -31,6 +30,10 @@ export default function TopUpThankYouPage() {
                   Gemini 3.1, and hundreds more
                 </p>
               </div>
+              <p className="text-muted-foreground text-sm">
+                Your purchase history shows the expiration date for each credit purchase.
+                Promotional and bonus credits may have separate deadlines.
+              </p>
 
               <div className="flex gap-4 pt-4">
                 <Button asChild variant="primary" className="flex-1">

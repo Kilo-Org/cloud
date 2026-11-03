@@ -36,7 +36,7 @@ export function ToolResultRows({
         <View key={index} className="border-b border-hair-soft px-2 py-1.5">
           <SelectableText
             className={cn(
-              'font-mono text-xs leading-4 text-foreground',
+              'font-mono text-xs leading-[1rem] text-foreground',
               row.emphasis && 'font-medium'
             )}
           >

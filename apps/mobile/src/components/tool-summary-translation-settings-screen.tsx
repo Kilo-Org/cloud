@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { Cpu, WandSparkles } from '@/components/ui/icons';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -11,6 +10,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrganization } from '@/lib/organization-context';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
@@ -32,7 +32,8 @@ const NO_MODEL_VALUE = '—';
  */
 export function ToolSummaryTranslationSettingsScreen() {
   const { organizationId } = useOrganization();
-  const { enabled, model, hasLoaded, setEnabled, setModel } = useToolSummaryTranslationPreference();
+  const { enabled, model, hasLoaded, setEnabled, setModel, getRequestedEnabled } =
+    useToolSummaryTranslationPreference();
   const { models, isLoading, isError, isFetching, isFetched, refetch } = useAvailableModels(
     organizationId ?? undefined
   );
@@ -67,8 +68,10 @@ export function ToolSummaryTranslationSettingsScreen() {
     modelSubtitle = t('common.loading');
   } else if (!catalogueError && models.length > 0) {
     // The default Auto Small shows before any pick; a stored model the live
-    // catalogue dropped falls back to its persisted name.
-    modelSubtitle = models.find(candidate => candidate.id === model.id)?.name ?? model.name;
+    // catalogue dropped falls back to its persisted name. Either way the label
+    // goes through the same resolver as the picker, so an Auto model reads the
+    // same on the row as the catalogue is labelled above it.
+    modelSubtitle = modelLabelFromCatalogue(models, model.id, model.name);
   }
 
   // A stored model the live catalogue dropped is kept (translations still route
@@ -81,16 +84,6 @@ export function ToolSummaryTranslationSettingsScreen() {
     models.length > 0 &&
     !models.some(candidate => candidate.id === model.id);
 
-  // The translation model carries no reasoning effort: the chosen id is the
-  // whole preference. The shared picker only commits and closes on tap for a
-  // single-variant row, so drop the catalogue's gateway variants here; without
-  // this, choosing a variant model left the sheet open and the row on its
-  // previous value, and Done was the only way to commit.
-  const pickerOptions = useMemo(
-    () => models.map(candidate => ({ ...candidate, variants: [] as string[] })),
-    [models]
-  );
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.toolSummaryTranslation')} />
@@ -101,11 +94,12 @@ export function ToolSummaryTranslationSettingsScreen() {
       >
         <PreferenceRow
           icon={WandSparkles}
-          title={t('preferences.toolSummaryTranslation')}
+          title={t('preferences.translateSummaries')}
           subtitle={t('preferences.toolSummaryTranslationSubtitle')}
           value={enabled}
           disabled={!hasLoaded}
           onValueChange={setEnabled}
+          resolveValue={getRequestedEnabled}
         />
         <ConfigureRow
           icon={Cpu}
@@ -116,12 +110,19 @@ export function ToolSummaryTranslationSettingsScreen() {
           disabled={modelRowDisabled}
           onPress={() => {
             openModelPicker(router, {
-              options: pickerOptions,
+              options: models,
               value: model.id,
               variant: '',
+              // The translation model carries no reasoning effort: the chosen id
+              // is the whole preference, so the picker offers no effort chips
+              // and a model tap commits and closes in one press.
+              acceptsVariant: false,
               onSelect: id => {
                 setModel({
                   id,
+                  // The stored name stays the catalogue's raw one: the row
+                  // localizes it at render, so a later language change is
+                  // reflected without rewriting the stored preference.
                   name: models.find(candidate => candidate.id === id)?.name ?? id,
                 });
               },

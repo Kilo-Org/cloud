@@ -39,9 +39,19 @@ export async function handleUpdateTownConfig(c: Context<GastownEnv>, params: { t
     }
   }
 
+  // Strip ownership fields — only the system (createTown flows) should set these
+  const {
+    owner_user_id: _a,
+    owner_type: _b,
+    owner_id: _c,
+    organization_id: _d,
+    created_by_user_id: _e,
+    ...safeConfig
+  } = parsed.data;
+
   const townDO = getTownDOStub(c.env, params.townId);
   const existingConfig = await townDO.getTownConfig();
-  const config = await townDO.updateTownConfig(parsed.data);
+  const config = await townDO.updateTownConfig(safeConfig);
 
   // Rewrite the mayor's AGENTS.md when custom instructions change
   if (config.custom_instructions?.mayor !== existingConfig.custom_instructions?.mayor) {

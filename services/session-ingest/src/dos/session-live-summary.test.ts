@@ -39,6 +39,12 @@ describe('foldSessionLiveSummary', () => {
     });
   });
 
+  it('keeps a file basename to the characters it draws', () => {
+    expect(
+      run([part('edit', 'running', { filePath: 'src/report\u202Efdp.exe' })]).step?.target
+    ).toBe('reportfdp.exe');
+  });
+
   it('maps read to a reading step', () => {
     expect(run([part('read', 'running', { filePath: '/tmp/a/notes.txt' })]).step).toEqual({
       verb: 'reading',

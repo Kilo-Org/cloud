@@ -1,0 +1,29 @@
+{
+  "name": "@kilocode/usage-queue",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./vercel/config": "./src/vercel/config.ts",
+    "./vercel/publisher": "./src/vercel/publisher.ts",
+    "./vercel/callback": "./src/vercel/callback.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/usage-queue/src packages/usage-queue/test packages/usage-queue/vitest.config.ts"
+  },
+  "dependencies": {
+    "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "@opentelemetry/api": "1.9.1",
+    "@vercel/queue": "0.8.0",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5"
+  }
+}

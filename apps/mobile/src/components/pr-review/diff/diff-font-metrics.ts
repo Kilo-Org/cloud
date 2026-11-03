@@ -20,11 +20,11 @@
 //   * 1.8+ → gutter overflow + side-by-side misalignment.
 
 import { createContext, useContext } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 
 /**
  * Maximum font scale honoured by the PR diff surface. The cap is
- * applied to `useWindowDimensions().fontScale`; values below the cap
+ * applied to the live system font scale; values below the cap
  * are passed through so a11y users see their preferred scale.
  *
  * The same value is used as `maxFontSizeMultiplier` on diff `Text`
@@ -112,7 +112,7 @@ const metricsCache = new Map<number, BoundedFontMetrics>();
  * stable between renders when the scale hasn't changed.
  */
 export function useBoundedDiffFontMetrics(): BoundedFontMetrics {
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const metrics = computeBoundedDiffFontMetrics(fontScale);
   const cached = metricsCache.get(metrics.scale);
   if (cached) {

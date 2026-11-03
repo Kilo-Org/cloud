@@ -133,30 +133,57 @@ describe('normalizeShareIntent partial copy failures', () => {
     });
   });
 
-  it('all copy failures without text throw', async () => {
-    await expect(
-      normalizeShareIntent(
-        {
-          text: null,
-          webUrl: null,
-          meta: null,
-          files: [
-            {
-              fileName: 'a.jpg',
-              mimeType: 'image/jpeg',
-              path: 'file:///share/a.jpg',
-              size: 1,
-              width: null,
-              height: null,
-              duration: null,
-            },
-          ],
-        },
-        async () => {
-          await Promise.resolve();
-          throw new Error('copy failed');
-        }
-      )
-    ).rejects.toThrow('Failed to copy shared files');
+  it('all copy failures without text resolve to a failed-files payload', async () => {
+    const payload = await normalizeShareIntent(
+      {
+        text: null,
+        webUrl: null,
+        meta: null,
+        files: [
+          {
+            fileName: 'a.jpg',
+            mimeType: 'image/jpeg',
+            path: 'file:///share/a.jpg',
+            size: 1,
+            width: null,
+            height: null,
+            duration: null,
+          },
+        ],
+      },
+      async () => {
+        await Promise.resolve();
+        throw new Error('copy failed');
+      }
+    );
+
+    expect(payload).toEqual({ text: '', files: [], failedFiles: ['a.jpg'] });
+  });
+
+  it('an unnamed failed copy keeps the placeholder name the gate shows', async () => {
+    const payload = await normalizeShareIntent(
+      {
+        text: '',
+        webUrl: null,
+        meta: null,
+        files: [
+          {
+            fileName: '',
+            mimeType: 'image/jpeg',
+            path: 'file:///share/unnamed',
+            size: null,
+            width: null,
+            height: null,
+            duration: null,
+          },
+        ],
+      },
+      async () => {
+        await Promise.resolve();
+        throw new Error('copy failed');
+      }
+    );
+
+    expect(payload).toEqual({ text: '', files: [], failedFiles: ['shared-file'] });
   });
 });

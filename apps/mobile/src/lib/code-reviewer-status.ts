@@ -1,4 +1,7 @@
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 
 // Pure classification logic for the code-reviewer domain's async query
 // states. Kept dependency-free (no react-query/expo-router/react-native)
@@ -80,13 +83,87 @@ export function classifyProviderState(input: {
   return input.connected ? { status: 'connected' } : { status: 'disconnected' };
 }
 
-// Discriminated status for "can this scope's role edit reviewer settings",
+// Discriminated status for "which reviewer actions can this scope's role take",
 // so a still-loading or failed org-list fetch isn't silently treated as
 // "read-only" (it used to fall through to `role === undefined` -> false).
+//
+// `canEdit` is the settings-level capability (billing roles included);
+// `canManage` is the narrower owner/admin capability that installing a
+// provider's app for the organization requires.
 export type PermissionState =
   | { status: 'loading' }
   | { status: 'error'; refetch: () => void; isRetrying: boolean }
-  | { status: 'ready'; canEdit: boolean };
+  | { status: 'ready'; canEdit: boolean; canManage: boolean };
+
+/**
+ * Whether a screen may offer this platform's connect action for the scope.
+ *
+ * GitHub's connect card mints an app-install state, which the server restricts
+ * to an organization-manage role, so the billing-level edit capability is too
+ * wide for it. GitLab connects an account token, which the billing roles may
+ * also connect. A personal scope carries both capabilities.
+ */
+export function canConnectProvider(
+  platform: 'github' | 'gitlab',
+  capabilities: { canEdit: boolean; canManage: boolean }
+): boolean {
+  return platform === 'gitlab' ? capabilities.canEdit : capabilities.canManage;
+}
+
+/**
+ * Discriminated status for a reviewer config read's body, so a screen always
+ * has exactly one surface to paint. The overview screens used to compose the
+ * body from separate `isLoading` / `isError` / `paused` tests, and a config
+ * query that reported none of them (`status: 'pending'`, `fetchStatus: 'idle'`,
+ * no data — the state react-query reverts a cancelled first fetch to) matched
+ * no branch at all: the header painted over an empty scroll area with no
+ * spinner, no error, and nothing that would ever resolve it.
+ *
+ * - `ready`: cached config exists; a background refetch failure keeps the rows.
+ * - `error`: a failed load with no cache, or a paused one whose pause is real
+ *   (connectivity is known), so retry is the useful action.
+ * - `loading`: any other in-flight, paused-while-connectivity-is-unsettled, or
+ *   never-started read. `useIdleLoadRetry` restarts the last one.
+ */
+export type ConfigBodyState =
+  | {
+      status: 'loading';
+      /** Pending with nothing in flight: nothing will ever resolve it on its own. */
+      idle: boolean;
+    }
+  | { status: 'error'; variant: 'server' | 'offline'; isRetrying: boolean; refetch: () => void }
+  | { status: 'ready' };
+
+export function classifyConfigBody(input: {
+  hasData: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  /** False while the app's probe-backed connectivity is still `unknown`. */
+  connectivityKnown: boolean;
+  refetch: () => void;
+}): ConfigBodyState {
+  if (input.hasData) {
+    return { status: 'ready' };
+  }
+  if (input.isError) {
+    return {
+      status: 'error',
+      variant: 'server',
+      isRetrying: input.isFetching,
+      refetch: input.refetch,
+    };
+  }
+  if (input.fetchStatus === 'paused' && input.connectivityKnown) {
+    return {
+      status: 'error',
+      variant: 'offline',
+      isRetrying: input.isFetching,
+      refetch: input.refetch,
+    };
+  }
+  return { status: 'loading', idle: input.fetchStatus === 'idle' };
+}
 
 export function classifyPermission(input: {
   isPersonal: boolean;
@@ -97,7 +174,7 @@ export function classifyPermission(input: {
   refetch: () => void;
 }): PermissionState {
   if (input.isPersonal) {
-    return { status: 'ready', canEdit: true };
+    return { status: 'ready', canEdit: true, canManage: true };
   }
   if (input.isLoading) {
     return { status: 'loading' };
@@ -105,5 +182,9 @@ export function classifyPermission(input: {
   if (input.isError) {
     return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
   }
-  return { status: 'ready', canEdit: canManageOrganizationBilling(input.role) };
+  return {
+    status: 'ready',
+    canEdit: canManageOrganizationBilling(input.role),
+    canManage: canManageOrganization(input.role),
+  };
 }

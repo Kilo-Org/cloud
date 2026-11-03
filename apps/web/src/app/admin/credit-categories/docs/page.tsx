@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/breadcrumb';
 import { PageContainer } from '@/components/layouts/PageContainer';
 
-// Server component to read and display the markdown file
 export default function CreditCategoriesDocsPage() {
   const markdownContent = generatePromoCreditCategoriesMarkdown(promoCreditCategories);
 

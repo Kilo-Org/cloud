@@ -18,6 +18,7 @@ import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { computeExpiration } from '@kilocode/db/credit-expiration';
 
 // ── Test user IDs (prefixed to avoid collisions) ────────────────────────────
 
@@ -560,7 +561,6 @@ async function runAssertions(): Promise<AssertionResult[]> {
   }
 
   // --- Helper: simulate expiration and return total expired amount
-  const { computeExpiration } = await import('@kilocode/web-shared/lib/creditExpiration');
 
   function simulateExpiration(userId: string): number {
     const credits = creditsFor(userId).filter(c => c.expiry_date != null);

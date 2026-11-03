@@ -5,7 +5,6 @@ import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import {
   type ContextTone,
-  formatCompactTokens,
   formatCost,
   formatExactTokens,
   formatRemainingTokens,
@@ -54,9 +53,9 @@ const trackOnly: HeaderPillContent = {
   usageUnavailable: false,
 };
 
-/** No info after loading has stopped: the dash marks the slot instead. */
-const unknownUsage: HeaderPillContent = {
-  primary: '—',
+/** Settled without any usage: the same label-free placeholder, named in a11y. */
+const settledWithoutUsage: HeaderPillContent = {
+  primary: null,
   secondary: null,
   hasCost: false,
   tone: 'neutral',
@@ -64,18 +63,6 @@ const unknownUsage: HeaderPillContent = {
   interactive: false,
   usageUnavailable: true,
 };
-
-describe('formatCompactTokens', () => {
-  it('formats below one thousand, thousands, and millions', () => {
-    expect(formatCompactTokens(0)).toBe('0');
-    expect(formatCompactTokens(999)).toBe('999');
-    expect(formatCompactTokens(1000)).toBe('1K');
-    expect(formatCompactTokens(32_418)).toBe('32.4K');
-    expect(formatCompactTokens(1500)).toBe('1.5K');
-    expect(formatCompactTokens(995_000)).toBe('995K');
-    expect(formatCompactTokens(1_200_000)).toBe('1.2M');
-  });
-});
 
 describe('formatExactTokens', () => {
   it('uses grouped digit formatting', () => {
@@ -155,10 +142,12 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  it('marks unknown usage with the dash, non-interactive, with no info and no transcript', () => {
-    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unknownUsage);
+  it('keeps the label-free placeholder, non-interactive, with no info and no transcript', () => {
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(
+      settledWithoutUsage
+    );
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(settledWithoutUsage);
+    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(settledWithoutUsage);
   });
 
   it('keeps the loading placeholder label-free before the session resolves', () => {
@@ -271,16 +260,16 @@ describe('getHeaderPillContent', () => {
     });
   });
 
-  it('marks unknown usage with the dash when a transcript exists without cost', () => {
-    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(unknownUsage);
+  it('keeps the label-free placeholder when a transcript exists without cost', () => {
+    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(settledWithoutUsage);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(settledWithoutUsage);
     expect(pill({ totalCostMicrodollars: null, hasMessages: true, loading: true })).toEqual(
       trackOnly
     );
   });
 
   it('never surfaces a bare cost before a transcript exists', () => {
-    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(settledWithoutUsage);
   });
 });
 

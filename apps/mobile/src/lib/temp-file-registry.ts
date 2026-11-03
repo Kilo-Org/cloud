@@ -42,7 +42,7 @@ function loadEntries(): TempFileEntry[] {
 
 function persistEntries(): void {
   try {
-    registryFile().write(JSON.stringify(entries ?? []));
+    registryFile().writeSync(JSON.stringify(entries ?? []));
   } catch {
     // Best-effort: the in-memory list stays authoritative for this session.
   }

@@ -156,6 +156,16 @@ describe('Worker worktree changes procedures', () => {
     expect(harness.control.getByName).not.toHaveBeenCalled();
   });
 
+  it.each(['uncommitted', 'against-base-branch'] as const)(
+    'forwards the selected %s scope without changing the file identity',
+    async scope => {
+      const harness = setup();
+      const query = { ...fileQuery, scope };
+      await harness.caller.getWorktreeFile({ cloudAgentSessionId: sessionId, ...query });
+      expect(harness.stub.getWorktreeFile).toHaveBeenCalledWith(query);
+    }
+  );
+
   it('normalizes a valid v1 session result at the API boundary', async () => {
     const harness = setup();
     harness.stub.getWorktreeChanges.mockResolvedValue({
@@ -221,17 +231,17 @@ describe('Worker worktree changes procedures', () => {
         expect(harness.session.get).toHaveBeenCalledTimes(1);
       });
 
-      it('rejects legacy sessions after authorization without calling either session DO', async () => {
+      it('rejects retired session IDs before authorization or DO resolution', async () => {
         const harness = setup();
         await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
-          code: 'PRECONDITION_FAILED',
+          code: 'BAD_REQUEST',
         });
-        expect(queryAccess).toHaveBeenCalledTimes(1);
+        expect(queryAccess).not.toHaveBeenCalled();
         expect(harness.session.get).not.toHaveBeenCalled();
         expect(harness.legacy.get).not.toHaveBeenCalled();
         queryAccess.mockResolvedValue(null);
         await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
-          code: 'FORBIDDEN',
+          code: 'BAD_REQUEST',
         });
       });
 

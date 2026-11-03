@@ -7,9 +7,7 @@ import {
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   isVercelRoutingOptOut,
-  passesVercelRoutingPercentage,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 import type {
   GatewayRequest,
   OpenRouterProviderConfig,
@@ -288,28 +286,13 @@ describe('convertProviderOptions', () => {
 });
 
 describe('shouldRouteToVercel', () => {
-  function request(provider?: GatewayRequest['body']['provider']): GatewayRequest {
-    return {
-      kind: 'chat_completions',
-      body: {
-        model: 'anthropic/claude-sonnet-4.5',
-        messages: [{ role: 'user', content: 'hello' }],
-        provider,
-      },
-    };
-  }
-
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
+  async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelPaid: 100,
-        vercelFree: 100,
+        vercelEnabled: options?.enabled ?? true,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
       })),
-    }));
-    jest.doMock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-      isFreeModel: jest.fn(() => false),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
@@ -323,21 +306,24 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), 'seed', async () => ({
-        only: ['google-vertex'],
-      }))
+      shouldRouteToVercel(
+        'anthropic/claude-sonnet-4.5',
+        async () => ({
+          only: ['google-vertex'],
+        }),
+        false
+      )
     ).resolves.toBe(false);
   });
 
-  it('falls back to request preferences when no policy config is resolved', async () => {
+  it('routes to Vercel when the resolved provider policy allows a Vercel provider', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
       shouldRouteToVercel(
         'anthropic/claude-sonnet-4.5',
-        request({ only: ['anthropic'] }),
-        'seed',
-        async () => undefined
+        async () => ({ only: ['anthropic'] }),
+        false
       )
     ).resolves.toBe(true);
   });
@@ -350,13 +336,26 @@ describe('shouldRouteToVercel', () => {
     };
 
     await expect(
-      shouldRouteToVercel(
-        'anthropic/claude-sonnet-4.5',
-        request(provider),
-        'seed',
-        async () => provider
-      )
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', async () => provider, false)
     ).resolves.toBe(true);
+  });
+
+  it('routes eligible traffic to Vercel without per-user randomization when switched on', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', async () => undefined, false)
+    ).resolves.toBe(true);
+  });
+
+  it('does not route to Vercel or resolve provider policy when switched off', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({ enabled: false });
+    const getRoutingProviderConfig = jest.fn(async () => undefined);
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, false)
+    ).resolves.toBe(false);
+    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
   it('does not resolve provider policy for models opted out of Vercel routing', async () => {
@@ -364,14 +363,65 @@ describe('shouldRouteToVercel', () => {
     const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
 
     await expect(
-      shouldRouteToVercel(
-        'anthropic/claude-sonnet-4.5',
-        request(),
-        'seed',
-        getRoutingProviderConfig
-      )
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, false)
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+
+  it('leaves a spend-bounded request on OpenRouter without resolving provider policy', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+    const getRoutingProviderConfig = jest.fn(async () => undefined);
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, true)
+    ).resolves.toBe(false);
+    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe('canRouteToVercel', () => {
+  async function loadCanRouteToVercel(vercelInferenceProviders: string[] | null = ['anthropic']) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')).canRouteToVercel;
+  }
+
+  it('rejects a model Vercel does not serve', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(canRouteToVercel('vendor/unknown-model', async () => undefined)).resolves.toBe(
+      false
+    );
+  });
+
+  it('rejects an only list with no provider available on Vercel', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ only: ['google-vertex'] }))
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an ignore list when inference provider data is unavailable', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel(null);
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ ignore: ['openai'] }))
+    ).resolves.toBe(false);
+  });
+
+  it('accepts a served model with compatible provider settings', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({
+        only: ['anthropic'],
+        ignore: ['amazon-bedrock'],
+      }))
+    ).resolves.toBe(true);
   });
 });
 
@@ -433,8 +483,83 @@ describe('applyVercelSettings BYOK pinning', () => {
         anthropic: [{ apiKey: 'sk-anthropic' }],
         bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
       },
+      sessionAffinity: true,
     });
     expect(request.body.provider).toBeUndefined();
+  });
+
+  it('keeps the same gateway options on BYOK and managed paths for identical provider preferences', async () => {
+    const provider = {
+      sort: 'latency' as const,
+      zdr: true,
+      data_collection: 'deny' as const,
+    };
+    const byok = byokRequest([]);
+    byok.body.provider = { ...provider };
+    const managed: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ...provider },
+      },
+    };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', byok, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+    const managedOptions = convertProviderOptions(managed, null).gateway;
+    if (!managedOptions) {
+      throw new Error('convertProviderOptions did not produce managed gateway options');
+    }
+
+    const gatewayOptions = byok.body.providerOptions?.gateway;
+    if (!gatewayOptions) {
+      throw new Error('applyVercelSettings did not produce BYOK gateway options');
+    }
+    const byokCredentials = gatewayOptions.byok;
+    expect(byokCredentials).toEqual({ anthropic: [{ apiKey: 'sk-anthropic' }] });
+    for (const [key, value] of Object.entries(managedOptions)) {
+      if (key === 'only' || key === 'order' || key === 'sessionId') {
+        continue;
+      }
+      expect(gatewayOptions[key as keyof typeof gatewayOptions]).toEqual(value);
+    }
+    expect(gatewayOptions.zeroDataRetention).toBe(true);
+    expect(gatewayOptions.disallowPromptTraining).toBe(true);
+  });
+
+  it('sets zeroDataRetention and disallowPromptTraining in the BYOK gateway options', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { zdr: true, data_collection: 'deny' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      zeroDataRetention: true,
+      disallowPromptTraining: true,
+      only: ['anthropic', 'bedrock'],
+      byok: {
+        anthropic: [{ apiKey: 'sk-anthropic' }],
+        bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+      },
+    });
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('leaves zeroDataRetention and disallowPromptTraining unset when the provider settings omit them', async () => {
+    const request = byokRequest([]);
+    request.body.provider = { data_collection: 'allow' };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.zeroDataRetention).toBeUndefined();
+    expect(request.body.providerOptions?.gateway?.disallowPromptTraining).toBeUndefined();
   });
 
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
@@ -598,6 +723,26 @@ describe('applyVercelSettings BYOK pinning', () => {
       openai: [{ apiKey: 'sk-user-openai' }],
     });
   });
+
+  it('pins Cohere requests to the provider and forwards the user API key', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'cohere/command-a',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('cohere/command-a', request, [
+      { decryptedAPIKey: 'cohere-user-key', providerId: 'cohere' },
+    ]);
+
+    expect(request.body.model).toBe('cohere/command-a');
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      only: ['cohere'],
+      byok: { cohere: [{ apiKey: 'cohere-user-key' }] },
+    });
+  });
 });
 
 describe('applyVercelSettings managed requests', () => {
@@ -705,30 +850,93 @@ describe('applyVercelSettings managed requests', () => {
   });
 });
 
-describe('passesVercelRoutingPercentage', () => {
-  it('never passes at 0% and always passes at 100%', () => {
-    for (let seed = 0; seed < 1_000; seed++) {
-      expect(passesVercelRoutingPercentage(String(seed), 0)).toBe(false);
-      expect(passesVercelRoutingPercentage(String(seed), 100)).toBe(true);
+describe('applyVercelSettings session affinity', () => {
+  const conversationId = 'conversation-hash';
+
+  function requestWithConversationId(
+    kind: GatewayRequest['kind'],
+    id: string | undefined
+  ): GatewayRequest {
+    const model = 'anthropic/claude-sonnet-4.5';
+    const provider = { order: ['google-vertex', 'amazon-bedrock'] };
+    if (kind === 'responses') {
+      return { kind, body: { model, input: 'hello', provider, prompt_cache_key: id } };
     }
+    if (kind === 'messages') {
+      return {
+        kind,
+        body: {
+          model,
+          max_tokens: 128,
+          messages: [{ role: 'user', content: 'hello' }],
+          provider,
+          session_id: id,
+        },
+      };
+    }
+    return {
+      kind,
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        provider,
+        prompt_cache_key: id,
+      },
+    };
+  }
+
+  async function loadApplyVercelSettings() {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['vertex', 'bedrock']),
+      getVercelModelsFromDatabase: jest.fn(),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .applyVercelSettings;
+  }
+
+  const kinds = ['chat_completions', 'messages', 'responses'] as const;
+
+  it.each(kinds)('sends the conversation ID for managed %s requests', async kind => {
+    const applySettings = await loadApplyVercelSettings();
+    const request = requestWithConversationId(kind, conversationId);
+
+    await applySettings('anthropic/claude-sonnet-4.5', request, null);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      sessionId: conversationId,
+      sessionAffinity: true,
+      order: ['vertex', 'bedrock'],
+    });
   });
 
-  it('preserves whole-percentage routing cohorts', () => {
-    for (let seed = 0; seed < 1_000; seed++) {
-      const randomSeed = String(seed);
-      const previousDecision = getRandomNumber('vercel_routing_' + randomSeed, 100) < 63;
+  it.each(kinds)('sends the conversation ID for BYOK %s requests', async kind => {
+    const request = requestWithConversationId(kind, conversationId);
 
-      expect(passesVercelRoutingPercentage(randomSeed, 63)).toBe(previousDecision);
-    }
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      sessionId: conversationId,
+      sessionAffinity: true,
+    });
   });
 
-  it('routes a fractional portion of the next percentage bucket', () => {
-    const seedsInFinalBucket = Array.from({ length: 10_000 }, (_, seed) => String(seed)).filter(
-      seed => getRandomNumber('vercel_routing_' + seed, 100) === 99
-    );
+  it.each(kinds)('leaves sessionId unset without a conversation ID for %s', async kind => {
+    const applySettings = await loadApplyVercelSettings();
+    const managed = requestWithConversationId(kind, undefined);
+    const byok = requestWithConversationId(kind, '');
 
-    expect(seedsInFinalBucket.some(seed => passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
-    expect(seedsInFinalBucket.some(seed => !passesVercelRoutingPercentage(seed, 99.9))).toBe(true);
+    await applySettings('anthropic/claude-sonnet-4.5', managed, null);
+    await applySettings('anthropic/claude-sonnet-4.5', byok, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+    ]);
+
+    for (const request of [managed, byok]) {
+      expect(request.body.providerOptions?.gateway?.sessionAffinity).toBe(true);
+      expect(request.body.providerOptions?.gateway).not.toHaveProperty('sessionId');
+    }
   });
 });
 

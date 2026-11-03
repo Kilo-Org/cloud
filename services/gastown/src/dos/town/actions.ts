@@ -16,6 +16,7 @@ import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
 import { review_metadata } from '../../db/tables/review-metadata.table';
 import { query } from '../../util/query.util';
+import { now } from '../../util/id.util';
 import * as beadOps from './beads';
 import * as agentOps from './agents';
 import * as reviewQueue from './review-queue';
@@ -354,6 +355,8 @@ function providerLabel(provider: 'github' | 'gitlab'): string {
 
 function failureMessageFor(error: PRStatusError): string {
   switch (error.kind) {
+    case 'owner_lookup_failed':
+      return 'Town ownership lookup failed repeatedly. Retry when the service is available.';
     case 'no_token':
       return (
         `No ${providerLabel(error.provider)} token resolved for this town. Tried (in order): ` +
@@ -401,13 +404,14 @@ function shouldFailImmediately(error: PRStatusError): boolean {
       return true;
     case 'http_error':
       return !error.transient;
+    case 'owner_lookup_failed':
     case 'invalid_response':
       return false;
   }
 }
 
 function shouldCountAsTransient(error: PRStatusError): boolean {
-  return error.kind === 'http_error' && error.transient;
+  return error.kind === 'owner_lookup_failed' || (error.kind === 'http_error' && error.transient);
 }
 
 type PollCounterState = {
@@ -432,10 +436,6 @@ function nextPollCounterState(error: PRStatusError, current: PollCounterState): 
     pollNonTransientCount,
     shouldFail: pollNonTransientCount >= PR_POLL_NON_TRANSIENT_THRESHOLD,
   };
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 /**
@@ -1335,7 +1335,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 statusCode: error.kind === 'http_error' ? error.status : undefined,
               });
             } else if (shouldCountAsTransient(error)) {
-              // Transient HTTP errors (5xx, 429) count toward the 10-strike threshold.
+              // Transient HTTP and owner lookup errors count toward the 10-strike threshold.
               // Migrate legacy poll_null_count into poll_transient_count on first read.
               query(
                 sql,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { type TFunction } from 'i18next';
 import { type CloudAgentEvent } from '@kilocode/cloud-agent-sdk';
 
@@ -23,6 +23,17 @@ function kilocodeEvent(properties: Record<string, unknown>): CloudAgentEvent {
     streamEventType: 'kilocode',
     timestamp: '2026-09-05T12:00:00.000Z',
     data: { type: 'message.part.updated', properties },
+  };
+}
+
+function statusEvent(data: unknown): CloudAgentEvent {
+  return {
+    eventId: 2,
+    executionId: 'exec-1',
+    sessionId: 'ses-1',
+    streamEventType: 'status',
+    timestamp: '2026-09-05T12:00:00.000Z',
+    data,
   };
 }
 
@@ -118,5 +129,55 @@ describe('toSpectatorRow text parts', () => {
       t
     );
     expect(result?.message).toBe('Done reading.');
+  });
+});
+
+describe('toSpectatorRow status frames', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('announces the two states this transcript knows in the reader’s language', () => {
+    expect(toSpectatorRow(statusEvent({ status: 'idle' }), t)).toEqual({
+      timestamp: '2026-09-05T12:00:00.000Z',
+      message: i18n.t('codeReviewer.reviewDetail.agentIdle'),
+      eventType: 'status',
+    });
+    expect(toSpectatorRow(statusEvent({ status: 'busy' }), t)?.message).toBe(
+      i18n.t('codeReviewer.reviewDetail.agentWorking')
+    );
+  });
+
+  it('reads the object form of a status, like the session.status branch', () => {
+    expect(toSpectatorRow(statusEvent({ status: { type: 'busy' } }), t)?.message).toBe(
+      i18n.t('codeReviewer.reviewDetail.agentWorking')
+    );
+  });
+
+  it('never puts an undeclared wire word inside the localized status sentence', () => {
+    const statusRow = toSpectatorRow(statusEvent({ status: 'warming-up' }), t);
+
+    expect(statusRow?.message).toBe(
+      i18n.t('codeReviewer.reviewDetail.statusWithValue', { status: i18n.t('common.unknown') })
+    );
+    expect(statusRow?.message).not.toContain('warming-up');
+  });
+
+  it('localizes both states under a non-English language', async () => {
+    await i18n.changeLanguage('hu');
+
+    const busy = toSpectatorRow(statusEvent({ status: 'busy' }), t);
+    expect(busy?.message).toBe(i18n.t('codeReviewer.reviewDetail.agentWorking'));
+    expect(busy?.message).not.toContain('busy');
+    expect(busy?.message).not.toBe('Agent working...');
+
+    const undeclared = toSpectatorRow(statusEvent({ status: 'warming-up' }), t);
+    expect(undeclared?.message).toBe(
+      i18n.t('codeReviewer.reviewDetail.statusWithValue', { status: i18n.t('common.unknown') })
+    );
+  });
+
+  it('skips a status frame that carries no status', () => {
+    expect(toSpectatorRow(statusEvent({ message: 'Cloning repository' }), t)).toBeNull();
   });
 });

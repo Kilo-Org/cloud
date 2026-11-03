@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../types.js';
-import { vercelBillingIdentity } from '../container-usage-context.js';
 import {
   buildControlPlaneCreateInput,
   buildControlPlaneRegisterInput,
@@ -9,8 +8,20 @@ import {
 import { buildControlPlaneSessionRegistration } from '../control-plane/session/registration.js';
 
 const FULL_MODEL = 'kilo/fake-deterministic';
+const MODERN_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 
 describe('buildControlPlanePromptPayload', () => {
+  it('preserves a repository agent slug without runtimeAgents', () => {
+    const payload = buildControlPlanePromptPayload({
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      turn: { type: 'prompt', prompt: 'Use foreman' },
+      attachments: [],
+      agent: { mode: 'foreman', model: FULL_MODEL },
+    });
+    expect(payload.agent).toEqual({ mode: 'foreman', model: 'fake-deterministic' });
+  });
+
   it('strips the kilo provider prefix from the wrapper-facing model', () => {
     const payload = buildControlPlanePromptPayload({
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
@@ -44,17 +55,63 @@ describe('buildControlPlanePromptPayload', () => {
 
 describe('buildControlPlaneCreateInput', () => {
   it.each([
-    { egressMode: undefined, egressAllowlist: undefined },
-    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: [] },
-    { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
-  ])(
+    { organizationId: '11111111-1111-4111-8111-111111111111' },
+    { userId: 'oauth/google/personal-owner' },
+  ])('pins the customer credential without Kilo compute billing for %j', async owner => {
+    const source = {
+      kind: 'byoc' as const,
+      ...owner,
+      credentialId: '22222222-2222-4222-8222-222222222222',
+    };
+    const input = await buildControlPlaneCreateInput({
+      command: {
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          orgId: source.organizationId,
+        },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt', prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'vercel',
+          sandboxProviderBinding: { kind: 'vercel', source },
+        },
+      },
+      env: { CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true' } as Env,
+      attachments: [],
+      agent: { mode: 'code', model: FULL_MODEL },
+    });
+    expect(input.sandboxSelection).toEqual({
+      provider: 'vercel',
+      configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+      byoc: { ...owner, credentialId: source.credentialId },
+    });
+  });
+
+  it.each(
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: [] },
+      { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+    ].flatMap(policy =>
+      [undefined, false, true].map(egressAudit => ({
+        ...policy,
+        egressAudit,
+      }))
+    )
+  )(
     'persists and selects the same policy for start and registration: %j',
-    async ({ egressMode, egressAllowlist }) => {
+    async ({ egressMode, egressAllowlist, egressAudit }) => {
       const command = {
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
-        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
           initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
           turn: { type: 'prompt' as const, prompt: 'hi' },
@@ -65,6 +122,7 @@ describe('buildControlPlaneCreateInput', () => {
           sandboxProvider: 'cloudflare-containers' as const,
           egressMode,
           egressAllowlist,
+          egressAudit,
         },
       };
       const created = await buildControlPlaneCreateInput({
@@ -85,6 +143,12 @@ describe('buildControlPlaneCreateInput', () => {
         expect(input.sandboxSelection.egressMode).toBe(egressMode);
         expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
         expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
+        expect(input.metadata.workspace?.egressAudit).toBe(egressAudit);
+        expect(input.sandboxSelection.egressAudit).toBe(egressAudit);
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+            .sandboxSelection?.egressAudit
+        ).toBe(egressAudit);
         expect(
           buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
             .sandboxSelection?.egressAllowlist
@@ -97,32 +161,35 @@ describe('buildControlPlaneCreateInput', () => {
     [undefined, { vcpus: 2, memory: 4096 }, 'SandboxVercelSmall'],
     ['vercel-large', { vcpus: 4, memory: 8192 }, 'SandboxVercelLarge'],
   ] as const)(
-    'pins %s Vercel selection to a billable size',
-    async (allocation, resources, className) => {
-      const input = await buildControlPlaneCreateInput({
-        command: {
-          identity: {
-            sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
-            userId: 'usr_1',
+    'rejects retired platform Vercel selection %s',
+    async (allocation, _resources, _className) => {
+      await expect(
+        buildControlPlaneCreateInput({
+          command: {
+            identity: {
+              sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+              userId: 'usr_1',
+            },
+            auth: {
+              kiloSessionId: 'ses_12345678901234567890123456',
+              kilocodeToken: MODERN_KILO_TOKEN,
+            },
+            message: {
+              initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+              turn: { type: 'prompt', prompt: 'hi' },
+            },
+            agent: { mode: 'code', model: FULL_MODEL },
+            workspace: {
+              sandboxId: 'ses-0123456789abcdef',
+              sandboxProvider: 'vercel',
+              ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
+            },
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
-          message: {
-            initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-            turn: { type: 'prompt', prompt: 'hi' },
-          },
+          env: {} as Env,
+          attachments: [],
           agent: { mode: 'code', model: FULL_MODEL },
-          workspace: {
-            sandboxId: 'ses-0123456789abcdef',
-            sandboxProvider: 'vercel',
-            ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
-          },
-        },
-        env: {} as Env,
-        attachments: [],
-        agent: { mode: 'code', model: FULL_MODEL },
-      });
-      expect(input.sandboxSelection.configuration).toEqual({ provider: 'vercel', resources });
-      expect(vercelBillingIdentity(resources).className).toBe(className);
+        })
+      ).rejects.toThrow('Kilo-paid Vercel compute is retired');
     }
   );
 
@@ -139,7 +206,10 @@ describe('buildControlPlaneCreateInput', () => {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          auth: {
+            kiloSessionId: 'ses_12345678901234567890123456',
+            kilocodeToken: MODERN_KILO_TOKEN,
+          },
           message: {
             initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
             turn: { type: 'prompt', prompt: 'hi' },
@@ -176,7 +246,10 @@ describe('buildControlPlaneCreateInput', () => {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          auth: {
+            kiloSessionId: 'ses_12345678901234567890123456',
+            kilocodeToken: MODERN_KILO_TOKEN,
+          },
           message: {
             initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
             turn: { type: 'prompt', prompt: 'hi' },
@@ -199,6 +272,35 @@ describe('buildControlPlaneCreateInput', () => {
     }
   );
 
+  it('pins code review on Cloudflare Containers to the code-review instance size', async () => {
+    const input = await buildControlPlaneCreateInput({
+      command: {
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+        },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt', prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'sbx-0123456789abcdef0123456789abcdef0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'code-review',
+        },
+      },
+      env: {} as Env,
+      attachments: [],
+      agent: { mode: 'code', model: FULL_MODEL },
+    });
+    expect(input.sandboxSelection.configuration).toEqual({
+      provider: 'cloudflare-containers',
+      instance: 'code-review',
+    });
+  });
+
   it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
@@ -206,7 +308,7 @@ describe('buildControlPlaneCreateInput', () => {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
         },
-        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
           initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
           turn: { type: 'prompt', prompt: 'hi' },

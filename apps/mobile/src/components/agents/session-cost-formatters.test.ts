@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
+
 import { formatSpokenCost } from './session-row-accessibility-label';
 import {
   composeStoredSessionSpokenMeta,
+  composeStoredSessionVisibleMeta,
+  formatSessionCostBadge,
   formatSessionTotalCost,
   selectSessionCostInputs,
 } from './session-list-helpers';
@@ -50,6 +55,43 @@ describe('formatSessionTotalCost (visible)', () => {
 
   it('formats multi-dollar values to two decimals', () => {
     expect(formatSessionTotalCost(1_234_567)).toBe('$1.23');
+  });
+});
+
+describe('formatSessionCostBadge (header pill)', () => {
+  it('keeps the sign in front of the amount in every language', async () => {
+    // Several locales format USD as a suffix with a separator (`0.0005 $`),
+    // which the pill's dense slot cannot show beside the percentage; the sign
+    // leads the number so the run reads as the one value it is. The digits stay
+    // the locale's own: a locale that resolves to a non-Latin numbering system
+    // still gets its own numerals after the sign, so the assertion derives them
+    // from the formatter instead of assuming one.
+    await i18n.changeLanguage('ar');
+    try {
+      const micro = formatNumber(0.0005, 'ar', {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      });
+      const cents = formatNumber(0.01, 'ar', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      expect(formatSessionCostBadge(500)).toBe(`$${micro}`);
+      expect(formatSessionCostBadge(13_113)).toBe(`$${cents}`);
+      // No separator between the sign and the first digit.
+      expect(formatSessionCostBadge(500)).toMatch(/^\$\S/u);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    expect(formatSessionCostBadge(500)).toBe('$0.0005');
+  });
+
+  it('keeps the canonical omit band and decimal thresholds', () => {
+    expect(formatSessionCostBadge(null)).toBeNull();
+    expect(formatSessionCostBadge(0)).toBeNull();
+    expect(formatSessionCostBadge(49)).toBeNull();
+    expect(formatSessionCostBadge(50)).toBe('$0.0001');
+    expect(formatSessionCostBadge(5000)).toBe('$0.01');
   });
 });
 
@@ -122,6 +164,19 @@ describe('formatSpokenCost (a11y)', () => {
 
   it('speaks a plural-dollar + singular-cent amount', () => {
     expect(formatSpokenCost(2_010_000)).toBe('2 dollars 1 cent');
+  });
+
+  // Estonian names the unit differently at one and at two or more, so the
+  // spoken phrase has to follow the same category boundary as the visible one.
+  it('speaks the Estonian dollar in the singular at one', async () => {
+    await i18n.changeLanguage('et');
+    try {
+      expect(formatSpokenCost(1_000_000)).toBe('1 dollar');
+      expect(formatSpokenCost(5_000_000)).toBe('5 dollarit');
+      expect(formatSpokenCost(1_100_000)).toBe('1 dollar 10 senti');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 
@@ -199,6 +254,26 @@ describe('selectSessionCostInputs', () => {
  * spoken formatter (`formatSpokenCost` → "12 cents").
  */
 describe('composeStoredSessionSpokenMeta (spoken wiring)', () => {
+  it('keeps cost-only metadata free of dangling timestamp separators', () => {
+    expect(composeStoredSessionVisibleMeta('$0.12', '')).toBe('$0.12');
+    expect(composeStoredSessionSpokenMeta('12 cents', '')).toBe('cost 12 cents');
+    expect(composeStoredSessionVisibleMeta(null, '')).toBe('');
+    expect(composeStoredSessionSpokenMeta(null, '')).toBe('');
+  });
+
+  it('localizes stored session cost metadata in Hindi', async () => {
+    const previousLanguage = i18n.language;
+    try {
+      await i18n.changeLanguage('hi');
+      expect(composeStoredSessionSpokenMeta(formatSpokenCost(10_000), '2 घंटे पहले')).toBe(
+        'लागत 1 सेंट, 2 घंटे पहले'
+      );
+      expect(composeStoredSessionSpokenMeta(null, '2 घंटे पहले')).toBe('2 घंटे पहले');
+    } finally {
+      await i18n.changeLanguage(previousLanguage);
+    }
+  });
+
   it('composes a humanized cost phrase with the spoken time', () => {
     const result = composeStoredSessionSpokenMeta(formatSpokenCost(120_000), '5 minutes ago');
     expect(result).toBe('cost 12 cents, 5 minutes ago');

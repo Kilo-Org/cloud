@@ -103,6 +103,7 @@ describe('refresh terminal classification', () => {
     expect(store.get(TOKEN_EXPIRES_AT_KEY)).toBeUndefined();
     // The terminal failure is reported once, not once per attempt.
     expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 
@@ -152,6 +153,7 @@ describe('refresh terminal classification', () => {
     store.set(AUTH_TOKEN_KEY, 'live-token');
     store.set(REFRESH_TOKEN_KEY, 'live-refresh');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('bad request', { status: 400 }));
+    const events = recordEvents();
 
     const outcome = await performRefresh();
 
@@ -161,9 +163,13 @@ describe('refresh terminal classification', () => {
       sessionVersion: currentAuthEpoch(),
     });
     // A non-401 terminal refusal is not proof the credential is dead, so the
-    // pair stays until sign-out clears it.
+    // pair stays until sign-out clears it. It is not the expected session end
+    // either, so it stays an error-level report.
     expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('error');
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '400']);
   });
 
   it('still refuses and reports when the keychain delete rejects on a 401', async () => {
@@ -188,6 +194,7 @@ describe('refresh terminal classification', () => {
       sessionVersion: currentAuthEpoch(),
     });
     expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 

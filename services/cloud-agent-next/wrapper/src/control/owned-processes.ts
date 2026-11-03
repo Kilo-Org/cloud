@@ -94,7 +94,6 @@ type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
   exited: boolean;
-  gate?: Writable;
 };
 type Cgroup = {
   directory: string;
@@ -265,13 +264,6 @@ function releaseChildStreams(child: OwnedChild): void {
   for (const stream of [child.process.stdin, child.process.stdout, child.process.stderr]) {
     try {
       stream.destroy();
-    } catch {
-      console.warn('Owned process child stream release failed; continuing stream cleanup');
-    }
-  }
-  if (child.gate) {
-    try {
-      child.gate.destroy();
     } catch {
       console.warn('Owned process child stream release failed; continuing stream cleanup');
     }
@@ -954,11 +946,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
 
       const spawnChild = (gatedChild: boolean): OwnedChild => {
         const child = gatedChild
-          ? spawnGated(command, args, {
-              ...options,
-              detached: true,
-              stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-            })
+          ? spawnGated(command, args, { ...options, detached: true, stdio: 'pipe' })
           : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
         const record: OwnedChild = { process: child, exited: false };
         children.add(record);
@@ -989,8 +977,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         startSweep();
         return record.process;
       }
-      const gate = record.process.stdio[3];
-      if (gate instanceof Writable) record.gate = gate;
+      const gate = record.process.stdin;
       try {
         const pid = record.process.pid;
         if (

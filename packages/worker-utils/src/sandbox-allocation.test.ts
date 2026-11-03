@@ -4,16 +4,17 @@ import {
   CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  allocationSupportsMultiRepository,
   getSandboxAllocationInstance,
   getSandboxAllocationProvider,
   getSandboxAllocationResources,
   getSandboxAllocationRequest,
-  getSandboxAllocationKey,
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
   sandboxAllocationRequestSchema,
   selectableSandboxAllocationInputSchema,
   isSelectableSandboxAllocation,
+  isSandboxAllocationAvailable,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
   sandboxSelectionCapabilitiesSchema,
@@ -21,25 +22,56 @@ import {
 } from './sandbox-allocation.js';
 
 describe('sandbox allocation contract', () => {
+  it.each(['isolated-standard', 'cloudflare-single'] as const)(
+    'allows legacy %s without a picker option only for an enabled owner',
+    allocation => {
+      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, allocation)).toBe(true);
+      expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, allocation)).toBe(false);
+    }
+  );
+
+  it.each([
+    { reasons: {}, expected: true },
+    { reasons: { unavailableReason: 'Provider unavailable' }, expected: false },
+    { reasons: { repositoryUnavailableReason: 'Repository unsupported' }, expected: false },
+  ])('checks offered allocation availability: $reasons', ({ reasons, expected }) => {
+    expect(
+      isSandboxAllocationAvailable(
+        {
+          enabled: true,
+          options: [{ allocation: getSandboxAllocationRequest('vercel-small'), ...reasons }],
+        },
+        'vercel-small'
+      )
+    ).toBe(expected);
+    expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, 'vercel-small')).toBe(
+      false
+    );
+  });
+
   it.each(sandboxAllocationSchema.options)(
     'normalizes legacy %s to its structured request',
     allocation => {
       const request = getSandboxAllocationRequest(allocation);
       expect(sandboxAllocationInputSchema.parse(allocation)).toEqual(request);
       expect(sandboxAllocationInputSchema.parse(request)).toEqual(request);
-      expect(getKiloSandboxAllocation(request)).toBe(allocation);
+      expect(getSandboxAllocation(request)).toBe(allocation);
     }
   );
 
-  it('keeps BYOC distinct from Kilo compute with the same instance type', () => {
-    const byoc = sandboxAllocationRequestSchema.parse({
-      provider: { id: 'vercel', account: 'byoc' },
-      instanceType: 'small',
-    });
-    const kilo = getSandboxAllocationRequest('vercel-small');
-    expect(getSandboxAllocationKey(byoc)).not.toBe(getSandboxAllocationKey(kilo));
-    expect(getKiloSandboxAllocation(byoc)).toBeUndefined();
-    expect(selectableSandboxAllocationInputSchema.parse(byoc)).toEqual(byoc);
+  it('accepts only BYOC Vercel and maps its selected size to the runtime allocation', () => {
+    const request = { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' } as const;
+    expect(sandboxAllocationRequestSchema.parse(request)).toEqual(
+      getSandboxAllocationRequest('vercel-small')
+    );
+    expect(getSandboxAllocation(request)).toBe('vercel-small');
+    expect(
+      sandboxAllocationRequestSchema.safeParse({
+        ...request,
+        provider: { id: 'vercel', account: 'kilo' },
+      }).success
+    ).toBe(false);
+    expect(selectableSandboxAllocationInputSchema.parse(request)).toEqual(request);
   });
 
   it.each([
@@ -78,7 +110,7 @@ describe('sandbox allocation contract', () => {
 
   it('accepts provider-default and devcontainer descriptions without making them selectable', () => {
     for (const defaultDestination of [
-      { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
     ]) {
       const capabilities = sandboxSelectionCapabilitiesSchema.parse({
@@ -194,5 +226,20 @@ describe('sandbox allocation contract', () => {
         options: [{ allocation: 'vercel-small' }],
       }).success
     ).toBe(false);
+  });
+});
+
+describe('multi-repository allocation support', () => {
+  const unsupported = ['cloudflare-shared', 'vercel-small', 'vercel-large'];
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
+    expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
+  });
+
+  it('rejects exactly the shared Cloudflare sandbox and Vercel', () => {
+    const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => !allocationSupportsMultiRepository(allocation)
+    );
+    expect(rejected).toEqual(unsupported);
   });
 });

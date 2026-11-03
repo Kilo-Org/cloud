@@ -86,7 +86,7 @@ function expectExistingSyncCalls() {
   expect(getRawOpenRouterModels).toHaveBeenCalledTimes(1);
   expect(getRawOpenRouterModels).toHaveBeenCalledWith();
   expect(getEnhancedOpenRouterModels).toHaveBeenCalledTimes(1);
-  expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith();
+  expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: null });
   expect(syncOpenRouterModels).toHaveBeenCalledTimes(1);
   expect(syncArtificialAnalysisBenchmarks).toHaveBeenCalledTimes(1);
   expect(syncInternalUsageStats).toHaveBeenCalledTimes(1);

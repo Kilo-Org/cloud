@@ -234,6 +234,18 @@ describe('preview entry', () => {
     expect(response.headers.get('location')).toBe('/');
   });
 
+  it('keeps the entry redirect on the preview host for a path value with dot segments', async () => {
+    const { deps } = fixture();
+    const query = new URLSearchParams({ ticket: entryTicket(), path: '/a/..//evil.example/' });
+    const response = await handlePreviewRequest(
+      new Request(`${ORIGIN}${PREVIEW_ENTER_PATH}?${query.toString()}`),
+      env,
+      deps
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/');
+  });
+
   it.each([
     ['missing ticket', null],
     ['wrong purpose', entryTicket({ purpose: 'stream' })],

@@ -8,7 +8,6 @@ import type {
   RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
 import type { TRPCContext } from '../../types';
-import { getWorktreeWorkspacePath } from '../../workspace';
 import { router } from '../auth';
 import { deleteWorktree } from './worktree-deletion';
 
@@ -79,6 +78,19 @@ function fixture(rootCount = 1, childCount = 0) {
   const begin = vi.fn(async (_params: CloudAgentWorktreeDeletionParams) => structuredClone(state));
   const record = vi.fn(async (input: RecordCloudAgentWorktreeCleanupParams) => {
     state.runtimeLocations = input.runtimeLocations ?? state.runtimeLocations;
+    if (
+      input.completedRuntimeLocation &&
+      !state.manifest.completedRuntimeLocations?.some(
+        item =>
+          item.sandboxId === input.completedRuntimeLocation?.sandboxId &&
+          item.provider === input.completedRuntimeLocation.provider
+      )
+    ) {
+      state.manifest.completedRuntimeLocations = [
+        ...(state.manifest.completedRuntimeLocations ?? []),
+        input.completedRuntimeLocation,
+      ];
+    }
     for (const sessionId of [
       ...(input.sessionIds ?? []),
       ...(input.childSessions ?? []).map(child => child.sessionId),
@@ -283,7 +295,7 @@ describe('deleteWorktree authorization and completion', () => {
     }));
     const record = f.record.getMockImplementation();
     if (!record) throw new Error('Missing record fixture');
-    const gates = Array.from({ length: 4 }, () => Promise.withResolvers<void>());
+    const gates = Array.from({ length: 2 }, () => Promise.withResolvers<void>());
     let active = 0;
     let peak = 0;
     let index = 0;
@@ -302,7 +314,7 @@ describe('deleteWorktree authorization and completion', () => {
       expect(active).toBe(1);
       expect(f.finishSession).not.toHaveBeenCalled();
       expect(f.complete).not.toHaveBeenCalled();
-      expect(f.cleanup).toHaveBeenCalledTimes(index < 2 ? 0 : 1);
+      expect(f.cleanup).toHaveBeenCalledTimes(index === 0 ? 0 : 1);
       gates[index].resolve();
     }
     await expect(pending).resolves.toMatchObject({
@@ -333,7 +345,7 @@ describe('deleteWorktree authorization and completion', () => {
     });
   });
 
-  it('deletes and retries an ownership-only root using the canonical allocation returned by ingest', async () => {
+  it('deletes and retries an unopened root using its registered runtime location', async () => {
     const f = fixture();
     f.getState().runtimeLocations = [location];
     f.beginSession.mockResolvedValue(null);
@@ -347,10 +359,22 @@ describe('deleteWorktree authorization and completion', () => {
       success: true,
       deletedSessionIds: [kiloId(0)],
     });
-    expect(mocks.getControl).toHaveBeenCalledWith(f.ctx.env, location.sandboxId);
+    expect(mocks.getControl).toHaveBeenCalledTimes(2);
   });
 
-  it('isolates unavailable allocation history instead of repeatedly waiting for registration that is fenced', async () => {
+  it('skips runtime locations whose successful cleanup is already journaled', async () => {
+    const f = fixture();
+    f.getState().runtimeLocations = [location];
+    f.getState().manifest.completedRuntimeLocations = [location];
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+    });
+    expect(f.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('fails promptly when no runtime location is recorded or active', async () => {
     const f = fixture();
     f.beginSession.mockResolvedValue(null);
     await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
@@ -361,6 +385,34 @@ describe('deleteWorktree authorization and completion', () => {
     expect(f.complete).not.toHaveBeenCalled();
     expect(f.getState().manifest.sessions).toHaveLength(1);
   });
+
+  it.each([
+    ['begin', 'worktree_unregistered_child_sessions', 'WORKTREE_UNREGISTERED_CHILD_SESSIONS'],
+    ['record', 'worktree_unregistered_child_sessions', 'WORKTREE_UNREGISTERED_CHILD_SESSIONS'],
+    ['record', 'worktree_child_lineage_conflict', 'WORKTREE_CHILD_LINEAGE_CONFLICT'],
+    ['discovery', 'worktree_child_lineage_conflict', 'WORKTREE_CHILD_LINEAGE_CONFLICT'],
+  ] as const)(
+    'reports a non-retryable %s failure for %s before resource cleanup',
+    async (phase, reason, errorCode) => {
+      const f = fixture();
+      const operation =
+        phase === 'begin' ? f.begin : phase === 'record' ? f.record : f.readChildren;
+      operation.mockRejectedValue(new Error(`remote exception: ${reason}`));
+
+      await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        cause: { error: errorCode, retryable: false },
+      });
+      expect(f.cleanup).not.toHaveBeenCalled();
+      expect(f.finishSession).not.toHaveBeenCalled();
+      expect(f.complete).not.toHaveBeenCalled();
+      expect(mocks.diagnostic).toHaveBeenCalledWith(
+        'worktree_deletion',
+        expect.objectContaining({ result: 'rejected', errorCode, retryable: false }),
+        'info'
+      );
+    }
+  );
 
   it('uses only the authenticated text owner and interprets omitted organization as personal', async () => {
     const f = fixture();
@@ -461,16 +513,15 @@ describe('deleteWorktree authorization and completion', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('records the stored checkout directory returned by the session DO', async () => {
-    const f = fixture();
-    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
+  it('records one manifest per phase regardless of the number of checkout directories', async () => {
+    const f = fixture(17);
     mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
       expect(ownerId).toBe(userId);
       return {
         beginWorktreeDeletion: async () => ({
           location: await f.beginSession(id),
           children: [],
-          directory: '/workspace/app',
+          directory: `/workspace/${id}`,
         }),
         finishWorktreeDeletion: () => f.finishSession(id),
       };
@@ -479,61 +530,34 @@ describe('deleteWorktree authorization and completion', () => {
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
       success: true,
     });
-    expect(f.record.mock.calls.length).toBeGreaterThan(0);
-    for (const call of f.record.mock.calls) {
-      expect(call[0].directory).toBe('/workspace/app');
-      expect(call[0].directory).not.toBe(identity);
-    }
+    expect(f.record).toHaveBeenCalledTimes(2);
+    expect(f.record.mock.calls[0][0]).toEqual({
+      worktreeId,
+      kiloUserId: userId,
+      runtimeLocations: [location],
+    });
+    expect(f.record.mock.calls[1][0]).toEqual({
+      worktreeId,
+      kiloUserId: userId,
+      sessionIds: Array.from({ length: 17 }, (_, index) => kiloId(index)),
+      completedRuntimeLocation: location,
+    });
   });
 
-  it('records every distinct stored checkout directory across sessions', async () => {
-    const f = fixture(2);
-    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
-    const directories = new Map<string, string>([
-      [workspaceId(0), '/workspace/app'],
-      [workspaceId(1), identity],
+  it('records cleanup exactly once for each runtime location', async () => {
+    const f = fixture();
+    const otherLocation = { sandboxId: 'usr-second-route', provider: 'vercel' as const };
+    f.getState().runtimeLocations = [location, otherLocation];
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+    });
+    expect(f.cleanup).toHaveBeenCalledTimes(2);
+    expect(f.record).toHaveBeenCalledTimes(3);
+    expect(f.record.mock.calls.slice(1).map(([input]) => input.completedRuntimeLocation)).toEqual([
+      location,
+      otherLocation,
     ]);
-    mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
-      expect(ownerId).toBe(userId);
-      return {
-        beginWorktreeDeletion: async () => ({
-          location: await f.beginSession(id),
-          children: [],
-          directory: directories.get(id) ?? null,
-        }),
-        finishWorktreeDeletion: () => f.finishSession(id),
-      };
-    });
-
-    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
-      success: true,
-    });
-    // Both call sites (record_manifest carrying runtimeLocations and
-    // record_cleanup carrying sessionIds) must cover both directories.
-    const manifestDirectories = new Set(
-      f.record.mock.calls
-        .filter(call => call[0].runtimeLocations !== undefined)
-        .map(call => call[0].directory)
-    );
-    const cleanupDirectories = new Set(
-      f.record.mock.calls
-        .filter(call => call[0].sessionIds !== undefined)
-        .map(call => call[0].directory)
-    );
-    expect(manifestDirectories).toEqual(new Set(['/workspace/app', identity]));
-    expect(cleanupDirectories).toEqual(new Set(['/workspace/app', identity]));
-  });
-
-  it('falls back to the identity workspace path when no session returns a directory', async () => {
-    const f = fixture();
-    const identity = getWorktreeWorkspacePath(undefined, userId, worktreeId);
-
-    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
-      success: true,
-    });
-    expect(f.record.mock.calls.length).toBeGreaterThan(0);
-    for (const call of f.record.mock.calls) {
-      expect(call[0].directory).toBe(identity);
-    }
+    expect(f.record.mock.calls.every(([input]) => !('directory' in input))).toBe(true);
   });
 });

@@ -1,0 +1,8 @@
+name: Reset pnpm installed graph
+description: Remove pnpm's generated dependency graph before install and sticky-disk commit
+
+runs:
+  using: node24
+  main: cleanup.cjs
+  post: cleanup.cjs
+  post-if: always()

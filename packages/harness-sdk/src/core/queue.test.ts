@@ -47,7 +47,7 @@ const rounds = (seen: readonly Continued[]) => {
 /** Watches `continued` until it has seen `count` rounds end. */
 const watching = (session: SessionHandle, count: number) => {
   let ended = 0;
-  return Effect.fork(
+  return Effect.forkChild(
     Stream.runCollect(
       Stream.takeUntil(session.continued, one => {
         ended += eventIn(one)?.kind === 'done' ? 1 : 0;
@@ -155,7 +155,7 @@ const started = Effect.runSync(Deferred.make<boolean>());
 const held: Tool = {
   definition: { name: 'held', description: 'held', parameters: { type: 'object', properties: {} } },
   run: () =>
-    Effect.zipRight(Deferred.succeed(started, true), Effect.as(Deferred.await(gate), 'let go')),
+    Effect.andThen(Deferred.succeed(started, true), Effect.as(Deferred.await(gate), 'let go')),
 };
 
 it('shows what is waiting, in the order it will be asked', async () => {
@@ -173,7 +173,7 @@ it('shows what is waiting, in the order it will be asked', async () => {
         const seen = yield* watching(session, 2);
         /* The session is busy from here: the tool is waiting on the gate and the
            model is waiting on the tool. */
-        const asking = yield* Effect.fork(Stream.runDrain(session.ask('use the tool')));
+        const asking = yield* Effect.forkChild(Stream.runDrain(session.ask('use the tool')));
         yield* Deferred.await(started);
         const one = yield* session.queue('one');
         const two = yield* session.queue('two');

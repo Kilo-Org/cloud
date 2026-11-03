@@ -1,6 +1,10 @@
 import 'server-only';
 import type { User } from '@kilocode/db/schema';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+} from '@kilocode/worker-utils/organization-membership';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -16,6 +20,7 @@ type CreateWorktreeChatOptions = {
   headersList?: Headers;
   sourceKiloSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   organizationId?: string;
 };
 
@@ -90,11 +95,31 @@ function getWorktreeErrorCode(error: WorktreeUpstreamErrorShape): WorktreeErrorC
   return typeof status === 'number' ? worktreeErrorCodesByHttpStatus.get(status) : undefined;
 }
 
+function rejectsProposedSessionId(error: unknown): boolean {
+  if (!(error instanceof TRPCClientError) || getWorktreeErrorCode(error) !== 'BAD_REQUEST') {
+    return false;
+  }
+  try {
+    return z
+      .tuple([
+        z.object({
+          code: z.literal('unrecognized_keys'),
+          keys: z.tuple([z.literal('kiloSessionId')]),
+          path: z.tuple([]),
+        }),
+      ])
+      .safeParse(JSON.parse(error.message)).success;
+  } catch {
+    return false;
+  }
+}
+
 export async function createWorktreeChat({
   user,
   headersList,
   sourceKiloSessionId,
   operationKey,
+  kiloSessionId,
   organizationId,
 }: CreateWorktreeChatOptions): Promise<CreateWorktreeChatOutput> {
   if (isMobileClient(headersList)) {
@@ -107,7 +132,8 @@ export async function createWorktreeChat({
   const organizationCondition = organizationId
     ? and(
         eq(cli_sessions_v2.organization_id, organizationId),
-        isNotNull(organization_memberships.id)
+        isNotNull(organization_memberships.id),
+        isNotNull(organizations.id)
       )
     : isNull(cli_sessions_v2.organization_id);
 
@@ -119,11 +145,9 @@ export async function createWorktreeChat({
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, user.id)
-      )
+      organizationMembershipJoinCondition(user.id, cli_sessions_v2.organization_id)
     )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(
       and(
         eq(cli_sessions_v2.session_id, sourceKiloSessionId),
@@ -157,13 +181,23 @@ export async function createWorktreeChat({
     tokenSource: 'cloud-agent',
   });
   try {
-    return await createCloudAgentNextClient(token).createWorktreeChat({
+    const client = createCloudAgentNextClient(token);
+    const input = {
       sourceKiloSessionId,
       sourceCloudAgentSessionId: source.cloudAgentSessionId,
       operationKey,
       ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
-      clientProvenance: 'browser',
-    });
+      clientProvenance: 'browser' as const,
+    };
+    return await client
+      .createWorktreeChat({ ...input, ...(kiloSessionId ? { kiloSessionId } : {}) })
+      .catch(error => {
+        // Older Workers reject the field before admission, so this retry cannot duplicate a chat.
+        if (kiloSessionId && rejectsProposedSessionId(error)) {
+          return client.createWorktreeChat(input);
+        }
+        throw error;
+      });
   } catch (error) {
     if (error instanceof TRPCClientError) {
       const code = getWorktreeErrorCode(error);

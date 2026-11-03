@@ -1,5 +1,5 @@
 import { type Ref } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type ViewInstance } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ type SessionPreviewActionPanelProps = {
    * VoiceOver focus moves when the portal actually mounts the row — an effect
    * on open runs before the portal has rendered it.
    */
-  firstItemRef?: Ref<View>;
+  firstItemRef?: Ref<ViewInstance>;
 };
 
 /**

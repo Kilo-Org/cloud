@@ -18,8 +18,16 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
-  AgentSessionsSection: () => null,
   LiveSessionFeedback: () => null,
+}));
+vi.mock('@/components/home/home-agent-sessions-section', () => ({
+  AgentSessionsSection: () => null,
+}));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store through the dismissal journal; this suite asserts Home copy.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: () => null,
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
 }));
 vi.mock('@/components/home/live-session-state', () => ({
   useLiveSessionContext: () => ({

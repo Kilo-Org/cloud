@@ -42,6 +42,12 @@ export type SsoDomainAuthority =
 
 type DbOrTransaction = typeof db | DrizzleTransaction;
 
+type SsoAuthorityRow = {
+  id: string;
+  ssoDomain: string | null;
+  parentOrganizationId: string | null;
+};
+
 const parentOrganizations = alias(organizations, 'sso_policy_parent_organizations');
 
 function normalizeSsoDomain(domain: string): string | null {
@@ -148,21 +154,26 @@ export async function resolveEffectiveOrganizationSsoPolicies(
     }
   }
 
-  const authorityRows = await dbOrTx
-    .select({
-      id: organizations.id,
-      ssoDomain: organizations.sso_domain,
-      parentOrganizationId: organizations.parent_organization_id,
-    })
-    .from(organizations)
-    .where(
-      and(
-        inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
-        isNull(organizations.deleted_at)
-      )
-    );
+  // The authority map is only consulted for organizations that carry a domain, so an empty set
+  // needs no lookup.
+  const authorityRows: SsoAuthorityRow[] =
+    normalizedDomains.size === 0
+      ? []
+      : await dbOrTx
+          .select({
+            id: organizations.id,
+            ssoDomain: organizations.sso_domain,
+            parentOrganizationId: organizations.parent_organization_id,
+          })
+          .from(organizations)
+          .where(
+            and(
+              inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
+              isNull(organizations.deleted_at)
+            )
+          );
 
-  const authoritiesByDomain = new Map<string, typeof authorityRows>();
+  const authoritiesByDomain = new Map<string, SsoAuthorityRow[]>();
   for (const authority of authorityRows) {
     if (!authority.ssoDomain) continue;
     const domain = authority.ssoDomain.toLowerCase();

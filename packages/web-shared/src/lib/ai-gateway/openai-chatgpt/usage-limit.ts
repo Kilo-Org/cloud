@@ -28,6 +28,9 @@ import * as z from 'zod';
  */
 export const CHATGPT_USAGE_SETTINGS_URL = 'https://chatgpt.com/settings/usage';
 
+export const CHATGPT_BUSINESS_USAGE_LIMIT_CODE =
+  'subscription_sharing_workplace_individual_usage_limit_exceeded';
+
 /** The only status that carries a plan limit. */
 const USAGE_LIMIT_STATUS = 429;
 
@@ -42,6 +45,7 @@ const USAGE_LIMIT_MARKERS: Record<string, true> = {
   usage_limit_reached: true,
   insufficient_quota: true,
   subscription_sharing_usage_limit_exceeded: true,
+  [CHATGPT_BUSINESS_USAGE_LIMIT_CODE]: true,
 };
 
 /**
@@ -65,6 +69,7 @@ const usageLimitEnvelopeSchema = z.object({
 
 /** What the gateway recorded about a plan limit. */
 export type ChatGptUsageLimit = {
+  code: string | null;
   /** Epoch milliseconds when the limit resets, or null when OpenAI gave none. */
   resetsAt: number | null;
 };
@@ -86,13 +91,14 @@ export function readChatGptUsageLimit(
   const metadata = parsed.data.detail ?? parsed.data.error;
   if (!metadata) return null;
 
-  const isPlanLimit = [metadata.type, metadata.code].some(
+  const code = [metadata.code, metadata.type].find(
     marker => marker !== undefined && USAGE_LIMIT_MARKERS[marker] === true
   );
-  if (!isPlanLimit) return null;
+  if (code === undefined) return null;
 
   const resetsInSeconds = metadata.resets_in_seconds;
   return {
+    code,
     resetsAt: resetsInSeconds === undefined ? null : now + Math.round(resetsInSeconds * 1000),
   };
 }

@@ -1,5 +1,11 @@
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { createGitHubLinkToken } from '@/lib/bot/github-link-token';
+import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
+import {
+  getGitHubRepositoryFullNameFromThread,
+  parseGitHubThreadId,
+  type GitHubThreadCoordinates,
+} from '@/lib/bot/github-thread';
 import {
   formatTriggerMessage,
   formatUserMessage,
@@ -39,11 +45,9 @@ function parseGitHubRepositoryFullName(id: string | undefined): string | null {
 
 export function getGitHubRepositoryReference(
   thread: Thread,
-  message: Message
+  message?: Message
 ): GitHubRepositoryReference {
-  // GitHub adapter messages always carry a GitHubRawMessage.raw, but tests
-  // exercise fallback paths with sparse fixtures, so treat raw as partial.
-  const { repository } = (message as Message<Partial<GitHubRawMessage>>).raw;
+  const { repository } = (message as Message<Partial<GitHubRawMessage>> | undefined)?.raw ?? {};
 
   return {
     id: repository?.id ?? null,
@@ -73,13 +77,6 @@ export function isGitHubRepositoryLinked(
     );
   });
 }
-
-type GitHubThreadCoordinates = {
-  owner: string;
-  repo: string;
-  number: number;
-  reviewCommentId: number | null;
-};
 
 type GitHubIssueLike = {
   body?: string | null;
@@ -111,43 +108,6 @@ type GitHubReviewThreadContext = {
   targetComment: GitHubReviewComment | null;
   comments: GitHubReviewComment[];
 };
-
-function parseGitHubThreadId(threadId: string): GitHubThreadCoordinates | null {
-  if (!threadId.startsWith('github:')) return null;
-
-  const withoutPrefix = threadId.slice('github:'.length);
-  const reviewCommentMatch = withoutPrefix.match(/^([^/]+)\/([^:]+):(\d+):rc:(\d+)$/);
-  if (reviewCommentMatch) {
-    return {
-      owner: reviewCommentMatch[1],
-      repo: reviewCommentMatch[2],
-      number: Number.parseInt(reviewCommentMatch[3], 10),
-      reviewCommentId: Number.parseInt(reviewCommentMatch[4], 10),
-    };
-  }
-
-  const issueMatch = withoutPrefix.match(/^([^/]+)\/([^:]+):issue:(\d+)$/);
-  if (issueMatch) {
-    return {
-      owner: issueMatch[1],
-      repo: issueMatch[2],
-      number: Number.parseInt(issueMatch[3], 10),
-      reviewCommentId: null,
-    };
-  }
-
-  const pullRequestMatch = withoutPrefix.match(/^([^/]+)\/([^:]+):(\d+)$/);
-  if (pullRequestMatch) {
-    return {
-      owner: pullRequestMatch[1],
-      repo: pullRequestMatch[2],
-      number: Number.parseInt(pullRequestMatch[3], 10),
-      reviewCommentId: null,
-    };
-  }
-
-  return null;
-}
 
 function formatGitHubItemBody(item: GitHubIssueLike): string {
   const body = item.body?.trim();
@@ -311,6 +271,14 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         getGitHubRepositoryReference(thread, message)
       );
     },
+    async authorizeBotActions({ thread, message, platformIntegration }) {
+      return await authorizeGitHubRepository({
+        platformIntegration,
+        repository: getGitHubRepositoryReference(thread, message).fullName,
+        threadRepository: getGitHubRepositoryFullNameFromThread(thread.id),
+        actorLogin: message.author.userName,
+      });
+    },
     async promptLinkAccount({ thread, identity, platformIntegration }) {
       await assertGitHubInstallationRuntimeAuthorized(
         identity.teamId,
@@ -400,9 +368,14 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
 
       if (reviewThreadContext) {
         const anchor = reviewThreadContext.comments[0] ?? reviewThreadContext.targetComment;
-        const reviewComments = reviewThreadContext.comments
-          .filter(comment => comment.id.toString() !== triggerMessage.id)
-          .map(formatGitHubReviewComment);
+        const history = reviewThreadContext.comments.filter(
+          comment => comment.id.toString() !== triggerMessage.id
+        );
+        if (history.length > BOT_CONTEXT_MESSAGE_LIMIT) {
+          // Keep the opening context alongside the latest discussion.
+          history.splice(1, history.length - BOT_CONTEXT_MESSAGE_LIMIT);
+        }
+        const reviewComments = history.map(formatGitHubReviewComment);
 
         lines.push('', 'Pull request review thread:');
 

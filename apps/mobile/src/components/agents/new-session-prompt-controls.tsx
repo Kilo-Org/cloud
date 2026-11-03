@@ -43,7 +43,10 @@ export function NewSessionPromptControls({
         <Pressable
           onPress={handlePaperclipPress}
           disabled={paperclipDisabled}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // The 31.5pt frame (h-9 at NativeWind's 14pt rem) carries 8.25pt of
+          // hit slop per side: 31.5 + 16.5 = 48dp, Android's minimum
+          // (WCAG 2.5.8 AA), with the visual and the row height unchanged.
+          hitSlop={{ top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 }}
           className={cn(
             'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
             paperclipDisabled && 'opacity-50'
@@ -58,20 +61,16 @@ export function NewSessionPromptControls({
             attachment list still allows a text paste. */}
         <ComposerPasteButton onPress={pasteClipboard} disabled={control.draftMutationLocked} />
       </View>
-      {voiceInput.available ? (
-        <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-      ) : null}
+      <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+        <VoiceInputStatus status={voiceInput.status} />
+      </View>
       {children}
-      {voiceInput.available ? (
-        <VoiceInputButton
-          disabled={control.voiceDisabled}
-          size="lg"
-          status={voiceInput.status}
-          onPress={handleVoiceToggle}
-        />
-      ) : null}
+      <VoiceInputButton
+        disabled={control.voiceDisabled}
+        size="lg"
+        status={voiceInput.status}
+        onPress={handleVoiceToggle}
+      />
     </View>
   );
 }

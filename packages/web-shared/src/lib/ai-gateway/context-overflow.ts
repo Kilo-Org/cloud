@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH,
+  isAutoSmallFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { getMaxTokens } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -87,12 +90,11 @@ export async function detectContextOverflow({
   }
 
   if (response.status !== 500) return null;
-  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  if (!model) return null;
+  if (!isAutoSmallFreeModel(requestedModel)) return null;
   const estimatedTokenCount = estimateTokenCount(request);
-  if (estimatedTokenCount < model.context_length) return null;
+  if (estimatedTokenCount < AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH) return null;
 
-  const error = `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`;
+  const error = `The maximum context length is ${AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH} tokens. However, about ${estimatedTokenCount} tokens were requested.`;
   warnExceptInTest(`Responding with ${response.status} ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.context_length_exceeded, message: error },

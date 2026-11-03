@@ -187,7 +187,6 @@ export type ProviderPrThread = {
   comments: ProviderPrComment[];
 };
 
-/** One page of discussion threads. */
 export type ProviderPrThreadsPage = {
   threads: ProviderPrThread[];
   nextCursor: string | null;
@@ -205,7 +204,6 @@ export type ProviderPrCheck = {
   detailsUrl: string | null;
 };
 
-/** The checks rollup for one PR/MR. */
 export type ProviderPrChecksResult = {
   checks: ProviderPrCheck[];
 };
@@ -256,7 +254,6 @@ export type ProviderPrInboxItem = {
   updatedAt: string;
 };
 
-/** One page of inbox rows. */
 export type ProviderPrInboxPage = {
   items: ProviderPrInboxItem[];
   nextCursor: string | null;

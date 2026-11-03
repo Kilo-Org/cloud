@@ -101,7 +101,9 @@ export function useCatalogDownload() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('modelChat.catalog.downloadAnyway'), onPress: start },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: no download starts.
+      { cancelable: true }
     );
   };
 }

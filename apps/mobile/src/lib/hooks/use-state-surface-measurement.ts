@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useWindowDimensions, type View } from 'react-native';
+import { useWindowDimensions, type ViewInstance } from 'react-native';
 
 import { intersectStateFrames, type StateFrame } from '@/lib/centered-state-layout';
 import { useNativeStateGeometry } from '@/lib/hooks/use-native-state-geometry';
@@ -14,8 +14,8 @@ export type SurfaceMeasurement = {
 };
 
 export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive = true) {
-  const nodeRef = useRef<View | null>(null);
-  const [nativeNode, setNode] = useState<View | null>(null);
+  const nodeRef = useRef<ViewInstance | null>(null);
+  const [nativeNode, setNode] = useState<ViewInstance | null>(null);
   const native = useNativeStateGeometry(nativeActive ? nativeNode : null);
   const [frame, setFrame] = useState<StateFrame | null>(null);
   const { width, height } = useWindowDimensions();
@@ -52,7 +52,7 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
   }, [androidSheet]);
 
   const capture = useCallback(
-    (node: View | null) => {
+    (node: ViewInstance | null) => {
       nodeRef.current = node;
       setNode(node);
       measure();

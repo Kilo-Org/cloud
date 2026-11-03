@@ -120,6 +120,18 @@ export default function ProfileLoading() {
         </CardContent>
       </Card>
 
+      <Card className="w-full">
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="mt-2 h-4 w-full" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-11 w-full max-w-sm" />
+          <Skeleton className="h-4 w-full max-w-lg" />
+          <Skeleton className="h-11 w-28" />
+        </CardContent>
+      </Card>
+
       {/* Redeem Promo Code Card */}
       <Card className="w-full">
         <CardHeader>

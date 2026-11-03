@@ -1,3 +1,4 @@
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { Terminal } from 'lucide-react';
 import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
@@ -9,7 +10,8 @@ type BashToolCardProps = {
   toolPart: ToolPart;
 };
 
-const WORKSPACE_PATH_PATTERN = /\/workspace\/(?:[^/\s]+\/)?[^/\s]+\/sessions\/[^/\s]+/g;
+const WORKSPACE_PATH_PATTERN =
+  /\/workspace\/(?:app(?![A-Za-z0-9._-])|(?:[^/\s]+\/)?[^/\s]+\/(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/\s]+)/g;
 const STREAMING_OUTPUT_WINDOW_CLASS = 'max-h-24';
 
 function getCommandPreview(command: string): string {
@@ -56,7 +58,7 @@ export function BashToolCard({ toolPart }: BashToolCardProps) {
       )}
       {cwd && (
         <div className="text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]">
-          cwd: {cwd}
+          cwd: {cloudAgentFileLabel(cwd)}
         </div>
       )}
       {output.trim() ? (

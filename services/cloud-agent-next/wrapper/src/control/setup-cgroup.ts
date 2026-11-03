@@ -77,18 +77,24 @@ export function applySetupLimits(reference: string): void {
   }
 }
 
-/** Moves the gated child into the leaf before it execs; any failure falls back to a plain spawn. */
+/**
+ * Moves the gated child into the leaf before it execs; a placement failure falls back to a plain
+ * spawn. The gate is the command's stdin and closes after `start`, so the command reads EOF as with
+ * `ignore`. A setup command takes no other stdin: any other `stdio[0]` throws, because running it
+ * unmanaged would drop containment without a signal.
+ */
 export function spawnInCgroup(
   leaf: SetupCgroup,
   command: string,
   args: string[],
   options: SpawnOptions
 ): ChildProcess {
-  const stdio = Array.isArray(options.stdio)
-    ? options.stdio.slice(0, 3)
+  const [stdin, stdout, stderr] = Array.isArray(options.stdio)
+    ? options.stdio
     : (['ignore', 'pipe', 'pipe'] as const);
-  const child = spawnGated(command, args, { ...options, stdio: [...stdio, 'pipe'] });
-  const gate = child.stdio[3];
+  if (stdin !== 'ignore') throw new Error('A setup command takes no stdin');
+  const child = spawnGated(command, args, { ...options, stdio: ['pipe', stdout, stderr] });
+  const gate = child.stdin;
   try {
     const pid = child.pid;
     if (pid === undefined || !(gate instanceof Writable)) {
@@ -99,6 +105,7 @@ export function spawnInCgroup(
       throw new Error('Setup command placement unconfirmed');
     }
     releaseGate(gate);
+    gate.end();
     return child;
   } catch {
     child.on('error', () => undefined);

@@ -23,6 +23,7 @@ let creditEventWireBody: typeof BouncerClient.creditEventWireBody;
 let usageEventWireBody: typeof BouncerClient.usageEventWireBody;
 let normalizeJa4: typeof BouncerClient.normalizeJa4;
 let signupDecide: typeof BouncerClient.signupDecide;
+let chargeDecide: typeof BouncerClient.chargeDecide;
 
 beforeAll(() => {
   ({
@@ -33,6 +34,7 @@ beforeAll(() => {
     usageEventWireBody,
     normalizeJa4,
     signupDecide,
+    chargeDecide,
   } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
@@ -204,6 +206,96 @@ describe('decide', () => {
   });
 });
 
+describe('chargeDecide', () => {
+  const request = {
+    requestId: 'checkout:r',
+    accountId: 'user:u',
+    userId: 'u',
+    ip: '203.0.113.7',
+    ja4: 'JA4_ABC',
+    stage: 'checkout' as const,
+    flow: 'kilo_pass' as const,
+  };
+
+  it('returns an enforced verdict with its internal flags', async () => {
+    const verdict = {
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [
+        { name: 'card_testing', decision: 'block', enforced: true, until: 1_800_000_000_000 },
+      ],
+    };
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    await expect(chargeDecide(request)).resolves.toEqual(verdict);
+  });
+
+  it('sends the normalized request to the charge-decide endpoint', async () => {
+    mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+    await chargeDecide(request);
+    const [url] = mockFetch.mock.calls[0] ?? [];
+    expect(url).toBe('https://bouncer.example.com/api/v1/charge-decide');
+    expect(lastRequestBody()).toEqual({
+      requestId: 'checkout:r',
+      accountId: 'user:u',
+      userId: 'u',
+      ip: '203.0.113.7',
+      ja4: 'ja4_abc',
+      stage: 'checkout',
+      flow: 'kilo_pass',
+    });
+  });
+
+  it('fails open on a 404 from an older bouncer deploy', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(new Response('not found', { status: 404 }));
+    await expect(chargeDecide(request)).resolves.toBeNull();
+  });
+
+  it('fails open at the timeout', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    await expect(chargeDecide(request, { timeoutMs: 30 })).resolves.toBeNull();
+  });
+
+  it.each([
+    ['an unknown code and a malformed flag', { enforced: true, code: 'banned', flags: [{}] }],
+    ['a non-string code and no flags', { enforced: true, code: 7 }],
+  ])('keeps an enforced verdict with %s', async (_name, body) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it('keeps the known flags of an enforced verdict whose code is unknown', async () => {
+    const flag = { name: 'card_testing', decision: 'block', enforced: true, until: null };
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, code: 'something_new', flags: [flag] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [flag] });
+  });
+
+  it('drops the flags list when any entry has an unknown shape', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, flags: [{ name: 'card_testing', decision: 'block' }] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it.each([
+    ['a non-boolean enforced', { enforced: 'yes', flags: [] }],
+    ['a non-object body', 'allow'],
+    ['a body without enforced', { code: 'charge_blocked', flags: [] }],
+  ])('fails open on %s', async (_name, body) => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(chargeDecide(request)).resolves.toBeNull();
+  });
+});
+
 describe('signupOperationId', () => {
   it('uses the same privacy-safe identity for normalized aliases and provider retries', () => {
     const operationId = signupOperationId(normalizeEmail(' First.Last+google@Googlemail.com '));
@@ -331,6 +423,74 @@ describe('signupDecide', () => {
     expect((await signupDecide({ ...request, operationId: 'a'.repeat(128) }))?.enforced).toBe(true);
   });
 
+  describe('step-up', () => {
+    const stepUp = {
+      enforced: true,
+      code: 'signup_step_up',
+      methods: ['apple'],
+      flags: [
+        { ...flag, name: 'signup:busy' },
+        { ...flag, name: 'signup:domain', source: 'domain' },
+      ],
+    };
+
+    it('accepts a step-up verdict with the busy and domain flags', async () => {
+      mockFetch.mockResolvedValue(Response.json(stepUp));
+      await expect(signupDecide(request)).resolves.toEqual(stepUp);
+    });
+
+    it('accepts eight flags and rejects nine', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const flags = (count: number) => Array.from({ length: count }, () => flag);
+      mockFetch.mockResolvedValueOnce(Response.json({ ...stepUp, flags: flags(8) }));
+      expect((await signupDecide(request))?.enforced).toBe(true);
+      mockFetch.mockResolvedValueOnce(Response.json({ ...stepUp, flags: flags(9) }));
+      await expect(signupDecide(request)).resolves.toBeNull();
+      mockFetch.mockResolvedValueOnce(
+        Response.json({ enforced: false, flags: flags(9).map(f => ({ ...f, enforced: false })) })
+      );
+      await expect(signupDecide(request)).resolves.toBeNull();
+    });
+
+    it.each([
+      ['missing methods', { ...stepUp, methods: undefined }],
+      ['empty methods', { ...stepUp, methods: [] }],
+      ['too many methods', { ...stepUp, methods: Array.from({ length: 9 }, () => 'apple') }],
+      ['uppercase method', { ...stepUp, methods: ['Apple'] }],
+      ['method with a space', { ...stepUp, methods: ['app le'] }],
+      ['over-long method', { ...stepUp, methods: ['a'.repeat(33)] }],
+      ['non-string method', { ...stepUp, methods: [1] }],
+      ['step-up deadline', { ...stepUp, retryAfterMs: 1 }],
+      ['rate-limit methods', { ...stepUp, code: 'signup_rate_limited', retryAfterMs: 1 }],
+      ['shadow step-up', { ...stepUp, enforced: false }],
+    ])('returns unavailable on %s', async (_name, verdict) => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockFetch.mockResolvedValue(Response.json(verdict));
+      await expect(signupDecide(request)).resolves.toBeNull();
+    });
+
+    it('sends the method and normalized email domain', async () => {
+      mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      await signupDecide({ ...request, method: 'email', emailDomain: ' Example.TEST ' });
+      expect(lastRequestBody()).toEqual({
+        ...request,
+        method: 'email',
+        emailDomain: 'example.test',
+      });
+    });
+
+    it.each([
+      { method: 'Email' },
+      { method: 'a'.repeat(33) },
+      { emailDomain: 'bücher.example.test' },
+      { emailDomain: '' },
+    ])('omits an invalid step-up field but still asks for admission: %j', async fields => {
+      mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      expect((await signupDecide({ ...request, ...fields }))?.enforced).toBe(false);
+      expect(lastRequestBody()).toEqual(request);
+    });
+  });
+
   it('returns unavailable on transport failure', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
@@ -384,6 +544,21 @@ describe('usage event and charge cost fields', () => {
     expect(body.costMicrodollars).toBe(1234);
   });
 
+  it('sends siwc only when the request ran on a ChatGPT subscription', () => {
+    const event = {
+      requestId: 'r',
+      accountId: 'user:u',
+      inputTokens: 1,
+      outputTokens: 2,
+      clientAttributed: true,
+      hasTools: false,
+      requestedLogprobs: false,
+    };
+    expect(usageEventWireBody({ ...event, siwc: true }).siwc).toBe(true);
+    expect(usageEventWireBody({ ...event, siwc: false })).not.toHaveProperty('siwc');
+    expect(usageEventWireBody(event)).not.toHaveProperty('siwc');
+  });
+
   it('carries the payer usage on charge.attempted', () => {
     const body = creditEventWireBody({
       type: 'charge.attempted',
@@ -401,7 +576,7 @@ describe('usage event and charge cost fields', () => {
 function lastRequestBody(): Record<string, unknown> {
   const call = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
   const body = call?.[1]?.body;
-  return JSON.parse(String(body)) as Record<string, unknown>;
+  return JSON.parse(body as string) as Record<string, unknown>;
 }
 
 describe('normalizeJa4', () => {

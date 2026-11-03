@@ -1,5 +1,7 @@
+/* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -21,10 +23,12 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
 import { KvRow } from '@/components/ui/kv-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
@@ -37,6 +41,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -90,10 +95,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
-  // A missing `withMembers` payload is not "off": the query can be paused
-  // offline or have errored with no persisted copy, so an org with the alert
-  // enabled must never read as disabled. Only a loaded payload with no stored
-  // threshold is genuinely off.
+  const lowBalanceUnavailable =
+    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   let lowBalanceSubtitle = t('common.loading');
   if (minimumBalance != null) {
@@ -102,38 +105,44 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
-  } else if (orgWithMembers.isError) {
-    lowBalanceSubtitle = t('common.unknown');
+  } else if (lowBalanceUnavailable) {
+    lowBalanceSubtitle = t(
+      orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
+    );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={org.organizationName} />
+      {/* The organization name is user prose, not a UI label, so it keeps a
+          second line for a natural break. The rename control sits beside it, so
+          the name appears once on the screen instead of again in the card. */}
+      <ScreenHeader
+        title={org.organizationName}
+        titleNumberOfLines={2}
+        headerRight={
+          showMoney ? (
+            <IconButton
+              onPress={() => {
+                setRenameVisible(true);
+              }}
+              accessibilityLabel={t('organization.hub.renameTitle')}
+            >
+              <Pencil size={16} color={colors.mutedForeground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-          <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-            <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
-              {org.organizationName}
-            </Text>
-            {showMoney && (
-              <IconButton
-                onPress={() => {
-                  setRenameVisible(true);
-                }}
-                accessibilityLabel={t('organization.hub.renameTitle')}
-              >
-                <Pencil size={16} color={colors.mutedForeground} />
-              </IconButton>
-            )}
-          </View>
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
               value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
+              valueFace="numeric"
             />
           )}
           {showMoney && org.balance === 0 && (
@@ -148,12 +157,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             // purchased capacity and can legitimately be zero.
             value={
               org.requireSeats
-                ? `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
-                    org.seatCount.total,
-                    i18n.language
-                  )}`
+                ? isolateLtrBidiText(
+                    `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
+                      org.seatCount.total,
+                      i18n.language
+                    )}`
+                  )
                 : formatNumber(org.seatCount.used, i18n.language)
             }
+            valueFace="numeric"
             last
           />
         </Animated.View>
@@ -207,7 +219,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
+                trailing={
+                  lowBalanceUnavailable ? (
+                    <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
+                  ) : undefined
+                }
                 onPress={() => {
+                  if (lowBalanceUnavailable) {
+                    void orgWithMembers.refetch();
+                    return;
+                  }
                   router.push('/(app)/(tabs)/(3_profile)/organization/low-balance-alert' as Href);
                 }}
               />
@@ -233,11 +254,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           initialValue={org.organizationName}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
           }}
           onClose={() => {
             setRenameVisible(false);
           }}
+          errorCopy={organizationErrorMessage}
         />
       )}
     </View>
@@ -271,7 +293,12 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
   } else if (state.action === 'retry') {
     onPress = onRetry;
   }
-  const opensWeb = state.action === 'manage' || state.action === 'setup';
+  // Every settled state of this row but the retryable error opens the Kilo Pass
+  // management page on the web. The unresolved status (`action: 'none'`, shown
+  // while the summary query is in flight) keeps that chevron too: it lasts one
+  // request, and a momentary row without it reads as broken beside the rows
+  // above and below it.
+  const showsChevron = state.action !== 'retry';
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -289,12 +316,23 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       </View>
       <View className="flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
-        <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
+        {/* `h-4` is the `text-xs` line box (1 rem; native rem is 14), so the row
+            keeps its height and this title its place while the status loads; a
+            shorter bar drops the text block below the 30dp icon tile and the
+            whole row with it. The bar is `bg-muted-soft` because the theme's
+            `bg-muted` equals the `bg-secondary` card it sits on, which drew no
+            bar at all. The subtitle keeps the theme's own `line-height` rather
+            than a fixed one, so it still grows with the system text scale. */}
+        {state.loading ? (
+          <Skeleton className="mt-0.5 h-4 w-28 rounded bg-muted-soft" />
+        ) : (
+          <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
+        )}
       </View>
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {opensWeb ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
+      {showsChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

@@ -8,7 +8,8 @@
       "scheduledAction": "Egy ütemezett művelet frissítést kapott",
       "lowBalance": "Az egyenleged figyelmet igényel",
       "spendAlert": "A költésed figyelmet igényel",
-      "securityFinding": "Egy biztonsági észlelés figyelmet igényel",
+      "securityFinding": "Egy biztonsági találat figyelmet igényel",
+      "securityUpdate": "Egy biztonsági ellenőrzés frissítést kapott",
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
@@ -40,7 +41,7 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Alacsony egyenleg figyelmeztetés",
+      "title": "Figyelmeztetés alacsony egyenlegre",
       "body": "{{organizationName}} egyenlege a(z) ${{minimumBalanceUsd}} alá esett"
     },
     "spendAlert": {
@@ -48,7 +49,7 @@
       "body": "{{scopeName}} költése meghaladta a(z) ${{amountUsd}} összeget"
     },
     "securityFindingNew": {
-      "title": "Új biztonsági észlelés ({{severity}})",
+      "title": "Új biztonsági találat ({{severity}})",
       "body": "{{findingTitle}} itt: {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Egy biztonsági észlelés figyelmet igényel"
+      "body": "Egy biztonsági ellenőrzés frissítést kapott"
     }
   },
   "instanceLifecycle": {

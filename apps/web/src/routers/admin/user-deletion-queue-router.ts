@@ -328,6 +328,7 @@ function tabCondition(tab: ListTab) {
         OR EXISTS (
           SELECT 1 FROM user_deletion_steps s
           WHERE s.request_id = ${user_deletion_requests.id}
+            AND s.step_key <> ${UserDeletionStepKey.CsaSupportDb}
             AND s.status IN ('needs_attention', 'manual_action_required')
         )
       )`;
@@ -336,6 +337,7 @@ function tabCondition(tab: ListTab) {
     AND EXISTS (
       SELECT 1 FROM user_deletion_steps s
       WHERE s.request_id = ${user_deletion_requests.id}
+        AND s.step_key <> ${UserDeletionStepKey.CsaSupportDb}
         AND (
           s.rate_limited_since IS NOT NULL
           OR (s.status = 'retry_wait' AND s.last_error_code = 'rate_limited')

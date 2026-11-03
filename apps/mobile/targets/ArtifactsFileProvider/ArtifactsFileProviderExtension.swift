@@ -68,7 +68,16 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
         completionHandler(nil, NSFileProviderError(.noSuchItem))
         return progress
       }
-      completionHandler(ArtifactItem(file: file, sessionId: sessionId), nil)
+      let modified = mirror.fileAttributes(sessionId: sessionId, fileId: fileId)?.modified
+      completionHandler(
+        ArtifactItem(
+          file: file,
+          sessionId: sessionId,
+          filename: resolvedFilename(file: file, sessionId: sessionId),
+          contentModificationDate: modified
+        ),
+        nil
+      )
     case .unknown:
       completionHandler(nil, NSFileProviderError(.noSuchItem))
     }
@@ -91,14 +100,56 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
       completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
       return progress
     }
+    let attributes = mirror.fileAttributes(sessionId: sessionId, fileId: fileId)
+    let modified = attributes?.modified
+    let item = ArtifactItem(
+      file: file,
+      sessionId: sessionId,
+      filename: resolvedFilename(file: file, sessionId: sessionId),
+      contentModificationDate: modified
+    )
+    // The requested version is the system's pinned copy of this file: serving
+    // different bytes against it would hand the Files app content that does
+    // not match what it asked for, so a mismatch fails and the system
+    // re-fetches the current state instead.
+    if let requestedVersion, requestedVersion.contentVersion != item.itemVersion.contentVersion
+    {
+      completionHandler(nil, nil, NSError(
+        domain: NSFileProviderErrorDomain,
+        code: -2009, // NSFileProviderErrorVersionNoLongerAvailable, unavailable on iOS
+        userInfo: nil
+      ))
+      return progress
+    }
     do {
-      let staged = try Self.stage(source: source, filename: file.name)
+      let staged = try Self.stage(source: source, filename: item.filename)
       progress.completedUnitCount = 1
-      completionHandler(staged, ArtifactItem(file: file, sessionId: sessionId), nil)
+      completionHandler(staged, item, nil)
     } catch {
       completionHandler(nil, nil, error)
     }
     return progress
+  }
+
+  /**
+   The safe, single-component filename this extension hands out for a manifest
+   entry: sanitized, then deduplicated against the rest of the session's
+   entries in the manifest's own order, exactly as enumeration resolves them,
+   so the item's filename and the staged URL agree.
+   */
+  private func resolvedFilename(file: ArtifactManifest.File, sessionId: String) -> String {
+    var taken = Set<String>()
+    var resolved: String?
+    for entry in mirror.session(id: sessionId)?.files ?? [] {
+      let candidate = ArtifactFileName.unique(
+        ArtifactFileName.sanitize(id: entry.id, name: entry.name, mime: entry.mime),
+        taken: &taken
+      )
+      if entry.id == file.id {
+        resolved = candidate
+      }
+    }
+    return resolved ?? ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime)
   }
 
   func createItem(
@@ -172,12 +223,20 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
    to take it, so a browse cannot accumulate up to the per-file cap per open.
    */
   private static func stage(source: URL, filename: String) throws -> URL {
+    // Manifest-derived data must never reach the path API unsanitized: a name
+    // that is not one plain component would trap here (or, without this
+    // guard, resolve outside the per-fetch directory). The caller resolves
+    // names through `ArtifactFileName`, so this is a last-resort fallback
+    // that keeps the copy inside the staging directory.
+    let stagedName = ArtifactPath.isSafeComponent(filename)
+      ? filename
+      : ArtifactFileName.sanitize(id: UUID().uuidString, name: "", mime: "")
     let root = Self.stagingRoot
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     reapStagedCopies(in: root)
     let directory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let destination = directory.appendingPathComponent(filename, isDirectory: false)
+    let destination = directory.appendingPathComponent(stagedName, isDirectory: false)
     try FileManager.default.copyItem(at: source, to: destination)
     return destination
   }
@@ -239,7 +298,23 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
   let filename: String
   let contentType: UTType
   let documentSize: NSNumber?
+  let contentModificationDate: Date?
+  let version: NSFileProviderItemVersion
   let capabilities: NSFileProviderItemCapabilities
+
+  /**
+   The version the framework compares: the mirrored file's size and
+   modification date as the content version, stamped as the metadata version.
+
+   `NSFileProviderItem.itemVersion` is an `NSFileProviderItemVersion` whose
+   `contentVersion` is `Data` — a `String` property is never read by the
+   system — so the identity `fetchContents` compares against and the identity
+   the system pins are the same bytes. The protocol requirement is
+   non-optional, so folders carry the zero version.
+   */
+  var itemVersion: NSFileProviderItemVersion {
+    version
+  }
 
   /** The location's own root, which the Files app titles with the domain name. */
   static let root = ArtifactItem(
@@ -248,6 +323,8 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     filename: "Kilo",
     contentType: .folder,
     documentSize: nil,
+    contentModificationDate: nil,
+    itemVersion: ArtifactItem.zeroVersion,
     isDirectory: true
   )
 
@@ -257,6 +334,8 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     filename: String,
     contentType: UTType,
     documentSize: NSNumber?,
+    contentModificationDate: Date?,
+    itemVersion: NSFileProviderItemVersion,
     isDirectory: Bool
   ) {
     self.itemIdentifier = itemIdentifier
@@ -264,6 +343,8 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
     self.filename = filename
     self.contentType = contentType
     self.documentSize = documentSize
+    self.contentModificationDate = contentModificationDate
+    self.version = itemVersion
     // `.allowsReading` is the whole of it for a file. The root and a session
     // folder add `.allowsContentEnumerating`; nothing here ever adds a write
     // capability.
@@ -287,20 +368,56 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
       filename: session.title,
       contentType: .folder,
       documentSize: nil,
+      contentModificationDate: nil,
+      itemVersion: ArtifactItem.zeroVersion,
       isDirectory: true
     )
   }
 
-  /** A mirrored file, typed from its manifest MIME type. */
-  convenience init(file: ArtifactManifest.File, sessionId: String) {
+  /**
+   A mirrored file, typed from its manifest MIME type.
+
+   `filename` is the safe single-component name the session resolved (see
+   `ArtifactFileName`), never the raw manifest name, and the version fields
+   carry the mirror file's own identity so the system can detect a rewrite.
+   */
+  convenience init(
+    file: ArtifactManifest.File,
+    sessionId: String,
+    filename: String,
+    contentModificationDate: Date?
+  ) {
     self.init(
       itemIdentifier: ArtifactItemIdentifier.encodeFile(file.id, inSession: sessionId),
       parentItemIdentifier: ArtifactItemIdentifier.encodeSession(sessionId),
-      filename: file.name,
+      filename: filename,
       contentType: UTType(mimeType: file.mime) ?? .data,
       documentSize: NSNumber(value: file.size),
+      contentModificationDate: contentModificationDate,
+      itemVersion: ArtifactItem.contentVersion(size: file.size, modified: contentModificationDate),
       isDirectory: false
     )
+  }
+
+  /** The zero version, what a folder (or a file with no readable stamp) carries. */
+  static let zeroVersion = NSFileProviderItemVersion(
+    contentVersion: Data(),
+    metadataVersion: Data()
+  )
+
+  /**
+   The content version of a mirrored file: its size and modification date.
+   The mirror writer replaces a file wholesale, so both change with every
+   rewrite; an equal pair means the bytes are unchanged. `contentVersion` is
+   `Data` because that is what the framework compares. A file whose
+   modification date cannot be read falls back to the zero version.
+   */
+  static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {
+    guard let modified else {
+      return zeroVersion
+    }
+    let content = Data("size:\(size) modified:\(modified.timeIntervalSince1970)".utf8)
+    return NSFileProviderItemVersion(contentVersion: content, metadataVersion: content)
   }
 }
 
@@ -454,12 +571,43 @@ final class ArtifactMirror: @unchecked Sendable {
     case .root:
       return (manifest()?.sessions ?? []).map { ArtifactItem(session: $0) }
     case .session(let sessionId):
-      return (session(id: sessionId)?.files ?? []).map {
-        ArtifactItem(file: $0, sessionId: sessionId)
+      guard let session = session(id: sessionId) else {
+        return []
+      }
+      // Names are sanitized and deduplicated here, so the item the
+      // enumeration hands out and the URL `fetchContents` stages agree on one
+      // safe filename per entry.
+      var taken = Set<String>()
+      return session.files.map { file in
+        let name = ArtifactFileName.unique(
+          ArtifactFileName.sanitize(id: file.id, name: file.name, mime: file.mime),
+          taken: &taken
+        )
+        let modified = fileAttributes(sessionId: sessionId, fileId: file.id)?.modified
+        return ArtifactItem(
+          file: file,
+          sessionId: sessionId,
+          filename: name,
+          contentModificationDate: modified
+        )
       }
     case .file, .unknown:
       return []
     }
+  }
+
+  /**
+   The mirror file's size and modification date, or nil when the file is not
+   on disk or its attributes cannot be read. The version fields and the
+   Files-app timestamp both come from this.
+   */
+  func fileAttributes(sessionId: String, fileId: String) -> (size: Int?, modified: Date?)? {
+    guard let url = fileURL(sessionId: sessionId, fileId: fileId),
+      let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+    else {
+      return nil
+    }
+    return (values.fileSize, values.contentModificationDate)
   }
 
   private static func rootURL() -> URL? {
@@ -583,5 +731,165 @@ enum ArtifactPath {
     }
     let segments = fileId.split(separator: "/", omittingEmptySubsequences: false)
     return !segments.isEmpty && segments.allSatisfy { isSafeComponent(String($0)) }
+  }
+}
+
+/**
+ Manifest file names become item filenames and staging path components, so
+ they are sanitized and disambiguated before either use — the same contract
+ `safeArtifactDisplayName` and `uniqueArtifactDisplayNames` give the manifest
+ the mirror writer writes, mirrored here so the extension cannot be undone by
+ a stale or older index.
+ */
+enum ArtifactFileName {
+  /** The longest display name this extension hands out, in UTF-8 bytes. */
+  static let maxBytes = 200
+  /** Stem used when a name has nothing usable in it at all. */
+  static let fallbackStem = "artifact"
+  /** Extension used when the MIME type yields no usable extension. */
+  static let fallbackExtension = "bin"
+
+  /**
+   One safe, single-component filename for a manifest entry: the basename
+   without directory components and control characters, `.` and `..`
+   rejected, falling back to the file id and then a fixed stem, and bounded to
+   `maxBytes`. Mirrors the mirror writer's `sanitizeArtifactName` +
+   `boundArtifactDisplayName`.
+   */
+  static func sanitize(id: String, name: String, mime: String) -> String {
+    let fromName = sanitizeName(name)
+    if !fromName.isEmpty {
+      return fromName
+    }
+    let fromId = sanitizeName("\(id).\(extensionForMime(mime))")
+    if !fromId.isEmpty {
+      return fromId
+    }
+    let extension_ = sanitizeName(extensionForMime(mime))
+    return extension_.isEmpty
+      ? "\(fallbackStem).\(fallbackExtension)"
+      : "\(fallbackStem).\(extension_)"
+  }
+
+  /**
+   The first of `candidates` that is not taken yet, or the input when it is
+   free. A collision takes a counter suffix before the extension, mirroring
+   `uniqueArtifactDisplayNames`, so two entries that share a name never
+   produce two items with the same filename in one parent.
+   */
+  static func unique(_ name: String, taken: inout Set<String>) -> String {
+    guard taken.contains(name) else {
+      taken.insert(name)
+      return name
+    }
+    let (stem, extension_) = splitExtension(name)
+    // The extension is capped at half the bound, mirroring the mirror
+    // writer's budget, so a very long extension cannot push the collision
+    // name past `maxBytes` or starve the stem entirely.
+    let boundedExtension = truncateUtf8(extension_, maxBytes / 2)
+    for index in 2...taken.count + 2 {
+      let suffix = " (\(index))"
+      // The suffix's bytes are budgeted against the same bound the base name
+      // holds, so a colliding name never grows past `maxBytes`.
+      let stemBudget = maxBytes - boundedExtension.utf8.count - suffix.utf8.count
+      let candidate = "\(truncateUtf8(stem, stemBudget))\(suffix)\(boundedExtension)"
+      if !taken.contains(candidate) {
+        taken.insert(candidate)
+        return candidate
+      }
+    }
+    return name
+  }
+
+  /** One sanitized basename, or an empty string when nothing survives. */
+  private static func sanitizeName(_ raw: String) -> String {
+    // Split by scalar, not by `Character`: a slash fused with an extending
+    // scalar is one grapheme that `lastIndex(of: "/")` never matches, so the
+    // basename split must run over scalars and drop every slash wherever it
+    // appears.
+    var scalars = raw.unicodeScalars
+    if let lastSlash = scalars.lastIndex(where: { $0 == "/" }) {
+      scalars.removeSubrange(...lastSlash)
+    }
+    var withoutControls = String.UnicodeScalarView()
+    for scalar in scalars {
+      if scalar == "/" || isControlScalar(scalar.value) {
+        continue
+      }
+      withoutControls.append(scalar)
+    }
+    let collapsed = String(withoutControls)
+      .split(whereSeparator: { $0.isWhitespace })
+      .joined(separator: " ")
+    if collapsed.isEmpty || collapsed == "." || collapsed == ".." {
+      return ""
+    }
+    return bound(collapsed)
+  }
+
+  private static func isControlScalar(_ value: UInt32) -> Bool {
+    value <= 31 || value == 127 || (128...159).contains(value)
+  }
+
+  private static func splitExtension(_ name: String) -> (stem: String, extension_: String) {
+    guard let start = name.lastIndex(of: "."), start != name.startIndex,
+      start < name.index(before: name.endIndex)
+    else {
+      return (name, "")
+    }
+    return (String(name[..<start]), String(name[start...]))
+  }
+
+  private static func bound(_ name: String) -> String {
+    guard name.utf8.count > maxBytes else {
+      return name
+    }
+    if let start = name.lastIndex(of: "."), start != name.startIndex,
+      start < name.index(before: name.endIndex)
+    {
+      let extension_ = String(name[start...])
+      if extension_.utf8.count < maxBytes {
+        let stemBudget = maxBytes - extension_.utf8.count
+        let stem = truncateUtf8(String(name[..<start]), stemBudget)
+        if !stem.isEmpty {
+          return stem + extension_
+        }
+      }
+    }
+    return truncateUtf8(name, maxBytes)
+  }
+
+  /**
+   Trim a string to at most `maxBytes` UTF-8 bytes without splitting a
+   character, mirroring `truncateUtf8` in the mirror writer.
+   */
+  private static func truncateUtf8(_ raw: String, _ maxBytes: Int) -> String {
+    guard raw.utf8.count > maxBytes else {
+      return raw
+    }
+    var result = ""
+    var used = 0
+    for character in raw {
+      let bytes = character.utf8.count
+      if used + bytes > maxBytes {
+        break
+      }
+      result.append(character)
+      used += bytes
+    }
+    return result
+  }
+
+  private static func extensionForMime(_ mime: String) -> String {
+    // Mirrors `extensionForMime` in `src/components/agents/tool-card-image-cache.ts`
+    // so a fallback filename matches the manifest/Android name.
+    guard let slash = mime.firstIndex(of: "/") else {
+      return fallbackExtension
+    }
+    let subtype = mime[mime.index(after: slash)...].lowercased()
+    if subtype == "jpeg" {
+      return "jpg"
+    }
+    return subtype.isEmpty ? fallbackExtension : subtype
   }
 }

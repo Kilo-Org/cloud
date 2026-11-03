@@ -1,0 +1,17 @@
+version: 1
+
+setupCommands:
+  - pnpm install --frozen-lockfile
+  - test -s .env.local || pnpm dev:setup-env --ci
+  - KILO_PORT_OFFSET=auto USE_PRODUCTION_DB=false pnpm test:db
+
+verificationCommands:
+  - pnpm --filter web run lint
+  - pnpm --filter web test --ci --maxWorkers=2
+
+# Stop the per-worktree Docker Compose test database that `pnpm test:db` starts.
+# kfab runs this once in the checkout when a run's workspace is cleaned up.
+# Only a checkout that published dev/.env owns its Compose project; without it,
+# Compose would fall back to the shared default `dev` project, so skip.
+teardown:
+  - test ! -f dev/.env || docker compose -f dev/docker-compose.yml down -v

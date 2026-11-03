@@ -27,7 +27,9 @@ import {
   buildCreditsTopUpCreditsRowSection,
   buildCreditsTopUpInfoRow,
   buildCreditsTopUpReceiptSection,
+  buildCreditsTopUpExpirySection,
   buildCreditsTopUpServiceFeeSection,
+  type RawHtml,
   subjects,
   sendCreditsTopUpEmail,
   sendKiloClawSubscriptionStartedEmail,
@@ -112,6 +114,7 @@ function creditsTopUpTemplateVars(
     service_fee_section: ReturnType<typeof buildCreditsTopUpServiceFeeSection>;
     credits_row_section: ReturnType<typeof buildCreditsTopUpCreditsRowSection>;
     purchase_date: string;
+    credit_expiry_section: RawHtml;
     credits_url: string;
     receipt_section: ReturnType<typeof buildCreditsTopUpReceiptSection>;
     year: string;
@@ -131,6 +134,7 @@ function creditsTopUpTemplateVars(
       hasServiceFee: false,
     }),
     purchase_date: 'January 1, 2026',
+    credit_expiry_section: buildCreditsTopUpExpirySection(undefined),
     credits_url: 'https://app.kilocode.ai/credits',
     receipt_section: buildCreditsTopUpReceiptSection('https://stripe.test/receipt'),
     year: '2026',
@@ -192,6 +196,29 @@ describe('creditsTopUp template', () => {
     expect(html).not.toContain('<strong style="color: #1a1a1a">Credits:</strong>');
     expect(html).not.toContain('Credit principal');
     expect(html).not.toContain('Amount:');
+  });
+
+  test('renders the persisted purchased-credit deadline or nonexpiring terms', () => {
+    const expiring = renderTemplate(
+      'creditsTopUp',
+      creditsTopUpTemplateVars({
+        credit_expiry_section: buildCreditsTopUpExpirySection(new Date('2027-02-28T12:34:00.000Z')),
+      })
+    );
+    expect(expiring).toContain(
+      '<strong style="color: #1a1a1a">Purchased credits expire:</strong> February 28, 2027 at 12:34 PM UTC.'
+    );
+
+    const nonexpiring = renderTemplate(
+      'creditsTopUp',
+      creditsTopUpTemplateVars({ credit_expiry_section: buildCreditsTopUpExpirySection(null) })
+    );
+    expect(nonexpiring).toContain(
+      '<strong style="color: #1a1a1a">Purchased credits:</strong> No expiration.'
+    );
+
+    const unknown = renderTemplate('creditsTopUp', creditsTopUpTemplateVars());
+    expect(unknown).not.toContain('Purchased credits');
   });
 });
 

@@ -16,6 +16,9 @@ type EmptyStateProps = {
   /** Optional muted text, or a node that carries its own styling (e.g. AccessibleStatus). */
   description?: ReactNode;
   className?: string;
+  /** The state's way out. It renders as given, so the action's own node carries
+   *  the shared `STATE_ACTION_CLASS` floor (Android measures the pressed node,
+   *  and `hitSlop` does not move its rect); see `apps/mobile/AGENTS.md`. */
   action?: ReactNode;
   /** `center` scrolls the content inside a measured `StateSurface`; `top`
    *  pins it to the surface top without a scroller; `static` renders the plain
@@ -25,15 +28,24 @@ type EmptyStateProps = {
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
+  /** Overrides the glyph color. Defaults to the muted token, which reads a step
+   *  dimmer on a near-black dark tile than on the light one; a caller that keeps
+   *  the illustration as visible as its light cell passes its own token. */
+  iconColor?: string;
   iconSize?: number;
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
-  /** Renders the short presentation (no icon bubble, tighter block gaps) for a
-   *  caller whose clear region cannot hold the full height; the title, the
-   *  description and the action all stay. When omitted, the centered form
-   *  reads the band the `CenteredState` around it publishes and compacts on its
-   *  own, so the form cannot disagree with the reserve the caller set. */
+  /** Title classes for the compact form only, which drops the icon bubble. A
+   *  caller whose state the icon would otherwise carry — an error — tints the
+   *  title here so the short form keeps the cue. */
+  compactTitleClassName?: string;
+  /** Renders the short presentation (no icon bubble, tighter block gaps, and
+   *  no top pin air above a `top`-placed stack) for a caller whose clear region
+   *  cannot hold the full height; the title, the description and the action all
+   *  stay. When omitted, the centered form reads the band the `CenteredState`
+   *  around it publishes and compacts on its own, so the form cannot disagree
+   *  with the reserve the caller set. */
   compact?: boolean;
 };
 
@@ -60,9 +72,11 @@ function EmptyStateBody({
   placement,
   compact: compactOverride,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
+  iconColor,
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
+  compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
   // A centered state is handed the band between the page header and the fixed
@@ -74,7 +88,10 @@ function EmptyStateBody({
   // scroll brings them back. The bubble is decoration: a short band drops it
   // and halves the gaps, which keeps the copy and the action inside the band
   // with no scroll. `placement="top"` and `placement="static"` states are laid
-  // out by their own caller and keep the full stack.
+  // out by their own caller and keep the full stack, unless the caller says
+  // the band is short: then the top pin's fixed air goes too, because 64pt of
+  // it is a band's whole height when a footer above the tab bar already owns
+  // the rest of a landscape window.
   //
   // A caller that measured its own clear region passes `compact` and owns the
   // decision (the Agents screen does); otherwise the centered form reads the
@@ -87,17 +104,25 @@ function EmptyStateBody({
       className={cn(
         'items-center px-6',
         compact ? 'gap-2' : 'gap-4',
-        placement === 'top' && 'pt-16',
+        placement === 'top' && !compact && 'pt-16',
         className
       )}
     >
       {compact ? null : (
         <View className={cn('items-center justify-center', iconContainerClassName)}>
-          <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
+          <Icon
+            size={iconSize}
+            color={iconColor ?? colors.mutedForeground}
+            strokeWidth={iconStrokeWidth}
+          />
         </View>
       )}
       <View className="items-center gap-1">
-        <Text variant="large" accessibilityRole={titleAccessibilityRole}>
+        <Text
+          variant="large"
+          className={cn('text-center', compact ? compactTitleClassName : undefined)}
+          accessibilityRole={titleAccessibilityRole}
+        >
           {title}
         </Text>
         {

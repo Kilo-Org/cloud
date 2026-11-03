@@ -34,8 +34,10 @@ const ask = (token: string | TokenSourceService, facts?: ModelFacts) => {
   });
   const said = Effect.scoped(
     Effect.flatMap(openSession({ system: 'sys', model: 'm', maxTokens: 8 }), session =>
-      Stream.runFold(session.ask('hi'), '', (held, event) =>
-        event.kind === 'delta' ? held + event.text : held
+      Stream.runFold(
+        session.ask('hi'),
+        () => '',
+        (held, event) => (event.kind === 'delta' ? held + event.text : held)
       )
     )
   );

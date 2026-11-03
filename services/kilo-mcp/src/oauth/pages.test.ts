@@ -131,29 +131,7 @@ describe('orgPickerPage', () => {
     expect(html).toContain('.notice{color:var(--muted);font-size:13px}');
   });
 
-  it('hides the authenticator subsection by default and reveals it with the checkbox', async () => {
-    const html = await orgPickerPage({
-      clientName: 'c',
-      actionUrl: '/authorize/org?id=pa-1',
-      options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
-      error: null,
-      showAdminOption: true,
-      authenticator: { secret: SECRET, verified: false },
-    }).text();
-    expect(html).toContain('<div id="otp-section" hidden>');
-    // The subsection sits after the org radios and before Connect.
-    expect(html.indexOf('<div class="orgs">')).toBeLessThan(html.indexOf('name="admin_enabled"'));
-    expect(html.indexOf('name="admin_enabled"')).toBeLessThan(html.indexOf('id="otp-section"'));
-    expect(html.indexOf('id="otp-section"')).toBeLessThan(html.indexOf('>Connect<'));
-    // The script flips `hidden` with the box and disables the code field while
-    // hidden, and re-checks nothing else.
-    expect(html).toContain("box.addEventListener('change'");
-    expect(html).toContain('section.hidden=!box.checked');
-    expect(html).toContain('code.disabled=!box.checked');
-    expect(html).not.toContain('box.checked=true');
-  });
-
-  it('shows the secret, the otpauth URI and the code field for an unenrolled admin', async () => {
+  it('carries no enrollment material until the reveal flag and offers the enroll action instead', async () => {
     const response = orgPickerPage({
       clientName: 'c',
       actionUrl: '/authorize/org?id=pa-1',
@@ -161,6 +139,32 @@ describe('orgPickerPage', () => {
       error: null,
       showAdminOption: true,
       authenticator: { secret: SECRET, verified: false },
+    });
+    const html = await response.text();
+    // The secret and its URI never appear in a plain render (the picker GET):
+    // the enrollment material is one explicit reveal action away.
+    expect(html).not.toContain('id="otp-section"');
+    expect(html).not.toContain(SECRET);
+    expect(html).not.toContain('otpauth://');
+    expect(html).not.toContain('Code from your authenticator app');
+    // The enroll affordance: its own form, outside the main one, posting only
+    // the reveal flag — never the pre-checked personal context.
+    expect(html).toContain(
+      '<button class="secondary" type="submit" name="enroll" value="1">Add an authenticator</button>'
+    );
+    expect(html.indexOf('name="enroll"')).toBeGreaterThan(html.indexOf('>Connect<'));
+    expect(html).not.toContain('Add this secret to your authenticator app');
+  });
+
+  it('shows the secret, the otpauth URI and the code field only on the revealed render', async () => {
+    const response = orgPickerPage({
+      clientName: 'c',
+      actionUrl: '/authorize/org?id=pa-1',
+      options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
+      error: null,
+      showAdminOption: true,
+      authenticator: { secret: SECRET, verified: false },
+      authenticatorRevealed: true,
     });
     const html = await response.text();
     // The one-time TOTP secret is long-lived, so this response must not be
@@ -176,6 +180,17 @@ describe('orgPickerPage', () => {
       '<label for="otp_code">Code from your authenticator app</label>' +
         '<input id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code">'
     );
+    // The subsection sits inside the main form (after the org radios, before
+    // Connect) and the enroll button is gone once the material is shown.
+    expect(html.indexOf('<div class="orgs">')).toBeLessThan(html.indexOf('id="otp-section"'));
+    expect(html.indexOf('id="otp-section"')).toBeLessThan(html.indexOf('>Connect<'));
+    expect(html).not.toContain('name="enroll"');
+    // The script flips visibility with the box and disables the code field
+    // while hidden, and re-checks nothing else.
+    expect(html).toContain("box.addEventListener('change'");
+    expect(html).toContain('section.hidden=!box.checked');
+    expect(html).toContain('code.disabled=!box.checked');
+    expect(html).not.toContain('box.checked=true');
   });
 
   it('renders only a ticked checkbox for an enrolled admin', async () => {

@@ -2,6 +2,48 @@ import { describe, expect, it } from 'vitest';
 import { parseKiloRunEvents } from './kilo-events';
 
 describe('parseKiloRunEvents', () => {
+  it('sums each token category across both step-finish spellings without overlapping categories', () => {
+    const result = parseKiloRunEvents([
+      JSON.stringify({
+        type: 'step_finish',
+        part: { tokens: { input: 10, cache: { read: 30 }, output: 4, reasoning: 8 } },
+      }),
+      JSON.stringify({
+        type: 'step-finish',
+        part: { tokens: { input: 5, cache: { read: 0 }, output: 2 } },
+      }),
+      JSON.stringify({ type: 'text', part: { tokens: { input: 999 } } }),
+    ]);
+    expect(result).toMatchObject({
+      inputTokens: 15,
+      cachedInputTokens: 30,
+      outputTokens: 6,
+      reasoningTokens: 8,
+    });
+  });
+
+  it('keeps missing token categories null and preserves reported zero counts', () => {
+    expect(parseKiloRunEvents([])).toMatchObject({
+      inputTokens: null,
+      cachedInputTokens: null,
+      outputTokens: null,
+      reasoningTokens: null,
+    });
+    expect(
+      parseKiloRunEvents([
+        JSON.stringify({
+          type: 'step_finish',
+          part: { tokens: { input: 0, cache: { read: '4' }, output: -1, reasoning: 0.5 } },
+        }),
+      ])
+    ).toMatchObject({
+      inputTokens: 0,
+      cachedInputTokens: null,
+      outputTokens: null,
+      reasoningTokens: null,
+    });
+  });
+
   it('assembles completed text parts and sums step-finish costs (part.* shape)', () => {
     const lines = [
       JSON.stringify({ type: 'text', part: { text: 'partial', time: { start: 1 } } }), // no end → skipped

@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq, and, isNull } from 'drizzle-orm';
-import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
+import { admin_action_audit_logs, kilocode_users, user_admin_notes } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -239,6 +239,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     expect(updated.is_super_admin).toBe(false);
     expect(updated.can_view_sessions).toBe(false);
     expect(updated.can_manage_credits).toBe(false);
+    expect(updated.can_export_api_request_logs).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-grant-pepper');
     // Grant must rotate api_token_pepper so pre-grant bearer tokens can't
     // inherit admin capability.
@@ -370,6 +371,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     const target = await insertQualifyingAdmin({
       can_manage_credits: true,
       can_view_sessions: true,
+      can_export_api_request_logs: true,
       web_session_pepper: 'before-revoke-pepper',
       api_token_pepper: 'before-revoke-api-pepper',
     });
@@ -387,6 +389,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     expect(updated.is_super_admin).toBe(false);
     expect(updated.can_view_sessions).toBe(false);
     expect(updated.can_manage_credits).toBe(false);
+    expect(updated.can_export_api_request_logs).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-revoke-pepper');
     // Revoke must rotate api_token_pepper so pre-revoke bearer tokens lose
     // their admin capability immediately.
@@ -563,6 +566,36 @@ describe('admin.users.setAdminPermissions', () => {
         permissions: { isSuperadmin: false },
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  test('grants and revokes API request log export access independently of session viewing', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({ can_view_sessions: true });
+    const caller = await createCallerForUser(admin.id);
+
+    const granted = await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { canExportApiRequestLogs: true },
+    });
+
+    expect(granted).toMatchObject({
+      changed: true,
+      user: { can_export_api_request_logs: true, can_view_sessions: true },
+    });
+
+    await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { canExportApiRequestLogs: false },
+    });
+
+    const updated = await getUser(target.id);
+    expect(updated.can_export_api_request_logs).toBe(false);
+    expect(updated.can_view_sessions).toBe(true);
+    const notes = await getUserAdminNotes(target.id);
+    expect(notes.map(note => note.note_content).sort()).toEqual([
+      'Granted API request log export access.',
+      'Revoked API request log export access.',
+    ]);
   });
 
   test('rejects targets that are not platform admins', async () => {
@@ -769,4 +802,71 @@ test('user_admin_notes rows are scoped to the target user, not the actor', async
     ),
   });
   expect(targetNotes).toHaveLength(1);
+});
+
+describe('admin role change audit logging', () => {
+  async function getRoleAudits(targetId: string) {
+    return db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(
+        and(
+          eq(admin_action_audit_logs.target_type, 'user'),
+          eq(admin_action_audit_logs.target_id, targetId)
+        )
+      );
+  }
+
+  test('granting and revoking platform admin access records the previous roles', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const candidate = await insertEligibleCandidate();
+    const caller = await createCallerForUser(superadmin.id);
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });
+    await caller.admin.users.setAdminPermissions({
+      userId: candidate.id,
+      permissions: { canViewSessions: true },
+    });
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: false });
+
+    const audits = await getRoleAudits(candidate.id);
+    expect(audits.every(audit => audit.actor_id === superadmin.id)).toBe(true);
+
+    const accessAudits = audits
+      .filter(audit => audit.action === 'admin.platform_access.set')
+      .map(audit => audit.metadata);
+    expect(accessAudits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isAdmin: true,
+          previous: expect.objectContaining({ isAdmin: false }),
+        }),
+        expect.objectContaining({
+          isAdmin: false,
+          previous: expect.objectContaining({ isAdmin: true, canViewSessions: true }),
+        }),
+      ])
+    );
+
+    const permissionAudit = audits.find(audit => audit.action === 'admin.permissions.set');
+    expect(permissionAudit?.message).toBe('Granted session viewer access.');
+    expect(permissionAudit?.metadata).toMatchObject({
+      changes: { can_view_sessions: true },
+      previous: { canViewSessions: false },
+    });
+  });
+
+  test('no-op role changes are not recorded', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const admin = await insertQualifyingAdmin({ is_super_admin: false });
+    const caller = await createCallerForUser(superadmin.id);
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: admin.id, isAdmin: true });
+    await caller.admin.users.setAdminPermissions({
+      userId: admin.id,
+      permissions: { isSuperadmin: false },
+    });
+
+    expect(await getRoleAudits(admin.id)).toHaveLength(0);
+  });
 });

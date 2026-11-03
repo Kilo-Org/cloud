@@ -20,6 +20,8 @@ const ASK: WaitingAsk = {
   organizationId: 'org_1',
   userId: 'u1',
   recordedAt: 1_750_000_000_000,
+  statusUpdatedAt: null,
+  boundPermissionId: 'perm_1',
 };
 
 const mocks = vi.hoisted(() => {
@@ -312,6 +314,23 @@ describe('handleApproveTask', () => {
       organizationId: 'org_1',
       answeredKiloSessionId: 'ses_1',
       askEnded: true,
+    });
+  });
+
+  it('clears a replaced request and keeps its session row in the republish', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'gone', replaced: true });
+
+    await handleApproveTask();
+
+    expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
+    expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    // The session still waits on the live request, so its row is not a stale
+    // one to skip.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: false,
     });
   });
 

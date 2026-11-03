@@ -1,6 +1,14 @@
 import { NextRequest } from 'next/server';
 
 const mockCaptureException = jest.fn();
+let mockHealthSecret = 'test-monitor-secret';
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  get CODE_REVIEW_HEALTH_SECRET() {
+    return mockHealthSecret;
+  },
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -17,20 +25,20 @@ const REPO = `test-org/code-review-up-${Date.now()}`;
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 
 function minutesAgo(minutes: number): string {
-  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+  return new Date(new Date().getTime() - minutes * 60 * 1000).toISOString();
 }
 
-function makeRequest(key: string | null) {
-  const url =
-    key === null
-      ? 'http://localhost:3000/api/code-reviews/up'
-      : `http://localhost:3000/api/code-reviews/up?key=${key}`;
-  return new NextRequest(url, { method: 'GET' });
+function makeRequest(token: string | null = 'test-monitor-secret') {
+  return new NextRequest('http://localhost:3000/api/code-reviews/up', {
+    method: 'GET',
+    headers: token === null ? {} : { Authorization: `Bearer ${token}` },
+  });
 }
 
 describe('GET /api/code-reviews/up', () => {
   let testUser: User;
   let reviewSequence = 0;
+  let clock = Date.now();
 
   beforeAll(async () => {
     testUser = await insertTestUser();
@@ -39,10 +47,14 @@ describe('GET /api/code-reviews/up', () => {
   beforeEach(async () => {
     await db.delete(cloud_agent_code_reviews).where(sql`true`);
     mockCaptureException.mockReset();
+    mockHealthSecret = 'test-monitor-secret';
+    clock += 61_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
   });
 
   afterEach(async () => {
     await db.delete(cloud_agent_code_reviews).where(sql`true`);
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -75,14 +87,14 @@ describe('GET /api/code-reviews/up', () => {
     } satisfies CodeReviewInsert;
   }
 
-  it('rejects requests with the wrong key', async () => {
+  it('requires monitor authorization', async () => {
     const response = await GET(makeRequest('wrong-key'));
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ healthy: false });
   });
 
-  it('rejects requests with no key', async () => {
+  it('requires monitor credentials', async () => {
     const response = await GET(makeRequest(null));
 
     expect(response.status).toBe(401);
@@ -90,7 +102,7 @@ describe('GET /api/code-reviews/up', () => {
   });
 
   it('returns healthy when no detectors trip', async () => {
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -104,26 +116,71 @@ describe('GET /api/code-reviews/up', () => {
     });
   });
 
-  it('runs each detector inside its own timed transaction', async () => {
-    const txExecuteCalls: jest.Mock[] = [];
-    const transactionSpy = jest.spyOn(db, 'transaction').mockImplementation(async callback => {
-      const execute = jest.fn().mockResolvedValue({ rows: [] });
-      txExecuteCalls.push(execute);
-      return callback({ execute } as never);
+  it('requires monitor configuration', async () => {
+    mockHealthSecret = '';
+    const transactionSpy = jest.spyOn(db, 'transaction');
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(401);
+    expect(transactionSpy).not.toHaveBeenCalled();
+  });
+
+  it('retains the evaluated health result until expiry', async () => {
+    const first = await GET(makeRequest());
+    const body = await first.json();
+    expect(first.status).toBe(200);
+    expect(first.headers.get('cache-control')).toBe('no-store');
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues({ status: 'failed', terminal_reason: 'timeout' }));
+
+    clock += 59_999;
+    const second = await GET(makeRequest());
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual(body);
+
+    clock += 1;
+    const refreshed = await GET(makeRequest());
+    expect(refreshed.status).toBe(503);
+    const refreshedBody = await refreshed.json();
+    expect(refreshedBody).toMatchObject({
+      healthy: false,
+      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 1 })],
     });
 
-    try {
-      const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    await db.delete(cloud_agent_code_reviews).where(sql`true`);
+    const retained = await GET(makeRequest());
+    expect(retained.status).toBe(503);
+    await expect(retained.json()).resolves.toEqual(refreshedBody);
+  });
 
-      expect(response.status).toBe(200);
+  it('authorizes access to evaluated results', async () => {
+    await GET(makeRequest());
+    const transactionSpy = jest.spyOn(db, 'transaction');
+    const response = await GET(makeRequest('different-secret'));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ healthy: false });
+    expect(transactionSpy).not.toHaveBeenCalled();
+  });
+
+  it('shares an active evaluation', async () => {
+    const transaction = db.transaction.bind(db);
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+    const transactionSpy = jest.spyOn(db, 'transaction').mockImplementation(async callback => {
+      await gate;
+      return transaction(callback);
+    });
+    const first = GET(makeRequest());
+    const second = GET(makeRequest());
+    try {
       expect(transactionSpy).toHaveBeenCalledTimes(2);
-      expect(txExecuteCalls).toHaveLength(2);
-      for (const execute of txExecuteCalls) {
-        expect(execute).toHaveBeenCalledTimes(2);
-      }
     } finally {
-      transactionSpy.mockRestore();
+      release();
     }
+    const responses = await Promise.all([first, second]);
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    const bodies = await Promise.all(responses.map(response => response.json()));
+    expect(bodies[0]).toEqual(bodies[1]);
   });
 
   it('returns 503 with slow-review alert when slow-review rate trips', async () => {
@@ -136,7 +193,7 @@ describe('GET /api/code-reviews/up', () => {
       ...Array.from({ length: 9 }, () => reviewValues()),
     ]);
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(503);
     const body = await response.json();
@@ -170,7 +227,7 @@ describe('GET /api/code-reviews/up', () => {
         ...Array.from({ length: 16 }, () => reviewValues()),
       ]);
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(503);
     const body = await response.json();
@@ -211,7 +268,7 @@ describe('GET /api/code-reviews/up', () => {
       ...Array.from({ length: 16 }, () => reviewValues()),
     ]);
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -229,7 +286,7 @@ describe('GET /api/code-reviews/up', () => {
         ...Array.from({ length: 16 }, () => reviewValues()),
       ]);
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(503);
     const body = await response.json();
@@ -252,7 +309,7 @@ describe('GET /api/code-reviews/up', () => {
       )
     );
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -276,7 +333,7 @@ describe('GET /api/code-reviews/up', () => {
       ...Array.from({ length: 17 }, () => reviewValues()),
     ]);
 
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+    const response = await GET(makeRequest());
 
     expect(response.status).toBe(503);
     const body = await response.json();
@@ -291,7 +348,7 @@ describe('GET /api/code-reviews/up', () => {
       .mockRejectedValue(new Error('DB unavailable'));
 
     try {
-      const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+      const response = await GET(makeRequest());
 
       expect(response.status).toBe(200);
       const body = await response.json();

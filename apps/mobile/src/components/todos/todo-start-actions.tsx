@@ -6,7 +6,8 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { TodoLinkSessionSheet } from '@/components/todos/todo-link-session-sheet';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Link2, Play } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { Link2, Play } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useTodoItemMutations } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -58,7 +59,7 @@ export function TodoStartActions({
             navigateToSession(newestSession.sessionId, organizationId);
           }}
         >
-          <ArrowRight size={16} color={colors.primaryForeground} />
+          <DirectionalArrowRight size={16} color={colors.primaryForeground} />
           <Text>{t('notifications.action.openSession')}</Text>
         </Button>
       ) : null}

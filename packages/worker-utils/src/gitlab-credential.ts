@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ProviderCredentialTimestampSchema } from './provider-credential-timestamp';
+
 export const GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME = 'gitlab-oauth-credential-rsa-aes-256-gcm';
 export const GITLAB_OAUTH_CREDENTIAL_ENVELOPE_VERSION = 1;
 export const GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_SCHEME =
@@ -33,10 +35,6 @@ export type GitLabProjectAccessTokenMetadata = z.infer<
   typeof GitLabProjectAccessTokenMetadataSchema
 >;
 
-const GitLabIsoTimestampSchema = z.iso.datetime({ offset: true });
-const GitLabPostgresTimestampPattern =
-  /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}(?::?\d{2})?)$/;
-
 function isCanonicalGitLabProviderBaseUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -67,21 +65,6 @@ const GitLabProviderBaseUrlSchema = z
   .string()
   .refine(isCanonicalGitLabProviderBaseUrl, 'Invalid canonical GitLab provider base URL');
 
-const GitLabCredentialTimestampSchema = z.string().refine(value => {
-  if (GitLabIsoTimestampSchema.safeParse(value).success) return true;
-
-  const match = GitLabPostgresTimestampPattern.exec(value);
-  if (!match) return false;
-  const [, date, time, postgresOffset] = match;
-  const offset =
-    postgresOffset.length === 3
-      ? `${postgresOffset}:00`
-      : postgresOffset.length === 5
-        ? `${postgresOffset.slice(0, 3)}:${postgresOffset.slice(3)}`
-        : postgresOffset;
-  return GitLabIsoTimestampSchema.safeParse(`${date}T${time}${offset}`).success;
-}, 'Invalid credential timestamp');
-
 export const GitLabOAuthCredentialRowSchema = z
   .object({
     id: z.string().min(1),
@@ -92,16 +75,16 @@ export const GitLabOAuthCredentialRowSchema = z
     provider_subject_login: z.string().min(1),
     provider_base_url: GitLabProviderBaseUrlSchema,
     access_token_encrypted: z.string().min(1),
-    access_token_expires_at: GitLabCredentialTimestampSchema.nullable(),
+    access_token_expires_at: ProviderCredentialTimestampSchema.nullable(),
     refresh_token_encrypted: z.string().min(1).nullable(),
-    refresh_token_expires_at: GitLabCredentialTimestampSchema.nullable(),
+    refresh_token_expires_at: ProviderCredentialTimestampSchema.nullable(),
     oauth_client_secret_encrypted: z.string().min(1).nullable(),
     credential_version: z.number().int().positive(),
-    revoked_at: GitLabCredentialTimestampSchema.nullable(),
+    revoked_at: ProviderCredentialTimestampSchema.nullable(),
     revocation_reason: z.string().nullable(),
-    last_used_at: GitLabCredentialTimestampSchema.nullable(),
-    created_at: GitLabCredentialTimestampSchema,
-    updated_at: GitLabCredentialTimestampSchema,
+    last_used_at: ProviderCredentialTimestampSchema.nullable(),
+    created_at: ProviderCredentialTimestampSchema,
+    updated_at: ProviderCredentialTimestampSchema,
   })
   .strict();
 
@@ -117,12 +100,12 @@ const GitLabAccessTokenCredentialRowBaseSchema = z.object({
   expires_at: z.null(),
   provider_base_url: GitLabProviderBaseUrlSchema,
   provider_scopes: z.array(z.string().min(1)).nullable(),
-  provider_verified_at: GitLabCredentialTimestampSchema.nullable(),
+  provider_verified_at: ProviderCredentialTimestampSchema.nullable(),
   credential_version: z.number().int().positive(),
-  last_validated_at: GitLabCredentialTimestampSchema.nullable(),
-  last_used_at: GitLabCredentialTimestampSchema.nullable(),
-  created_at: GitLabCredentialTimestampSchema,
-  updated_at: GitLabCredentialTimestampSchema,
+  last_validated_at: ProviderCredentialTimestampSchema.nullable(),
+  last_used_at: ProviderCredentialTimestampSchema.nullable(),
+  created_at: ProviderCredentialTimestampSchema,
+  updated_at: ProviderCredentialTimestampSchema,
 });
 
 export const GitLabPersonalAccessTokenCredentialRowSchema =

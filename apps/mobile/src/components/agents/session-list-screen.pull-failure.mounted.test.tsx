@@ -90,12 +90,6 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      run();
-      return { cancel: () => undefined };
-    },
-  },
   Platform: { OS: 'ios' },
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -120,6 +114,11 @@ vi.mock('react-native', () => ({
       )
     ),
 }));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    run();
+  },
+}));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
@@ -139,8 +138,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: () => undefined,
   useRouter: () => ({
+    canGoBack: () => false,
     push: () => undefined,
     replace: () => undefined,
   }),
@@ -150,6 +151,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  History: 'History',
   ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
@@ -172,6 +174,7 @@ vi.mock('@/components/agents/session-list-content', () => ({
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/agents/platform-filter-modal', () => ({
   SessionFilterModal: 'SessionFilterModal',
 }));
@@ -341,6 +344,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   detachSync?.();
   detachSync = undefined;
   act(() => mountedRenderer?.unmount());
@@ -368,6 +372,9 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       const result = await inFlight.promise;
       return result;
     };
+    // From the pull on, the pull's feedback timers run on the fake clock so the
+    // beat elapses without a real wait.
+    vi.useFakeTimers();
     act(() => {
       refreshControl().onRefresh();
     });
@@ -394,9 +401,7 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       inFlight.reject(failure);
     });
     await act(async () => {
-      await new Promise(resolve => {
-        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 250);
-      });
+      await vi.advanceTimersByTimeAsync(PULL_FEEDBACK_MIN_BEAT_MS + 250);
     });
 
     // The inline retryable failure with a working Retry action, next to the kept rows.
@@ -406,6 +411,7 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
     expect(retry?.props.onPress).toBeTypeOf('function');
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
     expect(refreshControl().refreshing).toBe(false);
+    vi.useRealTimers();
   }
 
   it('keeps rows, shows Updating in flight, and the inline failure with Retry (socket up)', async () => {
@@ -460,13 +466,12 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
 
     onlineManager.setOnline(false);
     try {
+      vi.useFakeTimers();
       act(() => {
         refreshControl().onRefresh();
       });
       await act(async () => {
-        await new Promise(resolve => {
-          setTimeout(resolve, PULL_FEEDBACK_BUDGET_MS + 250);
-        });
+        await vi.advanceTimersByTimeAsync(PULL_FEEDBACK_BUDGET_MS + 250);
       });
 
       expect(text()).toContain("Couldn't refresh");
@@ -476,7 +481,8 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       expect(nodes('RemoteSessionRow')).toHaveLength(1);
       expect(refreshControl().refreshing).toBe(false);
     } finally {
+      vi.useRealTimers();
       onlineManager.setOnline(true);
     }
-  }, 45_000);
+  }, 15_000);
 });

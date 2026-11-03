@@ -1,3 +1,7 @@
+import {
+  type OrganizationModelAudience,
+  organizationModelsPath,
+} from '@kilocode/app-shared/organizations';
 import { type Effort } from '@kilocode/harness-sdk';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -170,10 +174,13 @@ export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.str
  * refused or reset connection still rejects and surfaces the error + Retry,
  * while a stalled response resolves when the backend answers.
  */
-async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
+async function fetchModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience
+): Promise<ModelResponse> {
   const token = await getAuthTokenForRequest();
   const url = organizationId
-    ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
+    ? `${API_BASE_URL}${organizationModelsPath(organizationId, audience)}`
     : `${API_BASE_URL}/api/openrouter/models`;
   const response = await fetch(url, {
     headers: {
@@ -216,15 +223,43 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 60_000,
+    // The org default must settle even while the online manager reports
+    // offline: NetInfo can hold the device offline while the backend is
+    // reachable, and a paused read leaves `isLoading` false with no request and
+    // no failure, so the model picker's auto-selection waits on a value that
+    // never arrives. See `use-current-user-id`.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   return { defaultModel: data?.defaultModel, isLoading };
 }
 
-export function useAvailableModels(organizationId: string | undefined) {
+/**
+ * `audience` is `shared_services` for a picker whose model a platform service
+ * runs for the organization, such as the Code Reviewer: its BYOK badge then
+ * counts only keys that run can use.
+ */
+export function useAvailableModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience = 'member'
+) {
   const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
-    queryKey: ['available-models', organizationId] as const,
-    queryFn: fetchModels.bind(null, organizationId),
+    queryKey: ['available-models', organizationId, audience] as const,
+    queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
+    // The catalogue must settle even while the online manager reports offline:
+    // NetInfo can hold the device offline while the backend is reachable, and a
+    // paused read sends no request, reports `isLoading` false and reaches no
+    // error, so the picker lists no model and auto-selection never resolves.
+    // See `use-current-user-id`.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
   const models = useMemo(() => toModelOptions(data), [data]);

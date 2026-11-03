@@ -4,7 +4,8 @@ import {
   getIneligibleAutoFreeModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config } from '@kilocode/db/schema';
+import { ai_gateway_config, custom_llm2 } from '@kilocode/db/schema';
+import { parseCustomLlmRows } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { AutoFreeConfigSchema } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
@@ -25,11 +26,17 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
   }),
 
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
-    const ineligibleModelIds = input.config ? getIneligibleAutoFreeModelIds(input.config) : [];
+    // Read the primary, not the cached catalog, so a custom LLM saved moments ago counts.
+    const ineligibleModelIds = input.config
+      ? getIneligibleAutoFreeModelIds(
+          input.config,
+          parseCustomLlmRows(await db.select().from(custom_llm2))
+        )
+      : [];
     if (ineligibleModelIds.length > 0) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider): ${ineligibleModelIds.join(', ')}`,
+        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider, or a public custom LLM that serves Chat Completions): ${ineligibleModelIds.join(', ')}`,
       });
     }
 

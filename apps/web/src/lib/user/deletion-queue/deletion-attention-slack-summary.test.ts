@@ -1,6 +1,10 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
-import { UserDeletionRequestStatus, UserDeletionStepStatus } from '@kilocode/db/schema-types';
+import {
+  UserDeletionRequestStatus,
+  UserDeletionStepKey,
+  UserDeletionStepStatus,
+} from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import {
@@ -30,7 +34,12 @@ async function setStepAttention(
   const steps = await db
     .select({ id: user_deletion_steps.id })
     .from(user_deletion_steps)
-    .where(eq(user_deletion_steps.request_id, requestId));
+    .where(
+      and(
+        eq(user_deletion_steps.request_id, requestId),
+        ne(user_deletion_steps.step_key, UserDeletionStepKey.CsaSupportDb)
+      )
+    );
   const step = steps[stepOffset];
   if (!step) throw new Error('Expected a deletion step');
   await db.update(user_deletion_steps).set({ status }).where(eq(user_deletion_steps.id, step.id));
@@ -153,6 +162,46 @@ describe('getUserDeletionAttentionSnapshot', () => {
     const notification = buildUserDeletionAttentionSlackNotification(result);
     expect(JSON.stringify(notification)).not.toContain('deletion-attention-');
   });
+
+  it.each([UserDeletionStepStatus.NeedsAttention, UserDeletionStepStatus.ManualActionRequired])(
+    'ignores legacy CSA %s while retaining active-step and preflight attention',
+    async status => {
+      const requestId = await enqueueRequest();
+      await db.insert(user_deletion_steps).values({
+        request_id: requestId,
+        step_key: UserDeletionStepKey.CsaSupportDb,
+        status,
+      });
+
+      expect(await getUserDeletionAttentionSnapshot()).toMatchObject({
+        checked: 1,
+        actionable: 0,
+        attentionSourceCounts: { preflight: 0, steps: 0, overlapping: 0 },
+        details: [],
+      });
+
+      await db
+        .update(user_deletion_requests)
+        .set({ preflight_attention_code: 'missing_target_email' })
+        .where(eq(user_deletion_requests.id, requestId));
+
+      expect(await getUserDeletionAttentionSnapshot()).toMatchObject({
+        checked: 1,
+        actionable: 1,
+        attentionSourceCounts: { preflight: 1, steps: 0, overlapping: 0 },
+        details: [{ requestId, hasPreflightAttention: true, hasStepAttention: false }],
+      });
+
+      await setStepAttention(requestId, status);
+
+      expect(await getUserDeletionAttentionSnapshot()).toMatchObject({
+        checked: 1,
+        actionable: 1,
+        attentionSourceCounts: { preflight: 1, steps: 1, overlapping: 1 },
+        details: [{ requestId, hasPreflightAttention: true, hasStepAttention: true }],
+      });
+    }
+  );
 
   it('keeps exact counts when a detail-only attention source is omitted', async () => {
     for (let index = 0; index < 25; index += 1) {

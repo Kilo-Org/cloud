@@ -16,6 +16,7 @@ import {
   makeConnection,
   makeTestQueryClient,
   QUERY_KEY,
+  type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -81,8 +82,10 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // The app-level mount subscribes to foreground transitions; the mock exposes
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
   AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: vi.fn(),
 }));
 // The mount also derives the app-owned needs-input plan from the route and
 // posts through expo-notifications; both are native-backed, so the mount test
@@ -200,6 +203,27 @@ describe('live query presentation and refresh contracts', () => {
     expect(live().hasAcceptedSuccess).toBe(false);
   });
 
+  it('resumes a paused first load when the manager returns online', async () => {
+    // The offline→online edge the committed-connectivity bridge produces.
+    onlineManager.setOnline(false);
+    await render();
+    expect(live().isPaused).toBe(true);
+    const network = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValue(network.promise);
+    await act(async () => {
+      onlineManager.setOnline(true);
+      await flush();
+    });
+    expect(live().isFetching).toBe(true);
+    await act(async () => {
+      network.resolve({ sessions: [makeCached({ id: 'live-1', organizationId: null })] });
+      await flush();
+    });
+    expect(live().isPaused).toBe(false);
+    expect(live().hasAcceptedSuccess).toBe(true);
+    expect(live().activeSessions.map(row => row.id)).toEqual(['live-1']);
+  });
+
   it.each([
     ['retryable', new Error('offline')],
     ['non-retryable', Object.assign(new Error('denied'), { data: { code: 'FORBIDDEN' } })],
@@ -250,7 +274,7 @@ describe('live query presentation and refresh contracts', () => {
   it.each(['cancel', 'sign-out'])(
     'rejects a fallback result after %s without publishing late data',
     async boundary => {
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => cached });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => cached });
       await render();
       const network = deferred<CachedActiveSessionsData>();
       state.request.mockReturnValue(network.promise);
@@ -440,6 +464,34 @@ describe('live query presentation and refresh contracts', () => {
       await flush();
     });
     expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('settles a freshly selected scope whose first load a socket write canceled', async () => {
+    // A workspace switch mounts a new activeSessions.list key; its first load is
+    // in flight when the user's CLI heartbeat lands on the same scope.
+    state.organization.organizationId = 'org-1';
+    state.mountSync = true;
+    const first = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValueOnce(first.promise);
+    await render();
+    expect(state.request).toHaveBeenCalledTimes(1);
+    expect(live().hasAcceptedSuccess).toBe(false);
+    const heartbeat: SystemEvent = {
+      event: 'sessions.heartbeat',
+      data: { connectionId: 'c1', sessions: [] },
+    };
+    await act(async () => {
+      connection.__fireSystem(heartbeat);
+      await flush();
+    });
+    // The canceled attempt is replaced, so the server answer still lands
+    // without the user pulling to refresh.
+    expect(state.request).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await flush();
+    });
+    expect(live().hasAcceptedSuccess).toBe(true);
+    expect(live().activeSessions).toEqual([]);
   });
 
   it.each(['token', 'bootstrap', 'sign-out', 'organization'] as const)(

@@ -1,3 +1,5 @@
+import { type Href } from 'expo-router';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
@@ -13,15 +15,23 @@ import { ScreenHeader } from '@/components/screen-header';
 export function PlatformErrorScreen({
   title,
   eyebrow,
+  backFallback,
   errorTitle,
   message,
   variant = 'server',
   onRetry,
   isRetrying = false,
+  action,
 }: Readonly<{
   /** ScreenHeader's title, e.g. the screen/feature name. */
   title: string;
   eyebrow?: string;
+  /**
+   * Where the header's Back lands when the failed screen has no history to pop,
+   * e.g. a deep link or a relaunch restore that opened it on its own. A caller
+   * that leaves it out keeps the header's default: no Back without history.
+   */
+  backFallback?: Href;
   /** QueryError's own title override — independent of the ScreenHeader title above. */
   errorTitle?: string;
   message?: string;
@@ -29,16 +39,19 @@ export function PlatformErrorScreen({
   /** Omit to render a non-retriable state (e.g. permission/not-found errors). */
   onRetry?: () => void;
   isRetrying?: boolean;
+  /** Replaces the built-in retry button with a caller-composed recovery row. */
+  action?: ReactNode;
 }>) {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} eyebrow={eyebrow} />
+      <ScreenHeader title={title} eyebrow={eyebrow} backFallback={backFallback} />
       <QueryError
         variant={variant}
         title={errorTitle}
         message={message}
         onRetry={onRetry}
         isRetrying={isRetrying}
+        action={action}
       />
     </View>
   );

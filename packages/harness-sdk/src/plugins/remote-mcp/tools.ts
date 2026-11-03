@@ -12,6 +12,7 @@ import {
   mcpToolName,
   type RemoteMcpError,
   type RemoteMcpServer,
+  uiResourceUriOf,
 } from './server.js';
 
 /**
@@ -86,6 +87,22 @@ const argumentsOf = (
   );
 
 /**
+ * A remote tool, as this harness offers it: the tool the model calls, plus what
+ * a host drawing the call needs and the model does not.
+ *
+ * `serverToolName` is the server's own name, which the view calls the tool by;
+ * the model sees `mcp_<server>_<tool>` instead. `uiResourceUri` is the MCP Apps
+ * view the server attached, when it attached one — a tool without one keeps
+ * today's rendering on every surface. Both ride on the tool object rather than
+ * in `definition`, because a definition is part of the cached prefix and these
+ * are not: the model is told nothing new.
+ */
+interface RemoteMcpOfferedTool extends Tool {
+  readonly serverToolName: string;
+  readonly uiResourceUri?: string;
+}
+
+/**
  * One remote tool.
  *
  * `inlineFor` is 15 seconds: a call to somebody else's server is the case the
@@ -94,16 +111,27 @@ const argumentsOf = (
  * the result arrives in a round of its own. That needs the call's own deadline
  * to end later than `inlineFor`, which is why a call's default deadline is 60
  * seconds (`defaultCallTimeoutMs`).
+ *
+ * The model gets the result's text and nothing else. What the server answered
+ * besides it is reported to `onCallResult` before the text is returned, so a
+ * view that renders the same call has the content and structured result.
  */
-const toolFor = (
-  server: RemoteMcpServer,
-  client: RemoteMcpClient,
-  tool: RemoteMcpTool
-): readonly Tool[] => {
+const toolFor = ({
+  server,
+  client,
+  deps,
+  tool,
+}: {
+  readonly server: RemoteMcpServer;
+  readonly client: RemoteMcpClient;
+  readonly deps: RemoteMcpClientDeps;
+  readonly tool: RemoteMcpTool;
+}): readonly RemoteMcpOfferedTool[] => {
   const parameters = parametersOf(tool.inputSchema);
   if (parameters === undefined || !callableName(server.id) || !callableName(tool.name)) {
     return [];
   }
+  const view = uiResourceUriOf(tool);
   return [
     {
       definition: {
@@ -111,17 +139,26 @@ const toolFor = (
         description: tool.description ?? `Call ${tool.name} on ${server.name}.`,
         parameters,
       },
+      serverToolName: tool.name,
+      ...(view === undefined ? {} : { uiResourceUri: view }),
       inlineFor: Duration.seconds(15),
       run: (call: ToolCall) =>
         Effect.gen(function* () {
           const args = yield* argumentsOf(tool, call);
-          return yield* client
+          const answered = yield* client
             .call(tool.name, args)
             .pipe(
               Effect.mapError(error =>
                 error instanceof ToolFailure ? error : new ToolFailure({ cause: explain(error) })
               )
             );
+          deps.onCallResult?.({
+            tool: tool.name,
+            callId: call.id,
+            content: answered.content,
+            structuredContent: answered.structuredContent,
+          });
+          return answered.text;
         }),
     },
   ];
@@ -137,11 +174,12 @@ const toolFor = (
 const remoteMcpTools = (
   server: RemoteMcpServer,
   deps: RemoteMcpClientDeps
-): Effect.Effect<readonly Tool[], RemoteMcpError> => {
+): Effect.Effect<readonly RemoteMcpOfferedTool[], RemoteMcpError> => {
   const client = remoteMcpClient(server, deps);
   return client.tools.pipe(
-    Effect.map(tools => tools.flatMap(tool => toolFor(server, client, tool)))
+    Effect.map(tools => tools.flatMap(tool => toolFor({ server, client, deps, tool })))
   );
 };
 
+export type { RemoteMcpOfferedTool };
 export { remoteMcpTools };

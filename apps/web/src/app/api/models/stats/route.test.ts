@@ -80,6 +80,7 @@ beforeEach(() => {
       entries,
       observedAt: Date.now(),
       generation: 0,
+      customLlmIds: new Set(['acme/stats-list']),
     }));
 });
 afterEach(() => {
@@ -168,7 +169,7 @@ describe('GET /api/models/stats', () => {
 
   test.each([
     { isStealth: true },
-    { openrouterId: 'kilo-internal/stats-list' },
+    { openrouterId: 'acme/stats-list' },
     { benchmarks: { ...siblings, enkrypt: { ...benchmark, ingestedAt: 'invalid' } } },
     {
       benchmarks: {
@@ -184,9 +185,12 @@ describe('GET /api/models/stats', () => {
   });
 
   test('withholds scores from an expired snapshot even when the model metadata is returned', async () => {
-    jest
-      .mocked(getModelStatsSnapshot)
-      .mockResolvedValue({ entries, observedAt: Date.now() - 300_000, generation: 0 });
+    jest.mocked(getModelStatsSnapshot).mockResolvedValue({
+      entries,
+      observedAt: Date.now() - 300_000,
+      generation: 0,
+      customLlmIds: new Set(),
+    });
     expect((await models())[0].benchmarks).toEqual(siblings);
   });
 

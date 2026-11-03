@@ -4,10 +4,15 @@ import type { TransformRequestContext } from '../types';
 import edenai from './edenai';
 
 describe('Eden AI direct BYOK provider', () => {
-  test('supports all chat APIs with the nested Anthropic Messages base URL', () => {
-    expect(edenai.base_url).toBe('https://api.edenai.run/v3');
-    expect(edenai.base_url_overrides).toEqual({ messages: 'https://api.edenai.run/v3/v1' });
-    expect(edenai.supported_chat_apis).toEqual(['chat_completions', 'messages', 'responses']);
+  test('supports all chat APIs with the nested Anthropic Messages base URL', async () => {
+    await expect(
+      edenai.resolveUpstream({ credential: 'test-key', model: { id: 'test-model' }, stream: false })
+    ).resolves.toMatchObject({
+      apiUrl: 'https://api.edenai.run/v3',
+      apiUrlOverrides: { messages: 'https://api.edenai.run/v3/v1' },
+      apiKey: 'test-key',
+      supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    });
   });
 
   test.each([

@@ -1,11 +1,11 @@
 import { type ReactElement } from 'react';
-import { Cloud, Code, Terminal } from '@/components/ui/icons';
+import { Cloud, Code, Monitor, Terminal } from '@/components/ui/icons';
 
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { SlackIcon } from '@/components/icons/slack-icon';
 import { repoNameFromGitUrl } from './session-list-helpers';
 
-type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'slack' | 'github';
+type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'desktop' | 'slack' | 'github';
 
 const PLATFORM_TO_KIND = {
   'cloud-agent': 'cloud',
@@ -13,6 +13,7 @@ const PLATFORM_TO_KIND = {
   cli: 'terminal',
   vscode: 'code',
   'agent-manager': 'code',
+  desktop: 'desktop',
   slack: 'slack',
   github: 'github',
 } satisfies Record<string, SessionPlatformIconKind>;
@@ -104,6 +105,9 @@ export function SessionPlatformIcon({
   }
   if (kind === 'code') {
     return <Code size={size} color={color} />;
+  }
+  if (kind === 'desktop') {
+    return <Monitor size={size} color={color} />;
   }
   if (kind === 'slack') {
     return <SlackIcon size={size} color={color} />;

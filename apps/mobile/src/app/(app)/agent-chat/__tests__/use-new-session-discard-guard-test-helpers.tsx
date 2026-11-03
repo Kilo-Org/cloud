@@ -14,6 +14,12 @@ import { vi } from 'vitest';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 
 const alertMock = vi.hoisted(() => vi.fn());
+const backMock = vi.hoisted(() => vi.fn());
+// The route on top of the composer's stack. A picker route makes the guard
+// treat a Back as the picker's, exactly as the app's live stack does while a
+// sheet presents.
+const navigationState = vi.hoisted(() => ({ topRoute: 'agent-chat/new' }));
+const stateListeners = vi.hoisted(() => new Set<() => void>());
 const dispatchMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 // Mutable so a single file proves the confirm is one cross-platform
@@ -28,14 +34,21 @@ type Action = { type: string };
 
 const usePreventRemoveHolder = vi.hoisted(() => ({
   preventRemove: undefined as boolean | undefined,
-  callback: undefined as ((options: { data: { action: Action } }) => void) | undefined,
+  callback: undefined as
+    | ((options: { data: { action: Action }; repeat: () => void }) => void)
+    | undefined,
 }));
 
 const usePreventRemoveMock = vi.hoisted(() =>
-  vi.fn((preventRemove: boolean, handler: (options: { data: { action: Action } }) => void) => {
-    usePreventRemoveHolder.preventRemove = preventRemove;
-    usePreventRemoveHolder.callback = handler;
-  })
+  vi.fn(
+    (
+      preventRemove: boolean,
+      handler: (options: { data: { action: Action }; repeat: () => void }) => void
+    ) => {
+      usePreventRemoveHolder.preventRemove = preventRemove;
+      usePreventRemoveHolder.callback = handler;
+    }
+  )
 );
 
 // The dialog the hook returns is rendered for real, so its primitives and the
@@ -54,6 +67,8 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
@@ -75,13 +90,25 @@ vi.mock('sonner-native', () => ({
   toast: { error: toastErrorMock },
 }));
 
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: dispatchMock }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: usePreventRemoveMock,
-}));
+vi.mock('expo-router', () => {
+  const navigation = {
+    getState: () => ({
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }],
+    }),
+    addListener: (_event: string, listener: () => void) => {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+  };
+  return {
+    useNavigation: () => navigation,
+    usePreventRemove: usePreventRemoveMock,
+    useRouter: () => ({ back: backMock }),
+  };
+});
 
 function GuardHarness({
   dirty,
@@ -122,6 +149,25 @@ export function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
   return { renderer: ref.current, skipRef };
 }
 
+/**
+ * Mounts the guard while one of the screen's picker sheets is the top route.
+ * Clean prompt: the picker rule is the only reason a Back is held back.
+ */
+export function mountGuardWithPicker(dirty = false) {
+  navigationState.topRoute = 'agent-chat/repo-picker';
+  const skipRef: RefObject<boolean> = { current: false };
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(GuardHarness, { dirty, onDiscard: noOpDiscard, skipRef })
+    );
+  });
+  if (!ref.current) {
+    throw new Error('guard did not render');
+  }
+  return { renderer: ref.current };
+}
+
 /** Mounts the guard for an empty prompt that still holds admitted uploads. */
 export function mountGuardWithAttachments() {
   const skipRef: RefObject<boolean> = { current: false };
@@ -145,7 +191,12 @@ export function mountGuardWithAttachments() {
 /** Fires the captured leave outside `act`; the hook's handler runs synchronously. */
 export function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
-  usePreventRemoveHolder.callback?.({ data: { action } });
+  usePreventRemoveHolder.callback?.({
+    data: { action },
+    repeat: () => {
+      dispatchMock(action);
+    },
+  });
   return action;
 }
 
@@ -158,6 +209,15 @@ export function triggerPreventRemoveInAct(): Action {
   return holder.action;
 }
 
+export function setPickerTopRoute(topRoute: string): void {
+  act(() => {
+    navigationState.topRoute = topRoute;
+    for (const listener of stateListeners) {
+      listener();
+    }
+  });
+}
+
 /** Returns every hoisted mock and the captured removal to its pre-test state. */
 export function resetGuardHarness(): void {
   platform.os = 'ios';
@@ -167,6 +227,8 @@ export function resetGuardHarness(): void {
   usePreventRemoveMock.mockReset();
   usePreventRemoveHolder.preventRemove = undefined;
   usePreventRemoveHolder.callback = undefined;
+  navigationState.topRoute = 'agent-chat/new';
+  stateListeners.clear();
 }
 
 export function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
@@ -234,6 +296,7 @@ export async function flushMicrotasks() {
 
 export {
   alertMock,
+  backMock,
   dispatchMock,
   platform,
   PLATFORMS,

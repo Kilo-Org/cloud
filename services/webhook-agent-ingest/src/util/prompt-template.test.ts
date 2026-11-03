@@ -54,6 +54,17 @@ describe('renderPromptTemplate', () => {
     expect(renderPromptTemplate('Scheduled: {{scheduledTime}}', baseRequest)).toBe('Scheduled: ');
   });
 
+  it('does not expand placeholders contained in request data', () => {
+    const request = {
+      ...baseRequest,
+      body: 'payload {{sourceIp}} {{headers}}',
+      queryString: '{{body}}',
+    };
+    expect(renderPromptTemplate('{{body}} | {{query}} | {{unknown}}', request)).toBe(
+      'payload {{sourceIp}} {{headers}} | {{body}} | {{unknown}}'
+    );
+  });
+
   it('replaces multiple placeholders in a template', () => {
     const template = `Process this {{method}} webhook to {{path}}:
 

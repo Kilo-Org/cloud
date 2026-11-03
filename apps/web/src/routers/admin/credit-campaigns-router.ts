@@ -1,6 +1,8 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   credit_campaigns,
   credit_transactions,
@@ -95,6 +97,43 @@ function toMicrodollars(amount_usd: number): number {
   return Math.round(amount_usd * 1_000_000);
 }
 
+/**
+ * Audit metadata for a campaign write. Campaigns are not users or
+ * organizations, so the audit entry carries no typed target and keeps the
+ * identifying fields here instead — the same shape create, update and
+ * setActive record, so the audit log reads consistently regardless of which
+ * mutation changed the row.
+ */
+function campaignAuditMetadata(campaign: CreditCampaign): Record<string, unknown> {
+  return {
+    campaignId: campaign.id,
+    slug: campaign.slug,
+    amountUsd: Number(campaign.amount_microdollars) / 1_000_000,
+    totalRedemptionsAllowed: campaign.total_redemptions_allowed,
+    creditExpiryHours: campaign.credit_expiry_hours,
+    campaignEndsAt: campaign.campaign_ends_at,
+    active: campaign.active,
+  };
+}
+
+/**
+ * Billing-relevant fields an update can change, in the order the audit log
+ * lists them. `description` is an operator note rather than a credit-amount
+ * field, and the audit table stores metadata verbatim, so note text stays out
+ * of the delta; the entry itself still records that the campaign was updated.
+ */
+const mutableCampaignFields = [
+  'amount_microdollars',
+  'credit_expiry_hours',
+  'campaign_ends_at',
+  'total_redemptions_allowed',
+  'active',
+] as const;
+
+function changedCampaignFields(previous: CreditCampaign, next: CreditCampaign): string[] {
+  return mutableCampaignFields.filter(field => previous[field] !== next[field]);
+}
+
 export const creditCampaignsRouter = createTRPCRouter({
   /**
    * List all campaigns alongside per-campaign stats. Stats query is
@@ -141,7 +180,7 @@ export const creditCampaignsRouter = createTRPCRouter({
       return row;
     }),
 
-  create: adminProcedure
+  create: creditManagerProcedure
     .input(createCampaignInputSchema)
     .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       const credit_category = credit_categoryForSlug(input.slug);
@@ -173,6 +212,12 @@ export const creditCampaignsRouter = createTRPCRouter({
             created_by_kilo_user_id: ctx.user.id,
           })
           .returning();
+        await recordAdminAction(ctx, {
+          action: 'credit_campaign.create',
+          target: null,
+          message: `Created credit campaign ${row.slug}`,
+          metadata: campaignAuditMetadata(row),
+        });
         return row;
       } catch (error) {
         // Drizzle wraps the pg error in a `DrizzleQueryError`; the
@@ -189,39 +234,63 @@ export const creditCampaignsRouter = createTRPCRouter({
       }
     }),
 
-  update: adminProcedure
+  update: creditManagerProcedure
     .input(updateCampaignInputSchema)
-    .mutation(async ({ input }): Promise<CreditCampaign> => {
+    .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       // slug + credit_category are deliberately excluded from the SET —
       // they're immutable after create to keep historical credit_transactions
       // rows tied to a stable category. See updateCampaignInputSchema.
       //
-      // Atomic guard-then-act: the WHERE clause restricts the update to the
-      // single targeted row; the RETURNING clause gives us the authoritative
-      // post-update state. A missing row means the campaign was deleted
-      // concurrently — treat as NOT_FOUND rather than silently inserting.
-      const [row] = await db
-        .update(credit_campaigns)
-        .set({
-          amount_microdollars: toMicrodollars(input.amount_usd),
-          credit_expiry_hours: input.credit_expiry_hours ?? null,
-          campaign_ends_at: input.campaign_ends_at ?? null,
-          total_redemptions_allowed: input.total_redemptions_allowed,
-          active: input.active,
-          description: input.description,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(credit_campaigns.id, input.id))
-        .returning();
-      if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
-      }
+      // The previous row is read under a row lock so the audit entry can
+      // list which fields changed; the UPDATE then writes the single targeted
+      // row and RETURNING gives the authoritative post-update state. A missing
+      // row means the campaign was deleted concurrently — treat as NOT_FOUND
+      // rather than silently inserting.
+      const { previous, row } = await db.transaction(async tx => {
+        const [existing] = await tx
+          .select()
+          .from(credit_campaigns)
+          .where(eq(credit_campaigns.id, input.id))
+          .limit(1)
+          .for('update');
+        if (!existing) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
+        }
+
+        const [updated] = await tx
+          .update(credit_campaigns)
+          .set({
+            amount_microdollars: toMicrodollars(input.amount_usd),
+            credit_expiry_hours: input.credit_expiry_hours ?? null,
+            campaign_ends_at: input.campaign_ends_at ?? null,
+            total_redemptions_allowed: input.total_redemptions_allowed,
+            active: input.active,
+            description: input.description,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(credit_campaigns.id, existing.id))
+          .returning();
+        if (!updated) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
+        }
+        return { previous: existing, row: updated };
+      });
+      await recordAdminAction(ctx, {
+        action: 'credit_campaign.update',
+        target: null,
+        message: `Updated credit campaign ${row.slug}`,
+        metadata: {
+          ...campaignAuditMetadata(row),
+          changedFields: changedCampaignFields(previous, row),
+          previous: campaignAuditMetadata(previous),
+        },
+      });
       return row;
     }),
 
-  setActive: adminProcedure
+  setActive: creditManagerProcedure
     .input(z.object({ id: z.number().int().positive(), active: z.boolean() }))
-    .mutation(async ({ input }): Promise<CreditCampaign> => {
+    .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       const [row] = await db
         .update(credit_campaigns)
         .set({ active: input.active, updated_at: new Date().toISOString() })
@@ -230,6 +299,14 @@ export const creditCampaignsRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
       }
+      await recordAdminAction(ctx, {
+        action: 'credit_campaign.set_active',
+        target: null,
+        message: row.active
+          ? `Activated credit campaign ${row.slug}`
+          : `Deactivated credit campaign ${row.slug}`,
+        metadata: campaignAuditMetadata(row),
+      });
       return row;
     }),
 

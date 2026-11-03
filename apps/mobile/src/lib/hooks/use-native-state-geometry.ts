@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/react-native';
 import { useEffect, useState } from 'react';
-import { findNodeHandle, type View } from 'react-native';
+import { findNodeHandle, type ViewInstance } from 'react-native';
 
 import {
   addSurfaceGeometryListener,
@@ -11,7 +11,7 @@ import {
 } from '@/lib/native-surface-geometry';
 
 type Observation = {
-  node: View | null;
+  node: ViewInstance | null;
   status: 'pending' | 'ready' | 'failed';
   geometry: NativeSurfaceGeometry | null;
   failure?: string;
@@ -28,7 +28,7 @@ function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGe
   );
 }
 
-export function useNativeStateGeometry(node: View | null) {
+export function useNativeStateGeometry(node: ViewInstance | null) {
   const [observation, setObservation] = useState<Observation>({
     node: null,
     status: 'pending',
@@ -40,7 +40,7 @@ export function useNativeStateGeometry(node: View | null) {
       return undefined;
     }
     const tag = findNodeHandle(node);
-    if (tag === null) {
+    if (tag == null) {
       setObservation({
         node,
         status: 'failed',
@@ -73,11 +73,18 @@ export function useNativeStateGeometry(node: View | null) {
         });
         return;
       }
-      setObservation(previous =>
-        previous.node === node && sameGeometry(previous.geometry, geometry)
-          ? previous
-          : { node, status: 'ready', geometry }
-      );
+      // A covered or fully faded scene reports an empty visible range. It keeps
+      // the geometry it was last seen with: an empty range drops its centered
+      // states to the fallback layout, and they jump back only after the
+      // revealed scene reports its range again at the end of the transition.
+      const hidden = geometry.visibleBottom === geometry.visibleTop;
+      setObservation(previous => {
+        const last = previous.node === node ? previous.geometry : null;
+        const keep =
+          last !== null &&
+          (sameGeometry(last, geometry) || (hidden && last.visibleBottom > last.visibleTop));
+        return keep ? previous : { node, status: 'ready', geometry };
+      });
     };
     setObservation({ node, status: 'pending', geometry: null });
     const listener = addSurfaceGeometryListener(publish);

@@ -1,8 +1,11 @@
 import {
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
+import { z } from 'zod';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneHelloFrame,
@@ -21,6 +24,29 @@ import {
 } from './connection.js';
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
+
+// The hello accepted by the Worker before sessionSnapshots was added. Its schema is strict,
+// so the extra field is rejected and the wrapper must retry without it.
+const previousWorkerHelloSchema = z
+  .object({
+    type: z.literal('hello'),
+    wrapperId: z.string(),
+    allocationId: z.string(),
+    protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+    heartbeatAck: z.literal(true).optional(),
+    redactsNamedSecrets: z.literal(true).optional(),
+    installsSkillsSh: z.literal(true).optional(),
+  })
+  .strict();
+
+const legacyWorkerHelloSchema = z
+  .object({
+    type: z.literal('hello'),
+    wrapperId: z.string(),
+    allocationId: z.string(),
+    protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+  })
+  .strict();
 
 class TestSocket {
   static OPEN = 1;
@@ -151,6 +177,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     connection.start();
     const socket = TestSocket.instances[0];
     expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
+    expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
+      WORKSPACE_CONFIGURATION_VERSION
+    );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',
@@ -158,7 +187,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
+      sessionSnapshots: true,
       redactsNamedSecrets: true,
+      installsSkillsSh: true,
     });
   });
 });
@@ -214,18 +245,41 @@ describe('acknowledged heartbeat', () => {
     expect(scaled.sandbox.heartbeatMs).toBe(450);
     expect(scaled.sandbox.reconnectMs).toBe(900);
   });
-  it('uses a legacy hello fallback and never times out an unnegotiated peer', async () => {
-    await withTestSocket(async (_connection, socket, disconnected) => {
-      expect(socket.frames[0]).toMatchObject({ type: 'hello', heartbeatAck: true });
+  it('falls back through the capability hello before the bare legacy hello', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(false);
       await waitFor(() => socket.frames.length === 2);
-      expect(socket.frames[1]).toEqual({
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      await waitFor(() => socket.frames.length === 3);
+      expect(socket.frames[2]).toEqual({
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
+      expect(legacyWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(disconnected).toEqual([]);
+      expect(TestSocket.instances).toHaveLength(1);
+    });
+  });
+
+  it('keeps prior capabilities when the peer only predates sessionSnapshots', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      await waitFor(() => socket.frames.length === 2);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      expect(socket.frames[1]).toMatchObject({
+        heartbeatAck: true,
+        redactsNamedSecrets: true,
+        installsSkillsSh: true,
+      });
+      expect(socket.frames[1]).not.toHaveProperty('sessionSnapshots');
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await Bun.sleep(120);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(2);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -880,7 +934,9 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        sessionSnapshots: true,
         redactsNamedSecrets: true,
+        installsSkillsSh: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

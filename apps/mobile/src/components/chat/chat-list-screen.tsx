@@ -1,13 +1,13 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -28,7 +29,7 @@ import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -60,12 +61,7 @@ function ScopedChatListScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const tabBarHeight = useEffectiveTabBarHeight();
 
   const {
     models,
@@ -247,6 +243,7 @@ function ScopedChatListScreen() {
           description={t('modelChat.empty.description')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}
@@ -279,7 +276,9 @@ function ScopedChatListScreen() {
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
-                className="text-[30px] font-semibold leading-9 text-foreground"
+                // An explicit pixel line height keeps the title's header
+                // measurement stable on Android.
+                className="text-[30px] font-semibold leading-[36px] text-foreground"
                 numberOfLines={1}
               >
                 {t('common.chat')}
@@ -292,6 +291,21 @@ function ScopedChatListScreen() {
           className="px-[22px] pb-1"
           headerRight={<BackendSettingsControl />}
         />
+        {/* The account every read on this screen is scoped to: the chat list
+            (`useChatPlace`), the model catalogue, and the empty state below.
+            Switching it remounts the scoped screen, so without the name here a
+            person in two workspaces watches their conversations disappear with
+            nothing saying which workspace they are now in. It is the same
+            switchable control Home and the new-session screen put in their
+            header — the active account's name and the account picker sheet, no
+            copy of its own — and it holds one row in every scope (Personal and
+            a single membership included), so the list never moves when the
+            account list resolves or changes. It sits at the header's own
+            gutter and on its own row: the 30px title already fills the title
+            row, so a trailing cluster would paint over it on a phone. */}
+        <View className="px-[22px] pb-1">
+          <ContextControl />
+        </View>
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Pressable

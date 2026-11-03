@@ -802,6 +802,10 @@ rows renew.
    version conflicts with an existing subscription row's price version,
    runtime MUST fail closed rather than silently changing the lineage's
    price version.
+   Settlement MUST confirm canonical provider ownership before any financial write.
+   A stale invoice MUST NOT replace another active provider subscription.
+   A verified current-price Standard checkout for the same instance can replace canceled provider ownership.
+   Its confirmation MUST NOT predate the stored prior period.
 3. Settlement MUST be balance-neutral: the system MUST record a
    positive credit entry and a matching negative credit deduction
    in a single atomic operation. The user's visible credit balance

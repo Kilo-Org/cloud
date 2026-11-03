@@ -43,8 +43,6 @@ export function useDeleteAlertingConfig() {
   );
 }
 
-// --- TTFB alerting hooks ---
-
 export function useTtfbAlertingConfigs() {
   const trpc = useTRPC();
   return useQuery(trpc.admin.alerting.listTtfbConfigs.queryOptions());

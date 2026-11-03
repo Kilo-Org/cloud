@@ -3,7 +3,6 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   elevateViaKiloAdmin,
-  emitSupportServiceAccessEvent,
   organizationTarget,
   organizationsTarget,
   recordKiloAdminElevation,
@@ -150,10 +149,6 @@ describe('kilo admin elevation telemetry', () => {
       ip: '203.0.113.7',
       reason: 'organization_access',
       target: 'organization:org-1',
-      claimedActorEmail: null,
-      outcome: null,
-      targetEmailHash: null,
-      correlationId: null,
     });
   });
 
@@ -172,7 +167,7 @@ describe('kilo admin elevation telemetry', () => {
     // and must derive `authVia` from the request rather than assuming a session.
     await recordKiloAdminElevation(
       { user: defineTestUser({ is_admin: true }) },
-      { reason: 'organization_fetch', target: null }
+      { reason: 'organization_fetch', target: UNSCOPED_TARGET }
     );
 
     expect(events[0]).toMatchObject({
@@ -180,7 +175,7 @@ describe('kilo admin elevation telemetry', () => {
       route: null,
       method: null,
       ip: null,
-      target: null,
+      target: UNSCOPED_TARGET,
     });
   });
 
@@ -243,70 +238,22 @@ describe('kilo admin elevation telemetry', () => {
       target: 'service:wasteland',
     });
   });
-});
 
-describe('emitSupportServiceAccessEvent', () => {
-  let events: AdminAccessEvent[];
-
-  beforeEach(() => {
-    events = [];
-    setAdminAccessSinkForTest(event => events.push(event));
-  });
-
-  afterEach(() => {
-    setAdminAccessSinkForTest(null);
-  });
-
-  test('emits admin_access with support_service kind and sentinel principal', () => {
-    emitSupportServiceAccessEvent({
-      method: 'GET',
-      route: '/api/internal/support/users',
-      ip: '203.0.113.7',
-      claimedActorEmail: 'alice@kilocode.ai',
-      correlationId: 'csa-req-1',
-      outcome: 'found',
-      target: userTarget('user-1'),
-      targetEmailHash: 'abc123',
+  test('a server-component caller is labelled as such, not as a route handler', async () => {
+    await recordKiloAdminElevationForRequest({
+      user: defineTestUser({ is_admin: true }),
+      reason: 'organization_access_rest',
+      target: organizationTarget('org-1'),
+      surface: 'server-component',
     });
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toEqual({
-      event: 'admin_access',
-      surface: 'rest',
-      kind: 'support_service',
-      kiloUserId: 'support-automation',
-      email: 'support-automation',
-      adminTier: 'platform_admin',
-      authVia: 'token',
-      tokenSource: 'support-automation',
-      route: '/api/internal/support/users',
-      method: 'GET',
-      ip: '203.0.113.7',
-      reason: null,
-      target: 'user:user-1',
-      claimedActorEmail: 'alice@kilocode.ai',
-      outcome: 'found',
-      targetEmailHash: 'abc123',
-      correlationId: 'csa-req-1',
+    expect(events[0]).toMatchObject({
+      surface: 'server-component',
+      kind: 'kilo_admin_elevation',
+      // Still no fabricated HTTP method: a render carries no trustworthy one.
+      method: null,
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
     });
-  });
-
-  test('a throwing sink never propagates', () => {
-    setAdminAccessSinkForTest(() => {
-      throw new Error('drain unavailable');
-    });
-
-    expect(() =>
-      emitSupportServiceAccessEvent({
-        method: 'POST',
-        route: null,
-        ip: null,
-        claimedActorEmail: 'alice@kilocode.ai',
-        correlationId: 'csa-req-1',
-        outcome: 'deleted',
-        target: null,
-        targetEmailHash: null,
-      })
-    ).not.toThrow();
   });
 });

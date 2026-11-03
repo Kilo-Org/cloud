@@ -5,6 +5,7 @@ import {
   classifyAttachment,
   describeClassificationFailure,
 } from '@/lib/agent-attachments/validate';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { type SharePayload } from '@/lib/share-payload';
 
 type ClassificationReason = 'empty' | 'denied' | 'too-large' | 'unreadable';
@@ -30,6 +31,12 @@ export type SharePayloadValidation =
       /** null when the share had no files and no usable text (contentless). */
       reason: ClassificationReason | null;
       message: string;
+      /**
+       * Names of shared files whose cache copy threw. The gate preview lists
+       * them so the user can tell which file was unreadable; empty for any
+       * other all-rejected outcome.
+       */
+      failedCopies: string[];
     }
   | {
       kind: 'ok';
@@ -85,21 +92,27 @@ export function validateMeasuredShareFiles(input: {
     rejectedNotes.push({ name, reason: 'unreadable' });
   }
 
-  const hasUsableText = input.text.trim() !== '';
+  // Text counts as content only when a reader can see it, the same reading the
+  // composer's send gate and the auto-send arming use: invisible-only text
+  // would prefill a composer that cannot be sent.
+  const hasUsableText = hasVisibleComposerText(input.text);
 
   if (classifiedAccepted.length === 0 && !hasUsableText) {
+    const failedCopies = [...(input.failedCopies ?? [])];
     const firstRejection = rejectedNotes[0];
     if (firstRejection) {
       return {
         kind: 'all-rejected',
         reason: firstRejection.reason,
         message: describeClassificationFailure(firstRejection.reason),
+        failedCopies,
       };
     }
     return {
       kind: 'all-rejected',
       reason: null,
       message: i18n.t('share.contentlessMessage'),
+      failedCopies,
     };
   }
 

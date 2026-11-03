@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- one publisher state machine: derive, gate, renew, coalesce, and terminal end */
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   GLANCEABLE_COALESCE_MS,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
@@ -52,6 +53,12 @@ export type GlanceablePublisherOptions = {
   sinks: readonly GlanceableSink[];
   /** Seeded from the persisted last snapshot so revision stays monotonic. */
   initial?: GlanceableAgentsSnapshot | null;
+  /**
+   * Revision floor for a publisher that starts with no current snapshot: a sink
+   * drops a frame at or below the revision it holds, so the first frame this
+   * publisher writes still outranks the one already on the surfaces.
+   */
+  initialRevision?: number;
   now?: () => number;
   coalesceMs?: number;
   terminalMs?: number;
@@ -86,6 +93,14 @@ export type GlanceablePublisherOptions = {
    * and the retry has to answer that same session.
    */
   skipWaitingAskSessionId?: string;
+  /**
+   * Subscribe to the events that change a fact a sink reads at draw time rather
+   * than from the frame (the recorded ask's request binding). The publisher
+   * redraws the frame it already emits on each one, so a surface can offer
+   * Approve the moment the ask is bound instead of on the next heartbeat.
+   * Returns the unsubscribe, run from `dispose()`.
+   */
+  subscribeAskBound?: (listener: () => void) => () => void;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -128,9 +143,13 @@ export class GlanceablePublisher {
   private readonly terminalMs: number;
   private readonly terminalBlankEpoch: () => number;
   private readonly blankEpochAtStart: number;
+  private readonly initialRevision: number;
   private readonly orgLost: () => boolean;
   private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
   private readonly skipWaitingAskSessionId?: string;
+  private readonly unsubscribeAskBound: (() => void) | null;
+  /** The context of the last emit, so `redraw` can write the frame again. */
+  private lastEmitContext: GlanceableSinkContext | null = null;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   /** Home-only details from this publisher's previous tray read. */
@@ -170,11 +189,32 @@ export class GlanceablePublisher {
     this.terminalMs = options.terminalMs ?? GLANCEABLE_TERMINAL_MS;
     this.terminalBlankEpoch = options.terminalBlankEpoch ?? (() => 0);
     this.blankEpochAtStart = this.terminalBlankEpoch();
+    this.initialRevision = options.initialRevision ?? options.initial?.revision ?? 0;
     this.orgLost = options.orgLost ?? (() => false);
     this.onWaitingAskChange = options.onWaitingAskChange;
     this.skipWaitingAskSessionId = options.skipWaitingAskSessionId;
+    this.unsubscribeAskBound =
+      options.subscribeAskBound?.(() => {
+        this.redraw();
+      }) ?? null;
     this.current = options.initial ?? null;
     this.activityStarted = false;
+  }
+
+  /**
+   * Write the frame the sinks already hold once more. A sink reads some facts at
+   * draw time instead of from the frame — the recorded ask's request binding,
+   * which decides whether Approve is offered — and those can settle after the
+   * frame that recorded the ask. The content is unchanged, but the revision moves
+   * on: every sink drops a frame at or below the revision it last applied, so a
+   * redraw that kept it would never reach the surface.
+   */
+  redraw(): void {
+    if (this.current === null || this.lastEmitContext === null || this.isGated()) {
+      return;
+    }
+    this.current = { ...this.current, revision: this.current.revision + 1 };
+    this.emit(this.current, this.lastEmitContext);
   }
 
   /**
@@ -227,7 +267,7 @@ export class GlanceablePublisher {
       userId: ctx.userId,
       organizationId: ctx.organizationId,
       now,
-      previousRevision: this.current?.revision ?? 0,
+      previousRevision: this.current?.revision ?? this.initialRevision,
     });
     rememberSnapshotRows(snapshot.scopeKey, sessions);
 
@@ -291,7 +331,6 @@ export class GlanceablePublisher {
       return;
     }
 
-    // `needsApproval` is optional, so normalize it for the coalesce decision.
     const previousNeedsApproval = this.current?.needsApproval ?? 0;
 
     if (isEligibleGlanceableWork(snapshot)) {
@@ -302,7 +341,7 @@ export class GlanceablePublisher {
         this.activityStarted = true;
       } else if (
         snapshot.needsInput !== this.current?.needsInput ||
-        (snapshot.needsApproval ?? 0) !== previousNeedsApproval
+        snapshot.needsApproval !== previousNeedsApproval
       ) {
         // Actionable needs-input/approval changes must reach the launcher
         // immediately: `needsApproval` gates the Approve control on every
@@ -339,6 +378,7 @@ export class GlanceablePublisher {
       userId: ctx.userId,
       organizationId: ctx.organizationId,
       now: this.now(),
+      previousRevision: this.initialRevision,
       status: 'waiting',
     });
     this.publish(snapshot);
@@ -354,6 +394,12 @@ export class GlanceablePublisher {
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);
     if (this.isGated() || this.current === null) {
+      return;
+    }
+    // A publisher writes frames of its own scope only. A held frame under any
+    // other scope key is not this context's state.
+    if (this.current.scopeKey !== buildOpaqueScopeKey(ctx)) {
+      this.current = null;
       return;
     }
     // A fetch error supersedes any pending coalesced happy emit: otherwise the
@@ -413,6 +459,7 @@ export class GlanceablePublisher {
   dispose(): void {
     this.cancelCoalesce();
     this.cancelTerminal();
+    this.unsubscribeAskBound?.();
   }
 
   private isGated(): boolean {
@@ -493,6 +540,9 @@ export class GlanceablePublisher {
    */
   private writeFrame(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext | null): void {
     this.lastWriteAttemptAt = this.now();
+    if (ctx !== null) {
+      this.lastEmitContext = ctx;
+    }
     if (writeGlanceableFrame(this.sinks, snapshot, ctx)) {
       this.lastPublishedAt = Date.parse(snapshot.updatedAt);
       this.writeFailures = 0;

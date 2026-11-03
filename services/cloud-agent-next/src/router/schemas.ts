@@ -1,10 +1,13 @@
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  clientKiloSessionIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   sessionIdSchema,
@@ -23,7 +26,6 @@ import {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -35,7 +37,10 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/me
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
 
+export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
+export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
 export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
 export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
 
@@ -49,7 +54,6 @@ export {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -59,9 +63,9 @@ export {
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 
 const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
-  const allocation = getKiloSandboxAllocation(request);
+  const allocation = getSandboxAllocation(request);
   if (allocation === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    ctx.addIssue({ code: 'custom', message: 'Sandbox allocation is not available' });
     return z.NEVER;
   }
   return allocation;
@@ -92,49 +96,29 @@ export function isBuiltinMode(slug: string): boolean {
 }
 
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-export type Images = z.infer<typeof ImagesSchema>;
 
 const AttachmentFieldsSchema = {
   attachments: AttachmentsSchema.optional().describe(
     'Optional file attachments to download from R2 to the sandbox'
   ),
-  images: ImagesSchema.optional().describe(
-    'Legacy optional image attachments to download from R2 to the sandbox'
-  ),
 };
-
-function rejectAmbiguousAttachments(
-  data: { attachments?: unknown; images?: unknown },
-  ctx: z.RefinementCtx
-): void {
-  if (data.attachments !== undefined && data.images !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['attachments'],
-      message: 'Provide attachments or legacy images, not both',
-    });
-  }
-}
 
 /**
  * Reject a prompt that is empty or whitespace-only when there are no
- * `attachments.files` and no `images.files`. Command turns have no prompt and
- * must skip this rule at the call site.
+ * `attachments.files`. Command turns have no prompt and must skip this rule at
+ * the call site.
  */
 function rejectEmptyPromptWithoutAttachments(
   data: {
     prompt?: unknown;
     attachments?: { files?: unknown[] } | undefined;
-    images?: { files?: unknown[] } | undefined;
   },
   ctx: z.RefinementCtx,
   path: (string | number)[] = ['prompt']
 ): void {
   const prompt = typeof data.prompt === 'string' ? data.prompt : '';
   if (prompt.trim().length > 0) return;
-  const hasFiles =
-    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
-  if (hasFiles) return;
+  if ((data.attachments?.files?.length ?? 0) > 0) return;
   ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
 }
 
@@ -334,10 +318,9 @@ export const SendMessageV2Input = z
     SendMessageV2CommandPayloadInput,
   ])
   .superRefine((input, ctx) => {
-    rejectAmbiguousAttachments(input, ctx);
     if ('payload' in input) {
       if (input.payload.type === 'command') {
-        if (input.attachments !== undefined || input.images !== undefined) {
+        if (input.attachments !== undefined) {
           ctx.addIssue({
             code: 'custom',
             path: ['attachments'],
@@ -347,14 +330,14 @@ export const SendMessageV2Input = z
         return;
       }
       rejectEmptyPromptWithoutAttachments(
-        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        { prompt: input.payload.prompt, attachments: input.attachments },
         ctx,
         ['payload', 'prompt']
       );
       return;
     }
     rejectEmptyPromptWithoutAttachments(
-      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      { prompt: input.prompt, attachments: input.attachments },
       ctx,
       ['prompt']
     );
@@ -437,6 +420,31 @@ export const CloseTerminalOutput = z.object({
 });
 
 /**
+ * The environment the client selected: its id, and the branch of each
+ * additional repository of a multi-repository environment. The server checks
+ * both against the owner and the launch repository.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.string().uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: branchNameSchema.optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .describe(
+    'Repository environment the client selected. The server verifies it belongs to the owner and contains the launch repository.'
+  );
+
+/**
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
  * Used by backend-to-backend flows.
@@ -448,6 +456,19 @@ export const CloseTerminalOutput = z.object({
  */
 const PrepareSessionSharedFields = {
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+  allowUserAuthorization: z
+    .boolean()
+    .optional()
+    .describe(
+      'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  requireEnvironmentChoice: z
+    .literal(true)
+    .optional()
+    .describe(
+      'Set by a client that can ask its user to choose. Several matching environments then fail the start with a conflict; without it they resolve to no environment.'
+    ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
@@ -569,14 +590,13 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
     .max(100)
     .optional()
-    .describe('Platform that created this session (e.g. slack, app-builder)'),
-  clientProvenance: z.enum(['browser', 'mobile']).optional(),
+    .describe('Platform that created this session (e.g. slack, code-review)'),
+  clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
   shallow: z
     .boolean()
     .optional()
@@ -603,6 +623,11 @@ const PrepareSessionSharedFields = {
 
 const PrepareSessionNonCloneVariant = z.object({
   prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  kiloSessionId: clientKiloSessionIdSchema
+    .optional()
+    .describe(
+      'Client-proposed Kilo session ID, so the client can show the session before prepare returns'
+    ),
   initialMessageId: MessageIdSchema.optional().describe(
     'Initial message ID for correlation with external systems'
   ),
@@ -697,6 +722,14 @@ export const PrepareSessionInput = z
       });
     }
 
+    if (data.allowUserAuthorization === true && data.githubRepo === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['allowUserAuthorization'],
+        message: 'GitHub user authorization is only valid for GitHub repositories',
+      });
+    }
+
     const hasBitbucketIds =
       data.bitbucketWorkspaceUuid !== undefined && data.bitbucketRepositoryUuid !== undefined;
     if (
@@ -778,7 +811,6 @@ export const PrepareSessionInput = z
       });
     }
   })
-  .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
@@ -902,13 +934,12 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
-    message: z
-      .object({
-        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-        ...AttachmentFieldsSchema,
-        id: MessageIdSchema.optional(),
-      })
-      .superRefine(rejectAmbiguousAttachments),
+    operationKey: z.string().uuid().optional(),
+    message: z.object({
+      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+      ...AttachmentFieldsSchema,
+      id: MessageIdSchema.optional(),
+    }),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
@@ -953,6 +984,7 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
 
@@ -972,10 +1004,9 @@ export const SendMessageInput = z
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments)
       .superRefine((message, ctx) =>
         rejectEmptyPromptWithoutAttachments(
-          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          { prompt: message.prompt, attachments: message.attachments },
           ctx
         )
       ),
@@ -1028,6 +1059,11 @@ export const UpdateSessionOutput = z.object({
 export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
+
+export const GetEgressAuditInput = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: sessionIdSchema,
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
 
 export const GetSandboxStatusInput = z
   .object({
@@ -1170,6 +1206,9 @@ export const GetSessionOutput = z.object({
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
@@ -1178,7 +1217,7 @@ export const GetSessionOutput = z.object({
     )
     .optional()
     .describe(
-      'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
+      'Custom agents installed on this session, including picker visibility and model overrides'
     ),
 
   execution: ExecutionStatusSchema,
@@ -1227,6 +1266,16 @@ export const GetMessageResultInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
     messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+    expectedWorktreeId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional expected worktree identity for a scoped Cloud Agent parent'),
+    organizationId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Organization pinned by a scoped Cloud Agent parent authority'),
   })
   .strict();
 

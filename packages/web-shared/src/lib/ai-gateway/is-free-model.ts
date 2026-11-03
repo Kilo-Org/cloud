@@ -1,20 +1,27 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  findKiloExclusiveModel,
-  kiloExclusiveModels,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import {
+  findCustomLlm,
+  isCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
-export function isFreeModel(model: string): boolean {
+/** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
+export async function isFreeModel(modelId: string): Promise<boolean> {
+  const customLlm = await findCustomLlm(modelId);
+  if (customLlm?.definition.pricing) return false;
+  return customLlm !== null || isFreeModelExcludingCustomLlms(modelId);
+}
+
+/**
+ * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
+ * custom LLMs need separate handling, as for `kilo-auto/free` candidates.
+ */
+export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';
-  const exclusiveModel = findKiloExclusiveModel(modelId);
-  if (exclusiveModel) {
-    return !exclusiveModel.pricing;
-  }
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
@@ -25,14 +32,7 @@ export function isFreeModel(model: string): boolean {
   );
 }
 
-export function hasBestEffortGuessDataCollectionRequirement(model: string): boolean {
-  return (
-    isFreeModel(model) ||
-    kiloExclusiveModels.some(
-      candidate =>
-        candidate.public_id === model &&
-        candidate.status !== 'disabled' &&
-        candidate.flags.includes('requires-data-collection')
-    )
-  );
+/** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
+export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
+  return (await isCustomLlm(model)) || isFreeModelExcludingCustomLlms(model);
 }

@@ -67,6 +67,8 @@ if (Platform.OS === 'ios') {
   // while the native observer is attached, and the observer is attached from
   // this subscription.
   subscribeToInteractions();
+  refreshActiveAgentsLiveActivityCopy();
+  refreshSessionLiveActivityCopy();
 
   // Registers the iOS Live Activity and widget sink at import time. The root
   // layout imports this file on both platforms; Android owns

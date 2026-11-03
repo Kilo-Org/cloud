@@ -31,7 +31,7 @@ import {
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
 import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
-import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { isSessionStartRateLimited } from '@/lib/code-reviews/core/session-start-rate-limit';
 import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 
 const createCaller = createCallerFactory(rootRouter);
@@ -54,27 +54,18 @@ const QuerySchema = z.object({
 });
 
 /**
- * Per-actor abuse cap: a Redis fixed window keyed by the acting USER (scoped by org, so one member
- * cannot drain a shared bucket for co-members) and by the window bucket. Embedding the bucket in the
- * key makes the window self-healing: even if `expire` fails after `incr`, the key rotates on the
- * next window rather than counting up forever. Fails OPEN on any Redis error (per redis.ts guidance).
- * Callers MUST invoke this only after membership is proven, so an unauthorized org id can never
- * touch that org's counter.
+ * Per-actor cap for this flow. The shared fixed-window implementation lives in
+ * lib/code-reviews/core/session-start-rate-limit and runs only after membership
+ * is proven.
  */
-async function isConversionRateLimited(ownerScope: string, userId: string): Promise<boolean> {
-  try {
-    const windowMs = REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 1000;
-    const bucket = Math.floor(Date.now() / windowMs);
-    const key = `review-md-conversion:${ownerScope}:${userId}:${bucket}`;
-    const count = await redisClient.incr(key);
-    if (count === 1) {
-      // Best-effort TTL cleanup; correctness does not depend on it (the key rotates per window).
-      await redisClient.expire(key, REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS * 2);
-    }
-    return count > REVIEW_MD_CONVERSION_RATE_LIMIT;
-  } catch {
-    return false;
-  }
+function isConversionRateLimited(ownerScope: string, userId: string): Promise<boolean> {
+  return isSessionStartRateLimited({
+    keyPrefix: 'review-md-conversion',
+    ownerScope,
+    userId,
+    limit: REVIEW_MD_CONVERSION_RATE_LIMIT,
+    windowSeconds: REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
+  });
 }
 
 function settingsPath(organizationId: string | undefined): string {

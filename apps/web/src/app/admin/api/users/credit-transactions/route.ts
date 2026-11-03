@@ -28,6 +28,8 @@ export async function GET(
       stripe_payment_id: credit_transactions.stripe_payment_id,
       credit_category: credit_transactions.credit_category,
       expiry_date: credit_transactions.expiry_date,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
       created_at: credit_transactions.created_at,
       created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
       created_by_user_name: kilocode_users.google_user_name,

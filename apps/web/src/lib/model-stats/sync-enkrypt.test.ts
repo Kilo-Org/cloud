@@ -11,6 +11,10 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import { ENKRYPT_REQUIRED_MODEL_IDS, matchEnkryptScores } from './enkrypt-identity';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type * as EnkryptIdentity from './enkrypt-identity';
 import { getEnkryptSyncHealth } from './enkrypt-status';
 import { syncEnkryptBenchmarks } from './sync-enkrypt';
@@ -221,6 +225,20 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
           models.map(model => model.id)
         )
       );
+    }
+  });
+
+  it('never matches Enkrypt scores to a custom LLM', async () => {
+    const [customLlmId] = ENKRYPT_REQUIRED_MODEL_IDS;
+    await insertCustomLlmForTest(customLlmId);
+    try {
+      await syncEnkryptBenchmarks().catch(() => undefined);
+
+      const matchedModelIds = mockMatch.mock.calls[0]?.[1].map(model => model.openrouterId);
+      expect(matchedModelIds).toBeDefined();
+      expect(matchedModelIds).not.toContain(customLlmId);
+    } finally {
+      await deleteCustomLlmForTest(customLlmId);
     }
   });
 

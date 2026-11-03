@@ -1,7 +1,9 @@
 const mockHeaders = jest.fn<Promise<Headers>, []>();
 const mockGetServerSession = jest.fn();
 const mockCreateDeviceSession = jest.fn();
+const mockCreateDeviceSessionWithAttestedKey = jest.fn();
 const mockIssueSessionCredentials = jest.fn();
+const mockVerifyAdmissionAsync = jest.fn();
 
 jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
@@ -16,7 +18,23 @@ jest.mock('next-auth', () => ({
 
 jest.mock('@/lib/auth/device-sessions', () => ({
   createDeviceSession: (...args: unknown[]) => mockCreateDeviceSession(...args),
+  createDeviceSessionWithAttestedKey: (...args: unknown[]) =>
+    mockCreateDeviceSessionWithAttestedKey(...args),
   issueSessionCredentials: (...args: unknown[]) => mockIssueSessionCredentials(...args),
+}));
+
+// The route refuses a request with no verified proof, and a real proof needs a
+// live App Attest or Play Integrity verdict. This suite covers the credential
+// exchange behind that gate, so the gate is stubbed as passing.
+jest.mock('@/lib/auth/native-admission', () => ({
+  ...jest.requireActual('@/lib/auth/native-admission'),
+  requireAdmissionPayload: () => ({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'integrity-token',
+  }),
+  verifyAdmissionAsync: (...args: unknown[]) => mockVerifyAdmissionAsync(...args),
 }));
 
 import { NextRequest } from 'next/server';
@@ -38,6 +56,7 @@ function createRequest(headers: Record<string, string> = {}) {
   return new NextRequest(`${APP_URL}/api/auth/native/exchange`, {
     method: 'POST',
     headers,
+    body: JSON.stringify({ admission: { platform: 'android' } }),
   });
 }
 
@@ -56,7 +75,10 @@ describe('POST /api/auth/native/exchange integration', () => {
     mockHeaders.mockReset();
     mockGetServerSession.mockReset();
     mockCreateDeviceSession.mockReset();
+    mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockIssueSessionCredentials.mockReset();
+    mockVerifyAdmissionAsync.mockReset();
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android', keyId: '' });
   });
 
   test('exchanges a legacy generated API token with a null pepper and device authorization code', async () => {
@@ -171,6 +193,54 @@ describe('POST /api/auth/native/exchange integration', () => {
     );
 
     expect(response.status).toBe(403);
+    expectNoCredentialsIssued();
+  });
+
+  test('binds a verified iOS key and returns the pair from the same call', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: true,
+      platform: 'ios',
+      keyId: 'ios-key',
+      publicKey: 'spki',
+    });
+    mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
+      ...credentials,
+      sessionId: 'device-session-id',
+    });
+
+    const response = await POST(
+      createRequest({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(credentials);
+    expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
+      userId: user.id,
+      userAgent: undefined,
+      user: expect.objectContaining({ id: user.id }),
+      verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
+    });
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  test('refuses a key bound to a different account', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: true,
+      platform: 'ios',
+      keyId: 'ios-key',
+      existingKeyUserId: 'another-account',
+    });
+
+    const response = await POST(
+      createRequest({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
     expectNoCredentialsIssued();
   });
 });

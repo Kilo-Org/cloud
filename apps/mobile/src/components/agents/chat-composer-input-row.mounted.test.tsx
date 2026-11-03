@@ -115,7 +115,6 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
       isStreaming: true,
       canSend: false,
       hasSendableContent: false,
-      voiceInputAvailable: true,
     });
 
     expect(findAllByType(renderer.root, 'VoiceInputButton')).toHaveLength(1);
@@ -226,7 +225,6 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
   it('renders the mic at the lg size so it reaches the 48dp Android target', async () => {
     const renderer = await renderRow({
       inputEditable: true,
-      voiceInputAvailable: true,
     });
 
     const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
@@ -279,5 +277,26 @@ describe('ChatComposerInputRow mounted — single-line placeholder', () => {
     expect(findTextInput(renderer.root).props.accessibilityLabel).toBe('Message the agent');
 
     renderer.unmount();
+  });
+});
+
+describe('ChatComposerInputRow mounted — send control surface', () => {
+  // The send circle is the row's only filled control, and its dark fill must
+  // stay a visible disc on the near-black composer bar: the muted neutral sits
+  // within 1.2:1 of that bar, the idle-control surface clears it. The enabled
+  // state keeps the accent fill, so the two states stay distinct.
+  it('paints the idle control surface while there is nothing to send', async () => {
+    const renderer = await renderRow({ inputEditable: true, canSend: false });
+
+    const send = findByAccessibilityLabel(renderer.root, 'Send message');
+    expect(send?.props.className).toContain('bg-control-idle');
+    expect(send?.props.className).not.toContain('bg-accent-soft');
+  });
+
+  it('paints the accent surface once the input can send', async () => {
+    const renderer = await renderRow({ inputEditable: true, canSend: true });
+
+    const send = findByAccessibilityLabel(renderer.root, 'Send message');
+    expect(send?.props.className).toContain('bg-accent-soft');
   });
 });

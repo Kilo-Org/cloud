@@ -11,9 +11,6 @@ const config: KnipConfig = {
     // Used via plugins or extends (detected by custom compiler now)
     'eslint-config-prettier',
 
-    // Alternative test runner
-    'ts-jest',
-
     // Used in client-side code
     'client-only',
 
@@ -80,33 +77,9 @@ const config: KnipConfig = {
       entry: ['src/ai-attribution.worker.ts'],
       ignoreDependencies: ['cloudflare'],
     },
-    '../../services/app-builder': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare'],
-    },
-    '../../services/auto-fix-infra': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare'],
-    },
-    '../../services/auto-triage-infra': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare'],
-    },
     '../../services/code-review-infra': {
       entry: ['src/index.ts'],
       ignoreDependencies: ['cloudflare'],
-    },
-    '../../services/db-proxy': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare', '@cloudflare/vitest-pool-workers'],
-    },
-    '../../services/deploy-infra/builder': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare'],
-    },
-    '../../services/deploy-infra/dispatcher': {
-      entry: ['src/index.ts'],
-      ignoreBinaries: ['wrangler'],
     },
   },
 };

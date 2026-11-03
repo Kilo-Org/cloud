@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- cohesive chip: thumbnail, status overlays, retry/remove controls, viewer, text preview, and reorder drag/actions share one strip component */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import {
@@ -22,7 +23,8 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { AttachmentChipErrorBoundary } from '@/components/agents/attachment-chip-error-boundary';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -116,7 +118,9 @@ function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string })
     return <MarkdownText value={preview.text} />;
   }
   return (
-    <SelectableText className="text-sm leading-5 text-foreground">{preview.text}</SelectableText>
+    <SelectableText className="text-sm leading-[1.25rem] text-foreground">
+      {preview.text}
+    </SelectableText>
   );
 }
 
@@ -124,15 +128,26 @@ type AttachmentChipProps = {
   attachment: AgentAttachment;
   index: number;
   count: number;
-  onRemove: () => void;
-  onRetry: () => void;
-  onMove: (direction: AttachmentMoveDirection) => void;
+  /**
+   * Chip-scoped controls take the attachment id, so the strip hands out one
+   * function for every chip instead of a fresh closure per chip per render
+   * (a progress tick would otherwise re-render the whole strip's chips).
+   */
+  onRemove: (id: string) => void;
+  onRetry: (id: string) => void;
+  onMove: (id: string, direction: AttachmentMoveDirection) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   getOrderedWidths: () => number[];
-  onLayoutWidth: (width: number) => void;
+  onLayoutWidth: (id: string, width: number) => void;
 };
 
-function AttachmentChip({
+/**
+ * Memoized: the strip re-renders on every upload progress tick, and the upload
+ * hook replaces only the chip whose state changed, so every other chip's props
+ * are unchanged and its render body — the drag gesture, the class merges, the
+ * description — must not run again.
+ */
+const AttachmentChip = memo(function AttachmentChip({
   attachment,
   index,
   count,
@@ -167,7 +182,7 @@ function AttachmentChip({
 
   // The chip body is the single accessible element; focus restoration targets
   // it after a move so VoiceOver/TalkBack stays on the chip that changed slot.
-  const bodyRef = useRef<View>(null);
+  const bodyRef = useRef<ViewInstance>(null);
   const focusPendingRef = useRef(false);
   const [focusEpoch, setFocusEpoch] = useState(0);
 
@@ -179,30 +194,36 @@ function AttachmentChip({
   useEffect(() => {
     if (focusPendingRef.current) {
       focusPendingRef.current = false;
-      moveA11yFocus(bodyRef);
+      requestA11yFocus(bodyRef);
     }
   }, [focusEpoch]);
 
   // One drag-slot reorder per long-press gesture. The start index is captured
   // at gesture start; `runOnJS(true)` lets the callbacks call the reorder and
-  // focus helpers without a worklet.
+  // focus helpers without a worklet. Built once per chip (and rebuilt only when
+  // the slot or a handler identity changes) so another chip's upload progress
+  // cannot re-create this chip's native gesture handler.
   const dragStartIndexRef = useRef(index);
 
-  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
-  const panGesture = Gesture.Pan()
-    .runOnJS(true)
-    .activateAfterLongPress(LONG_PRESS_MS)
-    .onStart(() => {
-      dragStartIndexRef.current = index;
-    })
-    .onEnd(event => {
-      const startIndex = dragStartIndexRef.current;
-      const targetIndex = dragTargetIndex(startIndex, getOrderedWidths(), event.translationX);
-      if (targetIndex !== startIndex) {
-        onReorder(startIndex, targetIndex);
-        requestFocusRestore();
-      }
-    });
+  const panGesture = useMemo(
+    () =>
+      // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
+      Gesture.Pan()
+        .runOnJS(true)
+        .activateAfterLongPress(LONG_PRESS_MS)
+        .onStart(() => {
+          dragStartIndexRef.current = index;
+        })
+        .onEnd(event => {
+          const startIndex = dragStartIndexRef.current;
+          const targetIndex = dragTargetIndex(startIndex, getOrderedWidths(), event.translationX);
+          if (targetIndex !== startIndex) {
+            onReorder(startIndex, targetIndex);
+            requestFocusRestore();
+          }
+        }),
+    [index, getOrderedWidths, onReorder, requestFocusRestore]
+  );
 
   const moveActions: AccessibilityActionInfo[] = [];
   if (index > 0) {
@@ -221,10 +242,10 @@ function AttachmentChip({
   function handleAccessibilityAction(event: AccessibilityActionEvent) {
     const action = event.nativeEvent.actionName;
     if (action === 'moveLeft') {
-      onMove('left');
+      onMove(attachment.id, 'left');
       requestFocusRestore();
     } else if (action === 'moveRight') {
-      onMove('right');
+      onMove(attachment.id, 'right');
       requestFocusRestore();
     }
   }
@@ -377,7 +398,7 @@ function AttachmentChip({
           className="relative mr-2"
           collapsable={false}
           onLayout={(event: LayoutChangeEvent) => {
-            onLayoutWidth(event.nativeEvent.layout.width);
+            onLayoutWidth(attachment.id, event.nativeEvent.layout.width);
           }}
         >
           {/* Chip surface — the single accessible element describing the
@@ -434,7 +455,9 @@ function AttachmentChip({
               badge is the visible affordance; the content is padded clear of it. */}
           {description.showRetry ? (
             <Pressable
-              onPress={onRetry}
+              onPress={() => {
+                onRetry(attachment.id);
+              }}
               className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.attachmentPreview.retryUploading', {
@@ -449,7 +472,9 @@ function AttachmentChip({
 
           {description.showRemove ? (
             <Pressable
-              onPress={onRemove}
+              onPress={() => {
+                onRemove(attachment.id);
+              }}
               hitSlop={removeHitSlop()}
               className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
               accessibilityRole="button"
@@ -476,6 +501,7 @@ function AttachmentChip({
 
       {textPreview !== null ? (
         <SessionPageSheet
+          dismissible
           visible
           onClose={() => {
             setTextPreview(null);
@@ -508,7 +534,7 @@ function AttachmentChip({
       ) : null}
     </>
   );
-}
+});
 
 export function AttachmentPreviewStrip({
   attachments,
@@ -523,8 +549,33 @@ export function AttachmentPreviewStrip({
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
 
+  // The caller's controls change identity whenever the chip list does — the
+  // upload hook rebuilds `retryAttachment` on every attachment change — so the
+  // chips take these lifetime-stable dispatchers instead and read the current
+  // control at call time, the same way `attachmentsRef` tracks the current list.
+  // Without it a progress tick for one file would hand every memoized chip a new
+  // prop and re-render the whole strip.
+  const handlersRef = useRef({ onRemove, onRetry, onMove, onReorder });
+  handlersRef.current = { onRemove, onRetry, onMove, onReorder };
+
   const recordChipWidth = useCallback((id: string, width: number) => {
     chipWidthsRef.current[id] = width;
+  }, []);
+
+  const removeChip = useCallback((id: string) => {
+    handlersRef.current.onRemove(id);
+  }, []);
+
+  const retryChip = useCallback((id: string) => {
+    handlersRef.current.onRetry(id);
+  }, []);
+
+  const moveChip = useCallback((id: string, direction: AttachmentMoveDirection) => {
+    handlersRef.current.onMove(id, direction);
+  }, []);
+
+  const reorderChips = useCallback((fromIndex: number, toIndex: number) => {
+    handlersRef.current.onReorder(fromIndex, toIndex);
   }, []);
 
   const getOrderedWidths = useCallback(
@@ -547,26 +598,24 @@ export function AttachmentPreviewStrip({
       keyboardShouldPersistTaps="handled"
     >
       {attachments.map((attachment, index) => (
-        <AttachmentChip
+        <AttachmentChipErrorBoundary
           key={attachment.id}
-          attachment={attachment}
-          index={index}
-          count={attachments.length}
-          onRemove={() => {
-            onRemove(attachment.id);
-          }}
-          onRetry={() => {
-            onRetry(attachment.id);
-          }}
-          onMove={direction => {
-            onMove(attachment.id, direction);
-          }}
-          onReorder={onReorder}
-          getOrderedWidths={getOrderedWidths}
-          onLayoutWidth={width => {
-            recordChipWidth(attachment.id, width);
-          }}
-        />
+          attachmentId={attachment.id}
+          filename={attachment.filename}
+          onRemove={removeChip}
+        >
+          <AttachmentChip
+            attachment={attachment}
+            index={index}
+            count={attachments.length}
+            onRemove={removeChip}
+            onRetry={retryChip}
+            onMove={moveChip}
+            onReorder={reorderChips}
+            getOrderedWidths={getOrderedWidths}
+            onLayoutWidth={recordChipWidth}
+          />
+        </AttachmentChipErrorBoundary>
       ))}
     </GestureScrollView>
   );

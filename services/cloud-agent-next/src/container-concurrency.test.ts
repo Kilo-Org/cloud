@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkerDb } from '@kilocode/db/client';
-import type { SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   assertContainerCapacity,
-  countLiveContainers,
+  ContainerCapacityUnavailableError,
   ContainerConcurrencyLimitError,
-  isContainerConcurrencyLimitError,
+  getContainerCapacityFailureReason,
+  LOW_BALANCE_CONTAINER_LIMIT,
   ORGANIZATION_CONTAINER_LIMIT,
-  PERSONAL_CONTAINER_LIMIT,
+  USER_CONTAINER_LIMIT,
+  type ContainerCapacityCheck,
   type ContainerCapacityRequest,
 } from './container-concurrency.js';
 import { logger } from './logger.js';
@@ -19,109 +18,134 @@ const env = {} as Pick<Env, 'HYPERDRIVE'>;
 function request(overrides: Partial<ContainerCapacityRequest> = {}): ContainerCapacityRequest {
   return {
     subject: { type: 'user', id: 'user_1' },
+    actor: { type: 'user', id: 'user_1' },
     instanceId: 'ses-abcdef',
     checkpoint: 'control-plane-create',
     ...overrides,
   };
 }
 
-describe('countLiveContainers', () => {
-  it('excludes code reviews by service and instance ID, including the shared Sandbox pool', async () => {
-    const where = vi.fn(async (_condition: SQL) => [{ live: 19 }]);
-    const db = {
-      select: () => ({ from: () => ({ where }) }),
-    } as unknown as WorkerDb;
-
-    await expect(countLiveContainers(db, request())).resolves.toBe(19);
-
-    const query = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
-    expect(query.sql).toContain('"container_usage_interval"."service" not like $5');
-    expect(query.sql).toContain('"container_usage_interval"."instance_id" not like $6');
-    expect(query.sql).toContain(
-      "coalesce(\"container_usage_interval\".\"metadata\"->>'origin', '') <> 'code-review'"
-    );
-    expect(query.params).toEqual([
-      'user',
-      'user_1',
-      'open',
-      'cloud-agent-next-%',
-      '%code-review%',
-      'crv-%',
-      'ses-abcdef',
-    ]);
-  });
-});
+function userCapacity(live: number, limit = USER_CONTAINER_LIMIT): ContainerCapacityCheck[] {
+  return [{ subject: { type: 'user', id: 'user_1' }, live, limit }];
+}
 
 describe('assertContainerCapacity', () => {
-  it('admits a personal start below the personal limit', async () => {
-    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT - 1);
-    await expect(assertContainerCapacity(env, request(), { countLive })).resolves.toBeUndefined();
-    expect(countLive).toHaveBeenCalledWith(request());
-  });
+  it.each([LOW_BALANCE_CONTAINER_LIMIT, USER_CONTAINER_LIMIT])(
+    'admits a user below %i containers and rejects another start at the limit',
+    async limit => {
+      const readCapacity = vi.fn(async () => userCapacity(limit - 1, limit));
+      await expect(
+        assertContainerCapacity(env, request(), { readCapacity })
+      ).resolves.toBeUndefined();
+      expect(readCapacity).toHaveBeenCalledWith(request());
 
-  it('rejects a personal start at the personal limit', async () => {
-    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
-    const rejection = assertContainerCapacity(env, request(), { countLive });
-    await expect(rejection).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
-    await expect(rejection).rejects.toMatchObject({
-      accountType: 'personal',
-      limit: PERSONAL_CONTAINER_LIMIT,
-    });
-  });
+      readCapacity.mockResolvedValue(userCapacity(limit, limit));
+      await expect(assertContainerCapacity(env, request(), { readCapacity })).rejects.toMatchObject(
+        {
+          accountType: 'personal',
+          limit,
+        }
+      );
+    }
+  );
 
   it('admits any start when the account concurrency cap is disabled', async () => {
-    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
+    const readCapacity = vi.fn(async () => userCapacity(USER_CONTAINER_LIMIT));
     await expect(
       assertContainerCapacity(
         { ...env, CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true' },
         request(),
-        { countLive }
+        { readCapacity }
       )
     ).resolves.toBeUndefined();
-    expect(countLive).not.toHaveBeenCalled();
+    expect(readCapacity).not.toHaveBeenCalled();
   });
 
-  it('applies the organization limit to organization subjects', async () => {
+  it('requires both the user and organization to have capacity', async () => {
     const org = request({ subject: { type: 'org', id: 'org_1' } });
-    await expect(
-      assertContainerCapacity(env, org, { countLive: async () => PERSONAL_CONTAINER_LIMIT })
-    ).resolves.toBeUndefined();
-    await expect(
-      assertContainerCapacity(env, org, { countLive: async () => ORGANIZATION_CONTAINER_LIMIT })
-    ).rejects.toMatchObject({ accountType: 'organization', limit: ORGANIZATION_CONTAINER_LIMIT });
+    const organizationCapacity = {
+      subject: org.subject,
+      live: ORGANIZATION_CONTAINER_LIMIT - 1,
+      limit: ORGANIZATION_CONTAINER_LIMIT,
+    };
+    const readCapacity = vi.fn(async () => [
+      ...userCapacity(USER_CONTAINER_LIMIT - 1),
+      organizationCapacity,
+    ]);
+    await expect(assertContainerCapacity(env, org, { readCapacity })).resolves.toBeUndefined();
+
+    readCapacity.mockResolvedValue([
+      ...userCapacity(0),
+      { ...organizationCapacity, live: ORGANIZATION_CONTAINER_LIMIT },
+    ]);
+    await expect(assertContainerCapacity(env, org, { readCapacity })).rejects.toMatchObject({
+      accountType: 'organization',
+      limit: ORGANIZATION_CONTAINER_LIMIT,
+    });
+
+    readCapacity.mockResolvedValue([...userCapacity(USER_CONTAINER_LIMIT), organizationCapacity]);
+    await expect(assertContainerCapacity(env, org, { readCapacity })).rejects.toMatchObject({
+      accountType: 'personal',
+      limit: USER_CONTAINER_LIMIT,
+    });
   });
 
-  it('never counts code review sandboxes', async () => {
-    const countLive = vi.fn(async () => 1_000);
+  it.each([
+    { instanceId: 'crv-abcdef' },
+    { instanceId: `sbx-${'a'.repeat(48)}`, billingOrigin: 'code-review' },
+  ])('exempts Code Reviewer containers: %j', async overrides => {
+    const readCapacity = vi.fn(async () => userCapacity(1_000));
     await expect(
-      assertContainerCapacity(env, request({ instanceId: 'crv-abcdef' }), { countLive })
+      assertContainerCapacity(env, request(overrides), { readCapacity })
     ).resolves.toBeUndefined();
-    expect(countLive).not.toHaveBeenCalled();
+    expect(readCapacity).not.toHaveBeenCalled();
   });
 
-  it('exempts neutral Code Reviewer keys while enforcing ordinary neutral keys', async () => {
-    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
-    const neutral = request({ instanceId: `sbx-${'a'.repeat(48)}` });
+  it('enforces ordinary neutral sandbox keys', async () => {
     await expect(
-      assertContainerCapacity(env, { ...neutral, billingOrigin: 'code-review' }, { countLive })
-    ).resolves.toBeUndefined();
-    expect(countLive).not.toHaveBeenCalled();
-    await expect(
-      assertContainerCapacity(env, { ...neutral, billingOrigin: 'cloud-agent-web' }, { countLive })
+      assertContainerCapacity(
+        env,
+        request({ instanceId: `sbx-${'a'.repeat(48)}`, billingOrigin: 'cloud-agent-web' }),
+        { readCapacity: async () => userCapacity(USER_CONTAINER_LIMIT) }
+      )
     ).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
   });
 
-  it('admits the start when the count is unavailable', async () => {
-    await expect(
-      assertContainerCapacity(env, request(), {
-        countLive: async () => {
-          throw new Error('connection refused');
-        },
-      })
-    ).resolves.toBeUndefined();
+  it('refuses the start when capacity remains unavailable after a retry', async () => {
+    const readCapacity = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+    await expect(assertContainerCapacity(env, request(), { readCapacity })).rejects.toMatchObject({
+      code: 'container_capacity_unavailable',
+      message: expect.stringContaining('Try again shortly'),
+    });
+    expect(readCapacity).toHaveBeenCalledTimes(2);
   });
 
-  it('logs a tagged error with the account and counts when the limit is reached', async () => {
+  it('retries a transient read failure before admitting a start', async () => {
+    const readCapacity = vi.fn(async () => userCapacity(0));
+    readCapacity.mockRejectedValueOnce(new Error('connection reset'));
+    await expect(
+      assertContainerCapacity(env, request(), { readCapacity })
+    ).resolves.toBeUndefined();
+    expect(readCapacity).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses the start after the shared ten-second check deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const readCapacity = () => new Promise<ContainerCapacityCheck[]>(() => {});
+      const rejection = expect(
+        assertContainerCapacity(env, request(), { readCapacity })
+      ).rejects.toBeInstanceOf(ContainerCapacityUnavailableError);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('logs the user whose global limit rejects an organization start', async () => {
     const error = vi.fn();
     const withFields = vi.fn(() => ({ error }));
     const withTags = vi
@@ -129,7 +153,10 @@ describe('assertContainerCapacity', () => {
       .mockReturnValue({ withFields } as unknown as ReturnType<typeof logger.withTags>);
     try {
       await expect(
-        assertContainerCapacity(env, request(), { countLive: async () => PERSONAL_CONTAINER_LIMIT })
+        assertContainerCapacity(env, request({ subject: { type: 'org', id: 'org_1' } }), {
+          readCapacity: async () =>
+            userCapacity(LOW_BALANCE_CONTAINER_LIMIT, LOW_BALANCE_CONTAINER_LIMIT),
+        })
       ).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
       expect(withTags).toHaveBeenCalledWith({
         logTag: 'container_limit_reached',
@@ -139,8 +166,8 @@ describe('assertContainerCapacity', () => {
         checkpoint: 'control-plane-create',
         subjectType: 'user',
         subjectId: 'user_1',
-        live: PERSONAL_CONTAINER_LIMIT,
-        limit: PERSONAL_CONTAINER_LIMIT,
+        live: LOW_BALANCE_CONTAINER_LIMIT,
+        limit: LOW_BALANCE_CONTAINER_LIMIT,
       });
       expect(error).toHaveBeenCalledWith('Container concurrency limit reached');
     } finally {
@@ -148,22 +175,29 @@ describe('assertContainerCapacity', () => {
     }
   });
 
-  it('admits the start when no database binding is configured', async () => {
-    await expect(assertContainerCapacity(env, request())).resolves.toBeUndefined();
+  it('refuses the start when no database binding is configured', async () => {
+    await expect(assertContainerCapacity(env, request())).rejects.toBeInstanceOf(
+      ContainerCapacityUnavailableError
+    );
   });
 });
 
-describe('isContainerConcurrencyLimitError', () => {
-  it('recognizes the denial directly and after RPC flattening', () => {
-    const denial = new ContainerConcurrencyLimitError('personal', PERSONAL_CONTAINER_LIMIT);
-    expect(isContainerConcurrencyLimitError(denial)).toBe(true);
-    expect(isContainerConcurrencyLimitError(new Error(`remote: ${denial.message}`))).toBe(true);
-    expect(isContainerConcurrencyLimitError({ code: 'container_limit_reached' })).toBe(true);
-    expect(isContainerConcurrencyLimitError(denial.message)).toBe(true);
+describe('getContainerCapacityFailureReason', () => {
+  it.each([
+    [
+      new ContainerConcurrencyLimitError('personal', USER_CONTAINER_LIMIT),
+      'container_limit_reached',
+    ],
+    [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
+  ] as const)('preserves the reason for %s directly and after RPC flattening', (error, reason) => {
+    expect(getContainerCapacityFailureReason(error)).toBe(reason);
+    expect(getContainerCapacityFailureReason(new Error(`remote: ${error.message}`))).toBe(reason);
+    expect(getContainerCapacityFailureReason({ code: error.code })).toBe(reason);
+    expect(getContainerCapacityFailureReason(error.message)).toBe(reason);
   });
 
   it('does not match unrelated failures', () => {
-    expect(isContainerConcurrencyLimitError(new Error('meter unavailable'))).toBe(false);
-    expect(isContainerConcurrencyLimitError(undefined)).toBe(false);
+    expect(getContainerCapacityFailureReason(new Error('meter unavailable'))).toBeUndefined();
+    expect(getContainerCapacityFailureReason(undefined)).toBeUndefined();
   });
 });

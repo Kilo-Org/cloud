@@ -16,7 +16,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import {
   reconcileVoiceInputLanguageTag,
   voiceInputLanguageDisplayName,
@@ -29,6 +31,7 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
+import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -49,7 +52,10 @@ function SkeletonRows() {
     <View className="px-4 pb-4 pt-1">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
         // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View key={index} className="min-h-11 flex-row items-center justify-between py-3">
+        <View
+          key={index}
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
+        >
           <View className="flex-1 gap-1.5 pr-3">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-3 w-28" />
@@ -126,12 +132,12 @@ function VoiceLanguageList({
 
   return (
     <FlashList
+      nestedScrollEnabled
       style={[listStyle, { backgroundColor: colors.background }]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
       keyExtractor={option => option.tag ?? 'automatic'}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
+      {...SEARCHABLE_PICKER_LIST_PROPS}
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
       renderItem={({ item, index }) => (
         <ChoiceRow
@@ -238,6 +244,7 @@ export function VoiceLanguagePickerSheet() {
 
   const onSelect = useCallback(
     (tag: string | null) => {
+      dismissSearchPickerKeyboard();
       writeVoiceInputLanguage(tag);
       router.back();
     },

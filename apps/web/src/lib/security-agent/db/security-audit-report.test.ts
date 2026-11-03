@@ -18,6 +18,7 @@ import {
   securityAgentAuditReportSerializedByteLength,
   securityAgentAuditReportEventCountBucket,
   SecurityAgentAuditReportQueryError,
+  type SecurityAgentAuditReport,
   withSecurityAgentAuditReportTimeout,
 } from './security-audit-report';
 
@@ -57,23 +58,60 @@ function findingSnapshot(findingId: string): Record<string, unknown> {
   };
 }
 
-async function waitForAuditReportReadBlockedBy(lockingPid: number): Promise<void> {
+type ReportQueryRunner = {
+  query: (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+};
+
+async function waitForAuditReportReadBlockedBy(
+  monitor: ReportQueryRunner,
+  lockingPid: number
+): Promise<number> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    const result = await pool.query<{ waiting: boolean }>(
-      `SELECT EXISTS (
-        SELECT 1
+    const result = await monitor.query(
+      `SELECT pid
         FROM pg_locks
         WHERE relation = 'security_audit_log'::regclass
           AND NOT granted
           AND $1::integer = ANY(pg_blocking_pids(pid))
-      ) AS waiting`,
+        LIMIT 1`,
       [lockingPid]
     );
-    if (result.rows[0]?.waiting) return;
+    const pid = result.rows[0]?.pid;
+    if (typeof pid === 'number') return pid;
     await new Promise(resolve => setTimeout(resolve, 10));
   }
   throw new Error('Audit report read did not block on expected table lock');
+}
+
+/**
+ * Polls `pg_stat_activity` on a connection of its own, so the backend under observation is
+ * never the one running the observation.
+ */
+async function waitForBackendIdle(
+  monitor: ReportQueryRunner,
+  pid: number
+): Promise<{ state: string; xactOpen: boolean }> {
+  const deadline = Date.now() + 5_000;
+  let last: { state: string; xactOpen: boolean } = { state: 'missing', xactOpen: false };
+  while (Date.now() < deadline) {
+    const result = await monitor.query(
+      `SELECT state, xact_start IS NOT NULL AS xact_open
+        FROM pg_stat_activity
+        WHERE pid = $1`,
+      [pid]
+    );
+    const activity = result.rows[0];
+    last = activity
+      ? {
+          state: typeof activity.state === 'string' ? activity.state : 'unknown',
+          xactOpen: activity.xact_open === true,
+        }
+      : { state: 'missing', xactOpen: false };
+    if (last.state === 'idle' && !last.xactOpen) return last;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  return last;
 }
 
 afterEach(async () => {
@@ -407,7 +445,7 @@ describe('getSecurityAgentAuditReport', () => {
         input,
         isRequestingUserKiloAdmin: false,
       });
-      await waitForAuditReportReadBlockedBy(lockingPid);
+      await waitForAuditReportReadBlockedBy(pool, lockingPid);
       await lockClient.query('COMMIT');
 
       const firstReport = await firstReportPromise;
@@ -431,6 +469,92 @@ describe('getSecurityAgentAuditReport', () => {
       if (firstReportPromise) await firstReportPromise.catch(() => undefined);
     }
   }, 20_000);
+
+  it.each([
+    { label: 'query budget', timeoutMs: { requestMs: 20_000, queryMs: 300 }, budgetMs: 300 },
+    {
+      label: 'remaining request budget',
+      timeoutMs: { requestMs: 2_000, queryMs: 60_000 },
+      budgetMs: 1_500,
+    },
+  ])(
+    'cancels the blocked report statement at the $label and leaves no running work',
+    async ({ timeoutMs, budgetMs }) => {
+      const owner = await createIntegrationOwner();
+      const occurredAt = new Date(Date.now() - 1_000).toISOString();
+      await db.insert(security_audit_log).values({
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingCreated,
+        resource_type: 'security_finding',
+        resource_id: randomUUID(),
+        occurred_at: occurredAt,
+        finding_snapshot: findingSnapshot(randomUUID()),
+      });
+
+      const lockClient = await pool.connect();
+      const monitor = await pool.connect();
+      let reportPromise: Promise<SecurityAgentAuditReport> | null = null;
+      try {
+        await lockClient.query('BEGIN');
+        await lockClient.query('LOCK TABLE security_audit_log IN ACCESS EXCLUSIVE MODE');
+        const pidResult = await lockClient.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+        const lockingPid = pidResult.rows[0]?.pid;
+        if (lockingPid === undefined) {
+          throw new Error('Could not determine locking database process');
+        }
+
+        const startedAt = Date.now();
+        reportPromise = getSecurityAgentAuditReport({
+          owner,
+          input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
+          isRequestingUserKiloAdmin: false,
+          timeouts: timeoutMs,
+        });
+        const blockedPid = await waitForAuditReportReadBlockedBy(monitor, lockingPid);
+
+        // The stage proves the database cancelled the statement, not the client-side
+        // backstop at the request deadline.
+        await expect(reportPromise).rejects.toMatchObject({
+          name: 'SecurityAgentAuditReportQueryError',
+          stage: 'count',
+        });
+        const elapsedMs = Date.now() - startedAt;
+        expect(elapsedMs).toBeGreaterThanOrEqual(budgetMs - 150);
+        expect(elapsedMs).toBeLessThan(budgetMs + 1_000);
+
+        // The cancelled statement rolled the read-only transaction back, so the backend
+        // holds no running statement or open transaction and is back in the pool.
+        await expect(waitForBackendIdle(monitor, blockedPid)).resolves.toEqual({
+          state: 'idle',
+          xactOpen: false,
+        });
+      } finally {
+        if (reportPromise) await reportPromise.catch(() => undefined);
+        monitor.release();
+        await lockClient.query('ROLLBACK').catch(() => undefined);
+        lockClient.release();
+      }
+    },
+    20_000
+  );
+
+  it('reports the request stage when the request budget is spent before a statement starts', async () => {
+    const owner = await createIntegrationOwner();
+    const occurredAt = new Date(Date.now() - 1_000).toISOString();
+
+    await expect(
+      getSecurityAgentAuditReport({
+        owner,
+        input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
+        isRequestingUserKiloAdmin: false,
+        timeouts: { requestMs: 400, queryMs: 60_000 },
+      })
+    ).rejects.toMatchObject({
+      name: 'SecurityAgentAuditReportQueryError',
+      stage: 'request',
+    });
+  });
 });
 
 describe('buildSecurityAgentAuditReportFromRows', () => {
@@ -528,6 +652,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
       id: '00000000-0000-0000-0000-000000000000',
       displayName: 'Kilo Admin',
       masked: true,
+      maskedKind: 'kilo_admin',
     });
     expect(report.findings[0].events[1].afterState).toEqual({ status: 'ignored' });
     expect(report.findings[0].events[1].metadata).toEqual({ reason_code: 'not_used' });
@@ -542,6 +667,40 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
       hasLegacySupplementalActivity: true,
     });
     expect(report.hasLegacySupplementalActivity).toBe(true);
+  });
+
+  it('publishes the dismissal reason and the triage confidence that triggered an auto-dismiss', () => {
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'organization',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          action: SecurityAuditLogAction.FindingAutoDismissed,
+          before_state: { status: 'open' },
+          after_state: { status: 'ignored', reason_code: 'not_used' },
+          metadata: {
+            trigger: 'auto_dismiss_policy',
+            dismiss_source: 'triage',
+            confidence: 'high',
+            correlation_id: 'corr-1',
+            reason_code: 'not_used',
+          },
+        }),
+      ],
+    });
+
+    expect(report.findings[0].events[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      afterState: { status: 'ignored', reason_code: 'not_used' },
+      metadata: { reason_code: 'not_used', confidence: 'high' },
+    });
   });
 
   it('uses current finding metadata to describe legacy activity', () => {
@@ -675,6 +834,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
         id: '00000000-0000-0000-0000-000000000000',
         displayName: 'Kilo Admin',
         masked: true,
+        maskedKind: 'kilo_admin',
       },
       {
         type: 'user',
@@ -687,6 +847,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
         id: '00000000-0000-0000-0000-000000000000',
         displayName: 'Masked user',
         masked: true,
+        maskedKind: 'user',
       },
     ]);
 

@@ -4,6 +4,7 @@ import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
+import { projectSafeAssistantError, projectSafeSessionError } from '../shared/assistant-failure.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -100,6 +101,41 @@ export type SandboxControlSessionEventInput = {
   timestamp?: string;
 };
 
+function publicEventProperties({
+  type,
+  properties,
+}: SandboxControlSessionEventInput): Record<string, unknown> {
+  if (type === 'session.error') {
+    return {
+      ...properties,
+      error: projectSafeSessionError(properties.error, properties.reason),
+    };
+  }
+  const key =
+    type === 'message.updated' ? 'info' : type === 'message.part.updated' ? 'part' : undefined;
+  if (key === undefined) return properties;
+  const carrier = properties[key];
+  if (typeof carrier !== 'object' || carrier === null || Array.isArray(carrier)) return properties;
+  if (key === 'info' && (!('role' in carrier) || carrier.role !== 'assistant')) return properties;
+  if (!('error' in carrier) || carrier.error === undefined || carrier.error === null)
+    return properties;
+  return {
+    ...properties,
+    [key]: { ...carrier, error: projectSafeAssistantError(carrier.error) },
+  };
+}
+
+/**
+ * One completion for each repository of a multi-repository turn shares the
+ * assistant message, so each is stored under its own key. Without a repository
+ * there is one completion for the message, as before.
+ */
+function autocommitEntityId(messageId: string, repository: unknown): string {
+  return typeof repository === 'string'
+    ? `autocommit/${messageId}/${repository}`
+    : `autocommit/${messageId}`;
+}
+
 export function persistSandboxControlSessionEvent(params: {
   sessionId: string;
   payload: SandboxControlSessionEventInput;
@@ -136,16 +172,20 @@ export function persistSandboxControlSessionEvent(params: {
     });
     return { applied: true };
   }
+  const properties = publicEventProperties(params.payload);
   const timestamp = params.payload.timestamp ? Date.parse(params.payload.timestamp) : Date.now();
   const livePayload = JSON.stringify({
     type: params.payload.type,
     event: params.payload.type,
-    properties: params.payload.properties,
+    properties,
   });
   const entityId =
     params.payload.type === 'autocommit_completed' &&
     typeof params.payload.properties.messageId === 'string'
-      ? `autocommit/${params.payload.properties.messageId}`
+      ? autocommitEntityId(
+          params.payload.properties.messageId,
+          params.payload.properties.repository
+        )
       : extractEntityId(params.payload.type, { properties: params.payload.properties });
   let eventId: EventId = 0;
   if (entityId) {
@@ -153,7 +193,7 @@ export function persistSandboxControlSessionEvent(params: {
       slimPersistedKilocodeEvent({
         type: params.payload.type,
         event: params.payload.type,
-        properties: params.payload.properties,
+        properties,
       })
     );
     eventId = params.eventQueries.upsert({

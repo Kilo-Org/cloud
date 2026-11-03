@@ -38,6 +38,7 @@ import {
 type Props = {
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
 };
 
 type Status = 'idle' | 'reading' | 'previewing' | 'applying';
@@ -60,7 +61,7 @@ const NO_SELECTION: ImportSelectionState = {
   instructions: new Set(),
 };
 
-export function ImportConfigTab({ profileId, organizationId }: Props) {
+export function ImportConfigTab({ profileId, organizationId, readOnly = false }: Props) {
   const { previewConfigImport, applyConfigImport } = useProfileMutations({ organizationId });
   const confirm = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -208,17 +209,18 @@ export function ImportConfigTab({ profileId, organizationId }: Props) {
     <div
       className="space-y-3 p-4"
       onDragEnter={event => {
-        if (!dragHasFile(event)) return;
+        if (readOnly || !dragHasFile(event)) return;
         event.preventDefault();
         setDragDepth(depth => depth + 1);
       }}
       onDragLeave={() => setDragDepth(depth => Math.max(0, depth - 1))}
       onDragOver={event => {
-        if (!dragHasFile(event)) return;
+        if (readOnly || !dragHasFile(event)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={event => {
+        if (readOnly) return;
         event.preventDefault();
         setDragDepth(0);
         const file = Array.from(event.dataTransfer.files).find(candidate =>
@@ -231,35 +233,39 @@ export function ImportConfigTab({ profileId, organizationId }: Props) {
         void selectArchive(file);
       }}
     >
-      <div
-        className={cn(
-          'flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors',
-          isDragging && 'border-primary bg-primary/5'
-        )}
-      >
-        <Upload className="text-muted-foreground h-5 w-5" />
-        <p className="text-sm font-medium">Drop a ZIP of your Kilo config here</p>
-        <Button variant="outline" size="sm" onClick={pick} disabled={isBusy}>
-          Choose ZIP
-        </Button>
-        <p className="text-muted-foreground text-xs">
-          Up to {(MAX_IMPORT_ZIP_BYTES / (1024 * 1024)).toFixed(1)} MB. Nothing is saved until you
-          review and apply the import.
-        </p>
-      </div>
+      {!readOnly && (
+        <>
+          <div
+            className={cn(
+              'flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors',
+              isDragging && 'border-primary bg-primary/5'
+            )}
+          >
+            <Upload className="text-muted-foreground h-5 w-5" />
+            <p className="text-sm font-medium">Drop a ZIP of your Kilo config here</p>
+            <Button variant="outline" size="sm" onClick={pick} disabled={isBusy}>
+              Choose ZIP
+            </Button>
+            <p className="text-muted-foreground text-xs">
+              Up to {(MAX_IMPORT_ZIP_BYTES / (1024 * 1024)).toFixed(1)} MB. Nothing is saved until
+              you review and apply the import.
+            </p>
+          </div>
 
-      {!fileName && <ImportConfigCommands />}
+          {!fileName && <ImportConfigCommands />}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".zip,application/zip,application/x-zip-compressed"
-        className="hidden"
-        onChange={event => {
-          const file = event.target.files?.[0];
-          if (file) void selectArchive(file);
-        }}
-      />
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            className="hidden"
+            onChange={event => {
+              const file = event.target.files?.[0];
+              if (file) void selectArchive(file);
+            }}
+          />
+        </>
+      )}
 
       {fileName && (
         <div className="flex items-center justify-between gap-2 rounded-lg border p-3">
@@ -343,7 +349,7 @@ export function ImportConfigTab({ profileId, organizationId }: Props) {
           </p>
           <Button
             onClick={() => void handleApply()}
-            disabled={isBusy || selectedCount === 0 || !archiveBody}
+            disabled={readOnly || isBusy || selectedCount === 0 || !archiveBody}
           >
             {status === 'applying' && <Loader2 className="h-4 w-4 animate-spin" />}
             Import {selectedCount === 1 ? '1 definition' : `${selectedCount} definitions`}

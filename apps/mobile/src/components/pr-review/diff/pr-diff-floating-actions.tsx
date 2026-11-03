@@ -137,7 +137,7 @@ export function PrDiffFloatingActions({
               size="sm"
               onPress={() => {
                 onClearSelection();
-                clearDiffSelection({ owner, repo, number });
+                clearDiffSelection({ owner, repo, number, ref: prRef });
               }}
               accessibilityLabel={t('prReview.floatingActions.clearSelection')}
             >

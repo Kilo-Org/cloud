@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { i18n } from '@/i18n';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
-import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
+import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
 import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
+  deviceAuthErrorKey,
   type DeviceAuthState,
   errorDeviceAuthState,
   idleDeviceAuthState,
@@ -139,7 +139,11 @@ export function useDeviceAuth(): DeviceAuthResult {
       const startTimeout = setTimeout(() => {
         startAbort.abort();
         setState(
-          errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
+          errorDeviceAuthState(
+            undefined,
+            deviceAuthErrorKey('authErrors.startSignInFailed'),
+            undefined
+          )
         );
       }, START_TIMEOUT_MS);
 
@@ -166,12 +170,15 @@ export function useDeviceAuth(): DeviceAuthResult {
             const body = (await response.json().catch(() => undefined)) as
               | { error?: string }
               | undefined;
-            const message = getDeviceAuth429Message(body);
-            setState(errorDeviceAuthState(undefined, message, undefined));
+            setState(errorDeviceAuthState(undefined, getDeviceAuth429Error(body), undefined));
             return;
           }
           setState(
-            errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
+            errorDeviceAuthState(
+              undefined,
+              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              undefined
+            )
           );
           return;
         }
@@ -179,7 +186,11 @@ export function useDeviceAuth(): DeviceAuthResult {
         const data = parseDeviceAuthCodeResponse(await response.json());
         if (!data) {
           setState(
-            errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
+            errorDeviceAuthState(
+              undefined,
+              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              undefined
+            )
           );
           return;
         }
@@ -237,7 +248,11 @@ export function useDeviceAuth(): DeviceAuthResult {
           return;
         }
         setState(
-          errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
+          errorDeviceAuthState(
+            undefined,
+            deviceAuthErrorKey('authErrors.startSignInFailed'),
+            undefined
+          )
         );
         void clearPendingExternalAuth();
       } finally {
@@ -275,7 +290,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState(previous =>
           errorDeviceAuthState(
             previous.code,
-            i18n.t('authErrors.couldNotOpenBrowser'),
+            deviceAuthErrorKey('authErrors.couldNotOpenBrowser'),
             previous.verificationUrl
           )
         );

@@ -30,9 +30,8 @@ vi.mock('@shopify/flash-list', () => ({
       { getItemType: props.getItemType },
       props.ListHeaderComponent,
       data.length > 0
-        ? data.map(
-            (item, index): ReactNode =>
-              createElement(Fragment, { key: index }, props.renderItem({ item }))
+        ? data.map((item, index): ReactNode =>
+            createElement(Fragment, { key: index }, props.renderItem({ item }))
           )
         : props.ListEmptyComponent
     );
@@ -40,8 +39,14 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 12 }) }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search', Terminal: 'Terminal' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({
+  Search: 'Search',
+  Share2: 'Share2',
+  Terminal: 'Terminal',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
@@ -97,6 +102,7 @@ async function mount(
   const onRetry = vi.fn<() => void>();
   const onSelect = vi.fn<(row: ShareDestinationRow) => void>();
   const onSpawnInstance = vi.fn<(row: ShareCliSpawnRow) => void>();
+  const onDismiss = vi.fn<() => void>();
   const mounted = await renderWithProviders(
     createElement(ShareDestinationList, {
       headerContent: createElement('Header'),
@@ -108,10 +114,11 @@ async function mount(
       destinationsDisabled: false,
       onRetry,
       onSelect,
+      onDismiss,
       onSpawnInstance,
     })
   );
-  return mounted;
+  return { ...mounted, onDismiss };
 }
 
 describe('ShareDestinationList surface states', () => {
@@ -141,27 +148,54 @@ describe('ShareDestinationList surface states', () => {
     unmount();
   });
 
-  it.each(['stale-share', 'non-retryable-classification'] as const)(
-    'centers %s instead of an empty list',
-    async kind => {
-      const { renderer, unmount } = await mount(
-        {
-          kind,
-          message: 'Unavailable share',
-          showNewSession: false,
-          showRetry: false,
-          showList: false,
-        },
-        [instance]
-      );
-      expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
-      expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-      expect(
-        renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-      ).toHaveLength(0);
-      unmount();
-    }
-  );
+  it('renders the stale share as the shared empty state with a way out', async () => {
+    const { renderer, unmount, onDismiss } = await mount(
+      {
+        kind: 'stale-share',
+        message: 'Unavailable share',
+        showNewSession: false,
+        showRetry: false,
+        showList: false,
+      },
+      [instance]
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
+    ).toHaveLength(0);
+    const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(emptyState.props).toMatchObject({
+      title: 'Share unavailable',
+      description: 'Unavailable share',
+    });
+    const action = emptyState.props.action as { props: { onPress: () => void } };
+    expect(action.props).toMatchObject({ accessibilityLabel: 'Close' });
+    act(() => {
+      action.props.onPress();
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('centers non-retryable-classification instead of an empty list', async () => {
+    const { renderer, unmount } = await mount(
+      {
+        kind: 'non-retryable-classification',
+        message: 'Unavailable share',
+        showNewSession: false,
+        showRetry: false,
+        showList: false,
+      },
+      [instance]
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
+    ).toHaveLength(0);
+    unmount();
+  });
 
   it('keeps the search input mounted across empty and populated results', async () => {
     const { renderer, unmount } = await mount(happy, [], destinations);

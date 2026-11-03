@@ -30,7 +30,10 @@ export async function invalidateAgentSessionQueries(
   // Trim the stored list to page one (dropping later pages) and refetch that
   // page. Runs on rename, delete, and create, where the first page is the one
   // that changed.
-  reconcileFirstPage(queryClient as QueryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+  void reconcileFirstPage(
+    queryClient as QueryClient,
+    trpc.cliSessionsV2.list.pathFilter().queryKey
+  );
   await Promise.all([
     queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
@@ -51,11 +54,13 @@ export const SESSION_TRANSCRIPT_STALE_TIME_MS = 60_000;
  * fetching on the critical path.
  */
 export async function prefetchSessionTranscript(
-  queryClient: Pick<QueryClient, 'prefetchQuery'>,
+  queryClient: Pick<QueryClient, 'query'>,
   options: { queryKey: readonly unknown[] }
 ): Promise<void> {
-  await queryClient.prefetchQuery({
-    ...options,
-    staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
-  });
+  await queryClient
+    .query({
+      ...options,
+      staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
+    })
+    .catch(() => undefined);
 }

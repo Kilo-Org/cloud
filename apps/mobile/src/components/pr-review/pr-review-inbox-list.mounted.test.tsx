@@ -27,6 +27,8 @@ const inboxState = vi.hoisted(() => ({
     isDraft: boolean;
   }[],
   firstPageErrorState: null as { kind: string } | null,
+  firstPageErrorPlatform: null as 'github' | 'gitlab' | 'bitbucket' | null,
+  organizationId: null as string | null,
   laterPageError: false,
 }));
 
@@ -88,6 +90,9 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: inboxState.organizationId }),
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
 }));
@@ -106,7 +111,9 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
       updatedAt: item.updatedAt,
     })),
     firstPageErrorState: inboxState.firstPageErrorState,
+    firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
+    organizationScopeAccess: 'granted' as const,
   }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
@@ -219,22 +226,13 @@ describe('PrReviewInboxList side insets (landscape)', () => {
     ).toHaveLength(1);
   });
 
-  it('keeps the empty-inbox view reachable inside the padded container', () => {
+  it('shows the empty state and the retryable failure in their states', () => {
     inboxState.items = [];
-    const renderer = mountInboxList();
-
-    expect(flashListProps(renderer).contentContainerStyle).toEqual({
-      paddingLeft: 0,
-      paddingRight: 0,
-    });
+    let renderer = mountInboxList();
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
-  });
 
-  it('shows the retryable failure instead of the empty state when a provider failed', () => {
-    inboxState.items = [];
     inboxState.laterPageError = true;
-    const renderer = mountInboxList();
-
+    renderer = mountInboxList();
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
   });
@@ -248,10 +246,7 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 // row — the same fix as `PrRefsRow` in pr-review-overview-parts.tsx.
 describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => {
   beforeEach(() => {
-    insetsState.top = 0;
-    insetsState.bottom = 0;
-    insetsState.left = 0;
-    insetsState.right = 0;
+    Object.assign(insetsState, { top: 0, bottom: 0, left: 0, right: 0 });
     inboxState.query.isPending = false;
     inboxState.query.isFetching = false;
     inboxState.query.hasNextPage = false;
@@ -278,31 +273,20 @@ describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => 
     expect(metaClassName).toContain('shrink');
 
     // The provider chip keeps its own width so its rounded-full pill stays
-    // intact rather than being squeezed by the flexible text.
-    const chips = renderer.root.findAll(
-      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
-    );
-    expect(chips).toHaveLength(1);
-    expect(String(chips[0]?.props.className)).toContain('shrink-0');
-
-    renderer.unmount();
-  });
-
-  it('keeps the draft chip at full width beside the provider chip', () => {
+    // intact rather than being squeezed by the flexible text; a draft chip
+    // beside it holds the same width.
     inboxState.items = [
       makeItem({ owner: 'Kilo-Org', repo: 'cloud', number: 6401, isDraft: true }),
     ];
-    const renderer = mountInboxList();
-
-    const chips = renderer.root.findAll(
-      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
-    );
+    const draftRenderer = mountInboxList();
+    const chips = inboxChips(draftRenderer);
     expect(chips).toHaveLength(2);
     for (const chip of chips) {
       expect(String(chip.props.className)).toContain('shrink-0');
     }
 
     renderer.unmount();
+    draftRenderer.unmount();
   });
 });
 
@@ -310,30 +294,33 @@ describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => 
 // chip off the right edge ("Pull re") because the long repo/time metadata kept
 // its intrinsic width. The row must give that metadata up (single line, shrink)
 // and hold the chips whole (shrink-0).
-describe('PrReviewInboxList row metadata (long repository)', () => {
+// The same explorer saw an organization member's inbox say "Access denied" when
+// the organization's GitLab connection needed reconnecting: the reconnect state
+// must name THAT provider and its organization, because the notice's
+// connection check has no route scope on this provider-neutral surface and
+// would otherwise re-check GitHub, which cannot fix a GitLab connection.
+describe('PrReviewInboxList row metadata and reconnect state', () => {
   beforeEach(() => {
     insetsState.left = 0;
     insetsState.right = 0;
     inboxState.query.isPending = false;
     inboxState.firstPageErrorState = null;
+    inboxState.firstPageErrorPlatform = null;
+    inboxState.organizationId = null;
     inboxState.laterPageError = false;
     inboxState.items = [
       makeItem({ owner: 'kilo-stub', repo: 'discussion-conversation-only', number: 2 }),
     ];
   });
 
-  it('truncates the metadata instead of letting it push the chip out', () => {
-    const renderer = mountInboxList();
-
-    expect(metadataText(renderer).props.numberOfLines).toBe(1);
-    expect(metadataText(renderer).props.className).toContain('shrink');
-    expect(metadataText(renderer).props.className).toContain('min-w-0');
-  });
-
-  it('renders the provider chip whole and unsqueezed beside that metadata', () => {
+  it('truncates the metadata and holds the chip whole beside it', () => {
     const renderer = mountInboxList();
     const rowChips = inboxChips(renderer);
 
+    const meta = metadataText(renderer);
+    expect(meta.props.numberOfLines).toBe(1);
+    expect(String(meta.props.className)).toContain('shrink');
+    expect(String(meta.props.className)).toContain('min-w-0');
     expect(rowChips).toHaveLength(1);
     expect(rowChips[0]?.props.className).toContain('shrink-0');
     expect(
@@ -341,5 +328,31 @@ describe('PrReviewInboxList row metadata (long repository)', () => {
         node => String(node.type) === 'Text' && node.props.children === 'prReview.terms.pullRequest'
       )
     ).toHaveLength(1);
+  });
+
+  it('passes the failing provider and the organization to the reconnect notice', () => {
+    inboxState.items = [];
+    inboxState.firstPageErrorState = { kind: 'reconnect' };
+    inboxState.firstPageErrorPlatform = 'gitlab';
+    inboxState.organizationId = 'org-1';
+    const renderer = mountInboxList();
+
+    const notices = renderer.root.findAll(node => String(node.type) === 'PrReviewReconnectNotice');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props).toMatchObject({ platform: 'gitlab', organizationId: 'org-1' });
+    // The permission view is the state this fix removes for an organization
+    // member's own inbox.
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+  });
+
+  // A pending first read that is not fetching (offline, paused, cancelled)
+  // never settles on its own: it takes the retryable body so the user can
+  // restart the read, never the skeleton and never a false empty state.
+  it('gives a first read that cannot progress the retry action', () => {
+    inboxState.items = [];
+    inboxState.query.isPending = true;
+    inboxState.query.isFetching = false;
+    const bodies = mountInboxList().root.findAll(n => String(n.type) === 'QueryError');
+    expect(bodies).toHaveLength(1);
   });
 });

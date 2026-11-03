@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   shouldRetryNotFoundOnSpawnedRoute,
+  shouldRetryNotFoundOnYoungRoute,
   SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
 } from './spawned-not-found-retry';
 
@@ -103,5 +104,39 @@ describe('shouldRetryNotFoundOnSpawnedRoute', () => {
         shouldRetryNotFoundOnSpawnedRoute({ spawned: 'true', attempt: 0, errorCode: 'NOT_FOUND' })
       ).toBe(true);
     });
+  });
+});
+
+describe('shouldRetryNotFoundOnYoungRoute', () => {
+  it('retries NOT_FOUND on the first attempt without any route param', () => {
+    expect(shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: 'NOT_FOUND' })).toBe(true);
+  });
+
+  it('retries NOT_FOUND while attempt is below the ceiling', () => {
+    for (let attempt = 0; attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS; attempt += 1) {
+      expect(shouldRetryNotFoundOnYoungRoute({ attempt, errorCode: 'NOT_FOUND' })).toBe(true);
+    }
+  });
+
+  it('stops retrying once the attempt count reaches the ceiling', () => {
+    expect(
+      shouldRetryNotFoundOnYoungRoute({
+        attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS,
+        errorCode: 'NOT_FOUND',
+      })
+    ).toBe(false);
+    expect(
+      shouldRetryNotFoundOnYoungRoute({
+        attempt: SPAWNED_NOT_FOUND_MAX_ATTEMPTS + 5,
+        errorCode: 'NOT_FOUND',
+      })
+    ).toBe(false);
+  });
+
+  it('does not retry a non-NOT_FOUND error', () => {
+    expect(
+      shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: 'INTERNAL_SERVER_ERROR' })
+    ).toBe(false);
+    expect(shouldRetryNotFoundOnYoungRoute({ attempt: 0, errorCode: undefined })).toBe(false);
   });
 });

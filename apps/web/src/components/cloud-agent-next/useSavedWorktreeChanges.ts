@@ -2,34 +2,42 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
-import { preserveNewerWorktreeChanges } from './worktree-changes';
+import type { TRPCClientErrorLike } from '@trpc/client';
+import type { GetWorktreeChangesOutput } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { useRawTRPCClient } from '@/lib/trpc/utils';
+import type { RootRouter } from '@/routers/root-router';
+import { getWorktreeChangesQueryKey, preserveNewerWorktreeChanges } from './worktree-changes';
 
 export function useSavedWorktreeChanges({
+  userId,
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   enabled,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   enabled: boolean;
 }) {
-  const trpc = useTRPC();
-  const queryOptions = useMemo(
-    () =>
-      organizationId
-        ? trpc.organizations.cloudAgentNext.getWorktreeChanges.queryOptions(
-            { organizationId, cloudAgentSessionId },
-            { trpc: { abortOnUnmount: true, context: { skipBatch: true } } }
-          )
-        : trpc.cloudAgentNext.getWorktreeChanges.queryOptions(
-            { cloudAgentSessionId },
-            { trpc: { abortOnUnmount: true, context: { skipBatch: true } } }
-          ),
-    [trpc, organizationId, cloudAgentSessionId]
+  const trpcClient = useRawTRPCClient();
+  const queryKey = useMemo(
+    () => getWorktreeChangesQueryKey({ userId, organizationId, worktreeId, cloudAgentSessionId }),
+    [userId, organizationId, worktreeId, cloudAgentSessionId]
   );
-  const saved = useQuery({
-    ...queryOptions,
+  const saved = useQuery<GetWorktreeChangesOutput, TRPCClientErrorLike<RootRouter>>({
+    queryKey,
+    queryFn: ({ signal }) =>
+      organizationId
+        ? trpcClient.organizations.cloudAgentNext.getWorktreeChanges.query(
+            { organizationId, cloudAgentSessionId },
+            { signal, context: { skipBatch: true } }
+          )
+        : trpcClient.cloudAgentNext.getWorktreeChanges.query(
+            { cloudAgentSessionId },
+            { signal, context: { skipBatch: true } }
+          ),
     enabled,
     staleTime: 0,
     refetchOnMount: 'always',
@@ -44,5 +52,5 @@ export function useSavedWorktreeChanges({
     },
     structuralSharing: preserveNewerWorktreeChanges,
   });
-  return { saved, queryKey: queryOptions.queryKey };
+  return { saved, queryKey };
 }

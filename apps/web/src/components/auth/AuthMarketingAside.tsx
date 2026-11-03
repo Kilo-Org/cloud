@@ -17,7 +17,7 @@ const bullets: Bullet[] = [
   },
   {
     lead: 'Everywhere you code.',
-    detail: 'VS Code, JetBrains, CLI, Cloud, and App Builder.',
+    detail: 'VS Code, JetBrains, CLI, and Cloud.',
   },
   {
     lead: '500+ AI models.',

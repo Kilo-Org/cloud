@@ -80,7 +80,6 @@ async function resolveSignupProduct(
   if (callbackPath.startsWith('/claw')) return 'kiloclaw';
   if (callbackPath.startsWith('/cloud')) return 'cloud-agent';
   if (callbackPath.startsWith('/code-reviews')) return 'code-reviews';
-  if (callbackPath.startsWith('/app-builder')) return 'app-builder';
   if (callbackPath.startsWith('/install')) return 'kilo-code';
   // Exact-pathname match via shared helper — a naive startsWith check would
   // also attribute `/openclaw-advisor-fake` and any sibling path sharing the

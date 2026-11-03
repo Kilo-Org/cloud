@@ -192,20 +192,44 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+const CACHE_CONTROL_NODE_BUDGET = 100_000;
+
 function containsCacheControl(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(containsCacheControl);
+  const pending: unknown[] = [value];
+  let visited = 0;
+  while (pending.length > 0) {
+    if (visited >= CACHE_CONTROL_NODE_BUDGET) {
+      return true;
+    }
+    const current = pending.pop();
+    visited += 1;
+    let children: readonly unknown[];
+    if (Array.isArray(current)) {
+      children = current;
+    } else if (isObjectRecord(current)) {
+      if (
+        Object.hasOwn(current, 'cache_control') ||
+        Object.hasOwn(current, 'prompt_cache_breakpoint')
+      ) {
+        return true;
+      }
+      children = Object.values(current);
+    } else {
+      continue;
+    }
+    if (visited + pending.length + children.length > CACHE_CONTROL_NODE_BUDGET) {
+      return true;
+    }
+    for (const child of children) {
+      pending.push(child);
+    }
   }
-  if (!isObjectRecord(value)) {
-    return false;
-  }
-  if (Object.hasOwn(value, 'cache_control') || Object.hasOwn(value, 'prompt_cache_breakpoint')) {
-    return true;
-  }
-  return Object.values(value).some(containsCacheControl);
+  return false;
 }
 
 export function addCacheBreakpoints(request: GatewayRequest) {
+  const breakpoints: string[] = [];
+
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
@@ -213,18 +237,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   ) {
     const systemMessage = request.body.messages.find(msg => msg.role === 'system');
     if (systemMessage) {
-      console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
-      );
+      breakpoints.push('chat_completions.system');
       setCacheControlOnChatCompletionsMessage(systemMessage);
     }
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
     );
     if (lastMessage) {
-      console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.role} chat completions message`
-      );
+      breakpoints.push(`chat_completions.last.${lastMessage.role}`);
       setCacheControlOnChatCompletionsMessage(lastMessage);
     }
   } else if (
@@ -236,18 +256,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       msg => msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
     );
     if (instructionsMessage) {
-      console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on instructions responses message'
-      );
+      breakpoints.push('responses.instructions');
       setPromptCacheBreakpointOnResponsesMessage(instructionsMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
     );
     if (lastMessage) {
-      console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
-      );
+      breakpoints.push(`responses.last.${lastMessage.type}`);
       setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
   } else if (
@@ -259,14 +275,22 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
     if (request.body.system) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on messages system prompt');
+      breakpoints.push('messages.system');
       request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
     }
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
+      breakpoints.push('messages.last');
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
+  }
+
+  // One record per request: the per-breakpoint records put two lines on every transformed
+  // request. The record names the breakpoints that were set, never message content.
+  if (breakpoints.length > 0) {
+    console.debug(
+      `[addCacheBreakpoints] set ${breakpoints.length} cache breakpoints for ${request.kind}: ${breakpoints.join(', ')}`
+    );
   }
 }
 
@@ -296,22 +320,33 @@ export function removeChatCompletionsToolNames(request: OpenRouterChatCompletion
   }
 }
 
-/**
- * Inverse of the reasoning-content response transform: folds
- * OpenRouter-style `reasoning_details` back into the DeepSeek-style
- * `reasoning_content` string that upstreams like Friendli and Perplexity
- * expect on chat completions messages.
- */
-export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
+export function removeChatCompletionsMessageNames(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if ('name' in message) {
+      delete message.name;
+    }
+  }
+}
+
+function mapReasoningDetailsToReasoningString(
+  request: OpenRouterChatCompletionRequest,
+  field: 'reasoning_content' | 'reasoning'
+) {
   for (const message of request.messages) {
     const messageWithReasoning = message as typeof message & MessageWithReasoning;
+    const legacyReasoning = messageWithReasoning.reasoning;
+    delete messageWithReasoning.reasoning;
+
     const reasoningDetails = messageWithReasoning.reasoning_details;
     if (!Array.isArray(reasoningDetails)) {
+      if (legacyReasoning && !messageWithReasoning[field]) {
+        messageWithReasoning[field] = legacyReasoning;
+      }
       continue;
     }
     delete messageWithReasoning.reasoning_details;
 
-    const reasoningContent = reasoningDetails
+    const reasoningText = reasoningDetails
       .map(detail => {
         switch (detail.type) {
           case ReasoningDetailType.Text:
@@ -319,16 +354,36 @@ export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCom
           case ReasoningDetailType.Summary:
             return detail.summary;
           case ReasoningDetailType.Encrypted:
-            // Opaque provider-specific blob; not representable as reasoning_content.
+            // Opaque provider-specific blob; not representable as a reasoning string.
             return '';
         }
       })
       .join('');
 
-    if (reasoningContent) {
-      messageWithReasoning.reasoning_content = reasoningContent;
+    if (reasoningText) {
+      messageWithReasoning[field] = reasoningText;
     }
   }
+}
+
+/**
+ * Inverse of the reasoning-content response transform: folds
+ * OpenRouter-style `reasoning_details` back into the DeepSeek-style
+ * `reasoning_content` string that upstreams like Friendli and Perplexity
+ * expect on chat completions messages. The legacy OpenRouter `reasoning`
+ * string is dropped because strict upstreams reject it as an unknown field.
+ */
+export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
+  mapReasoningDetailsToReasoningString(request, 'reasoning_content');
+}
+
+/**
+ * Inverse of the reasoning response transform: folds OpenRouter-style
+ * `reasoning_details` back into the plain `reasoning` string that upstreams
+ * like Amazon Bedrock's mantle Chat Completions endpoint speak.
+ */
+export function mapReasoningDetailsToReasoning(request: OpenRouterChatCompletionRequest) {
+  mapReasoningDetailsToReasoningString(request, 'reasoning');
 }
 
 export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletionRequest) {
@@ -355,6 +410,30 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   );
 }
 
+/**
+ * Strict OpenAI-compatible upstreams reject OpenRouter's top-level `reasoning`
+ * object as an unknown parameter, so its effort is carried over as the
+ * standard `reasoning_effort` instead. `reasoning: { enabled: false }` maps to
+ * `reasoning_effort: 'none'` only for upstreams that accept that value; others,
+ * such as Chutes, reject it.
+ */
+export function replaceReasoningObjectWithReasoningEffort(
+  request: GatewayRequest,
+  { disableWithNoneEffort = false }: { disableWithNoneEffort?: boolean } = {}
+) {
+  if (request.kind !== 'chat_completions') {
+    return;
+  }
+  const reasoning = request.body.reasoning;
+  const reasoningEffort =
+    reasoning?.effort ??
+    (disableWithNoneEffort && reasoning?.enabled === false ? 'none' : undefined);
+  if (reasoningEffort) {
+    request.body.reasoning_effort ??= reasoningEffort;
+  }
+  delete request.body.reasoning;
+}
+
 export function enableReasoningSummaries(request: GatewayRequest) {
   if (
     request.kind === 'messages' &&
@@ -364,7 +443,9 @@ export function enableReasoningSummaries(request: GatewayRequest) {
   ) {
     request.body.thinking.display = 'summarized';
   }
-  if (request.kind === 'responses' && request.body.reasoning && !request.body.reasoning.summary) {
-    request.body.reasoning.summary = 'auto';
+  if (request.kind === 'responses' && !request.body.reasoning?.summary) {
+    // Requested even without a reasoning object: Vercel omits summaries otherwise,
+    // although models with mandatory reasoning (e.g. Muse Spark) still reason.
+    request.body.reasoning = { ...request.body.reasoning, summary: 'auto' };
   }
 }

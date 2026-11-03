@@ -10,8 +10,9 @@
  *   - lower-case the host and the owner/repo path
  *   - drop any `user@` prefix in the URL
  *
- * Returns the input unchanged if it cannot be parsed — caller still uses the
- * raw value as a fallback query, so this never throws.
+ * Never throws. An input that does not parse as a URL comes back as the
+ * trimmed candidate after the rewrites above, lower-cased; an empty input
+ * comes back as is.
  */
 export function normalizeGitUrl(url: string): string {
   if (!url) return url;
@@ -36,7 +37,6 @@ export function normalizeGitUrl(url: string): string {
     candidate = candidate.slice(0, -'.git'.length);
   }
 
-  // Trim trailing slash.
   if (candidate.endsWith('/')) {
     candidate = candidate.slice(0, -1);
   }

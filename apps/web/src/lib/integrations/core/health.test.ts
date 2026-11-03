@@ -1,4 +1,8 @@
-import { isPlatformIntegrationHealthy, isPlatformIntegrationSuspended } from './health';
+import {
+  isPlatformIntegrationActive,
+  isPlatformIntegrationHealthy,
+  isPlatformIntegrationSuspended,
+} from './health';
 
 const healthyIntegration = {
   integration_status: 'active',
@@ -61,5 +65,40 @@ describe('isPlatformIntegrationSuspended', () => {
   it('rejects a missing integration', () => {
     expect(isPlatformIntegrationSuspended(null)).toBe(false);
     expect(isPlatformIntegrationSuspended(undefined)).toBe(false);
+  });
+});
+
+describe('isPlatformIntegrationActive', () => {
+  it('accepts an active integration that was never suspended', () => {
+    expect(isPlatformIntegrationActive(healthyIntegration)).toBe(true);
+  });
+
+  it('rejects an integration that still carries an active status but a suspension timestamp', () => {
+    expect(
+      isPlatformIntegrationActive({
+        ...healthyIntegration,
+        suspended_at: '2026-06-25 18:00:00+00',
+      })
+    ).toBe(false);
+  });
+
+  it('rejects a suspended integration whose suspension timestamp is unset', () => {
+    expect(
+      isPlatformIntegrationActive({ ...healthyIntegration, integration_status: 'suspended' })
+    ).toBe(false);
+  });
+
+  it('rejects an integration that never reached the active status', () => {
+    expect(
+      isPlatformIntegrationActive({ ...healthyIntegration, integration_status: 'pending' })
+    ).toBe(false);
+    expect(isPlatformIntegrationActive({ ...healthyIntegration, integration_status: null })).toBe(
+      false
+    );
+  });
+
+  it('rejects a missing integration', () => {
+    expect(isPlatformIntegrationActive(null)).toBe(false);
+    expect(isPlatformIntegrationActive(undefined)).toBe(false);
   });
 });

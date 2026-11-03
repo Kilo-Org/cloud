@@ -37,6 +37,7 @@ const PRODUCT_METADATA_KEYS = [
   'kiloclawHostingPlan',
   'kiloclawInstanceId',
   'kiloclawPriceVersion',
+  'paid_credit_policy',
 ] as const;
 
 export async function createOrReuseKiloPassCheckoutSession(

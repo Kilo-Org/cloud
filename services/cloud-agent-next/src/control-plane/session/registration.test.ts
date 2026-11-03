@@ -2,6 +2,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../sandbox-control/session-credentials.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlanePrepareInputSchema,
@@ -30,6 +31,11 @@ beforeAll(() => {
   ({ privateKey: wrongPrivateKey } = generateKeyPair());
 });
 
+const MODERN_KILO_TOKEN = jwt.sign(
+  { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+  'test'
+);
+
 function metadata(overrides: Record<string, unknown> = {}) {
   return CurrentSessionMetadataSchema.parse({
     metadataSchemaVersion: 2,
@@ -40,7 +46,7 @@ function metadata(overrides: Record<string, unknown> = {}) {
     },
     auth: {
       kiloSessionId: 'ses_12345678901234567890123456',
-      kilocodeToken: 'native-kilo-token',
+      kilocodeToken: MODERN_KILO_TOKEN,
     },
     agent: { mode: 'code', model: 'kilo/fake-deterministic' },
     workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'cloudflare' },
@@ -52,6 +58,75 @@ function metadata(overrides: Record<string, unknown> = {}) {
 const selection = { provider: 'cloudflare' as const };
 
 describe('egress policy registration', () => {
+  it.each(
+    ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [
+        { storedAudit: true, selectedAudit: false },
+        { storedAudit: true, selectedAudit: undefined },
+        { storedAudit: false, selectedAudit: true },
+        { storedAudit: undefined, selectedAudit: true },
+      ].map(policy => ({ ...policy, egressMode }))
+    )
+  )('rejects mismatched audit opt-ins: %j', ({ storedAudit, selectedAudit, egressMode }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: storedAudit,
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: selectedAudit,
+      })
+    ).toThrow('Sandbox selection egress audit does not match session metadata');
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'preserves audited %s registration',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        }).sandboxSelection
+      ).toMatchObject({ egressAudit: true });
+    }
+  );
+
+  it.each([
+    { storedAudit: false, selectedAudit: undefined },
+    { storedAudit: undefined, selectedAudit: false },
+  ])('treats false and omitted audit equivalently: %j', ({ storedAudit, selectedAudit }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: storedAudit,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: selectedAudit,
+      }).sandboxSelection?.egressAudit
+    ).toBe(selectedAudit);
+  });
+
   it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves a matching policy %j',
     ({ egressAllowlist }) => {
@@ -150,6 +225,7 @@ describe('egress policy registration', () => {
     { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
+    { egressMode: 'allowlist', egressAudit: null },
   ])('rejects ambiguous sandbox selection policy %j', policy => {
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({
@@ -161,14 +237,26 @@ describe('egress policy registration', () => {
 
   it.each([
     { provider: 'cloudflare' },
-    { provider: 'vercel' },
+    {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
-  ])('restricts only allowlist mode to isolated containers: %j', placement => {
+  ])('restricts allowlist and audit policies to isolated containers: %j', placement => {
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'allowlist' })
         .success
     ).toBe(false);
+    for (const egressMode of [undefined, 'unrestricted', 'allowlist']) {
+      expect(
+        controlPlaneSandboxSelectionSchema.safeParse({
+          ...placement,
+          egressMode,
+          egressAudit: true,
+        }).success
+      ).toBe(false);
+    }
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
         .success
@@ -311,6 +399,24 @@ describe('runtime authorization admission', () => {
       kilocode: false,
       github: false,
     });
+  });
+
+  it.each([
+    { kilocode: false, github: false },
+    { kilocode: true, github: true },
+    { kilocode: false, github: true },
+  ])('rejects legacy authorization with containment %j', containment => {
+    const legacy = metadata({
+      auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'legacy-token' },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(
+        legacy,
+        { provider: 'cloudflare', containment },
+        undefined,
+        { containmentEnabled: true, workerUrl: 'https://worker.test' }
+      )
+    ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
 
   it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {
@@ -584,7 +690,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     );
 
     expect(registration.spec.env?.USER_SETTING).toBeUndefined();
-    expect(registration.credentials.kiloToken).toBe('native-kilo-token');
+    expect(registration.credentials.kiloToken).toBe(MODERN_KILO_TOKEN);
     expect(registration.credentials.encryptedSecrets).toBeUndefined();
     expect(registration.spec.runtimeSkills).toEqual([
       { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
@@ -1007,5 +1113,35 @@ describe('profile runtime delivery', () => {
         ],
       }).success
     ).toBe(false);
+  });
+
+  it('preserves skills.sh references through metadata and wrapper registration', () => {
+    const runtimeSkills = [{ name: 'find-skills', source: 'vercel-labs/skills' }];
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { runtimeSkills } }),
+      selection
+    );
+    expect(registration.spec.runtimeSkills).toEqual(runtimeSkills);
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.runtimeSkills
+    ).toEqual(runtimeSkills);
+  });
+});
+
+describe('continuation marker projection', () => {
+  it('projects the server-only continuation marker into the route spec', () => {
+    const { spec } = buildControlPlaneSessionRegistration(
+      metadata({ continuation: true }),
+      selection
+    );
+    expect(spec.continuation).toBe(true);
+  });
+
+  it('omits the marker for a normal session', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(spec.continuation).toBeUndefined();
   });
 });

@@ -1,0 +1,94 @@
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null,"reasoning_details":[{"type":"reasoning.encrypted","data":"I6Pd0rDZeIXOS80g0x4hmAamzyf/xpTe+ITC6jwZ4D/doTsBfSNC+BaJ6Q02K0dhl8liKTUyLPG/KTvhqzYdkykjZ/fje8u9Zxo4gWtDg+LA53tS6xrdoMm7eFOW3HnljVPemmoxmbIG4m+4W2KeTm/CqHV+iDB0tBMQMwb677PyoKXBtDsdJOdHmwcJz4h9JSS+fNtTzOPiwC5O.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuNy0yMDI2MDkxNnx4YWkifQ","format":"xai-responses-v1","id":"rs_8aa9ffd9-3aa0-9368-a56b-1856ff3cb960","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","annotations":[{"type":"url_citation","url_citation":{"url":"https://www.formula1.com/en/results/2026/races/1296/singapore/race-result","title":"FORMULA 1 SINGAPORE AIRLINES SINGAPORE GRAND PRIX 2026 - RACE RESULT","start_index":0,"end_index":0,"content":"FORMULA 1 SINGAPORE AIRLINES SINGAPORE GRAND PRIX 2026 - RACE RESULT\n\n...\n\n# FORMULA 1 SINGAPORE AIRLINES SINGAPORE GRAND PRIX 2026 - RACE RESULT\n\n...\n\n09 - 11 Oct 2026\n\n...\n\nMarina Bay Street Circuit, Marina Bay\n\n...\n\n| Pos. | No. | Driver | Team | Laps | Time / Retired | Pts. |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | 3 | Max Verstappen VER | Red Bull Racing | 62 | 1:42:00.785 | 25 |\n| 2 | 16 | Charles Leclerc LEC | Ferrari | 62 | +7.335s | 18 |\n| 3 | 12 | Kimi Antonelli ANT | Mercedes | 62 | +24.573s | 15 |\n| 4 | 1 | Lando Norris NOR | McLaren | 62 | +40.506s | 12 |\n| 5 | 81 | Oscar Piastri PIA | McLaren | 62 | +49.644s | 10 |\n| 6 | 44 | Lewis Hamilton HAM | Ferrari | 62 | +53.188s | 8 |\n\n...\n\n| 7 | 30 | Liam Lawson LAW | Racing Bulls | 62 | +81.666s | 6 |\n\n...\n\n| 8 | 27 | Nico Hulkenberg HUL | Audi | ... 2 | +83.386s | 4 |\n| 9 | 63 | George Russell RUS | Mercedes | 62 | +84.677s | 2 |\n\n...\n\n| 10 | 6 | Isack Hadjar HAD | Red Bull Racing | ... 2 | +90.862s | 1 |\n\n...\n\n| ... 1 ... | ... 0\n\n...\n\n|"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":"Max Verstappen won the","reasoning_details":[{"type":"reasoning.summary","summary":"Max Verstappen won the","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":" 2026 Singapore Grand","reasoning_details":[{"type":"reasoning.summary","summary":" 2026 Singapore Grand","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":" Prix.","reasoning_details":[{"type":"reasoning.summary","summary":" Prix.","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null,"reasoning_details":[{"type":"reasoning.encrypted","data":"WjypPCLY3wNQ0O2gyNA4tKa/cF1NqL87e5vpm2OUAzMpNiCh/AKGLFGlIN/Z8ePUbVQ3seAw3blNz3sN7xA57PRv7NTXqUpCiGwxsLGcG6PTIMFfJjkghNpaav0QYd8zbnsni6omwgIl3CYkFjZa4gfY/r2Y2krNxiocaUKKuAuRB6tLqalV0Ld8tas2Wr1eoiJASjQQJrpg2wvHxrB7cDiFAzNtgB+rZ6qFZrmDSfoRnFHycdKtxH54Kuv6ES9zNpBSWUDoPuC+IP39Lhxq9ey/qNpnbL9KfTs/VkVnIWf0yUJEpJuMH5BsI1VOIcHGjvHPfyP6PyOPZWHyU5GtdO2H7R7Dv9pDjv4zrBInspFpK4AyB3gs+Bzi0S7qeV4sER6NASxbrNwvV3RcCi3tWh3FpO1IEBDDTUOFxOlS7S5V1IX6vcaz9Q7tP/40rTx9PB266417WcJdP/g9a4Ik8VPwqiHFs8DNXCAUFWgTDwLpa6kiLEV+ZXpv+P/dXiyW0mHcrfHfjlOd8cG/82exyhnvniCI5n0RoxOUjaDjS5QaeNFRWzZf7Glm86Fue2Z2c5jBL4mawwojwC5x0wjO0qHv0vvSe8mpPflz/E+YueQyXddMQruxufA0zKjfWBVPw/ZtPGCypwuAlJCySEkSGEWx4+a+FepA+BGtj1SCfTKxeT/7lfASfqawOVQJRvVKp5eQ1zCMJ+W7KSCsoWmW9UGYaTkhpoCeQusnR8bv+UwORVcLZ9jh/t1sY8q3YJPCfVtWGiSiI19Q0Rc2BLHdUojfz/lDrArjb8dz98MCCqJCUAFdlSJeaxCWuN+adDPKa/8vHFoSOCjTSROFeY/wQ/iLyATtIEGA4VT15NGoZhsCJ0K1CvR1HIgD6dW5tvR+KAOxDQTvEtzzijUFnCxPxqtd/cHaq3wwoUkJ/7uDCbr/HtTyvcRSbVzA3GeBIAhXP3BO7v4M0G1osS1gYhod7KI1tZiGChjViB90.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuNy0yMDI2MDkxNnx4YWkifQ","format":"xai-responses-v1","id":"rs_9f344fa5-74b0-9033-b283-0b842fb62257","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":"Max Verstappen won the","reasoning_details":[{"type":"reasoning.summary","summary":"Max Verstappen won the","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":" 2026 Singapore Grand Prix.","reasoning_details":[{"type":"reasoning.summary","summary":" 2026 Singapore Grand Prix.","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null,"reasoning_details":[{"type":"reasoning.encrypted","data":"Dzg6dajZ8IKsHdphBg0oz0Q0R96tm2IB4K/wNnbKCuVHzrVtBVVWAwANfykR1EsgoR6Qyzvx4SuwrcxWNkxpzBQgxqVDufo/8AiXtltsA/2tPlPVVLr0xZbA7seP06md2R7TCL94iJEHket6cxITur391hqft3zt3S2Ew43Nc/QMh3BymGpwz20LjSRZhO6goJLYsbWpPA0knxuzo2TS35YP6h1AGsyWQ6aWCl2StWAQadxAJysxQhgWuXxaEwUijf484zTI4UJiGm2xRcp7L/MaGDZ7HOqcEKwe3pD6JaSqV33QpfNW800zazeZUmKUI0Wq2WRCwvNj8Jvsga5DkY3WfNy5GdaebrFbP0uGQOVqYIk4R4t02bj1Q0Kl3MZ81dgfHASR0jwEFmMZZX/zl+czLWp56KyrlnXDdZl+PTuYvN9xj3XlQQp7VH4OU+pdgybW4erzAaQ.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuNy0yMDI2MDkxNnx4YWkifQ","format":"xai-responses-v1","id":"rs_5d18df6e-479c-94bb-a528-0e5885aabef4","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"Max","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" Ver","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"st","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"appen","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" won","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" the","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" most","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" recent","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" Formula","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" ","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"1","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" race","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":",","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" the","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" ","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"202","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"6","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" Singapore","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" Grand","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":" Prix","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":".","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null},"finish_reason":"stop","native_finish_reason":"stop"}]}
+
+data: {"id":"gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw","object":"chat.completion.chunk","created":1792678004,"model":"x-ai/grok-4.7","provider":"xAI","service_tier":null,"choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"stop"}],"usage":{"prompt_tokens":6562,"completion_tokens":328,"total_tokens":6890,"cost":0.0074954,"is_byok":true,"prompt_tokens_details":{"cached_tokens":3456,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"completion_tokens_details":{"reasoning_tokens":259,"image_tokens":0,"audio_tokens":0},"cost_details":{"upstream_inference_cost":0.009908,"upstream_inference_prompt_cost":0.00794,"upstream_inference_completions_cost":0.001968},"server_tool_use_details":{"web_search_requests":2,"tool_calls_requested":2,"tool_calls_executed":2}}}
+
+data: [DONE]
+

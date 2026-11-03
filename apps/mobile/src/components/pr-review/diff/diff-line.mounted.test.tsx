@@ -82,6 +82,18 @@ function findRow(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
   return row;
 }
 
+/** The number drawn after the gutter glyph: `· 6` → `6`. */
+function gutterNumber(renderer: TestRenderer.ReactTestRenderer): string {
+  const [gutterText] = renderer.root.findAll(
+    node => node.type === ('RNText' as never) && node.props.adjustsFontSizeToFit === true
+  );
+  if (gutterText === undefined) {
+    throw new Error('expected a gutter Text');
+  }
+  const [, number] = gutterText.props.children as [unknown, string];
+  return number.trim();
+}
+
 /** The style.color of every painted run: gutter, marker, and code runs. */
 function paintedColors(root: TestRenderer.ReactTestInstance): string[] {
   return root
@@ -155,6 +167,38 @@ describe('DiffLine gutter alignment', () => {
         TestRenderer.ReactTestInstance,
       ];
       expect(gutter.props.className).toContain('justify-start');
+    }
+  });
+});
+
+describe('DiffLine gutter number matches its spoken label', () => {
+  // The row draws one number and the accessibility element announces one
+  // number; they must be the same number, so a listener who looks at the
+  // gutter is not told a different line. A context line's old and new numbers
+  // differ as soon as anything above it was added or removed.
+  it('draws the number it announces for context, add, and delete rows', () => {
+    const cases = [
+      {
+        line: line({ type: 'context', oldLine: 4, newLine: 6, text: 'shared' }),
+        expected: '6',
+      },
+      { line: line({ type: 'add', newLine: 5, text: 'plus' }), expected: '5' },
+      { line: line({ type: 'del', oldLine: 4, text: 'minus' }), expected: '4' },
+    ] as const;
+
+    for (const { line: diffLine, expected } of cases) {
+      const renderer = mountLine({ line: diffLine, language: null, keyId: 'k-number' });
+      const [codeContainer] = renderer.root.findAll(
+        node => node.type === ('View' as never) && node.props.accessible === true
+      );
+      if (codeContainer === undefined) {
+        throw new Error('expected an accessible code container');
+      }
+      const spoken = codeContainer.props.accessibilityLabel as string;
+      const spokenNumber = / line (\d+)/.exec(spoken)?.[1];
+
+      expect(gutterNumber(renderer)).toBe(expected);
+      expect(spokenNumber).toBe(expected);
     }
   });
 });

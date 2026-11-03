@@ -40,13 +40,11 @@ type MockState = {
   scope: ProviderPrScope | null;
 };
 
-const mock = vi.hoisted(
-  (): MockState => ({
-    results: {},
-    params: {},
-    scope: null,
-  })
-);
+const mock = vi.hoisted((): MockState => ({
+  results: {},
+  params: {},
+  scope: null,
+}));
 
 function mockResult(overrides: Partial<MockQueryResult> = {}): MockQueryResult {
   return {
@@ -92,8 +90,6 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 }));
 vi.mock('@/components/pr-review/merge/pr-merge-sheet', () => ({
   PrMergeSheet: 'PrMergeSheet',
-  providerPrNounKey: (platform: string) =>
-    platform === 'gitlab' ? 'common.mergeRequest' : 'common.pullRequest',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/trpc', () => ({

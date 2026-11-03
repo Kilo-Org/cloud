@@ -14,6 +14,7 @@ import {
   getSecurityFindingById,
   prepareActiveAnalysisRestart,
   reconcileStaleAnalysisQueueRows,
+  releaseOrphanedStartReservation,
 } from './queries.js';
 import { transitionAnalysisCallbackLifecycle } from '../analysis-start-lifecycle.js';
 
@@ -785,6 +786,49 @@ describe('security analysis durable database invariants', () => {
       type: 'user',
       id: testUserId,
     });
+  });
+
+  it('releases an orphaned pending start reservation only without an active queue row', async () => {
+    const orphaned = await insertFinding('orphaned-reservation', 'pending');
+    const claimed = await insertFinding('claimed-reservation', 'pending');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: claimed,
+      owned_by_user_id: testUserId,
+      queue_status: 'pending',
+      severity_rank: 1,
+      queued_at: new Date().toISOString(),
+      claimed_at: new Date().toISOString(),
+      claimed_by_job_id: 'manual-job',
+      claim_token: randomUUID(),
+      updated_at: new Date().toISOString(),
+    });
+
+    await releaseOrphanedStartReservation(client.db as never, orphaned);
+    await releaseOrphanedStartReservation(client.db as never, claimed);
+
+    const rows = await client.db
+      .select({ id: security_findings.id, analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(inArray(security_findings.id, [orphaned, claimed]));
+    const statusById = new Map(rows.map(row => [row.id, row.analysisStatus]));
+    expect(statusById.get(orphaned)).toBeNull();
+    expect(statusById.get(claimed)).toBe('pending');
+  });
+
+  it('leaves completed and running findings untouched when releasing reservations', async () => {
+    const completed = await insertFinding('completed-release', 'completed');
+    const running = await insertFinding('running-release', 'running');
+
+    await releaseOrphanedStartReservation(client.db as never, completed);
+    await releaseOrphanedStartReservation(client.db as never, running);
+
+    const rows = await client.db
+      .select({ id: security_findings.id, analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(inArray(security_findings.id, [completed, running]));
+    const statusById = new Map(rows.map(row => [row.id, row.analysisStatus]));
+    expect(statusById.get(completed)).toBe('completed');
+    expect(statusById.get(running)).toBe('running');
   });
 });
 

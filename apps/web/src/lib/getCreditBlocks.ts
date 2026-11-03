@@ -1,5 +1,5 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration, computeCreditLotAllocations } from '@kilocode/db/credit-expiration';
 import { toNonNullish } from '@/lib/utils';
 
 type EntityForCreditBlocks = {
@@ -15,7 +15,11 @@ export function getCreditBlocks(
   kilo_user_id: string
 ) {
   const paidTransactionsCount = transactions.filter(
-    t => t.amount_microdollars > 0 && !t.is_free
+    t =>
+      t.amount_microdollars > 0 &&
+      (!t.is_free || t.paid_credit_policy != null) &&
+      t.paid_credit_policy !== 'settlement' &&
+      t.source_transaction_id == null
   ).length;
   const isFirstPurchase = paidTransactionsCount === 0;
 
@@ -34,7 +38,7 @@ export function getCreditBlocks(
 
   // Filter to unprocessed transactions with expiry dates
   const all_expiring_transactions = transactions.filter(
-    t => t.expiry_date != null && !processedById.has(t.id)
+    t => t.amount_microdollars > 0 && t.expiry_date != null && !processedById.has(t.id)
   );
 
   const max_expiration_date = all_expiring_transactions.reduce(
@@ -67,45 +71,62 @@ export function getCreditBlocks(
   const totalBalance_mUsd = entity.total_microdollars_acquired - entity.microdollars_used;
   const expiringBalance_mUsd = expiredWithBalance.reduce((sum, t) => sum + t.balance_mUsd, 0);
   const nonExpiringBalance_mUsd = totalBalance_mUsd - expiringBalance_mUsd;
-  let prefixSumMusd = 0;
-  const nonExpiring = transactions
-    .filter(tx => tx.expiry_date == null && tx.amount_microdollars > 0)
-    .sort((a, b) => {
-      // Sort by effective_date (newest first)
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    })
-    .map(tx => {
-      const balance_mUsd = Math.min(
-        tx.amount_microdollars,
-        nonExpiringBalance_mUsd - prefixSumMusd
-      );
-      prefixSumMusd += tx.amount_microdollars;
+  let remainingNonExpiringBalance = Math.max(0, nonExpiringBalance_mUsd);
+  const nonExpiring = computeCreditLotAllocations(
+    transactions.filter(transaction => !processedById.has(transaction.id)),
+    entity
+  )
+    .filter(({ transaction }) => transaction.expiry_date === null)
+    .map(({ transaction, remaining_microdollars }) => {
+      const balance_mUsd = Math.min(remaining_microdollars, remainingNonExpiringBalance);
+      remainingNonExpiringBalance -= balance_mUsd;
       return {
-        id: tx.id,
-        effective_date: tx.created_at,
-        expiry_date: tx.expiry_date,
-        amount_mUsd: tx.amount_microdollars,
+        id: transaction.id,
+        effective_date: transaction.created_at,
+        expiry_date: transaction.expiry_date,
+        amount_mUsd: transaction.amount_microdollars,
         balance_mUsd,
-        is_free: tx.is_free,
+        is_free: transaction.is_free,
       };
     })
-    .filter(tx => tx.balance_mUsd > 0)
-    .reverse();
+    .filter(transaction => transaction.balance_mUsd > 0);
 
   const creditBlocks = [...expiredWithBalance, ...nonExpiring];
 
   // Extract deduction transactions (negative amounts) for display.
   // These include KiloClaw subscription charges and settlement deductions.
+  // An expiry row points at the grant it closed through
+  // `original_transaction_id`, so the row can show the purchase it ended.
+  const transactionById = new Map(transactions.map(transaction => [transaction.id, transaction]));
   const deductions = transactions
     .filter(tx => tx.amount_microdollars < 0)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .map(tx => ({
-      id: tx.id,
-      date: tx.created_at,
-      description: tx.description ?? tx.credit_category ?? 'Credit deduction',
-      credit_category: tx.credit_category,
-      amount_mUsd: tx.amount_microdollars, // negative
-    }));
+    .map(tx => {
+      const source = tx.original_transaction_id
+        ? transactionById.get(tx.original_transaction_id)
+        : undefined;
+      // Not every expiring source is a purchase: promotional, referral, Pass,
+      // and admin credits are grants the user did not pay for directly. The
+      // pair needs the grant's own free flag and recorded source to label it.
+      return {
+        id: tx.id,
+        date: tx.created_at,
+        description: tx.description ?? tx.credit_category ?? 'Credit deduction',
+        credit_category: tx.credit_category,
+        amount_mUsd: tx.amount_microdollars, // negative
+        purchase:
+          source && source.amount_microdollars > 0
+            ? {
+                id: source.id,
+                date: source.created_at,
+                description: source.description ?? source.credit_category ?? 'Credit grant',
+                amount_mUsd: source.amount_microdollars,
+                is_free: source.is_free,
+                credit_source: source.credit_source ?? null,
+              }
+            : null,
+      };
+    });
 
   return {
     creditBlocks,

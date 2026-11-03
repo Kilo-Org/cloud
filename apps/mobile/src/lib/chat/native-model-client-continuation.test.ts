@@ -1,5 +1,5 @@
 import { type ModelRequest } from '@kilocode/harness-sdk';
-import { Either } from 'effect';
+import { Result } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { nativeModelClient } from './native-model-client';
@@ -53,11 +53,11 @@ describe('native generation text across tool rounds', () => {
       await collect(bridge, client.stream(request));
       const result = await collect(bridge, client.stream(answered(call.id)));
       if (text) {
-        expect(Either.isRight(result) && [...result.right]).toEqual([
+        expect(Result.isSuccess(result) && [...result.success]).toEqual([
           expect.objectContaining({ kind: 'done', stop: 'end' }),
         ]);
       } else {
-        expect(Either.isLeft(result)).toBe(true);
+        expect(Result.isFailure(result)).toBe(true);
       }
     }
   );
@@ -86,7 +86,7 @@ describe('native generation text across tool rounds', () => {
     await collect(bridge, client.stream(request));
     await collect(bridge, client.stream(answered(call.id)));
     const result = await collect(bridge, client.stream(answered(secondCall.id)));
-    expect(Either.isRight(result) && [...result.right]).toEqual([
+    expect(Result.isSuccess(result) && [...result.success]).toEqual([
       expect.objectContaining({ kind: 'done', stop: 'end' }),
     ]);
   });

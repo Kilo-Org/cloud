@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 
 import type * as AppActionDispatchModule from '@/lib/app-actions/app-action-dispatch';
-import { type NeedsInputSession } from '@/lib/app-actions/app-action-contract';
+import {
+  type AppActionRequest,
+  type AppActionResult,
+  type NeedsInputSession,
+} from '@/lib/app-actions/app-action-contract';
 import {
   getPendingAppAction,
   setPendingAppAction,
@@ -13,9 +17,15 @@ import {
 } from '@/lib/app-actions/pending-app-action';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 
+type DispatchAppAction = typeof AppActionDispatchModule.dispatchAppActionRequest;
+
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   dispatch: vi.fn(),
+  realDispatch: null as null | DispatchAppAction,
+  confirmStart: vi.fn(),
+  resolveRepository: vi.fn(),
+  startAgent: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -23,13 +33,34 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ navigate: mocks.navigate }) 
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
+// This harness keeps the dispatcher active and replaces its UI and create boundaries.
+vi.mock('@/lib/app-actions/confirm-app-action-start', () => ({
+  confirmAppActionStart: mocks.confirmStart,
+}));
+
+vi.mock('@/lib/app-actions/start-agent', () => ({
+  resolveStartAgentRepository: mocks.resolveRepository,
+  startAgent: mocks.startAgent,
+}));
+
 // The refusal decision stays real — it is the contract's, and the hook must
-// consume the real one. Only the dispatch is replaced: its StartAgent branch
-// would run the headless create's module graph.
+// consume the real one. Only the dispatch is replaced, by a function that can
+// run the real one with its default dependencies; the StartAgent branch would
+// otherwise load the headless create's module graph.
 vi.mock('@/lib/app-actions/app-action-dispatch', async importOriginal => {
   const actual = await importOriginal<typeof AppActionDispatchModule>();
+  mocks.realDispatch = actual.dispatchAppActionRequest;
   return { ...actual, dispatchAppActionRequest: mocks.dispatch };
 });
+
+/** The real dispatcher with the default dependencies the mocks install. */
+function dispatchWithDefaults(request: AppActionRequest): Promise<AppActionResult> {
+  const dispatch = mocks.realDispatch;
+  if (dispatch === null) {
+    throw new Error('the real dispatcher was not loaded');
+  }
+  return dispatch(request);
+}
 
 type HarnessProps = {
   isError: boolean;
@@ -78,6 +109,17 @@ describe('usePendingAppAction', () => {
     // effects (same setup as use-pending-deep-link-restore.mounted.test.tsx).
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.resetAllMocks();
+    mocks.confirmStart.mockResolvedValue(true);
+    mocks.resolveRepository.mockImplementation(({ repository }: { repository?: string }) =>
+      Promise.resolve({
+        ok: true,
+        repository: {
+          platform: 'github',
+          fullName: repository ?? 'owner/recent',
+          isPrivate: false,
+        },
+      })
+    );
     takePendingAppAction();
   });
 
@@ -129,6 +171,53 @@ describe('usePendingAppAction', () => {
     expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('agentChat.session.serviceUnavailable')
     );
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('holds a parked StartAgent until the confirmation is answered', async () => {
+    const answer = Promise.withResolvers<boolean>();
+    mocks.confirmStart.mockReturnValue(answer.promise);
+    mocks.startAgent.mockResolvedValue({
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_11',
+      message: '',
+    });
+    mocks.dispatch.mockImplementation(dispatchWithDefaults);
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+    expect(mocks.confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'fix the build',
+      repository: 'GitHub: owner/recent',
+    });
+    await update(renderer, SETTLED);
+    expect(mocks.startAgent).not.toHaveBeenCalled();
+    await act(async () => {
+      answer.resolve(true);
+      await Promise.resolve();
+    });
+    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'fix the build',
+      resolvedRepository: { platform: 'github', fullName: 'owner/recent', isPrivate: false },
+    });
+    renderer.unmount();
+  });
+
+  it('creates nothing when the parked StartAgent confirmation is declined', async () => {
+    mocks.confirmStart.mockResolvedValue(false);
+    mocks.dispatch.mockImplementation(dispatchWithDefaults);
+    setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build', repository: 'o/r' });
+    const renderer = mount(SETTLED);
+    await update(renderer, SETTLED);
+    expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith({
+      action: 'StartAgent',
+      prompt: 'fix the build',
+      repository: 'o/r',
+    });
+    expect(mocks.startAgent).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
     expect(mocks.navigate).not.toHaveBeenCalled();
     renderer.unmount();
   });

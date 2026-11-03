@@ -6,6 +6,7 @@ import {
   sessionResumeNeedsSignIn,
   sessionResumeRefusal,
   sessionResumeSignInPath,
+  sessionScopeHref,
 } from '@/lib/cloud-agent/session-resume-target';
 
 describe('SESSION_RESUME_REFUSAL_HREF', () => {
@@ -105,6 +106,29 @@ function decodedCallbackPath(signInPath: string): string {
     new URLSearchParams(signInPath.slice(signInPath.indexOf('?') + 1)).get('callbackPath') ?? ''
   );
 }
+
+describe('sessionScopeHref', () => {
+  const orgSession = { session_id: 'ses_org', organization_id: 'org-a' };
+  const personalSession = { session_id: 'ses_personal', organization_id: null };
+
+  it('moves a session opened in another scope to its own chat page', () => {
+    expect(sessionScopeHref(orgSession, null, 'msg_1')).toBe(
+      '/organizations/org-a/cloud/chat?sessionId=ses_org&at=msg_1'
+    );
+    expect(sessionScopeHref(orgSession, 'org-b', null)).toBe(
+      '/organizations/org-a/cloud/chat?sessionId=ses_org'
+    );
+    expect(sessionScopeHref(personalSession, 'org-a', null)).toBe(
+      '/cloud/chat?sessionId=ses_personal'
+    );
+  });
+
+  it('keeps a session opened in its own scope', () => {
+    expect(sessionScopeHref(orgSession, 'org-a', null)).toBeNull();
+    expect(sessionScopeHref(personalSession, null, null)).toBeNull();
+    expect(sessionScopeHref({ session_id: 'ses_personal' }, null, null)).toBeNull();
+  });
+});
 
 describe('sessionResumeSignInPath', () => {
   it('sends the session path as the callbackPath when there is no anchor', () => {

@@ -294,10 +294,9 @@ describe('control-plane terminal adapter (B10)', () => {
     terminals.shutdown();
   });
 
-  it('reports heartbeat activity only for recent browser→PTY input', async () => {
+  it('tracks recent browser-to-PTY input for diagnostics', async () => {
     sockets.reverse = undefined;
     const terminals = attachedTerminals(fakeClient(serverUrl));
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
 
     await terminals.handle({
@@ -320,17 +319,14 @@ describe('control-plane terminal adapter (B10)', () => {
     await waitFor(() => sockets.reverse !== undefined);
     await connected;
 
-    // An open, idle PTY is not activity.
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     const reverse = sockets.reverse as Bun.ServerWebSocket<{ path: string }> | undefined;
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
-    await waitFor(() => terminals.hasRecentInput());
+    await waitFor(() => terminals.recentInputCount() === 1);
     expect(terminals.recentInputCount()).toBe(1);
 
     await terminals.forgetSession(session.sessionId);
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     terminals.shutdown();
   });
@@ -361,12 +357,10 @@ describe('control-plane terminal adapter (B10)', () => {
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
     await waitFor(() => terminals.recentInputCount() === 1);
-    expect(terminals.hasRecentInput()).toBe(true);
 
     try {
       setSystemTime(new Date(Date.now() + 31_000));
       expect(terminals.recentInputCount()).toBe(0);
-      expect(terminals.hasRecentInput()).toBe(false);
     } finally {
       setSystemTime();
     }

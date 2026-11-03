@@ -199,7 +199,18 @@ describe('createSelectingVoiceInputNative', () => {
     native.start(START_OPTIONS);
     native.start(START_OPTIONS);
 
-    // The first session's listeners are removed before the second attaches.
+    // The first session's listeners are removed before the second attaches:
+    // an event after the second start must reach the caller exactly once.
+    const transcripts: string[] = [];
+    native.addListener('result', event => {
+      transcripts.push(event.results[0]?.transcript ?? '');
+    });
+    os.emit('result', {
+      isFinal: true,
+      results: [{ transcript: 'x', confidence: 1, segments: [] }],
+    });
+
+    expect(transcripts).toEqual(['x']);
     expect(sessionCalls(os)).toEqual(['start:en-US', 'start:en-US']);
     expect(sessionCalls(gateway)).toEqual([]);
   });

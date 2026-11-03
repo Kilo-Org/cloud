@@ -16,6 +16,7 @@ import {
   mutationErrorDisplay,
   type MutationErrorDisplaySurface,
 } from '@/lib/pr-review/mutation-error-display';
+import { useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 
 export type ComposerInlineErrorKind =
   | 'retryable'
@@ -74,6 +75,10 @@ export function useComposerInlineError(
   // mutation toast owns it), so it must announce through AccessibleStatus;
   // mutation-classified errors are toast-owned and stay visual-only.
   const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
+  // The route publishes the provider scope for every pr-review screen; a
+  // GitLab/Bitbucket composer names its own provider in the reconnect copy
+  // instead of announcing a GitHub connection. Null on the GitHub route.
+  const platform = useProviderPrScopeOrNull()?.ref.platform;
 
   useEffect(() => {
     if (isEdit || !error) {
@@ -103,11 +108,11 @@ export function useComposerInlineError(
       })();
       return;
     }
-    const display = mutationErrorDisplay(surface, classification, { rawError: error });
+    const display = mutationErrorDisplay(surface, classification, { rawError: error, platform });
     setInlineError(display.message);
     setInlineErrorKind(display.kind);
     setInlineErrorIsLocal(false);
-  }, [error, isEdit, surface]);
+  }, [error, isEdit, surface, platform]);
 
   function clearBadRequestOnBodyEdit() {
     // bad-request clears on body change; forbidden stays for the session.

@@ -9,15 +9,16 @@
 // on iOS, so the mutation hook toasts onError AND the sheet shows inline.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  InteractionManager,
   Keyboard,
   Platform,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   type TextInput,
   View,
 } from 'react-native';
@@ -34,9 +35,10 @@ import {
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   focusAfterPendingCommentRemoval,
   PendingQueueHint,
@@ -124,7 +126,7 @@ function CapabilityReviewEventChips(props: {
               key={providerEvent}
               disabled={props.disabled}
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 props.onChange(event);
               }}
               {...radioItemA11y({
@@ -182,6 +184,7 @@ type PrReviewSubmitProps = Readonly<{
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, title, eyebrow, prRef, reviewEvents, onDismiss } = props;
   const router = useRouter();
+  const colors = useThemeColors();
   const pending = usePendingReview();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -208,11 +211,12 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the summary refs from the default-on footer preference once it
-  // resolves, before the summary field mounts, so a prefilled footer survives
-  // the async load without flashing an empty input.
+  // resolves, in the render that first sees the loaded preference and before
+  // the summary field mounts: the body below paints only after that, so its
+  // first frame already carries the prefilled footer and the settled hint.
   const footerSeededRef = useRef(false);
   const initialFooter =
     prReviewFooterLoaded && prReviewFooter ? buildReviewFooter(Platform.OS) : '';
@@ -268,6 +272,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       const display = mutationErrorDisplay('submit', classification, {
         rawError: submitReview.error,
         term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+        platform: providerPlatform,
       });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
@@ -331,7 +336,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             })
       );
       pending.removeComments(fresh.map(item => item.id));
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       if (stale.length > 0) {
         // Stale items stay queued: keep the sheet open and report the partial
         // result instead of dismissing, so the user can edit or delete them.
@@ -340,8 +345,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
-        // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
-        InteractionManager.runAfterInteractions(() => {
+        requestIdleCallback(() => {
           void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
         });
       }
@@ -406,6 +410,24 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const keyboardVisible = useFormSheetKeyboardVisible();
 
+  // The body paints only once both device reads it is built from have settled:
+  // the stored footer preference seeds the summary (and with it the summary
+  // field's height and whether the queue card shows the block reason or the
+  // hint) and the stored pending queue decides the card's rows. A provisional
+  // body painted first moved the queue card 8.4 dp and the submit CTA 5.7 dp
+  // under the reader when the preference arrived. The header stays, so the
+  // sheet keeps its frame while the reads resolve.
+  if (!pending.hydrated || !prReviewFooterLoaded) {
+    return (
+      <>
+        <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={onDismiss} />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </View>
+      </>
+    );
+  }
+
   // Hint only when empty/stale — skips the long happy-path line that
   // pushed footer CTAs below half-detent. blockReason replaces
   // PendingQueueHint so empty-queue + COMMENT is not contradictory.
@@ -455,20 +477,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             <Text className="text-sm font-medium text-foreground">
               {t('prReview.submit.summaryOptional')}
             </Text>
-            {prReviewFooterLoaded ? (
-              <ReviewSummaryField
-                bodyRef={bodyRef}
-                inputRef={bodyInputRef}
-                isDisabled={isSubmitting}
-                defaultValue={initialFooter}
-                onChange={() => {
-                  setHasSummary(bodyRef.current.trim().length > 0);
-                  clearRecoverableError();
-                }}
-              />
-            ) : (
-              <Skeleton className="h-32" />
-            )}
+            <ReviewSummaryField
+              bodyRef={bodyRef}
+              inputRef={bodyInputRef}
+              isDisabled={isSubmitting}
+              defaultValue={initialFooter}
+              onChange={() => {
+                setHasSummary(bodyRef.current.trim().length > 0);
+                clearRecoverableError();
+              }}
+            />
           </View>
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">

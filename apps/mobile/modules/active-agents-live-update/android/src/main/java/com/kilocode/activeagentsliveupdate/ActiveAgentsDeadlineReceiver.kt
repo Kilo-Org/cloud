@@ -9,14 +9,25 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import java.util.UUID
 
-/** One OS-owned widget deadline; an old delivery never changes a newer snapshot. */
+/**
+ * One OS-owned widget deadline; an old delivery never changes a newer snapshot.
+ *
+ * Both branches run on the durable queue, not on the broadcast thread: each
+ * persists SharedPreferences (a synchronous fsync) and makes `AlarmManager` and
+ * `NotificationManager` round-trips, and a failure there must be logged rather
+ * than thrown, because an exception on the broadcast thread takes the process
+ * down. The write is never skipped on a failure, so a refused commit leaves the
+ * stored deadline as it was instead of half-replacing it.
+ */
 class ActiveAgentsDeadlineReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     when (intent.action) {
-      Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> restoreWidgetDeadline(context)
-      else -> expire(context, intent)
+      Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED ->
+        enqueueDurableWrite { restoreWidgetDeadline(context) }
+      else -> enqueueDurableWrite { expire(context, intent) }
     }
   }
 
@@ -51,8 +62,14 @@ class ActiveAgentsDeadlineReceiver : BroadcastReceiver() {
         .putLong(action, deadline)
         .putString("$action-$GENERATION", generation)
       if (snapshot != null) editor.putString(SNAPSHOT, snapshot)
-      // Commit before returning across the bridge so process exit cannot lose a blank.
-      check(editor.commit()) { "Cannot persist the active agents deadline" }
+      // Commit before returning across the bridge so process exit cannot lose a blank,
+      // and report a refused commit instead of throwing: the callers are the JS bridge
+      // and the broadcast thread, and neither has an error surface for it. The stored
+      // deadline stays as it was, which the next write or restore corrects.
+      if (!editor.commit()) {
+        Log.e(ACTIVE_AGENTS_TAG, "Cannot persist the active agents deadline")
+        return
+      }
 
       val intent = Intent(context, ActiveAgentsDeadlineReceiver::class.java)
         .setAction(action)
@@ -100,8 +117,11 @@ class ActiveAgentsDeadlineReceiver : BroadcastReceiver() {
         preferences.getString("$action-$GENERATION", null) != intent.getStringExtra(GENERATION)
       ) return
 
-      check(preferences.edit().remove(action).remove("$action-$GENERATION").commit()) {
-        "Cannot consume the active agents deadline"
+      // A refused consume is logged, not thrown: the deadline then still reads as
+      // expired, and the next delivery or restore retries it.
+      if (!preferences.edit().remove(action).remove("$action-$GENERATION").commit()) {
+        Log.e(ACTIVE_AGENTS_TAG, "Cannot consume the active agents deadline")
+        return
       }
       if (action == NOTIFICATION) {
         val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

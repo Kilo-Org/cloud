@@ -32,7 +32,7 @@ export function ModelSelectionStatusBar({
             <span className="text-foreground font-medium">
               {selectedProvidersCount} {selectedProvidersCount === 1 ? 'Provider' : 'Providers'}{' '}
               enabled and {selectedModelsCount} {selectedModelsCount === 1 ? 'model' : 'models'}{' '}
-              allowed
+              selected
             </span>
           </div>
           <div className="flex items-center gap-2">

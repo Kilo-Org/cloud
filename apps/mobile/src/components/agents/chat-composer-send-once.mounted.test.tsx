@@ -2,6 +2,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await, matching chat-composer.test.ts */
 import * as React from 'react';
 import { createElement } from 'react';
+import * as Haptics from 'expo-haptics';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,6 +45,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // The composer reads the keyboard from the provider, not from a listener of its own.
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: <T,>(selector: (state: { height: number }) => T) => selector(keyboardState),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 }, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -68,6 +70,8 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T,>(value: T) => ({ value }),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 
 vi.mock('@/lib/a11y/motion', () => ({
@@ -90,10 +94,6 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: vi.fn() }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
@@ -165,7 +165,7 @@ vi.mock('@/lib/persist/use-draft-flush', () => ({
   useDraftFlushOnBackground: vi.fn(),
 }));
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
 }));
 
 const uploadMock = vi.hoisted(() => ({
@@ -191,7 +191,7 @@ vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
   useAndroidPendingPickerRecovery: vi.fn(),
 }));
 vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
-  clipboardPasteEmptyMessage: () => 'Clipboard is empty',
+  clipboardPasteFailureMessage: () => 'Clipboard is empty',
   useClipboardPaste: () => ({ paste: vi.fn() }),
 }));
 
@@ -318,6 +318,36 @@ describe('ChatComposer send — one tap sends exactly once', () => {
     expect(onSend).toHaveBeenCalledWith('hello from the repro', expect.anything());
 
     renderer.unmount();
+  });
+
+  it('sends the typed message when the send haptic rejects', async () => {
+    const onSend = vi.fn(async () => undefined);
+    vi.mocked(Haptics.impactAsync).mockRejectedValueOnce(new Error('no haptic engine'));
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    const renderer = await mountComposer(baseProps({ onSend }));
+
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+      await typeIntoComposer(renderer, 'sent with no haptics');
+
+      const send = sendControl(renderer.root);
+      expect(send.disabled).toBe(false);
+
+      await act(async () => {
+        send.press();
+        await flushSubmitChain();
+      });
+
+      expect(onSend).toHaveBeenCalledTimes(1);
+      expect(onSend).toHaveBeenCalledWith('sent with no haptics', expect.anything());
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+      renderer.unmount();
+    }
   });
 
   it('sends the typed message on the first send press, keyboard open', async () => {

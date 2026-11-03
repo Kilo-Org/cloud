@@ -128,7 +128,6 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
     };
   });
 
-  // Calculate dynamic Y-axis domain for better visualization
   const maxRevenue =
     chartData.length > 0
       ? Math.max(

@@ -1,6 +1,6 @@
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
-import { isControlSession } from '../../session-plane.js';
-import { isTerminalSessionPlatform } from '../../terminal/access.js';
+import { isControlSession } from '../../session-identity.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
 import type { ResolvedPreviewTarget, PreviewTargetResult } from '../sandbox/preview-target.js';
 
 export type ControlPlanePreviewDeps = {
@@ -16,10 +16,7 @@ export function createControlPlanePreview(deps: ControlPlanePreviewDeps) {
   async function resolve(): Promise<ResolvedPreviewTarget> {
     const metadata = deps.getMetadata();
     if (metadata === null) return { status: 'not_ready' };
-    if (
-      !isControlSession(metadata.identity.sessionId) ||
-      !isTerminalSessionPlatform(metadata.identity.createdOnPlatform)
-    ) {
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
       return { status: 'ineligible' };
     }
     const sandboxId = metadata.workspace?.sandboxId;

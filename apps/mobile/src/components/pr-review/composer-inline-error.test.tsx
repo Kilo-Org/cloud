@@ -10,6 +10,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type MutationErrorDisplaySurface } from '@/lib/pr-review/mutation-error-display';
+import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { useComposerInlineError } from './composer-inline-error';
 
 const { ensureTermsAcceptedOutcomeMock, TERMS_CHECK_RETRY, TERMS_OUTDATED } = vi.hoisted(() => ({
@@ -151,6 +152,33 @@ describe('useComposerInlineError terms gate', () => {
     expect(latestState?.inlineErrorKind).toBe('bad-request');
     expect(latestState?.inlineErrorIsLocal).toBe(false);
 
+    renderer.unmount();
+  });
+
+  it('names the connected provider in the reconnect copy', async () => {
+    const revoked = new Error('revoked');
+    Object.assign(revoked, { data: { code: 'PRECONDITION_FAILED' } });
+    const scope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 } as const,
+      organizationId: null,
+    };
+
+    const holder: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+    await act(async () => {
+      holder.current = TestRenderer.create(
+        <ProviderPrScopeProvider value={scope}>
+          {createElement(Harness, { error: revoked, isEdit: false })}
+        </ProviderPrScopeProvider>
+      );
+      await flush();
+    });
+    const renderer = holder.current;
+    if (renderer === null) {
+      throw new Error('Failed to create test renderer');
+    }
+
+    expect(latestState?.inlineError).toBe('GitLab connection expired');
+    expect(latestState?.inlineErrorKind).toBe('reconnect');
     renderer.unmount();
   });
 });

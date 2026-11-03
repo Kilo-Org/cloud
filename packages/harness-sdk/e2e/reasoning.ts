@@ -58,24 +58,28 @@ interface Answer {
 const empty: Answer = { said: '', thought: '', input: 0 };
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: 4000 }), empty, (held, event) => {
-    switch (event.kind) {
-      case 'delta': {
-        return { ...held, said: held.said + event.text };
-      }
-      case 'reasoning': {
-        return { ...held, thought: held.thought + event.text };
-      }
-      case 'done': {
-        return { ...held, input: event.usage.inputTokens + event.usage.cacheReadTokens };
-      }
-      case 'redacted':
-      case 'toolCall':
-      case 'toolResult': {
-        return held;
+  Stream.runFold(
+    session.ask(text, { maxTokens: 4000 }),
+    () => empty,
+    (held, event) => {
+      switch (event.kind) {
+        case 'delta': {
+          return { ...held, said: held.said + event.text };
+        }
+        case 'reasoning': {
+          return { ...held, thought: held.thought + event.text };
+        }
+        case 'done': {
+          return { ...held, input: event.usage.inputTokens + event.usage.cacheReadTokens };
+        }
+        case 'redacted':
+        case 'toolCall':
+        case 'toolResult': {
+          return held;
+        }
       }
     }
-  });
+  );
 
 const runShape = async (kind: ApiKind, model: string) => {
   const layers = kilo({ apiKinds: [kind] });
@@ -87,7 +91,7 @@ const runShape = async (kind: ApiKind, model: string) => {
     return { one, two, history: yield* session.history };
   });
 
-  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+  return Effect.runPromise(Effect.result(Effect.scoped(Effect.provide(program, layers))));
 };
 
 const reasoningOf = (turn: Turn | undefined) =>
@@ -99,13 +103,13 @@ console.log(
 
 for (const { kind, model, seals } of shapes) {
   const result = await runShape(kind, model);
-  if (result._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}${model.padEnd(29)}FAILED ${JSON.stringify(result.left)}`);
+  if (result._tag === 'Failure') {
+    console.log(`${kind.padEnd(18)}${model.padEnd(29)}FAILED ${JSON.stringify(result.failure)}`);
     fail(`${kind}: the call failed`);
     continue;
   }
 
-  const { one, two, history } = result.right;
+  const { one, two, history } = result.success;
   const stored = reasoningOf(history[1]);
   const seal = stored[0]?.signature;
   const thought = one.thought.length > 0 || seal !== undefined;

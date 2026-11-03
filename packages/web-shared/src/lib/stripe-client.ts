@@ -10,8 +10,16 @@ if (!stripeSecretKey) {
 const skipStripeApi =
   process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
+// Stripe rejects requests that hit a locked object ("another API request or
+// Stripe process is currently accessing it") and advises retrying; the SDK
+// retries those with exponential backoff and jitter (0.5s doubling, 5s cap). The stripe@23
+// default of 2 retries covers only ~1.5s and still let webhook contention fail,
+// so 4 retries stretch the window to roughly 4-7.5s while staying bounded.
+const STRIPE_MAX_NETWORK_RETRIES = 4;
+
 export const client: Stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-10-29.clover',
+  apiVersion: '2026-09-30.endive',
+  maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
 });
 
 type ConstrainedMetadata = UserConstrainedMetadata | OrganizationConstrainedMetdata;

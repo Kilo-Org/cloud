@@ -1,8 +1,10 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports
@@ -35,6 +37,21 @@ type SheetProps = {
    * so the sheet's edge never shows the card behind it.
    */
   background?: string;
+  /**
+   * Whether a downward drag on the sheet dismisses it (and, on iOS, a backdrop
+   * tap). Defaults to true. A sheet whose content scrolls passes false: the
+   * native sheet claims every downward drag that starts over a React Native
+   * scroll view on iOS, so dragging the content back up would dismiss the sheet
+   * and drop its values.
+   */
+  dismissGestures?: boolean;
+  /**
+   * Asked before a dismissal the sheet received by itself — Android Back or a
+   * backdrop tap. Return false to keep the sheet open, which is how a form asks
+   * its own "Keep editing / Discard" question first. iOS backdrop taps cannot
+   * be separated from the drag, so `dismissGestures` governs those.
+   */
+  onRequestDismiss?: () => boolean;
   children: ReactNode;
 };
 
@@ -44,8 +61,13 @@ type SheetProps = {
  * native sheet — unlike a JS sheet or a `@rn-primitives/portal` overlay, which
  * render inside the app's React tree and disappear behind it.
  *
- * Android Back, a swipe down and a backdrop tap all dismiss. The native sheet
- * cannot separate those three, and every caller here dismisses on all of them.
+ * Dismissal follows what the sheet holds, not how tall it is. A sheet that
+ * shows data (a message, a run, a detail) keeps the swipe, the backdrop tap and
+ * Android Back, so the drag is one more way out beside Done. A sheet that holds
+ * a draft — a form, a filter, a composer — turns the swipe and the iOS backdrop
+ * tap off with `dismissGestures={false}`, keeps Android Back, and answers it
+ * through `onRequestDismiss`: a drag would otherwise throw the draft away while
+ * the user scrolled the form back up.
  */
 export function Sheet({
   visible,
@@ -54,13 +76,24 @@ export function Sheet({
   snapPoints,
   showHandle = true,
   background,
+  dismissGestures = true,
+  onRequestDismiss,
   children,
 }: Readonly<SheetProps>) {
   const colors = useThemeColors();
+  // The native sheet paints a few strings of its own — the backdrop's dismiss
+  // label, the drag handle and the sheet's pane title. They resolve against the
+  // device locale unless it is told the app's, so a device in Portuguese
+  // announced Portuguese controls inside an Arabic app.
+  const { i18n } = useTranslation();
   // Stay mounted through the dismiss animation. `index` -1 starts the animation
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
+  // The app-wide touch gate stays shut for as long as this sheet is presented:
+  // until the sheet's own window takes touch, a tap made while it opens would
+  // land on the screen and the tab bar behind it.
+  useSheetTouchHold(visible);
   // A dismissal handed to the native sheet that has not reported back yet.
   const [dismissalPending, setDismissalPending] = useState(false);
 
@@ -88,6 +121,35 @@ export function Sheet({
     }
   }, [visible]);
 
+  // Before the sheet's own window takes focus, Android Back reaches the app
+  // instead of the sheet's native handler, so a press in that window of the
+  // opening animation is answered here. Once the window has focus the sheet
+  // receives Back natively and this listener does not run.
+  const requestSelfDismissRef = useRef<() => void>(() => undefined);
+  requestSelfDismissRef.current = () => {
+    // A dismissal the caller superseded is already on its way out; asking again
+    // would raise the caller's own confirm a second time for one press.
+    if (visible && dismissalPending) {
+      return;
+    }
+    if (onRequestDismiss?.() === false) {
+      return;
+    }
+    onClose();
+  };
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !mounted || !visible) {
+      return undefined;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      requestSelfDismissRef.current();
+      return true;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [mounted, visible]);
+
   if (!mounted) {
     return null;
   }
@@ -101,6 +163,9 @@ export function Sheet({
       backgroundStyle={{ backgroundColor: background ?? colors.card }}
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
+      dismissGestures={dismissGestures}
+      onRequestDismiss={onRequestDismiss}
+      locale={i18n.language}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
         // again through the caller's own handler. A self-dismissal (backdrop,

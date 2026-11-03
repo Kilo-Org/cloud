@@ -65,7 +65,7 @@ export async function GET(
   };
 
   const findFirstAllowedModelFromOpenRouter = async () => {
-    const openRouterModels = await getEnhancedOpenRouterModels();
+    const openRouterModels = await getEnhancedOpenRouterModels({ countryCode: null });
     for (const model of openRouterModels.data ?? []) {
       if (await isAllowed(model.id)) {
         return model.id;

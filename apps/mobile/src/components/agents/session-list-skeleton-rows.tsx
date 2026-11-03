@@ -8,13 +8,6 @@ const SKELETON_ROW_COUNT = 8;
 const TITLE_WIDTHS = ['w-3/4', 'w-1/2', 'w-2/3', 'w-3/5'] as const;
 const SUBTITLE_WIDTHS = ['w-2/5', 'w-1/3', 'w-1/2', 'w-1/4'] as const;
 
-/**
- * One placeholder in the shape of an inline-strip `SessionRow`: hue strip,
- * eyebrow, title and optional subtitle, on the screen background with the
- * row's hairline divider. Each line sits in a slot of the real line's height,
- * so the placeholder has the pitch of a one-line-title row and the rows land
- * where the placeholders stood.
- */
 export function SessionRowSkeleton({
   index,
   subtitle,
@@ -59,16 +52,14 @@ export function SessionSectionHeaderSkeleton() {
 }
 
 /**
- * The live list's placeholder rows while the first load is pending. The top
- * padding stands in for the refresh-status line (`gap-2` + `min-h-5`) that
- * `LiveSessionFeedback` reserves above loaded rows, and the side padding is the
- * same landscape inset the loaded list's content carries.
+ * The live list's placeholder rows while the first load is pending. The screen
+ * reserves the refresh-status band above both placeholders and loaded rows.
  */
 export function SessionListSkeletonRows({
   insets,
 }: Readonly<{ insets: { left: number; right: number } }>) {
   return (
-    <View className="pt-7" style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+    <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
         <SessionRowSkeleton key={i} index={i} subtitle />
       ))}

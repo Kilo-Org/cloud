@@ -114,20 +114,33 @@ export const POLICY_SETTING_VALUE_SCHEMAS = {
 
 const VALUE = POLICY_SETTING_VALUE_SCHEMAS;
 
+type AutoPolicySettingKey = {
+  [K in PolicySettingKey]: (typeof POLICY_SETTINGS)[K]['kind'] extends 'auto' ? K : never;
+}[PolicySettingKey];
+
+function isAutoSetting(key: PolicySettingKey): key is AutoPolicySettingKey {
+  return POLICY_SETTINGS[key].kind === 'auto';
+}
+
+/**
+ * Overrides and computed records exist only for the auto settings; a fixed
+ * setting is a read-only constant, so storing a value for it could never
+ * change the effective value.
+ */
+const AUTO_POLICY_SETTING_KEYS = POLICY_SETTING_KEYS.filter(isAutoSetting);
+
+function autoSettingShape<T>(
+  value: (key: AutoPolicySettingKey) => T
+): Record<AutoPolicySettingKey, T> {
+  const shape = {} as Record<AutoPolicySettingKey, T>;
+  for (const key of AUTO_POLICY_SETTING_KEYS) shape[key] = value(key);
+  return shape;
+}
+
 /** Sparse admin overrides. A missing key (or an explicit null) means "no override". */
-export const PolicySettingOverridesSchema = z.object({
-  minAccuracy: VALUE.minAccuracy.nullable().optional(),
-  accuracyNoiseBand: VALUE.accuracyNoiseBand.nullable().optional(),
-  frontierMinAccuracyDelta: VALUE.frontierMinAccuracyDelta.nullable().optional(),
-  productionTokenProfile: VALUE.productionTokenProfile.nullable().optional(),
-  switchHorizonTurns: VALUE.switchHorizonTurns.nullable().optional(),
-  switchCostFactor: VALUE.switchCostFactor.nullable().optional(),
-  bestAccuracySwitchThreshold: VALUE.bestAccuracySwitchThreshold.nullable().optional(),
-  lowConfidenceThreshold: VALUE.lowConfidenceThreshold.nullable().optional(),
-  classifierRepetitions: VALUE.classifierRepetitions.nullable().optional(),
-  deciderRepetitions: VALUE.deciderRepetitions.nullable().optional(),
-  classifierMaxP95LatencyMs: VALUE.classifierMaxP95LatencyMs.nullable().optional(),
-});
+export const PolicySettingOverridesSchema = z.object(
+  autoSettingShape(key => VALUE[key].nullable().optional())
+);
 export type PolicySettingOverrides = z.infer<typeof PolicySettingOverridesSchema>;
 
 function computedRecordSchema<T extends z.ZodType>(value: T) {
@@ -143,30 +156,17 @@ function computedRecordSchema<T extends z.ZodType>(value: T) {
 export const PolicySettingComputedSchema = computedRecordSchema(PolicySettingValueSchema);
 export type PolicySettingComputed = z.infer<typeof PolicySettingComputedSchema>;
 
-export const PolicySettingComputedMapSchema = z.object({
-  minAccuracy: computedRecordSchema(VALUE.minAccuracy).optional(),
-  accuracyNoiseBand: computedRecordSchema(VALUE.accuracyNoiseBand).optional(),
-  frontierMinAccuracyDelta: computedRecordSchema(VALUE.frontierMinAccuracyDelta).optional(),
-  productionTokenProfile: computedRecordSchema(VALUE.productionTokenProfile).optional(),
-  switchHorizonTurns: computedRecordSchema(VALUE.switchHorizonTurns).optional(),
-  switchCostFactor: computedRecordSchema(VALUE.switchCostFactor).optional(),
-  bestAccuracySwitchThreshold: computedRecordSchema(VALUE.bestAccuracySwitchThreshold).optional(),
-  lowConfidenceThreshold: computedRecordSchema(VALUE.lowConfidenceThreshold).optional(),
-  classifierRepetitions: computedRecordSchema(VALUE.classifierRepetitions).optional(),
-  deciderRepetitions: computedRecordSchema(VALUE.deciderRepetitions).optional(),
-  classifierMaxP95LatencyMs: computedRecordSchema(VALUE.classifierMaxP95LatencyMs).optional(),
-});
+export const PolicySettingComputedMapSchema = z.object(
+  autoSettingShape(key => computedRecordSchema(VALUE[key]).optional())
+);
 export type PolicySettingComputedMap = z.infer<typeof PolicySettingComputedMapSchema>;
 
-function validEntries(
-  raw: object,
-  shape: Record<PolicySettingKey, z.ZodType>
-): Record<string, unknown> {
+function validEntries(raw: object, shape: Record<string, z.ZodType>): Record<string, unknown> {
   const valid: Record<string, unknown> = {};
-  for (const key of POLICY_SETTING_KEYS) {
+  for (const [key, schema] of Object.entries(shape)) {
     if (!(key in raw)) continue;
     const value: unknown = Reflect.get(raw, key);
-    if (shape[key].safeParse(value).success) valid[key] = value;
+    if (schema.safeParse(value).success) valid[key] = value;
   }
   return valid;
 }
@@ -224,9 +224,10 @@ function resolveValue(
   overrides: PolicySettingOverrides | null,
   computed: PolicySettingComputedMap | null
 ): PolicySettingValue {
-  const meta: PolicySettingMeta = POLICY_SETTINGS[key];
-  if (meta.kind === 'fixed') return meta.fixed;
-  return overrides?.[key] ?? computed?.[key]?.value ?? defaults[key];
+  if (isAutoSetting(key)) {
+    return overrides?.[key] ?? computed?.[key]?.value ?? defaults[key];
+  }
+  return POLICY_SETTINGS[key].fixed;
 }
 
 export function resolvePolicySettings(config: PolicySettingSource): PolicySettingsState {
@@ -235,12 +236,16 @@ export function resolvePolicySettings(config: PolicySettingSource): PolicySettin
   const states = {} as PolicySettingsState;
   for (const key of POLICY_SETTING_KEYS) {
     const meta: PolicySettingMeta = POLICY_SETTINGS[key];
+    // A fixed setting ignores stored overrides and computed records, so its
+    // state does not advertise values resolution never reads.
+    const stored = isAutoSetting(key)
+      ? { override: overrides?.[key] ?? null, computed: computed?.[key] ?? null }
+      : { override: null, computed: null };
     states[key] = {
       kind: meta.kind,
       label: meta.label,
       effective: resolveValue(key, config, overrides, computed),
-      override: overrides?.[key] ?? null,
-      computed: computed?.[key] ?? null,
+      ...stored,
       reason: meta.kind === 'fixed' ? meta.reason : null,
     };
   }

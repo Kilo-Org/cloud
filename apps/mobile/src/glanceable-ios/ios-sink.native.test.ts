@@ -6,7 +6,7 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 type NativeRecord = {
   id: string;
@@ -133,9 +133,10 @@ vi.mock('./active-agents-live-activity', async () => {
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
     OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
-    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
-      banner: null,
-    })),
+    getActiveAgentsLiveActivity: () =>
+      new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
+        banner: null,
+      })),
   };
 });
 vi.mock('./active-agents-widget', () => ({

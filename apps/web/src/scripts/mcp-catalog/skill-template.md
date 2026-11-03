@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety, and the top-level catalog areas.
 ---
 
 <!--
@@ -13,12 +13,14 @@ Then regenerate:
 
 # Kilo MCP
 
-The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
-`kilo_call`.
+General account connections expose the Kilo API through two tools, `kilo_search`
+and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedicated
+child-session tools described below. Use the tool names published by your client;
+it may prefix them with the MCP server name.
 
 The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
 
-## How to use it
+## General API connections
 
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
 2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
@@ -36,6 +38,59 @@ The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
 it, and the catalog wins when the two disagree — read the catalog, not this
 file, for current detail.
 
+## Parent-scoped child sessions
+
+These connections publish `search_models`, `generate_message_id`, `spawn_session`,
+`list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
+`list_folders`, and `assign_workspace_to_folder`.
+They do not expose API `search` or `call`.
+
+1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
+2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
+3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
+4. Set `callbackTarget: { "url": "session:parent" }` for completion/failure/interruption messages; omit for none. Prefer callbacks over polling; never wait in a tool for one.
+5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
+6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
+7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
+8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
+
+Authority/callbacks belong to the canonical parent (original root chat), even from
+siblings. Only direct children are manageable, never unrelated sessions or the
+parent. No grandchildren.
+
+### Examples
+
+Pseudocode; `modelId` comes from `search_models`; `launchUuid` is a fresh retained UUID.
+
+```js
+const child = await spawn_session({
+  githubRepo: 'owner/repo', model: modelId, mode: 'code',
+  prompt: 'Fix the bug, run focused tests, and report. Do not commit, push, or create a PR.',
+  operationKey: launchUuid, autoCommit: false,
+  callbackTarget: { url: 'session:parent' },
+});
+```
+
+After the callback, retrieve `initialMessageId` via `list_child_sessions` and pass
+it with `child.cloudAgentSessionId` to `get_message_result`. Authorized follow-up:
+
+```js
+const { messageId } = await generate_message_id({});
+await send_message({
+  cloudAgentSessionId: child.cloudAgentSessionId, messageId,
+  payload: { type: 'prompt', prompt: followUpTask, mode: 'code', model: modelId },
+  autoCommit: false,
+});
+```
+
+After the callback, or as one bounded check:
+
+```js
+await get_message_result({ cloudAgentSessionId: child.cloudAgentSessionId, messageId });
+```
+
+Retain publication constraints in `followUpTask`.
+
 ## Reporting feedback and bugs
 
 Report bugs, confusing behavior, and feature requests about the Kilo platform
@@ -49,6 +104,8 @@ to send platform feedback and bug reports rather than a support channel.
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:
-each row's `summary` and `tags` are what the search matches.
+each row's `summary` and `tags` are what the search matches. Some areas also
+exist as an org-scoped mirror under `organizations`, for example
+`organizations.kiloclaw`.
 
 {{CENSUS}}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyBlockingSubmissionError,
+  classifyPermissionSubmissionError,
   formatBlockingCardTitle,
   getBlockingCardPresentation,
 } from './blocking-card-state';
@@ -38,6 +39,7 @@ describe('getBlockingCardPresentation', () => {
         hasPrimaryCta: true,
         hasRetryCta: false,
         retryAction: null,
+        retryPermissionResponse: null,
         hasRejectCta: true,
         errorMessage: null,
       });
@@ -57,6 +59,7 @@ describe('getBlockingCardPresentation', () => {
         hasPrimaryCta: true,
         hasRetryCta: false,
         retryAction: null,
+        retryPermissionResponse: null,
         hasRejectCta: false,
         errorMessage: null,
       });
@@ -67,7 +70,12 @@ describe('getBlockingCardPresentation', () => {
     it('replaces the primary CTA with an answer retry affordance on a question', () => {
       const presentation = getBlockingCardPresentation({
         blocking: 'question',
-        submissionError: { kind: 'retryable', message: 'Network hiccup', action: 'answer' },
+        submissionError: {
+          kind: 'retryable',
+          message: 'Network hiccup',
+          action: 'answer',
+          permissionResponse: null,
+        },
       });
 
       expect(presentation?.state).toBe('retryable');
@@ -82,7 +90,12 @@ describe('getBlockingCardPresentation', () => {
     it('replaces the primary CTA with a reject retry affordance on a question and hides Skip', () => {
       const presentation = getBlockingCardPresentation({
         blocking: 'question',
-        submissionError: { kind: 'retryable', message: 'Skip failed', action: 'reject' },
+        submissionError: {
+          kind: 'retryable',
+          message: 'Skip failed',
+          action: 'reject',
+          permissionResponse: null,
+        },
       });
 
       expect(presentation?.state).toBe('retryable');
@@ -93,16 +106,45 @@ describe('getBlockingCardPresentation', () => {
       expect(presentation?.errorMessage).toBe('Skip failed');
     });
 
-    it('replaces the primary CTA with a retry affordance on a permission', () => {
+    it.each(['once', 'always', 'reject'] as const)(
+      're-sends the failed %s decision from the permission retry affordance',
+      response => {
+        const presentation = getBlockingCardPresentation({
+          blocking: 'permission',
+          submissionError: {
+            kind: 'retryable',
+            message: 'Try again',
+            action: 'respond',
+            permissionResponse: response,
+          },
+        });
+
+        expect(presentation?.state).toBe('retryable');
+        expect(presentation?.hasPrimaryCta).toBe(false);
+        expect(presentation?.hasRetryCta).toBe(true);
+        expect(presentation?.retryAction).toBe('respond');
+        expect(presentation?.retryPermissionResponse).toBe(response);
+        expect(presentation?.hasRejectCta).toBe(false);
+        expect(presentation?.errorMessage).toBe('Try again');
+      }
+    );
+
+    it('keeps the decision controls when a permission error recorded no decision', () => {
       const presentation = getBlockingCardPresentation({
         blocking: 'permission',
-        submissionError: { kind: 'retryable', message: 'Try again', action: 'respond' },
+        submissionError: {
+          kind: 'retryable',
+          message: 'Try again',
+          action: 'respond',
+          permissionResponse: null,
+        },
       });
 
       expect(presentation?.state).toBe('retryable');
-      expect(presentation?.hasPrimaryCta).toBe(false);
-      expect(presentation?.hasRetryCta).toBe(true);
-      expect(presentation?.retryAction).toBe('respond');
+      expect(presentation?.hasPrimaryCta).toBe(true);
+      expect(presentation?.hasRetryCta).toBe(false);
+      expect(presentation?.retryAction).toBeNull();
+      expect(presentation?.retryPermissionResponse).toBeNull();
       expect(presentation?.hasRejectCta).toBe(false);
       expect(presentation?.errorMessage).toBe('Try again');
     });
@@ -158,9 +200,7 @@ describe('classifyBlockingSubmissionError', () => {
       kind: 'non-retryable',
       message: 'This question is no longer available.',
     });
-    expect(
-      classifyBlockingSubmissionError(makeTopLevelTrpcError('NOT_FOUND'), 'permission')
-    ).toEqual({
+    expect(classifyPermissionSubmissionError(makeTopLevelTrpcError('NOT_FOUND'), 'once')).toEqual({
       kind: 'non-retryable',
       message: 'This permission request is no longer available.',
     });
@@ -173,18 +213,21 @@ describe('classifyBlockingSubmissionError', () => {
       kind: 'retryable',
       message: 'Failed to submit answer. Please try again.',
       action: 'answer',
+      permissionResponse: null,
     });
-    expect(
-      classifyBlockingSubmissionError(makeTrpcError('PRECONDITION_FAILED'), 'permission')
-    ).toEqual({
-      kind: 'retryable',
-      message: 'Failed to respond to permission. Please try again.',
-      action: 'answer',
-    });
+    expect(classifyPermissionSubmissionError(makeTrpcError('PRECONDITION_FAILED'), 'once')).toEqual(
+      {
+        kind: 'retryable',
+        message: 'Failed to respond to permission. Please try again.',
+        action: 'respond',
+        permissionResponse: 'once',
+      }
+    );
     expect(classifyBlockingSubmissionError(makeTrpcError('TIMEOUT'), 'question')).toEqual({
       kind: 'retryable',
       message: 'Failed to submit answer. Please try again.',
       action: 'answer',
+      permissionResponse: null,
     });
   });
 
@@ -195,34 +238,40 @@ describe('classifyBlockingSubmissionError', () => {
       kind: 'retryable',
       message: 'Failed to skip question. Please try again.',
       action: 'reject',
+      permissionResponse: null,
     });
   });
 
-  it('classifies permission failures with respond action', () => {
-    expect(
-      classifyBlockingSubmissionError(makeTrpcError('TIMEOUT'), 'permission', 'respond')
-    ).toEqual({
-      kind: 'retryable',
-      message: 'Failed to respond to permission. Please try again.',
-      action: 'respond',
-    });
-  });
+  it.each(['once', 'always', 'reject'] as const)(
+    'records the %s decision a permission failure carried',
+    response => {
+      expect(classifyPermissionSubmissionError(makeTrpcError('TIMEOUT'), response)).toEqual({
+        kind: 'retryable',
+        message: 'Failed to respond to permission. Please try again.',
+        action: 'respond',
+        permissionResponse: response,
+      });
+    }
+  );
 
   it('classifies non-tRPC errors as retryable', () => {
     expect(classifyBlockingSubmissionError(new Error('network down'), 'question')).toEqual({
       kind: 'retryable',
       message: 'Failed to submit answer. Please try again.',
       action: 'answer',
+      permissionResponse: null,
     });
-    expect(classifyBlockingSubmissionError('string error', 'permission')).toEqual({
+    expect(classifyPermissionSubmissionError('string error', 'always')).toEqual({
       kind: 'retryable',
       message: 'Failed to respond to permission. Please try again.',
-      action: 'answer',
+      action: 'respond',
+      permissionResponse: 'always',
     });
     expect(classifyBlockingSubmissionError(null, 'question')).toEqual({
       kind: 'retryable',
       message: 'Failed to submit answer. Please try again.',
       action: 'answer',
+      permissionResponse: null,
     });
   });
 });

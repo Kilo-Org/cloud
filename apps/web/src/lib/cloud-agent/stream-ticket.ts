@@ -27,12 +27,16 @@ export function signStreamTicket(
   payload: StreamTicketPayload,
   expiresInSeconds = 60
 ): { ticket: string; expiresAt: number } {
-  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  // `jsonwebtoken` derives `exp` from a payload `iat`; one clock reading keeps
+  // the returned `expiresAt` equal to the token `exp` across a second boundary.
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + expiresInSeconds;
 
   const ticket = jwt.sign(
     {
       type: 'stream_ticket',
       ...payload,
+      iat: issuedAt,
       nonce: crypto.randomUUID(),
     },
     NEXTAUTH_SECRET,

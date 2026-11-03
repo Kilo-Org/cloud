@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /**
@@ -72,7 +73,9 @@ export function invitedMemberActionOptions(
 /**
  * Resend mutation for a failed invite. Delegates to
  * `trpcClient.organizations.members.resendInvite` and re-fetches the member
- * list on success.
+ * list on success. A failure is announced in localized copy: the server's own
+ * sentence is English-only, and no part of a rejected request belongs on a
+ * translated screen.
  */
 export function useResendInvite(organizationId: string) {
   const trpc = useTRPC();
@@ -86,8 +89,10 @@ export function useResendInvite(organizationId: string) {
         queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
       });
     },
-    onError: (error: { message: string }) => {
-      announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
+    onError: (error: unknown) => {
+      announcingToast.error(
+        knownServerErrorMessage(error) ?? i18n.t('organization.members.resendInviteError')
+      );
     },
   });
 }

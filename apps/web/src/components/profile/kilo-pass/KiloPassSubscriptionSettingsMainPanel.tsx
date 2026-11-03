@@ -7,11 +7,8 @@ type ActionLabel = {
 };
 
 type MainPanelProps = {
-  hasScheduledChange: boolean;
   onCancelPendingChange: () => void;
   isCancelingPendingChange: boolean;
-  onUpdateSubscription: () => void;
-  isUpdateSubscriptionDisabled: boolean;
   onManagePaymentMethod: () => void;
   isOpeningCustomerPortal: boolean;
   resumeAction: ActionLabel | null | undefined;
@@ -27,11 +24,8 @@ type MainPanelProps = {
 
 export function MainPanel(props: MainPanelProps) {
   const {
-    hasScheduledChange,
     onCancelPendingChange,
     isCancelingPendingChange,
-    onUpdateSubscription,
-    isUpdateSubscriptionDisabled,
     onManagePaymentMethod,
     isOpeningCustomerPortal,
     resumeAction,
@@ -47,27 +41,16 @@ export function MainPanel(props: MainPanelProps) {
 
   return (
     <div className="grid gap-3">
-      {hasScheduledChange ? (
-        <Button
-          variant="outline"
-          className="w-full justify-between"
-          onClick={onCancelPendingChange}
-          disabled={isCancelingPendingChange}
-        >
-          <span>
-            {isCancelingPendingChange ? 'Canceling pending change' : 'Cancel pending change'}
-          </span>
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          className="w-full justify-between"
-          onClick={onUpdateSubscription}
-          disabled={isUpdateSubscriptionDisabled}
-        >
-          <span>Update subscription</span>
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        className="w-full justify-between"
+        onClick={onCancelPendingChange}
+        disabled={isCancelingPendingChange}
+      >
+        <span>
+          {isCancelingPendingChange ? 'Canceling pending change' : 'Cancel pending change'}
+        </span>
+      </Button>
 
       <Button
         variant="outline"

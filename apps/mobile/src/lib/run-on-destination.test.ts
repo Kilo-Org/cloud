@@ -32,6 +32,10 @@ describe('readPreselectRunOn', () => {
     expect(readPreselectRunOn('cloud')).toBe('cloud');
   });
 
+  it('returns the computer sentinel', () => {
+    expect(readPreselectRunOn('computer')).toBe('computer');
+  });
+
   it('returns the first element of a repeated param', () => {
     expect(readPreselectRunOn(['cli-1'])).toBe('cli-1');
   });
@@ -61,6 +65,7 @@ describe('shouldRestorePersistedRunOn', () => {
   it('skips the restore when the route preselects any target', () => {
     expect(shouldRestorePersistedRunOn('cloud')).toBe(false);
     expect(shouldRestorePersistedRunOn(['cloud'])).toBe(false);
+    expect(shouldRestorePersistedRunOn('computer')).toBe(false);
     expect(shouldRestorePersistedRunOn('cli-1')).toBe(false);
     expect(shouldRestorePersistedRunOn(['cli-1'])).toBe(false);
   });

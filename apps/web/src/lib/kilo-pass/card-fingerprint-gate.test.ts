@@ -641,6 +641,146 @@ describe('duplicate-card provider enforcement and email', () => {
     );
   });
 
+  test('concurrent cancellation resource_missing confirms provider state before idempotent refund', async () => {
+    const missing = Object.assign(new Error('No such subscription: sub_concurrent_cancel'), {
+      code: 'resource_missing',
+      statusCode: 404,
+    });
+    let canceled = false;
+    const cancel = jest.fn(async () => {
+      if (canceled) throw missing;
+      canceled = true;
+      return { id: 'sub_concurrent_cancel' };
+    });
+    const retrieve = jest.fn(async (subscriptionId: string) => ({
+      id: subscriptionId,
+      status: 'canceled',
+    }));
+    const createRefund = jest.fn(async () => ({ id: 're_concurrent_cancel' }));
+    const params = {
+      stripe: {
+        subscriptions: { cancel, retrieve },
+        refunds: { create: createRefund },
+      } as unknown as Stripe,
+      stripeInvoiceId: 'in_concurrent_cancel',
+      stripeSubscriptionId: 'sub_concurrent_cancel',
+      kiloUserId: 'user_concurrent_cancel',
+      gateResult,
+    };
+
+    const results = await Promise.all([
+      attemptDuplicateCardProviderEnforcement(params),
+      attemptDuplicateCardProviderEnforcement(params),
+    ]);
+
+    expect(results).toEqual([
+      {
+        cancellation: { subscriptionId: 'sub_concurrent_cancel' },
+        refund: { status: 'succeeded', refundId: 're_concurrent_cancel' },
+      },
+      {
+        cancellation: { subscriptionId: 'sub_concurrent_cancel' },
+        refund: { status: 'succeeded', refundId: 're_concurrent_cancel' },
+      },
+    ]);
+    expect(retrieve).toHaveBeenCalledWith('sub_concurrent_cancel');
+    expect(createRefund).toHaveBeenCalledTimes(2);
+    for (const call of createRefund.mock.calls) {
+      expect(call).toEqual([
+        expect.objectContaining({ charge: 'ch_exact', reason: 'duplicate' }),
+        { idempotencyKey: 'kilo-pass-duplicate-card-refund:in_concurrent_cancel' },
+      ]);
+    }
+  });
+
+  test.each([
+    { id: 'sub_missing_active', status: 'active' },
+    { id: 'sub_wrong_target', status: 'canceled' },
+  ])(
+    'resource_missing does not authorize refund for unconfirmed target $id',
+    async subscription => {
+      const missing = Object.assign(new Error('No such subscription: sub_missing_active'), {
+        code: 'resource_missing',
+        statusCode: 404,
+      });
+      const createRefund = jest.fn();
+      await expect(
+        attemptDuplicateCardProviderEnforcement({
+          stripe: {
+            subscriptions: {
+              cancel: jest.fn(async () => {
+                throw missing;
+              }),
+              retrieve: jest.fn(async () => subscription),
+            },
+            refunds: { create: createRefund },
+          } as unknown as Stripe,
+          stripeInvoiceId: 'in_missing_active',
+          stripeSubscriptionId: 'sub_missing_active',
+          kiloUserId: 'user_missing_active',
+          gateResult,
+        })
+      ).rejects.toBe(missing);
+      expect(createRefund).not.toHaveBeenCalled();
+    }
+  );
+
+  test('resource_missing confirmation failure preserves original cancellation error without refund', async () => {
+    const missing = Object.assign(new Error('No such subscription: sub_not_found'), {
+      code: 'resource_missing',
+      statusCode: 404,
+    });
+    const createRefund = jest.fn();
+    await expect(
+      attemptDuplicateCardProviderEnforcement({
+        stripe: {
+          subscriptions: {
+            cancel: jest.fn(async () => {
+              throw missing;
+            }),
+            retrieve: jest.fn(async () => {
+              throw new Error('confirmation unavailable');
+            }),
+          },
+          refunds: { create: createRefund },
+        } as unknown as Stripe,
+        stripeInvoiceId: 'in_not_found',
+        stripeSubscriptionId: 'sub_not_found',
+        kiloUserId: 'user_not_found',
+        gateResult,
+      })
+    ).rejects.toBe(missing);
+    expect(createRefund).not.toHaveBeenCalled();
+  });
+
+  test('unrelated 404 cancellation error is not treated as successful cancellation', async () => {
+    const providerError = Object.assign(new Error('provider failure'), {
+      code: 'api_error',
+      statusCode: 404,
+    });
+    const retrieve = jest.fn();
+    const createRefund = jest.fn();
+    await expect(
+      attemptDuplicateCardProviderEnforcement({
+        stripe: {
+          subscriptions: {
+            cancel: jest.fn(async () => {
+              throw providerError;
+            }),
+            retrieve,
+          },
+          refunds: { create: createRefund },
+        } as unknown as Stripe,
+        stripeInvoiceId: 'in_unrelated_error',
+        stripeSubscriptionId: 'sub_unrelated_error',
+        kiloUserId: 'user_unrelated_error',
+        gateResult,
+      })
+    ).rejects.toBe(providerError);
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(createRefund).not.toHaveBeenCalled();
+  });
+
   test('already canceled message still throws when Stripe status is active', async () => {
     const createRefund = jest.fn();
     await expect(

@@ -2,14 +2,15 @@ import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
-import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 function isAvailableForBot(integration: PlatformIntegration): boolean {
-  return (
-    integration.platform !== 'github' ||
-    (integration.github_connection_role === 'workflow' && isPlatformIntegrationHealthy(integration))
-  );
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return false;
+  }
+
+  return integration.platform !== 'github' || integration.github_connection_role === 'workflow';
 }
 
 export class PlatformIntegrationUnavailableError extends Error {
@@ -62,7 +63,7 @@ export async function canKiloUserAccessPlatformIntegration(
   kiloUserId: string
 ): Promise<boolean> {
   if (integration.owned_by_organization_id) {
-    return await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
+    return await isOrganizationMember(db, integration.owned_by_organization_id, kiloUserId);
   }
 
   if (integration.owned_by_user_id) {

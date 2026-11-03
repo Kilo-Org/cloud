@@ -8,9 +8,10 @@ import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
-  isSecuritySyncRetryable,
+  localizedSecurityMarkerMessage,
   mapSecurityDismissOperationError,
-} from '@/lib/hooks/use-security-agent-mutations';
+  securityRetainsOperationKey,
+} from '@/lib/security-agent-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
@@ -157,7 +158,7 @@ export function useDismissSecurityFinding(scope: string) {
         rotateKey();
         return result;
       } catch (error) {
-        if (!isSecuritySyncRetryable(error)) {
+        if (!securityRetainsOperationKey(error)) {
           rotateKey();
         }
         // Map the raw `operation_in_progress` CONFLICT marker onto retryable
@@ -187,7 +188,7 @@ export function useStartSecurityAnalysis(scope: string) {
             forceSandbox: true,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
       if (result.commandId) {
@@ -203,7 +204,7 @@ export function useStartSecurityAnalysis(scope: string) {
           }),
         ]);
         scheduleCacheMaintenance(() => {
-          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+          void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
         });
         return;
       }
@@ -222,7 +223,7 @@ export function useStartSecurityAnalysis(scope: string) {
         }),
       ]);
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(
+        void reconcileFirstPage(
           queryClient,
           trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
         );

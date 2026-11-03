@@ -1,12 +1,18 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import type { GatewayRequest } from '../openrouter/types';
+import type OpenAI from 'openai';
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
 
-test('allows the Responses API for OpenCode Go', () => {
-  expect(openCodeGo.supported_chat_apis).toContain('responses');
+test('allows the Responses API for OpenCode Go', async () => {
+  const upstream = await openCodeGo.resolveUpstream({
+    credential: 'test-api-key',
+    model: { id: 'qwen3.7-plus' },
+    stream: false,
+  });
+  expect(upstream.supportedChatApis).toContain('responses');
 });
 
 describe('OpenCode Go session headers', () => {
@@ -21,13 +27,13 @@ describe('OpenCode Go session headers', () => {
   ): TransformRequestContext {
     return {
       provider: {
-        id: 'direct-byok',
-        apiUrl: openCodeGo.base_url,
+        type: 'direct-byok',
+        apiUrl: 'https://opencode.ai/zen/go/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,
         apiKey: 'test-api-key',
         apiKeyHeader: null,
-        supportedChatApis: openCodeGo.supported_chat_apis,
+        supportedChatApis: ['chat_completions', 'messages', 'responses'],
         responseTransforms: null,
         async transformRequest() {},
       },
@@ -109,6 +115,60 @@ describe('OpenCode Go session headers', () => {
     expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
   });
 
+  test('removes message names from Chat Completions requests', () => {
+    const toolMessageFromClient = {
+      role: 'tool',
+      name: 'read',
+      tool_call_id: 'call-1',
+      content: 'ok',
+    };
+    const body: OpenRouterChatCompletionRequest = {
+      model: 'glm-5.3-flash',
+      messages: [
+        { role: 'user', name: 'alice', content: 'Read a' },
+        {
+          role: 'assistant',
+          name: 'agent',
+          content: '',
+          tool_calls: [
+            { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+          ],
+        },
+        toolMessageFromClient as OpenAI.Chat.ChatCompletionToolMessageParam,
+      ],
+    };
+
+    openCodeGo.transformRequest(createContext({ request: { kind: 'chat_completions', body } }));
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Read a' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call-1', type: 'function', function: { name: 'read', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content: 'ok' },
+    ]);
+  });
+
+  test('forwards Muse Responses requests without rewriting the body', () => {
+    const body = {
+      model: 'muse-spark-1.3-contributor',
+      input: 'Hello',
+      reasoning: { effort: 'high' as const },
+    };
+    const request: GatewayRequest = { kind: 'responses', body: structuredClone(body) };
+    const context = createContext({ model: 'opencode-go/muse-spark-1.3-contributor', request });
+
+    openCodeGo.transformRequest(context);
+
+    expect(request.body).toEqual(body);
+    expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+    expect(context.extraHeaders).not.toHaveProperty('x-api-key');
+  });
+
   test('keeps the header stable when the model, API key, or request body changes', () => {
     const first = createContext();
     const next = createContext({
@@ -145,6 +205,17 @@ describe('getAiSdkProvider', () => {
       expect(getAiSdkProvider(model, 'opencode-go')).toBe('anthropic');
     }
   );
+
+  test.each(['opencode-go/muse-spark-1.2-contributor', 'opencode-go/muse-spark-1.3-contributor'])(
+    'uses the Responses API for OpenCode Go model %s',
+    model => {
+      expect(getAiSdkProvider(model, 'opencode-go')).toBe('openai');
+    }
+  );
+
+  test('uses the Responses API for Muse models through the gateway', () => {
+    expect(getAiSdkProvider('meta/muse-spark-1.2', null)).toBe('openai');
+  });
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
     expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();

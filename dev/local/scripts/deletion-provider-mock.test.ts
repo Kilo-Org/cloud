@@ -368,16 +368,6 @@ test('Customer.io DELETE follows 429-cio / fail-cio / ok scenarios', async () =>
   });
 });
 
-test('does not implement CSA Kilo support user routes', async () => {
-  await withMock(async origin => {
-    const { status } = await requestJson(
-      origin,
-      '/api/internal/support/users?email=ok%40local.test'
-    );
-    assert.equal(status, 404);
-  });
-});
-
 test('unknown numeric tickets map to ok+<number>@local.test', async () => {
   await withMock(async origin => {
     const { status, body } = await requestJson(origin, '/issues/9999');

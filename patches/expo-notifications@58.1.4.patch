@@ -1,0 +1,19 @@
+diff --git a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+index 1c41d99..e2e7464 100644
+--- a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
++++ b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+@@ -12,12 +12,8 @@ object BadgeHelper {
+ 
+   fun setBadgeCount(context: Context, badgeCount: Int): Boolean {
+     return try {
+-      if (badgeCount == 0) {
+-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+-        notificationManager.cancelAll()
+-      } else {
+-        ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+-      }
++      // Badge updates must preserve ongoing notifications.
++      ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+       BadgeHelper.badgeCount = badgeCount
+       true
+     } catch (e: ShortcutBadgeException) {

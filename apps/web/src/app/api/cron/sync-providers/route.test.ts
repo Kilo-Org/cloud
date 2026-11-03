@@ -14,16 +14,16 @@ jest.mock('@/lib/providers/openrouter/sync-providers', () => ({
 }));
 
 jest.mock('@/lib/providers/openrouter/sync-providers-stale-alert', () => ({
-  alertIfSyncProvidersStale: jest.fn(),
+  alertIfSyncStale: jest.fn(),
 }));
 
-import { alertIfSyncProvidersStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { alertIfSyncStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET, maxDuration } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
-const mockAlertIfSyncProvidersStale = jest.mocked(alertIfSyncProvidersStale);
+const mockAlertIfSyncStale = jest.mocked(alertIfSyncStale);
 
 describe('GET /api/cron/sync-providers', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -39,7 +39,6 @@ describe('GET /api/cron/sync-providers', () => {
       completed_at: '2026-07-20T00:05:00.000Z',
       total_models: 42,
       total_providers: 12,
-      direct_byok_model_counts: {},
       time: 5,
     });
 
@@ -50,8 +49,8 @@ describe('GET /api/cron/sync-providers', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockAlertIfSyncProvidersStale).toHaveBeenCalledTimes(1);
-    expect(mockAlertIfSyncProvidersStale.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockAlertIfSyncStale).toHaveBeenCalledWith('providers');
+    expect(mockAlertIfSyncStale.mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(syncAndStoreProviders).mock.invocationCallOrder[0]
     );
     expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
@@ -63,14 +62,13 @@ describe('GET /api/cron/sync-providers', () => {
 
   it('still runs the full sync when the stale-alert check rejects', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    mockAlertIfSyncProvidersStale.mockRejectedValue(new Error('alert failed'));
+    mockAlertIfSyncStale.mockRejectedValue(new Error('alert failed'));
     jest.mocked(syncAndStoreProviders).mockResolvedValue({
       id: 1,
       generated_at: '2026-07-20T00:00:00.000Z',
       completed_at: '2026-07-20T00:05:00.000Z',
       total_models: 42,
       total_providers: 12,
-      direct_byok_model_counts: {},
       time: 5,
     });
 

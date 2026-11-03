@@ -1,18 +1,18 @@
-import { i18n } from '@/i18n';
 import { API_BASE_URL } from '@/lib/config';
 import { type AuthBrowserKind, dismissAuthBrowser } from '@/lib/auth/auth-browser';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
-  buildDeviceAuthPollRequest,
-  parseDeviceAuthTokenResponse,
-} from '@/lib/auth/native-auth-contract';
-import {
   approvedDeviceAuthState,
+  deviceAuthErrorKey,
   type DeviceAuthState,
   errorDeviceAuthState,
   terminalDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
+import {
+  buildDeviceAuthPollRequest,
+  parseDeviceAuthTokenResponse,
+} from '@/lib/auth/native-auth-contract';
 
 const POLL_BASE_INTERVAL_MS = 3000;
 const POLL_MAX_INTERVAL_MS = 15_000;
@@ -74,7 +74,11 @@ export function startDeviceAuthPoll(params: {
     if (Date.now() - startedAt >= POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, i18n.t('authErrors.signInTimedOut'), previous.verificationUrl)
+        errorDeviceAuthState(
+          code,
+          deviceAuthErrorKey('authErrors.signInTimedOut'),
+          previous.verificationUrl
+        )
       );
       return;
     }
@@ -112,16 +116,17 @@ export function startDeviceAuthPoll(params: {
 
       if (parsed && (parsed.status === 'denied' || parsed.status === 'expired')) {
         cleanup();
-        const message =
-          parsed.status === 'denied'
-            ? i18n.t('authErrors.accessDeniedByUser')
-            : i18n.t('authErrors.codeExpired');
+        // The banner re-translates denied/expired at render by status; the
+        // stored key is the fallback a terminal state still carries.
+        const error = deviceAuthErrorKey(
+          parsed.status === 'denied' ? 'authErrors.accessDeniedByUser' : 'authErrors.codeExpired'
+        );
         const terminalStatus: 'denied' | 'expired' = parsed.status;
         setState(previous =>
           terminalDeviceAuthState({
             status: terminalStatus,
             code,
-            error: message,
+            error,
             previousVerificationUrl: previous.verificationUrl,
           })
         );
@@ -137,7 +142,11 @@ export function startDeviceAuthPoll(params: {
         case 'expired': {
           cleanup();
           setState(previous =>
-            errorDeviceAuthState(code, i18n.t('authErrors.invalidToken'), previous.verificationUrl)
+            errorDeviceAuthState(
+              code,
+              deviceAuthErrorKey('authErrors.invalidToken'),
+              previous.verificationUrl
+            )
           );
           return;
         }
@@ -179,7 +188,11 @@ export function startDeviceAuthPoll(params: {
       }
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, i18n.t('authErrors.networkError'), previous.verificationUrl)
+        errorDeviceAuthState(
+          code,
+          deviceAuthErrorKey('authErrors.networkError'),
+          previous.verificationUrl
+        )
       );
     }
   };

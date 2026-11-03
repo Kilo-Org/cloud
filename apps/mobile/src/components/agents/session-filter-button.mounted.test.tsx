@@ -9,15 +9,20 @@ import { Pressable, View } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { compiledDimensions } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { SessionFilterButton } from './session-filter-button';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/icons', () => ({ SlidersHorizontal: 'SlidersHorizontal' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
 }));

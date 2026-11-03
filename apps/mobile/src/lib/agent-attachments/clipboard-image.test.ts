@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   decodedBase64ByteLength,
   hasClipboardImage,
+  hasClipboardText,
   hasClipboardUrl,
   parseClipboardImageData,
   readClipboardImageFile,
@@ -11,7 +12,9 @@ import {
 type FileInstance = {
   exists: boolean;
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  written?: { content: string; encoding?: string };
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
+  directory?: { name?: string };
   filename: string;
 };
 
@@ -26,10 +29,13 @@ const expoFileSystemMock = vi.hoisted(() => {
     };
   });
   const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
-    const instance = {
+    const instance: FileInstance = {
       exists: false,
       uri: `file:///cache/clipboard-images/${filename}`,
-      write: vi.fn(),
+      async write(content, options) {
+        await Promise.resolve();
+        this.written = { content, encoding: options?.encoding };
+      },
       filename,
       directory,
     };
@@ -52,12 +58,14 @@ vi.mock('expo-file-system', () => ({
 
 const clipboardMock = vi.hoisted(() => ({
   hasImageAsync: vi.fn(),
+  hasStringAsync: vi.fn(),
   hasUrlAsync: vi.fn(),
   getImageAsync: vi.fn(),
 }));
 
 vi.mock('expo-clipboard', () => ({
   hasImageAsync: clipboardMock.hasImageAsync,
+  hasStringAsync: clipboardMock.hasStringAsync,
   hasUrlAsync: clipboardMock.hasUrlAsync,
   getImageAsync: clipboardMock.getImageAsync,
 }));
@@ -156,6 +164,18 @@ describe('hasClipboardUrl', () => {
   });
 });
 
+describe('hasClipboardText', () => {
+  it('returns true when hasStringAsync resolves true', async () => {
+    clipboardMock.hasStringAsync.mockResolvedValue(true);
+    await expect(hasClipboardText()).resolves.toBe(true);
+  });
+
+  it('returns false when hasStringAsync rejects', async () => {
+    clipboardMock.hasStringAsync.mockRejectedValue(new Error('unavailable'));
+    await expect(hasClipboardText()).resolves.toBe(false);
+  });
+});
+
 describe('readClipboardImageFile', () => {
   it('writes a PNG file with the correct name and encoding', async () => {
     clipboardMock.getImageAsync.mockResolvedValue({
@@ -178,7 +198,7 @@ describe('readClipboardImageFile', () => {
     expect(expoFileSystemMock.File).toHaveBeenCalled();
     const file = fileInstances[0];
     expect(file?.filename).toBe('pasted-image-uuid-1.png');
-    expect(file?.write).toHaveBeenCalledWith('iVBORw0KGgo=', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'iVBORw0KGgo=', encoding: 'base64' });
   });
 
   it('returns null when getImageAsync resolves null', async () => {
@@ -210,7 +230,7 @@ describe('readClipboardImageFile', () => {
     expect(fileInstances).toHaveLength(0);
   });
 
-  it('returns null when file.write throws', async () => {
+  it('returns null when saving the image fails', async () => {
     clipboardMock.getImageAsync.mockResolvedValue({
       data: 'data:image/png;base64,iVBORw0KGgo=',
     });
@@ -221,9 +241,7 @@ describe('readClipboardImageFile', () => {
       const instance = {
         exists: false,
         uri: 'file:///cache/clipboard-images/pasted-image-uuid-1.png',
-        write: vi.fn(() => {
-          throw new Error('disk full');
-        }),
+        write: vi.fn().mockRejectedValue(new Error('disk full')),
         filename: 'pasted-image-uuid-1.png',
         directory: _directory as { name?: string },
       };
@@ -234,7 +252,6 @@ describe('readClipboardImageFile', () => {
     const result = await readClipboardImageFile();
 
     expect(result).toBeNull();
-    expect(fileInstances[0]?.write).toHaveBeenCalled();
   });
 
   it("returns 'too-large' when maxBytes is set and the decoded payload exceeds it", async () => {

@@ -81,7 +81,7 @@ import {
 import {
   providerFingerprintInput,
   providerWriteIdentity,
-} from '@/lib/pr-review/use-pr-review-mutations';
+} from '@/lib/pr-review/provider-write-identity';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import {

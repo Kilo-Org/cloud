@@ -1,6 +1,10 @@
 export class ContainerBillingError extends Error {
   constructor(
-    readonly code: 'INSUFFICIENT_CREDITS' | 'BILLING_UNAVAILABLE' | 'CONTAINER_PAUSED',
+    readonly code:
+      | 'INSUFFICIENT_CREDITS'
+      | 'BILLING_UNAVAILABLE'
+      | 'CONTAINER_PAUSED'
+      | 'ACCESS_REVOKED',
     message: string,
     readonly details?: { remaining?: number; minimumRequired?: number }
   ) {

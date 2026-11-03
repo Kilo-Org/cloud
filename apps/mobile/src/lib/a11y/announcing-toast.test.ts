@@ -27,7 +27,6 @@ const sonnerMock = vi.hoisted(() => {
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
-  setAccessibilityFocus: vi.fn(),
 }));
 
 vi.mock('sonner-native', () => ({
@@ -35,7 +34,6 @@ vi.mock('sonner-native', () => ({
 }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
-  findNodeHandle: vi.fn(),
 }));
 
 describe('announcingToast', () => {

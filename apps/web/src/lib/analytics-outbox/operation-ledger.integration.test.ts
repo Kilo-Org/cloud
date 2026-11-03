@@ -12,6 +12,7 @@ import { and, eq, sql } from 'drizzle-orm';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
+import type { OperationLedgerRow } from '@kilocode/db/schema';
 import type { AnalyticsEventMap } from '@kilocode/app-shared/analytics';
 import {
   admitOperation,
@@ -56,6 +57,28 @@ async function admitSession(userId = 'ledger-user', operationKey: string = rando
     taxonomy: 'safe-retry',
     leaseSeconds: 60,
   });
+}
+
+/** Admits a `create_cloud` session in an explicit organization scope. */
+async function admitScopedSession(params: {
+  userId: string;
+  orgId?: string | null;
+  operationKey: string;
+  leaseSeconds?: number;
+}): Promise<OperationLedgerRow> {
+  const result = await admitOperation(db, {
+    userId: params.userId,
+    orgId: params.orgId,
+    domain: SESSION_DOMAIN,
+    intent: 'create_cloud',
+    operationKey: params.operationKey,
+    taxonomy: 'safe-retry',
+    leaseSeconds: params.leaseSeconds ?? 60,
+  });
+  if (result.admission !== 'admitted') {
+    throw new Error(`expected admitted, got ${result.admission}`);
+  }
+  return result.row;
 }
 
 describe('operation ledger (integration)', () => {
@@ -561,6 +584,177 @@ describe('operation ledger (integration)', () => {
         canonicalResult: { commandId: 'cmd-1' },
       })
     ).toBeNull();
+  });
+
+  it('treats a key admitted in another scope as a different operation', async () => {
+    const userId = 'scope-live-user';
+    const admitted = await admitScopedSession({
+      userId,
+      orgId: 'org-a',
+      operationKey: randomUUID(),
+    });
+    const operationKey = admitted.operation_key;
+
+    const foreign = await admitOperation(db, {
+      userId,
+      orgId: 'org-b',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 600,
+    });
+    // No row comes back: the other scope's stored state is not readable.
+    expect(foreign).toEqual({ admission: 'organization_mismatch' });
+
+    const rows = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, userId),
+          eq(operation_ledgers.operation_key, operationKey)
+        )
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.organization_id).toBe('org-a');
+    expect(rows[0]?.lease_expires_at).toBe(admitted.lease_expires_at);
+
+    // A settled row is not replayed into the other scope either.
+    await settleOperation(db, { rowId: admitted.id, status: 'completed' });
+    const settledForeign = await admitOperation(db, {
+      userId,
+      orgId: 'org-b',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 600,
+    });
+    expect(settledForeign).toEqual({ admission: 'organization_mismatch' });
+  });
+
+  it("treats another scope's expired lease as a different operation", async () => {
+    const userId = 'scope-takeover-user';
+    const admitted = await admitScopedSession({
+      userId,
+      orgId: 'org-a',
+      operationKey: randomUUID(),
+    });
+    const expiredLease = '2020-01-01T00:00:00.000Z';
+    await db
+      .update(operation_ledgers)
+      .set({ lease_expires_at: expiredLease })
+      .where(eq(operation_ledgers.id, admitted.id));
+
+    const foreign = await admitOperation(db, {
+      userId,
+      orgId: 'org-b',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey: admitted.operation_key,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 600,
+    });
+    expect(foreign).toEqual({ admission: 'organization_mismatch' });
+
+    const [afterForeign] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, admitted.id));
+    expect(new Date(afterForeign?.lease_expires_at ?? 0).toISOString()).toBe(expiredLease);
+    expect(afterForeign?.organization_id).toBe('org-a');
+
+    // The owning scope still takes over the expired lease normally.
+    const owner = await admitOperation(db, {
+      userId,
+      orgId: 'org-a',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey: admitted.operation_key,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 60,
+    });
+    expect(owner.admission).toBe('takeover');
+    if (owner.admission !== 'takeover') return;
+    expect(new Date(owner.row.lease_expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("treats another scope's reconcile-pending row as a different operation", async () => {
+    const userId = 'scope-reconcile-user';
+    const admitted = await admitScopedSession({
+      userId,
+      orgId: 'org-a',
+      operationKey: randomUUID(),
+    });
+    await markReconcilePending(db, { rowId: admitted.id });
+    const claimableLease = '2020-01-01T00:00:00.000Z';
+    await db
+      .update(operation_ledgers)
+      .set({ lease_expires_at: claimableLease })
+      .where(eq(operation_ledgers.id, admitted.id));
+
+    const foreign = await admitOperation(db, {
+      userId,
+      orgId: 'org-b',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey: admitted.operation_key,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 600,
+    });
+    expect(foreign).toEqual({ admission: 'organization_mismatch' });
+
+    const [afterForeign] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.id, admitted.id));
+    expect(afterForeign?.status).toBe('reconcile_pending');
+    expect(new Date(afterForeign?.lease_expires_at ?? 0).toISOString()).toBe(claimableLease);
+
+    // The owning scope still claims the reconciliation lease.
+    const owner = await admitOperation(db, {
+      userId,
+      orgId: 'org-a',
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey: admitted.operation_key,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 60,
+    });
+    expect(owner.admission).toBe('duplicate_reconcile_pending');
+  });
+
+  it('keeps personal-scope dedupe and readmission of an expired row in the caller scope', async () => {
+    const userId = 'scope-personal-user';
+    const personalKey = randomUUID();
+    const first = await admitScopedSession({ userId, operationKey: personalKey });
+    expect(first.organization_id).toBeNull();
+
+    // An explicit null scope is the same personal identity as an omitted one.
+    const retry = await admitOperation(db, {
+      userId,
+      orgId: null,
+      domain: SESSION_DOMAIN,
+      intent: 'create_cloud',
+      operationKey: personalKey,
+      taxonomy: 'safe-retry',
+      leaseSeconds: 60,
+    });
+    expect(retry.admission).toBe('duplicate_in_flight');
+
+    // An expired row is still deleted and re-admitted in the caller's scope.
+    await db
+      .update(operation_ledgers)
+      .set({ expires_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(operation_ledgers.id, first.id));
+    const readmitted = await admitScopedSession({
+      userId,
+      orgId: 'org-b',
+      operationKey: personalKey,
+    });
+    expect(readmitted.id).not.toBe(first.id);
+    expect(readmitted.organization_id).toBe('org-b');
   });
 
   it('computes a deterministic UUIDv5 per (rowId, eventName)', async () => {

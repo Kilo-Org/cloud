@@ -5,13 +5,13 @@ import {
   REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS,
 } from './cli-live-transport';
 import type { SlashCommandInfo } from './schemas';
+import { MAX_CREATE_SESSION_MUTATION_ID_LENGTH } from './create-session';
 import type {
   RemoteModelCatalogV1,
   RemoteModelCatalogWireV1,
   RemoteModelState,
 } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
-import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import {
   CommandDeliveredError,
   UserWebCommandError,
@@ -2886,8 +2886,7 @@ describe('CliLiveTransport createSession', () => {
       KILO_SESSION_ID,
       'create_session',
       { protocolVersion: 1 },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -3014,8 +3013,7 @@ describe('CliLiveTransport createSession', () => {
       KILO_SESSION_ID,
       'create_session',
       { protocolVersion: 1 },
-      'owner-a',
-      expect.any(String) as string
+      'owner-a'
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
@@ -3074,8 +3072,7 @@ describe('CliLiveTransport createSession', () => {
         model: { providerID: 'anthropic', modelID: 'claude-sonnet-4', variant: 'high' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     transport.destroy();
   });
@@ -3180,8 +3177,7 @@ describe('CliLiveTransport createSession', () => {
       KILO_SESSION_ID,
       'create_session',
       { protocolVersion: 1, cloneFromKiloSessionId: 'ses_clone_123456789012345678901' },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     transport.destroy();
   });
@@ -3271,7 +3267,7 @@ describe('CliLiveTransport createSession', () => {
     transport.destroy();
   });
 
-  it('uses a fresh mutationId for the bare retry so the DO treats it as a new command', async () => {
+  it('derives the extended and bare wire identities from the caller mutation id', async () => {
     const connection = createConnection();
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
 
@@ -3287,52 +3283,93 @@ describe('CliLiveTransport createSession', () => {
       .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
       .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
 
-    await transport.createSession?.({ agent: 'code' });
+    await transport.createSession?.({ mutationId: 'intent-1', agent: 'code' });
 
     const createCalls = jest
       .mocked(userWebConnection.sendCommand)
       .mock.calls.filter(([, command]) => command === 'create_session');
     expect(createCalls).toHaveLength(2);
-
-    // The second call (bare retry) must have a mutationId that differs
-    // from the first call's mutationId.
-    const firstMutationId = createCalls[0]?.[4];
-    const secondMutationId = createCalls[1]?.[4];
-    expect(firstMutationId).toBeDefined();
-    expect(secondMutationId).toBeDefined();
-    expect(secondMutationId).not.toBe(firstMutationId);
+    expect(createCalls[0]?.[4]).toBe('intent-1:ext');
+    expect(createCalls[1]?.[4]).toBe('intent-1:bare');
     transport.destroy();
   });
 
-  it('takes the mutationId from the configured runtime, not the global crypto', async () => {
-    // Hermes (React Native) has no global `crypto` binding, so a bare
-    // `crypto.randomUUID()` throws "Property crypto does not exist" and /new
-    // fails. Every id in this package must go through the runtime shim.
-    configureCloudAgentSdkRuntime({ randomUUID: () => 'runtime-uuid' });
-    try {
-      const connection = createConnection();
+  it('sends no wire mutation id when the caller supplies none', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await transport.createSession?.({ agent: 'code' });
+
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]).toHaveLength(4);
+    transport.destroy();
+  });
+
+  it('rejects a create intent key that cannot fit the relay wire bound', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await expect(
+      transport.createSession?.({
+        mutationId: 'k'.repeat(MAX_CREATE_SESSION_MUTATION_ID_LENGTH + 1),
+      })
+    ).rejects.toThrow(
+      `Create intent key must be at most ${MAX_CREATE_SESSION_MUTATION_ID_LENGTH} characters`
+    );
+    expect(
       jest
-        .mocked(connection.sendCommand)
-        .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
-      const { transport, userWebConnection } = createTransportWithSinks({ connection });
-
-      transport.connect();
-      emitOwner(connection);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      jest.mocked(userWebConnection.sendCommand).mockClear();
-      await transport.createSession?.();
-
-      const createCall = jest
         .mocked(userWebConnection.sendCommand)
-        .mock.calls.find(([, command]) => command === 'create_session');
-      expect(createCall?.[4]).toBe('runtime-uuid');
-      transport.destroy();
-    } finally {
-      resetCloudAgentSdkRuntime();
-    }
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(0);
+    transport.destroy();
+  });
+
+  it('keeps the longest accepted create intent key inside the relay wire bound', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    const key = 'k'.repeat(MAX_CREATE_SESSION_MUTATION_ID_LENGTH);
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+
+    await transport.createSession?.({ mutationId: key, agent: 'code' });
+
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls[0]?.[4]).toBe(`${key}:ext`);
+    expect(createCalls[1]?.[4]).toBe(`${key}:bare`);
+    expect(createCalls[1]?.[4]).toHaveLength(128);
+    transport.destroy();
   });
 });
 

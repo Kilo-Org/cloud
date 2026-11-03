@@ -8,6 +8,7 @@ import {
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepoSelection,
+  resolveStoredRepoSelection,
 } from '@/components/agents/new-session-prefill';
 
 /**
@@ -67,6 +68,12 @@ export type UseNewSessionPrefillTargetsInput = {
   models: { id: string; variants: string[] }[];
   // !isLoadingModels && !isModelsError && models.length > 0
   modelsSettled: boolean;
+  /**
+   * The durable repository draft for this account and organization: the
+   * `platform:fullName` key the form last held, or null before it loads and
+   * when none is stored.
+   */
+  storedRepo?: string | null;
 };
 
 /**
@@ -76,14 +83,24 @@ export type UseNewSessionPrefillTargetsInput = {
  *
  * The repo prefill apply mirrors the existing `hasAppliedAutoSelection`
  * pattern in `agent-chat/new.tsx` — a same-component render-phase update
- * guarded by a ref.
+ * guarded by a ref. The durable draft seeds the same state the same way, so a
+ * form reopened after a restart shows the repository it had before the user
+ * sees an empty row; a route prefill outranks it (see
+ * `resolveStoredRepoSelection`).
  */
 export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsInput) {
-  const { repositories, reposSettled, models, modelsSettled } = input;
+  const { repositories, reposSettled, models, modelsSettled, storedRepo = null } = input;
   const prefill = useNewSessionPrefill();
   const [selectedRepo, setSelectedRepo] = useState('');
   const hasAppliedRepo = useRef(false);
+  const hasSeededStoredRepo = useRef(false);
   const hasFiredToast = useRef(false);
+
+  const storedSeed = resolveStoredRepoSelection({ prefill, selectedRepo, storedRepo });
+  if (!hasSeededStoredRepo.current && storedSeed) {
+    hasSeededStoredRepo.current = true;
+    setSelectedRepo(storedSeed);
+  }
 
   if (!hasAppliedRepo.current && reposSettled && !selectedRepo) {
     hasAppliedRepo.current = true;

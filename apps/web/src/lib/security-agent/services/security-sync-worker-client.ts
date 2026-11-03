@@ -4,6 +4,7 @@ import {
   INTERNAL_API_SECRET,
   SECURITY_SYNC_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
+import { postSecurityWorkerJson } from './security-worker-request';
 
 export type AcceptedSecurityWorkerCommand = {
   accepted: true;
@@ -30,6 +31,9 @@ const CONFIG_ERROR_MESSAGE = 'Security service is not configured';
  * operation ledger: `BAD_GATEWAY` is ambiguous transport (the Worker may still
  * have accepted), `PRECONDITION_FAILED` is a definitive pre-acceptance
  * rejection. Worker/gateway response bodies are never echoed back.
+ *
+ * The call is bounded by `postSecurityWorkerJson`, so a Worker that never
+ * answers fails fast instead of holding the request open.
  */
 export async function postSecurityWorkerCommand(params: {
   path: string;
@@ -42,28 +46,15 @@ export async function postSecurityWorkerCommand(params: {
   if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
     throw new TRPCError({ code: 'PRECONDITION_FAILED', message: CONFIG_ERROR_MESSAGE });
   }
-  const unreachable = new TRPCError({
-    code: 'BAD_GATEWAY',
-    message: `Could not reach the security ${params.service} service. Try again.`,
+  // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
+  // `postSecurityWorkerJson`): a gateway HTML body and a Worker that never
+  // answers both leave the command's acceptance unknown.
+  const { response, body } = await postSecurityWorkerJson({
+    url: `${SECURITY_SYNC_WORKER_URL}${params.path}`,
+    service: params.service,
+    body: params.body,
   });
-
-  let response: Response;
-  let body: SecurityWorkerResponse | undefined;
-  try {
-    response = await fetch(`${SECURITY_SYNC_WORKER_URL}${params.path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify(params.body),
-    });
-    // A non-JSON body (gateway HTML) leaves the acceptance unknown.
-    body = (await response.json()) as SecurityWorkerResponse;
-  } catch (error) {
-    if (error instanceof TRPCError) throw error;
-    throw unreachable;
-  }
+  const workerBody = body as SecurityWorkerResponse | undefined;
 
   if (!response.ok) {
     const failed = `Security ${params.service} service request failed (status ${response.status}).`;
@@ -73,8 +64,8 @@ export async function postSecurityWorkerCommand(params: {
     const definitive =
       response.status < 500 ||
       (response.status === 503 &&
-        body?.success === false &&
-        body?.error === params.disabledRoutingError);
+        workerBody?.success === false &&
+        workerBody?.error === params.disabledRoutingError);
     throw new TRPCError({
       code: definitive ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
       message: definitive ? failed : `${failed} Try again.`,
@@ -82,12 +73,12 @@ export async function postSecurityWorkerCommand(params: {
   }
 
   if (
-    !body ||
-    body.success !== true ||
-    body.accepted !== true ||
-    typeof body.commandId !== 'string' ||
-    typeof body.runId !== 'string' ||
-    typeof body.messageId !== 'string'
+    !workerBody ||
+    workerBody.success !== true ||
+    workerBody.accepted !== true ||
+    typeof workerBody.commandId !== 'string' ||
+    typeof workerBody.runId !== 'string' ||
+    typeof workerBody.messageId !== 'string'
   ) {
     // Accepted, but the correlation ids were lost: the provider reference
     // cannot be recorded, so the outcome is ambiguous.
@@ -99,8 +90,8 @@ export async function postSecurityWorkerCommand(params: {
 
   return {
     accepted: true,
-    commandId: body.commandId,
-    runId: body.runId,
-    messageId: body.messageId,
+    commandId: workerBody.commandId,
+    runId: workerBody.runId,
+    messageId: workerBody.messageId,
   };
 }

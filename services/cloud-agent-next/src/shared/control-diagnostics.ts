@@ -472,7 +472,6 @@ export const controlDiagnosticRecordSchema = z
   .strict();
 
 export type ControlDiagnosticRecord = z.infer<typeof controlDiagnosticRecordSchema>;
-export type RetirementCause = NonNullable<ControlDiagnosticRecord['fields']['retirementCause']>;
 
 const NON_PROJECTABLE_PHASES = new Set(['keepalive_sent', 'keepalive_failed', 'retry_scheduled']);
 const PROJECTABLE_SOCKET_PHASES = new Set(['closed', 'connect_attempt', 'hello_rejected']);
@@ -543,44 +542,9 @@ export function isProjectableControlDiagnostic(
   }
 }
 
-const retirementCauseByReason = new Map<string, RetirementCause>([
-  ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
-  ['feed_stale', 'event_feed_unhealthy'],
-  ['feed_reconnected', 'event_feed_unhealthy'],
-  ['feed_ended', 'event_feed_unhealthy'],
-  ['feed_failed', 'event_feed_unhealthy'],
-  ['process_exited', 'process_exited'],
-  ['credential_refresh_failed', 'credential_refresh_failed'],
-  ['Sandbox control connection lost', 'control_disconnected'],
-  ['control_disconnected', 'control_disconnected'],
-  ['Preparation event delivery failed', 'preparation_delivery_failed'],
-  ['Sandbox shutting down', 'requested_shutdown'],
-  ['Wrapper received SIGTERM', 'sigterm'],
-  ['Wrapper received SIGINT', 'sigint'],
-  ['Wrapper uncaught exception', 'uncaught_exception'],
-  ['Wrapper unhandled rejection', 'unhandled_rejection'],
-  ['Kilo cancellation failed', 'cancellation_failed'],
-  ['Kilo cancellation was not confirmed', 'cancellation_failed'],
-  ['Native cancellation did not settle', 'cancellation_failed'],
-  ['Session outcome delivery failed', 'outcome_delivery_failed'],
-  ['Session event delivery failed', 'outcome_delivery_failed'],
-  ['Execution exceeded the 60 minute limit', 'execution_deadline'],
-  ['Session preparation timed out', 'preparation_deadline'],
-]);
-
 export function diagnosticDetail(value: string): string | undefined {
   const detail = value.trim().slice(0, 128);
   return detail === '' ? undefined : detail;
-}
-
-export function classifyRetirementCause(...reasons: string[]): RetirementCause {
-  for (const reason of reasons) {
-    const mapped = retirementCauseByReason.get(reason);
-    if (mapped) return mapped;
-    if (reason.startsWith('feed_')) return 'event_feed_unhealthy';
-    if (reason.startsWith('Session event delivery')) return 'outcome_delivery_failed';
-  }
-  return 'unknown';
 }
 
 export const controlLogIdentitySchema = z
@@ -604,11 +568,6 @@ export const controlLogBatchSchema = z
   .strict();
 
 export type ControlLogBatch = z.infer<typeof controlLogBatchSchema>;
-
-export function diagnosticSyncStatus(value: unknown): z.infer<typeof syncStatusSchema> {
-  const parsed = syncStatusSchema.safeParse(value);
-  return parsed.success ? parsed.data : 'other';
-}
 
 export function isUnreapedOwnedProcessDiagnostic(record: ControlDiagnosticRecord): boolean {
   return (

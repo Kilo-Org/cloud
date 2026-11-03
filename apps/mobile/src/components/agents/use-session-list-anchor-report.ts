@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { type ViewabilityConfig } from 'react-native';
+import { type FlatListProps } from 'react-native';
 import { type ViewToken } from '@shopify/flash-list';
 
 import {
@@ -15,7 +15,9 @@ const ANCHOR_REPORT_MIN_INTERVAL_MS = 1000;
 
 // A row claims the viewport only once half of it is on screen, so a row peeking
 // in during a fling cannot become the reported position.
-const ANCHOR_VIEWABILITY_CONFIG: ViewabilityConfig = { itemVisiblePercentThreshold: 50 };
+const ANCHOR_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 } satisfies NonNullable<
+  FlatListProps<unknown>['viewabilityConfig']
+>;
 
 /**
  * The topmost viewable row that names a message. A preparation row has no
@@ -39,7 +41,7 @@ function firstViewableAnchorMessageId<T>(viewableItems: readonly ViewToken<T>[])
 
 type SessionListAnchorReport<T> = {
   onViewableItemsChanged: ((info: { viewableItems: ViewToken<T>[] }) => void) | undefined;
-  viewabilityConfig: ViewabilityConfig | undefined;
+  viewabilityConfig: FlatListProps<T>['viewabilityConfig'];
 };
 
 /**

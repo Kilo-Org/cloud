@@ -42,9 +42,7 @@ vi.mock('@tanstack/react-query', () => ({
   hashKey: (key: unknown) => JSON.stringify(key),
 }));
 
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('sonner-native', () => ({
   toast: {

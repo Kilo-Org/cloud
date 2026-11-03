@@ -13,6 +13,7 @@ import type { CloudAgentSessionScopeV2 } from '@kilocode/session-ingest-contract
 import {
   encodeCloudAgentSessionScopeV2Headers,
   parseCloudAgentSessionScopeV2Headers,
+  tryEncodeCloudAgentSessionScopeV2Headers,
 } from '@kilocode/session-ingest-contracts';
 import {
   CLOUD_AGENT_SCOPE_MAX_ANCESTRY_DEPTH,
@@ -370,6 +371,44 @@ describe('Cloud Agent session scope v2 header codec', () => {
     const headers = encodeCloudAgentSessionScopeV2Headers(input);
     expect(headers.expectedOrganization).toBe('personal');
     expect(parseCloudAgentSessionScopeV2Headers(headers)).toEqual({ kind: 'ok', scope: input });
+  });
+
+  it.each([
+    ['a worktree id that is not a UUID', 'worktree_test'],
+    ['a scope id without the worktree prefix', 'workspace_11111111-1111-4111-8111-111111111111'],
+  ])('refuses to encode %s', (_label, invalidWorktreeId) => {
+    const scope = {
+      worktreeId: invalidWorktreeId as CloudAgentSessionScopeV2['worktreeId'],
+      organizationId,
+      memberRootKiloSessionIds: [memberRootId],
+    };
+
+    expect(tryEncodeCloudAgentSessionScopeV2Headers(scope)).toBeNull();
+    expect(() => encodeCloudAgentSessionScopeV2Headers(scope)).toThrow(/not encodable/);
+  });
+
+  it.each([
+    ['a non-uuid organization', { organizationId: 'org-a' }],
+    ['an empty member-root list', { memberRootKiloSessionIds: [] }],
+    [
+      'more member roots than the contract allows',
+      {
+        memberRootKiloSessionIds: Array.from(
+          { length: 33 },
+          (_, index) => `ses_${index.toString(36).padStart(26, '0')}`
+        ),
+      },
+    ],
+  ])('refuses to encode %s', (_label, override) => {
+    const scope: CloudAgentSessionScopeV2 = {
+      worktreeId,
+      organizationId,
+      memberRootKiloSessionIds: [memberRootId],
+      ...override,
+    };
+
+    expect(tryEncodeCloudAgentSessionScopeV2Headers(scope)).toBeNull();
+    expect(() => encodeCloudAgentSessionScopeV2Headers(scope)).toThrow(/not encodable/);
   });
 
   it('de-duplicates repeated member roots', () => {

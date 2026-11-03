@@ -20,8 +20,10 @@ import type { EditGroupConfig } from '@kilocode/web-shared/lib/organizations/org
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
-import { isOrganizationAutoTargetModel } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  isOrganizationAutoTargetModel,
+  isOrganizationCustomRouterTarget,
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -168,8 +170,11 @@ export function ModeForm({
   const modelOptions = useMemo(
     () =>
       (modelsData?.data || []).filter(model => {
-        if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
+        if (model.isCustomLlm) {
           return false;
+        }
+        if (isOrganizationCustomRouterTarget(model.id)) {
+          return true;
         }
         if (model.id.startsWith('kilo-auto/')) {
           return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);

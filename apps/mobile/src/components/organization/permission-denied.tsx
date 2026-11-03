@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type PermissionDeniedProps = Readonly<{
   description: string;
@@ -28,6 +29,7 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
       action={
         <Button
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => {
             router.back();
           }}

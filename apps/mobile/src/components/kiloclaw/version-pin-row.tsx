@@ -85,7 +85,7 @@ export function VersionPinRow({
               {t('kiloclaw.versionPin.reasonOptional')}
             </Text>
             <TextInput
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground"
               placeholder={t('kiloclaw.versionPin.reasonPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               onFocus={onFocusReason}

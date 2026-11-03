@@ -193,13 +193,13 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          if ! ENV_OUTPUT=$(pnpx eas-cli@24.8.0 env:list --environment production --format long 2>&1); then
+          if ! ENV_OUTPUT=$(pnpm exec eas env:list --environment production --format long 2>&1); then
             echo "$ENV_OUTPUT"
             echo "::error::eas env:list failed"
             exit 1
           fi
           MISSING=""
-          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
               MISSING="$MISSING $NAME"
             fi
@@ -219,7 +219,7 @@ jobs:
         # makes that evaluation throw on env the CLI never injects. SENTRY_AUTH_TOKEN
         # is a SECRET variable that only EAS builders can read, so the assertion run
         # gets a placeholder. The step above proves the real secret exists.
-        run: pnpx eas-cli@24.8.0 env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
+        run: pnpm exec eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
 
   build-and-submit:
     needs: [check-changes, validate, preflight]
@@ -250,9 +250,19 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        # eas-cli evaluates app.config.ts itself before it submits, and it syncs
+        # the App ID capabilities from what that evaluation returns. A release
+        # must be evaluated as the production profile: an unset EAS_BUILD_PROFILE
+        # makes app.config.ts evaluate as non-production, which puts the dev-only
+        # File Provider testing-mode entitlement in the extension's EAS entry.
+        # Apple then rejects the capability sync and the whole build command
+        # fails before any artifact exists. env:exec injects the production
+        # environment for that evaluation (a bare EAS_BUILD_PROFILE throws on the
+        # values it never sees), and SENTRY_AUTH_TOKEN is a SECRET variable only
+        # a builder can read, so the evaluation gets the preflight placeholder.
         run: |
           mkdir -p artifacts
-          pnpx eas-cli@24.8.0 build --profile production --platform all --non-interactive --json --wait > build.json
+          pnpm exec eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm exec eas build --profile production --platform all --non-interactive --json --wait > build.json'
           node ../../scripts/inspect-mobile-artifacts.mjs --select build.json > urls.txt
           echo "IOS_URL=$(sed -n '1p' urls.txt)" >> "$GITHUB_ENV"
           echo "ANDROID_URL=$(sed -n '2p' urls.txt)" >> "$GITHUB_ENV"
@@ -376,13 +386,13 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@24.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
+        run: pnpm exec eas submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
 
       - name: Submit Android
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@24.8.0 submit --profile production --platform android --non-interactive --path artifacts/app.aab
+        run: pnpm exec eas submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
       # Release detection only: the next run reads this to find the last release.
       # The upload cap never counts it (a partial run writes no release tag).
@@ -465,37 +475,30 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write # push the bump branch
-      pull-requests: read # look for an open bump PR to reuse its branch
     outputs:
       branch: ${{ steps.pending.outputs.branch || steps.bump.outputs.branch }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
-      # An open bump PR already carries the next version. A second one would
-      # bump to the same number and conflict with it.
-      # Only a PR from this repository counts: `gh pr list` also returns PRs
-      # opened from forks, and a fork PR whose head branch happens to be named
-      # `kilo-app-version-bump-x.y.z` would make this job skip the bump and
-      # publish a branch the changelog job cannot fetch from origin. The
-      # version would never be bumped while that PR stayed open.
-      - name: Look for an open bump PR
+      # Reuse the branch even when a retry has not opened its PR yet.
+      - name: Look for the next version branch
         id: pending
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCHES=$(gh pr list --state open --limit 100 --json headRefName,isCrossRepository \
-            --jq '[.[] | select((.headRefName | startswith("kilo-app-version-bump-")) and (.isCrossRepository | not))] | .[].headRefName')
-          OPEN=$(printf '%s\n' "$BRANCHES" | grep -c . || true)
-          if [ "$OPEN" != "0" ]; then
-            echo "A kilo-app version bump PR is already open — nothing to open."
-          fi
-          # A PR head ref is a name a stranger can choose. It is consumed by the
-          # changelog job's shell, so accept only the exact name this pipeline
-          # creates and fail loudly on anything else.
-          BRANCH=$(printf '%s\n' "$BRANCHES" | head -n 1)
-          if [ -n "$BRANCH" ] && ! printf '%s' "$BRANCH" | grep -qE '^kilo-app-version-bump-[0-9.]+$'; then
-            echo "::error::Refusing a version-bump branch this pipeline did not create: $BRANCH"
+          OLD=$(sed -n "s/^  version: '\([0-9][0-9.]*\)',$/\1/p" apps/mobile/app.config.ts)
+          if [ -z "$OLD" ]; then
+            echo "::error::Could not read the version line from apps/mobile/app.config.ts"
             exit 1
+          fi
+          NEW=$(echo "$OLD" | awk -F. '{print $1"."$2"."$3+1}')
+          BRANCH="kilo-app-version-bump-$NEW"
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH"; then
+            OPEN=1
+          else
+            STATUS=$?
+            if [ "$STATUS" != "2" ]; then
+              exit "$STATUS"
+            fi
+            OPEN=0
           fi
           echo "open=$OPEN" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
@@ -526,8 +529,7 @@ jobs:
           git checkout -b "kilo-app-version-bump-$NEW"
           git add apps/mobile/app.config.ts
           git commit -m "chore(kilo-app): bump version to $NEW"
-          # Force: a re-run rewrites the same single line onto the same branch.
-          git push -fu origin "kilo-app-version-bump-$NEW"
+          git push -u origin "kilo-app-version-bump-$NEW"
 
   # The changelog section rides the version-bump branch, not main. Main is
   # protected by the `main-reviews` ruleset (pull_request, 1 approval,
@@ -631,6 +633,5 @@ jobs:
               --head "$BRANCH" \
               --title "chore(kilo-app): bump version to $NEW" \
               --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md" \
-              --assignee iscekic \
-              --reviewer iscekic
+              --assignee iscekic
           fi

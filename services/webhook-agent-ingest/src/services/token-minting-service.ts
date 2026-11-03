@@ -6,6 +6,7 @@ import {
   findUserForToken,
   organizationExists,
   ensureBotUserForOrg,
+  isDirectOrgMember,
   type WorkerDb,
 } from '../db/queries.js';
 import { logger } from '../util/logger.js';
@@ -22,6 +23,7 @@ export type TokenMintingEnv = {
 };
 
 type MintTokenParams = {
+  executionUserId?: string | null;
   userId?: string | null;
   orgId?: string | null;
   triggerId: string;
@@ -35,6 +37,8 @@ type MintTokenResult = {
 
 // Fixed botId for webhook tokens - used for attribution/analytics
 const WEBHOOK_BOT_ID = 'webhook-bot';
+
+export class CreatorExecutionAuthorizationError extends Error {}
 
 export function getTokenMintingService(env: TokenMintingEnv): TokenMintingService {
   return new TokenMintingService(env);
@@ -70,10 +74,48 @@ export class TokenMintingService {
    * Mint a short-lived API token for webhook processing.
    *
    * For personal triggers: mints token for the real user
-   * For org triggers: mints token for the webhook bot user
+   * For org triggers: uses the configured creator, otherwise the webhook bot user.
    */
   async mintToken(params: MintTokenParams): Promise<MintTokenResult> {
     const db = this.getDb();
+
+    if (params.executionUserId != null) {
+      if (!params.orgId || params.userId || !params.executionUserId) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution requires an organization trigger'
+        );
+      }
+      if (!(await organizationExists(db, params.orgId))) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution organization not found or deleted'
+        );
+      }
+      const user = await findUserForToken(db, params.executionUserId);
+      if (!user) {
+        throw new CreatorExecutionAuthorizationError('Creator execution user not found');
+      }
+      if (user.blocked_at || user.blocked_reason) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution user is blocked or deleted'
+        );
+      }
+      if (!(await isDirectOrgMember(db, params.orgId, user.id))) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution user is no longer a direct organization member'
+        );
+      }
+      const token = await this.signToken(
+        {
+          kiloUserId: user.id,
+          apiTokenPepper: user.api_token_pepper,
+          organizationId: params.orgId,
+          internalApiUse: true,
+          createdOnPlatform: 'webhook',
+        },
+        true
+      );
+      return { token, userId: user.id, isBot: false };
+    }
 
     if (params.userId) {
       // Personal trigger - mint token for the real user
@@ -144,20 +186,21 @@ export class TokenMintingService {
     }
   }
 
-  /**
-   * Sign a Kilo API token (v3) with the given payload.
-   */
-  private async signToken(payload: {
-    kiloUserId: string;
-    apiTokenPepper: string | null;
-    botId?: string;
-    organizationId?: string;
-    internalApiUse: boolean;
-    createdOnPlatform: string;
-  }): Promise<string> {
+  private async signToken(
+    payload: {
+      kiloUserId: string;
+      apiTokenPepper: string | null;
+      botId?: string;
+      organizationId?: string;
+      internalApiUse: boolean;
+      createdOnPlatform: string;
+    },
+    requireModern = false
+  ): Promise<string> {
     const jwtSecret = await this.getJwtSecret();
 
     if (
+      requireModern ||
       this.env.SHARED_RESOURCE_TOKENS_ENABLED === true ||
       this.env.SHARED_RESOURCE_TOKENS_ENABLED === 'true'
     ) {

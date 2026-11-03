@@ -9,7 +9,11 @@ import type {
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
 } from './types';
-import { partSettledAt } from './part-utils';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import type { TransportFactory, TransportSink } from './transport';
 
 type CliHistoricalTransportConfig = {
@@ -40,32 +44,9 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
   return (sink: TransportSink) => {
     let generation = 0;
 
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
-
+    function replayCompletedPage(page: SessionSnapshotPage): void {
+      replaySnapshotPage(sink, page);
       sink.onServiceEvent({ type: 'stopped', reason: 'complete' });
-    }
-
-    function replaySnapshot(snapshot: SessionSnapshot): void {
-      replayPage({
-        info: snapshot.info,
-        messages: snapshot.messages,
-        nextCursor: null,
-        omittedItemCount: 0,
-      });
     }
 
     return {
@@ -85,19 +66,13 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
               }
               if (page.kind === 'success') {
                 config.onInitialPageLoaded?.(page);
-                replayPage(page);
+                replayCompletedPage(page);
                 return;
               }
               // Typed failure: surface via onError and mark the session as
               // stopped with `error` so the UI doesn't appear to load
               // forever.
-              const message =
-                page.kind === 'retryable_failure'
-                  ? 'Session history temporarily unavailable'
-                  : page.kind === 'too_large'
-                    ? 'Session history too large to load'
-                    : 'Session history is unavailable';
-              config.onError?.(message);
+              config.onError?.(sessionSnapshotFailureMessage(page.kind));
               sink.onServiceEvent({ type: 'stopped', reason: 'error' });
             },
             (error: unknown) => {
@@ -120,7 +95,7 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
         void config.fetchSnapshot(config.kiloSessionId).then(
           snapshot => {
             if (expectedGeneration !== generation) return;
-            replaySnapshot(snapshot);
+            replayCompletedPage(snapshotPageFromSnapshot(snapshot));
           },
           (error: unknown) => {
             if (expectedGeneration !== generation) return;

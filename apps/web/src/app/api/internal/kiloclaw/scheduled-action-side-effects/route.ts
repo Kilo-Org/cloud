@@ -12,19 +12,11 @@
  * Auth: X-Internal-Secret header.
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@kilocode/web-shared/lib/email';
-
-// Constant-time comparison so a public attacker can't probe the
-// internal-api secret via response-timing differences.
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  return timingSafeEqual(provided, expected);
-}
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we
 // only read the fields we need for the email path. Other channels can
@@ -130,10 +122,8 @@ function versionChangeSection(body: Body): string {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(rawBody);

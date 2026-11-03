@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, type Text as RNText, ScrollView, type TextInput, View } from 'react-native';
+import { Pressable, ScrollView, type TextInput, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,8 @@ import {
   formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +91,7 @@ export function QuestionCard({
   // reachable by VoiceOver while still landing focus on the card when it
   // appears. A missing node handle on the first paint is recovered by a
   // follow-up focus inside the shared appearance helper.
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
   useEffect(
@@ -98,7 +100,7 @@ export function QuestionCard({
       // request is replaced or the card unmounts.
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     [requestId]
   );
@@ -169,7 +171,7 @@ export function QuestionCard({
   }
 
   function handleSubmit() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onAnswer(buildAnswers());
   }
 
@@ -183,7 +185,7 @@ export function QuestionCard({
   }
 
   function handleRetrySkip() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onReject();
   }
 
@@ -315,7 +317,8 @@ export function QuestionCard({
                           customInputRefs.current[qIndex]?.focus();
                         }}
                         className={cn(
-                          'min-h-11 flex-row items-center justify-between rounded-md border px-3',
+                          ROW_TARGET_CLASS,
+                          'flex-row items-center justify-between rounded-md border px-3',
                           isCustomActive
                             ? 'border-primary bg-primary'
                             : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',

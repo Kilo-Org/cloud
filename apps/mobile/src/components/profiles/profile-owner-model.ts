@@ -13,13 +13,20 @@
 export type ProfileOwnerChoice = 'personal' | 'organization';
 
 /**
- * The owner tag a profile list item carries. The server tags organization rows
- * `organization` and personal rows `user` (`ProfilesListDialog.tsx:95-98`).
+ * The owner tag a profile list item carries. `agentProfiles.listCombined` tags
+ * its rows `organization` or `user`; `agentProfiles.list` leaves the tag off,
+ * and an untagged row is personal.
  */
 type ProfileOwnerType = 'user' | 'organization';
 
 /** The part of a profile summary ownership depends on. */
 type OwnerBearing = { ownerType?: ProfileOwnerType };
+
+/**
+ * Every owner a create can carry, in the order the form offers them. A route
+ * param allowlist and `ownerChoices` both read this one list.
+ */
+export const PROFILE_OWNER_CHOICES: readonly ProfileOwnerChoice[] = ['personal', 'organization'];
 
 /**
  * The owner choices a create screen offers. An organization context offers
@@ -29,7 +36,7 @@ type OwnerBearing = { ownerType?: ProfileOwnerType };
 export function ownerChoices(
   organizationId: string | null | undefined
 ): readonly ProfileOwnerChoice[] {
-  return hasOrganizationContext(organizationId) ? ['personal', 'organization'] : ['personal'];
+  return hasOrganizationContext(organizationId) ? PROFILE_OWNER_CHOICES : ['personal'];
 }
 
 /** Whether an organization context is active, i.e. ownership is a choice. */

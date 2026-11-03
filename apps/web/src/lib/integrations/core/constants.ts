@@ -34,7 +34,6 @@ export const GITHUB_EVENT = {
   REPOSITORY: 'repository',
 
   // Issue events
-  ISSUES: 'issues',
   ISSUE_COMMENT: 'issue_comment',
 
   // Pull request events

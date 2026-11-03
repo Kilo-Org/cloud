@@ -4,8 +4,10 @@ import { expect, it, vi } from 'vitest';
 // hooks, transitions) with app-unlock-context.mounted.test.tsx, which sits at
 // its max-lines budget.
 import {
+  action,
   expectState,
   finish,
+  flush,
   mount,
   native,
   settleReadRetries,
@@ -65,4 +67,34 @@ it('does not re-read a deterministic invalid value on foreground recovery', asyn
   await transition('active', 300_000);
   expectState(false, 'unlocked');
   expect(storage.getItemAsync).toHaveBeenCalledTimes(1);
+});
+
+it('clears a setting outcome but keeps a locked-scene outcome', async () => {
+  // A failed enable attempt publishes its outcome with the setting purpose;
+  // the screen that started it retires both on blur. The scope guard leaves a
+  // locked-scene outcome (purpose 'unlock') untouched.
+  native.authenticateAsync.mockResolvedValueOnce({ success: false, error: 'not_available' });
+  await mount('disabled');
+  await action(true);
+  expect(state().purpose).toBe('setting');
+  expect(state().outcome).toEqual({ status: 'setup-required', reason: 'not-available' });
+  await flush(() => {
+    state().clearSettingOutcome();
+  });
+  expect(state().purpose).toBeNull();
+  expect(state().outcome).toBeNull();
+
+  // An unlock purpose is never cleared by the screen-scoped call: the failed
+  // attempt behind the lock keeps its feedback for the Retry surface. A fresh
+  // provider with the preference enabled mounts locked and prompts once; the
+  // mock's failure lands on that cold-start attempt.
+  native.authenticateAsync.mockResolvedValueOnce({ success: false, error: 'lockout' });
+  await mount('enabled', false);
+  expect(state().purpose).toBe('unlock');
+  expect(state().outcome).toEqual({ status: 'lockout' });
+  await flush(() => {
+    state().clearSettingOutcome();
+  });
+  expect(state().purpose).toBe('unlock');
+  expect(state().outcome).toEqual({ status: 'lockout' });
 });

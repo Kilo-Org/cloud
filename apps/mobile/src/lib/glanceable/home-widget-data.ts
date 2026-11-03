@@ -1,6 +1,7 @@
 import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
+  isTerminalGlanceableStatus,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   EMPTY_HOME_WIDGET_DETAILS,
@@ -86,7 +87,7 @@ export function clearHomeWidgetData(): void {
 /** Accept only a confirmed fetch. Render time and failed fetches cannot renew the timestamp. */
 export function rememberHomeWidgetData(data: HomeWidgetData): boolean {
   const snapshot = data.snapshot;
-  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+  if (isTerminalGlanceableStatus(snapshot.status)) {
     epoch += 1;
     details = EMPTY_HOME_WIDGET_DETAILS;
     lastData = { snapshot, details };
@@ -125,10 +126,10 @@ export function rememberHomeWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): 
 }
 
 export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot): HomeWidgetData {
-  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+  if (isTerminalGlanceableStatus(snapshot.status)) {
     return { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
   }
-  if (lastData?.snapshot.status === 'signed_out' || lastData?.snapshot.status === 'privacy') {
+  if (lastData !== null && isTerminalGlanceableStatus(lastData.snapshot.status)) {
     return { snapshot: lastData.snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
   }
   const retained = lastData?.snapshot.scopeKey === snapshot.scopeKey ? lastData : null;

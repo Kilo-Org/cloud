@@ -9,12 +9,17 @@
  * showed "1 stavki" and "2 stavki" for exactly that reason.
  *
  * This script finds every counted message in the mobile source and checks that
- * English declares its plural family. With `--source-only` it stops after
- * English, which is the check the mobile app owns. Without the flag it also
- * measures every other catalog: for each family and each language it looks for
- * the categories that language's own plural rules require, and prints one line
- * per language with the number of families the language is missing. That is
- * the report the translation pass works from.
+ * English declares its plural family. A call site whose key is a variable —
+ * `t(mcp.view.statusKey, { count })` — is checked through the reviewed
+ * `DYNAMIC_COUNTED_KEYS` list, which names the keys each expression can
+ * produce; an unlisted variable-key call is a problem of its own. With
+ * `--source-only` it stops after English, which is the check the mobile app
+ * owns. Without the flag it also measures every other catalog: for each family
+ * and each language it looks for the categories that language's own plural
+ * rules require, and prints one line per language with the number of families
+ * the language is missing. That is the report the translation pass works from,
+ * so the app's `check:plurals` passes `--source-only`; the locale categories
+ * are gated in CI by `check:i18n` (`check-catalogs.mjs`).
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
@@ -26,6 +31,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+import { endOfComment, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -62,18 +70,18 @@ export const NO_AGREEMENT = new Map([
     'chat.reactions.accessibility',
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
-  ['codeReviewer.overview.nSelected', 'participle: "{{displayCount}} selected" has no count form'],
-  ['prReview.checks.passed', 'participle: "{{displayCount}} passed" has no count form'],
-  ['prReview.checks.failed', 'participle: "{{displayCount}} failed" has no count form'],
+  [
+    'codeReviewer.repos.allModeCount',
+    'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
+  ],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
-  ['prReview.checks.skipped', 'participle: "{{displayCount}} skipped" has no count form'],
   [
     'prReview.discussion.reactionPill',
     'the noun is already a family: "{{emoji}} reaction, {{displayCount}} {{countLabel}}"',
   ],
   [
-    'securityAgent.analysis.whereFound',
-    'bare count in parentheses: "Where this was found ({{displayCount}})"',
+    'securityAgent.auditReport.severityCount',
+    'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
   ],
   [
     'securityAgent.remediation.attemptHistory',
@@ -113,43 +121,31 @@ export const NO_AGREEMENT = new Map([
     'progress read-out: "Loading {{loaded}} of {{total}} lines…" — "lines" counts loaded, and the row is a spinner',
   ],
   ['prReview.hunkRows.loadingContext', 'progress read-out: "Loading context…" has no count'],
+  [
+    'modelChat.mcp.available',
+    'carried count, no inflected word: "Tools available: {{count}}" counts by number alone',
+  ],
+  ['modelChat.mcp.connecting', 'carried count, no inflected word: "Connecting to Kilo tools…"'],
+  ['modelChat.mcp.none', 'carried count, no inflected word: "No tools available"'],
+  ['modelChat.mcp.off', 'carried count, no inflected word: "Kilo tools are off"'],
+  [
+    'modelChat.mcp.unauthorized',
+    'carried count, no inflected word: "Kilo tools refused this session"',
+  ],
+  ['modelChat.mcp.unavailable', 'carried count, no inflected word: "Kilo tools are not available"'],
+  ['modelChat.mcp.unreachable', 'carried count, no inflected word: "Couldn\'t reach Kilo tools"'],
+  ['modelChat.mcp.serverChecking', 'carried count, no inflected word: "Checking this server…"'],
+  ['modelChat.mcp.serverOff', 'carried count, no inflected word: "This server is off"'],
+  [
+    'modelChat.mcp.serverUnreachable',
+    'carried count, no inflected word: "Couldn\'t reach this server"',
+  ],
+  [
+    'modelChat.mcpOAuth.serverNeedsSignIn',
+    'carried count, no inflected word: "Sign in to use this server"',
+  ],
+  ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
 ]);
-
-/** The source files the audit scans: app code, not tests or mounted harnesses. */
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (
-      /\.tsx?$/.test(entry.name) &&
-      !entry.name.includes('.test.') &&
-      !entry.name.includes('.mounted.')
-    ) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
-/** Skip a quoted run, returning the index of its closing quote. */
-function skipString(text, start) {
-  const quote = text[start];
-  let i = start + 1;
-  while (i < text.length) {
-    if (text[i] === '\\') {
-      i += 2;
-      continue;
-    }
-    if (text[i] === quote) {
-      return i;
-    }
-    i++;
-  }
-  return text.length - 1;
-}
 
 /** Whether the character opens/closes a bracket that changes nesting depth. */
 const OPENERS = '([{';
@@ -162,19 +158,12 @@ const CLOSERS = ')]}';
 function findCallClose(text, openIndex) {
   const stack = [];
   for (let i = openIndex; i < text.length; i++) {
+    const skipped = endOfQuotedOrComment(text, i);
+    if (skipped !== -1) {
+      i = skipped - 1;
+      continue;
+    }
     const ch = text[i];
-    if (ch === "'" || ch === '"' || ch === '`') {
-      i = skipString(text, i);
-      continue;
-    }
-    if (ch === '/' && text[i + 1] === '/') {
-      const newline = text.indexOf('\n', i);
-      if (newline === -1) {
-        return -1;
-      }
-      i = newline;
-      continue;
-    }
     if (OPENERS.includes(ch)) {
       stack.push(ch);
     } else if (CLOSERS.includes(ch)) {
@@ -187,15 +176,16 @@ function findCallClose(text, openIndex) {
   return -1;
 }
 
-/** The index of the first comma that is not inside a string or bracket. */
+/** The index of the first comma outside a string, comment or bracket. */
 function findTopLevelComma(text) {
   const stack = [];
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === "'" || ch === '"' || ch === '`') {
-      i = skipString(text, i);
+    const skipped = endOfQuotedOrComment(text, i);
+    if (skipped !== -1) {
+      i = skipped - 1;
       continue;
     }
+    const ch = text[i];
     if (OPENERS.includes(ch)) {
       stack.push(ch);
     } else if (CLOSERS.includes(ch)) {
@@ -208,47 +198,71 @@ function findTopLevelComma(text) {
 }
 
 /**
- * The property names written directly on the options object `{ … }`. A nested
- * call's argument named `count` is not a property of the options, so the depth
- * filter keeps the scan honest.
+ * The property names written in key position on the options object `{ … }`.
+ *
+ * Only a token the object's own grammar puts in key position counts: the first
+ * token after the object's `{` or after a depth-1 comma. There it is a name
+ * when it is an identifier (or shorthand closed by `,`/`}`), a quoted literal
+ * or a backtick literal without `${`, and followed by `:`. A value never is:
+ * in `{ label: count }` only `label` names an option, in `{ format: () => count }`
+ * the arrow body is inside `()` and `{}`, and a nested call's argument is inside
+ * its own brackets. A computed key such as `{ [key]: n }` holds an expression,
+ * which this scan cannot read, so it names nothing; the audit reports a counted
+ * call only through the names it can see.
  */
 function optionsPropertyNames(objectText) {
   const names = new Set();
   if (!objectText.startsWith('{')) {
     return names;
   }
-  let depth = 0;
+  const stack = [];
+  let expectKey = false;
   let i = 0;
   while (i < objectText.length) {
     const ch = objectText[i];
-    if (ch === "'" || ch === '"' || ch === '`') {
-      i = skipString(objectText, i) + 1;
+    if (/\s/.test(ch)) {
+      i++;
       continue;
     }
+    if (ch === '/') {
+      const comment = endOfComment(objectText, i);
+      if (comment !== -1) {
+        i = comment;
+        continue;
+      }
+    }
     if (OPENERS.includes(ch)) {
-      depth++;
+      stack.push(ch);
+      expectKey = ch === '{' && stack.length === 1;
       i++;
       continue;
     }
     if (CLOSERS.includes(ch)) {
-      depth--;
+      stack.pop();
+      expectKey = false;
       i++;
       continue;
     }
-    if (depth === 1 && /[A-Za-z_$]/.test(ch)) {
-      let end = i;
-      while (end < objectText.length && /[\w$]/.test(objectText[end])) {
-        end++;
+    if (ch === ',') {
+      expectKey = stack.length === 1;
+      i++;
+      continue;
+    }
+    if (expectKey && stack.length === 1) {
+      expectKey = false;
+      const key = propertyNameAt(objectText, i);
+      if (key !== null) {
+        names.add(key.name);
+        i = key.end;
+        continue;
       }
-      const name = objectText.slice(i, end);
-      let next = end;
-      while (next < objectText.length && /\s/.test(objectText[next])) {
-        next++;
-      }
-      if (objectText[next] === ':' || objectText[next] === ',' || objectText[next] === '}') {
-        names.add(name);
-      }
-      i = end;
+    }
+    // Everywhere else a quoted run is a value: a bracket or a comma inside it
+    // is text, and nothing in it names an option.
+    const quoted = endOfQuotedOrComment(objectText, i);
+    if (quoted !== -1) {
+      expectKey = false;
+      i = quoted;
       continue;
     }
     i++;
@@ -256,8 +270,84 @@ function optionsPropertyNames(objectText) {
   return names;
 }
 
-/** The options object text of a `t('key', { … })` call, or null. */
-function optionsObjectText(text, openIndex) {
+/**
+ * The property name written at `start` when it is a key rather than an
+ * expression, with the index just past it.
+ */
+function propertyNameAt(text, start) {
+  const char = text[start];
+  if (char === '"' || char === "'" || char === '`') {
+    const end = endOfQuotedOrComment(text, start);
+    const literal = text.slice(start + 1, end - 1);
+    // A `${…}` in a backtick key makes it a computed key, not a literal one.
+    if (char === '`' && literal.includes('${')) {
+      return null;
+    }
+    return text[firstCodeIndex(text, end)] === ':' ? { name: literal, end } : null;
+  }
+  if (!/[A-Za-z_$]/.test(char)) {
+    return null;
+  }
+  let end = start;
+  while (end < text.length && /[\w$]/.test(text[end])) {
+    end++;
+  }
+  const next = text[firstCodeIndex(text, end)];
+  return next === ':' || next === ',' || next === '}'
+    ? { name: text.slice(start, end), end }
+    : null;
+}
+
+/** A quoted literal key argument: `'k'`, `"k"` or a backtick run without `${`. */
+function literalKeyArgument(text, start) {
+  const quote = text[start];
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null;
+  }
+  let i = start + 1;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (quote === '`' && ch === '$' && text[i + 1] === '{') {
+      return null;
+    }
+    if (ch === quote) {
+      return text.slice(start + 1, i).replace(/\\(['"`\\])/g, '$1');
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * The index of the first character that is neither whitespace nor part of a
+ * comment, so a scan reads the code after a comment rather than the comment.
+ */
+function firstCodeIndex(text, start = 0) {
+  let i = start;
+  while (i < text.length) {
+    if (/\s/.test(text[i])) {
+      i++;
+      continue;
+    }
+    const end = endOfComment(text, i);
+    if (end === -1) {
+      return i;
+    }
+    i = end;
+  }
+  return text.length;
+}
+
+/** One counted call: its literal key, or the expression the key comes from. */
+function countedCall(text, keyStart) {
+  const openIndex = text.indexOf('(', keyStart);
+  if (openIndex === -1) {
+    return null;
+  }
   const closeIndex = findCallClose(text, openIndex);
   if (closeIndex === -1) {
     return null;
@@ -267,33 +357,170 @@ function optionsObjectText(text, openIndex) {
   if (comma === -1) {
     return null;
   }
-  const rest = argsText.slice(comma + 1).trim();
-  return rest.startsWith('{') ? rest : null;
+  // A comment between the comma and the options object is trivia, not the
+  // options: read the object from the first code character after the comma.
+  const options = argsText.slice(firstCodeIndex(argsText, comma + 1));
+  if (!options.startsWith('{')) {
+    return null;
+  }
+  const optionNames = optionsPropertyNames(options);
+  if (!COUNTED_OPTIONS.some(name => optionNames.has(name))) {
+    return null;
+  }
+  const firstArgStart = firstCodeIndex(argsText);
+  const first = argsText.slice(firstArgStart, comma).replace(/\s+/g, ' ').trim();
+  const literal = literalKeyArgument(argsText, firstArgStart);
+  return literal === null ? { dynamic: first } : { key: literal };
+}
+
+/** Every static counted key: `t('key', { … count … })` and its quoted variants. */
+export function collectCountedKeys(rootDir = SOURCE_DIR) {
+  return countedKeysFrom(collectCountedCalls(rootDir));
 }
 
 /**
- * Every key the source hands a count to: `t('key', { … })` and
- * `i18n.t('key', { … })` whose options carry `count`, `displayCount` or
- * `itemCount`. Sorted so the check's output is stable.
+ * Every counted call whose key is a variable expression, as the expression the
+ * source writes it, whitespace-normalized. A listed expression in
+ * `DYNAMIC_COUNTED_KEYS` names the keys it can produce; an unlisted one is an
+ * audit problem, because the audit cannot see which messages a count reaches.
  */
-export function collectCountedKeys(rootDir = SOURCE_DIR) {
-  const counted = new Set();
-  const callPattern = /(?<![\w.$])(?:i18n\.)?t\(\s*'([^'\\\n]*)'/g;
-  for (const file of sourceFiles(rootDir)) {
+export function collectDynamicCountedCalls(rootDir = SOURCE_DIR) {
+  return dynamicCallsFrom(collectCountedCalls(rootDir));
+}
+
+/** The literal-key view of one collection of counted calls. */
+function countedKeysFrom(calls) {
+  const keys = new Set();
+  for (const call of calls) {
+    if (call.key !== undefined) {
+      keys.add(call.key);
+    }
+  }
+  return [...keys].sort();
+}
+
+/** The dynamic-expression view of one collection of counted calls. */
+function dynamicCallsFrom(calls) {
+  const dynamic = new Set();
+  for (const call of calls) {
+    if (call.dynamic !== undefined) {
+      dynamic.add(call.dynamic);
+    }
+  }
+  return [...dynamic].sort();
+}
+
+/** One traversal of the source tree: every counted call the audit found. */
+function collectCountedCalls(rootDir) {
+  const calls = [];
+  const callPattern = /(?<![\w.$])(?:i18n\.)?t\s*\(/g;
+  for (const file of sourceFiles(rootDir, isTestArtifact)) {
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(callPattern)) {
-      const options = optionsObjectText(text, match.index + match[0].indexOf('('));
-      if (options === null) {
-        continue;
-      }
-      const names = optionsPropertyNames(options);
-      if (COUNTED_OPTIONS.some(name => names.has(name))) {
-        counted.add(match[1]);
+      const call = countedCall(text, match.index);
+      if (call !== null) {
+        calls.push(call);
       }
     }
   }
-  return [...counted].sort();
+  return calls;
 }
+
+/**
+ * Every key the `McpStatusKey` union in `mcp-settings-state.ts` can name, in the
+ * order the union lists them. Two call sites select from that union, so the
+ * set is written once: a member added to the union is audited by adding it
+ * here, and the audit then expects a plural family or its own `NO_AGREEMENT`
+ * entry for it. The list decides which keys the audit looks at, never whether
+ * their copy inflects.
+ */
+const MCP_STATUS_KEYS = [
+  'modelChat.mcp.available',
+  'modelChat.mcp.connecting',
+  'modelChat.mcp.none',
+  'modelChat.mcp.off',
+  'modelChat.mcp.unauthorized',
+  'modelChat.mcp.unavailable',
+  'modelChat.mcp.unreachable',
+];
+
+/**
+ * The variable-key counted calls the audit has reviewed, with the keys each
+ * expression can produce and where that set is pinned. A key here is checked
+ * exactly like a literal one: a plural family, or a `NO_AGREEMENT` entry.
+ */
+export const DYNAMIC_COUNTED_KEYS = new Map([
+  [
+    'mcp.view.statusKey',
+    {
+      keys: MCP_STATUS_KEYS,
+      reason: 'McpStatusKey union in mcp-settings-state.ts; only the count-free statuses',
+    },
+  ],
+  [
+    'kilo.statusKey',
+    {
+      keys: MCP_STATUS_KEYS,
+      reason: 'same McpStatusKey union through kiloServerRow in mcp-settings-state.ts',
+    },
+  ],
+  [
+    'row.statusKey',
+    {
+      keys: [
+        'modelChat.mcp.none',
+        'modelChat.mcp.serverChecking',
+        'modelChat.mcp.serverOff',
+        'modelChat.mcp.serverToolCount',
+        'modelChat.mcp.serverUnreachable',
+        'modelChat.mcpOAuth.serverNeedsSignIn',
+      ],
+      reason: 'RemoteMcpStatusKey union in mcp-settings-state.ts; serverToolCount inflects',
+    },
+  ],
+  [
+    'COUNT_KEYS[item.kind]',
+    {
+      keys: [
+        'profiles.counts.vars',
+        'profiles.counts.mcp',
+        'profiles.counts.skills',
+        'profiles.counts.commands',
+        'profiles.counts.setupCommands',
+        'profiles.counts.agents',
+      ],
+      reason: 'COUNT_KEYS map in profile-count-labels.ts; every unit word but MCP inflects',
+    },
+  ],
+  [
+    'STATUS_LABEL_KEY[status]',
+    {
+      keys: [
+        'prReview.checks.passed',
+        'prReview.checks.failed',
+        'prReview.checks.pending',
+        'prReview.checks.skipped',
+      ],
+      reason:
+        'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
+    },
+  ],
+  [
+    'BUCKET_KEYS[bucket]',
+    {
+      keys: [
+        'securityAgent.dashboard.repoSummaryOpen',
+        'securityAgent.dashboard.repoSummaryCritical',
+        'securityAgent.dashboard.repoSummaryHigh',
+        'securityAgent.dashboardMetrics.breakdownCritical',
+        'securityAgent.dashboardMetrics.breakdownHigh',
+        'securityAgent.dashboardMetrics.breakdownMediumLow',
+      ],
+      reason:
+        'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
+    },
+  ],
+]);
 
 /** Flatten a catalog to dotted keys, the same shape check-catalogs.mjs uses. */
 function flatten(value, prefix = '', out = new Map()) {
@@ -333,16 +560,77 @@ function hasFamily(english, key) {
   return english.has(`${key}_one`) && english.has(`${key}_other`);
 }
 
+/** The variable i18next selects a plural category from, and the number itself. */
+const COUNT_PLACEHOLDER = /{{\s*count\s*}}/;
+
 /**
- * The counted keys that are neither a plural family in English nor a reviewed
- * `NO_AGREEMENT` entry. Empty on a healthy tree; every entry is a message whose
- * count cannot select a form.
+ * The families every locale owes the categories its own plural rules require.
+ *
+ * A family English declares is owed, unless English builds its copy from
+ * `{{count}}` — the variable that is the count. Those families were accepted
+ * with the flat-key fallback: a locale whose wording inflects no word keeps the
+ * one string and renders it at every count, so it owes no categories until it
+ * declares a member itself. A family built from `{{displayCount}}` or
+ * `{{itemCount}}` carries the caller's formatted number instead and gets no such
+ * fallback. `check-catalogs.mjs` splits the same way in its `englishCountedBases`,
+ * so both gates stay in step while they read the same placeholder.
+ */
+function familiesOwedByEveryLocale(english) {
+  const numeralFamilies = new Set(
+    [...english]
+      .filter(([, value]) => COUNT_PLACEHOLDER.test(value))
+      .map(([key]) => pluralFamilyBase(key) ?? key)
+  );
+  return new Set(
+    englishPluralFamilies(english).filter(
+      family => hasFamily(english, family) && !numeralFamilies.has(family)
+    )
+  );
+}
+
+/**
+ * Every counted key the audit is responsible for: the literal ones and every
+ * key a reviewed dynamic call can produce.
+ */
+function auditKeys(calls) {
+  const keys = new Set(countedKeysFrom(calls));
+  for (const expression of dynamicCallsFrom(calls)) {
+    const listed = DYNAMIC_COUNTED_KEYS.get(expression);
+    if (listed !== undefined) {
+      for (const key of listed.keys) {
+        keys.add(key);
+      }
+    }
+  }
+  return [...keys].sort();
+}
+
+/** The unlisted dynamic calls among one collection of counted calls. */
+function unlistedDynamicCalls(calls) {
+  return dynamicCallsFrom(calls).filter(expression => !DYNAMIC_COUNTED_KEYS.has(expression));
+}
+
+/** The countless counted keys among one collection, checked against `english`. */
+function countlessFamilies(calls, english) {
+  return auditKeys(calls).filter(key => !NO_AGREEMENT.has(key) && !hasFamily(english, key));
+}
+
+/**
+ * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
+ * one is a call whose possible messages the audit cannot see.
+ */
+export function findUnlistedDynamicCalls(rootDir = SOURCE_DIR) {
+  return unlistedDynamicCalls(collectCountedCalls(rootDir));
+}
+
+/**
+ * The counted keys — literal, or produced by a reviewed dynamic call — that
+ * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
+ * Empty on a healthy tree; every entry is a message whose count cannot select
+ * a form.
  */
 export function findCountlessFamilies(rootDir = SOURCE_DIR, localesDir = LOCALES_DIR) {
-  const english = readEnglishCatalog(localesDir);
-  return collectCountedKeys(rootDir).filter(
-    key => !NO_AGREEMENT.has(key) && !hasFamily(english, key)
-  );
+  return countlessFamilies(collectCountedCalls(rootDir), readEnglishCatalog(localesDir));
 }
 
 /** The locale tags present on disk, without the `.json` extension. */
@@ -356,21 +644,24 @@ function localeTags(localesDir = LOCALES_DIR) {
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
+  const calls = collectCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
 
-  for (const key of collectCountedKeys()) {
-    if (NO_AGREEMENT.has(key)) {
-      continue;
-    }
-    if (!hasFamily(english, key)) {
-      problems.push(
-        `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
-      );
-    }
+  for (const key of countlessFamilies(calls, english)) {
+    problems.push(
+      `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
+    );
+  }
+
+  for (const expression of unlistedDynamicCalls(calls)) {
+    problems.push(
+      `en: counted call with variable key "${expression}" is not listed in DYNAMIC_COUNTED_KEYS; name its possible keys or add the call site's expression`
+    );
   }
 
   if (!sourceOnly) {
     const families = englishPluralFamilies(english);
+    const owed = familiesOwedByEveryLocale(english);
     const report = [];
     let totalKeys = 0;
     for (const tag of localeTags()) {
@@ -379,8 +670,23 @@ function run() {
       }
       const catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
       const categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+      const localeFamilyBases = new Set();
+      for (const key of catalog.keys()) {
+        const base = pluralFamilyBase(key);
+        if (base !== null) {
+          localeFamilyBases.add(base);
+        }
+      }
       let flagged = 0;
       for (const family of families) {
+        // A locale may keep the flat counted key and fall back to it when the
+        // copy inflects no word of its own; it only owes categories once it
+        // (or the audit's own rule) declares the family.
+        const localeDeclared = localeFamilyBases.has(family);
+        const mandatory = localeDeclared || owed.has(family);
+        if (!mandatory) {
+          continue;
+        }
         if (categories.some(category => !catalog.has(`${family}_${category}`))) {
           flagged++;
         }
@@ -407,8 +713,8 @@ function run() {
 
   console.log(
     sourceOnly
-      ? 'check-plurals: en declares a plural family for every counted message'
-      : 'check-plurals: every counted message and every locale declares its plural categories'
+      ? 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT'
+      : 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT, and every required plural family declares its locale categories'
   );
 }
 

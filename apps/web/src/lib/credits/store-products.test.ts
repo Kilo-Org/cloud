@@ -1,13 +1,25 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 import {
   STORE_CREDIT_PRODUCTS,
+  EXPIRING_GOOGLE_CREDIT_PRODUCTS,
+  getMobileCreditProducts,
   getStoreCreditProductByAppleProductId,
   getStoreCreditProductByGoogleProductId,
   storeCreditPaymentId,
 } from './store-products';
+
+jest.mock('@kilocode/web-shared/lib/paidCreditPolicy.server', () => ({
+  getPaidCreditTerms: jest.fn(() => 'legacy'),
+}));
+
+const mockGetPaidCreditTerms = jest.mocked(getPaidCreditTerms);
+beforeEach(() => {
+  mockGetPaidCreditTerms.mockReturnValue('legacy');
+});
 
 describe('STORE_CREDIT_PRODUCTS', () => {
   it('lists exactly the four preset packs in order', () => {
@@ -30,6 +42,35 @@ describe('STORE_CREDIT_PRODUCTS', () => {
     expect(STORE_CREDIT_PRODUCTS.map(product => product.amountMicrodollars)).toEqual([
       10_000_000, 50_000_000, 100_000_000, 500_000_000,
     ]);
+  });
+});
+
+describe('mobile paid-credit catalog cutover', () => {
+  it('keeps old apps on legacy SKUs after activation', () => {
+    mockGetPaidCreditTerms.mockReturnValue('one_year');
+    expect(getMobileCreditProducts()).toBe(STORE_CREDIT_PRODUCTS);
+    expect(getMobileCreditProducts(false)).toBe(STORE_CREDIT_PRODUCTS);
+  });
+
+  it('requires both capability and activation for the new disclosed SKUs', () => {
+    expect(getMobileCreditProducts(true)).toBe(STORE_CREDIT_PRODUCTS);
+    mockGetPaidCreditTerms.mockReturnValue('one_year');
+    expect(getMobileCreditProducts(true)).toBe(EXPIRING_GOOGLE_CREDIT_PRODUCTS);
+    expect(EXPIRING_GOOGLE_CREDIT_PRODUCTS.map(product => product.googleProductId)).toEqual([
+      'credits_usd10_1year_v2',
+      'credits_usd50_1year_v2',
+      'credits_usd100_1year_v2',
+      'credits_usd500_1year_v2',
+    ]);
+  });
+
+  it('continues verifying both receipt generations', () => {
+    expect(getStoreCreditProductByGoogleProductId('credits_usd10')?.creditExpiryPolicy).toBe(
+      'never'
+    );
+    expect(
+      getStoreCreditProductByGoogleProductId('credits_usd10_1year_v2')?.creditExpiryPolicy
+    ).toBe('one_year');
   });
 });
 

@@ -1,13 +1,8 @@
 import pLimit from 'p-limit';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getRawOpenRouterModels,
   normalizeModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import {
-  convertFromKiloExclusiveModel,
-  getInferenceProvider,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -16,28 +11,48 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
-import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
+import { modelsByProvider, ai_gateway_config } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { desc, eq, lt, sql } from 'drizzle-orm';
+import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
-import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
-import { syncDirectByokModels } from '@/lib/providers/direct-byok/sync-direct-byok';
+import {
+  EndpointsSchema,
+  ModelsSchema,
+  VercelModelIdOverridesConfigSchema,
+  type VercelModelIdOverride,
+} from '@kilocode/db/schema-types';
+import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
-import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
+import {
+  injectExtraProviderModels,
+  injectVercelOnlyProviders,
+} from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import {
+  getVercelModelIdOverrides,
+  type VercelModelIdOverrides,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { buildVercelModelIdOverrides } from '@/lib/providers/openrouter/vercel-model-id-overrides';
+import { fetchModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  fetchCustomLlmsFromDatabase,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/public-custom-llm-snapshot';
+import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-direct-byok-providers';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -58,7 +73,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
     headers,
   });
   if (!modelsResponse.ok) {
-    throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
+    throw new Error(`Fetching models from ${gateway.type} failed: ${modelsResponse.status}`);
   }
   const models = ModelsSchema.parse(await modelsResponse.json());
 
@@ -79,7 +94,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
         }
         if (!endpointsResponse.ok) {
           throw new Error(
-            `Fetching model endpoints for ${gateway.id}/${model.id} failed: ${endpointsResponse.status}`
+            `Fetching model endpoints for ${gateway.type}/${model.id} failed: ${endpointsResponse.status}`
           );
         }
         const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
@@ -102,15 +117,15 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
 
   if (modelsWithoutEndpoints.length > 0) {
     console.warn(
-      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.id} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
+      `[fetchGatewayModels] skipped ${modelsWithoutEndpoints.length} ${gateway.type} models without endpoints: ${modelsWithoutEndpoints.sort().join(', ')}`
     );
   }
 
   const count = Object.keys(result).length;
   if (count < 100) {
-    throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
+    throw new Error(`Suspicious: total number of ${gateway.type} models is ${count} < 100`);
   }
-  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
+  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.type}`);
 
   return result;
 }
@@ -149,8 +164,17 @@ async function syncProviders(params: {
   openRouterModels: Record<string, StoredModel>;
   openRouterCatalogModels: CatalogModel[];
   vercelModels: Record<string, StoredModel>;
+  vercelModelIdOverrides: VercelModelIdOverrides;
+  customLlms: CustomLlm[];
 }) {
-  const { providers, openRouterModels, openRouterCatalogModels, vercelModels } = params;
+  const {
+    providers,
+    openRouterModels,
+    openRouterCatalogModels,
+    vercelModels,
+    vercelModelIdOverrides,
+    customLlms,
+  } = params;
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -185,44 +209,14 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData);
+  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
 
-  const mappedExtraModels = kiloExclusiveModels
-    .flatMap(kfm => {
-      if (kfm.status !== 'public') return [];
-      const inferenceProvider = getInferenceProvider(kfm);
-      if (!inferenceProvider) return [];
-      return [{ kfm, inferenceProvider }];
-    })
-    .map(({ kfm, inferenceProvider }) => {
-      const model = convertFromKiloExclusiveModel(kfm);
-      return {
-        model: {
-          slug: normalizeModelId(model.id),
-          name: model.name,
-          author: 'Other',
-          description: model.description,
-          context_length: model.context_length,
-          input_modalities: model.architecture.input_modalities,
-          output_modalities: model.architecture.output_modalities,
-          group: 'other',
-          updated_at: new Date().toISOString(),
-          endpoint: {
-            provider_display_name: 'Other',
-            is_free: !kfm.pricing,
-            pricing: {
-              prompt: model.pricing.prompt,
-              completion: model.pricing.completion,
-            },
-            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
-              !unavailableModelIds.has(kfm.public_id) && {
-                data_policy: { training: true, retainsPrompts: true },
-              }),
-          },
-        },
-        provider: inferenceProvider,
-      };
-    });
+  const mappedExtraModels = buildPublicCustomLlmSnapshotModels(
+    customLlms,
+    unavailableModelIds,
+    new Date().toISOString()
+  );
 
   for (const extraModel of mappedExtraModels) {
     const providerData = providerModelData.find(
@@ -241,8 +235,6 @@ async function syncProviders(params: {
   applyFreeEndpointDataPolicy({
     providerModelData,
     openRouterFreeEndpoints,
-    kiloExclusiveModels,
-    unavailableModelIds,
   });
 
   injectVirtualModels({
@@ -289,7 +281,7 @@ async function syncProviders(params: {
 
   const allProviders = [...normalizedProviders];
 
-  // Auto-detect providers referenced by extra models that aren't already present
+  // Synthesize providers referenced by extra models that aren't already present
   const missingProviders = new Map(
     mappedExtraModels
       .map(m => m.provider)
@@ -319,7 +311,9 @@ async function syncProviders(params: {
   }
 
   // Sort providers by name
-  const sortedProviders = allProviders.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedProviders = (await injectDirectByokProviders(allProviders)).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   // Calculate total models across all providers
   const totalModels = sortedProviders.reduce((sum, provider) => sum + provider.models.length, 0);
@@ -332,6 +326,35 @@ async function syncProviders(params: {
   };
 
   return result;
+}
+
+async function generateVercelModelIdOverrides(
+  openrouterModels: Record<string, StoredModel>,
+  vercelModels: Record<string, StoredModel>
+): Promise<VercelModelIdOverride[] | null> {
+  try {
+    return buildVercelModelIdOverrides({
+      modelsDevCatalog: await fetchModelsDevCatalog(),
+      openrouterModelIds: new Set(Object.keys(openrouterModels)),
+      vercelModelIds: new Set(Object.keys(vercelModels)),
+    });
+  } catch (err) {
+    console.error('[sync-providers] generating Vercel model ID overrides failed', err);
+    captureException(err, { tags: { component: 'sync-providers-vercel-model-id-overrides' } });
+    return null;
+  }
+}
+
+async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
+  const value =
+    overrides.length === 0 ? null : VercelModelIdOverridesConfigSchema.parse({ overrides });
+  await db
+    .insert(ai_gateway_config)
+    .values({ id: 1, vercel_model_id_overrides: value })
+    .onConflictDoUpdate({
+      target: ai_gateway_config.id,
+      set: { vercel_model_id_overrides: value },
+    });
 }
 
 /**
@@ -411,11 +434,26 @@ export async function syncAndStoreProviders() {
 
   const openRouterCatalog = await getRawOpenRouterModels();
 
+  const generatedVercelModelIdOverrides = await generateVercelModelIdOverrides(
+    openrouter_data,
+    vercel_data
+  );
+  const vercelModelIdOverrides: VercelModelIdOverrides = generatedVercelModelIdOverrides
+    ? new Map(
+        generatedVercelModelIdOverrides.map(override => [
+          override.openrouter_model_id,
+          override.vercel_model_id,
+        ])
+      )
+    : await getVercelModelIdOverrides();
+
   const providers = await syncProviders({
     providers: openrouterProviders,
     openRouterModels: openrouter_data,
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels: vercel_data,
+    vercelModelIdOverrides,
+    customLlms: await fetchCustomLlmsFromDatabase(),
   });
 
   if (providers.total_providers < 10) {
@@ -426,31 +464,17 @@ export async function syncAndStoreProviders() {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
   }
 
+  if (generatedVercelModelIdOverrides) {
+    await storeVercelModelIdOverrides(generatedVercelModelIdOverrides);
+  }
+
   const result = await applySnapshotChangesAndAudit({
     providers,
     openrouter_data,
     vercel_data,
   });
 
-  const direct_byok_model_counts = await syncDirectByokModels();
-  console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
-
-  const completed_at = await db.transaction(async tx => {
-    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
-    const [row] = await tx
-      .select({ id: ai_gateway_sync_providers_state.id })
-      .from(ai_gateway_sync_providers_state)
-      .where(eq(ai_gateway_sync_providers_state.id, 1))
-      .for('update');
-    if (!row) throw new Error('Sync-providers state row is missing');
-
-    const completedAt = new Date().toISOString();
-    await tx
-      .update(ai_gateway_sync_providers_state)
-      .set({ last_completed_at: completedAt })
-      .where(eq(ai_gateway_sync_providers_state.id, 1));
-    return completedAt;
-  });
+  const completed_at = await recordSyncCompleted('providers');
 
   return {
     id: result.id,
@@ -458,7 +482,6 @@ export async function syncAndStoreProviders() {
     completed_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
-    direct_byok_model_counts,
     time: performance.now() - startTime,
   };
 }

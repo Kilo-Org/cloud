@@ -1,8 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -11,16 +12,18 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
-  | { key: string; kind: 'repo'; repo: RepoOption };
+  | { key: string; kind: 'repo'; repo: RepoOption; showPlatform: boolean };
 
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -42,10 +45,9 @@ export default function RepoPickerScreen() {
       setBridge(nextBridge);
       setSearch('');
 
-      return () => {
-        repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
     }, [])
   );
 
@@ -64,6 +66,9 @@ export default function RepoPickerScreen() {
         key: `${repo.platform}:${repo.fullName}`,
         kind: 'repo',
         repo,
+        // A flat search result has no section header, so the row names its
+        // provider itself.
+        showPlatform: true,
       }));
     }
     const sections = bridge?.sections ?? [];
@@ -72,7 +77,16 @@ export default function RepoPickerScreen() {
       if (section.repos.length > 0) {
         items.push({ key: `header:${section.key}`, kind: 'header', titleKey: section.titleKey });
         for (const repo of section.repos) {
-          items.push({ key: `${repo.platform}:${repo.fullName}`, kind: 'repo', repo });
+          items.push({
+            key: `${repo.platform}:${repo.fullName}`,
+            kind: 'repo',
+            repo,
+            // A provider section header already carries the provider, so
+            // repeating it on every row only steals width from the repository
+            // name. "Recently used" mixes providers under a header that names
+            // none of them, so those rows keep their provider cell.
+            showPlatform: section.key === 'recents',
+          });
         }
       }
     }
@@ -81,7 +95,8 @@ export default function RepoPickerScreen() {
 
   const handleSelect = useCallback(
     (repo: string) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
+      dismissSearchPickerKeyboard();
       bridgeRef.current?.onSelect(repo);
       repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
       bridgeRef.current = undefined;
@@ -105,6 +120,7 @@ export default function RepoPickerScreen() {
     <PickerSheet
       title={t('agentChat.repoPicker.title')}
       onDone={closePicker}
+      scrollable={false}
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
           <Search size={18} color={colors.mutedForeground} />
@@ -164,11 +180,17 @@ export default function RepoPickerScreen() {
           }
         />
       ) : (
-        // Mapped rows inside the shell ScrollView instead of a FlatList: the
-        // FlatList stretches into the space the formSheet offers and its rows
-        // painted over the pinned search header while scrolling. The shell
-        // scroll view starts below the header, so a row can never overlap it.
-        <View>
+        // Mapped rows inside the list's own scroll view rather than a virtualized
+        // list: the shell keeps its header and the pinned search field above the
+        // scroller, so a row can never paint over them. The list owns the sheet's
+        // scroll so its search field and rows share one tap contract — the first
+        // tap on a row arrives even while the search keyboard is up.
+        <ScrollView
+          className="flex-1"
+          nestedScrollEnabled
+          {...SEARCHABLE_PICKER_LIST_PROPS}
+          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+        >
           {listItems.map(item => {
             if (item.kind === 'header') {
               return (
@@ -200,21 +222,34 @@ export default function RepoPickerScreen() {
                 ) : (
                   <Unlock size={14} color={colors.mutedForeground} />
                 )}
-                <Text
-                  className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
-                  numberOfLines={1}
-                >
-                  {platformName}
-                </Text>
-                <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-                  {repo.fullName}
-                </Text>
+                {item.showPlatform ? (
+                  <Text
+                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                    numberOfLines={1}
+                  >
+                    {platformName}
+                  </Text>
+                ) : null}
+                {/* Middle ellipsis keeps both ends of the name: long names in a
+                    large organization share a prefix, so a tail cut made every
+                    row look identical and hid the distinguishing suffix. The
+                    min-w-0 box truncates inside the row, so the name can never
+                    run into the trailing check. */}
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="text-base text-foreground"
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
+                    {repo.fullName}
+                  </Text>
+                </View>
                 {isSelected ? <Check size={18} color={colors.primary} /> : null}
               </Pressable>
             );
           })}
           {renderBitbucketNote()}
-        </View>
+        </ScrollView>
       )}
     </PickerSheet>
   );

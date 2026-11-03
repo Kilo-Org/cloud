@@ -87,9 +87,10 @@ file before you change any file in this package.
     dependency's own imports, and `skipLibCheck: true` removes the rest of the
     leverage. So the rule is checked by reading the build, not by trusting the
     compiler, and `pnpm check:platform` is what reads it. It runs after
-    `pnpm build` as the last step of `pnpm check`, and it fails on an import of
-    a Node builtin anywhere, or on `globalThis`, `process` or `Buffer` under
-    `core/`. It matches code, not prose: `core/id.ts` names `node:crypto` in a
+    `pnpm build` inside `pnpm check:ci`, `pnpm check:package` follows it, and
+    `pnpm check` then runs `test:perf`. It fails on an import of a Node
+    builtin anywhere, or on `globalThis`, `process` or `Buffer` under `core/`.
+    It matches code, not prose: `core/id.ts` names `node:crypto` in a
     comment explaining why it does not import it.
 13. Measure, do not guess. A decision about performance is made from data.
     Write the benchmark, run it, and put the number in the commit message or
@@ -1480,9 +1481,11 @@ at once, to batch, or to buffer.
 
 `src/plugins/store/sqlite.ts` holds every query. The seam is `driver.ts`: one
 function — run this SQL with these parameters, give back the rows by position —
-so `node.ts` and `expo.ts` are about twenty lines each and share all of it.
-`rows.ts` says what a row means and asserts it, and `migrate.ts` applies the
-migrations the bundle carries.
+so `node.ts` and `expo.ts` share every query, and each adds only what its
+platform needs. `expo.ts` is the larger of the two because a native statement
+is asynchronous, is worth preparing once, and must not be stepped while another
+statement on the same connection writes. `rows.ts` says what a row means and
+asserts it, and `migrate.ts` applies the migrations the bundle carries.
 
 The schema is written in `schema.ts` and the SQL is generated from it, so a
 migration and a query can never disagree about a column. Run `pnpm migrations`
@@ -1530,6 +1533,17 @@ takes the first writer's rows with it, and the first then commits nothing. So
 `driver.ts` pairs a driver with the line its writes queue in, and `transact`
 holds that line for the whole unit. Reads stay out of it — a session holds
 itself while it writes, so no read asks for the rows being written.
+
+**A read never straddles a write, and a statement is prepared once.** The line
+keeps two writers apart; it says nothing about a reader. That is enough on
+`node:sqlite`, where a statement runs to completion in one call, and not enough
+on Expo, where a read is a run and then a fetch of its rows with an `await`
+between them. So `expoDriver` holds the connection for the whole of a read and
+alone for a write: SQLite does not support changing a table while a cursor is
+open on it. It also prepares each SQL text once and runs it again, keeping up to
+four idle statements per text so two reads of one query do not wait for each
+other, and finalizes every one of them when the store's layer is released —
+`SqlDriver.close` is that hook, and a driver that keeps no handle leaves it out.
 
 **An image is stored as base64, not as a blob.** Base64 is what every gateway
 shape wants on the wire, so storing it that way costs a third more space and
@@ -1790,8 +1804,9 @@ the entry even with the key.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither: 18.8 MB
-unpacked between them, against 4 runtime dependencies that are all used.
+build, so both are dev dependencies and a consumer installs neither: 21.5 MiB
+and 14.2 MiB unpacked at `openai` 7.36.0 and `@anthropic-ai/sdk` 0.137.0,
+against 4 runtime dependencies that are all used.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither

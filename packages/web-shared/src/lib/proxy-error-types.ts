@@ -19,7 +19,6 @@ export const proxyErrorTypeSchema = z.enum([
   'rate_limit_exceeded',
   'account_restricted',
   'paid_model_auth_required',
-  'promotion_limit_reached',
   'unsupported_fim_model',
   'unsupported_edit_model',
   'insufficient_credits',
@@ -28,8 +27,14 @@ export const proxyErrorTypeSchema = z.enum([
   'upstream_error',
   'no_free_models_available',
   'organization_auto_configuration',
+  'direct_byok_catalog_only',
+  'custom_router',
+  'auto_routing_unavailable',
+  'invalid_auto_decision',
   'upstream_disconnect',
   'client_disconnect',
+  'guardrail_blocked',
+  'guardrail_unavailable',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

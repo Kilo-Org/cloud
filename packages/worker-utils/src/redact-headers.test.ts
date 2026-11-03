@@ -12,6 +12,7 @@ describe('redactSensitiveHeaders', () => {
       'x-gitlab-token': 'glpat-secret',
       'x-hub-signature': 'sha1=abc',
       'x-hub-signature-256': 'sha256=def',
+      'x-kilo-briefing-settlement': 'generation-capability',
       'content-type': 'application/json',
       'x-request-id': '123',
     };
@@ -27,6 +28,7 @@ describe('redactSensitiveHeaders', () => {
       'x-gitlab-token': '[REDACTED]',
       'x-hub-signature': '[REDACTED]',
       'x-hub-signature-256': '[REDACTED]',
+      'x-kilo-briefing-settlement': '[REDACTED]',
       'content-type': 'application/json',
       'x-request-id': '123',
     });

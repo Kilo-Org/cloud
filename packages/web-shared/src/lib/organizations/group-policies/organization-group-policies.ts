@@ -22,6 +22,9 @@ export type {
 
 export const MAX_ORGANIZATION_GROUP_POLICIES = 20;
 
+export const ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE =
+  'Groups are available to Enterprise organizations.';
+
 export const OrganizationGroupPolicyTypeSchema = z.enum([
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
 ]);

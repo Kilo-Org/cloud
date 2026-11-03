@@ -9,6 +9,8 @@ import { NewTaskFromPictureButton } from '@/components/home/new-task-from-pictur
 const state = vi.hoisted(() => ({
   userId: 'user-1' as string | undefined,
   push: vi.fn(),
+  focusEffects: [] as (() => void)[],
+  now: 1_700_000_000_000,
   pickAgentPicture: vi.fn(),
   stagePictureForNewSession: vi.fn(),
   recovery: vi.fn(),
@@ -22,7 +24,12 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: state.push }),
+  useFocusEffect: (effect: () => void) => {
+    state.focusEffects.push(effect);
+  },
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
@@ -70,11 +77,43 @@ function entry(): TestRenderer.ReactTestInstance {
   return node;
 }
 
+/** The entry's press handler, narrowed once for the calls below. */
+function pressHandler(): () => void {
+  const handler: unknown = entry().props.onPress;
+  if (typeof handler !== 'function') {
+    throw new TypeError('Expected the picture entry to carry a press handler');
+  }
+  return handler as () => void;
+}
+
 /** Press the entry and let its async handler settle. */
 async function press(): Promise<void> {
   await act(async () => {
-    (entry().props.onPress as () => void)();
+    pressHandler()();
     await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+/** Press the entry twice, as a fast double tap does, and let both settle. */
+async function doublePress(): Promise<void> {
+  await act(async () => {
+    const handler = pressHandler();
+    handler();
+    handler();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+/** Run the focus effect the way the screen regaining focus does. */
+async function regainFocus(): Promise<void> {
+  await act(async () => {
+    for (const effect of state.focusEffects) {
+      effect();
+    }
     await Promise.resolve();
   });
 }
@@ -98,6 +137,9 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.userId = 'user-1';
   state.push.mockReset();
+  state.focusEffects = [];
+  state.now = 1_700_000_000_000;
+  vi.spyOn(Date, 'now').mockImplementation(() => state.now);
   state.pickAgentPicture.mockReset();
   state.stagePictureForNewSession.mockReset().mockReturnValue(null);
   state.recovery.mockReset();
@@ -106,6 +148,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  vi.restoreAllMocks();
 });
 
 describe('NewTaskFromPictureButton', () => {
@@ -131,10 +174,7 @@ describe('NewTaskFromPictureButton', () => {
 
     await press();
 
-    expect(state.stagePictureForNewSession).toHaveBeenCalledExactlyOnceWith({
-      candidates: [],
-      organizationId: 'org-1',
-    });
+    expect(state.stagePictureForNewSession).not.toHaveBeenCalled();
     expect(state.push).not.toHaveBeenCalled();
   });
 
@@ -186,5 +226,42 @@ describe('NewTaskFromPictureButton', () => {
       organizationId: 'org-1',
     });
     expect(state.push).toHaveBeenCalledExactlyOnceWith('/(app)/agent-chat/new?shareId=share-2');
+  });
+
+  it('opens the composer once on a fast double tap', async () => {
+    const candidate: Candidate = { name: 'photo.png', uri: 'file:///cache/photo.png' };
+    state.pickAgentPicture.mockResolvedValue([candidate]);
+    state.stagePictureForNewSession.mockReturnValue('/(app)/agent-chat/new?shareId=share-1');
+    await mount();
+
+    await doublePress();
+
+    expect(state.push).toHaveBeenCalledExactlyOnceWith('/(app)/agent-chat/new?shareId=share-1');
+  });
+
+  it('opens the composer again on a tap after the guard window', async () => {
+    const candidate: Candidate = { name: 'photo.png', uri: 'file:///cache/photo.png' };
+    state.pickAgentPicture.mockResolvedValue([candidate]);
+    state.stagePictureForNewSession.mockReturnValue('/(app)/agent-chat/new?shareId=share-1');
+    await mount();
+    await press();
+
+    state.now += 1000;
+    await press();
+
+    expect(state.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the composer again after the screen regains focus', async () => {
+    const candidate: Candidate = { name: 'photo.png', uri: 'file:///cache/photo.png' };
+    state.pickAgentPicture.mockResolvedValue([candidate]);
+    state.stagePictureForNewSession.mockReturnValue('/(app)/agent-chat/new?shareId=share-1');
+    await mount();
+    await doublePress();
+    await regainFocus();
+
+    await press();
+
+    expect(state.push).toHaveBeenCalledTimes(2);
   });
 });

@@ -2,7 +2,7 @@
  * Durable outbox state machine for Bouncer usage events of spend-watched requests.
  *
  * The AI-gateway usage write enqueues a row in the same transaction as the `microdollar_usage`
- * insert when the request's decide verdict said `spendWatch`. The gateway then claims that one row
+ * insert when the request's decide verdict said `spendWatch`. The writer then claims that one row
  * and tries an immediate delivery; the cron drainer in
  * `packages/web-shared/src/lib/bouncer/dispatch-usage-event-outbox.ts` retries the rest:
  *
@@ -108,7 +108,7 @@ export async function claimDueBouncerUsageEvents(
 }
 
 /**
- * Claims the one `pending` row for `requestId`, for the gateway's immediate delivery right after
+ * Claims the one `pending` row for `requestId`, for the writer's immediate delivery right after
  * the usage write commits. Returns null when the row is absent, already claimed by the drainer, or
  * already terminal, so the immediate delivery never races the drainer.
  */

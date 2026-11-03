@@ -115,7 +115,10 @@ vi.mock('./container-concurrency.js', async importOriginal => ({
 }));
 
 import { billingHeartbeatSeconds, MeteredSandbox } from './container-usage.js';
-import { ContainerConcurrencyLimitError } from './container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from './container-concurrency.js';
 import {
   PREVIEW_MARKER_ALLOCATION_HEADER,
   PREVIEW_MARKER_PORT_HEADER,
@@ -925,7 +928,7 @@ describe('MeteredSandbox', () => {
           durable_object_id: 'do-id',
           vcpu: '2',
           memory_mib: '6144',
-          disk_mb: '10000',
+          disk_mb: '20000',
         },
       })
     );
@@ -1561,6 +1564,7 @@ describe('MeteredSandbox container capacity', () => {
 
       expect(capacity.assertContainerCapacity).toHaveBeenCalledWith(expect.anything(), {
         subject: billingInput.subject,
+        actor: billingInput.actor,
         instanceId: billingInput.sandboxId,
         checkpoint: 'sandbox-start',
         billingOrigin: billingInput.metadata.origin,
@@ -1569,14 +1573,15 @@ describe('MeteredSandbox container capacity', () => {
     }
   );
 
-  it('refuses the start when the account is at its limit', async () => {
+  it.each([
+    new ContainerConcurrencyLimitError('organization', 50),
+    new ContainerCapacityUnavailableError(),
+  ])('refuses the physical start after capacity denial: %s', async denial => {
     const { sandbox } = createSandbox();
     await sandbox.configureBilling(billingInput);
-    capacity.assertContainerCapacity.mockRejectedValue(
-      new ContainerConcurrencyLimitError('organization', 50)
-    );
+    capacity.assertContainerCapacity.mockRejectedValue(denial);
 
-    await expect(sandbox.start()).rejects.toBeInstanceOf(ContainerConcurrencyLimitError);
+    await expect(sandbox.start()).rejects.toBe(denial);
     expect(sandbox.startCalls).toBe(0);
   });
 

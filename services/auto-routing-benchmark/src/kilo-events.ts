@@ -1,17 +1,10 @@
-// Pure parser for the `kilo run --format json` event stream.
-//
-// The CLI emits one JSON event per line on stdout. We care about two things:
-//   1. The final assistant answer — assembled from completed `text` events
-//      (those whose part has `time.end` set), concatenated in order.
-//   2. Total cost — summed across `step-finish` events' `part.cost` (USD).
-//
-// Event shapes vary across CLI versions; we accept both the documented
-// `evt.part.*` shape and a flattened `evt.*` shape, preferring `part.*`.
-// Everything is optional-chained so malformed lines can't throw.
-
 export type ParsedKiloRun = {
   text: string;
   costUsd: number | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
   // Diagnostics for empty-output investigations: how many event lines parsed
   // and the trailing event types (never the payloads, which may be sensitive).
   eventCount: number;
@@ -26,6 +19,12 @@ type LooseEvent = {
   part?: {
     text?: unknown;
     cost?: unknown;
+    tokens?: {
+      input?: unknown;
+      cache?: { read?: unknown };
+      output?: unknown;
+      reasoning?: unknown;
+    };
     time?: { end?: unknown };
   };
 };
@@ -49,9 +48,17 @@ function readCost(evt: LooseEvent): number | null {
   return null;
 }
 
+function readTokenCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
   const textParts: string[] = [];
   let costUsd: number | null = null;
+  let inputTokens: number | null = null;
+  let cachedInputTokens: number | null = null;
+  let outputTokens: number | null = null;
+  let reasoningTokens: number | null = null;
   const eventTypes: string[] = [];
 
   for (const line of lines) {
@@ -74,12 +81,25 @@ export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
     if (evt.type === 'step_finish' || evt.type === 'step-finish') {
       const cost = readCost(evt);
       if (cost !== null) costUsd = (costUsd ?? 0) + cost;
+      const tokens = evt.part?.tokens;
+      const input = readTokenCount(tokens?.input);
+      const cachedInput = readTokenCount(tokens?.cache?.read);
+      const output = readTokenCount(tokens?.output);
+      const reasoning = readTokenCount(tokens?.reasoning);
+      if (input !== null) inputTokens = (inputTokens ?? 0) + input;
+      if (cachedInput !== null) cachedInputTokens = (cachedInputTokens ?? 0) + cachedInput;
+      if (output !== null) outputTokens = (outputTokens ?? 0) + output;
+      if (reasoning !== null) reasoningTokens = (reasoningTokens ?? 0) + reasoning;
     }
   }
 
   return {
     text: textParts.join('\n'),
     costUsd,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
     eventCount: eventTypes.length,
     lastEventTypes: eventTypes.slice(-3),
   };

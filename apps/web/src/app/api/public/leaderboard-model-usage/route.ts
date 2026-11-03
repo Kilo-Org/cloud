@@ -25,7 +25,11 @@ where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()
     and mu.total_input_tokens > 0
-    and mu.provider != 'custom'
+    and (
+        mu.provider != 'custom'
+        or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
+        or coalesce(mu.requested_model, mu.model) = 'stealth/glyph-cluster'
+    )
 group by 1, 2, 3
 order by 1 desc, 4 desc;
 `;

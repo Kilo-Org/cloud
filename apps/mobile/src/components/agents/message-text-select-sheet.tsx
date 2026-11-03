@@ -30,7 +30,9 @@ export function MessageTextSelectSheet({ text, onClose }: Readonly<MessageTextSe
 
       {text.length > 0 ? (
         <ScrollView contentContainerClassName="px-6 pb-6 pt-3">
-          <SelectableText className="text-base leading-6 text-foreground">{text}</SelectableText>
+          <SelectableText className="text-base leading-[1.5rem] text-foreground">
+            {text}
+          </SelectableText>
         </ScrollView>
       ) : null}
 

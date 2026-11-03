@@ -18,6 +18,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Globe: 'Globe',
+  History: 'History',
   Mic: 'Mic',
   SlidersHorizontal: 'SlidersHorizontal',
   Wallet: 'Wallet',
@@ -68,7 +69,7 @@ describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();
 
-    expect(hubRows(renderer)).toHaveLength(6);
+    expect(hubRows(renderer)).toHaveLength(7);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
     expect(row(renderer, 'Voice input').props).toMatchObject({
       icon: 'Mic',
@@ -92,6 +93,11 @@ describe('PreferencesScreen hub', () => {
       subtitle: 'Push preferences',
       last: true,
     });
+    expect(row(renderer, i18n.t('notifications.history.title')).props).toMatchObject({
+      icon: 'History',
+      subtitle: 'Notifications this account received',
+      last: true,
+    });
     expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
       icon: 'Wallet',
       last: true,
@@ -103,7 +109,8 @@ describe('PreferencesScreen hub', () => {
     ['Voice input', '/(app)/(tabs)/(3_profile)/voice-input'],
     ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
-    ['Notifications', '/(app)/(tabs)/(3_profile)/notifications'],
+    ['Notifications', '/(app)/notifications'],
+    [i18n.t('notifications.history.title'), '/(app)/(tabs)/(3_profile)/notification-history'],
     [i18n.t('notifications.channel.spend'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
   ])('pushes the %s subpage from its row', async (title, route) => {
     const renderer = await mountPreferences();

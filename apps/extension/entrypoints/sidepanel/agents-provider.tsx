@@ -19,6 +19,7 @@ export interface ExtensionAgentsContextValue {
   readonly store: ReturnType<typeof createStore>;
   readonly trpcClient: TrpcClient;
   readonly organizationId: string | null;
+  readonly token: string;
 }
 
 const ExtensionAgentsContext = createContext<ExtensionAgentsContextValue | null>(null);
@@ -69,7 +70,14 @@ export const ExtensionAgentsProvider = ({
       userWebConnection,
     });
 
-    ref.current = { manager, organizationId, store, trpcClient, userWebConnection };
+    ref.current = {
+      manager,
+      organizationId,
+      store,
+      token: auth.token,
+      trpcClient,
+      userWebConnection,
+    };
   }
 
   useEffect(() => {

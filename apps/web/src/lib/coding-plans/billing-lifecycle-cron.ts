@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
@@ -254,14 +255,10 @@ async function sweepRenewals(
       } else if (result === 'past_due_started') {
         summary.past_due_started++;
         try {
-          await maybePerformAutoTopUp({
-            id: row.user_id,
-            total_microdollars_acquired: row.total_microdollars_acquired,
-            microdollars_used: row.microdollars_used,
-            auto_top_up_enabled: row.auto_top_up_enabled,
-            next_credit_expiration_at: row.next_credit_expiration_at,
-            updated_at: row.user_updated_at,
+          const payer = await database.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.id, row.user_id),
           });
+          if (payer) await maybePerformAutoTopUp(payer);
         } catch (error) {
           logError('Auto top-up attempt failed during coding plan recovery', {
             user_id: row.user_id,
@@ -299,7 +296,11 @@ export async function processCodingPlanRenewal(
     await tx.execute(
       sql`SELECT id FROM coding_plan_subscriptions WHERE id = ${subscriptionId} FOR UPDATE`
     );
-    await tx.execute(sql`SELECT id FROM kilocode_users WHERE id = ${userId} FOR UPDATE`);
+    await reconcileCreditExpirationsInTransaction(
+      { type: 'user', id: userId },
+      tx,
+      new Date(nowIso)
+    );
     const [row] = await tx
       .select({
         id: coding_plan_subscriptions.id,

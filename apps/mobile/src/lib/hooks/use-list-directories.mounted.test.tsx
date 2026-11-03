@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { type QueryClient } from '@tanstack/react-query';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -45,6 +45,7 @@ async function mount(connectionId: string | null = 'conn-1', queryClient?: Query
   });
   return {
     ...rendered,
+    probe,
     api: () => {
       if (probe.current === null) {
         throw new Error('hook has not rendered yet');
@@ -96,6 +97,66 @@ describe('useListDirectories', () => {
     });
     await waitFor(() => api().state?.phase === 'ready');
     expect(api().state).toEqual({ phase: 'ready', path: '', directories: [] });
+    unmount();
+  });
+
+  it('collates child folders instead of keeping the CLI filesystem order', async () => {
+    // The CLI answers in readdir order: numbered folders arrive shuffled and
+    // non-ASCII names land wherever the filesystem put them.
+    const cliOrder = [
+      { name: '作業フォルダ-10', path: '作業フォルダ-10' },
+      { name: 'café ☕', path: 'café ☕' },
+      { name: 'Zebra', path: 'Zebra' },
+      { name: '作業フォルダ-9', path: '作業フォルダ-9' },
+      { name: 'apple', path: 'apple' },
+      { name: '作業フォルダ-1', path: '作業フォルダ-1' },
+      { name: 'Cafe', path: 'Cafe' },
+      { name: '作業フォルダ-11', path: '作業フォルダ-11' },
+    ];
+    const before = [...cliOrder];
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: cliOrder });
+    const { api, probe, queryClient, renderer, unmount } = await mount('conn-1');
+
+    act(() => {
+      api().list('');
+    });
+    await waitFor(() => api().state?.phase === 'ready');
+
+    const ready = api().state;
+    if (ready?.phase !== 'ready') {
+      throw new Error(`expected the ready state, got ${String(ready?.phase)}`);
+    }
+    expect(ready.directories.map(entry => entry.name)).toEqual([
+      'apple',
+      'Cafe',
+      'café ☕',
+      'Zebra',
+      '作業フォルダ-1',
+      '作業フォルダ-9',
+      '作業フォルダ-10',
+      '作業フォルダ-11',
+    ]);
+    // Same number of rows: the sort reorders the projection, never drops one.
+    expect(ready.directories).toHaveLength(cliOrder.length);
+    // The listing handed to the query cache keeps the CLI's order.
+    expect(cliOrder).toEqual(before);
+
+    // The list's scroll position survives a re-render only while its data array
+    // is stable, so an unchanged listing must not be sorted again.
+    act(() => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(Harness, { connectionId: 'conn-1', probe })
+        )
+      );
+    });
+    const rerendered = api().state;
+    if (rerendered?.phase !== 'ready') {
+      throw new Error(`expected the ready state after re-render, got ${String(rerendered?.phase)}`);
+    }
+    expect(rerendered.directories).toBe(ready.directories);
     unmount();
   });
 

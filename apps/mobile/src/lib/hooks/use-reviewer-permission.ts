@@ -44,7 +44,7 @@ export function useReviewerEditGuard(scope: string, platform: ReviewerPlatform) 
 
   useEffect(() => {
     if (readOnly) {
-      router.replace(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}` as Href);
+      router.replace(`/(app)/code-reviewer/${scope}/${platform}` as Href);
     }
   }, [readOnly, router, scope, platform]);
 }

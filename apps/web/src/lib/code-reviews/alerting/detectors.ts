@@ -63,25 +63,22 @@ const modelNotFoundSql = sql`(
   OR COALESCE(error_message, '') ILIKE '%model not found%'
 )`;
 
-const startedReviewsCteSql = sql`
-  started_reviews AS (
-    SELECT
-      status,
-      terminal_reason,
-      error_message,
-      COALESCE(started_at, updated_at, created_at) AS started_at_effective,
-      COALESCE(completed_at, updated_at) AS completed_at_effective
-    FROM ${cloud_agent_code_reviews}
-    WHERE status NOT IN ('pending', 'queued')
-      -- Reaped reviews that never started have no started_at, so the COALESCE
-      -- above would resolve to the reap-stamped updated_at and place a days-old
-      -- row inside the live windows. The benign-reason filter already keeps
-      -- 'abandoned' out of both numerators, so counting it in started_count
-      -- would only dilute the rates and mask a real spike for the window right
-      -- after each reaper run.
-      AND COALESCE(terminal_reason, '') <> 'abandoned'
-  )
-`;
+function startedReviewsCteSql(windowMinutes: number) {
+  return sql`
+    started_reviews AS (
+      SELECT
+        status,
+        terminal_reason,
+        error_message,
+        COALESCE(started_at, updated_at, created_at) AS started_at_effective,
+        COALESCE(completed_at, updated_at) AS completed_at_effective
+      FROM ${cloud_agent_code_reviews}
+      WHERE status NOT IN ('pending', 'queued')
+        AND COALESCE(terminal_reason, '') <> 'abandoned'
+        AND COALESCE(started_at, updated_at, created_at) >= NOW() - (${windowMinutes} * INTERVAL '1 minute')
+    )
+  `;
+}
 
 function toNumber(value: CountValue): number {
   if (value === null || value === undefined) return 0;
@@ -97,11 +94,7 @@ export async function evaluateSlowReviews(
   database: AlertingDb
 ): Promise<CodeReviewAlertEvaluation> {
   const result = await database.execute<SlowReviewsRow>(sql`
-    WITH ${startedReviewsCteSql}, windowed AS (
-      SELECT *
-      FROM started_reviews
-      WHERE started_at_effective >= NOW() - (${SLOW_REVIEW_WINDOW_MINUTES} * INTERVAL '1 minute')
-    )
+    WITH ${startedReviewsCteSql(SLOW_REVIEW_WINDOW_MINUTES)}
     SELECT
       COUNT(*) AS started_count,
       COUNT(*) FILTER (
@@ -111,7 +104,7 @@ export async function evaluateSlowReviews(
           ELSE completed_at_effective - started_at_effective > (${SLOW_REVIEW_DURATION_MINUTES} * INTERVAL '1 minute')
         END
       ) AS slow_count
-    FROM windowed
+    FROM started_reviews
   `);
 
   const row = result.rows[0];
@@ -138,13 +131,9 @@ export async function evaluateSlowReviews(
 
 export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeReviewAlertEvaluation> {
   const result = await database.execute<ErrorSpikeRow>(sql`
-    WITH ${startedReviewsCteSql}, windowed AS (
-      SELECT *
-      FROM started_reviews
-      WHERE started_at_effective >= NOW() - (${ERROR_SPIKE_WINDOW_MINUTES} * INTERVAL '1 minute')
-    ), top_reason AS (
+    WITH ${startedReviewsCteSql(ERROR_SPIKE_WINDOW_MINUTES)}, top_reason AS (
       SELECT COALESCE(NULLIF(terminal_reason, ''), 'unknown') AS reason, COUNT(*) AS count
-      FROM windowed
+      FROM started_reviews
       WHERE ${systemFailureSql}
         AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
         AND NOT ${modelNotFoundSql}
@@ -161,7 +150,7 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
       ) AS error_count,
       (SELECT reason FROM top_reason) AS top_reason,
       (SELECT count FROM top_reason) AS top_reason_count
-    FROM windowed
+    FROM started_reviews
   `);
 
   const row = result.rows[0];

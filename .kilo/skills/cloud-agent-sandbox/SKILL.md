@@ -93,6 +93,12 @@ pnpm dev:stop
   ```
 - `--reuse-running` currently refuses to reuse a session because the Stripe
   forwarder is always skipped. Check `pnpm dev:status` instead.
+- `dev:start` moves the preferred service pane (normally `nextjs`) into the
+  dashboard window with `tmux join-pane`, so `nextjs` has no window of its own
+  and one window index is missing (`tmux list-windows` shows no `nextjs`).
+  This is expected, not a crash: the service runs as a pane of window 0. Find it
+  by pane identity (`tmux list-panes -s -t kilo-dev-app -F
+  '#{window_index}.#{pane_index}:#{@kilo_service}'`), not by window name.
 
 ## Log in and use the browser
 
@@ -168,14 +174,26 @@ about 2 GB.
 - Next.js dev (Turbopack) grows by 1 to 3 GB while compiling a route and gives
   most of it back after about two minutes idle: 4.2 GB after login fell to
   2.8 GB, and 4.4 GB after `/cloud` fell to 2.0 GB. Opening many routes back to
-  back fills the cap before that happens. Pause between heavy routes. Next 16.3
-  already defaults `experimental.turbopackMemoryEviction` to `auto`.
+  back fills the cap before that happens. Pause between heavy routes.
+- Turbopack's default `experimental.turbopackMemoryEviction` is `auto`, which
+  decides from OS memory-pressure feedback. The dev cgroup cap (about 9 GiB) sits
+  well below the sandbox `MemTotal` (about 12.5 GiB), so that feedback reports
+  free memory the cgroup does not have and `auto` can leave the web dev server
+  holding several GB. Setup therefore exports
+  `KILO_TURBOPACK_MEMORY_EVICTION=full`, which `apps/web/next.config.mjs` reads
+  (the value is unset elsewhere, so Next keeps `auto`); `full` evicts Turbopack's
+  persistent cache to disk instead of holding it in RAM. If `memory.current`
+  still climbs toward `memory.max`, that is the pressure state below.
 - High Redis, redis-http, or Postgres CPU means memory pressure, not load. Under
   pressure, Redis used 6 s of user CPU and 1590 s of system CPU in 90 minutes:
   the kernel kept evicting and re-reading its code pages. Compare with
   `cat $cg/containers/*/cpu.stat`. Idle Redis without pressure uses under 1%.
-- If Next.js is stuck above the cap, `pkill -9 -f '^[n]ext-server'`, then
-  `pnpm dev:restart nextjs`.
+- At the cap the kernel reclaims rather than OOM-killing (`oom_kill` stays 0), so
+  commands that shell out — `pnpm dev:restart`, `pnpm dev:stop`, `tmux`, `docker`,
+  wrangler — block and appear to hang. The same restart that hangs for minutes at
+  ~8.8 GiB runs in seconds at ~5 GiB. Recover by killing the large consumer
+  before retrying the restart or stop, e.g. `pkill -9 -f '^[n]ext-server'` (kill
+  by PID if the pattern is in your own command line), then `pnpm dev:stop`.
 
 Run heavy commands such as builds, tests, and typechecks from inside the
 repository, so that the wrapper caps them. pnpm outside the repository and

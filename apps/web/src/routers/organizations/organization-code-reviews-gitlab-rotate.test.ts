@@ -1,5 +1,6 @@
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
   syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
@@ -7,6 +8,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 // NOTE: `jest` is intentionally NOT imported from '@jest/globals' here. The
@@ -50,7 +52,8 @@ async function makeOrgAndOwner() {
 
 async function seedGitLabIntegration(
   organizationId: string,
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
+  integrationStatus: 'active' | 'suspended' = 'active'
 ): Promise<{ id: string; secret: string | undefined }> {
   const oldSecret = 'old-secret-do-not-leak';
   const [integration] = await db
@@ -59,7 +62,7 @@ async function seedGitLabIntegration(
       owned_by_organization_id: organizationId,
       platform: 'gitlab',
       integration_type: 'oauth',
-      integration_status: 'active',
+      integration_status: integrationStatus,
       platform_installation_id: `inst-${crypto.randomUUID()}`,
       metadata: { ...metadata, webhook_secret: oldSecret },
     })
@@ -117,6 +120,7 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
   beforeEach(() => {
     mockSyncWebhooksForRepositories.mockReset();
     mockGetValidGitLabToken.mockReset();
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
     // Default sync outcome: every currently-configured repo was "updated"
     // (mirrors the `previous=[]` "treat all as added" path used by rotate).
     mockSyncWebhooksForRepositories.mockImplementation(
@@ -175,7 +179,6 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
       // the stored integration row regardless of their concrete values).
       expect(status.integration).toEqual(
         expect.objectContaining({
-          isValid: true,
           instanceUrl: 'https://gitlab.example.com',
         })
       );
@@ -198,6 +201,103 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
 
       expect(status.connected).toBe(true);
       expect(status.integration).not.toHaveProperty('webhookSecret');
+    });
+
+    it('reports not connected when the stored credential is unusable despite a healthy row', async () => {
+      const { organization } = await makeOrgAndOwner();
+      const member = await insertTestUser();
+      SEED_USER_IDS.push(member.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+      mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+      const caller = await createCallerForUser(member.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      // A row the organization already authorized must ask for a
+      // re-authorization, not a first-time connect.
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      });
+    });
+
+    it('reports no reconnect for an organization that never connected GitLab', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: false,
+        integration: null,
+      });
+    });
+
+    it('reports reconnect for an existing row that is no longer active', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      await seedGitLabIntegration(
+        organization.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        'suspended'
+      );
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status).toEqual({
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    });
+
+    it('reports a healthy organization connection without a reconnect marker', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status.connected).toBe(true);
+      expect(status.reconnectRequired).toBe(false);
+    });
+
+    it('keeps the row-based answer for a Kilo admin, whom the broker cannot authorize', async () => {
+      const { organization } = await makeOrgAndOwner();
+      const admin = await insertTestUser({ is_admin: true });
+      SEED_USER_IDS.push(admin.id);
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+      });
+      mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+      const caller = await createCallerForUser(admin.id);
+      const status = await caller.organizations.reviewAgent.getGitLabStatus({
+        organizationId: organization.id,
+      });
+
+      expect(status.connected).toBe(true);
+      expect(status.integration).toEqual(
+        expect.objectContaining({ instanceUrl: 'https://gitlab.example.com' })
+      );
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
     });
   });
 

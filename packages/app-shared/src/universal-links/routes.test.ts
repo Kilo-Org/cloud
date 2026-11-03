@@ -39,35 +39,35 @@ const ROW_CASES = [
   },
   {
     path: '/security-agent',
-    app: '/(app)/(tabs)/(3_profile)/security-agent/personal',
+    app: '/(app)/security-agent/personal',
   },
   {
     path: '/security-agent/findings',
-    app: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings',
+    app: '/(app)/security-agent/personal/findings',
   },
   {
     path: '/code-reviews',
-    app: '/(app)/(tabs)/(3_profile)/code-reviewer/personal',
+    app: '/(app)/code-reviewer/personal',
   },
   {
     path: '/code-reviews/rev_9',
-    app: '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9',
+    app: '/(app)/code-reviewer/personal/reviews/rev_9',
   },
   {
     path: '/organizations/org_123/security-agent',
-    app: '/(app)/(tabs)/(3_profile)/security-agent/org_123',
+    app: '/(app)/security-agent/org_123',
   },
   {
     path: '/organizations/org_123/security-agent/findings',
-    app: '/(app)/(tabs)/(3_profile)/security-agent/org_123/findings',
+    app: '/(app)/security-agent/org_123/findings',
   },
   {
     path: '/organizations/org_123/code-reviews',
-    app: '/(app)/(tabs)/(3_profile)/code-reviewer/org_123',
+    app: '/(app)/code-reviewer/org_123',
   },
   {
     path: '/organizations/org_123/code-reviews/rev_9',
-    app: '/(app)/(tabs)/(3_profile)/code-reviewer/org_123/reviews/rev_9',
+    app: '/(app)/code-reviewer/org_123/reviews/rev_9',
   },
   {
     path: '/organizations/org_123/overview',
@@ -114,7 +114,7 @@ describe('resolveIncomingUrl — kiloapp:// forms', () => {
 
   it('maps kiloapp://code-reviews/rev_9 (host + path as pathname)', () => {
     expect(resolveIncomingUrl('kiloapp://code-reviews/rev_9')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9'
+      '/(app)/code-reviewer/personal/reviews/rev_9'
     );
   });
 
@@ -126,31 +126,31 @@ describe('resolveIncomingUrl — kiloapp:// forms', () => {
 describe('wildcard capture substitution', () => {
   it('row 7: /code-reviews/rev_9', () => {
     expect(resolveIncomingUrl(`${WEB}/code-reviews/rev_9`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9'
+      '/(app)/code-reviewer/personal/reviews/rev_9'
     );
   });
 
   it('row 8: /organizations/org_123/security-agent', () => {
     expect(resolveIncomingUrl(`${WEB}/organizations/org_123/security-agent`)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org_123'
+      '/(app)/security-agent/org_123'
     );
   });
 
   it('row 9: /organizations/org_123/security-agent/findings', () => {
     expect(resolveIncomingUrl(`${WEB}/organizations/org_123/security-agent/findings`)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org_123/findings'
+      '/(app)/security-agent/org_123/findings'
     );
   });
 
   it('row 10: /organizations/org_123/code-reviews', () => {
     expect(resolveIncomingUrl(`${WEB}/organizations/org_123/code-reviews`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org_123'
+      '/(app)/code-reviewer/org_123'
     );
   });
 
   it('row 11: /organizations/org_123/code-reviews/rev_9', () => {
     expect(resolveIncomingUrl(`${WEB}/organizations/org_123/code-reviews/rev_9`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org_123/reviews/rev_9'
+      '/(app)/code-reviewer/org_123/reviews/rev_9'
     );
   });
 
@@ -158,13 +158,13 @@ describe('wildcard capture substitution', () => {
     // String replacement would run ECMA-262 GetSubstitution on the capture:
     // `$&` re-inserts the placeholder, `$'` splices the un-substituted tail.
     expect(resolveIncomingUrl(`${WEB}/code-reviews/a$&b`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/a$&b'
+      '/(app)/code-reviewer/personal/reviews/a$&b'
     );
     expect(resolveIncomingUrl(`${WEB}/organizations/a$'b/code-reviews/rev_9`)).toBe(
-      "/(app)/(tabs)/(3_profile)/code-reviewer/a$'b/reviews/rev_9"
+      "/(app)/code-reviewer/a$'b/reviews/rev_9"
     );
     expect(resolveIncomingUrl(`${WEB}/organizations/a$b/code-reviews/rev_9`)).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/a$b/reviews/rev_9'
+      '/(app)/code-reviewer/a$b/reviews/rev_9'
     );
   });
 
@@ -172,10 +172,10 @@ describe('wildcard capture substitution', () => {
     // Per-capture replaceAll passes would substitute the `<2>` inserted for
     // `<1>` again in pass 2. Single-pass substitution must not.
     expect(resolveIncomingUrl('kiloapp:///organizations/<2>/code-reviews/rev_9')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/<2>/reviews/rev_9'
+      '/(app)/code-reviewer/<2>/reviews/rev_9'
     );
     expect(resolveIncomingUrl('kiloapp:///organizations/org_1/code-reviews/<1>')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/<1>'
+      '/(app)/code-reviewer/org_1/reviews/<1>'
     );
   });
 });

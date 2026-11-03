@@ -71,7 +71,7 @@ interface SubagentOptions {
    * A subagent that reads or searches usually outlives a request, so this is
    * worth setting where a harness knows.
    */
-  readonly inlineFor?: Duration.DurationInput;
+  readonly inlineFor?: Duration.Input;
   /**
    * Whether the model waits for the subagent, as it is told by default. False,
    * because handing a task over is how a model carries on. A harness whose
@@ -158,16 +158,20 @@ const answering = (
       ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
       ...(options.effort === undefined ? {} : { effort: options.effort }),
     });
-    const said = yield* Stream.runFold(session.ask(task), '', (held: string, event) => {
-      if (event.kind === 'delta') {
-        return held + event.text;
-      }
-      /* What the subagent said on the way to a tool is not its answer. A model
+    const said = yield* Stream.runFold(
+      session.ask(task),
+      () => '',
+      (held: string, event) => {
+        if (event.kind === 'delta') {
+          return held + event.text;
+        }
+        /* What the subagent said on the way to a tool is not its answer. A model
          narrates before it calls something — "let me look" — and handing that
          up would put the noise a subagent exists to absorb back into the
          parent's transcript. The answer is what it said after its last call. */
-      return event.kind === 'done' && event.stop === 'tools' ? '' : held;
-    });
+        return event.kind === 'done' && event.stop === 'tools' ? '' : held;
+      }
+    );
     return { sessionId: session.id, usage: yield* session.usage, said };
   });
 

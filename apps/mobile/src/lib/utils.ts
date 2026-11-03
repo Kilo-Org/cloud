@@ -10,8 +10,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const EMAIL_PATTERN = /.+@.+\..+/;
-
 // Ordered largest-first so the first unit whose bucket fits wins; the values
 // mirror the original minute/hour/day/month/year buckets.
 const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds: number }[] = [
@@ -42,6 +40,9 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
  * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
  */
 function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
   const seconds = Math.floor((nowMs - date.getTime()) / 1000);
   const magnitude = Math.abs(seconds);
   if (magnitude < 60) {
@@ -76,4 +77,4 @@ function capitalize(value: string): string {
   return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export { asyncNoop, capitalize, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, pick, timeAgo };
+export { asyncNoop, capitalize, cn, firstNonEmpty, parseTimestamp, pick, timeAgo };

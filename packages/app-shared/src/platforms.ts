@@ -5,7 +5,7 @@ export const KNOWN_PLATFORMS = [
   'cli',
   'vscode',
   'agent-manager',
-  'app-builder',
+  'desktop',
   'slack',
   'github',
   'linear',

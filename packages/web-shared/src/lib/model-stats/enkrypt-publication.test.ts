@@ -8,8 +8,8 @@ let mockPublicationEnabled = true;
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
-function metadata() {
-  return { observedAt: Date.now(), generation: 0 };
+function metadata(customLlmIds: ReadonlySet<string> = new Set()) {
+  return { observedAt: Date.now(), generation: 0, customLlmIds };
 }
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -293,13 +293,18 @@ describe('publishEnkryptModelStats', () => {
     expect(stored.openrouterData.enkrypt).toEqual(published);
   });
 
-  it.each([
-    { isActive: false },
-    { isActive: null },
-    { isStealth: true },
-    { openrouterId: 'kilo-internal/model' },
-  ])('withholds all saved scores for nonpublic models %j', overrides => {
-    const result = publishEnkryptModelStats({ ...stat(), ...overrides }, metadata());
+  it.each([{ isActive: false }, { isActive: null }, { isStealth: true }])(
+    'withholds all saved scores for nonpublic models %j',
+    overrides => {
+      const result = publishEnkryptModelStats({ ...stat(), ...overrides }, metadata());
+      expect(result.benchmarks).toEqual(siblings);
+      expect(result.openrouterData).not.toHaveProperty('enkrypt');
+    }
+  );
+
+  it('withholds all saved scores for custom LLMs', () => {
+    const custom = { ...stat(), openrouterId: 'Acme/Model' };
+    const result = publishEnkryptModelStats(custom, metadata(new Set(['acme/model'])));
     expect(result.benchmarks).toEqual(siblings);
     expect(result.openrouterData).not.toHaveProperty('enkrypt');
   });

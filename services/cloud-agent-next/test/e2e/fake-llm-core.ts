@@ -1645,6 +1645,52 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     writeAssistantResponse(ctx, `done-${tag}`);
   },
 
+  skill(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):([A-Za-z0-9_-]+)$/);
+    if (!parsed) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        'skill directive requires a tag and skill name',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, name] = parsed;
+    const id = `call_skill_${tag}`;
+    if (
+      isRecord(ctx.body) &&
+      Array.isArray(ctx.body.messages) &&
+      ctx.body.messages.some(
+        message => isRecord(message) && message.role === 'tool' && message.tool_call_id === id
+      )
+    ) {
+      writeAssistantResponse(ctx, `skill-complete:${tag}`);
+      return;
+    }
+    const tool = ctx.tools.find(tool => tool.name === 'skill');
+    if (!tool) {
+      writeJsonError(ctx.emit, 422, 'skill tool not advertised', 'unsupported_tool_schema');
+      return;
+    }
+    writeChunk(
+      ctx.emit,
+      makeChunk(ctx.id, ctx.model, {
+        role: 'assistant',
+        tool_calls: [
+          {
+            index: 0,
+            id,
+            type: 'function',
+            function: { name: tool.name, arguments: JSON.stringify({ name }) },
+          },
+        ],
+      })
+    );
+    writeFinish(ctx.emit, ctx.id, ctx.model, 1, 'tool_calls');
+    ctx.emit.end();
+  },
+
   question(args, ctx) {
     const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):([\s\S]+)$/);
     if (!parsed?.[1] || !parsed[2]) {

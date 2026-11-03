@@ -1,4 +1,4 @@
-import { Effect, Ref } from 'effect';
+import { Effect, Ref, Semaphore } from 'effect';
 import { createAssert } from 'typia';
 import { type JsonSchema, type Tool, ToolFailure, type ToolCall } from '../../core/tool.js';
 
@@ -117,8 +117,8 @@ interface TodoOptions {
  * would lose one of the two writes entirely rather than merging badly.
  */
 const todoTool = (options?: TodoOptions): Tool => {
-  const held = Ref.unsafeMake<readonly Todo[]>([]);
-  const permit = Effect.unsafeMakeSemaphore(1);
+  const held = Ref.makeUnsafe<readonly Todo[]>([]);
+  const permit = Semaphore.makeUnsafe(1);
   return {
     definition: { name: options?.name ?? 'todo', description, parameters },
     run: (call: ToolCall) =>

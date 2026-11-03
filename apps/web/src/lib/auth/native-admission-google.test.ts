@@ -1,11 +1,11 @@
 /**
- * Tests for findings #9 (cert digest enforcement), #12 (simulator bypass
- * production guard), and the Play Integrity decode endpoint fix (the resource
- * path must carry the configured package name, not the project number).
+ * Tests for findings #9 (cert digest enforcement), the Play Integrity decode
+ * endpoint fix (the resource path must carry the configured package name, not
+ * the project number), and the cached access token with bounded provider calls.
  */
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { createHash, generateKeyPairSync } from 'node:crypto';
-import { isProductionInternal, verifyPlayIntegrity } from './native-admission-google';
+import { resetAccessTokenCacheForTests, verifyPlayIntegrity } from './native-admission-google';
 
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {
@@ -33,71 +33,15 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-// ── Simulator bypass production guard (finding #12) ──────────────────────
+// ── Missing credentials fail closed ───────────────────────────────────────
 
-describe('isProductionInternal (internal guard)', () => {
-  const originalEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalEnv,
-      writable: false,
-    });
-  });
-
-  test('returns false in test environment', () => {
-    expect(isProductionInternal()).toBe(false);
-  });
-
-  test('returns true when NODE_ENV is production', () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'production',
-      writable: false,
-    });
-    expect(isProductionInternal()).toBe(true);
-  });
-});
-
-describe('verifyPlayIntegrity production bypass guard', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-  const originalBypass = process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
-
-  afterEach(() => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalNodeEnv,
-      writable: false,
-    });
-    if (originalBypass === undefined) {
-      delete process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
-    } else {
-      process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = originalBypass;
-    }
-  });
-
-  test('bypass is NOT taken in production even with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'production',
-      writable: false,
-    });
-    process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
-
-    // In production with bypass=true and no credentials configured,
-    // verifyPlayIntegrity must throw (fail-closed), NOT return the
-    // simulator bypass result.
+describe('verifyPlayIntegrity without credentials', () => {
+  test('throws so the route surfaces a retryable 5xx', async () => {
+    // Missing credentials mean the verdict cannot be checked. Throwing keeps
+    // this an infrastructure fault instead of a refusal of the device.
     await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
       'Google Play Integrity credentials not configured'
     );
-  });
-
-  test('bypass is taken in non-production with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'development',
-      writable: false,
-    });
-    process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
-
-    const result = await verifyPlayIntegrity('fake-token', 'fake-challenge');
-    expect(result).toEqual({ ok: true, packageName: 'com.example.simulator' });
   });
 });
 
@@ -125,6 +69,7 @@ describe('verifyPlayIntegrity decode endpoint', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    resetAccessTokenCacheForTests();
   });
 
   test('calls decodeIntegrityToken with the configured package name in the resource path', async () => {
@@ -271,5 +216,166 @@ describe('verifyPlayIntegrity decode endpoint', () => {
       expect(message).toBe('Play Integrity API returned 500');
       expect(message).not.toContain('com.kilocode.kiloapp');
     }
+  });
+});
+
+// ── Access token cache and request timeouts ──────────────────────────────
+
+describe('verifyPlayIntegrity access token cache', () => {
+  const originalFetch = global.fetch;
+  const mockFetch = jest.fn();
+
+  beforeAll(() => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = JSON.stringify({
+      client_email: 'cache-test@example.iam.gserviceaccount.com',
+      private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+      token_uri: 'https://oauth2.googleapis.com/token',
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    resetAccessTokenCacheForTests();
+  });
+
+  const validVerdict = (hash: string) => ({
+    ok: true,
+    json: async () => ({
+      tokenPayloadExternal: {
+        requestDetails: {
+          requestPackageName: 'com.kilocode.kiloapp',
+          requestHash: hash,
+        },
+        appIntegrity: {
+          appRecognitionVerdict: 'PLAY_RECOGNIZED',
+          certificateSha256Digest: ['test-cert-digest'],
+          packageName: 'com.kilocode.kiloapp',
+        },
+        deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+      },
+    }),
+  });
+
+  test('reuses the cached token so a second verification makes no token call', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    const hash1 = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash1));
+
+    const first = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+    expect(first).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    const hash2 = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash2));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    // Only the decode call ran again; the token call hit the cache.
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-one' }),
+      })
+    );
+  });
+
+  test('refreshes once the cached token enters the expiry margin', async () => {
+    // expires_in = 240 s keeps the token inside the 5-minute margin
+    // immediately, so the next verification must mint a fresh token.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 240 }),
+    });
+    const hash1 = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash1));
+    await verifyPlayIntegrity('integrity-1', 'challenge-1');
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+    });
+    const hash2 = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash2));
+    await verifyPlayIntegrity('integrity-2', 'challenge-2');
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-two' }),
+      })
+    );
+  });
+
+  test('concurrent verifications share one token refresh', async () => {
+    const { promise: tokenPromise, resolve: resolveToken } = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementationOnce(() => tokenPromise);
+    const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+
+    const first = verifyPlayIntegrity('integrity-1', 'challenge-1');
+    const second = verifyPlayIntegrity('integrity-2', 'challenge-1');
+
+    resolveToken({
+      ok: true,
+      json: async () => ({ access_token: 'shared-token', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValue(validVerdict(hash));
+
+    await Promise.all([first, second]);
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(1);
+  });
+
+  test('both Google calls carry the 10s abort timeout signal', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+      });
+      const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+      await verifyPlayIntegrity('integrity-1', 'challenge-1');
+
+      expect(timeoutSpy).toHaveBeenCalledTimes(2);
+      for (const call of timeoutSpy.mock.calls) {
+        expect(call[0]).toBe(10_000);
+      }
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+
+  test('a failed token refresh clears the cache so the next caller retries', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Failed to obtain Play Integrity access token'
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-after-failure', expires_in: 3600 }),
+    });
+    const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const result = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+    expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
   });
 });

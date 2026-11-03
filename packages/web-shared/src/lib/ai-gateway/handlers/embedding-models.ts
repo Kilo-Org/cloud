@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { KILO_EMBEDDING_MODEL_CATALOG } from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
@@ -18,6 +19,7 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
     const policy = await resolveOrganizationMemberModelPolicy({
       organizationId: auth.organizationId,
       kiloUserId: auth.user.id,
+      fromDb: readDb,
     });
     const models = [];
     for (const model of KILO_EMBEDDING_MODEL_CATALOG.models) {

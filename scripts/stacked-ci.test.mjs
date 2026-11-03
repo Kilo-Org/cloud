@@ -80,21 +80,22 @@ function validateCheck(workflow, jobName) {
   const installIndex = steps.findIndex(item => /\bpnpm\b.*\binstall\b/.test(item.run ?? ''));
   const checkIndex = steps.indexOf(step);
   assert.ok(installIndex >= 0 && installIndex < checkIndex, `${jobName}: install before the check`);
-  if (jobName === 'changes') {
-    const filterIndex = steps.findIndex(item => item.id === 'filter');
-    assert.ok(filterIndex > checkIndex, 'changes: check before filtering');
-  }
-  if (jobName === 'mobile-changes') {
-    const detectIndex = steps.findIndex(item => item.id === 'detect');
-    assert.ok(detectIndex > checkIndex, 'mobile-changes: check before change detection');
-    const detect = steps[detectIndex];
-    for (const fragment of mobilePathFragments) {
-      assert.match(
-        detect.run ?? '',
-        fragment,
-        `mobile change-detection step must recognise ${fragment}`
-      );
-    }
+  // No job waits for the check job, so only the required `test` fan-in makes
+  // a broken admission block the merge.
+  assert.ok(
+    [workflow.jobs.test?.needs ?? []].flat().includes(jobName),
+    `${jobName}: the required test job must need the check job`
+  );
+}
+
+function validateMobileDetect(mobile) {
+  const detect = mobile.jobs['mobile-changes'].steps.find(item => item.id === 'detect');
+  for (const fragment of mobilePathFragments) {
+    assert.match(
+      detect.run ?? '',
+      fragment,
+      `mobile change-detection step must recognise ${fragment}`
+    );
   }
 }
 
@@ -124,8 +125,8 @@ function validate(root, mobile) {
     'push must not filter by path: the required suite checks must report on every main push'
   );
   assert.equal(mobile.on.push['paths-ignore'], undefined);
-  validateCheck(root, 'changes');
-  validateCheck(mobile, 'mobile-changes');
+  validateCheck(root, 'ci-wiring');
+  validateMobileDetect(mobile);
 }
 
 test('both live workflows validate triggers and unconditional check invocations', () => {
@@ -160,10 +161,7 @@ test('mobile catches an isolated root main-only regression on a stacked base', (
   assert.throws(() => validate(root, mobile), /pull_request must admit every base/);
 });
 
-for (const [index, jobName] of [
-  [0, 'changes'],
-  [1, 'mobile-changes'],
-]) {
+for (const [index, jobName] of [[0, 'ci-wiring']]) {
   for (const defect of [
     'missing',
     'conditional-step',
@@ -171,6 +169,7 @@ for (const [index, jobName] of [
     'ignored',
     'directory',
     'before-install',
+    'not-required',
   ]) {
     test(`${jobName} rejects a ${defect} check`, () => {
       const workflows = readWorkflows();
@@ -183,6 +182,10 @@ for (const [index, jobName] of [
       if (defect === 'ignored') check['continue-on-error'] = true;
       if (defect === 'directory') job.defaults = { run: { 'working-directory': 'apps/mobile' } };
       if (defect === 'before-install') job.steps.unshift(...job.steps.splice(checkIndex, 1));
+      if (defect === 'not-required') {
+        const test = workflows[index].jobs.test;
+        test.needs = test.needs.filter(need => need !== jobName);
+      }
       assert.throws(() => validate(...workflows), assert.AssertionError);
     });
   }

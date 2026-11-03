@@ -28,6 +28,10 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+const mockRequireCustomLlmsById = jest.fn(async () => new Map([['acme/custom', {}]]));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  requireCustomLlmsById: () => mockRequireCustomLlmsById(),
+}));
 
 const TTL = 5 * 60 * 1000;
 const benchmark = {
@@ -124,6 +128,7 @@ describe('model stats snapshot cache', () => {
     expect(mockReplicaSelect).not.toHaveBeenCalled();
     const snapshot = await cache.getModelStatsSnapshot();
     expect(await enkrypt.getEnkryptBenchmarks()).toBe(snapshot);
+    expect(snapshot.customLlmIds).toEqual(new Set(['acme/custom']));
   });
 
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {
@@ -229,6 +234,15 @@ describe('model stats snapshot cache', () => {
     expect(await (await list()).json()).toEqual([]);
     expect((await detail()).status).toBe(404);
     expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails a cold snapshot instead of treating an unreadable custom LLM catalog as empty', async () => {
+    mockRequireCustomLlmsById.mockRejectedValueOnce(new Error('catalog unavailable'));
+
+    const [all, benchmark] = await Promise.all([list(), catalog()]);
+
+    expect(all.status).toBe(500);
+    expect(benchmark).toBeUndefined();
   });
 
   it('invalidates fallback eligibility immediately and bypasses failure cooldown', async () => {

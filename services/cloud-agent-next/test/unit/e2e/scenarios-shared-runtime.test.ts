@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   openConnectedStream: vi.fn(),
   sendMessage: vi.fn(),
   fetchFakeRequests: vi.fn(),
+  resolveFakeScope: vi.fn<() => string | undefined>(() => undefined),
   fakeDirective: vi.fn((conversation: string) => `__fake__:${conversation}`),
   isMessageCompleted: vi.fn(
     (event: { streamEventType: string; data?: { messageId?: string } } | null, messageId: string) =>
@@ -21,6 +22,7 @@ vi.mock('../../e2e/client.js', () => ({
   openConnectedStream: mocks.openConnectedStream,
   sendMessage: mocks.sendMessage,
   fetchFakeRequests: mocks.fetchFakeRequests,
+  resolveFakeScope: mocks.resolveFakeScope,
   fakeDirective: mocks.fakeDirective,
   isMessageCompleted: mocks.isMessageCompleted,
 }));
@@ -39,6 +41,7 @@ import {
   trackStartedSession,
   waitForBootTerminal,
   waitForPresentAllocation,
+  waitForPacedProgress,
   type ScenarioDeadline,
 } from '../../e2e/scenarios-shared-runtime.js';
 
@@ -94,6 +97,7 @@ function droppedStream(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.resolveFakeScope.mockReturnValue(undefined);
 });
 
 afterEach(() => {
@@ -399,6 +403,7 @@ describe('waitForBootTerminal', () => {
     // accumulated close evidence attached to the original error.
     expect(mocks.openConnectedStream).toHaveBeenCalledTimes(1);
     expect(error).toBe(establishment);
+    if (error === null) throw new Error('Expected stream establishment failure');
     expect(error.message).toContain('Stream did not connect for workspace_1');
     expect(error.message).toContain('code=1006');
   });
@@ -419,6 +424,23 @@ describe('waitForBootTerminal', () => {
 });
 
 describe('startPacedHoldTurn', () => {
+  it('refuses an unscoped baseline when the prompt uses a scoped fake marker', async () => {
+    mocks.resolveFakeScope.mockReturnValue('owned_scope');
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 3 });
+    await expect(
+      startPacedHoldTurn({
+        deadline: createScenarioDeadline(Date.now(), 30_000),
+        config: CONFIG,
+        cloudAgentSessionId: 'workspace_1',
+        directive: 'slow:2:50',
+        label: 'hold',
+        budgetMs: 10_000,
+        stream: fakeStream(),
+      })
+    ).rejects.toThrow('baseline scope did not match owned_scope');
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('closes the stream it opened when the baseline fetch rejects', async () => {
     const stream = fakeStream();
     mocks.openConnectedStream.mockResolvedValue(stream);
@@ -456,6 +478,161 @@ describe('startPacedHoldTurn', () => {
     ).rejects.toThrow('baseline unavailable');
     expect(stream.close).not.toHaveBeenCalled();
     expect(mocks.openConnectedStream).not.toHaveBeenCalled();
+  });
+});
+
+describe('paced readiness counter probes', () => {
+  function progressStream() {
+    const stream = fakeStream();
+    stream.events.push(
+      {
+        ...terminalEvent(),
+        streamEventType: 'kilocode',
+        data: {
+          type: 'message.updated',
+          properties: { info: { id: 'assistant_1', role: 'assistant', parentID: 'message_1' } },
+        },
+      },
+      {
+        ...terminalEvent(),
+        streamEventType: 'kilocode',
+        data: {
+          type: 'message.part.updated',
+          properties: { part: { id: 'part_1', messageID: 'assistant_1', type: 'text', text: '' } },
+        },
+      }
+    );
+    return stream;
+  }
+
+  it('aborts one stalled probe at five seconds and retries inside the original budget', async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    mocks.fetchFakeRequests
+      .mockImplementationOnce((_url, signal: AbortSignal) => {
+        signal.addEventListener('abort', () => {
+          aborted = true;
+        });
+        return new Promise<never>(() => {});
+      })
+      .mockResolvedValue({ chatCompletions: 2 });
+    const pending = waitForPacedProgress(
+      CONFIG,
+      progressStream(),
+      'message_1',
+      1,
+      createScenarioDeadline(Date.now(), 10_000),
+      10_000,
+      'hold'
+    );
+    await vi.advanceTimersByTimeAsync(5_200);
+    await expect(pending).resolves.toBeUndefined();
+    expect(aborted).toBe(true);
+    expect(mocks.fetchFakeRequests).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports count and probe diagnostics without accepting unchanged scoped counts', async () => {
+    vi.useFakeTimers();
+    mocks.resolveFakeScope.mockReturnValue('owned_scope');
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 4, scope: 'owned_scope' });
+    const pending = waitForPacedProgress(
+      CONFIG,
+      progressStream(),
+      'message_1',
+      4,
+      createScenarioDeadline(Date.now(), 1_000),
+      600,
+      'hold'
+    ).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(600);
+    const error = await pending;
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain('scope=owned_scope baseline=4 current=4');
+    expect(String(error)).toContain('probeFailures=0');
+    expect(String(error)).toContain('streamOpen=true');
+  });
+
+  it('reports bounded event identifiers and timestamps without including content or tokens', async () => {
+    vi.useFakeTimers();
+    const stream = progressStream();
+    stream.events[1].data = {
+      type: 'message.part.updated',
+      properties: {
+        part: {
+          id: 'part_1',
+          messageID: 'assistant_1',
+          type: 'text',
+          text: 'sensitive-content-fixture',
+          token: 'sensitive-token-fixture',
+        },
+      },
+    };
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 4 });
+    const pending = waitForPacedProgress(
+      CONFIG,
+      stream,
+      'message_1',
+      4,
+      createScenarioDeadline(Date.now(), 1_000),
+      200,
+      'hold'
+    ).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(200);
+    const diagnostic = String(await pending);
+    expect(diagnostic).toContain('"eventType":"message.part.updated"');
+    expect(diagnostic).toContain('"id":"part_1"');
+    expect(diagnostic).not.toContain('sensitive-content-fixture');
+    expect(diagnostic).not.toContain('sensitive-token-fixture');
+  });
+
+  it('rejects an increased global counter when a scoped counter was required', async () => {
+    mocks.resolveFakeScope.mockReturnValue('owned_scope');
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 9 });
+    await expect(
+      waitForPacedProgress(
+        CONFIG,
+        progressStream(),
+        'message_1',
+        4,
+        createScenarioDeadline(Date.now(), 1_000),
+        1_000,
+        'hold'
+      )
+    ).rejects.toThrow('invalid fake request counter or scope');
+  });
+
+  it('requires correlated parts even when the fake counter could increase', async () => {
+    vi.useFakeTimers();
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 9 });
+    const pending = waitForPacedProgress(
+      CONFIG,
+      fakeStream(),
+      'message_1',
+      4,
+      createScenarioDeadline(Date.now(), 1_000),
+      400,
+      'hold'
+    ).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(String(await pending)).toContain('children=0');
+    expect(mocks.fetchFakeRequests).not.toHaveBeenCalled();
+  });
+
+  it('reports timed-out probes when no counter can be observed before the readiness deadline', async () => {
+    vi.useFakeTimers();
+    mocks.fetchFakeRequests.mockImplementation(() => new Promise<never>(() => {}));
+    const pending = waitForPacedProgress(
+      CONFIG,
+      progressStream(),
+      'message_1',
+      4,
+      createScenarioDeadline(Date.now(), 10_000),
+      5_000,
+      'hold'
+    ).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(String(await pending)).toContain('current=unobserved probes=1 probeFailures=1');
+    expect(String(await pending)).toContain('lastProbeMs=5000 lastProbeError=timeout');
   });
 });
 
@@ -563,7 +740,7 @@ describe('trackStartedSession', () => {
 
     // The legacy prepare path reports the id before initiation; a later failure
     // must still find it in `tracked`.
-    wrapped.onSessionCreated?.('workspace_prepared');
+    wrapped.onSessionCreated?.('workspace_prepared', 'ses_prepared');
 
     expect(tracked).toEqual(['workspace_prepared']);
     expect(prior).toEqual(['workspace_prepared']);
@@ -572,7 +749,7 @@ describe('trackStartedSession', () => {
 
   it('works when the config has no prior onSessionCreated hook', () => {
     const tracked: string[] = [];
-    trackStartedSession(CONFIG, id => tracked.push(id)).onSessionCreated?.('workspace_1');
+    trackStartedSession(CONFIG, id => tracked.push(id)).onSessionCreated?.('workspace_1', 'ses_1');
     expect(tracked).toEqual(['workspace_1']);
   });
 });
@@ -588,7 +765,7 @@ describe('createOwnedSessionRegistry', () => {
       async () => {}
     );
 
-    registry.config.onSessionCreated?.('workspace_root');
+    registry.config.onSessionCreated?.('workspace_root', 'ses_root');
     registry.register({ cloudAgentSessionId: 'workspace_root', kiloSessionId: 'ses_root' });
     registry.register({ cloudAgentSessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' });
     registry.register({ cloudAgentSessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' });
@@ -609,9 +786,7 @@ describe('createOwnedSessionRegistry', () => {
       }
     );
 
-    // `onSessionCreated` records the id during start, before the create result
-    // supplies the real `kiloSessionId`.
-    registry.config.onSessionCreated?.('workspace_upgraded');
+    registry.register({ cloudAgentSessionId: 'workspace_upgraded', kiloSessionId: undefined });
     registry.register({ cloudAgentSessionId: 'workspace_upgraded', kiloSessionId: 'ses_real' });
     registry.register({ cloudAgentSessionId: 'workspace_other', kiloSessionId: 'ses_other' });
 
@@ -669,13 +844,13 @@ describe('createOwnedSessionRegistry', () => {
     const registry = createOwnedSessionRegistry(CONFIG, async () => {});
 
     const createThatRegistersThenThrows = (): never => {
-      registry.config.onSessionCreated?.('workspace_leaked');
+      registry.config.onSessionCreated?.('workspace_leaked', 'ses_leaked');
       throw new Error('wrong-plane session created');
     };
 
     expect(createThatRegistersThenThrows).toThrow('wrong-plane session created');
     expect(registry.entries()).toEqual([
-      { sessionId: 'workspace_leaked', kiloSessionId: undefined },
+      { sessionId: 'workspace_leaked', kiloSessionId: 'ses_leaked' },
     ]);
   });
 
@@ -769,7 +944,7 @@ describe('trackCreations late-create ownership', () => {
 
     // `client.ts` invokes the composed `onSessionCreated` before its wrong-plane
     // assertion rejects the create, so the id is registered but never returned.
-    owned.config.onSessionCreated?.('workspace_registered');
+    owned.config.onSessionCreated?.('workspace_registered', 'ses_registered');
     rejectCreate(new Error('wrong-plane session created'));
 
     await vi.waitFor(() => expect(cleaned).toEqual(['workspace_registered']));

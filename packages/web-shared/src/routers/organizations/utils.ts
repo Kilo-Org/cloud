@@ -6,6 +6,7 @@ import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organ
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
+  ORGANIZATION_PARENT_ACCESS_ROLES,
 } from '@kilocode/app-shared/organizations';
 import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -16,21 +17,32 @@ import {
   recordKiloAdminElevation,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
+import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
+
+const parentOrganizations = alias(organizations, 'parent_organizations');
 
 export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
 
-// Roles in a parent organization that inherit access to its children. Kept
-// separate from ORGANIZATION_BILLING_ROLES so changing billing scope cannot
-// silently widen child-organization inheritance.
-const parentOrganizationAccessRoles = [
-  'owner',
-  'admin',
-  'billing_manager',
-] satisfies OrganizationRole[];
+/**
+ * A soft-deleted organization is reported as missing rather than as an
+ * authorization failure. Existing callers rely on NOT_FOUND for an
+ * organization that no longer exists, while a live organization the caller
+ * cannot access stays UNAUTHORIZED.
+ */
+async function isSoftDeletedOrganization(organizationId: Organization['id']): Promise<boolean> {
+  const [organization] = await db
+    .select({ deletedAt: organizations.deleted_at })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return organization?.deletedAt != null;
+}
+
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 function allowedRole(
@@ -50,6 +62,20 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   if (ctx.user.is_admin) {
+    // An admin elevation applies only to an organization that exists and is
+    // live, matching getOrganizationById. A rejected request is not recorded
+    // as an elevation.
+    const [organization] = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    if (!organization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     return await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access',
       target: organizationTarget(organizationId),
@@ -59,6 +85,10 @@ export async function ensureOrganizationAccess(
   const directRows = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -70,18 +100,31 @@ export async function ensureOrganizationAccess(
     .select({ role: organization_memberships.role })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
   const rows = [...directRows, ...inheritedRows];
 
   if (!rows.length) {
+    if (await isSoftDeletedOrganization(organizationId)) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You do not have access to this organization',
@@ -115,12 +158,23 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
   if (ctx.user.is_admin) {
+    // Only organizations that exist and are live are elevated, matching
+    // getOrganizationById.
+    const liveIds = (
+      await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)))
+    ).map(row => row.id);
+    if (liveIds.length === 0) {
+      return result;
+    }
     const grant = await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access_batch',
-      target: organizationsTarget(uniqueIds),
+      target: organizationsTarget(liveIds),
       grant: 'owner',
     });
-    for (const id of uniqueIds) result.set(id, grant);
+    for (const id of liveIds) result.set(id, grant);
     return result;
   }
 
@@ -130,6 +184,10 @@ export async function getOrganizationsAccessRoles(
       role: organization_memberships.role,
     })
     .from(organization_memberships)
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -144,14 +202,21 @@ export async function getOrganizationsAccessRoles(
     })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(inArray(organizations.id, uniqueIds));
+    .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)));
 
   const rolesByOrg = new Map<string, OrganizationRole[]>();
   for (const row of [...directRows, ...inheritedRows]) {
@@ -200,7 +265,10 @@ export async function ensureOrganizationAccessAndFetchOrg(
       reason: 'organization_fetch',
       target: organizationTarget(organizationId),
     });
-    const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
     if (!org) {
       throw new TRPCError({
@@ -218,7 +286,10 @@ export async function ensureOrganizationAccessAndFetchOrg(
       organization: organizations,
     })
     .from(organization_memberships)
-    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .innerJoin(
+      organizations,
+      activeOrganizationJoinCondition(organization_memberships.organization_id)
+    )
     .where(
       and(
         eq(organization_memberships.kilo_user_id, ctx.user.id),
@@ -233,18 +304,31 @@ export async function ensureOrganizationAccessAndFetchOrg(
     })
     .from(organizations)
     .innerJoin(
+      parentOrganizations,
+      and(
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
       organization_memberships,
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, ctx.user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
   const rows = [...directRows, ...inheritedRows];
 
   if (!rows.length) {
+    if (await isSoftDeletedOrganization(organizationId)) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You do not have access to this organization',

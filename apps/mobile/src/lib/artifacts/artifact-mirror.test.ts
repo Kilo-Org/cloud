@@ -101,7 +101,7 @@ const fakeFs = vi.hoisted(() => {
           .toSorted((a, b) => a.localeCompare(b))
           .map(child => entryOf(child));
       },
-      write(content: string) {
+      writeSync(content: string) {
         const parent = parentOf(uri);
         if (parent !== '' && nodes.get(parent)?.kind !== 'directory') {
           throw new Error(`missing parent: ${parent}`);
@@ -173,7 +173,7 @@ const fakeFs = vi.hoisted(() => {
       if (parent !== '') {
         createDirectory(parent, { idempotent: true, intermediates: true });
       }
-      entryOf(uri).write(content);
+      entryOf(uri).writeSync(content);
     },
     /** Deep, order-independent snapshot of the whole tree. */
     snapshot: () =>

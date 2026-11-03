@@ -19,6 +19,10 @@ import { waitFor } from '@/test/render-with-providers';
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 type TestProfile = { id: string; name: string; isDefault: boolean };
 
+// The picker row for a private repository carries its privacy in the
+// accessible name, so it is matched by that name, never the bare full name.
+const PRIVATE_REPO_LABEL = 'acme/api, private repository';
+
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
@@ -56,11 +60,16 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindingMutations: () => h.mutations,
   useRepoOptions: () => h.repoOptions,
 }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useOrganizationProfilePermission: () => 'allowed',
+}));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -82,6 +91,7 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -94,6 +104,7 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   Search: 'Search',
   SearchX: 'SearchX',
+  SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
 }));
@@ -134,7 +145,9 @@ describe('RepoBindingsScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'Unbind')
+      findAll(renderer.root, 'Pressable').some(n =>
+        String(n.props.accessibilityLabel).startsWith('Unbind ')
+      )
     ).toBe(false);
 
     unmount();
@@ -178,7 +191,7 @@ describe('RepoBindingsScreen', () => {
     expect(texts).toContain('Backend debugging');
     expect(texts).toContain('GH');
 
-    pressPressable(renderer.root, 'Unbind');
+    pressPressable(renderer.root, 'Unbind acme/api');
     await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.unbind.mutateAsync.mock.calls[0]?.[0]).toEqual({
       repoFullName: 'acme/api',
@@ -197,7 +210,7 @@ describe('RepoBindingsScreen', () => {
     expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
 
     pressPressable(renderer.root, 'Select repository…');
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
 
     pressPressable(renderer.root, 'Select profile');
@@ -217,7 +230,7 @@ describe('RepoBindingsScreen', () => {
     pressPressable(renderer.root, 'Select repository…');
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
 
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     pressPressable(renderer.root, 'Select profile');
@@ -257,7 +270,7 @@ describe('RepoBindingsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressButton(renderer.root, 'Add default');
     pressPressable(renderer.root, 'Select repository…');
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     pressPressable(renderer.root, 'Select profile');
     pressPressable(renderer.root, 'Backend debugging');
     pressButton(renderer.root, 'Add default');
@@ -276,15 +289,21 @@ describe('RepoBindingsScreen', () => {
     pressPressable(renderer.root, 'Select repository…');
 
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+      findAll(renderer.root, 'Pressable').some(
+        n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+      )
     ).toBe(true);
     await changeSearch(renderer.root, 'infra');
     await waitFor(
       () =>
-        !findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+        !findAll(renderer.root, 'Pressable').some(
+          n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+        )
     );
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+      findAll(renderer.root, 'Pressable').some(
+        n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+      )
     ).toBe(false);
     expect(
       findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/infra')

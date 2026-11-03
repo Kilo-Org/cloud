@@ -46,4 +46,7 @@ describe('timeAgo', () => {
     expect(timeAgo(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
     expect(timeAgo(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
   });
+  it('omits an invalid timestamp instead of formatting a relative time', () => {
+    expect(timeAgo(new Date(Number.NaN))).toBe('');
+  });
 });

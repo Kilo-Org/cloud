@@ -3,15 +3,14 @@ import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
-  createSeedTextPart,
   forgetPartUpdateTime,
-  insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -53,8 +52,7 @@ function createMemoryStorage(): SessionStorage {
         messageId,
         upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence)
       );
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     applyPartDelta(messageId, partId, field, delta) {
@@ -63,43 +61,23 @@ function createMemoryStorage(): SessionStorage {
       }
 
       const arr = parts.get(messageId);
-
-      if (!arr) {
-        // First delta for this message — bootstrap a minimal text part
-        parts.set(messageId, [createSeedTextPart(messageId, partId, delta)]);
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
+      const nextArr = appendPartTextChunks(arr, messageId, partId, [delta]);
+      if (nextArr === arr) {
         return;
       }
-      const idx = arr.findIndex(p => p.id === partId);
-      const existing = idx >= 0 ? arr[idx] : undefined;
-      if (!existing) {
-        // Part not yet known for this message — create it with the delta as seed
-        parts.set(messageId, insertPartSorted(arr, createSeedTextPart(messageId, partId, delta)));
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
-        return;
-      }
-
-      const updatedPart = applyTextDelta(existing, delta);
-      if (updatedPart === existing) {
-        return;
-      }
-      const nextArr = [...arr];
-      nextArr[idx] = updatedPart;
       parts.set(messageId, nextArr);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     deletePart(messageId, partId) {
       const arr = parts.get(messageId);
       if (!arr) return;
-      const filtered = arr.filter(p => p.id !== partId);
-      parts.set(messageId, filtered);
+      parts.set(
+        messageId,
+        arr.filter(p => p.id !== partId)
+      );
       forgetPartUpdateTime(partEvidence, messageId, partId);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     getParts(messageId) {
@@ -147,20 +125,24 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deleteMessage(messageId) {
-      if (!messages.has(messageId)) return;
+      // A part delta can create parts before the message row (see
+      // `applyPartDelta`), so part state is dropped regardless of the row.
+      const hadMessage = messages.delete(messageId);
+      if (hadMessage) {
+        messageIds = messageIds.filter(id => id !== messageId);
+      }
 
-      messages.delete(messageId);
-      messageIds = messageIds.filter(id => id !== messageId);
-
-      if (parts.has(messageId)) {
-        for (const part of parts.get(messageId) ?? []) {
-          forgetPartUpdateTime(partEvidence, messageId, part.id);
-        }
-        parts.delete(messageId);
-        partsSnapshot.delete(messageId);
+      const hadParts = parts.has(messageId);
+      for (const part of parts.get(messageId) ?? []) {
+        forgetPartUpdateTime(partEvidence, messageId, part.id);
+      }
+      parts.delete(messageId);
+      partsSnapshot.delete(messageId);
+      if (hadParts) {
         notify(subscribers, `parts:${messageId}`);
       }
 
+      if (!hadMessage) return;
       notify(subscribers, `message:${messageId}`);
       notify(subscribers, 'messageIds');
     },

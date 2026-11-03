@@ -39,6 +39,33 @@ function signResourceToken(
 
 const validParams = { secret: TEST_JWT_SECRET, connectionString: 'postgres://test' };
 
+function scopedControlToken(overrides: Record<string, unknown> = {}) {
+  const expiresAt = Math.floor(Date.now() / 1000) + 24 * 3600;
+  const cloudAgentAuthority = {
+    version: 1,
+    ownerId: 'user-1',
+    parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+    organizationId: null,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt,
+  };
+  return {
+    cloudAgentAuthority,
+    token: signResourceToken(
+      {
+        apiTokenPepper: 'pepper-current',
+        aud: 'cloud-agent-next',
+        exp: expiresAt,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        cloudAgentAuthority,
+        ...overrides,
+      },
+      { algorithm: 'HS256' }
+    ),
+  };
+}
+
 describe('validateKiloToken', () => {
   beforeEach(() => {
     userRowByUserId.clear();
@@ -54,6 +81,45 @@ describe('validateKiloToken', () => {
       error: 'NEXTAUTH_SECRET is not configured on the worker',
     });
   });
+
+  it('retains verified authority only for explicitly allowed internal preparation', async () => {
+    userRowByUserId.set('user-1', { pepper: 'pepper-current', blockedReason: null });
+    const { token, cloudAgentAuthority } = scopedControlToken();
+    await expect(validateKiloToken(`Bearer ${token}`, validParams)).resolves.toEqual({
+      success: false,
+      error: 'Cloud Agent authority only permits internal preparation',
+    });
+    await expect(
+      validateKiloToken(`Bearer ${token}`, { ...validParams, allowCloudAgentAuthority: true })
+    ).resolves.toMatchObject({
+      success: true,
+      userId: 'user-1',
+      token,
+      cloudAgentAuthority,
+    });
+  });
+
+  it.each([
+    { aud: 'kilo-api' },
+    { aud: ['kilo-api', 'cloud-agent-next'] },
+    { credentialExchange: true },
+    { tokenPurpose: 'human-api' },
+    { runtimeAdmission: {} },
+    { deviceId: 'unexpected' },
+    { exp: Math.floor(Date.now() / 1000) + 3600 },
+  ])(
+    'rejects invalid scoped control claims %j without accepting ordinary-user fallback',
+    async overrides => {
+      userRowByUserId.set('user-1', { pepper: 'pepper-current', blockedReason: null });
+      const { token } = scopedControlToken(overrides);
+      await expect(
+        validateKiloToken(`Bearer ${token}`, { ...validParams, allowCloudAgentAuthority: true })
+      ).resolves.toEqual({
+        success: false,
+        error: 'Invalid or expired token',
+      });
+    }
+  );
 
   it('returns an error when the Authorization header is missing or malformed', async () => {
     await expect(

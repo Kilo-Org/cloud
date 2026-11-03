@@ -109,7 +109,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
       status: 'connected',
       integrationId: 'integration-id',
     });
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callPublicBitbucketCallback(makeRequest(state));
 
@@ -130,7 +132,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
       status: 'connected',
       integrationId: 'integration-id',
     });
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callBitbucketCallbackImplementation(makeRequest(state));
 
@@ -156,7 +160,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
       status: 'workspace_selection_required',
       integrationId: 'integration-id',
     });
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callBitbucketCallbackImplementation(makeRequest(state));
 
@@ -168,7 +174,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
 
   test('does not replace an integration when no workspaces are available', async () => {
     mockedFetchBitbucketWorkspaces.mockResolvedValue([]);
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callBitbucketCallbackImplementation(makeRequest(state));
 
@@ -181,7 +189,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
     mockedStoreBitbucketIntegration.mockRejectedValue(
       new BitbucketIntegrationAuthorizationError('authorization revoked')
     );
-    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID);
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callBitbucketCallbackImplementation(makeRequest(state));
 
@@ -197,7 +207,9 @@ describe('GET /api/integrations/bitbucket/callback', () => {
     mockedStoreBitbucketIntegration.mockRejectedValue(
       new BitbucketIntegrationConnectionConflictError()
     );
-    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID);
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+      provider: 'bitbucket',
+    });
 
     const response = await callPublicBitbucketCallback(makeRequest(state));
 

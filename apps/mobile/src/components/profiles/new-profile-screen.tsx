@@ -1,9 +1,14 @@
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import {
+  ProfileDescriptionField,
+  ProfileNameField,
+} from '@/components/profiles/profile-bound-field';
 import {
   createOrganizationId,
   hasOrganizationContext,
@@ -11,14 +16,18 @@ import {
   type ProfileOwnerChoice,
 } from '@/components/profiles/profile-owner-model';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
-import { useOrganization } from '@/lib/organization-context';
-import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import {
+  getProfileOverviewPath,
+  type ProfileManagementStack,
+} from '@/lib/profile-agent-navigation';
 
 /**
  * Copy keys for the owner control, named here so the catalog entries land with
@@ -45,27 +54,68 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-export function NewProfileScreen() {
+export function NewProfileScreen({
+  stack,
+  initialOwner,
+  returnToCaller = false,
+  organizationId,
+}: Readonly<{
+  /** The Stack this screen is mounted in; the created profile opens in it. */
+  stack: ProfileManagementStack;
+  /**
+   * The owner the form starts on. A picker that lists organization profiles
+   * opens the form on Organization so the profile it creates can be selected
+   * there; the user can still switch it.
+   */
+  initialOwner?: ProfileOwnerChoice;
+  /**
+   * Hand the form back to the caller after a create, instead of opening the new
+   * profile: a caller collecting a profile keeps its own state and place.
+   */
+  returnToCaller?: boolean;
+  /**
+   * The organization the caller is scoped to. It replaces the active account
+   * for this form, so a caller whose scope is not the active account still
+   * creates the profile where its list reads from.
+   */
+  organizationId?: string;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
+  const {
+    organizationId: boundaryOrganizationId,
+    role,
+    org,
+    isResolving,
+  } = useOrgBoundary(organizationId);
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
-  const nameRef = useRef('');
+  const nameField = useProfileNameField();
   const descriptionRef = useRef('');
-  const [owner, setOwner] = useState<ProfileOwnerChoice>('personal');
-  const [nameError, setNameError] = useState<string | null>(null);
+  // `null` until the user picks: the route's request, or Personal, applies
+  // while the boundary is the one being edited. A selection is stamped with its
+  // organization so an organization switch drops a choice made for another one.
+  const [ownerSelection, setOwnerSelection] = useState<{
+    organizationId: string | null;
+    owner: ProfileOwnerChoice;
+  } | null>(null);
+  const canOwnOrganization =
+    !isResolving && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
+  const pickedOwner =
+    ownerSelection?.organizationId === boundaryOrganizationId ? ownerSelection.owner : null;
+  const owner: ProfileOwnerChoice = canOwnOrganization
+    ? (pickedOwner ?? initialOwner ?? 'personal')
+    : 'personal';
+  const selectOwner = (next: ProfileOwnerChoice) => {
+    setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
+  };
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
-    const name = nameRef.current.trim();
-    const nameIssue = validateProfileName(name);
-    if (nameIssue !== null) {
-      setNameError(
-        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
-      );
+    const name = nameField.commit();
+    if (name === null) {
       return;
     }
 
@@ -74,9 +124,8 @@ export function NewProfileScreen() {
       setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
-    setNameError(null);
     setDescriptionError(null);
-    const ownerOrganizationId = createOrganizationId(organizationId, owner);
+    const ownerOrganizationId = createOrganizationId(boundaryOrganizationId, owner);
     try {
       const created = await create.mutateAsync({
         name,
@@ -84,7 +133,15 @@ export function NewProfileScreen() {
         ...(ownerOrganizationId === undefined ? {} : { organizationId: ownerOrganizationId }),
       });
       toast.success(t('profiles.createdToast', { name }));
-      router.replace(getProfileOverviewPath(created.id, ownerOrganizationId));
+      // The caller is collecting a profile to select, so it keeps its form and
+      // the user's place in it; only a direct create opens the new profile.
+      if (returnToCaller && router.canGoBack()) {
+        router.back();
+        return;
+      }
+      router.replace(
+        getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
+      );
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.createFailed'));
@@ -95,33 +152,16 @@ export function NewProfileScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.newProfile')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <FormField
-          label={t('profiles.nameLabel')}
-          placeholder={t('profiles.namePlaceholder')}
-          error={nameError ?? undefined}
-          required
-          returnKeyType="next"
-          onChangeText={value => {
-            nameRef.current = value;
-            if (nameError !== null && validateProfileName(value) === null) {
-              setNameError(null);
-            }
-          }}
-        />
-        <FormField
-          label={t('profiles.descriptionLabel')}
-          placeholder={t('profiles.descriptionPlaceholder')}
+        <ProfileNameField error={nameField.error} onChangeText={nameField.handleChangeText} />
+        <ProfileDescriptionField
           error={descriptionError ?? undefined}
-          multiline
-          textAlignVertical="top"
-          className="min-h-20 leading-5"
           onChangeText={value => {
             descriptionRef.current = value;
             if (descriptionError !== null && validateProfileDescription(value) === null) {
@@ -130,7 +170,7 @@ export function NewProfileScreen() {
           }}
         />
 
-        {hasOrganizationContext(organizationId) ? (
+        {canOwnOrganization ? (
           <View className="gap-1">
             <Text className="text-sm font-medium text-foreground">
               {t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
@@ -138,16 +178,19 @@ export function NewProfileScreen() {
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
-              options={ownerChoices(organizationId).map(choice => ({
+              options={ownerChoices(boundaryOrganizationId).map(choice => ({
                 value: choice,
                 label: t(OWNER_CHOICE_LABEL_KEYS[choice], {
                   defaultValue: t(OWNER_CHOICE_FALLBACK_KEYS[choice]),
                 }),
               }))}
               value={owner}
-              onChange={setOwner}
+              onChange={selectOwner}
               accessibilityLabel={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
             />
+            {owner === 'organization' && org ? (
+              <Text className="text-sm text-muted-foreground">{org.organizationName}</Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -158,7 +201,7 @@ export function NewProfileScreen() {
         >
           <Text>{t('profiles.createAction')}</Text>
         </Button>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

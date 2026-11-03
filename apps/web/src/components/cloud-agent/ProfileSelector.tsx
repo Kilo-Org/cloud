@@ -42,6 +42,8 @@ type ProfileSelectorProps = {
    * Use this for features that don't support personal profiles in org context (e.g., webhook triggers).
    */
   orgProfilesOnly?: boolean;
+  emptyLabel?: string;
+  savedSelectionLabel?: string;
 };
 
 export function ProfileSelector({
@@ -52,6 +54,8 @@ export function ProfileSelector({
   onRepoDefaultsClick,
   disabled = false,
   orgProfilesOnly = false,
+  emptyLabel = 'No profile',
+  savedSelectionLabel,
 }: ProfileSelectorProps) {
   const [showManageDialog, setShowManageDialog] = useState(false);
 
@@ -163,7 +167,9 @@ export function ProfileSelector({
                 ) : (
                   <>
                     <FolderCog className="h-4 w-4 shrink-0" />
-                    <span>No profile</span>
+                    <span>
+                      {selectedProfileId && savedSelectionLabel ? savedSelectionLabel : emptyLabel}
+                    </span>
                   </>
                 )}
               </div>
@@ -172,7 +178,7 @@ export function ProfileSelector({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">
-            <span className="text-muted-foreground">No profile</span>
+            <span className="text-muted-foreground">{emptyLabel}</span>
           </SelectItem>
 
           {/* Org profiles section (only in org context) */}

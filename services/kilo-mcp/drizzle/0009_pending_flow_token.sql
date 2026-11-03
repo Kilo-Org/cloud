@@ -1,0 +1,1 @@
+ALTER TABLE `oauth_pending_authorizations` ADD `flow_token` text DEFAULT '' NOT NULL;

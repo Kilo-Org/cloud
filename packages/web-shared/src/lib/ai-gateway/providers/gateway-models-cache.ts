@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
@@ -26,7 +27,8 @@ function createStoredModelsFromDatabaseFetcher(provider: 'openrouter' | 'vercel'
       return StoredModelMapSchema.parse(row.models);
     },
     TTL_MS,
-    {}
+    {},
+    { name: `modelsByProvider[${provider}]` }
   );
 }
 
@@ -82,73 +84,60 @@ export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): 
   ];
 }
 
-const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
+/**
+ * Inference provider ids per model id, projected from the cached Vercel metadata map. Nothing is
+ * keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
+ */
+const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<string, string[]>>(
+  async () => {
+    const models = await getVercelModelsMetadataFromDatabase();
+    return new Map(
+      Object.entries(models).map(([modelId, model]) => [
+        modelId,
+        extractVercelInferenceProviderIdsFromModel(model),
+      ])
+    );
+  },
+  TTL_MS,
+  new Map(),
+  { name: 'vercelInferenceProviderIdsByModel' }
+);
 
-export function getCachedVercelInferenceProviderIdsForModel(
+export async function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
 ): Promise<string[] | null> {
-  let fetchProviders = vercelInferenceProviderFetchers.get(modelId);
-  if (!fetchProviders) {
-    fetchProviders = createCachedFetch<string[] | null>(
-      async () => {
-        const models = await getVercelModelsMetadataFromDatabase();
-        const model = models[modelId];
-        return model ? extractVercelInferenceProviderIdsFromModel(model) : null;
-      },
-      TTL_MS,
-      null
-    );
-    vercelInferenceProviderFetchers.set(modelId, fetchProviders);
-  }
-
-  return fetchProviders();
+  return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
 }
 
-function createLanguageModelIdsFetcher(fetchModels: () => Promise<StoredModelMap>) {
+function createLanguageModelIdsFetcher(name: string, fetchModels: () => Promise<StoredModelMap>) {
   return createCachedFetch<ReadonlySet<string>>(
     async () => new Set(getLanguageModelIds(await fetchModels())),
     TTL_MS,
-    new Set<string>()
+    new Set<string>(),
+    { name }
   );
 }
 
 export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
+  'vercelLanguageModelIds',
   getVercelModelsMetadataFromDatabase
 );
 
 export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
+  'openRouterLanguageModelIds',
   getOpenRouterModelsMetadataFromDatabase
 );
 
 export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
   async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
   TTL_MS,
-  new Set<string>()
+  new Set<string>(),
+  { name: 'openRouterSystemOneModelIds' }
 );
 
-// Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
-const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
-  'anthropic/claude-haiku-4-5',
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-sonnet-4-6',
-  'anthropic/claude-sonnet-5-20260630',
-  'claude-sonnet-4.5',
-  'claude-sonnet-5',
-  'deepseek-v4-flash',
-  'deepseek-v4-flash-0731',
-  'deepseek-v4-pro',
-  'gemini-2.5-flash-lite',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gpt-5.4',
-  'gpt-5.4-mini',
-  'gpt-5.5',
-  'gpt-5.6-luna',
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'minimax-m3',
-  'minimax/minimax-m2.5-20260211',
-]);
+// The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
+// empty snapshot reports an outage once per window instead of once per validated model id.
+let warnedMissingOpenRouterModelMetadataFor: ReadonlySet<string> | null = null;
 
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
   if (legacyOpenRouterAliases.has(modelId)) {
@@ -156,10 +145,14 @@ export async function isValidOpenRouterModelId(modelId: string): Promise<boolean
   }
   const openRouterModelIds = await getOpenRouterModelsFromDatabase();
   if (openRouterModelIds.size === 0) {
-    warnExceptInTest(
-      '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'
-    );
+    if (warnedMissingOpenRouterModelMetadataFor !== openRouterModelIds) {
+      warnedMissingOpenRouterModelMetadataFor = openRouterModelIds;
+      warnExceptInTest(
+        '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'
+      );
+    }
     return true;
   }
+  warnedMissingOpenRouterModelMetadataFor = null;
   return openRouterModelIds.has(modelId);
 }

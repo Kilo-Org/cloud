@@ -239,13 +239,13 @@ describe('collectSystemSearchDocuments', () => {
         keywords: ['octocat/hello-world', '42'],
       },
       {
-        id: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1',
+        id: '/(app)/security-agent/personal/findings/finding-1',
         title: 'SQL injection',
         description: 'acme/api · critical',
         keywords: ['acme/api', 'critical'],
       },
       {
-        id: '/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/finding-2',
+        id: '/(app)/security-agent/org-1/findings/finding-2',
         title: 'XSS',
         description: 'acme/web · high',
         keywords: ['acme/web', 'high'],
@@ -362,7 +362,7 @@ describe('collectSystemSearchDocuments', () => {
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
     expect(documents.map(document => document.id)).toEqual([
-      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1',
+      '/(app)/security-agent/personal/findings/finding-1',
     ]);
     expect(observedSources.has('findings:personal')).toBe(false);
   });

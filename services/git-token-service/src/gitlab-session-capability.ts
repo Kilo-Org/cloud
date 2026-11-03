@@ -93,6 +93,62 @@ export type GitLabSessionCapabilitySubject = {
   source: GitLabCapabilityCredentialSource;
 };
 export type GitLabSessionCapabilityClaims = z.infer<typeof GitLabSessionCapabilityClaimsSchema>;
+
+export function validateGitLabSessionCapabilityPath(
+  pathname: string,
+  session: Pick<GitLabSessionCapabilitySubject, 'projectPath' | 'source'>,
+  basePath: string
+): {
+  failure: 'invalid_upstream_url' | 'invalid_upstream_request' | 'repository_mismatch' | null;
+  authSurface: 'git' | 'api';
+} {
+  const repositoryPath = `${basePath}/${session.projectPath}.git`;
+  const gitEndpoint =
+    /^(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/;
+  if (
+    pathname.startsWith(`${repositoryPath}/`) &&
+    gitEndpoint.test(pathname.slice(repositoryPath.length + 1))
+  ) {
+    return { failure: null, authSurface: 'git' };
+  }
+  if (
+    /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/.test(
+      pathname
+    )
+  ) {
+    return { failure: 'repository_mismatch', authSurface: 'git' };
+  }
+
+  const projectApiPrefix = `${basePath}/api/v4/projects/`;
+  if (pathname.startsWith(projectApiPrefix)) {
+    const projectSelector = pathname.slice(projectApiPrefix.length).split('/', 1)[0];
+    if (!projectSelector) return { failure: 'invalid_upstream_url', authSurface: 'api' };
+    let decodedProjectSelector: string;
+    try {
+      decodedProjectSelector = decodeURIComponent(projectSelector);
+    } catch {
+      return { failure: 'invalid_upstream_url', authSurface: 'api' };
+    }
+    const selectorMatches =
+      decodedProjectSelector === session.projectPath ||
+      (session.source.type === 'project' &&
+        decodedProjectSelector === String(session.source.projectId));
+    return {
+      failure: selectorMatches ? null : 'repository_mismatch',
+      authSurface: 'api',
+    };
+  }
+  const apiPrefix = `${basePath}/api/v4`;
+  return {
+    failure: 'invalid_upstream_request',
+    authSurface:
+      pathname === apiPrefix ||
+      pathname.startsWith(`${apiPrefix}/`) ||
+      pathname === `${basePath}/api/graphql`
+        ? 'api'
+        : 'git',
+  };
+}
 export type GitLabSessionCapabilityFailureReason =
   | 'invalid_capability'
   | 'expired_capability'

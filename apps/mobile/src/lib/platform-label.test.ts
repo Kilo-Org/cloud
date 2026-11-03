@@ -34,4 +34,8 @@ describe('platformLabel', () => {
     await i18n.changeLanguage('tr');
     expect(platformLabel('instance')).toBe('İNSTANCE');
   });
+  it('uses the neutral live label when a restored session has no platform', () => {
+    expect(platformLabel(null)).toBe(i18n.t('agents.sessionList.live'));
+    expect(platformLabel(undefined)).toBe(i18n.t('agents.sessionList.live'));
+  });
 });

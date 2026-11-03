@@ -48,15 +48,20 @@ vi.mock('@shopify/flash-list', () => ({
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: i18nManager,
+  Keyboard: { dismiss: () => undefined },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
@@ -102,6 +107,7 @@ beforeEach(() => {
     options: [model],
     currentValue: '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope: {
       sessionId: UNFENCED_ROUTE_KEY,
       ownerConnectionId: null,

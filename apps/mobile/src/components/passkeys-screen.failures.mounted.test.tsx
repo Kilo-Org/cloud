@@ -108,4 +108,18 @@ describe('PasskeysScreen inline failures', () => {
     expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
     view.unmount();
   });
+
+  it('resets the Add control once the attempt settles: enabled, not loading, still offered', async () => {
+    store.rows = [];
+    list.register.mockResolvedValue({ status: 'error', failure: 'failed' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
+    // The label re-derivation itself is covered in button.mounted.test.tsx;
+    // here the failed ceremony settles back to an enabled, offered control.
+    expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
+    view.unmount();
+  });
 });

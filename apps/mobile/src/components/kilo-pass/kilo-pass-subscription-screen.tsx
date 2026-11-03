@@ -76,14 +76,17 @@ function KiloPassUnavailableScreen({
       <ScreenHeader title={t('kiloPass.title')} modal />
       <CenteredState>
         <View className="items-center gap-3 px-6">
-          <Text className="text-center text-sm leading-5 text-muted-foreground">
+          <Text className="text-center text-sm leading-[1.25rem] text-muted-foreground">
             {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
           <Text className="text-center font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
           <Text className="text-center text-sm text-muted-foreground">{description}</Text>
           {isWebManagement && presentation.webUrl ? (
+            // The lone centered CTA: 48dp keeps the whole pressable above the
+            // Android minimum without hitSlop, since nothing sits beside it.
             <Button
               accessibilityLabel={t('kiloPass.manage')}
+              className="min-h-[48px]"
               onPress={() => {
                 if (!presentation.webUrl) {
                   return;
@@ -94,7 +97,7 @@ function KiloPassUnavailableScreen({
               }}
               variant="outline"
             >
-              {t('kiloPass.manage')}
+              <Text>{t('kiloPass.manage')}</Text>
             </Button>
           ) : null}
         </View>

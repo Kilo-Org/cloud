@@ -6,9 +6,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { cliSessions } from '@kilocode/db/schema';
 import { generateSignedUploadUrl } from '@/lib/r2/cli-sessions';
-import { BLOB_TYPES } from '@/routers/cli-sessions-router';
-
-const MAX_CONTENT_LENGTH = 5 * 1024 * 1024;
+import { BLOB_TYPES, CLI_SESSION_BLOB_MAX_BYTES } from '@/lib/cli-sessions/session-copies';
 
 const BodySchema = z.object({
   session_id: z.uuid(),
@@ -17,7 +15,10 @@ const BodySchema = z.object({
     .number()
     .int()
     .positive()
-    .max(MAX_CONTENT_LENGTH, `Content length must not exceed ${MAX_CONTENT_LENGTH} bytes (5MB)`),
+    .max(
+      CLI_SESSION_BLOB_MAX_BYTES,
+      `Content length must not exceed ${CLI_SESSION_BLOB_MAX_BYTES} bytes (5MB)`
+    ),
 });
 
 export async function POST(request: NextRequest) {

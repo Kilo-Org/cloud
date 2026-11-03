@@ -2,20 +2,24 @@
 set -euo pipefail
 
 # Output a JSON matrix of workspace packages that have file changes and a test script.
-# Excludes the root package and packages listed in --exclude arguments.
+# Excludes the root package and packages listed in --exclude arguments. Each
+# --include dir is selected as if it had file changes.
 #
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
+#   scripts/changed-workspaces.sh --include services/latency-ingest  # also select a dir
 
 excludes=()
+includes=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --exclude)
+    --exclude|--include)
       if [[ $# -lt 2 ]]; then
-        echo "Error: --exclude requires a value" >&2; exit 1
+        echo "Error: $1 requires a value" >&2; exit 1
       fi
-      excludes+=("$2"); shift 2 ;;
+      if [[ "$1" == --exclude ]]; then excludes+=("$2"); else includes+=("$2"); fi
+      shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -25,8 +29,13 @@ done
 #   the pushed range. `git merge-base origin/main HEAD` on a push to main
 #   resolves to HEAD, which would produce an empty matrix and skip the
 #   workspace-tests job.
-# - `pull_request` event (and locally with no GitHub env): use the merge-base
-#   against origin/main to preserve prior PR behavior.
+# - `pull_request` and `merge_group` events: use the PR base SHA or the merge
+#   group base SHA from $GITHUB_EVENT_PATH. On pull requests this is the base
+#   the affected workspace detector uses; in the merge queue that detector
+#   checks every workspace instead. For a stacked PR the base is the parent
+#   branch, so the matrix covers this PR's changes, not the whole stack's.
+# - Otherwise (or when that SHA is unavailable, and locally with no GitHub
+#   env): use the merge-base against origin/main.
 # - All-zeros before-sha (force-push / first push / branch creation) or any
 #   invalid/unreachable before-sha falls back to HEAD~1.
 base=""
@@ -40,7 +49,15 @@ if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [
     base=$(git rev-parse --verify HEAD~1 2>/dev/null || true)
   fi
 else
-  base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+  event_base=""
+  if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+    event_base=$(jq -r '.pull_request.base.sha // .merge_group.base_sha // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+  fi
+  if [ -n "$event_base" ] && git cat-file -e "${event_base}^{commit}" 2>/dev/null; then
+    base="$event_base"
+  else
+    base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+  fi
 fi
 
 force_all=false
@@ -86,6 +103,9 @@ if [ -n "$base" ]; then
       sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
     fi
   fi
+fi
+if [ ${#includes[@]} -gt 0 ]; then
+  printf '%s\n' "${includes[@]}" >> "$dependent_dirs_file"
 fi
 
 # Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)

@@ -8,7 +8,7 @@
   "finish_reason": "end_turn",
   "latency": null,
   "moderation_latency": null,
-  "generation_time": 3508.150326999952,
+  "generation_time": null,
   "streamed": false,
   "cancelled": null,
   "status_code": 200,
@@ -17,5 +17,6 @@
   "cacheHitTokens": 0,
   "cacheWriteTokens": 0,
   "cost_mUsd": 402,
+  "nonInferenceCost_mUsd": 0,
   "is_byok": true
 }

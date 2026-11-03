@@ -4,6 +4,8 @@
  * is not expressed as a unit test.
  */
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   type SlashCommandCatalogStatus,
@@ -35,20 +37,26 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState } from 'react-native-keyboard-controller';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useNavigation } from 'expo-router';
+import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { usePreventRemove } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
@@ -58,6 +66,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -100,8 +109,9 @@ import {
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
-  clipboardPasteEmptyMessage,
+  clipboardPasteFailureMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -135,9 +145,11 @@ const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
 /** Hide the remaining-characters counter until the draft nears the limit. */
 const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
+/** A shown toolbar row is never clamped; any real row is far below this. */
+const TOOLBAR_ROW_UNCLAMPED_HEIGHT = 10_000;
 
 type AndroidDismissKeyboardGesture = {
-  identifier: string;
+  identifier: GestureResponderEvent['nativeEvent']['identifier'];
   startPageX: number;
   startPageY: number;
   dismissed: boolean;
@@ -255,6 +267,22 @@ type ChatComposerProps = {
   controlRef?: Ref<ChatComposerControl>;
 };
 
+/**
+ * Runs the send path the composer launches without awaiting it. A failure
+ * escaping `submit` is reported, never left as an unhandled rejection.
+ */
+async function runSubmit(submit: () => Promise<void>): Promise<void> {
+  try {
+    await submit();
+  } catch (error) {
+    captureTelemetry({
+      level: 'error',
+      error,
+      tags: { 'error.subsystem': 'agent-chat', 'error.operation': 'submit' },
+    });
+  }
+}
+
 export function ChatComposer({
   onSend,
   onSendCommand,
@@ -296,7 +324,8 @@ export function ChatComposer({
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
   const { reducedMotion } = useMotionPolicy();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
@@ -393,18 +422,12 @@ export function ChatComposer({
   } satisfies { current: boolean };
   const upload = useAgentAttachmentUpload({ organizationId, delivery: attachmentDelivery });
 
-  // Leave confirm for unsent uploads. The composer registers its own
-  // `beforeRemove` listener so header back, the iOS swipe-back gesture, and
-  // Android back all confirm the same way. Slash-command navigation (/new,
-  // /restart, /exit) is already rejected while attachments are present, so no
-  // bypass flag is needed; a successful send clears the chips and disarms.
-  const navigation = useNavigation();
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const releaseUnclaimedRef = useRef(upload.releaseUnclaimedUploads);
   releaseUnclaimedRef.current = upload.releaseUnclaimedUploads;
-  usePreventRemove(upload.hasUnclaimedAttachments, ({ data }) => {
-    const action = data.action;
+  usePreventRemove(upload.hasUnclaimedAttachments && !leaveAllowed, ({ repeat }) => {
     confirm({
       title: i18n.t('agentChat.composer.discardAttachmentsTitle'),
       message: i18n.t('agentChat.composer.discardAttachmentsMessage'),
@@ -412,7 +435,8 @@ export function ChatComposer({
       cancelLabel: i18n.t('common.keepEditing'),
       onConfirm: () => {
         releaseUnclaimedRef.current();
-        navigation.dispatch(action);
+        setLeaveAllowed(true);
+        repeat();
       },
     });
   });
@@ -474,12 +498,16 @@ export function ChatComposer({
   // paths) goes through it, and each setter fires only when the value the
   // composer renders actually changed.
   const publishDerivedState = useCallback((value: string, slashCandidate: string | null) => {
-    const nextHasText = value.trim().length > 0;
-    if (nextHasText !== publishedHasTextRef.current) {
-      publishedHasTextRef.current = nextHasText;
-      setHasText(nextHasText);
+    const hasVisible = hasVisibleComposerText(value);
+    if (hasVisible !== publishedHasTextRef.current) {
+      publishedHasTextRef.current = hasVisible;
+      setHasText(hasVisible);
     }
-    const nextInputEmpty = value.length === 0;
+    // The placeholder follows the same reading: a draft that draws nothing is
+    // an empty composer to look at, so it must show the hint an empty one
+    // shows. Deriving it from `value.length` left such a draft with no glyph,
+    // no hint and a disabled Send — an empty state that reads as broken.
+    const nextInputEmpty = !hasVisible;
     if (nextInputEmpty !== publishedInputEmptyRef.current) {
       publishedInputEmptyRef.current = nextInputEmpty;
       setInputEmpty(nextInputEmpty);
@@ -641,9 +669,10 @@ export function ChatComposer({
   // Imperative occupancy check: the host asks whether the composer holds any
   // text or attachment so a queued-message cancel can pick restore vs drop.
   const hasContentRef = useRef(
-    () => textRef.current.trim().length > 0 || upload.attachments.length > 0
+    () => hasVisibleComposerText(textRef.current) || upload.attachments.length > 0
   );
-  hasContentRef.current = () => textRef.current.trim().length > 0 || upload.attachments.length > 0;
+  hasContentRef.current = () =>
+    hasVisibleComposerText(textRef.current) || upload.attachments.length > 0;
 
   const restoreFilePartsRef = useRef(upload.restoreFileParts);
   restoreFilePartsRef.current = upload.restoreFileParts;
@@ -701,7 +730,7 @@ export function ChatComposer({
     addCandidates,
   });
 
-  useSharePrefill({
+  const sharePrefill = useSharePrefill({
     shareId,
     inputRef,
     maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
@@ -796,6 +825,26 @@ export function ChatComposer({
   // the message field (video V1 ~4.5s and ~19s).
   const showToolbarRow = control.showToolbar || keyboardVisible;
 
+  // Once the chip is hidden, its row gives its height back in the same frames
+  // as the keyboard. `keyboardVisible` reaches false only after the keyboard
+  // has landed, so unmounting the row on that flag alone shifted the
+  // transcript a second time, after the keyboard had finished moving. The
+  // worklet reads only shared values and always writes `maxHeight`: Reanimated
+  // keeps a style key a worklet stops returning, so a conditional key would
+  // leave the row stuck at its collapsed height.
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const toolbarRowHeight = useSharedValue(0);
+  const toolbarRowCollapsing = useSharedValue(false);
+  useEffect(() => {
+    toolbarRowCollapsing.value = !control.showToolbar;
+  }, [control.showToolbar, toolbarRowCollapsing]);
+  const toolbarRowStyle = useAnimatedStyle(() => ({
+    maxHeight: toolbarRowCollapsing.value
+      ? toolbarRowHeight.value * keyboardProgress.value
+      : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+    overflow: 'hidden',
+  }));
+
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await upload.addCandidates([file]);
@@ -818,9 +867,7 @@ export function ChatComposer({
       });
     },
     onFailure: reason => {
-      toast.error(
-        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
-      );
+      toast.error(clipboardPasteFailureMessage(reason) ?? describeClassificationFailure(reason));
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
@@ -986,7 +1033,7 @@ export function ChatComposer({
     publishDerivedState('', null);
     setGoalComposeActive(false);
     measureHandleRef.current?.reset();
-    inputRef.current?.clear();
+    clearComposerInput(inputRef.current);
     // Clear the persisted draft only on successful send / explicit clear,
     // never on navigation-away, process kill, or sign-out.
     if (draftKey && userId) {
@@ -995,7 +1042,10 @@ export function ChatComposer({
   }
 
   async function handleSend() {
-    const trimmed = textRef.current.trim();
+    // Trim alone keeps zero-width and control characters, which draw nothing:
+    // a draft of them must send exactly what an empty one sends, so the prompt
+    // below is empty even though the input still holds them.
+    const trimmed = composerPromptText(textRef.current);
     // Decide admission from live values, not render-time `control.canSend`,
     // which can lag behind a same-frame edit. An empty prompt with no sendable
     // attachment is never sent. "Sendable" counts non-terminal chips: upload is
@@ -1063,7 +1113,7 @@ export function ChatComposer({
     // executes the submission without re-acquiring/releasing the lock or
     // toggling pending state. That keeps one authority and lets the lock
     // protect the entire asynchronous send.
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     try {
       // Upload pending attachments on the prompt branch only. Slash commands
       // and session controls never carry chips (`parseChatComposerSubmission`
@@ -1110,7 +1160,7 @@ export function ChatComposer({
                   // keyboard is left exactly where the person had it — dismissing
                   // it here took the focused input away on every send (video V1
                   // ~4.4s and ~18.9s).
-                  if (textRef.current.trim() === trimmed) {
+                  if (composerPromptText(textRef.current) === trimmed) {
                     clearDraft();
                   }
                   upload.clearOptimistic();
@@ -1216,11 +1266,11 @@ export function ChatComposer({
       return;
     }
     autoSendFiredRef.current = true;
-    void submitRef.current();
+    void runSubmit(submitRef.current);
   }, [autoSendArmed, shareDelivered, hasText, attachmentsEnabled, control.canSend, upload]);
 
   function handleStop() {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
     // Arm the remount restore; the remount effect reads the live text, so
     // a transcript that lands between this tap and the remount is kept (the
     // gateway upload resolves after Stop).
@@ -1267,6 +1317,9 @@ export function ChatComposer({
           userId,
           surface: 'agent-chat',
           sessionId: sessionId ?? null,
+          // Carried so a launch this composer loses to an Activity recreation
+          // reopens the same session in the same organization scope.
+          organizationId: organizationId ?? null,
         },
         themedSheet
       )
@@ -1277,6 +1330,7 @@ export function ChatComposer({
     showActionSheetWithOptions,
     userId,
     sessionId,
+    organizationId,
     themedSheet,
   ]);
 
@@ -1336,36 +1390,56 @@ export function ChatComposer({
 
         {!suggestionRow && showToolbarRow ? (
           <Animated.View
-            // The row is never animated out. An exit animation leaves its
-            // snapshot painted while the input row has already moved up into
-            // that space, so the collapsing model chip drew over the message
-            // field (video V1 ~4.5s and ~19s). The chip and the field stay in
-            // separate rows, and when the row does go there is nothing left to
-            // paint through the input.
-            entering={
-              control.showToolbar
-                ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
-                : undefined
-            }
-            pointerEvents={control.showToolbar ? 'auto' : 'none'}
-            accessibilityElementsHidden={!control.showToolbar}
-            importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
-            className={control.showToolbar ? undefined : 'opacity-0'}
+            style={toolbarRowStyle}
+            onLayout={event => {
+              if (!toolbarRowCollapsing.value) {
+                toolbarRowHeight.value = event.nativeEvent.layout.height;
+              }
+            }}
           >
-            <ChatToolbar
-              modeControl={modeControl}
-              model={model}
-              variant={variant}
-              modelOptions={modelOptions}
-              onModelSelect={onModelSelect}
-              disabled={control.toolbarDisabled}
-              onPaste={attachmentsEnabled ? pasteClipboard : undefined}
-              pasteDisabled={!control.inputEditable}
-              modelLocked={modelLocked}
-              modelLockLabel={modelLockLabel}
-              className={toolbarClassName}
-            />
+            <Animated.View
+              // The row is never animated out. An exit animation leaves its
+              // snapshot painted while the input row has already moved up into
+              // that space, so the collapsing model chip drew over the message
+              // field (video V1 ~4.5s and ~19s). The chip and the field stay in
+              // separate rows, and when the row does go there is nothing left to
+              // paint through the input.
+              entering={
+                control.showToolbar
+                  ? selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))
+                  : undefined
+              }
+              pointerEvents={control.showToolbar ? 'auto' : 'none'}
+              accessibilityElementsHidden={!control.showToolbar}
+              importantForAccessibility={control.showToolbar ? 'auto' : 'no-hide-descendants'}
+              className={control.showToolbar ? undefined : 'opacity-0'}
+            >
+              <ChatToolbar
+                modeControl={modeControl}
+                model={model}
+                variant={variant}
+                modelOptions={modelOptions}
+                onModelSelect={onModelSelect}
+                disabled={control.toolbarDisabled}
+                onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+                pasteDisabled={!control.inputEditable}
+                modelLocked={modelLocked}
+                modelLockLabel={modelLockLabel}
+                className={toolbarClassName}
+              />
+            </Animated.View>
           </Animated.View>
+        ) : null}
+
+        {sharePrefill.failed ? (
+          <SharePrefillFailure
+            onRetry={() => {
+              sharePrefill.retry();
+            }}
+            onDismiss={() => {
+              sharePrefill.dismiss();
+            }}
+          />
         ) : null}
 
         {showAttachments ? (
@@ -1470,7 +1544,7 @@ export function ChatComposer({
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}
               onSubmit={() => {
-                void submit();
+                void runSubmit(submit);
               }}
               onToggleVoice={() => {
                 void voiceInput.toggle();
@@ -1481,7 +1555,6 @@ export function ChatComposer({
               sendDisabledReason={sendDisabledReason}
               textInputStyle={textInputStyle}
               voiceDisabled={control.voiceDisabled}
-              voiceInputAvailable={voiceInput.available}
               voiceInputStatus={voiceInput.status}
             />
           </View>

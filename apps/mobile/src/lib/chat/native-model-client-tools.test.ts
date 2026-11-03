@@ -1,5 +1,5 @@
 import { type ModelClientService, type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
-import { Effect, Either, Stream } from 'effect';
+import { Effect, Result, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { backendFailureKey } from './backend-target';
@@ -21,11 +21,11 @@ describe('native on-device model client with tools', () => {
   const TOOLS: NativeAvailability = { ...AVAILABLE, tools: true };
 
   async function said(client: ModelClientService, asked = request): Promise<ModelEvent[]> {
-    const result = await Effect.runPromise(Effect.either(Stream.runCollect(client.stream(asked))));
-    if (Either.isLeft(result)) {
+    const result = await Effect.runPromise(Effect.result(Stream.runCollect(client.stream(asked))));
+    if (Result.isFailure(result)) {
       throw new Error('Expected the answer to finish');
     }
-    return [...result.right];
+    return [...result.success];
   }
 
   function toolBridge(script: Script) {
@@ -201,7 +201,7 @@ describe('native on-device model client with tools', () => {
       bridge,
       client.stream({ ...answered([{ callId: call.id, body: '12:00' }]), tools: undefined })
     );
-    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
       'modelChat.localModels.failed'
     );
     expect(bridge.resume).toHaveBeenCalledTimes(2);
@@ -236,7 +236,7 @@ describe('native on-device model client with tools', () => {
     await said(client);
     const waiting = bridge.generate.mock.calls[0]?.[0].id;
     const result = await collect(bridge, client.stream(answered([{ callId: 'other', body: 'x' }])));
-    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
       'modelChat.localModels.failed'
     );
     expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
@@ -258,7 +258,7 @@ describe('native on-device model client with tools', () => {
       bridge,
       client.stream(answered([{ callId: call.id, body: '12:00' }]))
     );
-    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
       'modelChat.localModels.failed'
     );
     expect(bridge.resume).toHaveBeenCalledOnce();

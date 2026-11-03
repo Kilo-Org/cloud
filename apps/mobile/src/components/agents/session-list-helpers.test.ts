@@ -13,6 +13,7 @@ import {
   composeActiveSessionVisibleMeta,
   composeSessionProvenanceSubtitle,
   expandPlatformFilter,
+  formatGitUrlProject,
   formatMeta,
   formatScheduledWake,
   knownPlatformBucket,
@@ -23,6 +24,7 @@ import {
   remoteMeta,
   remoteSessionEyebrowLabel,
   repoNameFromGitUrl,
+  sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
@@ -189,6 +191,74 @@ describe('formatMeta (moved helper, regression guard)', () => {
       timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
     );
   });
+  it('omits a missing restored timestamp', () => {
+    expect(formatMeta(null)).toBe('');
+  });
+});
+
+describe('sectionAwareTimeMeta', () => {
+  // 2026-10-30T16:00Z is a Friday; the rows below land on the calendar days the
+  // Agents list buckets as Today/Yesterday/a weekday, so each heading is the one
+  // that section really renders above the row.
+  const NOW = new Date('2026-10-30T16:00:00.000Z').getTime();
+  const HOUR = 60 * 60 * 1000;
+
+  function clockOf(iso: string): string {
+    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
+      new Date(iso)
+    );
+  }
+
+  it('shows the clock time of the row timestamp when the relative label restates the heading', () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    // The premise: the relative label is the section heading itself.
+    expect(formatMeta(iso, NOW)).toBe('YESTERDAY');
+
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', NOW)).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+    });
+  });
+
+  it('matches a heading already in the eyebrow casing, and every locale casing', async () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', NOW).clock).toBe(clockOf(iso));
+
+    // German heads the section "Gestern" while RelativeTimeFormat says "gestern".
+    await i18n.changeLanguage('de');
+    expect(formatMeta(iso, NOW)).toBe('GESTERN');
+    expect(sectionAwareTimeMeta(iso, 'Gestern', NOW).clock).not.toBeNull();
+  });
+
+  it('keeps the relative label under a heading it does not repeat', () => {
+    const today = new Date(NOW - 3 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(today, 'Today', NOW)).toEqual({
+      visible: '3 HOURS AGO',
+      clock: null,
+    });
+
+    const midWeek = new Date(NOW - 51 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', NOW)).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+    });
+  });
+
+  it('keeps the relative label on a row with no section (share sheet)', () => {
+    const iso = new Date(NOW - 27 * HOUR).toISOString();
+    expect(sectionAwareTimeMeta(iso, null, NOW)).toEqual({ visible: 'YESTERDAY', clock: null });
+    expect(sectionAwareTimeMeta(iso, undefined, NOW)).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+    });
+  });
+
+  it('omits the meta for an unparseable timestamp instead of inventing a clock', () => {
+    expect(sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', NOW)).toEqual({
+      visible: '',
+      clock: null,
+    });
+  });
 });
 
 describe('formatScheduledWake', () => {
@@ -281,6 +351,56 @@ describe('normalisePlatformSelection (persisted selection → sheet rows)', () =
   });
 });
 
+describe('formatGitUrlProject (percent-decoded segments)', () => {
+  it('decodes an encoded CJK repository name in an https URL', () => {
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      'org/山田-API'
+    );
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API')).toBe(
+      'org/山田-API'
+    );
+  });
+
+  it('decodes an encoded CJK repository name in an ssh URL', () => {
+    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      'org/山田-API'
+    );
+    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API')).toBe('org/山田-API');
+  });
+
+  it('decodes every path segment, not only the repository name', () => {
+    expect(
+      formatGitUrlProject(
+        'https://gitlab.com/%E7%A7%BB%E5%8A%A8%E7%AB%AF/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
+      )
+    ).toBe('移动端/метаданные');
+  });
+
+  it('keeps the GitLab dash-separated project form while decoding', () => {
+    expect(
+      formatGitUrlProject('https://gitlab.com/group/%E7%A7%BB%E5%8A%A8%E7%AB%AF/-/tree/main')
+    ).toBe('group/移动端');
+  });
+
+  it('keeps a malformed escape raw instead of throwing', () => {
+    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%ZZ-repo.git')).toBe(
+      'org/%E5%B1%B1%ZZ-repo'
+    );
+    expect(formatGitUrlProject('https://github.com/org/100%-repo.git')).toBe('org/100%-repo');
+    expect(formatGitUrlProject('git@github.com:org/100%-repo.git')).toBe('org/100%-repo');
+  });
+
+  it('decodes %25 to a single % and never decodes the value twice', () => {
+    expect(formatGitUrlProject('https://github.com/org/50%2525-off.git')).toBe('org/50%25-off');
+    expect(formatGitUrlProject('https://github.com/org/50%25-off.git')).toBe('org/50%-off');
+  });
+
+  it('leaves an already-decoded URL unchanged', () => {
+    expect(formatGitUrlProject('https://github.com/org/山田-API.git')).toBe('org/山田-API');
+    expect(formatGitUrlProject('git@github.com:org/метаданные.git')).toBe('org/метаданные');
+  });
+});
+
 describe('projectOptionKey (visible-label identity)', () => {
   it('folds https, ssh, and a .git suffix into one key', () => {
     const key = projectOptionKey('https://github.com/org/repo.git');
@@ -292,6 +412,12 @@ describe('projectOptionKey (visible-label identity)', () => {
 
   it('trims and lowercases the formatted label', () => {
     expect(projectOptionKey('https://github.com/Kilo-Org/KiloCode.git')).toBe('kilo-org/kilocode');
+  });
+
+  it('folds an encoded URL and the decoded repository name into one key', () => {
+    const encoded = 'https://github.com/org/%E5%B1%B1%E7%94%B0-API.git';
+    expect(projectOptionKey(encoded)).toBe(projectOptionKey('git@github.com:org/山田-API.git'));
+    expect(projectOptionKey(encoded)).toBe('org/山田-api');
   });
 });
 
@@ -329,6 +455,17 @@ describe('repoNameFromGitUrl', () => {
     // are >=2 leading parts, so the last segment is the repo name.
     expect(repoNameFromGitUrl('https://gitlab.com/group/sub/my-repo.git')).toBe('my-repo');
   });
+
+  it('returns the decoded repository name for a percent-encoded git URL', () => {
+    expect(repoNameFromGitUrl('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
+      '山田-API'
+    );
+    expect(
+      repoNameFromGitUrl(
+        'git@github.com:org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
+      )
+    ).toBe('метаданные');
+  });
 });
 
 describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', () => {
@@ -358,6 +495,22 @@ describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     expect(storedSessionEyebrowLabel({ git_url: '', created_on_platform: 'cloud-agent' })).toBe(
       'CLOUD AGENT'
     );
+  });
+
+  it('shows the decoded repository name for a percent-encoded git_url', () => {
+    expect(
+      storedSessionEyebrowLabel({
+        git_url:
+          'https://github.com/org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git',
+        created_on_platform: 'cloud-agent-web',
+      })
+    ).toBe('МЕТАДАННЫЕ');
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'git@github.com:org/%E5%B1%B1%E7%94%B0-API.git',
+        created_on_platform: 'cli',
+      })
+    ).toBe('山田-API');
   });
 });
 
@@ -398,6 +551,16 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     expect(
       remoteSessionEyebrowLabel({ gitUrl: undefined, createdOnPlatform: 'cloud-agent-web' })
     ).toBe('CLOUD AGENT');
+  });
+
+  it('shows the decoded repository name for a percent-encoded gitUrl', () => {
+    expect(
+      remoteSessionEyebrowLabel({
+        gitUrl:
+          'https://github.com/org/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).toBe('МЕТАДАННЫЕ');
   });
 
   it('repo name wins over a known platform origin', () => {
@@ -472,52 +635,68 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  const costSpoken = '12 cents';
-  const timeSpoken = '5 minutes ago';
-
-  it('needsInput + cost + time → null', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })).toBeNull();
-  });
-
-  it('needsInput + cost only → null', () => {
+  it('keeps metadata clauses separate from the outer Arabic conjunction', async () => {
+    await i18n.changeLanguage('ar');
     expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
-    ).toBeNull();
+      selectRemoteRowSpokenMeta({
+        variant: 'list',
+        needsInput: false,
+        scheduled: true,
+        scheduledWake: 'wake',
+        costSpoken: null,
+        timeSpoken: 'activity',
+      })
+    ).toBe('wake, activity');
   });
 
-  it('needsInput + time only → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
-    ).toBeNull();
+  it('keeps cost and activity alongside a scheduled wake', () => {
+    const result = selectRemoteRowSpokenMeta({
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      costSpoken: '12 cents',
+      timeSpoken: '5 minutes ago',
+    });
+    expect(result).toContain('tomorrow');
+    expect(result).toContain('12 cents');
+    expect(result).toContain('5 minutes ago');
   });
 
-  it('needsInput + neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
-
-  it('cost + time → combined spoken form', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })).toBe(
-      'cost 12 cents, 5 minutes ago'
-    );
-  });
-
-  it('cost only → spoken cost alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })).toBe(
-      'cost 12 cents'
-    );
-  });
-
-  it('time only → spoken time alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })).toBe(
-      '5 minutes ago'
-    );
-  });
-
-  it('neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
+  it.each([
+    {
+      variant: 'list',
+      needsInput: true,
+      scheduled: false,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    {
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    { variant: 'card', needsInput: true, scheduled: false, scheduledWake: null, expected: null },
+    {
+      variant: 'card',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      expected: 'tomorrow',
+    },
+    { variant: 'card', needsInput: false, scheduled: true, scheduledWake: null, expected: null },
+  ] as const)(
+    'preserves $variant metadata precedence for needsInput=$needsInput, scheduled=$scheduled, wake=$scheduledWake',
+    ({ expected, ...state }) => {
+      expect(
+        selectRemoteRowSpokenMeta({
+          ...state,
+          costSpoken: '12 cents',
+          timeSpoken: '5 minutes ago',
+        })
+      ).toBe(expected);
+    }
+  );
 });

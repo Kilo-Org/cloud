@@ -12,6 +12,25 @@ export type LabeledInstance = InstancePickerInstance & {
   dedupSuffix: string | null;
 };
 
+export type InstancePickerListItem =
+  | { key: string; type: 'header'; kind: InstancePickerInstance['kind'] }
+  | { key: string; type: 'instance'; instance: LabeledInstance };
+
+export function instancePickerListItems(instances: InstancePickerInstance[], locale: string) {
+  const labeled = dedupeInstanceLabels(instances, locale);
+  const items: InstancePickerListItem[] = [];
+  for (const kind of ['remote', 'cli'] as const) {
+    const group = labeled.filter(instance => instance.kind === kind);
+    if (group.length > 0) {
+      items.push({ key: `header:${kind}`, type: 'header', kind });
+      for (const instance of group) {
+        items.push({ key: instance.connectionId, type: 'instance', instance });
+      }
+    }
+  }
+  return items;
+}
+
 /** Preserve every connection and its order; disambiguate displayed identities, not raw metadata. */
 export function dedupeInstanceLabels(
   instances: InstancePickerInstance[],

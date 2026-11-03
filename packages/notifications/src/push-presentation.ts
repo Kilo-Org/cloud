@@ -1,5 +1,4 @@
 import { type PushData } from './push-data';
-import { translatePush } from './i18n';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -11,6 +10,7 @@ import { translatePush } from './i18n';
 export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
   { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+  { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -55,11 +55,19 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 /** Both channel resolvers gate on the same first split-channel release. */
 export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = AGENT_CHANNEL_SPLIT_APP_VERSION;
 
-/** The agent channels that only a build at or above the split's release creates. */
-const AGENT_KIND_ANDROID_CHANNELS: readonly AndroidNotificationChannelId[] = [
-  'needs-input',
-  'agent-progress',
-];
+/**
+ * The first mobile version whose every build creates `agent-briefing`. Builds of
+ * `1.0.15` shipped without it, so a lower version keeps the brief on
+ * `agent-progress` (see `androidChannelIdForPushDataToAppVersion`).
+ */
+export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
+
+/** Channels that only a build at or above the given version creates. */
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
+  'needs-input': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'agent-progress': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
+};
 
 /**
  * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
@@ -120,6 +128,8 @@ export function androidChannelIdForPushDataToAppVersion(
       return 'chat';
     case 'active_agents_glanceable':
       return 'active-agents';
+    case 'agent_briefing':
+      return androidChannelIdForRegisteredClient('agent-progress', appVersion);
     default:
       return undefined;
   }
@@ -127,9 +137,9 @@ export function androidChannelIdForPushDataToAppVersion(
 
 /**
  * The Android channel a token's client can actually receive, or `undefined`
- * when the client predates channel creation or predates the named agent
- * channels. The caller omits `channelId` in that case; Android then posts to
- * the app's default channel instead of dropping the notification.
+ * when the client predates channel creation or predates that channel. The
+ * caller omits `channelId` in that case; Android then posts to the app's
+ * default channel instead of dropping the notification.
  */
 export function androidChannelIdForRegisteredClient(
   channelId: AndroidNotificationChannelId,
@@ -138,12 +148,11 @@ export function androidChannelIdForRegisteredClient(
   if (appVersion == null) {
     return undefined;
   }
-  if (!AGENT_KIND_ANDROID_CHANNELS.includes(channelId)) {
+  const minAppVersion = ANDROID_CHANNEL_MIN_APP_VERSIONS[channelId];
+  if (minAppVersion === undefined) {
     return channelId;
   }
-  return isPushAppVersionAtLeast(appVersion, ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION)
-    ? channelId
-    : undefined;
+  return isPushAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
 }
 
 /**
@@ -278,123 +287,12 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_finding':
     case 'security_lifecycle':
       return 'security';
+    case 'agent_briefing':
+      return 'agent-briefing';
     case 'session_live_update':
       return 'followed-sessions-lock-screen';
     default: {
       // Exhaustiveness: the agent variants returned above.
-      const _exhaustive: never = data;
-      return _exhaustive;
-    }
-  }
-}
-
-/**
- * Content-free push copy for the `generic` preview mode. Never embeds a
- * session title, message body, org name, amount, or id — the OS lock-screen
- * text must not leak private content.
- */
-export function genericPushContentForPushData(
-  data: PushData,
-  // Old callers omit locale; remove the default when every caller passes a token locale.
-  locale: string | null | undefined = 'en'
-): { title: string; body: string } {
-  switch (data.type) {
-    case 'cloud_agent_session':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.cloudAgentSession',
-          undefined,
-          'Your agent session has an update'
-        ),
-      };
-    case 'chat.message':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.chatMessage',
-          undefined,
-          'You have a new message'
-        ),
-      };
-    case 'instance-lifecycle':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.instanceLifecycle',
-          undefined,
-          'Your instance has an update'
-        ),
-      };
-    case 'scheduled-action':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.scheduledAction',
-          undefined,
-          'A scheduled action has an update'
-        ),
-      };
-    case 'low_balance':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.lowBalance',
-          undefined,
-          'Your balance needs attention'
-        ),
-      };
-    case 'spend_alert':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.spendAlert',
-          undefined,
-          'Your spend needs attention'
-        ),
-      };
-    case 'security_finding':
-    case 'security_lifecycle':
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.securityFinding',
-          undefined,
-          'A security finding needs attention'
-        ),
-      };
-    case 'active_agents_glanceable':
-      // Generic, count-free lock-screen banner copy: the ongoing notification
-      // never leaks how many agents are running or which sessions they are.
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.activeAgentsGlanceable',
-          undefined,
-          'Active agents have an update'
-        ),
-      };
-    case 'session_live_update':
-      // Data-only: the app draws the notification. Never the session title.
-      return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
-        body: translatePush(
-          locale,
-          'generic.body.cloudAgentSession',
-          undefined,
-          'Your agent session has an update'
-        ),
-      };
-    default: {
-      // Exhaustiveness: new PushData variants must be handled above.
       const _exhaustive: never = data;
       return _exhaustive;
     }

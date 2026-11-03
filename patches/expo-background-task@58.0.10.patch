@@ -1,0 +1,17 @@
+diff --git a/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt b/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
+index 67097c6..0689d51 100644
+--- a/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
++++ b/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
+@@ -266,7 +266,11 @@ object BackgroundTaskScheduler {
+ 
+     return try {
+       val workInfos = workManager.getWorkInfosForUniqueWork(WORKER_IDENTIFIER).await()
+-      return workInfos.firstOrNull()
++      // Each run appends to the unique work chain, which lists entries in id
++      // order, so the first one can be a finished run. Reporting that entry as
++      // the worker made a cold start re-enqueue with REPLACE and cancel the run
++      // in progress. Prefer the live (enqueued, running or blocked) entry.
++      return workInfos.firstOrNull { !it.state.isFinished } ?: workInfos.firstOrNull()
+     } catch (e: Exception) {
+       Log.d(TAG, "Calling getWorkInfosForUniqueWork failed with error " + e.message)
+       null

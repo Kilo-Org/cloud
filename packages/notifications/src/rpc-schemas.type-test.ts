@@ -1,6 +1,6 @@
+import type { ScheduledActionEvent } from './notification-events';
 import type {
   InternalDispatchSecurityLifecycleRequest,
-  ScheduledActionEvent,
   SendScheduledActionNoticeParams,
   SendScheduledActionNoticeResult,
 } from './rpc-schemas';

@@ -278,6 +278,7 @@ describe('shouldCountAsTransient', () => {
 
 describe('error categorization is mutually exclusive', () => {
   const allKinds: PRStatusError[] = [
+    { kind: 'owner_lookup_failed', provider: 'github' },
     { kind: 'no_token', provider: 'github', resolutionChain: [] },
     {
       kind: 'http_error',
@@ -322,6 +323,21 @@ describe('error categorization is mutually exclusive', () => {
 });
 
 describe('counter cross-contamination', () => {
+  it('allows recovery from owner lookup errors but fails after 10 consecutive failed polls', () => {
+    const error: PRStatusError = { kind: 'owner_lookup_failed', provider: 'github' };
+    expect(_shouldFailImmediately(error)).toBe(false);
+    expect(_shouldCountAsTransient(error)).toBe(true);
+    let state = { pollTransientCount: 0, pollNonTransientCount: 0, shouldFail: false };
+    for (let i = 1; i <= 10; i++) {
+      state = _nextPollCounterState(error, state);
+      expect(state.pollTransientCount).toBe(i);
+      expect(state.shouldFail).toBe(i === 10);
+    }
+    expect(_failureMessageFor(error)).toBe(
+      'Town ownership lookup failed repeatedly. Retry when the service is available.'
+    );
+  });
+
   it('9 transient errors then 1 non-transient should not fail (separate counters)', () => {
     const transientError: PRStatusError = {
       kind: 'http_error',

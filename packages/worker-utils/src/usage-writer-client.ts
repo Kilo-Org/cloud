@@ -4,11 +4,19 @@ import {
   type UsageRecordResponse,
 } from '@kilocode/usage-contracts';
 import { readBoundedStream } from './bounded-stream-reader';
+import { z } from 'zod';
+
+const AdmissionRejectionSchema = z.strictObject({
+  error: z.literal('Usage writer overloaded'),
+  reason: z.enum(['queue_limit', 'pool_waiting', 'pool_busy']),
+});
+type AdmissionReason = z.infer<typeof AdmissionRejectionSchema>['reason'];
 
 export type UsageWriterConfig = {
   url?: string;
   secret?: string;
   protectionBypass?: string;
+  source?: 'queue' | 'queue_vercel';
 };
 
 export type UsageWriteOutcome =
@@ -23,6 +31,7 @@ export type UsageWriteOutcome =
         | 'timeout'
         | 'request_failed';
       status?: number;
+      admissionReason?: AdmissionReason;
     };
 
 // The existing writer allows 150 seconds for its database transaction.
@@ -31,18 +40,25 @@ export const MAX_WRITER_RESPONSE_BYTES = 4096;
 
 export async function recordUsage(
   payload: UsageRecordRequest,
-  config: UsageWriterConfig
+  config: UsageWriterConfig,
+  fetchWriter: typeof fetch = fetch
 ): Promise<UsageWriteOutcome> {
   const unavailable = (
     reason: Extract<UsageWriteOutcome, { kind: 'unavailable' }>['reason'],
-    status?: number
+    status?: number,
+    admissionReason?: AdmissionReason
   ): UsageWriteOutcome => {
     console.warn('usage writer unavailable', {
       usageId: payload.core.id,
       reason,
       ...(status === undefined ? {} : { status }),
     });
-    return { kind: 'unavailable', reason, ...(status === undefined ? {} : { status }) };
+    return {
+      kind: 'unavailable',
+      reason,
+      ...(status === undefined ? {} : { status }),
+      ...(admissionReason === undefined ? {} : { admissionReason }),
+    };
   };
 
   if (!config.url || !config.secret) return unavailable('missing_config');
@@ -50,12 +66,13 @@ export async function recordUsage(
   const signal = AbortSignal.timeout(USAGE_WRITER_TIMEOUT_MS);
   let response: Response | undefined;
   try {
-    response = await fetch(config.url, {
+    response = await fetchWriter(config.url, {
       method: 'POST',
       redirect: 'manual',
       headers: {
         'content-type': 'application/json',
         'x-internal-api-key': config.secret,
+        ...(config.source ? { 'x-usage-write-source': config.source } : {}),
         ...(config.protectionBypass
           ? { 'x-vercel-protection-bypass': config.protectionBypass }
           : {}),
@@ -63,13 +80,28 @@ export async function recordUsage(
       body: JSON.stringify(payload),
       signal,
     });
+    if (response.status === 429) {
+      let admissionReason: AdmissionReason | undefined;
+      try {
+        if (response.body) {
+          const body = await readBoundedStream(response.body, MAX_WRITER_RESPONSE_BYTES);
+          if (body.ok) {
+            const value: unknown = JSON.parse(
+              new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body.bytes)
+            );
+            const parsed = AdmissionRejectionSchema.safeParse(value);
+            if (parsed.success) admissionReason = parsed.data.reason;
+          }
+        }
+      } catch {
+        // A partial, slow or malformed rejection remains generic HTTP 429 overload.
+      }
+      return unavailable('http_error', 429, admissionReason);
+    }
     if (!response.ok) return unavailable('http_error', response.status);
     if (!response.body) return unavailable('invalid_response');
 
-    const body = await readBoundedStream(
-      response.body as ReadableStream<Uint8Array>,
-      MAX_WRITER_RESPONSE_BYTES
-    );
+    const body = await readBoundedStream(response.body, MAX_WRITER_RESPONSE_BYTES);
     if (!body.ok) return unavailable('invalid_response');
     const value: unknown = JSON.parse(
       new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body.bytes)

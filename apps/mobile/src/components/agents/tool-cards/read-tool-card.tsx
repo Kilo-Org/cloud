@@ -22,6 +22,7 @@ import {
 } from '../read-tool-markdown';
 import { getToolImageAttachments } from '../tool-card-attachments';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 // A completed code read can exceed what a detail sheet renders comfortably;
 // the cap keeps highlighting and layout bounded, and the hit shows the shared
@@ -118,7 +119,7 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

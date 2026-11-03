@@ -8,11 +8,7 @@
 // "you just did this thing and one part of it did not complete"
 // feedback, not durable state. A cold reload can safely drop it.
 
-export type PrRef = {
-  owner: string;
-  repo: string;
-  number: number;
-};
+import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 
 type PartialMergeSuccess = {
   /** Human-readable branch-delete failure reason from the server. */
@@ -21,15 +17,15 @@ type PartialMergeSuccess = {
 
 const store = new Map<string, PartialMergeSuccess>();
 
-function key(ref: PrRef): string {
+function key(ref: ProviderPrTriple): string {
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
 }
 
-export function setMergePartialSuccess(ref: PrRef, value: PartialMergeSuccess): void {
+export function setMergePartialSuccess(ref: ProviderPrTriple, value: PartialMergeSuccess): void {
   store.set(key(ref), value);
 }
 
-export function consumeMergePartialSuccess(ref: PrRef): PartialMergeSuccess | null {
+export function consumeMergePartialSuccess(ref: ProviderPrTriple): PartialMergeSuccess | null {
   const k = key(ref);
   const value = store.get(k) ?? null;
   // Consume-on-read: the screen MUST render exactly once and then clear
@@ -40,7 +36,7 @@ export function consumeMergePartialSuccess(ref: PrRef): PartialMergeSuccess | nu
   return value;
 }
 
-export function clearMergePartialSuccess(ref: PrRef): void {
+export function clearMergePartialSuccess(ref: ProviderPrTriple): void {
   store.delete(key(ref));
 }
 

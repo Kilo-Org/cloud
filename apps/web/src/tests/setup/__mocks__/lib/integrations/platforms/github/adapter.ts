@@ -4,8 +4,8 @@
 
 export type GitHubAppType = 'standard' | 'lite';
 
-export function verifyGitHubWebhookSignature(_payload: string, _signature: string): boolean {
-  return true;
+export function verifyGitHubWebhookSignature(_payload: string, _signature: string): 'valid' {
+  return 'valid';
 }
 
 export async function generateGitHubInstallationToken(
@@ -35,14 +35,19 @@ export async function getCollaboratorPermissionLevel(
   return 'write';
 }
 
-export async function isMergeCommit(
-  _installationId: string,
-  _owner: string,
-  _repo: string,
-  _commitSha: string,
-  _appType: GitHubAppType = 'standard'
-): Promise<boolean> {
-  return false;
+export async function resolveMergeHeadContent(_args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<{ kind: 'not_merge' }> {
+  return { kind: 'not_merge' };
+}
+
+export async function getCheckRunConclusion(): Promise<'success' | undefined> {
+  return undefined;
 }
 
 export async function addReactionToPR(
@@ -76,6 +81,28 @@ export async function updateCheckRun(
   _appType: GitHubAppType = 'standard'
 ): Promise<void> {
   return;
+}
+
+export async function createPRComment(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  _body: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<void> {
+  return;
+}
+
+export async function hasPRCommentWithMarker(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  _marker: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<boolean> {
+  return false;
 }
 
 export type AssociatedPullRequest = {

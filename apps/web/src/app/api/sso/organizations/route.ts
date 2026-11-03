@@ -11,6 +11,7 @@ import {
   type SignInDiscoveryResponse,
 } from '@/lib/schemas/sso-organizations';
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
@@ -104,7 +105,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? ProdNonSSOAuthProviders
         : ProdNonSSOAuthProviders.filter(provider => provider !== 'email')),
     ];
-    return discoveryResponse({ kind: 'new', providers });
+    return discoveryResponse({
+      kind: 'new',
+      providers,
+      ...(isEmailSignupDisabled() ? { emailSignupDisabled: true } : {}),
+    });
   } catch (err: unknown) {
     warnInSentry('sso error');
     captureException(err, {

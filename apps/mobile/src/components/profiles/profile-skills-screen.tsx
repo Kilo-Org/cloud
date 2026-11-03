@@ -1,24 +1,35 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
   useAgentProfileMutations,
+  useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_SKILLS: AgentProfileDetail['skills'] = [];
@@ -26,11 +37,14 @@ const NO_SKILLS: AgentProfileDetail['skills'] = [];
 /** The skill the sheet edits; `null` opens the sheet in add mode. */
 type SkillTarget = { id: string; name: string; rawMarkdown: string };
 
+/** A refused save, and whether it is a failure or an expected limit. */
+type SaveFailure = { message: string; tone: 'error' | 'warn' };
+
 type SkillRowProps = Readonly<{
   skill: AgentProfileDetail['skills'][number];
-  onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onToggle?: (enabled: boolean) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -42,41 +56,54 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled switch,
- * and edit/delete controls. The row carries no container
- * `accessibilityLabel`, so the switch's label stays the only element a screen
- * reader matches by the skill's name.
+ * One skill row: the name in mono, its source type, the enabled switch, and
+ * delete plus edit for local skills. The name is painted only and hidden from
+ * assistive technology, so the switch's label stays the only element a screen
+ * reader matches by the skill's name; the source type keeps its own stop
+ * because it says what the name does not.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const subtitleKey = skillRowSubtitle(skill);
+  const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
+  const canEdit = skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" numberOfLines={1}>
+        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
-          {skillRowSubtitle(skill)}
+          {subtitle}
         </Text>
       </View>
-      <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.skillEditTitle')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      <Switch
+        value={skill.enabled}
+        accessibilityLabel={skill.name}
+        disabled={onToggle === undefined}
+        onValueChange={onToggle}
+      />
+      {onEdit !== undefined && canEdit ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.skillEdit', { name: skill.name })}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -98,23 +125,51 @@ export function ProfileSkillsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileSkills(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const skills = profileQuery.data?.skills ?? NO_SKILLS;
-  // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
-  const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
+  const skills = profileQuery.data ?? NO_SKILLS;
+  const atSkillCap = skills.length >= MAX_PROFILE_SKILLS;
+  // `null` = closed, the add form, or the skill being edited. The sheet and the
+  // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
+  // what was typed instead of dropping it.
+  const draftScope = `profiles:skills:${profileId}`;
+  // The message the open sheet shows for a refused save, and whether it is a
+  // failure or an expected limit, is the form's note: the mutation hook's toast
+  // sits behind the sheet, and opening or closing resets the note with the rest
+  // of the draft.
+  const form = useProfileFormDraft(draftScope, skills, { saveFailure: null as SaveFailure | null });
+  // The list sits underneath the sheet, and a sheet dismisses natively, so the
+  // second tap of a Save double tap would land on the row just saved.
+  const { markClosed: markSheetClosed, guard: guardRowPress } = useSheetRowTapGuard();
+  const { startAdd: handleStartAdd } = form;
 
-  const startAdd = () => {
-    setForm({ skill: null });
+  const handleClose = () => {
+    markSheetClosed();
+    form.close();
   };
 
-  const closeForm = () => {
-    setForm(null);
+  const setSaveFailure = (next: SaveFailure | null) => {
+    form.setNotes({ saveFailure: next });
   };
+  const saveFailure = form.notes.saveFailure;
+
+  const skillLimitFailure = (): SaveFailure => ({
+    message: t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }),
+    tone: 'warn',
+  });
 
   const saveSkill = async (target: SkillTarget | null, submission: SkillFormSubmission) => {
+    const generation = form.generation();
+    setSaveFailure(null);
+    // The server counts every skill row of the profile, so a full list cannot
+    // take another create: name the cap here instead of round-tripping for it.
+    if (target === null && atSkillCap) {
+      setSaveFailure(skillLimitFailure());
+      return;
+    }
     try {
       await (target === null
         ? createCustomSkill.mutateAsync({ profileId, ...submission })
@@ -125,12 +180,22 @@ export function ProfileSkillsScreen({
             description: submission.description ?? null,
           }));
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
+      if (!form.isCurrent(generation)) {
+        return;
       }
+      // A create the server refused at the cap, e.g. the list was stale; an
+      // update never hits the cap, so its PRECONDITION_FAILED (an unmodifiable
+      // skills.sh reference) keeps the generic message.
+      const limited =
+        target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED';
+      setSaveFailure(
+        limited ? skillLimitFailure() : { message: t('profiles.skillSaveFailed'), tone: 'error' }
+      );
       return;
     }
-    closeForm();
+    if (form.isCurrent(generation)) {
+      handleClose();
+    }
   };
 
   const runDelete = async (skillId: string) => {
@@ -138,7 +203,7 @@ export function ProfileSkillsScreen({
       await deleteSkill.mutateAsync({ profileId, skillId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
+        toast.error(t('profiles.skillDeleteFailed'));
       }
     }
   };
@@ -175,9 +240,11 @@ export function ProfileSkillsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
+              <Text>{t('profiles.addSkill')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -188,43 +255,68 @@ export function ProfileSkillsScreen({
           <SkillRow
             key={skill.id}
             skill={skill}
-            onToggle={enabled => {
-              setSkillEnabled.mutate(
-                { profileId, skillId: skill.id, enabled },
-                {
-                  onError: error => {
-                    if (!hasUsableMessage(error)) {
-                      toast.error(t('profiles.skillSaveFailed'));
-                    }
-                  },
-                }
-              );
-            }}
-            onEdit={() => {
-              setForm({
-                skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
-              });
-            }}
-            onDelete={() => {
-              confirmDelete({
-                id: skill.id,
-                name: skill.name,
-                rawMarkdown: skill.rawMarkdown,
-              });
-            }}
+            onToggle={
+              canManage
+                ? guardRowPress(enabled => {
+                    setSkillEnabled.mutate(
+                      { profileId, skillId: skill.id, enabled },
+                      {
+                        onError: error => {
+                          if (!hasUsableMessage(error)) {
+                            toast.error(t('profiles.skillToggleFailed'));
+                          }
+                        },
+                      }
+                    );
+                  })
+                : undefined
+            }
+            onEdit={
+              canManage
+                ? guardRowPress(() => {
+                    form.startEdit(skill);
+                  })
+                : undefined
+            }
+            onDelete={
+              canManage
+                ? guardRowPress(() => {
+                    confirmDelete({
+                      id: skill.id,
+                      name: skill.name,
+                      rawMarkdown: skill.rawMarkdown,
+                    });
+                  })
+                : undefined
+            }
           />
         ))}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.addSkill')}</Text>
-        </Button>
+        {canManage ? (
+          <>
+            <Button onPress={handleStartAdd}>
+              <Text>{t('profiles.addSkill')}</Text>
+            </Button>
+            {atSkillCap ? (
+              <AccessibleStatus
+                message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
+                tone="warn"
+                className="text-sm"
+              />
+            ) : null}
+          </>
+        ) : null}
       </>
     );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.skillsTitle')} />
-      <ScrollView
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.skillsTitle')}
+      />
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -232,15 +324,18 @@ export function ProfileSkillsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <SkillFormSheet
-          skill={form.skill}
+          draftScope={draftScope}
+          skill={form.editing}
           isSaving={createCustomSkill.isPending || updateSkill.isPending}
-          onClose={closeForm}
+          saveFailure={saveFailure?.message ?? null}
+          saveFailureTone={saveFailure?.tone}
+          onClose={handleClose}
           onSave={submission => {
-            void saveSkill(form.skill, submission);
+            void saveSkill(form.editing, submission);
           }}
         />
       ) : null}

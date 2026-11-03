@@ -23,6 +23,7 @@ const allRejected: SharePayloadValidation = {
   kind: 'all-rejected',
   reason: 'denied',
   message: "Executable files can't be attached",
+  failedCopies: [],
 };
 
 function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput {
@@ -65,7 +66,7 @@ describe('selectShareGateState', () => {
     const state = selectShareGateState(base({ shareId: undefined }));
     expect(state.kind).toBe('stale-share');
     if (state.kind === 'stale-share') {
-      expect(state.message).toBe('This share is no longer available.');
+      expect(state.message).toBe('Send it again from the app you shared from.');
       expect(state.showNewSession).toBe(false);
       expect(state.showRetry).toBe(false);
       expect(state.showList).toBe(false);

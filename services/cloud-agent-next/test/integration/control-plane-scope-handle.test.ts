@@ -26,7 +26,7 @@ import {
   type ScopeHandleResolution,
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import type { AgentSandboxProvider } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
@@ -44,7 +44,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 
 const USER_ID = 'user_123';
 const OTHER_USER_ID = 'user_other';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const WORKER_URL = 'https://control.test';
 const SECRET = env.NEXTAUTH_SECRET as string;
 
@@ -140,14 +140,13 @@ type FakeProvider = { adapter: ProviderAdapter; launchEnvs: Record<string, strin
 function createProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -214,7 +213,10 @@ async function createSession(input: {
       turn: { type: 'prompt', prompt: 'hello' },
       agent: { mode: 'code', model: 'test/model' },
     },
-    sandboxSelection: { provider: 'vercel' },
+    sandboxSelection: {
+      provider: 'vercel',
+      byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     ...(input.seal ? { runtimeAuthorizationSeal: input.seal } : {}),
   });
   return sessionStub;

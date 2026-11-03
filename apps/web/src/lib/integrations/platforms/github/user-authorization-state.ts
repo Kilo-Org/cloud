@@ -37,7 +37,9 @@ export async function createGitHubUserAuthorizationState(
   }
 
   const encodedPayload = Buffer.from(JSON.stringify({ verifierRef })).toString('base64url');
-  const state = createOAuthState(`${STATE_PREFIX}${encodedPayload}`, userId);
+  const state = createOAuthState(`${STATE_PREFIX}${encodedPayload}`, userId, undefined, {
+    provider: 'github',
+  });
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
 
   return { state, codeChallenge };
@@ -62,6 +64,9 @@ export async function consumeGitHubUserAuthorizationState(
 ): Promise<GitHubUserAuthorizationStateResult> {
   const verified = verifyOAuthStateDetailed(state);
   if (verified.status === 'invalid') return verified;
+  if (verified.state.provider !== 'github') {
+    return { status: 'invalid', reason: 'flow_mismatch' };
+  }
   if (verified.state.userId !== sessionUserId) {
     return { status: 'invalid', reason: 'user_mismatch' };
   }

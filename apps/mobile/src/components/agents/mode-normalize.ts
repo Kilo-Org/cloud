@@ -41,10 +41,14 @@ type ProfileAgent = {
   };
 };
 
-/** Structural shape of a session `runtimeAgents` entry. */
+/**
+ * Structural shape of a session `runtimeAgents` entry, or of an agent a CLI
+ * reports through `list_agents`.
+ */
 type RuntimeAgent = {
   slug: string;
   name: string;
+  description?: string;
   model?: string;
   variant?: string;
 };
@@ -110,7 +114,7 @@ export function customModeOptionsFromRuntimeAgents(
   return runtimeAgents.map(a => ({
     value: a.slug,
     label: a.name,
-    description: '',
+    description: a.description ?? '',
   }));
 }
 
@@ -173,10 +177,11 @@ export type SessionRoleType = 'remote' | 'cloud-agent' | 'read-only';
 
 /**
  * Merge the effective profile's visible custom agents (labels + descriptions)
- * with the session's runtime-reported agents. Profile agents come first so
- * their metadata wins on a slug collision.
+ * with the agents the runtime reports: a cloud-agent session's `runtimeAgents`
+ * or a CLI's `list_agents`. Profile agents come first so their metadata wins
+ * on a slug collision.
  */
-function mergeProfileAndRuntimeModeOptions(
+export function mergeProfileAndRuntimeModeOptions(
   profileAgents: ProfileAgent[] | undefined,
   runtimeAgents: RuntimeAgent[] | undefined
 ): ModeOption[] {

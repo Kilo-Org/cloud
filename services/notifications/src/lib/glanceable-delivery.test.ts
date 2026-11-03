@@ -2233,10 +2233,18 @@ describe('toGlanceableContentState', () => {
         .needsApproval
     ).toBe(1);
     // A snapshot from a server older than this release omits the field; the
-    // Live Activity content state still carries an explicit 0.
-    const { needsApproval: _absent, ...legacy } = snapshot;
+    // Live Activity content state still carries an explicit 0. `toGlanceable
+    // ContentState` reads the raw wire shape, so the legacy payload is typed
+    // as a Partial of it.
+    const legacy: Partial<typeof snapshot> = { ...snapshot };
+    delete legacy.needsApproval;
     expect(
-      (JSON.parse(toGlanceableContentState(legacy).props) as Record<string, unknown>).needsApproval
+      (
+        JSON.parse(toGlanceableContentState(legacy as ActiveAgentsGlanceable).props) as Record<
+          string,
+          unknown
+        >
+      ).needsApproval
     ).toBe(0);
   });
 

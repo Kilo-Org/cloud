@@ -18,6 +18,7 @@ import {
 } from './utils';
 import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { CreditExpiryNotice } from '@/components/payment/CreditExpiryNotice';
 
 export function KiloPassTierCard(props: {
   tier: KiloPassTier;
@@ -139,6 +140,9 @@ export function KiloPassTierCard(props: {
       </div>
 
       <div className="mt-4">
+        <div className="mb-3">
+          <CreditExpiryNotice purchase="pass" />
+        </div>
         <Button
           type="button"
           variant={isRecommended ? 'default' : 'secondary'}

@@ -17,9 +17,16 @@ export type OpenRouterProviderConfig = {
   sort?: 'price' | 'throughput' | 'latency';
   only?: string[];
   ignore?: string[];
+  /**
+   * `deny` excludes providers that store prompts for feedback or training. Providers may still
+   * store prompts for compliance; only `zdr` excludes all retention.
+   */
   data_collection?: 'allow' | 'deny';
+  /** `true` excludes providers that store prompts at all, so it also excludes training. */
   zdr?: boolean;
   require_parameters?: boolean;
+  allow_fallbacks?: boolean;
+  max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
 
 export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
@@ -35,15 +42,26 @@ export type VercelInferenceProviderConfig =
 export type VercelProviderConfig = {
   gateway?: GatewayProviderOptions & {
     byok?: Record<string, VercelInferenceProviderConfig[]>;
+    // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
+    sessionId?: string;
+    sessionAffinity?: boolean;
   };
   anthropic?: AnthropicProviderOptions;
 };
 
+/** True when prompts must not be used for training. Does not mean prompts are not retained. */
 export function isDataCollectionExplicitlyDisallowed(
   provider: OpenRouterProviderConfig | undefined
 ) {
   return provider?.data_collection === 'deny' || provider?.zdr === true;
 }
+
+// https://openrouter.ai/docs/guides/features/plugins
+export type OpenRouterPlugin = {
+  id: string;
+  enabled?: boolean;
+  [option: string]: unknown;
+};
 
 export type OpenRouterReasoningConfig = {
   effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
@@ -64,9 +82,17 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // OpenRouter specific field we do not support
+  // Forwarded as providerOptions.gateway.models on the Vercel path
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
+
+  // Messages API fallback models we do not support: OpenRouter tries them when the requested
+  // model fails, not only on Anthropic safety refusals
+  // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+  fallbacks?: unknown;
+
+  // OpenRouter plugins (web search, PDF parsing with OCR, ...), stripped from free requests
+  plugins?: OpenRouterPlugin[];
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba
@@ -76,10 +102,18 @@ export type SharedGatewayRequestProperties = {
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
+// https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+export type ThinkingBlockBinding = {
+  prefix_mismatch_behavior?: 'error' | 'drop_block';
+  /** Deprecated alias of `prefix_mismatch_behavior`; sending both is rejected. */
+  mismatch_behavior?: 'error' | 'drop_block';
+};
+
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
 /**

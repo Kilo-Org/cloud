@@ -10,3 +10,8 @@ export const MAX_SINGLE_ITEM_BYTES = 50 * 1024 * 1024;
 // Shared policy for keeping one ingest RPC within conservative payload bounds.
 export const INGEST_CHUNK_MAX_BYTES = 4 * 1024 * 1024;
 export const INGEST_CHUNK_MAX_ITEMS = 128;
+
+// Largest body the request handler accepts before staging. Matches the queue
+// consumer's per-item cap, so a payload the consumer is built to chunk is never
+// rejected at the edge; bodies are counted during multipart storage with flat memory.
+export const STAGING_MAX_BYTES = MAX_SINGLE_ITEM_BYTES;

@@ -104,7 +104,7 @@ interface SessionHandle {
  * queued to, whether or not it has a tool.
  */
 const handleOf = (wiring: Wiring): Effect.Effect<SessionHandle> =>
-  Effect.as(Effect.forkIn(drivePending(wiring), wiring.scope), {
+  Effect.as(Effect.forkIn(drivePending(wiring), wiring.scope, { startImmediately: true }), {
     id: wiring.id,
     ask: askWith(wiring),
     queue: (input: string | readonly PartDraft[], options?: AskOptions) =>

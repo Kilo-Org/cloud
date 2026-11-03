@@ -14,7 +14,9 @@ import {
   type SessionCommandResponse,
   type SessionPromptResponse,
   type SessionMessagesResponse2,
+  type SnapshotFileDiff,
   type SuggestionRequest,
+  type Todo,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
@@ -27,6 +29,7 @@ import {
 } from '../../src/shared/slash-commands.js';
 import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
 import { sessionChildSchema } from './control/session-child-schema.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../src/shared/control-plane-protocol.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -250,6 +253,10 @@ type PromptOptions = {
  * All wrapper modules depend on this type rather than the raw SDK client.
  */
 export type WrapperKiloClient = {
+  updateCloudAgentMcp: (
+    grant: NonNullable<ControlPlaneSessionCredentialsPayload['cloudAgentMcp']>,
+    signal?: AbortSignal
+  ) => Promise<void>;
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
   getSessionDetails: (
@@ -358,6 +365,12 @@ export type WrapperKiloClient = {
   ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
   getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
   getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
+  getSessionTodos: (sessionID: string, directory?: string, signal?: AbortSignal) => Promise<Todo[]>;
+  getSessionDiff: (
+    sessionID: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<SnapshotFileDiff[]>;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   listEffectiveModels: (providerID: string) => Promise<string[]>;
@@ -426,6 +439,30 @@ export function createWrapperKiloClient(
   return {
     serverUrl,
     server,
+    updateCloudAgentMcp: async (grant, signal) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        signal?.throwIfAborted();
+        try {
+          const result = await v2Client.mcp.add(
+            {
+              directory: workspacePath,
+              name: 'kilo-cloud-agent',
+              config: {
+                type: 'remote',
+                url: grant.url,
+                oauth: false,
+                headers: { Authorization: `Bearer ${grant.token}` },
+              },
+            },
+            { signal }
+          );
+          if (!result.error && result.data?.['kilo-cloud-agent']?.status === 'connected') return;
+        } catch {
+          signal?.throwIfAborted();
+        }
+      }
+      throw new Error('Cloud Agent MCP credential refresh failed');
+    },
 
     subscribeEvents: async opts => {
       const result = await v2Client.global.event({ signal: opts.signal });
@@ -741,6 +778,16 @@ export function createWrapperKiloClient(
     getPermissions: async (directory = workspacePath, signal) => {
       const result = await v2Client.permission.list({ directory }, { signal });
       return requireSdkData(result, 'Permission list');
+    },
+
+    getSessionTodos: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.todo({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session todo ${sessionID}`);
+    },
+
+    getSessionDiff: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.diff({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session diff ${sessionID}`);
     },
 
     getNetworkWaits: async () => {

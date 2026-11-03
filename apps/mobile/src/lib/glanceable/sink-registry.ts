@@ -129,11 +129,8 @@ export function writeGlanceableFrame(
   return ok;
 }
 
-/**
- * Activity-token registrar, set by a later token slice. No-op by default.
- * `unregisterTokens` reports only the tokens whose unregister failed, so
- * logout can tombstone the failed tokens and retry them later.
- */
+/** The LiveActivity token access a surface uses: read its push token and
+ *  listen for token updates. */
 export type GlanceableActivity = Pick<LiveActivity, 'getPushToken' | 'addPushTokenListener'>;
 
 /**
@@ -153,6 +150,10 @@ export type GlanceableDelivery = {
   ): void;
   /** Retire a lifetime and tombstone failures. The optional lookup starts before native end. */
   cleanupTokens(lifetime: ActivityTokenLifetime, activityToken?: Promise<string | null>): void;
+  /**
+   * Reports only the tokens whose unregister failed, so logout can tombstone
+   * the failed tokens and retry them later.
+   */
   unregisterTokens(
     lifetime?: ActivityTokenLifetime,
     activityToken?: Promise<string | null>
@@ -176,6 +177,7 @@ const noopDelivery: GlanceableDelivery = {
   },
 };
 
+/** Activity-token registrar, set by a later token slice. No-op by default. */
 let delivery: GlanceableDelivery = noopDelivery;
 
 export function setGlanceableDelivery(next: GlanceableDelivery): void {

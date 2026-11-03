@@ -9,7 +9,7 @@ export function getExtensionUrl(searchParams: NextAppSearchParams, cookies: Cook
   const sourceParam = searchParams?.source;
   const urlParam =
     (Array.isArray(searchParams.path) ? searchParams.path[0] : searchParams.path) || '';
-  const path = urlParam ? `/${urlParam}` : '';
+  const path = urlParam ? `/${encodeURIComponent(urlParam)}` : '';
   const source =
     (Array.isArray(sourceParam) ? sourceParam[0] : sourceParam) ||
     cookies?.get(EDITOR_SOURCE_COOKIE_NAME)?.value ||
@@ -17,18 +17,41 @@ export function getExtensionUrl(searchParams: NextAppSearchParams, cookies: Cook
 
   const editor = EDITOR_OPTIONS.find(editor => editor.source === source);
 
-  const ideName = editor ? editor.name : source.charAt(0).toUpperCase() + source.slice(1);
+  if (editor) {
+    const urlScheme = editor.scheme;
+    const urlHost = editor.host;
+    const urlPath = editor.path;
+    const extensionUrl = `${urlScheme}://${urlHost}${urlPath}${path}`;
 
-  const urlScheme = editor ? editor.scheme : source;
-  const urlHost = editor ? editor.host : DEFAULT_EDITOR.host;
-  const urlPath = editor ? editor.path : DEFAULT_EDITOR.path;
+    return {
+      urlScheme,
+      ideName: editor.name,
+      extensionUrl,
+      logoSrc: editor.logoSrc,
+      editor,
+    };
+  }
+
+  if (source === 'web') {
+    return {
+      urlScheme: 'web',
+      ideName: 'Web',
+      extensionUrl: '',
+      logoSrc: undefined,
+      editor: DEFAULT_EDITOR,
+    };
+  }
+
+  const urlScheme = DEFAULT_EDITOR.scheme;
+  const urlHost = DEFAULT_EDITOR.host;
+  const urlPath = DEFAULT_EDITOR.path;
   const extensionUrl = `${urlScheme}://${urlHost}${urlPath}${path}`;
 
   return {
     urlScheme,
-    ideName,
+    ideName: DEFAULT_EDITOR.name,
     extensionUrl,
-    logoSrc: editor?.logoSrc,
-    editor: editor || DEFAULT_EDITOR,
+    logoSrc: DEFAULT_EDITOR.logoSrc,
+    editor: DEFAULT_EDITOR,
   };
 }

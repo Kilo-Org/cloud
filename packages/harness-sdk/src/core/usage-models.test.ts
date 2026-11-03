@@ -113,7 +113,7 @@ it('keeps a billed summary in model totals when the following answer fails', asy
     use: session =>
       Effect.gen(function* () {
         yield* Stream.runDrain(session.ask('one'));
-        yield* Effect.either(Stream.runDrain(session.ask('two')));
+        yield* Effect.result(Stream.runDrain(session.ask('two')));
         return yield* session.usageByModel;
       }),
   });

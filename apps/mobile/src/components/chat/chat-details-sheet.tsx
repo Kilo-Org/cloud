@@ -116,7 +116,7 @@ export function ChatDetailsSheet({
   const variants = modelOptions.find(one => one.id === model)?.variants ?? [];
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
       <SheetHeader
         title={t('modelChat.details.title')}
         onDone={onClose}

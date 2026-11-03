@@ -1,14 +1,20 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  apiKeyUpstream,
+  faviconIcon,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'neuralwatt',
-  base_url: 'https://api.neuralwatt.com/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(_context) {},
+  models_dev_id: 'neuralwatt',
+  ...apiKeyUpstream({
+    apiUrl: 'https://api.neuralwatt.com/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'neuralwatt',
     recommendedModels: [
@@ -21,4 +27,14 @@ export default {
       },
     ],
   }),
+  provider_listing: {
+    dataPolicy: {
+      training: false,
+      retainsPrompts: true,
+      canPublish: false,
+      termsOfServiceURL: 'https://neuralwatt.com/terms',
+      privacyPolicyURL: 'https://neuralwatt.com/privacy',
+    },
+    icon: faviconIcon('https://neuralwatt.com/'),
+  },
 } satisfies DirectByokProvider;

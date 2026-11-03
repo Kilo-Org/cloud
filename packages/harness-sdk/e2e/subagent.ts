@@ -19,7 +19,7 @@
  *   answers without the subagent, and is told the result in a round of its own
  *   when it lands.
  */
-import { Duration, Effect, Layer, Schedule, Stream } from 'effect';
+import { Duration, Effect, Fiber, Layer, Schedule, Stream } from 'effect';
 import { said } from '../src/core/model.js';
 import type { Continued } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
@@ -54,7 +54,7 @@ const layers = kilo();
  * hand-off and the sending away visible where the question was asked. The
  * package's own default is the opposite, and `subagent.test.ts` covers it.
  */
-const subagent = (model: string, inlineFor: Duration.DurationInput) =>
+const subagent = (model: string, inlineFor: Duration.Input) =>
   subagentTool(
     {
       system: subSystem,
@@ -67,7 +67,7 @@ const subagent = (model: string, inlineFor: Duration.DurationInput) =>
     layers
   );
 
-const withSubagent = (model: string, inlineFor: Duration.DurationInput) =>
+const withSubagent = (model: string, inlineFor: Duration.Input) =>
   Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [subagent(model, inlineFor)] }));
 
 /** A task handed down, and one answer handed up. */
@@ -84,15 +84,15 @@ const runHandOff = async (model: string): Promise<boolean> => {
   });
 
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
+    Effect.result(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
   );
 
-  if (got._tag === 'Left') {
-    fail(`the hand-off failed: ${JSON.stringify(got.left)}`);
+  if (got._tag === 'Failure') {
+    fail(`the hand-off failed: ${JSON.stringify(got.failure)}`);
     return false;
   }
 
-  const { id, answer, history, usage } = got.right;
+  const { id, answer, history, usage } = got.success;
   const report = reports[0];
   const written = history.map(turn => turn.parts.map(part => part.body).join('')).join(' | ');
   console.log(`\nthe parent answered: ${JSON.stringify(answer.trim())}`);
@@ -139,7 +139,7 @@ const runSentAway = async (model: string): Promise<boolean> => {
       maxTokens: room,
       tools: ['subagent'],
     });
-    const watching = yield* Effect.fork(
+    const watching = yield* Effect.forkChild(
       Effect.timeout(
         Stream.runForEach(
           Stream.takeUntil(session.continued, one => 'failed' in one || one.event.kind === 'done'),
@@ -155,7 +155,7 @@ const runSentAway = async (model: string): Promise<boolean> => {
     );
     /* Watch the running calls, and send the subagent away the moment the model
        is waiting on one. */
-    const sending = yield* Effect.fork(
+    const sending = yield* Effect.forkChild(
       Effect.retry(
         Effect.flatMap(session.running, waiting => {
           const one = waiting[0];
@@ -163,28 +163,28 @@ const runSentAway = async (model: string): Promise<boolean> => {
             ? Effect.fail('not yet' as const)
             : Effect.map(session.background(one.id), sent => ({ sent, on: one }));
         }),
-        Schedule.spaced('50 millis').pipe(Schedule.upTo('60 seconds'))
+        Schedule.spaced('50 millis').pipe(Schedule.upTo({ duration: '60 seconds' }))
       )
     );
     const answer = yield* said(session.ask('Ask the subagent for this quarter’s codename.'));
-    const sent = yield* sending.await;
-    yield* watching.await;
+    const sent = yield* Fiber.await(sending);
+    yield* Fiber.await(watching);
     return { answer, sent };
   });
 
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
+    Effect.result(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
   );
 
-  if (got._tag === 'Left') {
-    fail(`the sent-away run failed: ${JSON.stringify(got.left)}`);
+  if (got._tag === 'Failure') {
+    fail(`the sent-away run failed: ${JSON.stringify(got.failure)}`);
     return false;
   }
 
   const later = rounds.join('');
-  const sent = got.right.sent._tag === 'Success' ? got.right.sent.value : undefined;
+  const sent = got.success.sent._tag === 'Success' ? got.success.sent.value : undefined;
   console.log(`\nsent away: ${JSON.stringify(sent?.on.name ?? 'nothing')}`);
-  console.log(`answered without it: ${JSON.stringify(got.right.answer.trim())}`);
+  console.log(`answered without it: ${JSON.stringify(got.success.answer.trim())}`);
   console.log(`told later:          ${JSON.stringify(later.trim())}`);
 
   if (sent === undefined) {
@@ -205,7 +205,7 @@ const runSentAway = async (model: string): Promise<boolean> => {
      `google/gemini-3.7-flash` wins it on 2026-09-06 and the send still
      succeeded. Nothing here can slow a provider down, so it is counted, and
      what a late round would have carried is already in the answer. */
-  if (got.right.answer.toLowerCase().includes(secret)) {
+  if (got.success.answer.toLowerCase().includes(secret)) {
     return false;
   }
 

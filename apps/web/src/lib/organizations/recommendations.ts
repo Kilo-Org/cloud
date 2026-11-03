@@ -74,7 +74,6 @@ export type RecommendationState = {
   linearBotEnabled: boolean;
   teamIntegrationConnected: boolean;
   cloudAgentUsed: boolean;
-  projectDeployed: boolean;
   webhookTriggerCount: number;
   githubConnected: boolean;
   githubLiteApp: boolean;

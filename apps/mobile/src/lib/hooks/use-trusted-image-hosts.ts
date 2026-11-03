@@ -154,14 +154,14 @@ export function subscribeTrustedImageHosts(listener: () => void): () => void {
 }
 
 export function isTrustedImageHost(host: string): boolean {
-  return store.get().includes(host);
+  return store.getRequested().includes(host);
 }
 
 export function trustImageHost(host: string): void {
   // Start the disk read if it has not run, so the trust write merges with the
   // persisted list instead of replacing it with the empty default.
   store.preload();
-  const current = store.get();
+  const current = store.getRequested();
   if (current.includes(host)) {
     return;
   }
@@ -169,7 +169,7 @@ export function trustImageHost(host: string): void {
 }
 
 export function revokeImageHost(host: string): void {
-  store.set(store.get().filter(item => item !== host));
+  store.set(store.getRequested().filter(item => item !== host));
 }
 
 export function clearTrustedImageHosts(): void {

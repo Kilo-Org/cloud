@@ -43,19 +43,58 @@ const questionSchema = z.discriminatedUnion('type', [
   }),
 ]) satisfies z.ZodType<Question>;
 
-export const systemOneRequestSchema = z.object({
-  model: z
-    .string()
-    .trim()
-    .min(1)
-    .default(TYPESAFE_MODEL)
-    .transform(model => SYSTEM_ONE_MODEL_ALIASES.get(model) ?? model),
-  state: entrySchema,
-  provider: providerPrivacySchema.optional(),
-  questions: z
-    .record(z.string(), questionSchema)
-    .refine(questions => Object.keys(questions).length > 0, 'At least one question is required'),
-}) satisfies z.ZodType<SystemOneRequestPayload>;
+// The largest in-repo System One caller (the auto-routing classifier) sends ~2 KiB of state and
+// ~23 KiB of questions across 6 questions, so these limits leave every existing caller admitted
+// while bounding the input a single request can carry. Output answers repeat the question criteria
+// keys, so a request cannot cost more than the same bytes in and out.
+export const SYSTEM_ONE_MAX_STATE_BYTES = 128 * 1024;
+export const SYSTEM_ONE_MAX_QUESTIONS_BYTES = 128 * 1024;
+export const SYSTEM_ONE_MAX_QUESTIONS = 64;
+
+function serializedBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
+}
+
+export const systemOneRequestSchema = z
+  .object({
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .default(TYPESAFE_MODEL)
+      .transform(model => SYSTEM_ONE_MODEL_ALIASES.get(model) ?? model),
+    state: entrySchema,
+    provider: providerPrivacySchema.optional(),
+    questions: z
+      .record(z.string(), questionSchema)
+      .refine(questions => Object.keys(questions).length > 0, 'At least one question is required'),
+  })
+  .superRefine((request, ctx) => {
+    const stateBytes = serializedBytes(request.state);
+    if (stateBytes > SYSTEM_ONE_MAX_STATE_BYTES) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['state'],
+        message: `State must be at most ${SYSTEM_ONE_MAX_STATE_BYTES} serialized bytes, received ${stateBytes}`,
+      });
+    }
+    const questionCount = Object.keys(request.questions).length;
+    if (questionCount > SYSTEM_ONE_MAX_QUESTIONS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['questions'],
+        message: `At most ${SYSTEM_ONE_MAX_QUESTIONS} questions are allowed, received ${questionCount}`,
+      });
+    }
+    const questionBytes = serializedBytes(request.questions);
+    if (questionBytes > SYSTEM_ONE_MAX_QUESTIONS_BYTES) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['questions'],
+        message: `Questions must be at most ${SYSTEM_ONE_MAX_QUESTIONS_BYTES} serialized bytes, received ${questionBytes}`,
+      });
+    }
+  }) satisfies z.ZodType<SystemOneRequestPayload>;
 
 type OpenRouterSystemOneResult = SystemOneResult<Questions> & {
   id: string;

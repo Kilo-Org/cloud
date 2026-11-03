@@ -8,8 +8,39 @@ import {
   createDelegatedResourceToken,
   isDelegableResource,
   TypedResourceDelegationError,
+  type DelegableResource,
 } from '@/lib/auth/resource-delegation';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
+import {
+  adminActionContextFromHeaders,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
+
+// Roles that may mint each token kind without the admin bypass, mirroring the
+// role checks below (which never fire for admins, who are forced to owner).
+function rolesAllowedToMint(resource: DelegableResource | undefined): OrganizationRole[] {
+  if (resource === undefined) return ['owner', 'admin', 'billing_manager', 'member'];
+  if (resource === 'attribution') return ['owner', 'member'];
+  return ['owner', 'admin', 'member'];
+}
+
+// Records a token minted by a Kilo admin whose own role would not allow it.
+async function recordTokenMint(
+  user: Parameters<typeof adminActionContextFromHeaders>[0],
+  organizationId: string,
+  headers: Headers,
+  resource: DelegableResource | undefined,
+  metadata: Record<string, unknown>
+) {
+  await recordElevatedOrganizationAdminAction(adminActionContextFromHeaders(user, headers), {
+    organizationId,
+    requiredRoles: rolesAllowedToMint(resource),
+    action: 'organization.token.mint',
+    message: 'Minted organization-scoped token',
+    metadata,
+  });
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
@@ -62,6 +93,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         actor_id: user.id,
         message: `Resource token generated for organization ${organization.name}`,
       });
+      await recordTokenMint(user, organizationId, request.headers, resource, {
+        tokenKind: 'resource',
+        resource,
+        organizationRole,
+        expiresAt: delegated.expiresAt,
+      });
       return NextResponse.json({
         token: delegated.token,
         expiresAt: delegated.expiresAt,
@@ -92,6 +129,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     actor_email: user.google_user_email,
     actor_id: user.id,
     message: `User token generated for organization ${organization.name}`,
+  });
+  await recordTokenMint(user, organizationId, request.headers, undefined, {
+    tokenKind: 'legacy',
+    organizationRole: user.role,
+    expiresAt,
   });
 
   return NextResponse.json({

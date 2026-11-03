@@ -16,9 +16,8 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
-  buildDeleteIssueCommentParams,
+  buildDeleteCommentParams,
   buildDeleteRefParams,
-  buildDeleteReviewCommentParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
   buildMergePullRequestParams,
@@ -28,8 +27,7 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
-  buildUpdateIssueCommentParams,
-  buildUpdateReviewCommentParams,
+  buildUpdateCommentParams,
 } from './mutations';
 
 describe('GitHub PR review mutation enums', () => {
@@ -228,10 +226,10 @@ describe('buildReplyToCommentParams', () => {
   });
 });
 
-describe('buildUpdateReviewCommentParams', () => {
-  it('maps to the REST field names', () => {
+describe('buildUpdateCommentParams', () => {
+  it('maps to the REST field names the review and issue endpoints share', () => {
     expect(
-      buildUpdateReviewCommentParams({
+      buildUpdateCommentParams({
         owner: 'octocat',
         repo: 'hello',
         commentId: 99,
@@ -246,44 +244,10 @@ describe('buildUpdateReviewCommentParams', () => {
   });
 });
 
-describe('buildUpdateIssueCommentParams', () => {
-  it('maps to the REST field names', () => {
+describe('buildDeleteCommentParams', () => {
+  it('maps to the REST field names the review and issue endpoints share', () => {
     expect(
-      buildUpdateIssueCommentParams({
-        owner: 'octocat',
-        repo: 'hello',
-        commentId: 99,
-        body: 'edited',
-      })
-    ).toEqual({
-      owner: 'octocat',
-      repo: 'hello',
-      comment_id: 99,
-      body: 'edited',
-    });
-  });
-});
-
-describe('buildDeleteReviewCommentParams', () => {
-  it('maps to the REST field names', () => {
-    expect(
-      buildDeleteReviewCommentParams({
-        owner: 'octocat',
-        repo: 'hello',
-        commentId: 99,
-      })
-    ).toEqual({
-      owner: 'octocat',
-      repo: 'hello',
-      comment_id: 99,
-    });
-  });
-});
-
-describe('buildDeleteIssueCommentParams', () => {
-  it('maps to the REST field names', () => {
-    expect(
-      buildDeleteIssueCommentParams({
+      buildDeleteCommentParams({
         owner: 'octocat',
         repo: 'hello',
         commentId: 99,

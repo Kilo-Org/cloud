@@ -1,6 +1,15 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
-import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+} from './organization-membership';
 
 export type AccessibleSession = {
   kiloSessionId: string;
@@ -34,14 +43,11 @@ async function queryAccessibleSession(
   db: SessionAccessDb,
   query: AccessibleSessionQuery
 ): Promise<AccessibleKiloSession | null> {
-  const membershipJoin = and(
-    eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-    eq(organization_memberships.kilo_user_id, query.kiloUserId)
+  const membershipJoin = organizationMembershipJoinCondition(
+    query.kiloUserId,
+    cli_sessions_v2.organization_id
   );
-  const organizationJoin = and(
-    eq(organizations.id, cli_sessions_v2.organization_id),
-    isNull(organizations.deleted_at)
-  );
+  const organizationJoin = activeOrganizationJoinCondition(cli_sessions_v2.organization_id);
   const expectedOrganizationId =
     'expectedOrganizationId' in query ? query.expectedOrganizationId : undefined;
   const scopeCondition =
@@ -50,13 +56,9 @@ async function queryAccessibleSession(
       : expectedOrganizationId !== undefined
         ? and(
             eq(cli_sessions_v2.organization_id, expectedOrganizationId),
-            isNotNull(organization_memberships.id),
-            isNotNull(organizations.id)
+            personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
           )
-        : or(
-            isNull(cli_sessions_v2.organization_id),
-            and(isNotNull(organization_memberships.id), isNotNull(organizations.id))
-          );
+        : personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id);
   const sessionCondition =
     'cloudAgentSessionId' in query
       ? eq(cli_sessions_v2.cloud_agent_session_id, query.cloudAgentSessionId)
@@ -71,6 +73,11 @@ async function queryAccessibleSession(
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
     .leftJoin(organizations, organizationJoin)
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(query.kiloUserId)
+    )
     .where(
       and(
         eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),

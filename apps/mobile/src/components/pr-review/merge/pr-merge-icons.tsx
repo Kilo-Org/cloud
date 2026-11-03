@@ -17,6 +17,7 @@ import {
   getAllowedMergeMethods,
   type MergeBlockedReasonId,
   prMergeLabel,
+  prMergeShortLabel,
   type PrOverviewRepoSettings,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
@@ -36,11 +37,18 @@ export function mergeBlockedReasonIcon(kind: MergeBlockedReasonId): LucideIcon {
 
 export type MergeMethodOption = {
   value: AllowedMergeMethod;
+  /** The chip's own copy: the method name alone. */
   label: string;
+  /** The spoken label: the full sentence the provider words the method with. */
+  accessibilityLabel: string;
 };
 
 export function mergeMethodOptionsFor(repo: PrOverviewRepoSettings): MergeMethodOption[] {
-  return getAllowedMergeMethods(repo).map(value => ({ value, label: prMergeLabel(value) }));
+  return getAllowedMergeMethods(repo).map(value => ({
+    value,
+    label: prMergeShortLabel(value),
+    accessibilityLabel: prMergeLabel(value),
+  }));
 }
 
 export function defaultMergeMethodOptionFor(repo: PrOverviewRepoSettings): AllowedMergeMethod {

@@ -14,6 +14,7 @@ import {
   normalizePrThreadsPages,
   providerCapabilitiesIdentity,
   type PrThreadsPageModel,
+  selectOverviewWebUrl,
 } from './provider-pr-queries';
 import { githubPrRef, isProviderScopeReady, type ProviderPrScope } from './provider-pr-ref';
 
@@ -85,7 +86,9 @@ describe('namespace selection', () => {
     const overview = loose(buildPrOverviewQueryOptions(trpc, githubScope));
     expect(overview.procedure).toBe('github.getPullRequest');
     expect(overview.input).toEqual({ owner: 'octocat', repo: 'hello', number: 7 });
-    expect(loose(buildPrChecksQueryOptions(trpc, githubScope, 'abc')).input).toEqual({
+    expect(
+      loose(buildPrChecksQueryOptions(trpc, githubScope, { headSha: 'abc', enabled: true })).input
+    ).toEqual({
       owner: 'octocat',
       repo: 'hello',
       ref: 'abc',
@@ -196,7 +199,9 @@ describe('organization readiness', () => {
     const scope = { ...bitbucketScope, organizationId: null };
     expect(isProviderScopeReady(scope)).toBe(false);
     expect(loose(buildPrOverviewQueryOptions(trpc, scope)).enabled).toBe(false);
-    expect(loose(buildPrChecksQueryOptions(trpc, scope, 'sha')).enabled).toBe(false);
+    expect(
+      loose(buildPrChecksQueryOptions(trpc, scope, { headSha: 'sha', enabled: true })).enabled
+    ).toBe(false);
     expect(loose(buildPrFilesQueryOptions(trpc, scope, true)).enabled).toBe(false);
   });
 
@@ -281,7 +286,9 @@ describe('normalizeProviderChecks', () => {
 
   it('routes the provider checks arm through that normalizer, so the section reads the bucketed rollup', () => {
     const { trpc } = makeTrpc();
-    const select = loose(buildPrChecksQueryOptions(trpc, gitlabScope, 'head')).select;
+    const select = loose(
+      buildPrChecksQueryOptions(trpc, gitlabScope, { headSha: 'head', enabled: true })
+    ).select;
     if (typeof select !== 'function') {
       throw new TypeError('the provider checks arm carries no select');
     }
@@ -469,6 +476,13 @@ describe('normalizeProviderOverview', () => {
     });
   });
 
+  it('carries the provider web URL the server resolved for the loaded PR/MR', () => {
+    // The ref alone does not name a host; this URL is the read's own answer.
+    expect(normalizeProviderOverview(summary).webUrl).toBe(
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12'
+    );
+  });
+
   it('derives merge affordances from the provider capabilities', () => {
     const gitlab = normalizeProviderOverview(summary);
     const bitbucket = normalizeProviderOverview({
@@ -481,5 +495,19 @@ describe('normalizeProviderOverview', () => {
     expect(bitbucket.repo.allowMergeCommit).toBe(true);
     // Two same-named repositories on different providers stay apart.
     expect(gitlab.prNodeId).not.toBe(bitbucket.prNodeId);
+  });
+});
+
+describe('selectOverviewWebUrl', () => {
+  it('reads the provider web URL off a loaded read model', () => {
+    expect(selectOverviewWebUrl({ webUrl: 'https://gl.example.com/g/r/-/merge_requests/1' })).toBe(
+      'https://gl.example.com/g/r/-/merge_requests/1'
+    );
+  });
+
+  it('answers null for a GitHub answer, a pending read, or no URL', () => {
+    expect(selectOverviewWebUrl(undefined)).toBeNull();
+    expect(selectOverviewWebUrl({ number: 7 })).toBeNull();
+    expect(selectOverviewWebUrl({ webUrl: null })).toBeNull();
   });
 });

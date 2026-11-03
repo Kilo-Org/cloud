@@ -14,7 +14,7 @@ export const CONTAINER_IDLE_STOP_THRESHOLD_MS = 5 * 60_000;
 export const CONTAINER_IDLE_STOP_THROTTLE_MS = 2 * 60_000;
 
 export type IdleStopDeps = {
-  hasActiveWork: () => boolean;
+  hasRunningAgents: () => boolean;
   isDraining: () => boolean;
   getMayor: () => Agent | null;
   getTownId: () => string | null;
@@ -29,7 +29,7 @@ export type IdleStopDeps = {
 };
 
 export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
-  if (deps.hasActiveWork()) return;
+  if (deps.hasRunningAgents()) return;
   if (deps.isDraining()) return;
 
   const mayor = deps.getMayor();
@@ -71,6 +71,7 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
     await stub.stop();
     await deps.setLastIdleStopAt(now);
     deps.writeEventFn({ event: 'container.idle_stop', townId, reason });
+    logger.info('stopContainerIfIdle: stopped idle container', { reason });
   } catch (err) {
     logger.warn('stopContainerIfIdle: stop() failed', {
       error: err instanceof Error ? err.message : String(err),

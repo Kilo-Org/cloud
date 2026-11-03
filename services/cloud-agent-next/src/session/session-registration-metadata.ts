@@ -1,30 +1,28 @@
-/**
- * Plane-neutral session-metadata construction for session registration.
- *
- * The JSON shape here is the one both planes persist: the legacy
- * `CloudAgentSession` DO builds its stored metadata through
- * `buildSessionMetadataFromRegistration`, and the control-plane Worker builds
- * the `createSessionWithInitialAdmission`/`registerSessionFromMetadata` input
- * through the same function. One owner means a registration field can never
- * mean two different things depending on the plane.
- */
+/** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
+import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import { deriveSharedSandboxId } from '../sandbox-id.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { BUILTIN_AGENT_MODES } from '../schema.js';
+import { isRepositoryAgentOrigin } from '../shared/agent-modes.js';
 import type {
   AgentSelection,
   ExecutionTurnSubmission,
   SessionFinalization,
 } from '../execution/types.js';
+import { launchRepositoryIdentity } from './environment-launch.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
 
 export type GroupedRegisterSessionInput = {
+  allowSubagentSessions?: boolean;
+  parentCloudAgentSessionId?: string;
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
   clone?: SessionMetadata['clone'];
+  /** Server-only continuation marker; never client-controlled. */
+  continuation?: boolean;
   /** Omitted for a clone-only create: no synthetic initial turn is registered. */
   message?: {
     initialMessageId?: string;
@@ -35,6 +33,10 @@ export type GroupedRegisterSessionInput = {
   };
   repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
+  /** The environment scope preflight authorized; registration adds the branch of each V2 repository. */
+  environment?: EnvironmentScope;
+  /** The additional-repository branches the client requested for the environment. */
+  requestedEnvironmentRepositories?: { repoFullName: string; branch?: string }[];
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
@@ -43,12 +45,14 @@ export type GroupedRegisterSessionInput = {
     | 'sandboxRoute'
     | 'sandboxKind'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
     | 'sandboxAllocation'
     | 'egressMode'
     | 'egressAllowlist'
+    | 'egressAudit'
   >;
 };
 
@@ -67,6 +71,9 @@ function repositoryMetadataFromRegistrationInput(
         type: 'github',
         repo: repository.repo,
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
+        ...(repository.allowUserAuthorization === undefined
+          ? {}
+          : { allowUserAuthorization: repository.allowUserAuthorization }),
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),
@@ -126,7 +133,14 @@ export function validateModeAgainstRuntimeAgents(
   metadata: SessionMetadata,
   mode = metadata.agent?.mode
 ): string | null {
-  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
+  // Only internal automation can stamp the Worker-owned billing origin.
+  const { billingOrigin, createdOnPlatform } = metadata.identity;
+  if (
+    !mode ||
+    BUILTIN_AGENT_MODES.has(mode) ||
+    (billingOrigin === createdOnPlatform && isRepositoryAgentOrigin(billingOrigin))
+  )
+    return null;
 
   const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
   if (knownSlugs.has(mode)) return null;
@@ -163,6 +177,43 @@ function initialMessageFromRegistration(
 }
 
 /**
+ * The environment reference a session stores: the authorized scope, and for a V2
+ * environment the branch each repository resolved to. A V2 reference needs the
+ * launch repository to tell it from the additional ones.
+ */
+function environmentReferenceFromRegistration(
+  input: Pick<
+    GroupedRegisterSessionInput,
+    'environment' | 'repository' | 'requestedEnvironmentRepositories'
+  >,
+  generatedBranch: string
+):
+  | { ok: true; reference: SessionMetadata['environment'] | undefined }
+  | { ok: false; error: string } {
+  const scope = input.environment;
+  if (scope === undefined) return { ok: true, reference: undefined };
+  if (scope.repositories === undefined) {
+    return { ok: true, reference: scope };
+  }
+  const launch = input.repository ? launchRepositoryIdentity(input.repository) : undefined;
+  if (launch === undefined) {
+    return {
+      ok: false,
+      error: 'Invalid metadata: a multi-repository environment needs a launch repository',
+    };
+  }
+  return {
+    ok: true,
+    reference: sessionReferenceOf(scope, {
+      generatedBranch,
+      launch,
+      launchBranch: input.repository?.branch,
+      requested: input.requestedEnvironmentRepositories ?? [],
+    }),
+  };
+}
+
+/**
  * Builds and validates the grouped `SessionMetadata` a registration persists.
  * The error strings match the legacy `registerSession` rejections exactly so the
  * Worker maps a rejection to the same failure as before.
@@ -186,14 +237,21 @@ export async function buildSessionMetadataFromRegistration(
     };
   }
 
+  const generatedBranch = `kilo/${generateBranchSlug()}`;
+  const environment = environmentReferenceFromRegistration(input, generatedBranch);
+  if (!environment.ok) return environment;
+
   const initialMessage = initialMessageFromRegistration(input.message);
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: input.identity,
     auth: input.auth,
     // Metadata without clone remains an empty-session bootstrap; remove
     // this fallback only after old prepared sessions age out.
     clone: input.clone,
+    ...(input.continuation ? { continuation: true as const } : {}),
     repository,
     ...(initialMessage ? { initialMessage } : {}),
     agent: {
@@ -204,11 +262,13 @@ export async function buildSessionMetadataFromRegistration(
     },
     finalization: input.finalization,
     profile: input.profile,
+    ...(environment.reference ? { environment: environment.reference } : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-      branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
+      branchName: repository?.upstreamBranch ?? generatedBranch,
+      ...(environment.reference?.repositories ? { generatedBranchName: generatedBranch } : {}),
     },
     lifecycle: {
       version: now,

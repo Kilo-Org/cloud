@@ -59,12 +59,12 @@ vi.mock('expo-widgets', () => ({
   },
 }));
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
-  ActiveAgentsLiveActivity: {
+  getActiveAgentsLiveActivity: () => ({
     getInstances: () => [activityMock],
-  },
+  }),
 }));
 vi.mock('@/glanceable-ios/session-live-activity', () => ({
-  SessionLiveActivity: { getInstances: () => sessionCardsMock.instances },
+  getSessionLiveActivity: () => ({ getInstances: () => sessionCardsMock.instances }),
 }));
 vi.mock('react-native', () => ({
   Platform: platformMock,

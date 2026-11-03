@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import {
   BenchmarkJobMessageSchema,
   buildClassifierMessages,
-  chunkArray,
   computeEngineIdentity,
   deciderCasesForRouter,
   getDeciderContainerInstanceName,
@@ -23,6 +23,10 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     score: 1,
     latency_ms: 100,
     cost_usd: 0.001,
+    input_tokens: null,
+    cached_input_tokens: null,
+    output_tokens: null,
+    reasoning_tokens: null,
     error: null,
     fallback_reason: null,
     route_hit: null,
@@ -33,11 +37,38 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     last_event_types: null,
     rep: 0,
     timed_out: 0,
+    prompt_revision: 2,
     ...overrides,
   };
 }
 
 describe('summarize — classifier kind', () => {
+  it('averages token categories only over rows reporting each category', () => {
+    const [summary] = summarize(
+      [
+        makeRow({ input_tokens: 10, cached_input_tokens: 0, output_tokens: 3 }),
+        makeRow({ input_tokens: 15, output_tokens: 4, reasoning_tokens: 8 }),
+        makeRow(),
+      ],
+      'classifier'
+    );
+    expect(summary).toMatchObject({
+      avgInputTokens: 12.5,
+      avgCachedInputTokens: 0,
+      avgOutputTokens: 3.5,
+      avgReasoningTokens: 8,
+    });
+  });
+
+  it('returns null token averages when no row reports usage', () => {
+    expect(summarize([makeRow()], 'decider')[0]).toMatchObject({
+      avgInputTokens: null,
+      avgCachedInputTokens: null,
+      avgOutputTokens: null,
+      avgReasoningTokens: null,
+    });
+  });
+
   it('groups all classifier rows under * route key', () => {
     const rows: CaseResultRow[] = [
       makeRow({
@@ -342,34 +373,6 @@ describe('computeEngineIdentity', () => {
         `${router}:v1:${(hash >>> 0).toString(16).padStart(8, '0')}`
       );
     }
-  });
-});
-
-describe('chunkArray', () => {
-  it('splits into 5-per-chunk with a partial final chunk', () => {
-    const items = Array.from({ length: 13 }, (_, i) => i);
-    const chunks = chunkArray(items, 5);
-    expect(chunks).toHaveLength(3);
-    expect(chunks[0]).toHaveLength(5);
-    expect(chunks[1]).toHaveLength(5);
-    expect(chunks[2]).toHaveLength(3);
-  });
-
-  it('round-trips caseIds: flatten equals the original order', () => {
-    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'];
-    const chunks = chunkArray(ids, 10);
-    expect(chunks).toHaveLength(2);
-    expect(chunks.flat()).toEqual(ids);
-  });
-
-  it('returns a single full chunk when items fit exactly', () => {
-    const chunks = chunkArray([1, 2, 3, 4, 5], 5);
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toEqual([1, 2, 3, 4, 5]);
-  });
-
-  it('returns no chunks for an empty array', () => {
-    expect(chunkArray([], 10)).toEqual([]);
   });
 });
 

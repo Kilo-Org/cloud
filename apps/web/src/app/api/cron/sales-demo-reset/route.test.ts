@@ -19,6 +19,8 @@ import {
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_metadata,
+  organization_groups,
+  organization_group_memberships,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -70,6 +72,7 @@ async function deleteAllSalesDemoOrgs() {
 describe('GET /api/cron/sales-demo-reset', () => {
   let admin: User;
   let target: User;
+  let childOrgId: string;
 
   beforeAll(async () => {
     await deleteAllSalesDemoOrgs();
@@ -88,6 +91,12 @@ describe('GET /api/cron/sales-demo-reset', () => {
   });
 
   afterAll(async () => {
+    if (childOrgId) {
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, childOrgId));
+      await db.delete(organizations).where(eq(organizations.id, childOrgId));
+    }
     await deleteAllSalesDemoOrgs();
     const demoIds = Array.from({ length: 25 }, (_, i) => salesDemoMemberId(i + 1));
     await db
@@ -114,10 +123,42 @@ describe('GET /api/cron/sales-demo-reset', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
   });
 
-  it('resets one dirty live demo org to $25.03 and reports reset 1', async () => {
+  it('refreshes demo credits and usage while preserving membership', async () => {
     const org = await db.transaction(async tx =>
       createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn: tx })
     );
+    const [child] = await db
+      .insert(organizations)
+      .values({
+        name: 'Demo department',
+        parent_organization_id: org.id,
+        created_by_kilo_user_id: target.id,
+      })
+      .returning();
+    childOrgId = child.id;
+    await db.insert(organization_memberships).values([
+      { organization_id: org.id, kilo_user_id: admin.id, role: 'admin' },
+      { organization_id: child.id, kilo_user_id: target.id, role: 'owner' },
+      { organization_id: child.id, kilo_user_id: admin.id, role: 'member' },
+    ]);
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: org.id, name: 'Demo model access' })
+      .returning();
+    await db.insert(organization_group_memberships).values([
+      { organization_id: org.id, group_id: group.id, kilo_user_id: target.id },
+      { organization_id: org.id, group_id: group.id, kilo_user_id: admin.id },
+    ]);
+    const membershipsBefore = await db
+      .select()
+      .from(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, [org.id, child.id]))
+      .orderBy(organization_memberships.id);
+    const groupsBefore = await db
+      .select()
+      .from(organization_group_memberships)
+      .where(eq(organization_group_memberships.organization_id, org.id))
+      .orderBy(organization_group_memberships.kilo_user_id);
 
     await db.insert(microdollar_usage).values({
       kilo_user_id: target.id,
@@ -135,6 +176,19 @@ describe('GET /api/cron/sales-demo-reset', () => {
         headers: { authorization: 'Bearer cron-secret' },
       })
     );
+    const membershipsAfter = await db
+      .select()
+      .from(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, [org.id, child.id]))
+      .orderBy(organization_memberships.id);
+    const groupsAfter = await db
+      .select()
+      .from(organization_group_memberships)
+      .where(eq(organization_group_memberships.organization_id, org.id))
+      .orderBy(organization_group_memberships.kilo_user_id);
+
+    expect(membershipsAfter).toEqual(membershipsBefore);
+    expect(groupsAfter).toEqual(groupsBefore);
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ reset: 1, failed: 0 });

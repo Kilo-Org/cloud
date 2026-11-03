@@ -158,6 +158,40 @@ export function numberFormat(locale: string, options: Intl.NumberFormatOptions):
   return format;
 }
 
+/** Memoized answer of the device locale read below; `undefined` until it runs. */
+let deviceDecimalSeparatorValue: string | null | undefined = undefined;
+
+/**
+ * The decimal separator of the device's own number keyboard.
+ *
+ * iOS and Android draw `decimal-pad` with the *device* locale's separator, not
+ * the app language's, so a typed amount can carry the device's character while
+ * the rest of the field follows the active language: a German app language on a
+ * `.` keypad offers only `.`. `expo-localization` reports the first preferred
+ * locale's separator, which is the locale the keypad follows.
+ *
+ * Read lazily: the module is native, so the Node test projects cannot import it
+ * at load time. A runtime that cannot answer reports no separator, which leaves
+ * the language-only behaviour. Memoized because a region change does not reach
+ * an open app on either platform; the field reads it on every keystroke.
+ */
+export function deviceDecimalSeparator(): string | null {
+  if (deviceDecimalSeparatorValue !== undefined) {
+    return deviceDecimalSeparatorValue;
+  }
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the native module is absent from the Node test projects, so it cannot be a top-level import
+    const { getLocales } = require('expo-localization') as {
+      getLocales: () => readonly { decimalSeparator: string | null }[];
+    };
+    const separator = getLocales()[0]?.decimalSeparator;
+    deviceDecimalSeparatorValue = separator?.length === 1 ? separator : null;
+  } catch {
+    deviceDecimalSeparatorValue = null;
+  }
+  return deviceDecimalSeparatorValue;
+}
+
 export function dateTimeFormat(
   /** Omitted only to read the device's own resolved options, e.g. its time zone. */
   locale: string | undefined,
@@ -258,5 +292,25 @@ export function prewarmIntl(locale: string): void {
   } catch {
     // A prewarm is only a cache fill. Every formatter is built again on demand
     // at the real call site, so a failure must not block the app.
+  }
+}
+
+/**
+ * Install the grapheme segmenter for text a headless surface cuts itself.
+ *
+ * Session card titles, targets and commands are cut on character boundaries
+ * through `@kilocode/session-ingest-contracts`, which reads `Intl.Segmenter`
+ * when the runtime has one. Hermes does not, so a headless process that draws a
+ * widget or a notification before the root layout has run would cut those
+ * strings by code unit and could end one inside an emoji sequence. The widget,
+ * Approve and notification entries apply the stored language before they build
+ * any text, and this fills the same lazy polyfill the foreground path warms.
+ */
+export function prewarmSegmenter(locale: string): void {
+  try {
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill: a failed install leaves the cut on its
+    // code unit boundary, which is what a runtime without one has today.
   }
 }

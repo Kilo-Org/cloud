@@ -171,6 +171,7 @@ async function awaitFifoDelivery(input: {
   expected: string[];
   budgetMs: number;
   label: string;
+  requiredSent?: string[];
 }): Promise<{ ok: boolean; detail: string }> {
   const { stream, expected, budgetMs, label } = input;
   await Promise.all(
@@ -202,6 +203,15 @@ async function awaitFifoDelivery(input: {
       }`,
     };
   }
+  return checkDeliveryOrder(events, expected, input.requiredSent ?? [], label);
+}
+
+function checkDeliveryOrder(
+  events: readonly StreamEvent[],
+  expected: string[],
+  requiredSent: string[],
+  label: string
+): { ok: boolean; detail: string } {
   const sentOrder = events
     .filter(event => event.streamEventType === 'cloud.message.sent')
     .map(event => messageIdFromEvent(event))
@@ -210,6 +220,7 @@ async function awaitFifoDelivery(input: {
     );
   const expectedSent = expected.filter(messageId => sentOrder.includes(messageId));
   const orderOk =
+    requiredSent.every(messageId => sentOrder.includes(messageId)) &&
     sentOrder.length === expectedSent.length &&
     sentOrder.every((messageId, index) => messageId === expectedSent[index]);
   return orderOk
@@ -310,7 +321,8 @@ async function queueWhileBusyBody(
       )
     );
 
-    if (second.delivery !== 'queued' || third.delivery !== 'queued') {
+    const controlPlane = sessionId.startsWith('workspace_');
+    if (!controlPlane && (second.delivery !== 'queued' || third.delivery !== 'queued')) {
       return fail(
         `expected delivery=queued for both follow-ups; got second=${second.delivery}, third=${third.delivery}`
       );
@@ -322,6 +334,7 @@ async function queueWhileBusyBody(
       expected: expectedOrder,
       budgetMs: deadline.remaining('settlement'),
       label: scenarioName,
+      requiredSent: controlPlane ? expectedOrder : undefined,
     });
     const events = [...stream.events];
     stream.close();
@@ -673,7 +686,8 @@ async function queueInterruptClearsBody(
       )
     );
 
-    if (second.delivery !== 'queued' || third.delivery !== 'queued') {
+    const controlPlane = sessionId.startsWith('workspace_');
+    if (!controlPlane && (second.delivery !== 'queued' || third.delivery !== 'queued')) {
       return fail(
         `expected delivery=queued for both follow-ups; got second=${second.delivery}, third=${third.delivery}`
       );
@@ -705,6 +719,14 @@ async function queueInterruptClearsBody(
       thirdFailed,
       activeStream.events
     );
+    const order = checkDeliveryOrder(
+      activeStream.events,
+      [second.messageId, third.messageId],
+      [second, third]
+        .filter(message => message.delivery === 'sent')
+        .map(message => message.messageId),
+      scenarioName
+    );
 
     const events = [...activeStream.events];
     stream.close();
@@ -713,8 +735,8 @@ async function queueInterruptClearsBody(
     return {
       name: scenarioName,
       conversation,
-      ok: secondResult.ok && thirdResult.ok,
-      message: `${secondResult.detail}; ${thirdResult.detail}`,
+      ok: secondResult.ok && thirdResult.ok && order.ok,
+      message: `${secondResult.detail}; ${thirdResult.detail}; ${order.detail}`,
       events,
       durationMs: Date.now() - startedAt,
     };

@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
@@ -18,6 +19,7 @@ const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 export default function ApiRequestLogPage() {
   const [id, setId] = useState('');
   const [userId, setUserId] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -27,7 +29,12 @@ export default function ApiRequestLogPage() {
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
-  const summaryQuery = useQuery(trpc.admin.apiRequestLog.getSummary.queryOptions());
+  const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
+  const summaryQuery = useQuery(
+    trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
+      enabled: canExportApiRequestLogs,
+    })
+  );
 
   function handleDownload() {
     const params = new URLSearchParams();
@@ -36,6 +43,9 @@ export default function ApiRequestLogPage() {
     }
     if (userId.trim()) {
       params.set('userId', userId.trim());
+    }
+    if (organizationId.trim()) {
+      params.set('organizationId', organizationId.trim());
     }
     if (startDate) {
       params.set('startDate', startDate);
@@ -63,10 +73,60 @@ export default function ApiRequestLogPage() {
     window.location.href = `/admin/api/api-request-log/download?${params}`;
   }
 
+  const breadcrumbs = <BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>;
+
+  if (isError) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Could not check API request log export access</CardTitle>
+            <CardDescription>The permission check request failed.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!isPermissionResolved) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardContent className="text-muted-foreground py-8 text-center text-sm">
+            Checking API request log export access...
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!canExportApiRequestLogs) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>API request log export access required</CardTitle>
+            <CardDescription>
+              Ask a superadmin to grant API request log exporter permission on the Admins page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AdminPage>
+    );
+  }
+
   return (
-    <AdminPage
-      breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
-    >
+    <AdminPage breadcrumbs={breadcrumbs}>
       <div className="w-full max-w-xl space-y-4">
         {summaryQuery.data && (
           <p className="text-muted-foreground text-sm tabular-nums">
@@ -113,10 +173,20 @@ export default function ApiRequestLogPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="model">Model (optional)</Label>
+              <Label htmlFor="organizationId">Organization ID (optional)</Label>
+              <Input
+                id="organizationId"
+                placeholder="Enter organization ID"
+                value={organizationId}
+                onChange={e => setOrganizationId(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="model">Model prefix (optional)</Label>
               <Input
                 id="model"
-                placeholder="e.g. claude-sonnet-4-20250514"
+                placeholder="e.g. anthropic/"
                 value={model}
                 onChange={e => setModel(e.target.value)}
               />

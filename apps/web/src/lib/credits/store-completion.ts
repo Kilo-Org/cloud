@@ -161,6 +161,11 @@ export async function completeStoreCreditPurchase(params: {
         creditTransactionId: attemptedCreditTransactionId,
         creditDescription: creditDescriptionForProvider(purchase.paymentProvider),
         skipPostTopUpFreeStuff: true,
+        paidCredit: {
+          source: isAppStore ? 'apple' : 'google_play',
+          purchasedAt: purchase.purchasedAtIso,
+          terms: purchase.paidCreditTerms,
+        },
       }
     );
 

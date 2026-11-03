@@ -38,7 +38,7 @@ function makeDeps(overrides: Partial<IdleStopDeps> = {}): TestDeps {
   const events: Array<{ event: string; townId: string; reason: string; error?: string }> = [];
 
   return {
-    hasActiveWork: overrides.hasActiveWork ?? (() => false),
+    hasRunningAgents: overrides.hasRunningAgents ?? (() => false),
     isDraining: overrides.isDraining ?? (() => false),
     getMayor: overrides.getMayor ?? (() => null),
     getTownId: overrides.getTownId ?? (() => 'town-1'),
@@ -70,8 +70,8 @@ function makeDeps(overrides: Partial<IdleStopDeps> = {}): TestDeps {
 }
 
 describe('stopContainerIfIdle', () => {
-  it('does not stop when town has active work', async () => {
-    const deps = makeDeps({ hasActiveWork: () => true });
+  it('does not stop while an agent is running', async () => {
+    const deps = makeDeps({ hasRunningAgents: () => true });
     await stopContainerIfIdle(deps);
     expect(deps._stopFn).not.toHaveBeenCalled();
   });

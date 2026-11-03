@@ -10,5 +10,3 @@ export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
   // Kimi models only accept top_p=0.95; any other value causes a 400 error
   delete requestToMutate.body.top_p;
 }
-
-export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k3';

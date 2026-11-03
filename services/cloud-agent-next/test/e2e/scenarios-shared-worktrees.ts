@@ -18,15 +18,18 @@ import {
   fakeDirective,
   fetchFakeRequests,
   fetchFakeScenarioStatus,
+  getHostedWorkspace,
   getSessionSnapshot,
   hasPreparationForMessage,
   interruptSession,
   isMessageCompleted,
+  listHostedWorkspaces,
   messageIdFromEvent,
   openConnectedStream,
   prepareBrowserSession,
   sendMessage,
   type DriverConfig,
+  type CloudAgentWorkspaceSummary,
   type SessionSnapshot,
   type StreamConnection,
   type StreamEvent,
@@ -80,6 +83,35 @@ const DURABLE_DIAGNOSTIC_MS = 15_000;
 const CONTAINER_BUDGET_MS = 240_000;
 /** Bound for re-reading a present allocation reference on a warm session. */
 const HOT_ALLOCATION_BUDGET_MS = 30_000;
+
+function assertWorkspaceCatalog(
+  workspace: CloudAgentWorkspaceSummary | null,
+  expected: {
+    workspaceId: string;
+    sessionIds: string[];
+  }
+): void {
+  if (!workspace) throw new Error(`workspace catalog omitted ${expected.workspaceId}`);
+  if (workspace.workspaceId !== expected.workspaceId) {
+    throw new Error(
+      `workspace catalog returned ${workspace.workspaceId}; expected ${expected.workspaceId}`
+    );
+  }
+  const actualSessionIds = workspace.sessions.map(session => session.cloudAgentSessionId).sort();
+  const expectedSessionIds = [...expected.sessionIds].sort();
+  if (JSON.stringify(actualSessionIds) !== JSON.stringify(expectedSessionIds)) {
+    throw new Error(
+      `workspace catalog sessions=${actualSessionIds.join(',')}; expected=${expectedSessionIds.join(',')}`
+    );
+  }
+  for (const session of workspace.sessions) {
+    if (session.workspaceId !== expected.workspaceId) {
+      throw new Error(
+        `workspace catalog session ${session.cloudAgentSessionId} has workspaceId=${session.workspaceId}`
+      );
+    }
+  }
+}
 /**
  * Bound for the paced-readiness wait: a correlated part on the paced turn's own
  * stream plus a bounded increase in the fake's aggregate `chatCompletions`
@@ -848,6 +880,52 @@ async function runWorktreeMultiChat(
       );
     }
 
+    const catalogAllocationBefore = await waitForPresentAllocation(
+      deadline,
+      sandbox,
+      root,
+      'catalog before',
+      HOT_ALLOCATION_BUDGET_MS
+    );
+    const catalogPage = await deadline.within('workspace catalog list', signal =>
+      listHostedWorkspaces(
+        scenarioConfig,
+        { repositoryUrl: scenarioConfig.gitUrl, limit: 50, sessionLimit: 100 },
+        signal
+      )
+    );
+    const listedWorkspace = catalogPage.items.find(
+      workspace => workspace.workspaceId === rootOwnership.worktreeId
+    );
+    assertWorkspaceCatalog(listedWorkspace ?? null, {
+      workspaceId: rootOwnership.worktreeId,
+      sessionIds: [rootId, siblingId],
+    });
+    const fetchedWorkspace = await deadline.within('workspace catalog get', signal =>
+      getHostedWorkspace(scenarioConfig, rootOwnership.worktreeId, signal)
+    );
+    assertWorkspaceCatalog(fetchedWorkspace, {
+      workspaceId: rootOwnership.worktreeId,
+      sessionIds: [rootId, siblingId],
+    });
+    const catalogAllocationAfter = await waitForPresentAllocation(
+      deadline,
+      sandbox,
+      root,
+      'catalog after',
+      HOT_ALLOCATION_BUDGET_MS
+    );
+    if (
+      catalogAllocationBefore === null ||
+      catalogAllocationAfter === null ||
+      catalogAllocationBefore !== rootAllocation ||
+      catalogAllocationAfter !== rootAllocation
+    ) {
+      throw new Error(
+        `workspace catalog changed allocation: root=${rootAllocation}; before=${catalogAllocationBefore ?? 'none'}; after=${catalogAllocationAfter ?? 'none'}`
+      );
+    }
+
     await sleep(LAZINESS_OBSERVATION_MS);
     const after = await deadline.within('fake requests after', () =>
       fetchFakeRequests(scenarioConfig.fakeLlmUrl)
@@ -1405,7 +1483,7 @@ async function runWorktreeMultiChat(
         `question=root-owned; questionReplay=replayed-no-request; questionAnswered=owner-only; ` +
         'targetedInterrupt=sibling-interrupted (reason=interrupted); ' +
         'rootStillRunning=true; rootAllocationUnchanged=true; ' +
-        'targetedDelete=survivor-completes; ' +
+        'workspaceCatalog=list+get+no-wake; targetedDelete=survivor-completes; ' +
         "chatContentIsolation=true (no other-chat ids or markers in either chat's streams/replay)",
       events: [...rootEvents, ...siblingEvents],
       durationMs: Date.now() - startedAt,

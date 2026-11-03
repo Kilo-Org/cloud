@@ -4,10 +4,9 @@ import {
   cloudAgentSessionScopeProtocolVersionV2,
   cloudAgentSessionScopeV2Headers,
   cloudAgentWorktreeIdSchema,
-  encodeCloudAgentSessionScopeV2Headers,
   MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES,
-  MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS,
   measureCloudAgentSessionScopeV2HeaderBytes,
+  tryEncodeCloudAgentSessionScopeV2Headers,
 } from '@kilocode/session-ingest-contracts';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
@@ -54,22 +53,22 @@ function stripCallerScopeHeaders(request: Request): Headers {
 
 /**
  * Encodes the scope view as the v2 header block, or null when the receiver
- * would reject it or it exceeds the contract limits: a non-worktree scope id, an
- * empty member-root list, more than 32 roots, or an encoded block over 4096
+ * would reject it or it exceeds the contract limits: a scope outside the v2
+ * assertion contract (a non-worktree scope id, an empty member-root list, more
+ * than 32 roots, a malformed organization), or an encoded block over 4096
  * bytes. The facade maps null to its 503; it never truncates an authorized root.
  */
 export function encodeCloudAgentSessionScopeV2ViewHeaders(
   view: ScopeGrantView
 ): Record<string, string> | null {
-  if (view.memberRootKiloSessionIds.length === 0) return null;
-  if (view.memberRootKiloSessionIds.length > MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS)
-    return null;
-  if (!cloudAgentWorktreeIdSchema.safeParse(view.scopeId).success) return null;
-  const encoded = encodeCloudAgentSessionScopeV2Headers({
-    worktreeId: view.scopeId,
+  const worktreeId = cloudAgentWorktreeIdSchema.safeParse(view.scopeId);
+  if (!worktreeId.success) return null;
+  const encoded = tryEncodeCloudAgentSessionScopeV2Headers({
+    worktreeId: worktreeId.data,
     organizationId: view.expectedOrganizationId,
     memberRootKiloSessionIds: view.memberRootKiloSessionIds,
   });
+  if (encoded === null) return null;
   if (
     measureCloudAgentSessionScopeV2HeaderBytes(encoded) > MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES
   ) {

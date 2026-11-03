@@ -6,7 +6,6 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
 import type { CloudAgentSessionId, KiloSessionId } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
@@ -17,8 +16,11 @@ import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
  */
 type CreateRemoteSessionInput = {
   /**
-   * Stable key for a caller retry of the same create intent. The spawn helper
-   * derives distinct durable wire identities from it (`${key}:ext`, `${key}:bare`).
+   * Stable key for a caller retry of the same create intent. Both create
+   * paths derive distinct durable wire identities from it (`${key}:ext`,
+   * `${key}:bare`), so the key is at most
+   * `MAX_CREATE_SESSION_MUTATION_ID_LENGTH` characters; a longer key fails the
+   * create with a clear error before any wire traffic.
    */
   mutationId?: string;
   agent?: string;
@@ -119,7 +121,6 @@ type TransportSendInput = {
   payload: TransportSendPayload;
   messageId?: string | undefined;
   attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
@@ -190,9 +191,13 @@ type CloudAgentApi = {
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
-    messageId?: string;
+    /**
+     * Durable user-message identity minted by the caller. The Cloud Agent
+     * replays a repeated id instead of admitting a second turn, so it must be
+     * the same value on a retry of the same turn.
+     */
+    messageId: string;
     attachments?: CloudAgentAttachments;
-    images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
   /**

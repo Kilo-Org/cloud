@@ -6,7 +6,8 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { SectionHeader } from '@/components/home/section-header';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { ArrowRight, ListTodo, Play } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { ListTodo, Play } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useTodoLists, useUpNextTodos } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -14,7 +15,11 @@ import { todoItemPath } from '@/lib/todos/todo-routes';
 
 /** Open points at the newest linked session once one has run; Start leads otherwise. */
 function UpNextGlyph({ hasSession, color }: Readonly<{ hasSession: boolean; color: string }>) {
-  return hasSession ? <ArrowRight size={16} color={color} /> : <Play size={16} color={color} />;
+  return hasSession ? (
+    <DirectionalArrowRight size={16} color={color} />
+  ) : (
+    <Play size={16} color={color} />
+  );
 }
 
 /**
@@ -39,7 +44,7 @@ export function UpNextSection({
   }
   return (
     <View>
-      <SectionHeader label={t('todos.upNext')} />
+      <SectionHeader label={t('todos.upNext')} reserveLabelAir />
       {items.map(item => {
         const list = lists.data?.find(candidate => candidate.id === item.listId);
         const newestSession = item.sessions[0] ?? null;

@@ -12,7 +12,7 @@ import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
+import { getActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
 import {
   renderStoredSnapshotWithNotice,
   setGlanceableActionApproving,
@@ -73,9 +73,9 @@ function isActiveAgentsLiveActivity(source: string): boolean {
     return true;
   }
   try {
-    return ActiveAgentsLiveActivity.getInstances(true).some(
-      instance => instance.getId() === source
-    );
+    return getActiveAgentsLiveActivity()
+      .getInstances(true)
+      .some(instance => instance.getId() === source);
   } catch {
     // An unreadable or unsupported surface is not an identity: dropping the
     // press beats answering a target that may belong to another layout.
@@ -168,8 +168,12 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
     if (ask !== null) {
       // The republish skips that session's stale tray row only for an ended
       // ask; a `none` outcome leaves the ask as it is, so re-selecting it
-      // keeps the session the card names.
-      await republishAnsweredAsk(ask, result.kind === 'approved' || result.kind === 'gone');
+      // keeps the session the card names, and a replaced request leaves the
+      // session waiting for the live one.
+      await republishAnsweredAsk(
+        ask,
+        result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)
+      );
     }
     return result;
   } finally {

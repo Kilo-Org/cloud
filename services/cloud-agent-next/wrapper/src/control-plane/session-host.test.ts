@@ -5,6 +5,7 @@ import { createControlPlaneSessionHost } from './main.js';
 import type { KiloFeedCallbacks } from './kilo-runtime.js';
 import type { KiloEventFeedSource } from './kilo-event-feed.js';
 import type { SessionObservation } from './session-supervisor.js';
+import { createControlPlaneTerminals } from './terminals.js';
 
 async function settle() {
   for (let index = 0; index < 40; index++) await Promise.resolve();
@@ -14,7 +15,6 @@ async function settle() {
 async function hostFixture() {
   let now = Date.now();
   let preparing = false;
-  let terminalInput = false;
   let abortReply: () => Promise<boolean> = async () => true;
   let summaryReply: () => Promise<boolean> = async () => true;
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -26,11 +26,30 @@ async function hostFixture() {
   const feeds: Array<{ source: KiloEventFeedSource; callbacks: KiloFeedCallbacks }> = [];
   const intervals = new Map<symbol, () => void>();
   const stopped: number[] = [];
-  const server = Bun.serve({
+  let terminalSocket: Bun.ServerWebSocket<string> | undefined;
+  const server = Bun.serve<string>({
     hostname: '127.0.0.1',
     port: 0,
-    async fetch(request) {
+    async fetch(request, instance) {
       const url = new URL(request.url);
+      if (request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+        if (instance.upgrade(request, { data: url.pathname })) return undefined;
+        return new Response('upgrade failed', { status: 400 });
+      }
+      if (url.pathname === '/pty') {
+        return Response.json({
+          id: 'pty_terminal',
+          title: 'Terminal',
+          command: '/bin/sh',
+          args: [],
+          cwd: '/workspace',
+          status: 'running',
+          pid: 73,
+        });
+      }
+      if (url.pathname.startsWith('/pty/') && request.method === 'DELETE') {
+        return Response.json(true);
+      }
       if (url.pathname.endsWith('/abort')) {
         aborts.push({ path: url.pathname, scope: url.searchParams.get('scope') });
         return Response.json(await abortReply());
@@ -47,6 +66,12 @@ async function hostFixture() {
       }
       if (url.pathname === '/command') return Response.json([]);
       return new Response(null, { status: 404 });
+    },
+    websocket: {
+      open(socket) {
+        if (socket.data.startsWith('/sandbox-terminal/')) terminalSocket = socket;
+      },
+      message() {},
     },
   });
   let pid = 10_000;
@@ -98,10 +123,16 @@ async function hostFixture() {
     },
     turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined },
     isPreparing: () => preparing,
-    hasRecentTerminalInput: () => terminalInput,
+  });
+  const terminals = createControlPlaneTerminals({
+    controlUrl: server.url.toString(),
+    wrapperId: 'wrapper_test',
+    runtimes: host.runtimes,
   });
   const fixture = {
     host,
+    terminals,
+    terminalSocket: () => terminalSocket,
     now: () => now,
     frames,
     feeds,
@@ -144,11 +175,9 @@ async function hostFixture() {
     prepare(value: boolean) {
       preparing = value;
     },
-    terminal(value: boolean) {
-      terminalInput = value;
-    },
     async dispose() {
       host.turns.shutdown();
+      terminals.shutdown();
       await host.runtimes.shutdown();
       await server.stop(true);
     },
@@ -157,6 +186,115 @@ async function hostFixture() {
 }
 
 describe('production session host composition', () => {
+  it('keeps preparation active without native compute or pending work', async () => {
+    const f = await hostFixture();
+    try {
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      f.prepare(true);
+      expect(f.host.getHeartbeat().active).toBe(true);
+      f.prepare(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('keeps pending delivery and finalization active without native compute', async () => {
+    const f = await hostFixture();
+    const summary = Promise.withResolvers<boolean>();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute({
+        sessionId: 'workspace_chat',
+        kiloSessionId: 'ses_root',
+        directory: '/workspace',
+        attemptId: 'a',
+      });
+      f.setSummary(() => summary.promise);
+      f.host.turns.submit('workspace_chat', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'test' },
+        agent: { mode: 'code', model: 'test/model' },
+        finalization: { condenseOnComplete: true },
+      });
+      await f.promptRequested;
+      await settle();
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.turns.hasPendingWork()).toBe(true);
+      expect(f.host.getHeartbeat().active).toBe(true);
+
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await f.summaryRequested;
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.turns.hasPendingWork()).toBe(true);
+      expect(f.host.getHeartbeat().active).toBe(true);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+
+      summary.resolve(true);
+      await settle();
+      expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'm1' },
+      ]);
+    } finally {
+      summary.resolve(true);
+      await f.dispose();
+    }
+  });
+
+  it('does not make a heartbeat active for an open terminal, even with recent input', async () => {
+    const f = await hostFixture();
+    const session = {
+      sessionId: 'workspace_terminal',
+      kiloSessionId: 'ses_terminal',
+      directory: '/workspace',
+    };
+    try {
+      await f.runtime('/workspace');
+      f.terminals.rememberAttachedSession(session, '/workspace');
+      expect(
+        await f.terminals.handle({
+          type: 'terminal.create',
+          requestId: 'create',
+          session,
+          payload: { operationId: crypto.randomUUID() },
+        })
+      ).toMatchObject({ ok: true, result: { pty: { id: 'pty_terminal' } } });
+      expect(
+        await f.terminals.handle({
+          type: 'terminal.connect',
+          requestId: 'connect',
+          session,
+          payload: {
+            ownerId: 'user_1',
+            ptyId: 'pty_terminal',
+            bridgeGeneration: crypto.randomUUID(),
+            capability: 'a'.repeat(64),
+          },
+        })
+      ).toMatchObject({ ok: true, result: { connected: true } });
+      expect(f.terminals.recentInputCount()).toBe(0);
+      expect(f.host.getHeartbeat().active).toBe(false);
+
+      const socket = f.terminalSocket();
+      if (!socket) throw new Error('terminal socket was not opened');
+      socket.send('keystroke');
+      await settle();
+      expect(f.terminals.recentInputCount()).toBe(1);
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+    } finally {
+      await f.terminals.forgetSession(session.sessionId);
+      await f.dispose();
+    }
+  });
+
   it.each([
     ['response-first', 0, 'after-open'],
     ['response-first', 1, 'after-open'],
@@ -580,13 +718,6 @@ describe('production session host composition', () => {
       expect(f.host.getHeartbeat().active).toBe(true);
       f.event(feed, 'session.status', { sessionID: 'ses_other', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_other', reason: 'completed' });
-      expect(f.host.getHeartbeat().active).toBe(false);
-      f.prepare(true);
-      expect(f.host.getHeartbeat().active).toBe(true);
-      f.prepare(false);
-      f.terminal(true);
-      expect(f.host.getHeartbeat().active).toBe(true);
-      f.terminal(false);
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.dispose();

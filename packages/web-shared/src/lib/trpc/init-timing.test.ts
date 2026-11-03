@@ -113,6 +113,17 @@ describe('timingMiddleware', () => {
     expect(line).not.toHaveProperty('userId');
   });
 
+  test('samples an unrecognized client value at the base rate', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+
+    await runTiming({
+      path: 'kiloPass.getState',
+      ctx: { user: null, headersList: new Headers({ 'x-kilo-client': 'mobile2' }) },
+    });
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
   test('emits nothing when TRPC_TIMING_LOGGING is unset', async () => {
     delete process.env.TRPC_TIMING_LOGGING;
     process.env.TRPC_TIMING_SAMPLE_RATE = '1';

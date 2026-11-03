@@ -96,8 +96,6 @@ function sharedResult<T>(initialValue: T): { set: (value: T) => void; read: () =
   };
 }
 
-// ── Fingerprint options ──────────────────────────────────────────────
-
 test('fingerprint options include iOS platform and only skip the Expo extra section beyond defaults', () => {
   const options = buildFingerprintOptions();
   assert.deepEqual(options.platforms, ['ios']);
@@ -181,8 +179,6 @@ test('fingerprint changes for iOS module and extension sources and ignores unrel
   }
 });
 
-// ── Compatibility key ────────────────────────────────────────────────
-
 test('buildCompatibilityKey is stable for identical dimensions and changes on each dimension', () => {
   const dimensions = fixedDimensions();
   const keyA = buildCompatibilityKey(dimensions);
@@ -200,8 +196,6 @@ test('buildCompatibilityKey is stable for identical dimensions and changes on ea
   }
 });
 
-// ── Cache root resolution ────────────────────────────────────────────
-
 test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain', () => {
   assert.equal(
     resolveCacheRoot({ home: '/Users/test', platform: 'darwin', env: {} }),
@@ -216,8 +210,6 @@ test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain
     '/home/test/.cache/Kilo/mobile-ios-builds'
   );
 });
-
-// ── Artifact checksum ────────────────────────────────────────────────
 
 test('computeArtifactChecksum is deterministic and content-sensitive', async () => {
   const dir = makeTempDir('checksum');
@@ -234,8 +226,6 @@ test('computeArtifactChecksum is deterministic and content-sensitive', async () 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-
-// ── Concurrency: withFingerprintLock ─────────────────────────────────
 
 test('withFingerprintLock runs producer once for matching concurrent callers', async () => {
   const cacheRoot = makeTempDir('lock-once');
@@ -361,8 +351,6 @@ test('withFingerprintLock bounds wait when an active lock holds the producer', a
   }
 });
 
-// ── Cache lookup ─────────────────────────────────────────────────────
-
 test('cache hit returns the published manifest and avoids the producer', async () => {
   const cacheRoot = makeTempDir('hit');
   const key = 'k-hit';
@@ -479,8 +467,6 @@ test('cache miss when the entry is missing the app bundle directory', async () =
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 test('validateSimulatorClaim accepts the current worktree and rejects foreign worktrees', () => {
   const claimRoot = makeTempDir('claims');
   const worktree = makeTempDir('wt');
@@ -506,8 +492,6 @@ test('validateSimulatorClaim accepts the current worktree and rejects foreign wo
   }
 });
 
-// ── Install command ──────────────────────────────────────────────────
-
 test('buildInstallCommand uses xcrun simctl install with the cached bundle', () => {
   const command = buildInstallCommand('UDID-1234', '/cache/key/Kilo.app');
   assert.deepEqual(command, {
@@ -515,8 +499,6 @@ test('buildInstallCommand uses xcrun simctl install with the cached bundle', () 
     args: ['simctl', 'install', 'UDID-1234', '/cache/key/Kilo.app'],
   });
 });
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 test('pruneCache removes entries older than the threshold and protects active locks', async () => {
   const cacheRoot = makeTempDir('prune');
@@ -568,8 +550,6 @@ test('pruneCache removes entries older than the threshold and protects active lo
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── CLI parsing ──────────────────────────────────────────────────────
-
 test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.deepEqual(parseCliArgs(['fingerprint']), { command: 'fingerprint' });
   assert.deepEqual(parseCliArgs(['build', 'UDID-1']), { command: 'build', udid: 'UDID-1' });
@@ -578,8 +558,6 @@ test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.throws(() => parseCliArgs(['build']), /Usage/);
   assert.throws(() => parseCliArgs(['unknown']), /Usage/);
 });
-
-// ── Publication boundary ─────────────────────────────────────────────
 
 test('withFingerprintLock does not publish a usable entry when the producer throws', async () => {
   const cacheRoot = makeTempDir('lock-publish-fail');
@@ -680,8 +658,6 @@ test('withFingerprintLock publishes atomically via a temp directory rename', asy
   assert.equal(fs.existsSync(entriesDir), true);
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
-
-// ── xcodebuild command ──────────────────────────────────────────────
 
 test('validateXcodeWorkspace accepts the generated workspace and rejects missing', () => {
   const mobileRoot = makeTempDir('ws-ok');
@@ -786,8 +762,6 @@ test('locateProducedApp throws when the canonical .app is missing', () => {
     fs.rmSync(derived, { recursive: true, force: true });
   }
 });
-
-// ── runBuild orchestration ──────────────────────────────────────────
 
 function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
   return {
@@ -1383,8 +1357,6 @@ test('runBuild installs via the exact xcrun simctl install command shape', async
   }
 });
 
-// ── runFingerprint orchestration ────────────────────────────────────
-
 test('runFingerprint prints sanitized compatibility dimensions and key only', async () => {
   const outputs: string[] = [];
   const write = (chunk: string): void => {
@@ -1426,8 +1398,6 @@ test('runFingerprint prints sanitized compatibility dimensions and key only', as
   );
 });
 
-// ── runPrune orchestration ──────────────────────────────────────────
-
 test('runPrune reports the removed count and keeps the rest', async () => {
   const cacheRoot = makeTempDir('prune-run');
   const entriesRoot = path.join(cacheRoot, 'entries');
@@ -1462,8 +1432,6 @@ test('runPrune reports the removed count and keeps the rest', async () => {
     fs.rmSync(cacheRoot, { recursive: true, force: true });
   }
 });
-
-// ── Spec-review findings ────────────────────────────────────────────
 
 test('atomic lock takeover: two simultaneous adopters produce exactly once', async () => {
   const cacheRoot = makeTempDir('lock-atomic-takeover');
@@ -1777,8 +1745,6 @@ test('computeArtifactChecksum rejects symlinks outside root', async () => {
     fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
-
-// ── Review findings ────────────────────────────────────────────────
 
 test('tryAdoptLock does not steal a lock that has been replaced by a fresh active record', async () => {
   const cacheRoot = makeTempDir('lock-steal-toctou');

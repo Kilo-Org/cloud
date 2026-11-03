@@ -6,7 +6,7 @@ import { getMonitoredModels, getPreferredModels, readPreferredModels } from './p
 
 const storedModels = [
   'kilo-auto/efficient',
-  'stepfun/step-5-preview-free',
+  'provider/a:free',
   'kilo-auto/free',
   'provider/b:free',
   'anthropic/claude-opus-5.5',
@@ -26,7 +26,7 @@ describe('getPreferredModels', () => {
 describe('getMonitoredModels', () => {
   it('returns the stored list without auto models', async () => {
     expect(await getMonitoredModels()).toEqual([
-      'stepfun/step-5-preview-free',
+      'provider/a:free',
       'provider/b:free',
       'anthropic/claude-opus-5.5',
     ]);

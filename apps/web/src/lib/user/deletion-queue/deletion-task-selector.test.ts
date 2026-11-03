@@ -15,6 +15,44 @@ describe('deletion task selector catalog compatibility', () => {
     await cleanupDbForTest();
   });
 
+  it('does not materialize a CSA support DB step for new v2 requests', async () => {
+    const requestId = await createV2Request();
+    const steps = await db
+      .select({ step_key: user_deletion_steps.step_key })
+      .from(user_deletion_steps)
+      .where(eq(user_deletion_steps.request_id, requestId));
+
+    expect(steps).toHaveLength(12);
+    expect(steps.map(step => step.step_key)).not.toContain(UserDeletionStepKey.CsaSupportDb);
+  });
+
+  it.each([
+    UserDeletionStepStatus.Pending,
+    UserDeletionStepStatus.RetryWait,
+    UserDeletionStepStatus.NeedsAttention,
+    UserDeletionStepStatus.Running,
+  ])('does not select a persisted legacy CSA row in %s status', async status => {
+    const requestId = await createV2Request();
+    await markAllTasksSucceeded(requestId, [UserDeletionStepKey.PylonContact]);
+    await db.insert(user_deletion_steps).values({
+      request_id: requestId,
+      step_key: UserDeletionStepKey.CsaSupportDb,
+      status,
+      claim_token: status === UserDeletionStepStatus.Running ? crypto.randomUUID() : null,
+      claimed_until:
+        status === UserDeletionStepStatus.Running
+          ? new Date(Date.now() - 60_000).toISOString()
+          : null,
+    });
+
+    const contact = await selectNextTaskForRequest({ requestId, remainingMs: 60_000 });
+    expect(contact?.step.step_key).toBe(UserDeletionStepKey.PylonContact);
+
+    await markTaskSucceeded(requestId, UserDeletionStepKey.PylonContact);
+
+    await expect(selectNextTaskForRequest({ requestId, remainingMs: 60_000 })).resolves.toBeNull();
+  });
+
   it('waits for completion email before selecting Pylon contact on new v2 requests', async () => {
     const requestId = await createV2Request();
     await markAllTasksSucceeded(requestId, [

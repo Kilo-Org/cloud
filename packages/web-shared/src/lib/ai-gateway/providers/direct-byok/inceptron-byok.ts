@@ -1,20 +1,20 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  apiKeyUpstream,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'inceptron-byok',
-  base_url: 'https://api.inceptron.io/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(context) {
-    const { request } = context;
-    if (request.kind !== 'chat_completions') {
-      return;
-    }
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
-  },
+  openrouter_inference_provider_id: 'inceptron',
+  models_dev_id: 'inceptron',
+  ...apiKeyUpstream({
+    apiUrl: 'https://api.inceptron.io/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'inceptron-byok',
     recommendedModels: [

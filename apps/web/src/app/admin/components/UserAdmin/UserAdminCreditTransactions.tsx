@@ -75,7 +75,18 @@ export function UserAdminCreditTransactions({ id }: UserDetailProps) {
                           </BooleanBadge>
                           {transaction.is_free && (
                             <Badge variant="secondary" className="text-xs">
-                              Free
+                              Free flag
+                            </Badge>
+                          )}
+                          {transaction.paid_credit_policy && (
+                            <Badge variant="outline" className="text-xs">
+                              {transaction.paid_credit_policy === 'one_year'
+                                ? 'Paid · one-year expiry'
+                                : transaction.paid_credit_policy === 'apple_exempt'
+                                  ? 'Apple paid · no expiry'
+                                  : transaction.paid_credit_policy === 'legacy'
+                                    ? 'Paid · legacy terms'
+                                    : transaction.paid_credit_policy}
                             </Badge>
                           )}
                           {transaction.credit_category && (

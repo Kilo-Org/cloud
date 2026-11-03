@@ -1,5 +1,8 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { CLOUD_AGENT_DISPATCH_HEALTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { evaluateDispatchHealth } from '@/lib/cloud-agent/dispatch-health/detector';
 import {
@@ -9,18 +12,22 @@ import {
   type DispatchHealthResponse,
 } from '@/lib/cloud-agent/dispatch-health/health-response';
 
-const HEALTH_CHECK_KEY = 'kilo-cloud-agent-dispatch-health-check';
 const DETECTOR_STATEMENT_TIMEOUT_MS = 10_000;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 type UnauthorizedResponse = { healthy: false };
 
 export async function GET(
   request: Request
 ): Promise<NextResponse<DispatchHealthResponse | UnauthorizedResponse>> {
-  const { searchParams } = new URL(request.url);
+  const token = extractBearerToken(request.headers.get('authorization'));
 
-  if (searchParams.get('key') !== HEALTH_CHECK_KEY) {
-    return NextResponse.json({ healthy: false }, { status: 401 });
+  if (
+    !CLOUD_AGENT_DISPATCH_HEALTH_SECRET ||
+    !token ||
+    !timingSafeEqual(token, CLOUD_AGENT_DISPATCH_HEALTH_SECRET)
+  ) {
+    return NextResponse.json({ healthy: false }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
   try {
@@ -30,7 +37,10 @@ export async function GET(
     });
 
     if (!evaluation.tripped) {
-      return NextResponse.json(buildCompletedHealthyResponse(), { status: 200 });
+      return NextResponse.json(buildCompletedHealthyResponse(), {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
     }
 
     console.warn('[cloud-agent/dispatch-health] returning 503: detector tripped', {
@@ -42,6 +52,7 @@ export async function GET(
     });
     return NextResponse.json(buildCompletedUnhealthyResponse(evaluation.details), {
       status: 503,
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     captureException(error, {
@@ -51,6 +62,9 @@ export async function GET(
         detector: 'stuck_dispatch_rate',
       },
     });
-    return NextResponse.json(buildFailedOpenHealthyResponse(), { status: 200 });
+    return NextResponse.json(buildFailedOpenHealthyResponse(), {
+      status: 200,
+      headers: NO_STORE_HEADERS,
+    });
   }
 }

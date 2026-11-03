@@ -9,7 +9,7 @@
 // was a bare `null`, which dropped the dialog and stranded the user with an
 // unanswerable navigation.
 
-import { type ComponentType, createElement, type ReactNode, useState } from 'react';
+import { type ComponentType, createElement, type ReactNode, useEffect, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,7 +40,9 @@ const router = vi.hoisted(() => ({
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
 const preventRemove = vi.hoisted(() => ({
   enabled: false,
-  handler: undefined as ((options: { data: { action: unknown } }) => void) | undefined,
+  handler: undefined as
+    | ((options: { data: { action: unknown }; repeat: () => void }) => void)
+    | undefined,
 }));
 // The child controls record their props on render so the test drives a real
 // edit through the screen's own onChange/onPress props, not a fabricated
@@ -84,17 +86,18 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
-}));
-vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/navigation/prevent-remove', () => ({
+  useFocusEffect: (effect: () => void) => {
+    useEffect(effect, [effect]);
+  },
   usePreventRemove: (
     enabled: boolean,
-    handler: (options: { data: { action: unknown } }) => void
+    handler: (options: { data: { action: unknown }; repeat: () => void }) => void
   ) => {
     preventRemove.enabled = enabled;
     preventRemove.handler = handler;
   },
 }));
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
@@ -405,7 +408,12 @@ describe.each(CASES)('$name disabled-while-dirty', ({ Screen, makeDirty, makeCle
     // redirect; the intercepted leave must surface a visible choice even
     // though the disabled body early-returns.
     act(() => {
-      preventRemove.handler?.({ data: { action: REPLACED_BY_REDIRECT } });
+      preventRemove.handler?.({
+        data: { action: REPLACED_BY_REDIRECT },
+        repeat: () => {
+          navigation.dispatch(REPLACED_BY_REDIRECT);
+        },
+      });
     });
     expect(visibleConfirmationCount(renderer)).toBe(1);
     const dialog = confirmDialog.current;
@@ -428,7 +436,12 @@ describe.each(CASES)('$name disabled-while-dirty', ({ Screen, makeDirty, makeCle
 
     // Discard: replays the captured navigation and leaves.
     act(() => {
-      preventRemove.handler?.({ data: { action: REPLACED_BY_REDIRECT } });
+      preventRemove.handler?.({
+        data: { action: REPLACED_BY_REDIRECT },
+        repeat: () => {
+          navigation.dispatch(REPLACED_BY_REDIRECT);
+        },
+      });
     });
     expect(visibleConfirmationCount(renderer)).toBe(1);
     const reopened = confirmDialog.current;
@@ -448,7 +461,14 @@ describe.each(CASES)('$name disabled-while-dirty', ({ Screen, makeDirty, makeCle
     act(() => {
       invalidate();
     });
-    act(() => preventRemove.handler?.({ data: { action: REPLACED_BY_REDIRECT } }));
+    act(() =>
+      preventRemove.handler?.({
+        data: { action: REPLACED_BY_REDIRECT },
+        repeat: () => {
+          navigation.dispatch(REPLACED_BY_REDIRECT);
+        },
+      })
+    );
     act(() => confirmDialog.current?.onCancel());
     expect(renderer.root.findAll(node => String(node.type) === 'SettingsSaveButton')).toHaveLength(
       1

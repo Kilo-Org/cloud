@@ -173,7 +173,7 @@ test('workflow is created-comment-only, least-privilege, and never checks out PR
   }
   const ci = load(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
   assert.ok(
-    ci.jobs.changes.steps.some(
+    ci.jobs['ci-wiring'].steps.some(
       step => step.run === 'node --test scripts/meta-janitor-approve.test.mjs'
     )
   );

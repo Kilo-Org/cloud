@@ -13,6 +13,10 @@ import {
   type OpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import {
+  organizationModelsPath,
+  type OrganizationModelAudience,
+} from '@kilocode/app-shared/organizations';
 
 interface OpenRouterProvider {
   name: string;
@@ -46,6 +50,8 @@ interface OpenRouterProvider {
     className?: string;
   };
   ignoredProviderModels: string[];
+  /** Kilo never routes to this provider; it only serves an organization's own keys. */
+  byokOnly?: boolean;
   models: OpenRouterModel[];
 }
 
@@ -65,6 +71,7 @@ interface OpenRouterData {
       url: string;
       className?: string;
     };
+    byokOnly?: true;
     models: OpenRouterModel[];
   }>;
   total_providers: number;
@@ -100,13 +107,19 @@ export function useOpenRouterProviders() {
   });
 }
 
-export function useModelSelectorList(organizationId: string | undefined, enabled = true) {
+export function useModelSelectorList(
+  organizationId: string | undefined,
+  enabled = true,
+  audience: OrganizationModelAudience = 'member',
+  cacheOptions?: { staleTime: number; gcTime: number }
+) {
   const query = useQuery({
-    queryKey: ['openrouter-models', organizationId],
+    ...cacheOptions,
+    queryKey: ['openrouter-models', organizationId, audience],
     enabled,
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
       const response = await fetch(
-        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
+        organizationId ? organizationModelsPath(organizationId, audience) : '/api/openrouter/models'
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
@@ -167,6 +180,7 @@ export function useOpenRouterModelsAndProviders() {
       byokEnabled: false,
       icon: provider.icon,
       ignoredProviderModels: [],
+      byokOnly: provider.byokOnly,
       models: provider.models, // Include all models, filtering will happen in the UI hook
     }));
   }, [query.data]);
@@ -177,8 +191,10 @@ export function useOpenRouterModelsAndProviders() {
 
     // A model can be offered by multiple providers. For consumers that just want a list of
     // selectable model ids, dedupe by model slug.
+    // BYOK-only providers copy models other providers list, with no Kilo pricing, so they are skipped.
     const modelBySlug = new Map<string, OpenRouterModel>();
     for (const provider of query.data.providers) {
+      if (provider.byokOnly) continue;
       for (const model of provider.models) {
         if (!model.endpoint) continue;
         if (!modelBySlug.has(model.slug)) {

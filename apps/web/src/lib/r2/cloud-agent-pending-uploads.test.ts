@@ -1,9 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import type {
   admitPendingUpload as AdmitPendingUpload,
+  linkAttachmentsForDispatch as LinkAttachmentsForDispatch,
   linkPendingUploads as LinkPendingUploads,
+  purgeUserPendingUploads as PurgeUserPendingUploads,
   reapAbandonedUploads as ReapAbandonedUploads,
   releasePendingUploads as ReleasePendingUploads,
+  releaseUnadmittedUploads as ReleaseUnadmittedUploads,
 } from './cloud-agent-pending-uploads';
 
 const mockSend = jest.fn<(command: { input: { Key: string }; name: string }) => Promise<unknown>>();
@@ -20,18 +23,23 @@ jest.mock('@aws-sdk/client-s3', () => ({
   DeleteObjectCommand: mockDeleteObjectCommand,
 }));
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
+  CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT,
+  CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH,
 } from '@/lib/cloud-agent/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
 
 let admitPendingUpload: typeof AdmitPendingUpload;
+let linkAttachmentsForDispatch: typeof LinkAttachmentsForDispatch;
 let linkPendingUploads: typeof LinkPendingUploads;
+let purgeUserPendingUploads: typeof PurgeUserPendingUploads;
 let reapAbandonedUploads: typeof ReapAbandonedUploads;
 let releasePendingUploads: typeof ReleasePendingUploads;
+let releaseUnadmittedUploads: typeof ReleaseUnadmittedUploads;
 
 function buildObjectKey(kiloUserId: string, messageUuid: string, attachmentId: string): string {
   return `${kiloUserId}/cloud-agent/${messageUuid}/${attachmentId}.bin`;
@@ -72,9 +80,12 @@ describe('cloud-agent pending-upload ledger', () => {
   beforeAll(async () => {
     const pendingUploadsModule = await import('./cloud-agent-pending-uploads');
     admitPendingUpload = pendingUploadsModule.admitPendingUpload;
+    linkAttachmentsForDispatch = pendingUploadsModule.linkAttachmentsForDispatch;
     linkPendingUploads = pendingUploadsModule.linkPendingUploads;
+    purgeUserPendingUploads = pendingUploadsModule.purgeUserPendingUploads;
     reapAbandonedUploads = pendingUploadsModule.reapAbandonedUploads;
     releasePendingUploads = pendingUploadsModule.releasePendingUploads;
+    releaseUnadmittedUploads = pendingUploadsModule.releaseUnadmittedUploads;
   });
 
   afterEach(async () => {
@@ -490,6 +501,242 @@ describe('cloud-agent pending-upload ledger', () => {
     );
   });
 
+  it('counts pending rows across every message against the per-account bound', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+
+    // One pending row per distinct message, up to the account bound.
+    for (let i = 0; i < CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT; i++) {
+      const messageUuid = crypto.randomUUID();
+      await admit({
+        kiloUserId,
+        messageUuid,
+        attachmentId: crypto.randomUUID(),
+        objectKey: buildObjectKey(kiloUserId, messageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      });
+    }
+
+    // A fresh message uuid starts at zero for the per-message count; the
+    // account-wide count is what rejects the next presign.
+    const freshMessageUuid = crypto.randomUUID();
+    await expect(
+      admit({
+        kiloUserId,
+        messageUuid: freshMessageUuid,
+        attachmentId: crypto.randomUUID(),
+        objectKey: buildObjectKey(kiloUserId, freshMessageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT} uploads allowed per account`,
+    });
+
+    // Another account is unaffected.
+    const otherUserId = `ca-user-${crypto.randomUUID()}`;
+    await expect(
+      admit({
+        kiloUserId: otherUserId,
+        messageUuid: freshMessageUuid,
+        attachmentId: crypto.randomUUID(),
+        objectKey: buildObjectKey(otherUserId, freshMessageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      })
+    ).resolves.toBeDefined();
+  });
+
+  it('applies the per-account ceiling when one attachment id repeats', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const attachmentId = crypto.randomUUID();
+
+    for (let i = 0; i < CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT; i++) {
+      const messageUuid = crypto.randomUUID();
+      await admitPendingUpload({
+        kiloUserId,
+        messageUuid,
+        attachmentId,
+        objectKey: buildObjectKey(kiloUserId, messageUuid, attachmentId),
+        freshObjectKey: buildObjectKey(kiloUserId, messageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      });
+    }
+
+    const freshMessageUuid = crypto.randomUUID();
+    await expect(
+      admitPendingUpload({
+        kiloUserId,
+        messageUuid: freshMessageUuid,
+        attachmentId,
+        objectKey: buildObjectKey(kiloUserId, freshMessageUuid, attachmentId),
+        freshObjectKey: buildObjectKey(kiloUserId, freshMessageUuid, crypto.randomUUID()),
+        byteSize: 1,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT} uploads allowed per account`,
+    });
+  });
+
+  it('purgeUserPendingUploads deletes objects for the caller across row statuses', async () => {
+    mockSend.mockResolvedValue({});
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const otherUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const pendingAttachment = crypto.randomUUID();
+    const linkedAttachment = crypto.randomUUID();
+    const otherUserAttachment = crypto.randomUUID();
+
+    const pendingRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: pendingAttachment,
+      expiresAt: future,
+    });
+    const linkedRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: linkedAttachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+    const otherUserRow = await insertPendingRow({
+      kiloUserId: otherUserId,
+      messageUuid,
+      attachmentId: otherUserAttachment,
+      expiresAt: future,
+    });
+
+    await purgeUserPendingUploads(kiloUserId);
+
+    const deletedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
+    expect(deletedKeys).toHaveLength(2);
+    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, pendingAttachment));
+    expect(deletedKeys).toContain(buildObjectKey(kiloUserId, messageUuid, linkedAttachment));
+
+    const remaining = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads);
+    const byId = new Map(remaining.map(row => [row.id, row.status]));
+
+    expect(byId.get(pendingRow)).toBe('reaped');
+    expect(byId.get(linkedRow)).toBe('reaped');
+    expect(byId.get(otherUserRow)).toBe('pending');
+  });
+
+  it('purgeUserPendingUploads keeps claiming until every row is done, batch by batch', async () => {
+    mockSend.mockResolvedValue({});
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // More rows than one purge batch, so the loop must make several passes.
+    const attachments = Array.from({ length: CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH + 3 }, () =>
+      crypto.randomUUID()
+    );
+    await db.insert(cloud_agent_pending_uploads).values(
+      attachments.map((attachmentId, index) => ({
+        id: crypto.randomUUID(),
+        kilo_user_id: kiloUserId,
+        object_key: buildObjectKey(kiloUserId, messageUuid, attachmentId),
+        message_uuid: messageUuid,
+        attachment_id: attachmentId,
+        byte_size: 42,
+        status: index % 2 === 0 ? ('pending' as const) : ('linked' as const),
+        expires_at: future,
+      }))
+    );
+
+    await purgeUserPendingUploads(kiloUserId);
+
+    const deletedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
+    expect(deletedKeys).toHaveLength(attachments.length);
+
+    const remaining = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+    expect(remaining.map(row => row.status)).toEqual(
+      Array.from({ length: attachments.length }, () => 'reaped')
+    );
+  }, 30_000);
+
+  it('purgeUserPendingUploads completes the retry sweep', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const attachments = Array.from({ length: CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH + 3 }, () =>
+      crypto.randomUUID()
+    );
+    const keys = attachments.map(id => buildObjectKey(kiloUserId, messageUuid, id));
+    await db.insert(cloud_agent_pending_uploads).values(
+      attachments.map((attachmentId, index) => ({
+        id: crypto.randomUUID(),
+        kilo_user_id: kiloUserId,
+        object_key: keys[index],
+        message_uuid: messageUuid,
+        attachment_id: attachmentId,
+        byte_size: 42,
+        status: 'linked' as const,
+        expires_at: future,
+      }))
+    );
+    const attempts = new Map<string, number>();
+    mockSend.mockImplementation(async command => {
+      const key = command.input.Key;
+      const attempt = (attempts.get(key) ?? 0) + 1;
+      attempts.set(key, attempt);
+      if (attempt === 1) throw new Error('R2 unavailable');
+      return {};
+    });
+
+    await purgeUserPendingUploads(kiloUserId);
+
+    expect(keys.map(key => attempts.get(key))).toEqual(keys.map(() => 2));
+    const remaining = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+    expect(remaining.map(row => row.status)).toEqual(keys.map(() => 'reaped'));
+  }, 30_000);
+
+  it('purgeUserPendingUploads retains actionable cleanup records', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    const rowId = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      status: 'linked',
+    });
+    mockSend.mockRejectedValue(new Error('R2 unavailable'));
+
+    await expect(purgeUserPendingUploads(kiloUserId)).rejects.toThrow(
+      'Cloud Agent attachment cleanup incomplete'
+    );
+
+    expect(mockSend.mock.calls.map(call => call[0].input.Key)).toEqual([objectKey, objectKey]);
+    expect(
+      await db
+        .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId))
+    ).toEqual([{ id: rowId, status: 'pending' }]);
+
+    mockSend.mockResolvedValue({});
+    await purgeUserPendingUploads(kiloUserId);
+    expect(
+      await db
+        .select({ status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.id, rowId))
+    ).toEqual([{ status: 'reaped' }]);
+  });
+
   it('releasePendingUploads deletes only the caller pending object and leaves linked and other-user rows', async () => {
     mockSend.mockResolvedValue({});
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
@@ -553,7 +800,7 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(byId.get(otherUserRow)).toBe('pending');
   });
 
-  it('claims the row before deleting its R2 object so a concurrent link cannot lose it', async () => {
+  it('moves a released row out of pending before deleting its R2 object', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const attachment = crypto.randomUUID();
@@ -614,7 +861,7 @@ describe('cloud-agent pending-upload ledger', () => {
     ).toBe('pending');
   });
 
-  it('claims an expired row before deleting its object so a late link cannot lose it', async () => {
+  it('moves an expired row out of pending before deleting its object', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const attachment = crypto.randomUUID();
@@ -628,9 +875,9 @@ describe('cloud-agent pending-upload ledger', () => {
       expiresAt: past,
     });
 
-    // A row picked by the reaper must already be claimed when DeleteObject
-    // runs. If it were still 'pending', linkPendingUploads could flip it to
-    // 'linked' and the sent attachment would lose its object.
+    // A row picked by the reaper must be out of 'pending' before DeleteObject
+    // runs, so a caller that links afterwards reads 'reaped' and refuses the
+    // dispatch instead of promising an object that is gone.
     const statusesAtDelete: (string | undefined)[] = [];
     mockSend.mockImplementation(async () => {
       const rows = await db
@@ -644,5 +891,263 @@ describe('cloud-agent pending-upload ledger', () => {
     await reapAbandonedUploads();
 
     expect(statusesAtDelete).toEqual(['reaped']);
+  });
+
+  it('keeps a linked attachment object when the reaper runs afterwards', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
+    const past = new Date(Date.now() - 60_000).toISOString();
+    mockSend.mockResolvedValue({});
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+    });
+
+    const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
+    expect(linked).toEqual({ linkedObjectKeys: [objectKey], unlinkedObjectKeys: [] });
+
+    const summary = await reapAbandonedUploads();
+
+    expect(summary.reaped).toBe(0);
+    expect(mockSend).not.toHaveBeenCalled();
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('linked');
+  });
+
+  it('returns only the unadmitted message rows to pending and leaves another message linked', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const unadmittedMessage = crypto.randomUUID();
+    const otherMessage = crypto.randomUUID();
+    const unadmittedAttachment = crypto.randomUUID();
+    const otherAttachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const unadmittedRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid: unadmittedMessage,
+      attachmentId: unadmittedAttachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+    const otherRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid: otherMessage,
+      attachmentId: otherAttachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+
+    const released = await releaseUnadmittedUploads(kiloUserId, unadmittedMessage, [
+      buildObjectKey(kiloUserId, unadmittedMessage, unadmittedAttachment),
+    ]);
+
+    expect(released).toBe(1);
+    const rows = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(inArray(cloud_agent_pending_uploads.id, [unadmittedRow, otherRow]));
+    const statusById = new Map(rows.map(row => [row.id, row.status]));
+    expect(statusById.get(unadmittedRow)).toBe('pending');
+    expect(statusById.get(otherRow)).toBe('linked');
+  });
+
+  it('lets the reaper reclaim a returned row once its lease lapses', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    mockSend.mockResolvedValue({});
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+      status: 'linked',
+    });
+
+    await releaseUnadmittedUploads(kiloUserId, messageUuid, [
+      buildObjectKey(kiloUserId, messageUuid, attachment),
+    ]);
+    const summary = await reapAbandonedUploads();
+
+    expect(summary.reaped).toBe(1);
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('reaped');
+  });
+
+  it('reports the attachment row a reaper claim took first and does not link it', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
+    const past = new Date(Date.now() - 60_000).toISOString();
+    mockSend.mockResolvedValue({});
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+    });
+
+    await reapAbandonedUploads();
+
+    const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
+    expect(linked).toEqual({ linkedObjectKeys: [], unlinkedObjectKeys: [objectKey] });
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('reaped');
+  });
+
+  it('does not reap a lease a retry refreshes before the claim runs', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    mockSend.mockResolvedValue({});
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+    });
+
+    const hold = Promise.withResolvers<void>();
+    const refreshed = Promise.withResolvers<void>();
+
+    // The retry presign extends the lease while the reaper is already running.
+    // Whichever statement reaches the row first, the lease re-check in the
+    // claim keeps the object; only an expired row may be deleted.
+    const refreshing = db.transaction(async tx => {
+      await tx
+        .update(cloud_agent_pending_uploads)
+        .set({ expires_at: future })
+        .where(eq(cloud_agent_pending_uploads.id, row));
+      refreshed.resolve();
+      await hold.promise;
+    });
+
+    await refreshed.promise;
+    const reaping = reapAbandonedUploads();
+    hold.resolve();
+    await refreshing;
+
+    expect(await reaping).toEqual({ reaped: 0 });
+    expect(mockSend).not.toHaveBeenCalled();
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('pending');
+  });
+
+  it('links a message attachment row before dispatch and tolerates a key with no row', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const legacyFile = `${crypto.randomUUID()}.pdf`;
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+    });
+
+    const linkedKeys = await linkAttachmentsForDispatch(kiloUserId, {
+      path: messageUuid,
+      files: [`${attachment}.bin`, legacyFile],
+    });
+
+    expect(linkedKeys).toEqual([buildObjectKey(kiloUserId, messageUuid, attachment)]);
+
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('linked');
+  });
+
+  it('links nothing for a dispatch whose rows an earlier send already holds', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+
+    // The composer reuses one attachment path across sends, so a second send
+    // finds the rows of the first one already linked and links none of them.
+    const linkedKeys = await linkAttachmentsForDispatch(kiloUserId, {
+      path: messageUuid,
+      files: [`${attachment}.bin`],
+    });
+
+    expect(linkedKeys).toEqual([]);
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('linked');
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('leaves every row of a refused message reapable', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const readyAttachment = crypto.randomUUID();
+    const goneAttachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    const readyRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: readyAttachment,
+      expiresAt: future,
+    });
+    await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: goneAttachment,
+      expiresAt: past,
+      status: 'reaped',
+    });
+
+    await expect(
+      linkAttachmentsForDispatch(kiloUserId, {
+        path: messageUuid,
+        files: [`${readyAttachment}.bin`, `${goneAttachment}.bin`],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, readyRow));
+    expect(after?.status).toBe('pending');
   });
 });

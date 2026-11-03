@@ -17,9 +17,17 @@
 // for the same tap.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {
   ComposerInlineError,
@@ -62,7 +70,7 @@ export function PrCommentEditSheet({
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // State only for derived UI: an empty body and an unchanged body both have
   // nothing to save, so each keeps Save down.
@@ -143,7 +151,7 @@ export function PrCommentEditSheet({
     }
     try {
       await updateComment.mutateAsync({ owner, repo, number, commentId, kind, body });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       // The mutation hook announces success for a11y; its settle invalidation
       // renders the edited text in the discussion behind the sheet.
       onDismiss();

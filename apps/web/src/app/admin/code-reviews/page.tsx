@@ -156,7 +156,6 @@ export default function CodeReviewsPage() {
 
   const trpcClient = useRawTRPCClient();
 
-  // Filter state
   const [ownershipType, setOwnershipType] = useState<OwnershipType>('all');
   const [retryAccountingMode, setRetryAccountingMode] =
     useState<RetryAccountingModeType>('final_outcome');
@@ -200,7 +199,6 @@ export default function CodeReviewsPage() {
     }));
   };
 
-  // Build filter params
   const filterParams: FilterParams = useMemo(
     () => ({
       startDate,
@@ -213,7 +211,6 @@ export default function CodeReviewsPage() {
     [startDate, endDate, selectedUser, selectedOrg, ownershipType, retryAccountingMode]
   );
 
-  // Queries
   const queueHealthQuery = useCodeReviewQueueHealthStats(filterParams);
   const overviewQuery = useCodeReviewOverviewStats(filterParams);
   const dailyQuery = useCodeReviewDailyStats(filterParams);
@@ -260,26 +257,22 @@ export default function CodeReviewsPage() {
     segmentationQuery,
   ]);
 
-  // Handle selecting a user from search
   const handleSelectUser = (user: SelectedUser) => {
     setSelectedUser(user);
     setSelectedOrg(null); // Clear org filter when user is selected
     setOwnershipType('all');
   };
 
-  // Handle selecting an org from search
   const handleSelectOrg = (org: SelectedOrg) => {
     setSelectedOrg(org);
     setSelectedUser(null); // Clear user filter when org is selected
     setOwnershipType('all');
   };
 
-  // Handle clicking on a user in segmentation
   const handleUserClick = (userId: string, email: string | null, name: string | null) => {
     handleSelectUser({ id: userId, email, name });
   };
 
-  // Handle clicking on an org in segmentation
   const handleOrgClick = (orgId: string, name: string | null, plan: string | null) => {
     handleSelectOrg({ id: orgId, name, plan });
   };
@@ -304,7 +297,6 @@ export default function CodeReviewsPage() {
           ? 'Organizations'
           : undefined;
 
-  // Handle CSV export
   const handleExport = useCallback(async () => {
     if (isExporting || isIntervalDraftInvalid) return;
 

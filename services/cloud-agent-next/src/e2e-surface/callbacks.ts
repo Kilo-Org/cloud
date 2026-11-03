@@ -20,6 +20,12 @@ import type { Env } from '../types.js';
 
 export const E2E_CALLBACK_BODY_LIMIT_BYTES = 64 * 1024;
 
+const CALLBACK_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+export function isCallbackToken(token: string): boolean {
+  return token.length === 36 && CALLBACK_TOKEN.test(token);
+}
+
 /** A body read that either fits the limit or was cancelled at the first excess byte. */
 export type BoundedBodyResult = { ok: true; bytes: Uint8Array } | { ok: false };
 
@@ -89,6 +95,11 @@ export async function handleCallbackMint(c: Context<HonoContext>): Promise<Respo
 
 /** `POST /__e2e/callbacks/:token` — token-authorized ingest. */
 export async function handleCallbackIngest(c: Context<HonoContext>): Promise<Response> {
+  const token = callbackToken(c);
+  if (!token || !isCallbackToken(token)) {
+    return new Response('Unknown or expired callback token', { status: 404 });
+  }
+
   const declaredLength = Number(c.req.header('content-length') ?? '');
   if (Number.isFinite(declaredLength) && declaredLength > E2E_CALLBACK_BODY_LIMIT_BYTES) {
     return new Response('Payload too large', { status: 413 });
@@ -109,8 +120,6 @@ export async function handleCallbackIngest(c: Context<HonoContext>): Promise<Res
   if (!c.env.E2E_CALLBACK_SINK) {
     return new Response('Callback sink not configured', { status: 503 });
   }
-  const token = callbackToken(c);
-  if (!token) return new Response('Unknown or expired callback token', { status: 404 });
   const result = await callbackSink(c.env, token).append(raw);
   if (result.ok) return Response.json({ ok: true });
   if (result.reason === 'full') {

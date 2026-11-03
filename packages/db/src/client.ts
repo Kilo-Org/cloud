@@ -3,9 +3,24 @@ import pg, { types } from 'pg';
 import * as schema from './schema';
 import { getDatabaseClientConfig } from './database-url';
 
-// Drizzle requires this for BigInts
-// https://orm.drizzle.team/docs/column-types/pg#bigint
-types.setTypeParser(types.builtins.INT8, val => BigInt(val));
+/**
+ * Per-pool parsers that hand back `int8` (OID 20) as a `BigInt`.
+ *
+ * Drizzle's `bigint` columns read either form, but raw results here and in the export
+ * paths expect a `BigInt` (https://orm.drizzle.team/docs/column-types/pg#bigint). Opt in
+ * by passing this to a pool's `types`; `pg.types.setTypeParser` would instead change
+ * decoding for every client in the process, including clients that never imported this
+ * module. Other OIDs and the binary format keep pg's own parsers.
+ */
+export const databaseTypeParsers: pg.CustomTypesConfig = {
+  getTypeParser: (oid, format): ((value: string) => unknown) => {
+    if (oid === types.builtins.INT8 && (format ?? 'text') === 'text') {
+      return (value: string) => BigInt(value);
+    }
+    // pg types every parser as `(value: string) => any`; callers only invoke the result.
+    return types.getTypeParser(oid, format) as (value: string) => unknown;
+  },
+};
 
 export type CreateDrizzleClientOptions = {
   connectionString: string;
@@ -26,6 +41,7 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 
   const pool = new pg.Pool({
     ...baseConfig,
+    types: databaseTypeParsers,
     ...poolConfig,
   });
 
@@ -46,6 +62,7 @@ export function getWorkerDb(connectionString: string, options: GetWorkerDbOption
   const pool = new pg.Pool({
     connectionString,
     max: 1,
+    types: databaseTypeParsers,
     ...options,
   });
   return drizzle(pool, { schema });

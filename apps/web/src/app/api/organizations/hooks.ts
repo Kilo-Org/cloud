@@ -7,6 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import type { SubscriptionWithPeriod } from '@/components/organizations/subscription/types';
 
 export function useOrganizationWithMembers(id: string, options?: { enabled?: boolean }) {
   const trpc = useTRPC();
@@ -371,12 +372,12 @@ export function useUpdateSuppressTrialMessaging() {
   );
 }
 
-export function useAdminToggleCodeIndexing() {
+export function useUpdateKiloEncrypt() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.organizations.settings.updateCodeIndexingFeatureFlag.mutationOptions({
+    trpc.organizations.admin.updateKiloEncrypt.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
         void invalidate();
@@ -498,6 +499,14 @@ export function useOrganizationSubscription(organizationId: string) {
             skipBatch: true,
           },
         },
+        // The API returns the Stripe subscription itself, but the generated
+        // client declaration cannot reproduce Stripe's recursive account graph,
+        // so its inferred type is not assignable to the view the cards read.
+        select: data =>
+          data && {
+            ...data,
+            subscription: data.subscription as SubscriptionWithPeriod | null,
+          },
       }
     )
   );
@@ -615,9 +624,14 @@ export function useClearOrganizationSsoDomain() {
   );
 }
 
-export function useOrganizationAvailableModels(organizationId: string) {
+export function useOrganizationAvailableModels(
+  organizationId: string,
+  options?: { enabled?: boolean }
+) {
   const trpc = useTRPC();
-  return useQuery(trpc.organizations.settings.listAvailableModels.queryOptions({ organizationId }));
+  return useQuery(
+    trpc.organizations.settings.listAvailableModels.queryOptions({ organizationId }, options)
+  );
 }
 
 /// CUSTOM MODES HOOKS ///

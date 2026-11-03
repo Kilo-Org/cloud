@@ -27,6 +27,7 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL,
     run_id TEXT,
     failure_reason TEXT,
+    invalidated_at TEXT,
     requested_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isPreviewEnabled, previewHostTemplate } from '../../preview/host.js';
-import { isPreviewOwner } from '../../session-plane.js';
+import { isPreviewOwner } from '../../session-identity.js';
 import { protectedProcedure } from '../auth.js';
 
 /**

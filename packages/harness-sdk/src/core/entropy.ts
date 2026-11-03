@@ -27,10 +27,9 @@ interface EntropySourceService {
   readonly bytes: (count: number) => Uint8Array;
 }
 
-class EntropySource extends Context.Tag('harness/EntropySource')<
-  EntropySource,
-  EntropySourceService
->() {}
+class EntropySource extends Context.Service<EntropySource, EntropySourceService>()(
+  'harness/EntropySource'
+) {}
 
 export type { EntropySourceService };
 export { EntropyError, EntropySource };

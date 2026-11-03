@@ -33,6 +33,18 @@ describe('postAuth', () => {
     resetAuthTerminalReports();
   });
 
+  it('sends the app product token as the User-Agent so device sessions record it', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(Response.json({ token: 't', refreshToken: 'r' }));
+
+    await postAuth('/api/auth/native/token', { provider: 'email' });
+
+    expect(fetchSpy.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
+  });
+
   it('forwards ssoOrganizationId on a non-ok SSO_ERROR response', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json({ error: 'SSO_ERROR', ssoOrganizationId: 'org_1' }, { status: 400 })

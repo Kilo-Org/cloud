@@ -63,7 +63,7 @@ import {
   shouldSkipUpdateForMergeCommit,
 } from '@/lib/integrations/platforms/gitlab/webhook-handlers/merge-request-handler';
 import type { MergeRequestPayload } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
-import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { GitLabWebhookIntegration } from '@/lib/integrations/db/platform-integrations';
 
 function mergeRequestPayload(overrides: Partial<MergeRequestPayload> = {}): MergeRequestPayload {
   return {
@@ -106,16 +106,19 @@ function mergeRequestPayload(overrides: Partial<MergeRequestPayload> = {}): Merg
   } as MergeRequestPayload;
 }
 
-function platformIntegration(overrides: Partial<PlatformIntegration> = {}): PlatformIntegration {
+function platformIntegration(
+  overrides: Partial<GitLabWebhookIntegration> = {}
+): GitLabWebhookIntegration {
   return {
     id: '8b2ff443-8396-4b07-99ae-7015789da7dd',
     owned_by_organization_id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
     owned_by_user_id: null,
     kilo_requester_user_id: null,
-    platform_installation_id: '98765',
-    metadata: { gitlab_instance_url: 'https://gitlab.example.com' },
+    integration_status: 'active',
+    suspended_at: null,
+    webhook_secret: 'test-webhook-secret',
     ...overrides,
-  } as PlatformIntegration;
+  };
 }
 
 beforeEach(() => {

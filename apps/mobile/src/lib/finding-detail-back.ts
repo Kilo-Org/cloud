@@ -1,12 +1,6 @@
 import { type Href } from 'expo-router';
 
-/**
- * Profile tab root. This is the fixed landing target when a push/deep-link
- * opened a finding report with no in-app history beneath it. The group href
- * (no trailing `/index`) is the route expo-router matches — the `/index`
- * suffix resolves to the not-found screen.
- */
-export const PROFILE_TAB_ROOT = '/(app)/(tabs)/(3_profile)' as Href;
+import { getSecurityAgentPath } from '@/lib/security-agent';
 
 export type FindingDetailBackTarget = { kind: 'pop' } | { kind: 'replace'; href: Href };
 
@@ -28,15 +22,25 @@ export function findingDetailHasLocalHistory(state: { index: number } | undefine
  * Decide the finding-detail back action from the local-history signal.
  *
  * - `pop` when there is local history: the normal findings-list -> finding
- *   flow must return to the list, so back pops normally.
- * - `replace` to the profile root when there is no local history: a
+ *   flow must return to the list, so back pops normally. A report a link
+ *   opened on its own has the scope dashboard beneath it too, because the
+ *   group's scene layout puts it there (`use-repair-security-agent-scope-stack`),
+ *   so back steps to the dashboard — the parent the reader arrived under —
+ *   rather than leaving the feature.
+ * - `replace` to the scope's findings list when there is no local history: a
  *   push/deep-link opened the report with nothing beneath it, so a bare `pop`
- *   is a no-op and back must land on the profile root — never an intermediate
- *   security-agent screen.
+ *   is a no-op and back must land on that list. It is a sibling route in the
+ *   same stack as the report — `security-agent` lives in the root stack, above
+ *   the tab bar — so the landing leaves no tab selected and never drops the
+ *   user into a different tab. This is the frame before that repair commits,
+ *   and the fallback for a Stack the repair cannot settle.
  */
-export function findingDetailBackTarget(hasLocalHistory: boolean): FindingDetailBackTarget {
+export function findingDetailBackTarget(
+  hasLocalHistory: boolean,
+  scope: string
+): FindingDetailBackTarget {
   if (hasLocalHistory) {
     return { kind: 'pop' };
   }
-  return { kind: 'replace', href: PROFILE_TAB_ROOT };
+  return { kind: 'replace', href: getSecurityAgentPath(scope, 'findings') };
 }

@@ -20,6 +20,7 @@ import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import { SIGNUP_STEP_UP_METHODS_PARAM } from '@/lib/auth/redirect-urls';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
@@ -78,7 +79,12 @@ export function SignInForm({
     );
   }
 
-  const errorNotification = flow.error ? <AuthErrorNotification error={flow.error} /> : null;
+  const errorNotification = flow.error ? (
+    <AuthErrorNotification
+      error={flow.error}
+      stepUpMethods={searchParams[SIGNUP_STEP_UP_METHODS_PARAM]}
+    />
+  ) : null;
 
   // Turnstile overlay
   if (flow.showTurnstile) {

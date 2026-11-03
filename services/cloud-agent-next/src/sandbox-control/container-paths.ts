@@ -7,7 +7,7 @@ import {
 /**
  * Runtime paths inside the control-plane sandbox image.
  *
- * `CONTROL_SUPERVISOR_PATH` is what providers start; it owns wrapper restarts
+ * `CONTROL_SUPERVISOR_PATH` is what preinstalled startup supplies; it owns wrapper restarts
  * (spec §7). `CONTROL_WRAPPER_PATH` is the bun bundle the supervisor runs and
  * is the process the stale/probe scans look for.
  *
@@ -18,6 +18,14 @@ export const CONTROL_WRAPPER_PATH = runtimeInstallPath(
   wrapperBundle('src/control-plane/main.ts').installName
 );
 export const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
+
+/**
+ * The environment builder bundle. A builder container runs it as its main
+ * process (`RUNTIME_BUN_PATH` + this path), never through the session supervisor.
+ */
+export const ENVIRONMENT_BUILDER_PATH = runtimeInstallPath(
+  wrapperBundle('src/environment-builder/main.ts').installName
+);
 
 /** pgrep pattern matching the supervisor or its wrapper child. */
 export const CONTROL_PROCESS_MATCH = `${CONTROL_SUPERVISOR_PATH}|${CONTROL_WRAPPER_PATH}`;

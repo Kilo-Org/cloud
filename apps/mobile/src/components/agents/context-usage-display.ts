@@ -2,7 +2,7 @@ import { i18n } from '@/i18n';
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
-import { formatSessionTotalCost } from './session-list-helpers';
+import { formatSessionCostBadge, formatSessionTotalCost } from './session-list-helpers';
 import { formatSpokenCost } from './session-row-accessibility-label';
 
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
@@ -11,16 +11,6 @@ const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;
 
 const INDETERMINATE_ARC_FRACTION = 0.25;
-
-export function formatCompactTokens(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens < 0) {
-    return '0';
-  }
-  return formatNumber(Math.trunc(tokens), i18n.language, {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  });
-}
 
 export function formatExactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
@@ -90,19 +80,22 @@ export type HeaderPillContent = {
   arcFraction: number | undefined;
   interactive: boolean;
   /**
-   * Settled without usage: the pill labels the slot with the unknown-usage
-   * mark, and the accessibility label names usage as unavailable. Stays false
-   * while the session is still loading, when the pill is a bare placeholder.
+   * Settled without usage: the accessibility label names usage as unavailable.
+   * Stays false while the session is still loading, when the pill is a bare
+   * placeholder. Never changes the visible pill: a session that settles without
+   * usage keeps the placeholder it showed while loading, so the header pill is
+   * the same in both states.
    */
   usageUnavailable: boolean;
 };
 
 /**
- * Label the pill shows for unknown usage once the session stopped loading: the
- * slot keeps a visible value (or this mark) instead of degrading to a bare
- * unlabeled ring that reads as a rendering bug.
+ * Mark the pill shows while the model's context window is unresolved: the slot
+ * keeps a visible value instead of a ring that reads as zero percent. It never
+ * stands in for usage that has not arrived — a session without usage keeps the
+ * same label-free placeholder whether it is still resolving or has settled.
  */
-const UNKNOWN_USAGE_LABEL = '—';
+const UNKNOWN_WINDOW_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -121,11 +114,14 @@ export function getHeaderPillContent({
 }): HeaderPillContent {
   if (info) {
     const tone = getContextTone(info.percentage);
+    // The pill reports context usage as a percentage only. While the model's
+    // context window is unresolved there is no honest denominator, so the slot
+    // keeps the dash instead of a token count; the sheet still shows the tokens.
     const primary =
-      info.percentage !== undefined
-        ? formatPercent(info.percentage, i18n.language)
-        : formatCompactTokens(info.contextTokens);
-    const secondary = formatSessionTotalCost(totalCostMicrodollars);
+      info.percentage === undefined
+        ? UNKNOWN_WINDOW_LABEL
+        : formatPercent(info.percentage, i18n.language);
+    const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
       secondary,
@@ -137,13 +133,15 @@ export function getHeaderPillContent({
     };
   }
 
-  const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
-  // Usage unknown. While the session is unresolved the pill keeps its loading
-  // placeholder (no label). Once loading has stopped, the pill shows the value
-  // this screen already had — the cost — or the dash that marks the slot as
-  // intentionally without usage, in both themes.
+  const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
+  // Usage unknown. The pill keeps the placeholder it shows while the session
+  // resolves — the track-only ring and, when this screen already knows it, the
+  // session's cost — and never a dash standing in for a value that has not
+  // arrived; only the dash above, for usage without a context window, is a real
+  // value. A settled session therefore looks the same as a loading one instead
+  // of changing shape late.
   return {
-    primary: costText ?? (loading ? null : UNKNOWN_USAGE_LABEL),
+    primary: costText,
     secondary: null,
     hasCost: costText !== null,
     tone: 'neutral',

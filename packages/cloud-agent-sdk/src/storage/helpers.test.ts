@@ -2,7 +2,8 @@ import type { Part } from '@kilocode/app-shared/opencode';
 import type { MessageInfo } from '../types';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
+  applyTextDeltas,
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
@@ -12,6 +13,7 @@ import {
   isSupportedDeltaField,
   notify,
   orderMessageIds,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -551,23 +553,81 @@ describe('createReadonlyPartView', () => {
   });
 });
 
-describe('applyTextDelta', () => {
-  test('appends delta to existing text', () => {
+describe('applyTextDeltas', () => {
+  test('appends one chunk to existing text', () => {
     const part = makePart('p1', 'hello');
-    const result = applyTextDelta(part, ' world');
+    const result = applyTextDeltas(part, [' world']);
     expect((result as Part & { text: string }).text).toBe('hello world');
   });
 
-  test('returns new object on success', () => {
+  test('joins a batch with a single new part', () => {
     const part = makePart('p1', 'hello');
-    const result = applyTextDelta(part, ' world');
+    const result = applyTextDeltas(part, [' ', 'big', ' world']);
+    expect((result as Part & { text: string }).text).toBe('hello big world');
     expect(result).not.toBe(part);
+  });
+
+  test('returns the same part when the appended text is empty', () => {
+    const part = makePart('p1', 'hello');
+    expect(applyTextDeltas(part, [])).toBe(part);
+    expect(applyTextDeltas(part, [''])).toBe(part);
+    expect(applyTextDeltas(part, ['', ''])).toBe(part);
   });
 
   test('returns same reference for non-text part', () => {
     const part = { id: 'p1', sessionID: 's', messageID: 'm', type: 'tool' } as Part;
-    const result = applyTextDelta(part, 'delta');
-    expect(result).toBe(part);
+    expect(applyTextDeltas(part, ['delta'])).toBe(part);
+  });
+});
+
+describe('appendPartTextChunks', () => {
+  test('seeds the message with a text part when nothing is stored', () => {
+    const result = appendPartTextChunks(undefined, 'msg-1', 'part-1', ['hel', 'lo']);
+    expect(result).toEqual([createSeedTextPart('msg-1', 'part-1', 'hello')]);
+  });
+
+  test('inserts a new part in id order next to the stored ones', () => {
+    const stored = [makePart('a', 'first'), makePart('c', 'third')];
+    const result = appendPartTextChunks(stored, 'm', 'b', ['second']);
+    expect(result.map(p => p.id)).toEqual(['a', 'b', 'c']);
+    expect((result[1] as Part & { text: string }).text).toBe('second');
+    expect(stored.map(p => p.id)).toEqual(['a', 'c']);
+  });
+
+  test('appends to an existing part without mutating the stored array', () => {
+    const existing = makePart('a', 'hel');
+    const stored = [existing];
+    const result = appendPartTextChunks(stored, 'm', 'a', ['lo']);
+    expect(result).not.toBe(stored);
+    expect((result[0] as Part & { text: string }).text).toBe('hello');
+    expect((existing as Part & { text: string }).text).toBe('hel');
+  });
+
+  test('returns the same array when the chunks change nothing', () => {
+    const stored = [
+      makePart('a', 'text'),
+      { id: 'b', sessionID: 's', messageID: 'm', type: 'tool' } as Part,
+    ];
+    expect(appendPartTextChunks(stored, 'm', 'a', [''])).toBe(stored);
+    expect(appendPartTextChunks(stored, 'm', 'b', ['ignored'])).toBe(stored);
+  });
+});
+
+describe('publishPartsChanged', () => {
+  test('invalidates the message snapshot and notifies only its channel', () => {
+    const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
+    const partsCallback = jest.fn();
+    const messageCallback = jest.fn();
+    const subscribers = new Map<string, Set<() => void>>([
+      ['parts:msg-1', new Set([partsCallback])],
+      ['message:msg-1', new Set([messageCallback])],
+    ]);
+
+    publishPartsChanged(snapshot, subscribers, 'msg-1');
+
+    expect(snapshot.get('msg-1')).toBeNull();
+    expect(partsCallback).toHaveBeenCalledTimes(1);
+    expect(messageCallback).not.toHaveBeenCalled();
   });
 });
 

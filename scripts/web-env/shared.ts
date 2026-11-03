@@ -9,8 +9,7 @@ export const PROJECTS = ['kilocode-app', 'kilocode-ai-gateway'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
 const ONE_PASSWORD_ACCOUNT_URL = 'kilocode.1password.com';
-const VERCEL_PACKAGE = 'vercel@53.3.1';
-const VERCEL_COMMAND = `pnpm dlx ${VERCEL_PACKAGE}`;
+const VERCEL_COMMAND = 'pnpm exec vercel';
 const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
 
 export type Project = (typeof PROJECTS)[number];
@@ -71,11 +70,11 @@ function missingCommandMessage(command: string, args: string[]): string | undefi
     ].join('\n');
   }
 
-  if (command === 'pnpm' && args[0] === 'dlx' && args[1]?.startsWith('vercel@')) {
+  if (command === 'pnpm' && args[0] === 'exec' && args[1] === 'vercel') {
     return [
       'Vercel access checks require pnpm, but `pnpm` is not installed or is not on PATH.',
       'Install pnpm with Corepack (`corepack enable`) or enter the repo dev shell.',
-      'Then verify access with `pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json`.',
+      'Run `pnpm install --frozen-lockfile` in the checkout, then verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.',
     ].join('\n');
   }
 
@@ -86,6 +85,17 @@ function missingCommandMessage(command: string, args: string[]): string | undefi
 // full install/verify guidance, so callers rethrow it as-is instead of wrapping
 // it in a provider-access error (which would repeat the same instructions).
 class MissingCommandError extends Error {}
+
+// `pnpm exec` exits non-zero, rather than failing with ENOENT, when the command
+// exists but the workspace install does not provide the binary.
+const PNPM_MISSING_WORKSPACE_VERCEL = /Command "vercel" not found/;
+
+function missingWorkspaceVercelMessage(): string {
+  return [
+    'The workspace does not provide the Vercel CLI.',
+    `Run \`pnpm install --frozen-lockfile\` in the checkout, then verify access with \`${VERCEL_COMMAND} whoami --scope kilocode --format=json\`.`,
+  ].join('\n');
+}
 
 export function run(
   command: string,
@@ -108,6 +118,15 @@ export function run(
   if (errorCode(result.error) === 'ENOENT') {
     const message = missingCommandMessage(command, args);
     if (message) throw new MissingCommandError(message);
+  }
+  if (
+    result.status !== 0 &&
+    command === 'pnpm' &&
+    args[0] === 'exec' &&
+    args[1] === 'vercel' &&
+    PNPM_MISSING_WORKSPACE_VERCEL.test(`${result.stderr}${result.stdout}`)
+  ) {
+    throw new MissingCommandError(missingWorkspaceVercelMessage());
   }
   if (result.status !== 0) {
     const operation = `${command} ${args.slice(0, 3).join(' ')}`;
@@ -132,8 +151,8 @@ function vercel(
   return run(
     'pnpm',
     [
-      'dlx',
-      VERCEL_PACKAGE,
+      'exec',
+      'vercel',
       ...args,
       '--scope',
       'kilocode',
@@ -142,7 +161,7 @@ function vercel(
       ...(context ? ['--cwd', context.cwd] : []),
     ],
     {
-      cwd: context?.cwd,
+      cwd: findRepoRoot(),
       env: context
         ? {
             ...process.env,
@@ -159,8 +178,8 @@ function vercel(
 function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const commandArgs = [
-      'dlx',
-      VERCEL_PACKAGE,
+      'exec',
+      'vercel',
       ...args,
       '--scope',
       'kilocode',
@@ -170,7 +189,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
       context.cwd,
     ];
     const child = spawn('pnpm', commandArgs, {
-      cwd: context.cwd,
+      cwd: findRepoRoot(),
       env: {
         ...process.env,
         VERCEL_ORG_ID: context.orgId,
@@ -179,6 +198,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
     let outputBytes = 0;
     let settled = false;
 
@@ -199,6 +219,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
         return;
       }
       if (keep) stdout.push(chunk);
+      else stderr.push(chunk);
     };
 
     child.stdout.on('data', chunk => capture(Buffer.from(chunk), true));
@@ -220,6 +241,10 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
         resolve(Buffer.concat(stdout).toString('utf8'));
         return;
       }
+      if (PNPM_MISSING_WORKSPACE_VERCEL.test(Buffer.concat(stderr).toString('utf8'))) {
+        fail(new MissingCommandError(missingWorkspaceVercelMessage()));
+        return;
+      }
       fail(
         new Error(`pnpm ${commandArgs.slice(0, 3).join(' ')} failed; provider output was redacted.`)
       );
@@ -232,6 +257,7 @@ function vercelAccessError(error: unknown): Error {
   return new Error(
     [
       'Could not verify Vercel access for the kilocode team.',
+      'Install workspace tools with `pnpm install --frozen-lockfile` in the checkout.',
       `Run \`${VERCEL_COMMAND} login\` with an account that has access to the kilocode team.`,
       `Verify access with \`${VERCEL_COMMAND} whoami --scope kilocode --format=json\`.`,
       details ? `Vercel reported:\n${details}` : undefined,

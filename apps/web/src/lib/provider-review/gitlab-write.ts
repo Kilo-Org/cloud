@@ -21,7 +21,7 @@ import {
   createMRNote,
   fetchGitLabMergeRequest,
   type GitLabDiscussion,
-  type GitLabMergeRequest,
+  type GitLabMergeRequestDetail,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   authorizeProject,
@@ -30,7 +30,8 @@ import {
   type GitLabProjectAccess,
   type GitLabReviewOwner,
 } from './gitlab-authorization';
-import { requestGitLabJson } from './gitlab-read';
+import { getGitLabDiscussionState } from './gitlab-discussion';
+import { requestGitLabJson } from './gitlab-http';
 
 /** The MR a write acts on. `instanceHint` is display/matching only. */
 export type GitLabMrTarget = {
@@ -88,12 +89,6 @@ export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   reviewStatus: { supported: true, reason: '' },
 };
 
-type GitLabMergeRequestDetail = GitLabMergeRequest & {
-  merge_when_pipeline_succeeds?: boolean;
-  force_remove_source_branch?: boolean;
-  head_pipeline?: { status?: string } | null;
-};
-
 /**
  * Pipeline states that can still succeed. Any other state (no pipeline, a
  * terminal state, a manual one) means GitLab's merge endpoint would merge
@@ -136,12 +131,12 @@ async function fetchMrDiffRefs(
   access: GitLabProjectAccess,
   mrIid: number
 ): Promise<GitLabDiffRefs> {
-  const mr = (await fetchGitLabMergeRequest({
+  const mr = await fetchGitLabMergeRequest({
     accessToken: access.accessToken,
     projectId: access.projectPath,
     mrIid,
     instanceUrl: access.instanceUrl,
-  })) as GitLabMergeRequestDetail;
+  });
   const refs = mr.diff_refs;
   if (!refs?.base_sha || !refs.head_sha || !refs.start_sha) {
     throw new GitLabReviewError(
@@ -363,11 +358,7 @@ async function fetchDiscussionResolvedState(
     access,
     `${mrPath(access, mrIid)}/discussions/${encodeURIComponent(discussionId)}`
   );
-  const resolvableNote = discussion?.notes?.find(note => note.resolvable);
-  return {
-    resolvable: Boolean(resolvableNote),
-    resolved: resolvableNote?.resolved === true,
-  };
+  return getGitLabDiscussionState(discussion?.notes);
 }
 
 async function setThreadResolved(
@@ -440,12 +431,12 @@ export async function mergePullRequest(
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
-    const mr = (await fetchGitLabMergeRequest({
+    const mr = await fetchGitLabMergeRequest({
       accessToken: access.accessToken,
       projectId: access.projectPath,
       mrIid: target.mrIid,
       instanceUrl: access.instanceUrl,
-    })) as GitLabMergeRequestDetail;
+    });
     if (mr.state === 'merged') {
       // The target state already holds: report the replay, run no effect.
       return { done: true, replayed: true };
@@ -492,12 +483,12 @@ export async function enableAutoMerge(
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
-    const mr = (await fetchGitLabMergeRequest({
+    const mr = await fetchGitLabMergeRequest({
       accessToken: access.accessToken,
       projectId: access.projectPath,
       mrIid: target.mrIid,
       instanceUrl: access.instanceUrl,
-    })) as GitLabMergeRequestDetail;
+    });
     // The head fence guards the replay too: an auto-merge armed on another
     // revision must be reported as stale, never as "already holds".
     requireHeadShaFence(mr, target.expectedHeadSha);
@@ -530,12 +521,12 @@ export async function disableAutoMerge(
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
-    const mr = (await fetchGitLabMergeRequest({
+    const mr = await fetchGitLabMergeRequest({
       accessToken: access.accessToken,
       projectId: access.projectPath,
       mrIid: target.mrIid,
       instanceUrl: access.instanceUrl,
-    })) as GitLabMergeRequestDetail;
+    });
     if (target.expectedHeadSha) {
       requireHeadShaFence(mr, target.expectedHeadSha);
     }

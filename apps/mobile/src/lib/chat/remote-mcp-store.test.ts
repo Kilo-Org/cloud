@@ -105,6 +105,37 @@ describe('parseRemoteMcpServers', () => {
     ]);
   });
 
+  it('keeps one server when two persisted rows name one root endpoint', () => {
+    expect(
+      parseRemoteMcpServers(
+        JSON.stringify([
+          {
+            id: 'alpha',
+            name: 'Alpha',
+            url: 'https://alpha.example/',
+            auth: { type: 'bearer', token: 'secret' },
+            enabled: true,
+          },
+          {
+            id: 'beta',
+            name: 'Beta',
+            url: 'https://alpha.example',
+            auth: { type: 'none' },
+            enabled: true,
+          },
+        ])
+      )
+    ).toEqual([
+      {
+        id: 'alpha',
+        name: 'Alpha',
+        url: 'https://alpha.example',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+    ]);
+  });
+
   it('keeps valid servers and credentials when another persisted entry is malformed', () => {
     const valid = {
       id: 'alpha',

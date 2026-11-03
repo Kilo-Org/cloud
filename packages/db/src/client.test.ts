@@ -12,19 +12,16 @@ jest.mock('pg', () => {
     return this;
   });
 
+  const types = {
+    builtins: { INT8: 20 },
+    setTypeParser: jest.fn(),
+    getTypeParser: jest.fn(),
+  };
+
   return {
     __esModule: true,
-    default: {
-      Pool,
-      types: {
-        builtins: { INT8: 20 },
-        setTypeParser: jest.fn(),
-      },
-    },
-    types: {
-      builtins: { INT8: 20 },
-      setTypeParser: jest.fn(),
-    },
+    default: { Pool, types },
+    types,
   };
 });
 
@@ -33,19 +30,85 @@ jest.mock('drizzle-orm/node-postgres', () => ({
 }));
 
 import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-import { getWorkerDb } from './client';
+import pg, { types } from 'pg';
+import { createDrizzleClient, databaseTypeParsers, getWorkerDb } from './client';
+
+const workerConnectionString = 'postgres://worker.example/db';
 
 describe('getWorkerDb', () => {
   it('creates separate Worker DB transports for identical inputs', () => {
-    const connectionString = 'postgres://worker.example/db';
-    const firstDb = getWorkerDb(connectionString);
-    const secondDb = getWorkerDb(connectionString);
+    const firstDb = getWorkerDb(workerConnectionString);
+    const secondDb = getWorkerDb(workerConnectionString);
     const drizzleMock = jest.mocked(drizzle);
 
-    expect(pg.Pool).toHaveBeenNthCalledWith(1, { connectionString, max: 1 });
-    expect(pg.Pool).toHaveBeenNthCalledWith(2, { connectionString, max: 1 });
+    expect(pg.Pool).toHaveBeenNthCalledWith(1, {
+      connectionString: workerConnectionString,
+      max: 1,
+      types: databaseTypeParsers,
+    });
+    expect(pg.Pool).toHaveBeenNthCalledWith(2, {
+      connectionString: workerConnectionString,
+      max: 1,
+      types: databaseTypeParsers,
+    });
     expect(drizzleMock.mock.calls[0]?.[0]).not.toBe(drizzleMock.mock.calls[1]?.[0]);
     expect(firstDb).not.toBe(secondDb);
+  });
+
+  it('lets a caller replace the int8 parsers for its own pool', () => {
+    const customTypes = { getTypeParser: jest.fn() };
+
+    getWorkerDb(workerConnectionString, { types: customTypes });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith({
+      connectionString: workerConnectionString,
+      max: 1,
+      types: customTypes,
+    });
+  });
+});
+
+describe('createDrizzleClient', () => {
+  it('scopes the int8 parsers to the pool it creates', () => {
+    createDrizzleClient({ connectionString: 'postgres://primary.example/db' });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith(
+      expect.objectContaining({ types: databaseTypeParsers })
+    );
+  });
+
+  it('lets a caller replace the int8 parsers for its own pool', () => {
+    const customTypes = { getTypeParser: jest.fn() };
+
+    createDrizzleClient({
+      connectionString: 'postgres://primary.example/db',
+      poolConfig: { types: customTypes },
+    });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith(expect.objectContaining({ types: customTypes }));
+  });
+});
+
+describe('databaseTypeParsers', () => {
+  it('reads int8 as BigInt', () => {
+    const parse = databaseTypeParsers.getTypeParser(types.builtins.INT8, 'text');
+
+    expect(parse('9223372036854775807')).toBe(BigInt('9223372036854775807'));
+  });
+
+  it('leaves every other type to the client', () => {
+    const delegated = (value: string) => value;
+    jest.mocked(types.getTypeParser).mockReturnValue(delegated);
+
+    expect(databaseTypeParsers.getTypeParser(23, 'text')).toBe(delegated);
+    expect(types.getTypeParser).toHaveBeenLastCalledWith(23, 'text');
+  });
+
+  it('leaves the binary int8 format to the client', () => {
+    const delegated = (value: string) => value;
+    jest.mocked(types.getTypeParser).mockReturnValue(delegated);
+
+    expect(databaseTypeParsers.getTypeParser(types.builtins.INT8, 'binary')).toBe(delegated);
+    expect(types.getTypeParser).toHaveBeenLastCalledWith(types.builtins.INT8, 'binary');
   });
 });

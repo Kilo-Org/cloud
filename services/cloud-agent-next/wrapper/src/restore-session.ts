@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
+import { selectedRuntimeCli } from '../../src/shared/runtime-distribution.js';
+import { routeRestoreDiffs, type RestoreRoots } from './restore-roots.js';
 import {
   createSafeProcessDiagnostic,
   isTimeoutTermination,
@@ -52,6 +54,8 @@ type SnapshotDiff = {
 
 export type RestoreSessionOptions = {
   restoreFiles?: boolean;
+  /** The git roots of a multi-repository route; without it every diff applies at the workspace path. */
+  roots?: RestoreRoots;
   env?: NodeJS.ProcessEnv;
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
@@ -1198,14 +1202,35 @@ export async function restoreSession(
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
-    const importResult = await runProcess('kilo', ['import', tmpPath], {
+    const completedImport = new AbortController();
+    let completionTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingOutput = '';
+    const importResult = await runProcess(selectedRuntimeCli(process.env), ['import', tmpPath], {
       cwd: workspacePath,
       env,
       inheritEnv: false,
       timeoutMs: importTimeoutMs,
-      signal: options.signal,
+      signal: options.signal
+        ? AbortSignal.any([options.signal, completedImport.signal])
+        : completedImport.signal,
       terminationGraceMs: options.importTerminationGraceMs,
+      onOutput: (stream, output) => {
+        if (stream !== 'stdout' || completionTimer !== undefined) return;
+        pendingOutput += output;
+        const lines = pendingOutput.split('\n');
+        pendingOutput = (lines.pop() ?? '').slice(-512);
+        if (!lines.some(line => line.replace(/\r$/, '') === `Imported session: ${kiloSessionId}`))
+          return;
+        // Kilo prints this after committing import; its instance disposal can leave the CLI alive.
+        completionTimer = setTimeout(() => completedImport.abort(), 1_000);
+      },
+    }).finally(() => {
+      if (completionTimer !== undefined) clearTimeout(completionTimer);
     });
+    const importedBeforeCleanup =
+      completedImport.signal.aborted &&
+      !options.signal?.aborted &&
+      importResult.terminationReason === 'abort';
     const importElapsedMs = Date.now() - importStartedAt;
 
     if (isTimeoutTermination(importResult)) {
@@ -1221,7 +1246,7 @@ export async function restoreSession(
       );
     }
 
-    if (importResult.exitCode !== 0) {
+    if (importResult.exitCode !== 0 && !importedBeforeCleanup) {
       log(
         `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
@@ -1234,7 +1259,7 @@ export async function restoreSession(
       );
     }
     log(
-      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      `kilo import finished outcome=${importedBeforeCleanup ? 'imported_cleanup' : 'ok'} exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
     if (options.restoreFiles === false) {
@@ -1262,7 +1287,6 @@ export async function restoreSession(
 
     log(`found ${total} unique file diffs`);
 
-    const resolvedWorkspace = path.resolve(workspacePath);
     let applied = 0;
     let skipped = 0;
     const skippedDiffs: RestoreDiffSkip[] = [];
@@ -1278,11 +1302,22 @@ export async function restoreSession(
       }
     };
 
-    for (const diff of uniqueDiffs) {
+    const routing = routeRestoreDiffs(uniqueDiffs, workspacePath, options.roots);
+    for (const diff of routing.outside) {
+      log(`skipping diff outside every root file=${diff.file}`);
+      recordSkip(diff.file, 'outside_workspace');
+      skipped++;
+    }
+    if (routing.recoveredCount > 0) {
+      log(`left ${routing.recoveredCount} diffs to the saved worktree recovery of their root`);
+    }
+
+    for (const { diff, workspace } of routing.routed) {
       options.signal?.throwIfAborted();
+      const resolvedWorkspace = path.resolve(workspace);
       if (diff.patch) {
         try {
-          const outcome = await applyPatch(workspacePath, diff, options.signal, env);
+          const outcome = await applyPatch(workspace, diff, options.signal, env);
           if (outcome.applied) {
             applied++;
           } else {
@@ -1336,7 +1371,8 @@ export async function restoreSession(
       }
     }
 
-    log(`diffs applied=${applied} skipped=${skipped} total=${total}`);
+    const restoredTotal = total - routing.recoveredCount;
+    log(`diffs applied=${applied} skipped=${skipped} total=${restoredTotal}`);
     if (skipped > 0) {
       // A skipped diff does not fail the restore: the worktree keeps whatever
       // applied, and the named reasons above are the report. Do NOT retry the
@@ -1366,7 +1402,7 @@ export async function restoreSession(
       skipped: number;
       total: number;
       skippedDiffs?: RestoreDiffSkip[];
-    } = { applied, skipped, total };
+    } = { applied, skipped, total: restoredTotal };
     if (skipped > 0) {
       diffs.skippedDiffs = skippedDiffs;
     }

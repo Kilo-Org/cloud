@@ -1,5 +1,5 @@
 import { type ModelEvent } from '@kilocode/harness-sdk';
-import { Either, Stream } from 'effect';
+import { Result, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { backendFailureKey } from './backend-target';
@@ -16,18 +16,18 @@ vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 
 async function events(bridge: NativeModelBridge): Promise<ModelEvent[]> {
   const result = await collect(bridge);
-  if (Either.isLeft(result)) {
+  if (Result.isFailure(result)) {
     throw new Error('Expected the answer to finish');
   }
-  return [...result.right];
+  return [...result.success];
 }
 
 async function failureKey(bridge: NativeModelBridge): Promise<string> {
   const result = await collect(bridge);
-  if (Either.isRight(result)) {
+  if (Result.isSuccess(result)) {
     throw new Error('Expected the answer to fail');
   }
-  return backendFailureKey(result.left);
+  return backendFailureKey(result.failure);
 }
 
 describe('native on-device model client', () => {
@@ -144,8 +144,8 @@ describe('native on-device model client', () => {
       emit({ id: native.id, kind: 'error', reason: 'guardrail_violation' });
     });
     const result = await collect(bridge);
-    expect(Either.isLeft(result) && result.left.reason).toBe('stream');
-    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    expect(Result.isFailure(result) && result.failure.reason).toBe('stream');
+    expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
       'modelChat.localModels.failed'
     );
   });
@@ -201,8 +201,8 @@ describe('native on-device model client', () => {
         throw failsTokenGeneration;
       });
       const result = await collect(bridge);
-      expect(Either.isLeft(result) && result.left.reason).toBe('stream');
-      expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+      expect(Result.isFailure(result) && result.failure.reason).toBe('stream');
+      expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
         'modelChat.localModels.failed'
       );
       expect(bridge.generate).toHaveBeenCalledOnce();
@@ -231,7 +231,9 @@ describe('native on-device model client', () => {
     // A late terminal event from the cancelled request reaches nothing.
     emit({ id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
     running.resolve(undefined);
-    expect(Either.isRight(taken) && [...taken.right]).toEqual([{ kind: 'delta', text: 'First' }]);
+    expect(Result.isSuccess(taken) && [...taken.success]).toEqual([
+      { kind: 'delta', text: 'First' },
+    ]);
   });
 
   it('prefers native usage, then the provider token count, then an estimate', async () => {
@@ -279,8 +281,8 @@ describe('native on-device model client', () => {
       // No done and no error: the promise resolves anyway.
     });
     const result = await collect(bridge);
-    expect(Either.isLeft(result) && result.left.reason).toBe('stream');
-    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    expect(Result.isFailure(result) && result.failure.reason).toBe('stream');
+    expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
       'modelChat.localModels.failed'
     );
   });

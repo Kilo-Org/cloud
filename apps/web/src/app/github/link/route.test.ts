@@ -5,7 +5,7 @@ import { createGitHubBotLinkState, verifyGitHubBotLinkState } from '@/lib/bot/gi
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
-import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -13,7 +13,7 @@ jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot/github-link-token');
 jest.mock('@/lib/integrations/platforms/github/app-selector');
 jest.mock('@/lib/bot/platform-helpers');
-jest.mock('@kilocode/web-shared/lib/organizations/organizations');
+jest.mock('@kilocode/worker-utils/account-access');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCreateGitHubBotLinkState = jest.mocked(createGitHubBotLinkState);

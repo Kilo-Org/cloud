@@ -58,8 +58,16 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.
 // typeof` syntax crashes Node's parser in the pure (node) test environment.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// `exchange-legacy-token` builds the app `User-Agent` through
+// `client-metadata` -> `expo-application`; that module's expo root needs
+// `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
@@ -90,7 +98,18 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'integrity-token',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
+
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   AppState: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
@@ -106,6 +125,7 @@ import {
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
 import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import * as SecureStore from 'expo-secure-store';
 /* eslint-enable import/first */
 
@@ -582,6 +602,20 @@ describe('exchangeLegacyToken', () => {
     const result = await exchangeLegacyToken();
     expect(result).toBeNull();
     // Must not set the done marker — retry on next launch.
+    expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+  });
+
+  it('drops the stored attest key when the exchange is refused admission', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 })
+    );
+
+    const result = await exchangeLegacyToken();
+    expect(result).toBeNull();
+    expect(clearAttestKeyOnRefusal).toHaveBeenCalledWith('ADMISSION_REQUIRED');
+    // Retry on next launch: the old token stays and no done marker is set.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
     expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
   });
 

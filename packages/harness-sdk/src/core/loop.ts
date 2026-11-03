@@ -15,7 +15,7 @@ import {
 import type { ModelError, ModelEvent, ModelRequest } from './model.js';
 import { sinceSummary } from './session.js';
 import type { StoreError } from './storage.js';
-import { definitionsOf } from './tool.js';
+import { definitionsOf, type ToolCall } from './tool.js';
 import { callsIn, resultsTurn, runCalls } from './tools.js';
 import type { Wiring } from './wiring.js';
 
@@ -97,7 +97,11 @@ const requestFor = (round: Round, offer: boolean): Effect.Effect<ModelRequest> =
   });
 
 /** Everything one round hears, kept where it belongs. */
-const heard = (round: Round, event: ModelEvent): Effect.Effect<void, StoreError> => {
+const heard = (
+  round: Round,
+  offered: boolean,
+  event: ModelEvent
+): Effect.Effect<void, StoreError> => {
   switch (event.kind) {
     case 'delta': {
       return said(round.exchange.spoken, event.text);
@@ -112,7 +116,9 @@ const heard = (round: Round, event: ModelEvent): Effect.Effect<void, StoreError>
       return called(round.exchange.spoken, event.call);
     }
     case 'done': {
-      return Effect.asVoid(endRound(round.wiring, round.exchange, event));
+      return Effect.andThen(endRound(round.wiring, round.exchange, event), () =>
+        closedRound(round, offered)
+      );
     }
     /* Made here, from a tool, and never by the model. It is on the stream for
        the caller to show, and there is nothing to collect. */
@@ -126,11 +132,39 @@ const heard = (round: Round, event: ModelEvent): Effect.Effect<void, StoreError>
 const mayContinue = (wiring: Wiring, rounds: number): Effect.Effect<boolean> =>
   Effect.map(isFull(wiring), full => !full && rounds < (wiring.maxRounds ?? defaultMaxRounds));
 
+/** Whether the round that just ended was the last one this exchange gets. */
+const endsRound = (
+  round: Round,
+  offered: boolean
+): Effect.Effect<readonly ToolCall[], StoreError> =>
+  Effect.gen(function* () {
+    const stop = yield* Ref.get(round.exchange.stop);
+    const written = yield* Ref.get(round.exchange.written);
+    const last = written.at(-1);
+    const calls = last === undefined ? [] : callsIn(last);
+    return !offered || stop !== 'tools' || calls.length === 0 ? [] : calls;
+  });
+
+/**
+ * Writes the exchange as soon as the round that ends it has ended.
+ *
+ * The write happens while the `done` event is still being handled, so a caller
+ * that closes the session on the last event cannot lose the exchange between
+ * the event and the end of the stream.
+ */
+const closedRound = (round: Round, offered: boolean): Effect.Effect<void, StoreError> =>
+  Effect.gen(function* () {
+    const next = yield* endsRound(round, offered);
+    if (next.length === 0) {
+      yield* commit(round.wiring, round.exchange);
+    }
+  });
+
 const roundsFrom = (round: Round, offer: boolean): Answer =>
   Stream.unwrap(
-    Effect.map(Effect.zipRight(nextRound(round.exchange), requestFor(round, offer)), request =>
+    Effect.map(Effect.andThen(nextRound(round.exchange), requestFor(round, offer)), request =>
       round.wiring.client.stream(request).pipe(
-        Stream.tap(event => heard(round, event)),
+        Stream.tap(event => heard(round, offer, event)),
         Stream.concat(Stream.unwrap(afterRound(round, offer)))
       )
     )
@@ -158,12 +192,14 @@ const answering = (round: Round, calls: ReturnType<typeof callsIn>): Effect.Effe
  */
 const afterRound = (round: Round, offered: boolean): Effect.Effect<Answer, StoreError> =>
   Effect.gen(function* () {
-    const stop = yield* Ref.get(round.exchange.stop);
-    const written = yield* Ref.get(round.exchange.written);
-    const last = written.at(-1);
-    const calls = last === undefined ? [] : callsIn(last);
-    if (!offered || stop !== 'tools' || calls.length === 0) {
-      yield* commit(round.wiring, round.exchange);
+    const calls = yield* endsRound(round, offered);
+    if (calls.length === 0) {
+      /* The `done` handler writes it, so a stream that ends without one still
+         has this path to fall back on. */
+      const answered = yield* Ref.get(round.exchange.answered);
+      if (!answered) {
+        yield* commit(round.wiring, round.exchange);
+      }
       return Stream.empty;
     }
     return yield* answering(round, calls);

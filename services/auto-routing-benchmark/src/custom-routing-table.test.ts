@@ -220,6 +220,31 @@ describe('buildCustomRoutingTable', () => {
       computeRegistryRoutingTableVersion(a, knobs)
     );
   });
+
+  it('flags only stale entries and versions the table by engine identity', () => {
+    const routeKey = 'implementation/code_generation' as TaxonomyRouteKey;
+    const params = {
+      ...base,
+      router: 'frontier' as const,
+      engineIdentity: 'frontier:v1:a',
+      readyEntries: [
+        { entry: { model: 'fresh', variant: null }, runId: 'r1', stale: false },
+        { entry: { model: 'old', variant: null }, runId: 'r2', stale: true },
+      ],
+      summaries: [
+        summary('fresh', null, routeKey, 0.9, 0.001, 'r1'),
+        summary('old', null, routeKey, 0.9, 0.001, 'r2'),
+      ],
+    };
+    const table = buildCustomRoutingTable(params);
+    expect(
+      Object.fromEntries(table!.routes[routeKey]!.map(c => [c.model, c.stale ?? false]))
+    ).toEqual({ fresh: false, old: true });
+    expect(table!.version).toMatch(/^frontier-registry-/);
+    expect(
+      buildCustomRoutingTable({ ...params, engineIdentity: 'frontier:v2:b' })!.version
+    ).not.toBe(table!.version);
+  });
 });
 
 describe('assembleCustomRoutingTable', () => {

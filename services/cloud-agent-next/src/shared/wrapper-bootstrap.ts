@@ -1,5 +1,6 @@
 import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import type { RuntimeSkillInput } from './runtime-profile.js';
 
 export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
@@ -39,11 +40,7 @@ export type WrapperBootstrapWorkspace = {
   requireSnapshot?: boolean;
 };
 
-export type WrapperBootstrapRuntimeSkill = {
-  name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
-};
+export type WrapperBootstrapRuntimeSkill = RuntimeSkillInput;
 
 export type WrapperBootstrapRuntimeInstruction = {
   name: string;

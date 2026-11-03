@@ -184,7 +184,7 @@ store.preload();
 
 /** The stored servers, in the order they were added. */
 export function listRemoteMcpServers(): StoredRemoteMcpServer[] {
-  return store.get();
+  return store.getRequested();
 }
 
 /**
@@ -193,7 +193,7 @@ export function listRemoteMcpServers(): StoredRemoteMcpServer[] {
  * two rows pointing at one endpoint is a user mistake, not two servers.
  */
 export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcpServer {
-  const current = store.get();
+  const current = store.getRequested();
   const url = normalizeRemoteMcpUrl(draft.url);
   if (current.some(server => server.url === url)) {
     throw new Error('Remote MCP URL is already saved.');
@@ -219,7 +219,7 @@ export function updateRemoteMcpServer(
   id: string,
   patch: RemoteMcpServerPatch
 ): StoredRemoteMcpServer {
-  const current = store.get();
+  const current = store.getRequested();
   const existing = current.find(server => server.id === id);
   if (existing === undefined) {
     throw new Error('Remote MCP server not found.');
@@ -244,7 +244,7 @@ export function updateRemoteMcpServer(
 
 /** Removes one server, and its OAuth tokens with it, and returns it. */
 export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
-  const current = store.get();
+  const current = store.getRequested();
   const removed = current.find(server => server.id === id);
   if (removed === undefined) {
     throw new Error('Remote MCP server not found.');
@@ -256,7 +256,7 @@ export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
 
 /** Flips one server's enabled flag and leaves every other server untouched. */
 export function setRemoteMcpServerEnabled(id: string, enabled: boolean): StoredRemoteMcpServer {
-  const current = store.get();
+  const current = store.getRequested();
   const existing = current.find(server => server.id === id);
   if (existing === undefined) {
     throw new Error('Remote MCP server not found.');

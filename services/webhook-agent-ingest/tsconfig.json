@@ -23,6 +23,7 @@
     "worker-configuration.d.ts",
     "src/**/*.ts",
     "test/integration/setup.ts",
+    "test/unit/**/*.ts",
     "vitest.config.ts",
     "vitest.workers.config.ts",
     "drizzle/**/*"

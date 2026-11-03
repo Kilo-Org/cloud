@@ -1,4 +1,7 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { PAID_CREDIT_EXPIRATION_EFFECTIVE_AT } from '@kilocode/web-shared/lib/config.server';
+import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
   getUserAuthProviders,
@@ -31,6 +34,10 @@ import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
+  listNotificationHistory,
+  NOTIFICATION_HISTORY_MAX_PAGE_SIZE,
+} from '@/lib/notification-history';
+import {
   kilocode_users,
   microdollar_usage,
   credit_transactions,
@@ -58,6 +65,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -141,6 +149,7 @@ async function revokeOwnedDeviceSession(
         isNull(device_sessions.revoked_at)
       )
     );
+  invalidateDeviceSession(sessionId);
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -207,6 +216,19 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /** The grant this deduction closed, present for an expiry row. */
+  purchase: z
+    .object({
+      id: z.string(),
+      date: z.string(),
+      description: z.string(),
+      amount_mUsd: z.number(),
+      /** True for promotional, referral, and Pass grants the user did not buy. */
+      is_free: z.boolean(),
+      /** The recorded purchase channel, null for legacy and internal grants. */
+      credit_source: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -219,6 +241,7 @@ const GetCreditBlocksOutputSchema = z.object({
 
 const CreditPurchaseHistoryInputSchema = z.object({
   cursor: z.number().int().min(0).default(0),
+  organizationId: z.uuid().optional(),
 });
 
 const CreditPurchaseHistoryOutputSchema = z.object({
@@ -228,6 +251,7 @@ const CreditPurchaseHistoryOutputSchema = z.object({
       date: z.iso.datetime(),
       description: z.string(),
       amount_mUsd: z.number().positive(),
+      expiryDate: z.iso.datetime().nullable(),
     })
   ),
   nextCursor: z.number().int().positive().nullable(),
@@ -236,12 +260,14 @@ const CreditPurchaseHistoryOutputSchema = z.object({
 
 const CreditPurchaseTransactionInputSchema = z.object({
   transactionId: z.uuid(),
+  organizationId: z.uuid().optional(),
 });
 
 const CreditPurchaseConfirmationOutputSchema = z.object({
   transactionId: z.uuid(),
   amount_mUsd: z.number().positive(),
   purchasedAt: z.iso.datetime(),
+  expiryDate: z.iso.datetime().nullable(),
 });
 
 const CreditPurchaseReceiptOutputSchema = z.object({
@@ -254,6 +280,14 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  purchase: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    is_free: boolean;
+    credit_source: string | null;
+  } | null;
 };
 
 /**
@@ -340,6 +374,18 @@ function getPersonalTopUpConditions(userId: string) {
   );
 }
 
+function getTopUpConditions(userId: string, organizationId?: string) {
+  return organizationId
+    ? and(
+        eq(credit_transactions.organization_id, organizationId),
+        eq(credit_transactions.is_free, false),
+        gt(credit_transactions.amount_microdollars, 0),
+        isNotNull(credit_transactions.stripe_payment_id),
+        eq(credit_transactions.description, 'Organization top-up via stripe')
+      )
+    : getPersonalTopUpConditions(userId);
+}
+
 /**
  * Enrich KiloClaw deduction descriptions with instance names so users
  * can distinguish charges across multiple instances.
@@ -354,6 +400,7 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    purchase: RawDeduction['purchase'];
   }[]
 > {
   // Collect unique instance IDs from pure-credit deduction categories.
@@ -444,6 +491,7 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      purchase: d.purchase,
     };
   });
 }
@@ -545,6 +593,9 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 }
 
 export const userRouter = createTRPCRouter({
+  getPaidCreditPolicy: baseProcedure.query(() =>
+    getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
+  ),
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
     return successResult({
@@ -773,15 +824,23 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseHistoryInputSchema)
     .output(CreditPurchaseHistoryOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transactions = await db
         .select({
           id: credit_transactions.id,
           date: credit_transactions.created_at,
           description: credit_transactions.description,
           amount_mUsd: credit_transactions.amount_microdollars,
+          expiryDate: credit_transactions.expiry_date,
         })
         .from(credit_transactions)
-        .where(getPersonalTopUpConditions(ctx.user.id))
+        .where(getTopUpConditions(ctx.user.id, input.organizationId))
         .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
         .limit(CREDIT_PURCHASE_HISTORY_PAGE_SIZE + 1)
         .offset(input.cursor);
@@ -795,6 +854,7 @@ export const userRouter = createTRPCRouter({
             ? 'Automatic top-up'
             : 'Credit purchase',
         amount_mUsd: transaction.amount_mUsd,
+        expiryDate: transaction.expiryDate ? new Date(transaction.expiryDate).toISOString() : null,
       }));
 
       return {
@@ -809,15 +869,23 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseConfirmationOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: {
           id: true,
           amount_microdollars: true,
           created_at: true,
+          expiry_date: true,
         },
       });
 
@@ -829,6 +897,9 @@ export const userRouter = createTRPCRouter({
         transactionId: transaction.id,
         amount_mUsd: transaction.amount_microdollars,
         purchasedAt: new Date(transaction.created_at).toISOString(),
+        expiryDate: transaction.expiry_date
+          ? new Date(transaction.expiry_date).toISOString()
+          : null,
       };
     }),
 
@@ -836,9 +907,16 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseReceiptOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: { stripe_payment_id: true },
@@ -970,6 +1048,12 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
@@ -1002,6 +1086,12 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,
@@ -1347,7 +1437,9 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      // A token belongs to the account that registered it. A device that
+      // switches accounts releases the token with unregisterPushToken first.
+      const registered = await db
         .insert(user_push_tokens)
         .values({
           user_id: ctx.user.id,
@@ -1359,13 +1451,22 @@ export const userRouter = createTRPCRouter({
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
           set: {
-            user_id: ctx.user.id,
             platform: input.platform,
             app_version: input.appVersion ?? null,
             locale: input.locale ?? null,
             updated_at: sql`now()`,
           },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
+
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
         });
+      }
+
       return { success: true };
     }),
 
@@ -1632,6 +1733,32 @@ export const userRouter = createTRPCRouter({
       capabilities,
     };
   }),
+
+  // ─── Notification History ──────────────────────────────────────────
+
+  getNotificationHistory: baseProcedure
+    .input(
+      z.object({
+        /**
+         * Settings category to filter by, or omitted for every recorded kind.
+         * Bounded rather than enumerated: the column only ever holds a category
+         * the recorder mapped, and a chip for a category with no rows must
+         * answer an empty page, not a validation error.
+         */
+        category: z.string().min(1).max(64).optional(),
+        /** Opaque cursor from a previous page's `nextCursor`. */
+        cursor: z.string().min(1).max(512).optional(),
+        limit: z.number().int().min(1).max(NOTIFICATION_HISTORY_MAX_PAGE_SIZE).optional(),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listNotificationHistory({
+        userId: ctx.user.id,
+        category: input.category,
+        cursor: input.cursor,
+        limit: input.limit,
+      })
+    ),
 
   setNotificationPreferences: baseProcedure
     .input(

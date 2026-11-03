@@ -21,8 +21,10 @@ const incompleteReasons: Readonly<Record<string, StopReason>> = {
 
 const asIncomplete = stopFrom(incompleteReasons);
 
-const asStop = (status: string | null | undefined, reason: string | null | undefined): StopReason =>
-  status === 'completed' ? 'end' : (asIncomplete(reason) ?? 'unknown');
+const asStop = (
+  status: string | null | undefined,
+  reason: string | null | undefined
+): StopReason => (status === 'completed' ? 'end' : (asIncomplete(reason) ?? 'unknown'));
 
 /** This shape names its frames, so the two events are matched on `type`. */
 interface DeltaEvent {

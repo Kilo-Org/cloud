@@ -51,7 +51,7 @@ async function request(
   secret: string | { get(): Promise<string | null> } | null = TEST_SECRET
 ) {
   return Promise.all(
-    ['/api/whoami', '/trpc/whoami'].map(path =>
+    ['/api/whoami', '/trpc/whoami'].map(async path =>
       app.request(
         path,
         token === undefined ? {} : { headers: { Authorization: `Bearer ${token}` } },
@@ -71,7 +71,7 @@ describe('kiloAuthMiddleware', () => {
       authorization === undefined
         ? await request(app, undefined)
         : await Promise.all(
-            ['/api/whoami', '/trpc/whoami'].map(path =>
+            ['/api/whoami', '/trpc/whoami'].map(async path =>
               app.request(path, { headers: { Authorization: authorization } }, {
                 NEXTAUTH_SECRET: TEST_SECRET,
               } as never)

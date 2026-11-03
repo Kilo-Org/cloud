@@ -124,7 +124,6 @@ export function ModelStatsTable() {
   ) => {
     if (!editingField) return;
 
-    // Guard against concurrent updates
     if (updatingModelId) return;
 
     setUpdatingModelId(modelId);

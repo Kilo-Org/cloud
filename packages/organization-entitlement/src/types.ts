@@ -25,6 +25,8 @@ export type OrganizationEntitlementClassification = {
   trialStatus: OrganizationTrialStage;
 };
 
+// The seat-purchase column stores the subscription status the provider reports,
+// which is an open set, plus the local 'pending_cancel' and 'ended' markers.
 export type OrganizationSeatPurchaseSubscriptionStatus =
   | 'active'
   | 'pending_cancel'
@@ -35,7 +37,8 @@ export type OrganizationSeatPurchaseSubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 
 export type OrganizationEntitlementSettings = {
   suppress_trial_messaging?: boolean;

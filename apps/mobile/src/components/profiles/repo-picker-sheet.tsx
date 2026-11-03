@@ -16,7 +16,10 @@ import { Check, GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
   repositories: readonly RepoOption[];
@@ -33,7 +36,7 @@ function RepoPickerSkeleton() {
   return (
     <View className="gap-1 px-4">
       {[0, 1, 2, 3].map(index => (
-        <Skeleton key={index} className="h-11 w-full rounded-md bg-muted-soft" />
+        <Skeleton key={index} className={cn(ROW_TARGET_CLASS, 'w-full rounded-md bg-muted-soft')} />
       ))}
     </View>
   );
@@ -41,8 +44,9 @@ function RepoPickerSkeleton() {
 
 /**
  * One repo option: a private/public lock, the full name, the provider badge and
- * a check on the selected row. The `accessibilityLabel` is the full name, so a
- * screen reader matches the row by the repository it picks.
+ * a check on the selected row. The accessible name is the full name — plus the
+ * localized privacy qualifier for a private row, because the lock is decorative
+ * and a screen reader would otherwise read both kinds of row the same way.
  */
 function RepoOptionRow({
   repo,
@@ -53,19 +57,25 @@ function RepoOptionRow({
   const colors = useThemeColors();
   return (
     <Pressable
-      className="min-h-11 flex-row items-center gap-2 px-4 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
       accessibilityRole="button"
-      accessibilityLabel={repo.fullName}
+      accessibilityLabel={
+        repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
+      }
       accessibilityState={{ selected: isSelected }}
       onPress={onSelect}
     >
-      {repo.private ? (
-        <View accessibilityLabel={t('profiles.repoBindings.private')}>
+      <View
+        className="shrink-0"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {repo.private ? (
           <Lock size={14} color={colors.mutedForeground} />
-        </View>
-      ) : (
-        <Unlock size={14} color={colors.mutedForeground} />
-      )}
+        ) : (
+          <Unlock size={14} color={colors.mutedForeground} />
+        )}
+      </View>
       <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
         {repo.fullName}
       </Text>
@@ -126,9 +136,7 @@ export function RepoPickerSheet({
       <EmptyState
         icon={isSearching ? SearchX : GitBranch}
         title={
-          isSearching
-            ? t('codeReviewer.repos.noRepositoriesFound')
-            : t('agentChat.repoPicker.noRepositories')
+          isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')
         }
         description={
           isSearching
@@ -144,6 +152,7 @@ export function RepoPickerSheet({
         repo={repo}
         isSelected={repositoryOptionKey(repo) === selectedKey}
         onSelect={() => {
+          dismissSearchPickerKeyboard();
           onSelect(repo);
         }}
       />
@@ -177,7 +186,7 @@ export function RepoPickerSheet({
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-4"
-        keyboardShouldPersistTaps="handled"
+        {...SEARCHABLE_PICKER_LIST_PROPS}
         showsVerticalScrollIndicator={false}
       >
         {body}

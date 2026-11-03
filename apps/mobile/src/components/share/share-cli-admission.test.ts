@@ -51,6 +51,7 @@ describe('resolveShareHasFiles', () => {
       kind: 'all-rejected',
       reason: 'denied',
       message: 'None of the shared files can be attached.',
+      failedCopies: [],
     };
     expect(resolveShareHasFiles(validation, 2)).toBe(false);
   });

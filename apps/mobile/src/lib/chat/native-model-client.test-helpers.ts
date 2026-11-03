@@ -123,7 +123,7 @@ export async function collect(
   bridge: NativeModelBridge,
   stream = nativeModelClient(bridge).stream(request)
 ) {
-  const result = await Effect.runPromise(Effect.either(Stream.runCollect(stream)));
+  const result = await Effect.runPromise(Effect.result(Stream.runCollect(stream)));
   return result;
 }
 

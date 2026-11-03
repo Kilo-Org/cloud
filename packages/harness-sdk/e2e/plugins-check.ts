@@ -32,7 +32,7 @@ export const layerMemory = Layer.sync(SessionStore, () => {
   const turns = new Map<string, readonly Turn[]>();
   return {
     create: session => Effect.sync(() => void sessions.set(session.id, session)),
-    read: id => Effect.sync(() => Option.fromNullable(sessions.get(id))),
+    read: id => Effect.sync(() => Option.fromNullishOr(sessions.get(id))),
     append: ({ sessionId, turns: added, prompted }) =>
       Effect.sync(() => {
         turns.set(sessionId, [...(turns.get(sessionId) ?? []), ...added]);
@@ -99,7 +99,7 @@ export const layerRefreshing = Layer.succeed(TokenSource, refreshing);
 /* A policy that gives up after three tries, and a source of bytes. */
 
 export const layerThrice = Layer.succeed(RetryPolicy, {
-  schedule: Schedule.recurs(3).pipe(Schedule.addDelay(() => '1 second')),
+  schedule: Schedule.recurs(3).pipe(Schedule.addDelay(() => Effect.succeed('1 second'))),
 });
 
 export const layerCounting = Layer.sync(EntropySource, () => {

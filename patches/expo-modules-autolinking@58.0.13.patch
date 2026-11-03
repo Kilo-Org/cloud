@@ -1,0 +1,26 @@
+diff --git a/build/platforms/apple/moduleScanner.js b/build/platforms/apple/moduleScanner.js
+index 093a8f5a3bf5c7b0578b64ea112e9606d201779b..94e4f7aca6b5c97394ed5f07617dcb659492c74a 100644
+--- a/build/platforms/apple/moduleScanner.js
++++ b/build/platforms/apple/moduleScanner.js
+@@ -137,7 +137,7 @@ async function scanExpoModulesAsync(scanner, packageRoots) {
+     let output;
+     try {
+         output = await scanner.scanModules(roots, {
+-            timeout: 5000
++            timeout: 60000
+         });
+     } catch (error) {
+         console.warn(`warning: Scanning for Expo modules failed, only modules declared in expo-module.config.json will be linked: ${error.message ?? error}`);
+diff --git a/src/platforms/apple/moduleScanner.ts b/src/platforms/apple/moduleScanner.ts
+index ede2607f0bff9a96a98ccaecacb6047467d947d0..1ffdaba85d027eacb2b6eea75ce8294b16ed9ed9 100644
+--- a/src/platforms/apple/moduleScanner.ts
++++ b/src/platforms/apple/moduleScanner.ts
+@@ -150,7 +150,7 @@ export async function scanExpoModulesAsync(
+ 
+   let output: ScanModulesOutput;
+   try {
+-    output = await scanner.scanModules(roots, { timeout: 5000 });
++    output = await scanner.scanModules(roots, { timeout: 60000 });
+   } catch (error: any) {
+     console.warn(
+       `warning: Scanning for Expo modules failed, only modules declared in expo-module.config.json will be linked: ${error.message ?? error}`

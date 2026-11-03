@@ -179,6 +179,30 @@ export async function claimDueBouncerCreditEvents(
     .returning();
 }
 
+/**
+ * Claims the one `pending` row for `eventId`, for a webhook's immediate delivery so a declined
+ * charge reaches bouncer before the same webhook asks for the charge verdict. Returns null when the
+ * row is absent, already claimed by the drainer, or already terminal, so the immediate delivery
+ * never races the drainer.
+ */
+export async function claimBouncerCreditEventByEventId(
+  database: BouncerCreditEventOutboxDatabase,
+  eventId: string
+): Promise<BouncerCreditEventOutboxRow | null> {
+  const [row] = await database
+    .update(bouncer_credit_event_outbox)
+    .set({ status: 'sending', claimed_at: sql`now()` })
+    .where(sql`${bouncer_credit_event_outbox.id} IN (
+      SELECT ${bouncer_credit_event_outbox.id}
+      FROM ${bouncer_credit_event_outbox}
+      WHERE ${bouncer_credit_event_outbox.event_id} = ${eventId}
+        AND ${bouncer_credit_event_outbox.status} = 'pending'
+      FOR UPDATE SKIP LOCKED
+    )`)
+    .returning();
+  return row ?? null;
+}
+
 // ----- terminal marks -----------------------------------------------------------
 
 /**

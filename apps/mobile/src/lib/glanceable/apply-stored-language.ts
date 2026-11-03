@@ -3,6 +3,7 @@ import {
   getResolvedLanguage,
   whenLanguagePreferenceLoaded,
 } from '@/lib/hooks/use-language-preference';
+import { prewarmSegmenter } from '@/lib/intl-cache';
 
 /**
  * Switch i18n to the user's language before a press or a headless surface
@@ -14,6 +15,12 @@ import {
  * stored language and every translated string would render English whatever the
  * user chose. Foreground callers already have it applied, and this is then a
  * no-op.
+ *
+ * A headless surface also builds the text it shows here: card titles, targets
+ * and commands are cut on character boundaries through their own module, which
+ * reads `Intl.Segmenter` and Hermes has none. The root layout warms that
+ * polyfill for the foreground app, so the same warm runs here for the text a
+ * background widget or notification cuts before any render.
  */
 export async function applyStoredLanguage(): Promise<void> {
   await whenLanguagePreferenceLoaded();
@@ -21,4 +28,5 @@ export async function applyStoredLanguage(): Promise<void> {
   if (i18n.language !== language) {
     await i18n.changeLanguage(language);
   }
+  prewarmSegmenter(language);
 }

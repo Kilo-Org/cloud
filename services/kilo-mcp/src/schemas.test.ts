@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SEARCH_LIMIT } from './search';
+import { MAX_SEARCH_LIMIT, MAX_SEARCH_QUERY_LENGTH } from './search';
 import {
   MAX_CLIENT_HEADER_LENGTH,
   callArgsSchema,
@@ -119,6 +119,28 @@ describe('searchArgsSchema', () => {
     expect(searchArgsSchema.safeParse({ query: '' }).success).toBe(false);
     expect(searchArgsSchema.safeParse({ query: '   ' }).success).toBe(false);
     expect(searchArgsSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('accepts a query at the maximum length and rejects one character more', () => {
+    expect(searchArgsSchema.safeParse({ query: 'q'.repeat(MAX_SEARCH_QUERY_LENGTH) }).success).toBe(
+      true
+    );
+    const over = searchArgsSchema.safeParse({ query: 'q'.repeat(MAX_SEARCH_QUERY_LENGTH + 1) });
+    expect(over.success).toBe(false);
+    expect(JSON.stringify(over.error?.issues)).toContain(
+      `at most ${MAX_SEARCH_QUERY_LENGTH} characters`
+    );
+  });
+
+  it('measures the bound in code points, matching the published JSON Schema maxLength', () => {
+    // An astral character is two UTF-16 code units and one code point; the
+    // published `maxLength` counts code points, so the parser must too.
+    expect(
+      searchArgsSchema.safeParse({ query: '😀'.repeat(MAX_SEARCH_QUERY_LENGTH) }).success
+    ).toBe(true);
+    expect(
+      searchArgsSchema.safeParse({ query: '😀'.repeat(MAX_SEARCH_QUERY_LENGTH + 1) }).success
+    ).toBe(false);
   });
 
   it('rejects a limit outside the range or not an integer', () => {

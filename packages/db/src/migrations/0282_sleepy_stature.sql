@@ -1,0 +1,1 @@
+ALTER TABLE "auto_top_up_configs" ADD COLUMN "threshold_cents" integer;

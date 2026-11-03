@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
 import type * as DbModule from './db';
 import type * as ConfigModule from './config';
+import type * as SubscriptionsModule from './subscriptions';
 import type { OfflineSweep } from './scoreboard/schema';
 import {
   caseSplitForId,
@@ -24,6 +25,12 @@ vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
   return { ...actual, getBenchmarkConfig: vi.fn() };
 });
+
+vi.mock('./subscriptions', async importOriginal => ({
+  ...(await importOriginal<typeof SubscriptionsModule>()),
+  loadSubscriptionSnapshot: vi.fn(),
+}));
+import { loadSubscriptionSnapshot, PLATFORM_SUBSCRIPTION_OWNER } from './subscriptions';
 
 import {
   getRoutingCaseResultsForEntries,
@@ -218,6 +225,16 @@ const env = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(loadSubscriptionSnapshot)
+    .mockReset()
+    .mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+    ]);
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => Response.json({ data: [{ id: 'platform/a' }] }))
@@ -228,6 +245,53 @@ beforeEach(() => {
 });
 
 describe('reevaluateSystemOptimalSettings', () => {
+  it('evaluates persisted serving pairs rather than desired or live alias targets', async () => {
+    vi.mocked(getBenchmarkConfig).mockResolvedValue({
+      ...baseConfig,
+      deciderModels: [{ id: '~platform/latest' }],
+    });
+    vi.mocked(loadSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: '~platform/latest',
+        pairs: [{ model: 'platform/next', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { id: '~platform/latest', alias_target: 'platform/live' },
+            { id: 'platform/a' },
+            { id: 'platform/next' },
+            { id: 'platform/live' },
+          ],
+        })
+      )
+    );
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'cached-run' },
+    ]);
+
+    await reevaluateSystemOptimalSettings(env, 'efficient', null);
+
+    expect(loadSubscriptionSnapshot).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      'efficient',
+      PLATFORM_SUBSCRIPTION_OWNER
+    );
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [{ model: 'platform/a', variant: null }]
+    );
+    expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(env.BENCH_DB, [
+      { entry: { model: 'platform/a', variant: null }, runId: 'cached-run' },
+    ]);
+  });
+
   it('keeps the previous computed threshold when the registry has no ready entries', async () => {
     vi.mocked(getBenchmarkConfig).mockResolvedValue({
       ...baseConfig,

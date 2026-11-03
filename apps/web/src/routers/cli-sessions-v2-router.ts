@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -16,6 +16,7 @@ import {
   gte,
   isNotNull,
   sql,
+  getTableColumns,
   type SQL,
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -24,35 +25,47 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  cloud_agent_session_runs,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
   type CliSessionV2,
+  type CloudAgentSessionRunStatus,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import {
+  readFirstPageStreamState,
+  type FirstPageStreamState,
+} from '@/lib/cloud-agent-next/first-page-stream-state';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  SessionShareTooLargeError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
+  sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
+import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
   UNSCOPED_TARGET,
@@ -66,17 +79,47 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import {
+  isGitHubOwnerName,
+  isGitHubRepositoryName,
+  parseGitHubOwnerRepo,
+} from '@/lib/integrations/platforms/github/repository-coordinates';
+import {
   pullRequestUrlMatchesRepo,
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import {
+  getPrObservationSummary,
+  prObservationSummarySchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
  * This is expected for legacy sessions created before the new DO-based system.
  */
+function sessionTrpcErrorCode(err: unknown): string | undefined {
+  if (!(err instanceof TRPCClientError)) return undefined;
+  const data = err.data as { code?: string } | undefined;
+  const shape = err.shape as { data?: { code?: string } } | undefined;
+  return data?.code ?? shape?.data?.code;
+}
+
+function isSessionConflictError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'CONFLICT';
+}
+
 function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
@@ -96,6 +139,9 @@ function isSessionNotFoundError(err: unknown): boolean {
 }
 
 const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
   'path',
   'file',
   'activeFile',
@@ -103,11 +149,14 @@ const privateTranscriptPathFields = new Set([
   'absolutePath',
   'filePath',
   'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
-function isAbsoluteTranscriptPath(value: string): boolean {
-  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
 }
 
 function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
@@ -124,13 +173,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
 
   for (const [key, current] of Object.entries(value)) {
     if (typeof current === 'string') {
-      if (
-        key === 'directory' ||
-        key === 'cwd' ||
-        key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
-      ) {
-        Reflect.set(value, key, directory);
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
         Reflect.set(value, key, '');
       }
@@ -140,8 +184,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
     if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
-        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
-          current[index] = directory;
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
         }
@@ -178,47 +222,12 @@ const PG_MAX_INTEGER = 2_147_483_647;
 export const REFRESH_THROTTLE_MS = 60_000;
 
 /**
- * Parse a git URL into `{ owner, repo }` when it points at GitHub. Returns
- * `null` for non-GitHub hosts or URLs that cannot be parsed into exactly
- * `owner/repo`. Handles https, ssh:// and SCP-style
- * (`git@github.com:owner/repo.git`) URLs, plus trailing `.git` suffixes.
+ * Parse a git URL into `{ owner, repo }` when it points at GitHub and both
+ * parts stay inside GitHub's name charset. The canonical implementation lives
+ * in the GitHub platform module so the batch review-decision path and this
+ * router share one rule.
  */
-export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
-  const segments = cleaned.split('/').filter(Boolean);
-  if (segments.length !== 2) {
-    return null;
-  }
-  const [owner, repo] = segments;
-  if (!owner || !repo) {
-    return null;
-  }
-  return { owner, repo };
-}
+export { parseGitHubOwnerRepo };
 
 export const associatedPrSchema = z.object({
   url: z.string(),
@@ -226,6 +235,7 @@ export const associatedPrSchema = z.object({
   state: z.string(),
   title: z.string().nullable(),
   headSha: z.string().nullable(),
+  observations: prObservationSummarySchema.nullable(),
   lastSyncedAt: z.string(),
   reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
   // True when the server has flagged this PR for an async review-decision
@@ -244,6 +254,7 @@ type AssociatedPrRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -293,8 +304,9 @@ type SessionPrFields = {
 
 /**
  * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts or URLs that do not resolve to
- * `owner/repo/pull/N`. Accepts a trailing subpath (e.g. `/files`), query
+ * `null` for non-GitHub hosts, URLs that do not resolve to
+ * `owner/repo/pull/N`, and owner or repo values outside GitHub's name charset.
+ * Accepts a trailing subpath (e.g. `/files`), query
  * string, and fragment, matching the mobile parser so a pasted PR URL is
  * never skipped during refresh. A PR URL has more than two path segments,
  * so `parseGitHubOwnerRepo` cannot parse it.
@@ -332,7 +344,10 @@ export function parseGitHubPrUrl(
   }
   const [owner, repo, , numberStr] = segments;
   const number = Number(numberStr);
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+  if (!isGitHubOwnerName(owner) || !isGitHubRepositoryName(repo)) {
+    return null;
+  }
+  if (!Number.isInteger(number) || number <= 0) {
     return null;
   }
   return { owner, repo, number };
@@ -363,6 +378,7 @@ function formatCacheRow(
     state: cache.pr_state,
     title: cache.pr_title,
     headSha: cache.pr_head_sha,
+    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
     lastSyncedAt: cache.pr_last_synced_at,
     reviewDecision,
     reviewDecisionPending: cache.review_decision_pending === true,
@@ -407,6 +423,7 @@ function pendingPartialFromSession(
     state: 'unknown',
     title: null,
     headSha: null,
+    observations: null,
     lastSyncedAt: session.updated_at
       ? new Date(session.updated_at).toISOString()
       : new Date().toISOString(),
@@ -514,6 +531,39 @@ export function getPrLinkVerificationKey(
 
 const createdOnPlatformField = z.string().min(1).max(100);
 
+type LatestRunOutcome = {
+  latest_run_status: CloudAgentSessionRunStatus | null;
+  latest_run_failure_kind: 'failed' | 'system_interrupted' | null;
+  latest_run_terminal_at: string | null;
+};
+
+function latestRunField<T>(field: SQL<T>): SQL<T | null> {
+  return sql<T | null>`(
+    SELECT ${field}
+    FROM ${cloud_agent_session_runs}
+    WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+    ORDER BY ${cloud_agent_session_runs.queued_at} DESC NULLS LAST,
+      ${cloud_agent_session_runs.message_id} DESC
+    LIMIT 1
+  )`;
+}
+
+const latestRunFields = {
+  latest_run_status: latestRunField(
+    sql<CloudAgentSessionRunStatus>`${cloud_agent_session_runs.status}`
+  ),
+  latest_run_failure_kind: latestRunField(sql<LatestRunOutcome['latest_run_failure_kind']>`CASE
+    WHEN ${cloud_agent_session_runs.status} = 'failed' THEN 'failed'
+    WHEN ${cloud_agent_session_runs.status} = 'interrupted'
+      AND ${cloud_agent_session_runs.failure_code} IN ('system_interrupt', 'container_shutdown')
+      THEN 'system_interrupted'
+    ELSE NULL
+  END`),
+  latest_run_terminal_at: latestRunField(
+    sql<string>`${cloud_agent_session_runs.terminal_at}`
+  ).mapWith((value: string | null) => (value === null ? null : new Date(value).toISOString())),
+};
+
 /**
  * Fields to select for session list/get operations
  */
@@ -532,6 +582,7 @@ const commonSessionFields = {
   created_at: cli_sessions_v2.created_at,
   updated_at: cli_sessions_v2.updated_at,
   version: cli_sessions_v2.version,
+  ...latestRunFields,
 } as const;
 
 /**
@@ -546,6 +597,7 @@ const commonSessionFieldsWithPr = {
   pr_state: github_branch_pull_requests.pr_state,
   pr_title: github_branch_pull_requests.pr_title,
   pr_head_sha: github_branch_pull_requests.pr_head_sha,
+  pr_observations: github_branch_pull_requests.pr_observations,
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -611,6 +663,7 @@ export function projectAssociatedPr<
     pr_state,
     pr_title,
     pr_head_sha,
+    pr_observations,
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
@@ -649,6 +702,7 @@ export function projectAssociatedPr<
         pr_state,
         pr_title,
         pr_head_sha,
+        pr_observations,
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
@@ -661,16 +715,21 @@ export function projectAssociatedPr<
 type WorktreeDetail = {
   name: string | null;
   defaultTitle: string | null;
-  sessions: {
+  sessions: (LatestRunOutcome & {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
     updatedAt: string;
-  }[];
+  })[];
   prSession:
-    | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
-        associatedPr: z.infer<typeof associatedPrSchema> | null;
-      })
+    | (Pick<
+        CliSessionV2,
+        | Exclude<keyof typeof commonSessionFields, keyof LatestRunOutcome>
+        | 'total_cost_microdollars'
+      > &
+        LatestRunOutcome & {
+          associatedPr: z.infer<typeof associatedPrSchema> | null;
+        })
     | null;
 };
 
@@ -716,7 +775,7 @@ const GetSessionMessagesPageInputSchema = z
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).optional(),
+    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.cursor === undefined) return;
@@ -813,9 +872,10 @@ const RenameSessionInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
 });
 
-const ShareSessionInputSchema = z.object({
+const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
+const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -889,15 +949,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }
@@ -958,6 +1012,27 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {
@@ -1026,6 +1101,9 @@ export const cliSessionsV2Router = createTRPCRouter({
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
             'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'latest_run_status', ${latestRunFields.latest_run_status},
+            'latest_run_failure_kind', ${latestRunFields.latest_run_failure_kind},
+            'latest_run_terminal_at', ${latestRunFields.latest_run_terminal_at},
             'updatedAt', ${cli_sessions_v2.updated_at}
           ) ORDER BY ${cli_sessions_v2.session_id})`,
         })
@@ -1041,6 +1119,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         row.sessions.map(session => ({
           ...session,
           updatedAt: new Date(session.updatedAt).toISOString(),
+          latest_run_terminal_at: session.latest_run_terminal_at
+            ? new Date(session.latest_run_terminal_at).toISOString()
+            : null,
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,
@@ -1453,7 +1534,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     // that could pick another account's row for the same id and deny the owner
     // their own session. Read the rows for the id and prefer the caller's.
     const sessions = await db
-      .select()
+      .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
       .from(cli_sessions_v2)
       .where(eq(cli_sessions_v2.session_id, session_id));
 
@@ -1559,40 +1640,20 @@ export const cliSessionsV2Router = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
-      // Read the event-log watermark from the existing getSession response
-      // for the initial history page, so the transport can use `fromId` on
-      // its first WebSocket connect instead of `replay=false`. Cursor pages
-      // skip the Cloud Agent read — the watermark is only seeded once.
-      // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read. The page response does
-      // not depend on the watermark, so the read runs concurrently with the
-      // worker page fetch rather than serially ahead of it.
+      // The first page also carries what the stream would replay first: the
+      // event-log watermark, so the transport can use `fromId` on its first
+      // WebSocket connect instead of `replay=false`, and the preparation
+      // attempts, so the transcript shows those rows before the stream does.
+      // Cursor pages skip the Cloud Agent reads. Each read fails open to an
+      // empty value, so these optional reads never block the page, and they
+      // run concurrently with the worker page fetch rather than serially.
       const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
-      const watermarkPromise: Promise<number | null> = cloudAgentSessionId
-        ? (async () => {
-            try {
-              const authToken = (
-                await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
-                  headers: ctx.headersList,
-                  organizationId: session.organization_id ?? undefined,
-                  tokenSource: 'cloud-agent',
-                })
-              ).token;
-              const client = createCloudAgentNextClient(authToken);
-              const sessionState = await client.getSession(cloudAgentSessionId);
-              return sessionState.latestEventId ?? null;
-            } catch (error) {
-              console.warn(
-                `Failed to fetch watermark for session ${input.session_id}:`,
-                error instanceof Error ? error.message : error
-              );
-              return null;
-            }
-          })()
-        : Promise.resolve(null);
+      const streamStatePromise: Promise<FirstPageStreamState> = cloudAgentSessionId
+        ? readFirstPageStreamState(ctx, session.organization_id, cloudAgentSessionId)
+        : Promise.resolve({ watermarkEventId: null, preparationAttempts: [] });
 
       // Start the page fetch first so it is in flight before the optional
-      // watermark read above resolves.
+      // stream-state reads above resolve.
       const pagePromise = (async () => {
         try {
           return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
@@ -1617,9 +1678,13 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       })();
 
-      // The watermark promise never rejects (it resolves to null on failure),
-      // so a rejecting page promise cannot leave it as an unhandled rejection.
-      const [result, watermarkEventId] = await Promise.all([pagePromise, watermarkPromise]);
+      // The stream-state promise never rejects (each read resolves to an empty
+      // value on failure), so a rejecting page promise cannot leave it as an
+      // unhandled rejection.
+      const [result, { watermarkEventId, preparationAttempts }] = await Promise.all([
+        pagePromise,
+        streamStatePromise,
+      ]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only
@@ -1651,6 +1716,12 @@ export const cliSessionsV2Router = createTRPCRouter({
             )
           : pageResult),
         watermarkEventId,
+        preparationAttempts,
+        // The access check already read the row, so the page can answer the
+        // session's parent without a second full-session query. Always
+        // present: `null` means a root session, and a client that opens this
+        // session has no further read to make.
+        parentSessionId: session.parent_session_id,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),
@@ -1697,9 +1768,9 @@ export const cliSessionsV2Router = createTRPCRouter({
    * This combines the DB fetch (ownership check + metadata) with the DO fetch
    * (mode, model, repository, execution state) in a single call.
    *
-   * For V2 sessions (those with cloud_agent_session_id), this also fetches
-   * runtime state from the cloud-agent DO. For CLI sessions without a
-   * cloud_agent_session_id, runtimeState will be null.
+   * Runtime state is null when no cloud runtime is recorded, its stored ID
+   * is unsupported by the current runtime, or the runtime no longer exists.
+   * Failures reading a supported runtime ID still propagate to the caller.
    */
   getWithRuntimeState: baseProcedure
     .input(GetSessionInputSchema)
@@ -1719,6 +1790,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: z.coerce.date(),
         version: z.number(),
         total_cost_microdollars: z.number().nullable(),
+        latest_run_status: z
+          .enum(['queued', 'accepted', 'completed', 'failed', 'interrupted'])
+          .nullable(),
+        latest_run_failure_kind: z.enum(['failed', 'system_interrupted']).nullable(),
+        latest_run_terminal_at: z.string().datetime().nullable(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
@@ -1736,11 +1812,13 @@ export const cliSessionsV2Router = createTRPCRouter({
       const [row] = await db
         .select({
           session: cli_sessions_v2,
+          ...latestRunFields,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1775,7 +1853,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
-      if (session.cloud_agent_session_id) {
+      if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
         try {
           const authToken = (
             await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -1806,6 +1884,8 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+      } else if (session.cloud_agent_session_id) {
+        console.debug('Stored runtime identifier is unsupported; returning historical metadata');
       }
 
       return {
@@ -1824,6 +1904,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: session.updated_at,
         version: session.version,
         total_cost_microdollars: session.total_cost_microdollars,
+        latest_run_status: row.latest_run_status,
+        latest_run_failure_kind: row.latest_run_failure_kind,
+        latest_run_terminal_at: row.latest_run_terminal_at,
         runtimeState,
         prLinkVerificationKey: getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(
@@ -1841,6 +1924,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_state: row.pr_state,
             pr_title: row.pr_title,
             pr_head_sha: row.pr_head_sha,
+            pr_observations: row.pr_observations,
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
@@ -1860,12 +1944,14 @@ export const cliSessionsV2Router = createTRPCRouter({
    * (`platform`/`pr_url`/`pr_number` plus `pr_head_ref`/`pr_head_sha`). The
    * fetched PR is accepted only when `verifySessionPullRequestLink` confirms
    * the link names the session's repo, the PR base and head repositories are
-   * that same repo, the PR head ref is the session's branch, and (when
-   * reported) the session head SHA is the PR head or one of its commits. On
-   * failure the link is left unverified and no live PR is returned (the read
-   * path still shows the session's own pending partial); there is no
-   * branch-name fallback. On success `pr_link_verified_at` is set and the
-   * state cache is upserted by PR identity `(git_url, pr_number, tenant)`.
+   * that same repo, the PR head ref is the branch the session reported pushing
+   * (its `pr_head_ref`, or the stored session branch when the link carries no
+   * head ref), and (when reported) the session head SHA is the PR head or one
+   * of its commits. On failure the link is left unverified and no live PR is
+   * returned (the read path still shows the session's own pending partial);
+   * there is no branch-name fallback. On success `pr_link_verified_at` is set
+   * and the state cache is upserted by PR identity `(git_url, pr_number,
+   * tenant)`.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
@@ -1884,6 +1970,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1927,6 +2014,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: row.pr_state,
         pr_title: row.pr_title,
         pr_head_sha: row.pr_head_sha,
+        pr_observations: row.pr_observations,
         pr_last_synced_at: row.pr_last_synced_at,
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
@@ -2176,6 +2264,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -2195,7 +2284,12 @@ export const cliSessionsV2Router = createTRPCRouter({
         .where(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+            eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+            eq(cli_sessions_v2.pr_url, sessionPrUrl),
+            eq(cli_sessions_v2.git_url, gitUrl),
+            sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+            sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+            sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
           )
         );
 
@@ -2216,7 +2310,58 @@ export const cliSessionsV2Router = createTRPCRouter({
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
-    if (session.cloud_agent_session_id) {
+    const hostedCloudSessionId =
+      session.cloud_agent_session_id !== null &&
+      SESSION_ID_RE.test(session.cloud_agent_session_id) &&
+      session.cloud_agent_worktree_id !== null &&
+      session.parent_session_id === null
+        ? session.cloud_agent_session_id
+        : null;
+    if (hostedCloudSessionId !== null) {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: session.organization_id ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const client = createCloudAgentNextClient(authToken);
+      let alreadyGone = false;
+      try {
+        await client.deleteHostedWorkspaceSession({
+          workspaceId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
+          sessionId: hostedCloudSessionId,
+          operationKey: randomUUID(),
+        });
+      } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
+        if (!isSessionNotFoundError(err)) {
+          captureException(err, {
+            tags: { source: 'cli-sessions-v2-router', endpoint: 'delete-hosted-workspace-session' },
+            extra: {
+              session_id,
+              cloud_agent_session_id: session.cloud_agent_session_id,
+              cloud_agent_worktree_id: session.cloud_agent_worktree_id,
+            },
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to clean up cloud-agent session',
+            cause: err,
+          });
+        }
+        alreadyGone = true;
+      }
+      if (!alreadyGone) return { success: true, session_id };
+    }
+
+    if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
           headers: ctx.headersList,
@@ -2231,6 +2376,13 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new Error('Cloud-agent session deletion was not confirmed');
         }
       } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
             tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },
@@ -2307,17 +2459,21 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * Share a V2 session by issuing an opaque JWT share token.
    *
-   * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has an active share generation, the existing one is reused.
+   * Delegates to the session-ingest worker, which rotates the public
+   * capability. Each call issues a fresh share generation and invalidates the
+   * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
-    const { session_id } = input;
+    const { session_id, ...shareOptions } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
     try {
-      const result = await shareSessionIngest(session_id, ctx.user.id);
+      const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
       return { share_token: result.share_token };
     } catch (error) {
+      if (error instanceof SessionShareTooLargeError) {
+        throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
+      }
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
         extra: { session_id },
@@ -2336,7 +2492,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Owner-only, matching the session-ingest worker. A missing or inaccessible
    * session is NOT_FOUND. Worker 404 is mapped the same way.
    */
-  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+  unshare: baseProcedure.input(UnshareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
@@ -2358,51 +2514,4 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
   }),
-
-  /**
-   * Share a v2 CLI session from a webhook trigger request.
-   * Creates a read-only public snapshot via the session-ingest worker.
-   *
-   * For org triggers, any org member can share; for personal triggers, only the owner.
-   */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().startsWith('ses_'),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cli_sessions_v2.organization_id, input.organization_id)
-        : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
-        .from(cli_sessions_v2)
-        .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      try {
-        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
-        return { share_token: result.share_token, session_id: input.kilo_session_id };
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Session not found') {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-        }
-        throw error;
-      }
-    }),
 });

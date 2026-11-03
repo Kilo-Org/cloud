@@ -78,9 +78,9 @@ describe('recent-prs', () => {
   });
 
   it('caps the list at 10 entries, keeping the most recent first', async () => {
-    // Sequentially upsert so each write sees the previous write's result
-    // — the write-queue relies on this ordering. Promise.all would let
-    // the in-flight reads race.
+    // Ten concurrent upserts: the per-key account-metadata write queue
+    // serializes their read-modify-write pairs, so each one sees the previous
+    // write's result even though every promise starts before any resolves.
     const writes: Promise<void>[] = [];
     for (let index = 0; index < 10; index += 1) {
       writes.push(upsertRecentPr(makeRecent({ number: index + 1, title: `T${index + 1}` })));

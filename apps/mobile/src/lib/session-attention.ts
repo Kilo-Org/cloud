@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one cohesive ack store: identity, persistence, hydration, reconcile, and the test seams read together */
+import { parseTimestamp } from '@kilocode/app-shared/utils';
 import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
@@ -26,8 +28,9 @@ import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
  * hydration completes the store is empty, so badges render from server status
  * alone; a restored ack then suppresses its raise.
  *
- * No backend, tRPC, or shared-package imports: this is a mobile-local
- * module so the web client can keep its own copy.
+ * No backend or tRPC imports: this is a mobile-local module so the web client
+ * can keep its own copy. The one shared import is the pure timestamp reader,
+ * because Hermes cannot parse the PostgreSQL text a stored row carries.
  */
 
 const ATTENTION_STATUSES = new Set(['question', 'permission']);
@@ -53,10 +56,35 @@ export function sessionNeedsInput(status: string | null | undefined): boolean {
 }
 
 /**
+ * True when two raise ids name the same raise.
+ *
+ * Raise identity is `statusUpdatedAt ?? status`, and the time arrives in two
+ * spellings: ISO 8601 from the live rows, raw PostgreSQL text
+ * (`2026-10-12 09:45:12.945+00`) from stored rows. Same instant, different
+ * string, so a comparison that only used string equality would clear an ack
+ * the moment the other surface reconciled the same raise. `parseTimestamp` is
+ * the app's reader for both spellings: Hermes' `Date` cannot parse the
+ * PostgreSQL form on its own.
+ */
+function sameRaise(a: string | null, b: string | null): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a === null || b === null) {
+    return false;
+  }
+  const at = parseTimestamp(a).getTime();
+  const bt = parseTimestamp(b).getTime();
+  return !Number.isNaN(at) && !Number.isNaN(bt) && at === bt;
+}
+
+/**
  * One durable ack entry. `sessionId` is the map key and is added to the
  * persisted form at serialization time.
  *
- * `raiseId === null` marks a pending ack (acked, raise not yet observed).
+ * `raiseId` names the raise the user answered (`statusUpdatedAt ?? status`), so
+ * the ack can only ever suppress that raise. A null `raiseId` only appears in a
+ * blob written before acks carried a raise; hydration drops those.
  * `ackedAt === null` marks a cleared ack (a same-session re-raise replaced
  * the raise and cleared the ack so the badge returns).
  */
@@ -86,7 +114,7 @@ const store: AttentionStore = (globalScope[STORE_KEY] ??= {
 
 // ── Encrypted KV (lazy) ─────────────────────────────────────────────────────
 
-/** The two encrypted-KV calls this module uses, kept structural so the lazy
+/** The encrypted-KV calls this module uses, kept structural so the lazy
  * import never pulls the native SQLCipher chain into this module's types. */
 type AttentionKv = {
   getItem: (scope: string, k: string) => Promise<string | null>;
@@ -166,7 +194,11 @@ function applyHydratedEntries(raw: string): boolean {
     return false;
   }
   const now = Date.now();
-  const fresh = entries.filter(entry => entry.expiresAt === null || entry.expiresAt > now);
+  // An ack that names no raise (written before acks carried one) suppresses
+  // nothing: dropping it keeps a raise the user has not answered visible.
+  const fresh = entries.filter(
+    entry => entry.raiseId !== null && (entry.expiresAt === null || entry.expiresAt > now)
+  );
   let applied = false;
   for (const entry of fresh) {
     // A mutation that landed after hydration began must win over the stale
@@ -230,7 +262,6 @@ function bumpRevision(): void {
   }
 }
 
-/** Notify subscribers and persist the new entries map. */
 function commit(): void {
   bumpRevision();
   persistEntries();
@@ -260,18 +291,40 @@ function getServerSnapshot(): number {
  * permission response, before the server status round-trip lands.
  * `reconcileSessionAttention` clears the entry once status leaves attention.
  *
- * If the entry is already pending, nothing changes — skip the bump so we
+ * The ack names the raise the user answered, so it can only ever suppress that
+ * raise: `statusUpdatedAt` when the answered row carried it, the status alone
+ * otherwise. A caller that has no timestamp keeps the raise an existing entry
+ * already tracks for the same status — the raise that was on screen when the
+ * answer happened.
+ *
+ * A late response cannot replace a newer dated raise already tracked here.
+ *
+ * Re-acking the raise already acked changes nothing — skip the bump so we
  * don't fire a redundant global re-render.
  */
-export function ackSessionAttention(sessionId: string): void {
+export function ackSessionAttention(
+  sessionId: string,
+  status: string,
+  statusUpdatedAt?: string | null
+): void {
   const entry = store.entries.get(sessionId);
-  if (entry && entry.ackedAt !== null && entry.raiseId === null) {
+  // Only a cleared entry tracks the raise still waiting for an answer; an acked
+  // entry's raise was answered already and must not be reused for a new one.
+  const trackedRaise = entry?.ackedAt === null && entry.status === status ? entry.raiseId : null;
+  const raiseId = statusUpdatedAt ?? trackedRaise ?? status;
+  if (
+    entry?.raiseId != null &&
+    parseTimestamp(entry.raiseId).getTime() > parseTimestamp(raiseId).getTime()
+  ) {
+    return;
+  }
+  if (entry && entry.ackedAt !== null && sameRaise(entry.raiseId, raiseId)) {
     return;
   }
   const now = Date.now();
   store.entries.set(sessionId, {
-    raiseId: null,
-    status: null,
+    raiseId,
+    status,
     ackedAt: now,
     expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
   });
@@ -285,9 +338,14 @@ export function ackSessionAttention(sessionId: string): void {
  *
  * - expired entry: delete it and notify
  * - non-attention status: delete the entry (if any) and notify
- * - attention + existing pending entry: resolve it to the current raise
- * - attention + resolved entry with a different raise: replace the raise and
- *   clear the ack (same-session re-raise) so the badge returns
+ * - observed raise is the acked raise: no-op
+ * - acked with its status alone and that same status observed: learn the raise
+ *   (the ack keeps suppressing it; a later raise is then told apart)
+ * - observation without a timestamp of the acked status: keep the ack — the
+ *   observer cannot name the raise, and the badge it draws belongs to the
+ *   raise the user answered
+ * - any other raise: replace the raise and clear the ack (same-session
+ *   re-raise) so the badge returns
  * - otherwise: no-op (does NOT bump the revision)
  */
 export function reconcileSessionAttention(
@@ -317,7 +375,7 @@ export function reconcileSessionAttention(
 
   if (entry.ackedAt === null) {
     // Cleared ack (re-raise): keep tracking the current raise, still unacked.
-    if (entry.raiseId !== raiseId) {
+    if (!sameRaise(entry.raiseId, raiseId)) {
       store.entries.set(sessionId, {
         raiseId,
         status: status ?? null,
@@ -329,11 +387,16 @@ export function reconcileSessionAttention(
     return;
   }
 
-  if (entry.raiseId === null) {
-    // Pending ack resolves to the current raise.
+  if (sameRaise(entry.raiseId, raiseId)) {
+    return;
+  }
+
+  if (entry.raiseId !== null && entry.raiseId === entry.status && entry.status === status) {
+    // Acked with the status alone: the first observation of that status is the
+    // raise the user answered. Learn it, so the next raise is told apart.
     store.entries.set(sessionId, {
       raiseId,
-      status: status ?? null,
+      status,
       ackedAt: entry.ackedAt,
       expiresAt: entry.expiresAt,
     });
@@ -341,17 +404,21 @@ export function reconcileSessionAttention(
     return;
   }
 
-  if (entry.raiseId !== raiseId) {
-    // Same-session re-raise: replace the raise and clear the ack so the badge
-    // returns.
-    store.entries.set(sessionId, {
-      raiseId,
-      status: status ?? null,
-      ackedAt: null,
-      expiresAt: null,
-    });
-    commit();
+  if (statusUpdatedAt == null && entry.status === status) {
+    // The observer has no timestamp for the acked status, so it cannot tell
+    // this raise from the answered one. Keeping the ack is what hides the
+    // badge the user already dismissed.
+    return;
   }
+
+  // Different raise: replace the raise and clear the ack so the badge returns.
+  store.entries.set(sessionId, {
+    raiseId,
+    status: status ?? null,
+    ackedAt: null,
+    expiresAt: null,
+  });
+  commit();
 }
 
 /**
@@ -387,12 +454,43 @@ export async function clearSessionAttentionForSignOut(): Promise<void> {
   hydrationPromise = null;
 }
 
-export function isAttentionAcked(sessionId: string, raiseId: string | null): boolean {
+/**
+ * One raise as a reader sees it: the identity the row gives (`statusUpdatedAt ??
+ * status`) plus, when the caller knows it, the row's status.
+ */
+export type AttentionRaise = {
+  raiseId: string | null;
+  status?: string | null;
+};
+
+/**
+ * True when the ack names this raise.
+ *
+ * Raise ids are compared as identities, so a stored row's PostgreSQL text and a
+ * live row's ISO form of the same instant are the same raise. A row the surface
+ * cannot date (`raiseId === status`), or an ack written from a status-only
+ * answer, matches by status: a miss there would draw the badge for a raise the
+ * user already answered. A caller that knows the row's status time asks about
+ * exactly one raise, so a re-raise under the same status shows again.
+ */
+export function isAttentionAcked(sessionId: string, raise: AttentionRaise): boolean {
   const entry = store.entries.get(sessionId);
   if (!entry || entry.ackedAt === null) {
     return false;
   }
-  return entry.raiseId === null || entry.raiseId === raiseId;
+  if (sameRaise(entry.raiseId, raise.raiseId)) {
+    return true;
+  }
+  if (raise.raiseId === null || entry.status === null) {
+    return false;
+  }
+  // The row could not be dated, so it names the acked status rather than a raise.
+  if (raise.raiseId === entry.status) {
+    return true;
+  }
+  // The ack itself was written from a status-only answer: nothing it holds can
+  // tell two raises of that status apart.
+  return entry.raiseId === entry.status && raise.status === entry.status;
 }
 
 export function shouldShowNeedsInput({

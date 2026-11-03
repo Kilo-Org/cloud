@@ -85,10 +85,9 @@ interface SessionStoreService {
   readonly flush: () => Effect.Effect<void, StoreError>;
 }
 
-class SessionStore extends Context.Tag('harness/SessionStore')<
-  SessionStore,
-  SessionStoreService
->() {}
+class SessionStore extends Context.Service<SessionStore, SessionStoreService>()(
+  'harness/SessionStore'
+) {}
 
 /** Runs the work when there is a store, and does nothing when there is not. */
 const onStore = (

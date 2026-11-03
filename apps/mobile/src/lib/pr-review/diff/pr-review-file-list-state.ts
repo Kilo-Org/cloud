@@ -71,6 +71,9 @@ export function buildPrReviewFileListQueryOptions(
   );
 }
 
+/** The mounted contract the Files tab renders from: the raw infinite query plus the classified error states. */
+export type PrReviewFileListQueryResult = ReturnType<typeof usePrReviewFileListQuery>;
+
 export function usePrReviewFileListQuery(args: {
   owner: string;
   repo: string;

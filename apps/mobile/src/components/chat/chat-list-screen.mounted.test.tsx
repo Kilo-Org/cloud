@@ -54,6 +54,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff' }),
 }));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
 vi.mock('sonner-native', () => ({
   toast: { error: state.toastError, dismiss: state.toastDismiss },
@@ -74,6 +75,9 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The workspace row has its own suite (`chat-list-screen.workspace.mounted.test.tsx`);
+// here it is stubbed so these assertions stay about starting a chat.
+vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

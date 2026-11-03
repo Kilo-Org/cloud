@@ -293,14 +293,12 @@ export const mockAgentsApi = async (
 
       if (proc === 'activeSessions.listInstances') {
         // eslint-disable-next-line oxc/no-map-spread -- Keep caller-owned seeds immutable and preserve every router field.
-        const instances = (options.instances ?? []).map(
-          (instance): ConnectedInstance => ({
-            ...instance,
-            gitBranch: instance.gitBranch ?? null,
-            kind: instance.kind ?? 'cli',
-            startedAt: instance.startedAt ?? null,
-          })
-        );
+        const instances = (options.instances ?? []).map((instance): ConnectedInstance => ({
+          ...instance,
+          gitBranch: instance.gitBranch ?? null,
+          kind: instance.kind ?? 'cli',
+          startedAt: instance.startedAt ?? null,
+        }));
         return { result: { data: { instances } } };
       }
 

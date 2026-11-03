@@ -117,6 +117,12 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      // The recognizer answers availability live, so returning to the app is a
+      // natural probe: the user may have installed, enabled or freed the speech
+      // service while away.
+      if (nextAppState === 'active') {
+        voiceInputController.refreshAvailability();
+      }
       const lifecycleInput = {
         appState: toLifecycleAppState(nextAppState),
         disabled: getDisabledRef.current,
@@ -138,6 +144,13 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     },
     [actions]
   );
+
+  useEffect(() => {
+    // The controller captures availability once, when the module loads. A
+    // surface that mounts later re-reads it, so a stale verdict never hides the
+    // microphone on a recognizer that works.
+    voiceInputController.refreshAvailability();
+  }, []);
 
   useEffect(() => {
     const currentSnapshot = voiceInputController.getSnapshot();

@@ -32,7 +32,7 @@ type Story = StoryObj<typeof InsufficientBalanceBanner>;
 export const Default: Story = {
   args: {
     balance: 0.5,
-    content: { type: 'productName', productName: 'App Builder' },
+    content: { type: 'productName', productName: 'Cloud Agent' },
     variant: 'default',
   },
 };
@@ -40,7 +40,7 @@ export const Default: Story = {
 export const Compact: Story = {
   args: {
     balance: 0.25,
-    content: { type: 'productName', productName: 'App Builder' },
+    content: { type: 'productName', productName: 'Cloud Agent' },
     variant: 'compact',
   },
 };
@@ -64,7 +64,7 @@ export const CloudAgentCompact: Story = {
 export const ZeroBalance: Story = {
   args: {
     balance: 0,
-    content: { type: 'productName', productName: 'App Builder' },
+    content: { type: 'productName', productName: 'Cloud Agent' },
     variant: 'default',
   },
 };

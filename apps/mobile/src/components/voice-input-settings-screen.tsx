@@ -38,6 +38,7 @@ export function VoiceInputSettingsScreen() {
     gatewayTranscriptionEnabled,
     hasLoaded: gatewayTranscriptionLoaded,
     setGatewayTranscriptionEnabled,
+    getRequestedGatewayTranscriptionEnabled,
   } = useGatewayTranscriptionPreference();
   const { status, model, isFetching, refetch } = useGatewayTranscriptionModelSelection(
     organizationId ?? undefined
@@ -101,6 +102,7 @@ export function VoiceInputSettingsScreen() {
           value={gatewayTranscriptionEnabled}
           disabled={!gatewayTranscriptionLoaded}
           onValueChange={setGatewayTranscriptionEnabled}
+          resolveValue={getRequestedGatewayTranscriptionEnabled}
         />
         <ConfigureRow
           icon={Cpu}

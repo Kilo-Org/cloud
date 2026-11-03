@@ -21,7 +21,7 @@ export function setReturnSendsMessage(value: boolean) {
 
 /** The stored return-sends-message value for callers with no React tree. */
 export function getReturnSendsMessage(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function useReturnSendsMessagePreference() {

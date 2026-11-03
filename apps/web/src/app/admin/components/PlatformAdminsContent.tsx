@@ -47,6 +47,7 @@ type PermissionValues = {
   isSuperadmin: boolean;
   canViewSessions: boolean;
   canManageCredits: boolean;
+  canExportApiRequestLogs: boolean;
 };
 
 function AccountStatusBadge({ user }: { user: PlatformAdminUser }) {
@@ -190,6 +191,7 @@ export function PlatformAdminsContent() {
       isSuperadmin: user.is_super_admin,
       canViewSessions: user.can_view_sessions,
       canManageCredits: user.can_manage_credits,
+      canExportApiRequestLogs: user.can_export_api_request_logs,
     });
   }
 
@@ -205,6 +207,10 @@ export function PlatformAdminsContent() {
       }),
       ...(permissionValues.canManageCredits !== permissionTarget.can_manage_credits && {
         canManageCredits: permissionValues.canManageCredits,
+      }),
+      ...(permissionValues.canExportApiRequestLogs !==
+        permissionTarget.can_export_api_request_logs && {
+        canExportApiRequestLogs: permissionValues.canExportApiRequestLogs,
       }),
     };
 
@@ -287,9 +293,13 @@ export function PlatformAdminsContent() {
                           {admin.can_manage_credits && (
                             <Badge variant="secondary">Credit manager</Badge>
                           )}
+                          {admin.can_export_api_request_logs && (
+                            <Badge variant="secondary">API request log exporter</Badge>
+                          )}
                           {!admin.is_super_admin &&
                             !admin.can_view_sessions &&
-                            !admin.can_manage_credits && (
+                            !admin.can_manage_credits &&
+                            !admin.can_export_api_request_logs && (
                               <span className="text-muted-foreground text-sm">None</span>
                             )}
                         </div>
@@ -463,8 +473,8 @@ export function PlatformAdminsContent() {
                 <>
                   Are you sure you want to grant platform admin access to{' '}
                   <span className="font-medium">{confirmAction.user.google_user_email}</span>? This
-                  grants no superadmin, session-viewer, or credit-manager permissions. Their current
-                  credentials will be rotated.
+                  grants no superadmin, session-viewer, credit-manager, or API request log exporter
+                  permissions. Their current credentials will be rotated.
                 </>
               ) : confirmAction ? (
                 <>
@@ -597,6 +607,37 @@ export function PlatformAdminsContent() {
                     disabled={setPermissionsMutation.isPending}
                     onCheckedChange={canManageCredits =>
                       setPermissionValues(values => values && { ...values, canManageCredits })
+                    }
+                  />
+                </Label>
+              </div>
+
+              <div className="flex min-h-11 items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="permission-api-request-log-exporter">
+                    API request log exporter
+                  </Label>
+                  <p
+                    id="permission-api-request-log-exporter-help"
+                    className="text-muted-foreground text-sm"
+                  >
+                    Can export logged API requests and responses of opted-in accounts and
+                    organizations.
+                  </p>
+                </div>
+                <Label
+                  htmlFor="permission-api-request-log-exporter"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                >
+                  <Switch
+                    id="permission-api-request-log-exporter"
+                    aria-describedby="permission-api-request-log-exporter-help"
+                    checked={permissionValues.canExportApiRequestLogs}
+                    disabled={setPermissionsMutation.isPending}
+                    onCheckedChange={canExportApiRequestLogs =>
+                      setPermissionValues(
+                        values => values && { ...values, canExportApiRequestLogs }
+                      )
                     }
                   />
                 </Label>

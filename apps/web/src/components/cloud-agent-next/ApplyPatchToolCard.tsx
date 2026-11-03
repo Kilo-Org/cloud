@@ -1,3 +1,4 @@
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { FileDiff } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
@@ -6,6 +7,7 @@ import {
   getUnifiedPatch,
   MAX_TOOL_DIFF_CHARACTERS,
   readApplyPatchFiles,
+  readApplyPatchInputPaths,
   sumFileChanges,
 } from './toolDiffUtils';
 import type { ToolPart } from './types';
@@ -24,8 +26,13 @@ const changeLabels = {
 export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
   const state = toolPart.state;
   const files = readApplyPatchFiles(state.status === 'pending' ? undefined : state.metadata);
-  const single = files.length === 1 ? files[0] : undefined;
   const patchText = typeof state.input.patchText === 'string' ? state.input.patchText : undefined;
+  const filePaths =
+    files.length > 0
+      ? files.map(file =>
+          cloudAgentFileLabel(file.relativePath ?? file.movePath ?? file.filePath ?? '')
+        )
+      : readApplyPatchInputPaths(patchText).map(cloudAgentFileLabel);
   const error = state.status === 'error' ? state.error : undefined;
 
   return (
@@ -33,17 +40,22 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
       icon={FileDiff}
       title="Apply patch"
       subtitle={
-        single ? (
-          <ToolFilePath filePath={single.relativePath ?? single.movePath ?? single.filePath} />
-        ) : files.length > 0 ? (
-          `${files.length} files`
+        filePaths.length === 1 ? (
+          <ToolFilePath filePath={filePaths[0]} />
+        ) : filePaths.length > 0 ? (
+          <span title={filePaths.join(', ')}>
+            {files.length > 0 ? `${files.length} files · ` : ''}
+            {filePaths.join(', ')}
+          </span>
         ) : undefined
       }
       badge={<ToolDiffStats {...sumFileChanges(files)} />}
       status={state.status}
     >
       {files.map((file, index) => {
-        const filePath = file.relativePath ?? file.movePath ?? file.filePath;
+        const filePath = cloudAgentFileLabel(
+          file.relativePath ?? file.movePath ?? file.filePath ?? ''
+        );
         return (
           <section key={`${index}:${filePath}`} className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
@@ -56,12 +68,17 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
             {file.type === 'move' && (
               <div className="text-muted-foreground space-y-1 text-xs">
                 <div>
-                  From: <code className="break-all">{file.filePath ?? 'Unknown source'}</code>
+                  From:{' '}
+                  <code className="break-all">
+                    {file.filePath ? cloudAgentFileLabel(file.filePath) : 'Unknown source'}
+                  </code>
                 </div>
                 <div>
                   To:{' '}
                   <code className="break-all">
-                    {file.movePath ?? file.relativePath ?? 'Unknown destination'}
+                    {(file.movePath ?? file.relativePath)
+                      ? cloudAgentFileLabel(file.movePath ?? file.relativePath ?? '')
+                      : 'Unknown destination'}
                   </code>
                 </div>
               </div>

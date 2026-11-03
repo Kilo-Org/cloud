@@ -5,6 +5,11 @@
  * collisions when adding new features.
  */
 
+import {
+  BLACKLISTED_DOMAINS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/worker-utils/account-access';
+
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -13,7 +18,10 @@ export type RedisKey = string & {
 
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
-export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
+export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey(BLACKLISTED_DOMAINS_REDIS_KEY);
+export const BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY = redisKey(
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY
+);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
@@ -40,6 +48,9 @@ export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 
+export const discordGatewayMessageRedisKey = (botUserId: string, messageId: string) =>
+  redisKey(`discord:gateway-message:${botUserId}:${messageId}`);
+
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
 
@@ -48,3 +59,9 @@ export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
 
 export const githubConnectionPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-connection:${verifierRef}`);
+
+export const watchPrCiInboxRedisKey = (input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  repositoryId: string;
+}) => redisKey(`watch-pr-ci:v1:${input.installationId}:${input.appType}:${input.repositoryId}`);

@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAppReturnOutcomeView,
+  buildGitHubManagementInput,
   getGitHubUserConnectionErrorMessage,
   GitHubIntegrationDetails,
 } from './GitHubIntegrationDetails';
@@ -54,6 +55,25 @@ describe('GitHub user-connect recovery copy', () => {
     'not_installation_admin',
   ])('leaves unrelated error presentation unchanged: %s', error => {
     expect(getGitHubUserConnectionErrorMessage(error, 'user-connect')).toBeNull();
+  });
+});
+
+describe('GitHub installation management input', () => {
+  test('targets the displayed personal installation', () => {
+    expect(buildGitHubManagementInput(undefined, 'displayed-integration')).toEqual({
+      integrationId: 'displayed-integration',
+    });
+  });
+
+  test('keeps the personal fallback when no installation is displayed', () => {
+    expect(buildGitHubManagementInput(undefined, undefined)).toBeUndefined();
+  });
+
+  test('keeps organization targeting unchanged', () => {
+    expect(buildGitHubManagementInput('organization-id', 'displayed-integration')).toEqual({
+      organizationId: 'organization-id',
+      integrationId: 'displayed-integration',
+    });
   });
 });
 
@@ -198,6 +218,24 @@ describe('GitHubIntegrationDetails installation setup recovery', () => {
       expect(open).not.toHaveBeenCalled();
     }
   );
+
+  test('an unavailable installation landing names the state and offers no retry', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(GitHubIntegrationDetails, {
+        error: 'installation_unavailable',
+        fromApp: true,
+        appReturnPath: '/github-app?organizationId=synthetic-organization&fromApp=1',
+        organizationId: 'synthetic-organization',
+      })
+    );
+    expect(html).toContain('Cannot complete installation');
+    expect(html).toContain(
+      'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
+    );
+    expect(html).toContain('/cloud/sessions?error=installation_unavailable');
+    expect(html).not.toContain('another Kilo account');
+    expect(html).not.toContain('Try again');
+  });
 });
 
 describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
@@ -254,6 +292,17 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.kind).toBe('blocked');
     expect(view.cta).toBe('Back');
     expect(view.href).toBe('/cloud/sessions?error=installation_already_claimed');
+  });
+
+  it('non-retryable unavailable installation: names the state instead of another account', () => {
+    const view = buildAppReturnOutcomeView({ error: 'installation_unavailable' });
+    expect(view.kind).toBe('blocked');
+    expect(view.cta).toBe('Back');
+    expect(view.description).toBe(
+      'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
+    );
+    expect(view.description).not.toContain('another Kilo account');
+    expect(view.href).toBe('/cloud/sessions?error=installation_unavailable');
   });
 
   it('non-retryable multiple-installation error: Back and no retry', () => {

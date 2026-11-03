@@ -10,7 +10,16 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
+    {
+      "type": "Data",
+      "globs": [
+        "**/wrapper/dist/control-plane-wrapper.js?binary",
+        "**/wrapper/control-plane-supervisor.sh?binary",
+      ],
+    },
+  ],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -74,21 +83,25 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+    "ENVIRONMENT_SNAPSHOT_ORG_IDS": "*",
+    "SESSION_SNAPSHOT_ORG_IDS": "",
+    "SESSION_SNAPSHOT_USER_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
-    "PREVIEW_ENABLED_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130,9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "PREVIEW_ENABLED_IDS": "*",
+    "BYOC_VERCEL_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "VERCEL_SANDBOX_ORG_IDS": "",
     "VERCEL_PROJECT_ID": "",
     "VERCEL_TEAM_ID": "",
     "VERCEL_SANDBOX_SNAPSHOT_ID": "",
     "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
     "VERCEL_SANDBOX_RUNTIME": "node24",
-    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
-    "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
+    "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
   },
   "placement": { "mode": "smart" },
+  "ai": { "binding": "AI" },
   /**
    * Bindings
    * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
@@ -181,6 +194,9 @@
   // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
   // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
   // Remove retired applications/bindings only after verifying drain and external bindings.
+  // The containment classes that carry live traffic request the platform maximum 20 GB disk,
+  // so large repository checkouts are not bounded by the class's vCPU/memory tier. The
+  // non-containment classes have no live instances and keep their lower tiers.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -191,7 +207,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 40,
       "rollout_active_grace_period": 1800,
@@ -205,7 +221,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -219,7 +235,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -233,7 +249,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -247,7 +263,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -258,10 +274,10 @@
       "instance_type": {
         "vcpu": 2,
         "memory_mib": 6144,
-        "disk_mb": 10000,
+        "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -272,10 +288,10 @@
       "instance_type": {
         "vcpu": 1,
         "memory_mib": 4096,
-        "disk_mb": 8000,
+        "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -287,7 +303,7 @@
       "images": {
         "app": {
           "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
         },
       },
     },
@@ -323,10 +339,6 @@
         "name": "SandboxCodeReviewContainment",
       },
       {
-        "class_name": "CloudAgentSession",
-        "name": "CLOUD_AGENT_SESSION",
-      },
-      {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
       },
@@ -345,6 +357,14 @@
       {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
+      },
+      {
+        "class_name": "EnvironmentBuild",
+        "name": "ENVIRONMENT_BUILD",
+      },
+      {
+        "class_name": "VercelSnapshotBuild",
+        "name": "VERCEL_SNAPSHOT_BUILD",
       },
     ],
   },
@@ -397,6 +417,14 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v11",
     },
+    {
+      "new_sqlite_classes": ["EnvironmentBuild"],
+      "tag": "v12",
+    },
+    {
+      "new_sqlite_classes": ["VercelSnapshotBuild"],
+      "tag": "v13",
+    },
   ],
   /**
    * Hyperdrive Bindings
@@ -412,9 +440,6 @@
   "kv_namespaces": [
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-    {
-      "binding": "REPO_SNAPSHOTS",
     },
   ],
 
@@ -471,9 +496,6 @@
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
         },
-        {
-          "binding": "REPO_SNAPSHOTS",
-        },
       ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
@@ -495,19 +517,18 @@
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
-        "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+        "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+        "ENVIRONMENT_SNAPSHOT_ORG_IDS": "*",
+        "SESSION_SNAPSHOT_ORG_IDS": "",
+        "SESSION_SNAPSHOT_USER_IDS": "",
         "PREVIEW_ENABLED_IDS": "*",
-        "VERCEL_SANDBOX_ORG_IDS": "",
-        "VERCEL_PROJECT_ID": "",
-        "VERCEL_TEAM_ID": "",
-        "VERCEL_SANDBOX_SNAPSHOT_ID": "",
-        "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
+        "BYOC_VERCEL_IDS": "",
         "VERCEL_SANDBOX_RUNTIME": "node24",
-        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
+        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
         {
@@ -543,6 +564,10 @@
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
         },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "cloud-agent-runtime-dev",
+        },
       ],
       "containers": [
         // A local sandbox holds about 1.5 GiB. The small classes the e2e matrix boots
@@ -553,7 +578,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -563,7 +588,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -573,7 +598,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -587,7 +612,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -597,7 +622,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -607,7 +632,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -621,7 +646,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -633,7 +658,7 @@
           "images": {
             "app": {
               "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
             },
           },
         },
@@ -669,10 +694,6 @@
             "name": "SandboxCodeReviewContainment",
           },
           {
-            "class_name": "CloudAgentSession",
-            "name": "CLOUD_AGENT_SESSION",
-          },
-          {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",
           },
@@ -691,6 +712,14 @@
           {
             "class_name": "SandboxContainers",
             "name": "SANDBOX_CONTAINERS",
+          },
+          {
+            "class_name": "EnvironmentBuild",
+            "name": "ENVIRONMENT_BUILD",
+          },
+          {
+            "class_name": "VercelSnapshotBuild",
+            "name": "VERCEL_SNAPSHOT_BUILD",
           },
         ],
       },

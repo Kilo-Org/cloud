@@ -4,17 +4,19 @@ import { captureException } from '@sentry/nextjs';
 import {
   sendPushForConversationOutputSchema,
   type GlanceableScopeRefreshRequest,
+  type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
   type InternalDispatchSecurityFindingRequest,
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   INTERNAL_API_SECRET,
   NOTIFICATIONS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 
 type DispatchBody =
+  | InternalDispatchAgentBriefingRequest
   | InternalDispatchLowBalanceRequest
   | InternalDispatchSecurityFindingRequest
   | InternalDispatchSecurityLifecycleRequest
@@ -206,6 +208,12 @@ export async function dispatchSpendAlertPush(
   input: Omit<InternalDispatchSpendAlertRequest, 'kind'>
 ): Promise<boolean> {
   return dispatchInternal({ kind: 'spend_alert', ...input });
+}
+
+export async function dispatchAgentBriefingPush(
+  input: Omit<InternalDispatchAgentBriefingRequest, 'kind'>
+): Promise<boolean> {
+  return dispatchInternal({ kind: 'agent_briefing', ...input });
 }
 
 export async function dispatchSecurityFindingPush(

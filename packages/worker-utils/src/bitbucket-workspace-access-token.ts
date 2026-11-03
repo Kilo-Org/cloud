@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ProviderCredentialTimestampSchema } from './provider-credential-timestamp';
+
 export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME =
   'bitbucket-workspace-access-token-rsa-aes-256-gcm';
 export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_VERSION = 1;
@@ -33,25 +35,6 @@ export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS = {
   webhook: 'Webhooks Read and Write',
 } satisfies Record<BitbucketWorkspaceAccessTokenRequiredScope, string>;
 
-const BitbucketIsoTimestampSchema = z.iso.datetime({ offset: true });
-const BitbucketPostgresTimestampPattern =
-  /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}(?::?\d{2})?)$/;
-
-const BitbucketCredentialTimestampSchema = z.string().refine(value => {
-  if (BitbucketIsoTimestampSchema.safeParse(value).success) return true;
-
-  const match = BitbucketPostgresTimestampPattern.exec(value);
-  if (!match) return false;
-  const [, date, time, postgresOffset] = match;
-  const offset =
-    postgresOffset.length === 3
-      ? `${postgresOffset}:00`
-      : postgresOffset.length === 5
-        ? `${postgresOffset.slice(0, 3)}:${postgresOffset.slice(3)}`
-        : postgresOffset;
-  return BitbucketIsoTimestampSchema.safeParse(`${date}T${time}${offset}`).success;
-}, 'Invalid credential timestamp');
-
 export const BitbucketOAuthCredentialRowSchema = z
   .object({
     id: z.string().min(1),
@@ -62,16 +45,16 @@ export const BitbucketOAuthCredentialRowSchema = z
     provider_subject_login: z.string().min(1),
     provider_base_url: z.null(),
     access_token_encrypted: z.string().min(1),
-    access_token_expires_at: BitbucketCredentialTimestampSchema.nullable(),
+    access_token_expires_at: ProviderCredentialTimestampSchema.nullable(),
     refresh_token_encrypted: z.string().min(1),
-    refresh_token_expires_at: BitbucketCredentialTimestampSchema.nullable(),
+    refresh_token_expires_at: ProviderCredentialTimestampSchema.nullable(),
     oauth_client_secret_encrypted: z.null(),
     credential_version: z.number().int().positive(),
-    revoked_at: BitbucketCredentialTimestampSchema.nullable(),
+    revoked_at: ProviderCredentialTimestampSchema.nullable(),
     revocation_reason: z.string().nullable(),
-    last_used_at: BitbucketCredentialTimestampSchema.nullable(),
-    created_at: BitbucketCredentialTimestampSchema,
-    updated_at: BitbucketCredentialTimestampSchema,
+    last_used_at: ProviderCredentialTimestampSchema.nullable(),
+    created_at: ProviderCredentialTimestampSchema,
+    updated_at: ProviderCredentialTimestampSchema,
   })
   .strict();
 
@@ -85,19 +68,19 @@ export const BitbucketWorkspaceAccessTokenCredentialRowSchema = z
     platform: z.string().nullable().optional(),
     integration_type: z.string().nullable().optional(),
     token_encrypted: z.string().min(1),
-    expires_at: BitbucketCredentialTimestampSchema.nullable(),
+    expires_at: ProviderCredentialTimestampSchema.nullable(),
     provider_credential_type: z.literal(BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE),
     provider_resource_id: z.null(),
     provider_base_url: z.null(),
     authorized_by_user_id: z.null(),
     provider_metadata: z.null(),
     provider_scopes: z.array(z.string().min(1)),
-    provider_verified_at: BitbucketCredentialTimestampSchema,
+    provider_verified_at: ProviderCredentialTimestampSchema,
     credential_version: z.number().int().positive(),
-    last_validated_at: BitbucketCredentialTimestampSchema,
-    last_used_at: BitbucketCredentialTimestampSchema.nullable(),
-    created_at: BitbucketCredentialTimestampSchema,
-    updated_at: BitbucketCredentialTimestampSchema,
+    last_validated_at: ProviderCredentialTimestampSchema,
+    last_used_at: ProviderCredentialTimestampSchema.nullable(),
+    created_at: ProviderCredentialTimestampSchema,
+    updated_at: ProviderCredentialTimestampSchema,
   })
   .strict();
 

@@ -22,6 +22,7 @@ import { deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/cli
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
+  claimBouncerCreditEventByEventId,
   claimDueBouncerCreditEvents,
   deleteBouncerCreditEvent,
   markBouncerCreditEventDelivered,
@@ -55,6 +56,37 @@ export type BouncerCreditEventOutboxDispatchSummary = {
 };
 
 type OutboxDispatchOutcome = 'delivered' | 'retried' | 'failed';
+
+/**
+ * Claims and delivers the row for `eventId` right after a webhook enqueued it, so bouncer's payer
+ * standing includes this failure before the same webhook asks for a charge verdict. Resolves true
+ * only when this call delivered the event. A row the drainer holds, an already terminal row, or a
+ * failed delivery resolves false: the row stays with the outbox, and the cron drainer retries it.
+ * Never throws.
+ */
+export async function deliverBouncerCreditEventNow(eventId: string): Promise<boolean> {
+  let row: BouncerCreditEventOutboxRow | null;
+  try {
+    row = await claimBouncerCreditEventByEventId(db, eventId);
+  } catch (error) {
+    logError('Bouncer credit-event outbox claim failed', {
+      event_id: eventId,
+      error: error instanceof Error ? error.name : String(error),
+    });
+    return false;
+  }
+  if (!row) return false;
+  try {
+    return (await dispatchCreditEvent(row)) === 'delivered';
+  } catch (error) {
+    // The row stays claimed and the stale-claim window hands it back to the drainer.
+    logError('Immediate bouncer credit-event delivery failed; the cron drainer retries it', {
+      event_id: eventId,
+      error: error instanceof Error ? error.name : String(error),
+    });
+    return false;
+  }
+}
 
 /**
  * Drains the Bouncer credit-event outbox in one cron pass and returns a per-step summary for the

@@ -40,11 +40,13 @@ async function classifierUsage() {
       },
     }),
     {
+      scope: 'efficient',
       conversationKey: 'conversation-1',
       classifierModel: 'test/classifier',
       contentHash: 'hash',
       kind: 'sync',
       requestStart: 'request-start',
+      requestedModel: 'kilo-auto/efficient',
     },
     0.000013,
     new Date().toISOString()

@@ -7,7 +7,6 @@ import {
   KILO_PASS_MANAGE_CTA_LABEL,
   mapKiloPassStatusToClass,
   resolvePurchasePresentation,
-  type KiloPassSubscriptionStatus,
   type PurchaseCtaAction,
   type PurchasePresentationKind,
   type PurchasePresentationReason,
@@ -39,7 +38,7 @@ export type PurchasePresentationInput = {
 
 type SubscriptionForPresentation = {
   paymentProvider: KiloPassPaymentProvider;
-  status: KiloPassSubscriptionStatus;
+  status: string;
 };
 
 /**

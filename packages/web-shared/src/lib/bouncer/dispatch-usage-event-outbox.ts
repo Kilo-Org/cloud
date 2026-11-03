@@ -1,13 +1,13 @@
 /**
  * Delivery for the durable Bouncer usage-event outbox.
  *
- * `deliverBouncerUsageEventNow` is the gateway's immediate attempt right after the usage write that
+ * `deliverBouncerUsageEventNow` is the writer's immediate attempt right after the usage write that
  * enqueued the row; `dispatchQueuedBouncerUsageEvents` is the cron pass that retries everything
  * else (reclaim stale claims, claim due rows in bounded batches, deliver, mark, purge). Both claim
  * through `@kilocode/db/bouncer-usage-event-outbox`, so the immediate attempt and the drainer never
  * send the same claim, and a row is marked delivered only on a real 2xx. This mirrors
  * `apps/web/src/lib/bouncer/dispatch-credit-event-outbox.ts`; it lives in web-shared because the
- * gateway's usage path needs the immediate delivery.
+ * gateway and primary-region writer share usage accounting.
  */
 import 'server-only';
 

@@ -52,6 +52,14 @@ function buildAppReturnHref(query: string, organizationId?: string): string {
   return `/cloud/sessions?${query}${orgParam}`;
 }
 
+/**
+ * A canonical installation GitHub reports as suspended or deleted refuses the
+ * completion, so the card must name that state instead of the
+ * claimed-by-another-account reason.
+ */
+const INSTALLATION_UNAVAILABLE_MESSAGE =
+  'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.';
+
 export type AppReturnOutcomeView = {
   kind: 'installed' | 'pending' | 'blocked' | 'retryable';
   title: string;
@@ -79,6 +87,7 @@ export function buildAppReturnOutcomeView(input: {
     input.error === 'installation_already_claimed' ||
     input.error === 'shared_installation_disabled' ||
     input.error === 'incompatible_workflow' ||
+    input.error === 'installation_unavailable' ||
     input.error === 'multiple_installations_disabled';
   const returnQuery = isSuccess
     ? 'github_install=success'
@@ -106,9 +115,11 @@ export function buildAppReturnOutcomeView(input: {
               ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
               : input.error === 'multiple_installations_disabled'
                 ? 'This Kilo organization can currently connect only one GitHub organization.'
-                : input.error === 'install_state_user_mismatch'
-                  ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                  : 'The installation did not complete. Try again or return to the Kilo App.';
+                : input.error === 'installation_unavailable'
+                  ? INSTALLATION_UNAVAILABLE_MESSAGE
+                  : input.error === 'install_state_user_mismatch'
+                    ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                    : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {
@@ -124,6 +135,15 @@ export function buildAppReturnOutcomeView(input: {
     cta,
     href: buildAppReturnHref(returnQuery, input.organizationId),
   };
+}
+
+/** Targets the displayed installation so management actions cannot drift to another association. */
+export function buildGitHubManagementInput(
+  organizationId: string | undefined,
+  integrationId: string | undefined
+) {
+  if (organizationId) return { organizationId, integrationId };
+  return integrationId ? { integrationId } : undefined;
 }
 
 export function getGitHubUserConnectionErrorMessage(
@@ -182,6 +202,8 @@ function GitHubIntegrationOutcomeToasts({
         'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
         { duration: 8000 }
       );
+    } else if (error === 'installation_unavailable') {
+      toast.error(INSTALLATION_UNAVAILABLE_MESSAGE, { duration: 8000 });
     } else if (error === 'multiple_installations_disabled') {
       toast.error('This organization can currently connect only one GitHub organization.', {
         duration: 8000,
@@ -587,6 +609,10 @@ function GitHubIntegrationDetailsContent({
   };
 
   const handleCancelPending = async () => {
+    // Cancel exactly the pending row this view rendered; the id is required so
+    // the request cannot fall back to another pending request.
+    const pendingIntegrationId = installationData?.installation?.id;
+    if (!pendingIntegrationId) return;
     if (
       await confirm({
         title: 'Cancel this installation request?',
@@ -596,17 +622,22 @@ function GitHubIntegrationDetailsContent({
         destructive: true,
       })
     ) {
-      cancelPendingInstallation.mutate(managementInput, {
-        onSuccess: async () => {
-          toast.success('Installation request cancelled');
-          await refetch();
-        },
-        onError: error => {
-          toast.error('Failed to cancel installation request', {
-            description: error.message,
-          });
-        },
-      });
+      cancelPendingInstallation.mutate(
+        organizationId
+          ? { organizationId, integrationId: pendingIntegrationId }
+          : { integrationId: pendingIntegrationId },
+        {
+          onSuccess: async () => {
+            toast.success('Installation request cancelled');
+            await refetch();
+          },
+          onError: error => {
+            toast.error('Failed to cancel installation request', {
+              description: error.message,
+            });
+          },
+        }
+      );
     }
   };
 
@@ -646,9 +677,7 @@ function GitHubIntegrationDetailsContent({
   }
 
   const installation = installationData?.installation;
-  const managementInput = organizationId
-    ? { organizationId, integrationId: installation?.id }
-    : undefined;
+  const managementInput = buildGitHubManagementInput(organizationId, installation?.id);
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 

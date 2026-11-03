@@ -1,5 +1,7 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it } from '@jest/globals';
+import { ai_gateway_config } from '@kilocode/db/schema';
 import type { StoredModel } from '@kilocode/db/schema-types';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -15,6 +17,19 @@ import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/m
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;
+const OVERRIDDEN_MODEL = 'anthropic/claude-sonnet-4-6';
+const OVERRIDDEN_VERCEL_MODEL = 'anthropic/claude-sonnet-4.6';
+
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db.insert(ai_gateway_config).values({
+    vercel_model_id_overrides: {
+      overrides: [
+        { openrouter_model_id: OVERRIDDEN_MODEL, vercel_model_id: OVERRIDDEN_VERCEL_MODEL },
+      ],
+    },
+  });
+});
 
 function snapshotModel(slug: string, variant: string | null): OpenRouterModel {
   return {
@@ -80,6 +95,25 @@ describe('getSnapshotModelVariantId', () => {
   });
 });
 
+describe('buildModelIdToProviderSlugsIndex', () => {
+  it('leaves out BYOK-only providers', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers.push({
+      name: 'Synthetic',
+      displayName: 'Synthetic',
+      slug: 'synthetic',
+      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      byokOnly: true,
+      models: [snapshotModel(MODEL, 'standard'), snapshotModel('only/byok', 'standard')],
+    });
+
+    const index = buildModelIdToProviderSlugsIndex(snapshot);
+
+    expect(index.get(MODEL)).toEqual(new Set(['deepinfra', 'coreweave', 'nvidia']));
+    expect(index.has('only/byok')).toBe(false);
+  });
+});
+
 describe('buildDataCollectionRequiredModelIds', () => {
   function provider(slug: string, training: boolean, models: OpenRouterModel[]) {
     return {
@@ -115,6 +149,19 @@ describe('buildDataCollectionRequiredModelIds', () => {
     expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(
       new Set(['meta/muse-spark-1.3-contributor', FREE_MODEL])
     );
+  });
+
+  it('ignores BYOK-only providers, which Kilo never routes to', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('trains', true, [snapshotModel('mixed/model', 'standard')]),
+      {
+        ...provider('synthetic', false, [snapshotModel('mixed/model', 'standard')]),
+        byokOnly: true,
+      },
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set(['mixed/model']));
   });
 
   it('keys standard and free variants separately', () => {
@@ -300,8 +347,8 @@ describe('createModelsByProviderIndexLoader', () => {
   });
 
   it('maps model and provider IDs when retaining Vercel endpoints', async () => {
-    const modelId = 'anthropic/claude-sonnet-4-6';
-    const vercelModelId = 'anthropic/claude-sonnet-4.6';
+    const modelId = OVERRIDDEN_MODEL;
+    const vercelModelId = OVERRIDDEN_VERCEL_MODEL;
     const snapshot = makeSnapshot();
     snapshot.providers = ['anthropic', 'google-vertex'].map(slug => ({
       name: slug,

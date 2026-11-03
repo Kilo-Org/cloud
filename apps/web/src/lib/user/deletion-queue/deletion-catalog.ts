@@ -173,14 +173,16 @@ export const USER_DELETION_CATALOG_V2 = [
     dependsOn: [UserDeletionStepKey.PylonFinalize, UserDeletionStepKey.CompletionEmail],
     allowsManualVerification: true,
   },
-  {
-    stepKey: UserDeletionStepKey.CsaSupportDb,
-    phase: UserDeletionPhase.Finalize,
-    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-    dependsOn: [UserDeletionStepKey.PylonContact],
-    allowsManualVerification: true,
-  },
 ] as const satisfies readonly UserDeletionCatalogEntry[];
+
+// Persisted v2 rows remain readable, but new requests no longer materialize this retired step.
+const LEGACY_CSA_ENTRY: UserDeletionCatalogEntry = {
+  stepKey: UserDeletionStepKey.CsaSupportDb,
+  phase: UserDeletionPhase.Finalize,
+  maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+  dependsOn: [UserDeletionStepKey.PylonContact],
+  allowsManualVerification: true,
+};
 
 export const USER_DELETION_CATALOG_V3 = [
   {
@@ -238,6 +240,7 @@ export function catalogEntryFor(
   version: number,
   stepKey: UserDeletionStepKey
 ): UserDeletionCatalogEntry {
+  if (version === 2 && stepKey === UserDeletionStepKey.CsaSupportDb) return LEGACY_CSA_ENTRY;
   const entry = catalogForVersion(version).find(candidate => candidate.stepKey === stepKey);
   if (!entry) {
     throw new Error(`Unknown user deletion step ${stepKey} for catalog version ${version}`);

@@ -4,7 +4,7 @@ import { StatusSpinner } from '@/components/shared/StatusSpinner';
 
 export function SessionStatusIndicator({ indicator }: { indicator: SessionStatusIndicatorType }) {
   return (
-    <div className="flex items-center gap-2 py-2 text-xs">
+    <div className="flex min-w-0 items-center gap-2 py-2 text-xs">
       <IndicatorContent indicator={indicator} />
     </div>
   );
@@ -16,28 +16,34 @@ function IndicatorContent({ indicator }: { indicator: SessionStatusIndicatorType
       return (
         <span className="text-destructive flex items-center gap-2">
           <AlertCircle className="h-3 w-3 shrink-0" />
-          <span>{indicator.message}</span>
+          <span title={indicator.message}>{indicator.message}</span>
         </span>
       );
     case 'warning':
       return (
-        <span className="flex items-center gap-2 text-amber-500">
+        <span className="flex min-w-0 items-center gap-2 text-amber-500">
           <StatusSpinner className="h-3 w-3 shrink-0" />
-          <span>{indicator.message}</span>
+          <span className="truncate" title={indicator.message}>
+            {indicator.message}
+          </span>
         </span>
       );
     case 'progress':
       return (
-        <span className="text-muted-foreground flex items-center gap-2">
+        <span className="text-muted-foreground flex min-w-0 items-center gap-2">
           <StatusSpinner className="h-3 w-3 shrink-0" />
-          <span>{indicator.message}</span>
+          <span className="truncate" title={indicator.message}>
+            {indicator.message}
+          </span>
         </span>
       );
     case 'info':
       return (
-        <span className="text-muted-foreground flex items-center gap-2">
+        <span className="text-muted-foreground flex min-w-0 items-center gap-2">
           <Check className="h-3 w-3 shrink-0" />
-          <span>{indicator.message}</span>
+          <span className="truncate" title={indicator.message}>
+            {indicator.message}
+          </span>
         </span>
       );
   }

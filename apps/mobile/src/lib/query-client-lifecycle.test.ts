@@ -2,6 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { installQueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 
+const committedConnectivity = vi.hoisted(() => ({
+  status: 'unknown' as 'online' | 'offline' | 'unknown',
+  subscribe: undefined as ((listener: () => void) => void) | undefined,
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => committedConnectivity.status,
+  subscribeCommittedConnectivityStatus: (listener: () => void) => {
+    committedConnectivity.subscribe = listener;
+    return () => {
+      committedConnectivity.subscribe = undefined;
+    };
+  },
+}));
+
 vi.mock('react-native', () => ({
   AppState: { currentState: 'active', addEventListener: vi.fn() },
 }));
@@ -17,8 +32,11 @@ function createSources(initialAppState: AppState = 'active') {
   let appState = initialAppState;
   let appStateListener: ((state: AppState) => void) | undefined = undefined;
   let connectivityListener: ((state: ConnectivityState) => void) | undefined = undefined;
+  let committedListener: (() => void) | undefined = undefined;
+  let committedState: 'online' | 'offline' | 'unknown' = 'unknown';
   const removeAppStateListener = vi.fn();
   const removeConnectivityListener = vi.fn();
+  const removeCommittedListener = vi.fn();
 
   return {
     sources: {
@@ -31,6 +49,10 @@ function createSources(initialAppState: AppState = 'active') {
         connectivityListener = listener;
         return removeConnectivityListener;
       },
+      onCommittedConnectivityChange: (listener: () => void) => {
+        committedListener = listener;
+        return removeCommittedListener;
+      },
     },
     setAppState(nextState: AppState) {
       appState = nextState;
@@ -39,8 +61,15 @@ function createSources(initialAppState: AppState = 'active') {
     setConnectivity(nextState: ConnectivityState) {
       connectivityListener?.(nextState);
     },
+    setCommitted(nextState: 'online' | 'offline' | 'unknown') {
+      committedState = nextState;
+      committedConnectivity.status = nextState;
+      committedListener?.();
+    },
+    committed: () => committedState,
     removeAppStateListener,
     removeConnectivityListener,
+    removeCommittedListener,
   };
 }
 
@@ -48,6 +77,17 @@ function createBooleanSetterMock() {
   return vi.fn((value: boolean): void => {
     void value;
   });
+}
+
+function createOnlineManager(initial: boolean) {
+  let online = initial;
+  const setOnline = vi.fn((next: boolean): void => {
+    online = next;
+  });
+  return {
+    online: { setOnline, isOnline: () => online },
+    setOnline,
+  };
 }
 
 describe('installQueryClientNativeLifecycle', () => {
@@ -60,7 +100,7 @@ describe('installQueryClientNativeLifecycle', () => {
       sources: native.sources,
       managers: {
         focus: { setFocused },
-        online: { setOnline },
+        online: { setOnline, isOnline: () => true },
       },
     });
 
@@ -83,7 +123,7 @@ describe('installQueryClientNativeLifecycle', () => {
       sources: native.sources,
       managers: {
         focus: { setFocused },
-        online: { setOnline },
+        online: { setOnline, isOnline: () => true },
       },
     });
 
@@ -105,7 +145,7 @@ describe('installQueryClientNativeLifecycle', () => {
       sources: native.sources,
       managers: {
         focus: { setFocused },
-        online: { setOnline },
+        online: { setOnline, isOnline: () => true },
       },
     });
 
@@ -123,6 +163,46 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(setOnline).toHaveBeenNthCalledWith(4, true);
   });
 
+  it('keeps a confirmed-online handover online when reachability stays unknown', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(true);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    // Wi-Fi → cellular handover: the radio reports connected while its
+    // reachability probe never answers, and the probe store has already
+    // confirmed online. The manager must not latch offline with no recovery
+    // edge, so the unknown state reads the committed state.
+    committedConnectivity.status = 'online';
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    cleanup();
+
+    expect(manager.setOnline).toHaveBeenNthCalledWith(1, true);
+  });
+
+  it('keeps an unconfirmed unknown state offline during a handover', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(false);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    // The probe has not confirmed anything yet (boot, no probe answer): the
+    // unknown state still pauses the manager.
+    committedConnectivity.status = 'unknown';
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    cleanup();
+
+    expect(manager.setOnline).toHaveBeenNthCalledWith(1, false);
+  });
+
   it('flapping unknown → offline → online → offline is online only on the confirmed online state', () => {
     const native = createSources();
     const setFocused = createBooleanSetterMock();
@@ -132,7 +212,7 @@ describe('installQueryClientNativeLifecycle', () => {
       sources: native.sources,
       managers: {
         focus: { setFocused },
-        online: { setOnline },
+        online: { setOnline, isOnline: () => true },
       },
     });
 
@@ -148,5 +228,65 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(setOnline).toHaveBeenNthCalledWith(2, false);
     expect(setOnline).toHaveBeenNthCalledWith(3, true);
     expect(setOnline).toHaveBeenNthCalledWith(4, false);
+  });
+
+  it('promotes a latched-offline manager on a committed online probe', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(false);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    // The radio returned but NetInfo's reachability probe never answered: the
+    // manager stays offline, and the backend probe then commits online.
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    committedConnectivity.status = 'online';
+    native.setCommitted('online');
+    cleanup();
+
+    expect(manager.setOnline).toHaveBeenCalledWith(true);
+    expect(native.removeCommittedListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not demote or double-set an already-online manager', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(true);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    committedConnectivity.status = 'online';
+    native.setCommitted('online');
+    committedConnectivity.status = 'offline';
+    native.setCommitted('offline');
+    cleanup();
+
+    // NetInfo owns going offline: a probe commit never writes the manager.
+    expect(manager.setOnline).not.toHaveBeenCalled();
+  });
+
+  it('leaves the manager latched offline when the probe has not confirmed online', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const manager = createOnlineManager(false);
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: { focus: { setFocused }, online: manager.online },
+    });
+
+    committedConnectivity.status = 'unknown';
+    native.setCommitted('unknown');
+    committedConnectivity.status = 'offline';
+    native.setCommitted('offline');
+    cleanup();
+
+    expect(manager.setOnline).not.toHaveBeenCalled();
   });
 });

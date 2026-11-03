@@ -5,9 +5,9 @@
 // `useHoistedOperationKey` is React state (useRef) and lives in
 // `@/lib/operation-key`, covered by `operation-key.mounted.test.tsx`.
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-key';
+import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-markers';
 import {
   isPrMutationRetryable,
   isPrOperationPersistenceFailed,
@@ -16,12 +16,6 @@ import {
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
-
-// `@/lib/operation-key` imports expo-crypto for the hoisted key, which drags
-// react-native in and does not parse under the pure project.
-vi.mock('expo-crypto', () => ({
-  randomUUID: () => 'not-used-in-pure-tests',
-}));
 
 const IN_PROGRESS = new Error(OPERATION_IN_PROGRESS_MESSAGE);
 const AMBIGUOUS = new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);

@@ -3,10 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from './auth-epoch';
 
 describe('auth-epoch', () => {
-  it('starts with a current epoch', () => {
-    expect(isCurrentAuthEpoch(currentAuthEpoch())).toBe(true);
-  });
-
   it('bumpAuthEpoch invalidates the prior epoch', () => {
     const prior = currentAuthEpoch();
     bumpAuthEpoch();

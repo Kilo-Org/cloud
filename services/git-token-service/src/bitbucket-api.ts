@@ -1,6 +1,7 @@
 import { isValidBitbucketRepositoryPaginationUrl } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { z } from 'zod';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
+import { ResponseTooLargeError, readBoundedJsonBody } from './lib/bounded-read.js';
 
 const BITBUCKET_REPOSITORY_PAGE_LENGTH = 50;
 const BITBUCKET_MAX_REPOSITORY_PAGES = 100;
@@ -132,46 +133,13 @@ function normalizeRepository(
 async function readBoundedJson(response: Response, signal: AbortSignal): Promise<unknown> {
   if (!response.body) throw new BitbucketApiError('invalid_response');
 
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
   try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      const chunkValue: unknown = chunk.value;
-      if (!(chunkValue instanceof Uint8Array)) {
-        throw new BitbucketApiError('invalid_response');
-      }
-      totalBytes += chunkValue.byteLength;
-      if (totalBytes > BITBUCKET_MAX_RESPONSE_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The bounded read still fails closed if cancellation itself fails.
-        }
-        throw new BitbucketApiError('response_too_large');
-      }
-      chunks.push(chunkValue);
-    }
+    return await readBoundedJsonBody(response.body, BITBUCKET_MAX_RESPONSE_BYTES);
   } catch (error) {
-    if (error instanceof BitbucketApiError) throw error;
+    if (error instanceof ResponseTooLargeError) {
+      throw new BitbucketApiError('response_too_large');
+    }
     throw new BitbucketApiError(signal.aborted ? 'request_timed_out' : 'invalid_response');
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
-  } catch {
-    throw new BitbucketApiError('invalid_response');
   }
 }
 

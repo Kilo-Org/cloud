@@ -92,6 +92,8 @@ export type KilocodeEventData = {
 export type AutocommitStartedData = {
   message: string;
   messageId?: string;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -108,6 +110,8 @@ export type AutocommitCompletedData = {
   committedAt?: string;
   pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
   commitMessageTruncated?: true;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -139,6 +143,7 @@ export type PreparingStep =
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
+  | 'environment_snapshot'
   | 'sandbox_boot'
   | 'snapshot_fallback'
   | 'kilo_server'
@@ -272,8 +277,8 @@ export type CommandsAvailableData = {
 };
 
 /**
- * Regex for validating session IDs (`agent_<uuid>` legacy, `workspace_<uuid>` control plane).
+ * Regex for validating session IDs (`workspace_<uuid>`).
  * Shared between worker (zod schema) and wrapper (defense-in-depth validation).
  */
 export const SESSION_ID_RE =
-  /^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

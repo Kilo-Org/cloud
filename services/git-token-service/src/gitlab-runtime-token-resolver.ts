@@ -10,6 +10,7 @@ import {
   sha256Digest,
   type GitLabCapabilityCredentialSource,
 } from './gitlab-session-capability.js';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 
 export type GetGitLabTokenParams = {
   userId: string;
@@ -95,7 +96,8 @@ function mapCredentialFailure(status: string, project = false): GetGitLabTokenFa
 }
 
 async function readBoundedProjectIdentity(response: Response): Promise<number | null> {
-  if (!response.body) return null;
+  const stream = response.body;
+  if (!stream) return null;
   const contentLength = response.headers.get('Content-Length');
   if (
     contentLength &&
@@ -103,34 +105,9 @@ async function readBoundedProjectIdentity(response: Response): Promise<number | 
   ) {
     return null;
   }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      const value: unknown = chunk.value;
-      if (!(value instanceof Uint8Array)) return null;
-      total += value.byteLength;
-      if (total > MAX_PROJECT_LOOKUP_RESPONSE_BYTES) {
-        await reader.cancel();
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
   try {
     const parsed = GitLabProjectIdentitySchema.safeParse(
-      JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body))
+      await readBoundedJsonBody(stream, MAX_PROJECT_LOOKUP_RESPONSE_BYTES)
     );
     return parsed.success ? parsed.data.id : null;
   } catch {

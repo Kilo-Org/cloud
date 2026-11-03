@@ -9,6 +9,7 @@ import Link from 'next/link';
 import type { RootRouter } from '@/routers/root-router';
 import { useTRPC } from '@/lib/trpc/utils';
 import { formatCents } from '@/lib/utils';
+import { stripeCustomerUrl, stripePaymentUrl } from '@/lib/stripe/dashboard-urls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -241,16 +242,4 @@ function formatTimestamp(value: string | null): string {
 function formatAmount(amountMinorUnits: number | null, currency: string | null): string {
   if (amountMinorUnits === null || !currency) return 'Not available';
   return formatCents(amountMinorUnits, currency);
-}
-
-function stripeDashboardPrefix(): string {
-  return process.env.NODE_ENV === 'development' ? 'test/' : '';
-}
-
-function stripePaymentUrl(chargeId: string): string {
-  return `https://dashboard.stripe.com/${stripeDashboardPrefix()}payments/${chargeId}`;
-}
-
-function stripeCustomerUrl(customerId: string): string {
-  return `https://dashboard.stripe.com/${stripeDashboardPrefix()}customers/${customerId}`;
 }

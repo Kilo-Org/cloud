@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import type { RootRouter } from '@/routers/root-router';
 import { useTRPC } from '@/lib/trpc/utils';
 import { formatCents } from '@/lib/utils';
+import { stripeCustomerUrl, stripeDisputeUrl, stripePaymentUrl } from '@/lib/stripe/dashboard-urls';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -704,20 +705,4 @@ function actionBadgeClass(status: string): string {
   if (status === 'failed') return 'border-destructive/30 bg-destructive/10 text-destructive';
   if (status === 'processing') return 'border-yellow-500/20 bg-yellow-500/10 text-yellow-400';
   return 'border-border bg-secondary text-secondary-foreground';
-}
-
-function stripeDashboardPrefix(): string {
-  return process.env.NODE_ENV === 'development' ? 'test/' : '';
-}
-
-function stripeDisputeUrl(disputeId: string): string {
-  return `https://dashboard.stripe.com/${stripeDashboardPrefix()}disputes/${disputeId}`;
-}
-
-function stripePaymentUrl(chargeId: string): string {
-  return `https://dashboard.stripe.com/${stripeDashboardPrefix()}payments/${chargeId}`;
-}
-
-function stripeCustomerUrl(customerId: string): string {
-  return `https://dashboard.stripe.com/${stripeDashboardPrefix()}customers/${customerId}`;
 }

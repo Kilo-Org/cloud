@@ -17,15 +17,11 @@ import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
-  modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getEffectiveProviderPrivacy,
-  providerPrivacySchema,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -41,6 +37,7 @@ import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsag
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
+  organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
@@ -279,25 +276,28 @@ export async function handleAudioTranscriptionsRequest(
   if (creditsBlocked) return await creditsBlocked();
 
   // OpenRouter's transcription endpoint accepts the same provider preferences
-  // as chat, so the organization data-collection policy is forwarded with the
-  // request instead of rejecting it.
+  // as chat, so the organization data-collection policy and provider routes are
+  // forwarded with the request instead of rejecting it.
   const requestProvider = parsedRequest.kind === 'json' ? parsedRequest.body.provider : undefined;
   const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
   if (!requestPrivacy.success) return invalidRequestResponse();
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
-    settings?.data_collection
-  );
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestedModelLowerCased,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-  }
+  const organizationDecision = organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId,
+          kiloUserId: user.id,
+          modelId: requestedModelLowerCased,
+          fromDb: readDb,
+        })
+      ).decision
+    : undefined;
+  const preferences = organizationProviderPreferences({
+    decision: organizationDecision,
+    settings,
+    requestProvider: requestPrivacy.data,
+  });
+  if (preferences.kind === 'rejected') return preferences.response;
+  const organizationProvider = preferences.provider;
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
@@ -323,15 +323,15 @@ export async function handleAudioTranscriptionsRequest(
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
     // The multipart form takes the provider preferences as a JSON string.
-    if (Object.keys(effectivePrivacy).length > 0) {
-      upstreamForm.append('provider', JSON.stringify(effectivePrivacy));
+    if (organizationProvider) {
+      upstreamForm.append('provider', JSON.stringify(organizationProvider));
     }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
-    if (Object.keys(effectivePrivacy).length > 0) {
-      parsedRequest.body.provider = { ...requestProvider, ...effectivePrivacy };
+    if (organizationProvider) {
+      parsedRequest.body.provider = { ...requestProvider, ...organizationProvider };
     }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }

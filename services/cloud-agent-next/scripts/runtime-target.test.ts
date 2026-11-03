@@ -34,15 +34,22 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog scopes production runtime-free to an org cohort', async () => {
+it('the committed catalog defaults production to runtime-free without an org restriction', async () => {
   const catalog: unknown = JSON.parse(
     await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
   );
-  expect(selectRuntimeTarget(catalog, 'production')).toMatchObject({
+  const production = selectRuntimeTarget(catalog, 'production');
+  expect(production).toEqual({
     mode: 'downloaded',
     image: 'runtime-free',
-    interactiveOrgIds: [expect.any(String)],
   });
+  const output = renderRuntimeTarget({
+    config: baseline(),
+    environment: 'production',
+    startup: production,
+    release,
+  });
+  expect(output.vars).not.toHaveProperty('RUNTIME_INTERACTIVE_ORG_IDS');
   for (const target of ['dev', 'isolated'])
     expect(selectRuntimeTarget(catalog, target)).toEqual({
       mode: 'preinstalled',

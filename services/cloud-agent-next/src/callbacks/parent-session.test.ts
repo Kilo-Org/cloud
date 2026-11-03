@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseChildSessionCallbackPrompt } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { createMessageId } from '../session/message-id.js';
 import type { Env } from '../types.js';
@@ -67,6 +68,21 @@ beforeEach(() => {
   queuePrompt.mockReset().mockResolvedValue({ delivery: 'queued' });
 });
 
+describe('child session callback envelope', () => {
+  it('emits the shared child callback envelope', () => {
+    expect(parseChildSessionCallbackPrompt(parentSessionCallbackPrompt(job.payload))).toMatchObject(
+      {
+        version: 1,
+        cloudAgentSessionId: childId,
+        kiloSessionId: 'ses_child',
+        messageId: job.payload.messageId,
+        status: 'completed',
+        result: 'Child result',
+      }
+    );
+  });
+});
+
 describe('workspace session callback delivery', () => {
   beforeEach(() => {
     child.parentCloudAgentSessionId = rootId;
@@ -91,6 +107,21 @@ describe('workspace session callback delivery', () => {
         : null
     );
     job.target = { url: `workspace:${targetId}` };
+  });
+
+  it('preserves gate and structured failure results in the queued parent prompt', async () => {
+    job.payload.gateResult = 'fail';
+    job.payload.failure = { code: 'workspace_setup_failed', stage: 'pre_dispatch' };
+    job.payload.failureStage = 'pre_dispatch';
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    const [input] = queuePrompt.mock.calls[0];
+    expect(JSON.parse(input.turn.prompt.split('\n')[2])).toMatchObject({
+      version: 1,
+      status: 'completed',
+      gateResult: 'fail',
+      failure: job.payload.failure,
+      failureStage: 'pre_dispatch',
+    });
   });
 
   it('queues the child result into the addressed chat in the same workspace', async () => {

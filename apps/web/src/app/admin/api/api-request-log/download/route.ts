@@ -429,7 +429,10 @@ export async function GET(request: NextRequest) {
             }
             try {
               const blob = apiRequestLogBlobSchema.parse(JSON.parse(body.value));
-              return { request: { value: blob.request }, response: { value: blob.response } };
+              return {
+                request: { value: JSON.stringify(blob.request) },
+                response: { value: blob.response },
+              };
             } catch {
               const failure = {
                 loadError: `Failed to decode ${row.request_r2_key} from R2: Invalid API request log envelope`,

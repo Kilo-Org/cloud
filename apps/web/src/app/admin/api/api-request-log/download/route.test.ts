@@ -297,7 +297,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
   it('exports combined request and response bodies with a single R2 GET and DB-sourced error', async () => {
     const key = '2026-08-01/combined/log.json';
-    const request = '{"messages":[{"role":"user","content":"hello"}]}';
+    const request = { messages: [{ role: 'user', content: 'hello' }] };
     const response = 'data: {"choices":[]}\n\ndata: [DONE]\n\n';
     const error = { response_body_read_error: 'upstream disconnected' };
     fakeR2.objects.set(`${BUCKET}/${key}`, JSON.stringify({ version: 1, request, response }));
@@ -310,9 +310,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     const entries = await downloadEntries();
 
     expect(Object.keys(entries)).toHaveLength(3);
-    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(
-      JSON.stringify(JSON.parse(request), null, 2)
-    );
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
     expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(response);
     expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
     expect(send).toHaveBeenCalledTimes(1);
@@ -324,7 +322,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     const key = '2026-08-01/no-response/log.json';
     fakeR2.objects.set(
       `${BUCKET}/${key}`,
-      JSON.stringify({ version: 1, request: '{"request":true}', response: null })
+      JSON.stringify({ version: 1, request: { request: true }, response: null })
     );
     const [row] = await db
       .insert(api_request_log)
@@ -356,13 +354,18 @@ describe('GET /admin/api/api-request-log/download', () => {
 
   it.each([
     ['invalid JSON', 'private-invalid-json-body'],
-    ['unsupported version', JSON.stringify({ version: 2, request: 'private', response: null })],
     [
-      'non-string request',
-      JSON.stringify({ version: 1, request: { private: true }, response: null }),
+      'unsupported version',
+      JSON.stringify({ version: 2, request: { content: 'private' }, response: null }),
     ],
-    ['non-string response', JSON.stringify({ version: 1, request: 'private', response: {} })],
-    ['missing response', JSON.stringify({ version: 1, request: 'private' })],
+    ['string request', JSON.stringify({ version: 1, request: 'private', response: null })],
+    ['array request', JSON.stringify({ version: 1, request: ['private'], response: null })],
+    ['null request', JSON.stringify({ version: 1, request: null, response: null })],
+    [
+      'non-string response',
+      JSON.stringify({ version: 1, request: { content: 'private' }, response: {} }),
+    ],
+    ['missing response', JSON.stringify({ version: 1, request: { content: 'private' } })],
   ])(
     'records load errors for a combined log with %s without exposing its payload',
     async (_, body) => {

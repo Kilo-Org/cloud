@@ -3128,11 +3128,11 @@ describe('api_request_log storage', () => {
     expect(row.response_r2_key).toBe(row.request_r2_key);
     expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
       version: 1,
-      request: JSON.stringify({
+      request: {
         model: 'kilo-internal/my-model',
         messages: [{ role: 'user', content: 'hello' }],
         providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
-      }),
+      },
       response: JSON.stringify({ error: 'upstream error' }),
     });
   });
@@ -3190,7 +3190,7 @@ describe('api_request_log storage', () => {
     expect(row.response_r2_key).toBe(row.request_r2_key);
     expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toMatchObject({
       version: 1,
-      request: expect.any(String),
+      request: expect.any(Object),
       response: null,
     });
     expect(fakeR2.objects.size).toBe(1);

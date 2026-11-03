@@ -12,7 +12,7 @@ export type ApiRequestLogBlobUpload = {
 
 export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
-  request: z.string(),
+  request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
 });
 
@@ -47,7 +47,7 @@ export async function uploadApiRequestLogBlobs({
   request,
   response,
 }: {
-  request: string;
+  request: Record<string, unknown>;
   response: string | undefined;
 }): Promise<ApiRequestLogBlobUpload> {
   try {

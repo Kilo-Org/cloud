@@ -5,7 +5,7 @@ import {
   type GetProviderInput,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   canRouteToVercel,
@@ -43,10 +43,6 @@ import {
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
-import {
-  addKiloExclusiveModel,
-  kiloExclusiveModelFixture,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof directByokModule>(
@@ -74,6 +70,30 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getCatalogModeByokCredentials: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
+  // Key metadata mirrors whatever the test's credential mocks return.
+  getByokKeyStates: jest.fn(
+    async (fromDb: never, owner: { type: 'user' | 'organization'; id: string }) => {
+      const byok = jest.requireMock<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok');
+      const keys =
+        owner.type === 'user'
+          ? await byok.getBYOKforUser(fromDb, owner.id, [])
+          : await byok.getBYOKforOrganization(fromDb, owner.id, []);
+      const catalogKeys = await byok.getCatalogModeByokCredentials(fromDb, owner, []);
+      return [
+        ...(keys ?? []).map(({ providerId, priority }) => ({
+          providerId,
+          priority,
+          isEnabled: true,
+          serveCatalogModels: false,
+        })),
+        ...catalogKeys.map(({ providerId, serveCatalogModels }) => ({
+          providerId,
+          isEnabled: true,
+          serveCatalogModels,
+        })),
+      ];
+    }
+  ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
@@ -239,20 +259,20 @@ describe('getProvider local fake deterministic routing', () => {
           isFree: true,
           bypassAccessCheck: false,
         });
-        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function));
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function), false);
       }
     );
   });
 });
 
-describe('getProvider exclusive model routing', () => {
+describe('getProvider auto small free model routing', () => {
   beforeEach(() => {
     jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(false);
     jest.mocked(getModelInferenceUserByokProviders).mockReset().mockResolvedValue([]);
   });
 
-  test.each(kiloExclusiveModels)('routes $public_id to OpenRouter', async model => {
-    const result = await getProvider(providerInput(model.public_id));
+  test('routes the auto small free model to OpenRouter', async () => {
+    const result = await getProvider(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID));
     expect(result.kind).toBe('provider');
     if (result.kind !== 'provider') throw new Error('Expected a provider');
     expect(result.provider).toBe(OPENROUTER);
@@ -260,31 +280,23 @@ describe('getProvider exclusive model routing', () => {
     expect(result.bypassAccessCheck).toBe(false);
   });
 
-  test('does not divert an exclusive to BYOK', async () => {
-    const removeModel = addKiloExclusiveModel(kiloExclusiveModelFixture);
-    try {
-      jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic']);
+  test('does not divert the auto small free model to BYOK', async () => {
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['google']);
 
-      const result = await getProvider(providerInput(kiloExclusiveModelFixture.public_id));
+    const result = await getProvider(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID));
 
-      expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
-      expect(getModelInferenceUserByokProviders).not.toHaveBeenCalled();
-    } finally {
-      removeModel();
-    }
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(getModelInferenceUserByokProviders).not.toHaveBeenCalled();
   });
 
-  test.each(kiloExclusiveModels)(
-    'preserves Vercel routing eligibility for $public_id',
-    async model => {
-      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
-      const result = await getProvider(providerInput(model.public_id));
-      expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
-    }
-  );
-
-  test('keeps a spend-bounded request on the provider that can enforce its ceiling', async () => {
+  test('preserves Vercel routing eligibility for the auto small free model', async () => {
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+    const result = await getProvider(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID));
+    expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
+  });
+
+  test('forwards the spend ceiling to the Vercel routing decision', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
 
     const result = await getProvider({
       ...providerInput('openai/gpt-5-nano'),
@@ -292,7 +304,11 @@ describe('getProvider exclusive model routing', () => {
     });
 
     expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
-    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      'openai/gpt-5-nano',
+      expect.any(Function),
+      true
+    );
   });
 });
 
@@ -422,9 +438,9 @@ describe('getProvider ChatGPT connection routing order', () => {
       isFree: false,
       bypassAccessCheck: false,
     });
-    expect(jest.mocked(getBYOKforUser).mock.calls[0]?.slice(1)).toEqual([
+    expect(jest.mocked(getBYOKforUser).mock.calls.at(-1)?.slice(1)).toEqual([
       user.id,
-      ['anthropic', 'vercel-ai-gateway', 'openrouter'],
+      ['anthropic'],
     ]);
   });
 
@@ -606,9 +622,7 @@ describe('getProvider gateway BYOK routing', () => {
 
     const result = await resolve({ ...providerInput(model), organizationId: ORG_ID });
 
-    expect(getBYOKforOrganization).toHaveBeenCalledWith(expect.anything(), ORG_ID, [
-      'anthropic',
-      'vercel-ai-gateway',
+    expect(getBYOKforOrganization).toHaveBeenLastCalledWith(expect.anything(), ORG_ID, [
       'openrouter',
     ]);
     expect(getBYOKforUser).not.toHaveBeenCalled();
@@ -878,10 +892,10 @@ describe('getProvider direct BYOK routing', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected provider result');
 
-    expect(getCatalogModeByokCredentials).toHaveBeenCalledWith(
+    expect(getCatalogModeByokCredentials).toHaveBeenLastCalledWith(
       expect.anything(),
       { type: 'organization', id: ORG_ID },
-      ['synthetic', 'zai-coding']
+      ['zai-coding']
     );
     expect(result.provider).toMatchObject({
       type: 'direct-byok',
@@ -964,7 +978,11 @@ describe('getProvider direct BYOK routing', () => {
       isDirectByokProviderAllowed: async () => false,
     });
 
-    expect(getCatalogModeByokCredentials).not.toHaveBeenCalled();
+    expect(getCatalogModeByokCredentials).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ['synthetic']
+    );
     expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
   });
 

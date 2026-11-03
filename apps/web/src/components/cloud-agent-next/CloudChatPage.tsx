@@ -1835,7 +1835,11 @@ export default function CloudChatPage({
                                   </div>
                                 )}
                               <ComposerContextLine
+                                userId={currentUserId}
                                 reserve={Boolean(sessionIdFromParams)}
+                                cloudAgentSessionId={workspaceCloudSessionId ?? undefined}
+                                organizationId={organizationId}
+                                worktreeId={selectedWorktreeId ?? undefined}
                                 repository={composerRepository}
                                 branch={composerBranch}
                                 contextTokens={contextUsage?.contextTokens}

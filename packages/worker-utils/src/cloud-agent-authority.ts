@@ -83,6 +83,10 @@ const scopedPrepareSessionSchema = z
 
 const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+// Discovery is scope-neutral; auth context pins any signed organization, and the
+// shared input stays empty so it cannot carry one.
+const MODELS_LIST_PROCEDURE = 'models.list';
+const modelsListInputSchema = z.object({}).strict();
 const scopedChildOperations = {
   prepareSession: { kind: 'mutation', schema: scopedPrepareSessionSchema },
   listChildSessions: {
@@ -135,7 +139,24 @@ const scopedChildOperations = {
   },
 } as const;
 
-function childOperation(procedure: string) {
+const scopedFolderOperations = {
+  'workspaceFolders.list': { kind: 'query', schema: z.object({}).strict() },
+  'workspaceFolders.moveWorktree': {
+    kind: 'mutation',
+    schema: z
+      .object({
+        cloudAgentSessionId: childSessionIdSchema,
+        worktreeId: cloudAgentWorktreeIdSchema,
+        folderId: z.uuid().nullable(),
+      })
+      .strict(),
+  },
+} as const;
+
+function scopedOperation(procedure: string) {
+  if (Object.hasOwn(scopedFolderOperations, procedure)) {
+    return scopedFolderOperations[procedure as keyof typeof scopedFolderOperations];
+  }
   const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
   const name = match?.[1];
   if (!name || !Object.hasOwn(scopedChildOperations, name)) {
@@ -144,14 +165,23 @@ function childOperation(procedure: string) {
   return scopedChildOperations[name as keyof typeof scopedChildOperations];
 }
 
+function isModelsListProcedure(procedure: string): boolean {
+  return procedure === MODELS_LIST_PROCEDURE;
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
-  return Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`);
+  return [
+    ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
+    MODELS_LIST_PROCEDURE,
+    ...Object.keys(scopedFolderOperations),
+  ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
-  return childOperation(procedure).kind;
+  if (isModelsListProcedure(procedure)) return 'query';
+  return scopedOperation(procedure).kind;
 }
 
 export function cloudAgentAuthorityInputSchema(
@@ -161,13 +191,18 @@ export function cloudAgentAuthorityInputSchema(
   if (!cloudAgentAuthorityProcedures(authority).includes(procedure)) {
     throw new Error('Cloud Agent launch exceeds its authority');
   }
+  if (isModelsListProcedure(procedure)) {
+    return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
+  }
   return z.toJSONSchema(
-    childOperation(procedure).schema.extend({
-      organizationId:
-        authority.organizationId === null
+    scopedOperation(procedure).schema.extend({
+      organizationId: procedure.startsWith('workspaceFolders.')
+        ? z.literal(authority.organizationId)
+        : authority.organizationId === null
           ? z.never().optional()
           : z.literal(authority.organizationId),
-    })
+    }),
+    { io: 'input' }
   );
 }
 
@@ -187,13 +222,21 @@ export function validateCloudAgentAuthorityRequest(
   if (scope.expiresAt <= nowSeconds || !cloudAgentAuthorityProcedures(scope).includes(procedure)) {
     throw new Error('Cloud Agent authority does not permit this procedure');
   }
-  const operation = childOperation(procedure);
+  if (isModelsListProcedure(procedure)) {
+    return modelsListInputSchema.optional().parse(input);
+  }
+  const operation = scopedOperation(procedure);
+  const folderProcedure = procedure.startsWith('workspaceFolders.');
   const request = operation.schema
-    .extend({ organizationId: z.string().min(1).optional() })
+    .extend({
+      organizationId: folderProcedure
+        ? z.literal(scope.organizationId)
+        : z.string().min(1).optional(),
+    })
     .parse(input);
   const organizationProcedure = procedure.startsWith('organizations.');
   if (
-    organizationProcedure !== (scope.organizationId !== null) ||
+    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
     (request.organizationId ?? null) !== scope.organizationId
   ) {
     throw new Error('Cloud Agent launch exceeds its authority');

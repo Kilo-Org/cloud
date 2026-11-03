@@ -111,7 +111,7 @@ export function sessionDisplayLine(raw: string): string {
     .join('');
 }
 
-let graphemeSegmenter: Intl.Segmenter | null | undefined;
+let graphemeSegmenter: Intl.Segmenter | undefined;
 
 /**
  * The segmenter the cut reads character boundaries from, or null when the

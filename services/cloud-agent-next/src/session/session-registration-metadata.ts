@@ -1,5 +1,6 @@
 /** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
+import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import { deriveSharedSandboxId } from '../sandbox-id.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
@@ -10,6 +11,7 @@ import type {
   ExecutionTurnSubmission,
   SessionFinalization,
 } from '../execution/types.js';
+import { launchRepositoryIdentity } from './environment-launch.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
 
 export type GroupedRegisterSessionInput = {
@@ -31,7 +33,10 @@ export type GroupedRegisterSessionInput = {
   };
   repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
-  environment?: SessionMetadata['environment'];
+  /** The environment scope preflight authorized; registration adds the branch of each V2 repository. */
+  environment?: EnvironmentScope;
+  /** The additional-repository branches the client requested for the environment. */
+  requestedEnvironmentRepositories?: { repoFullName: string; branch?: string }[];
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
@@ -172,6 +177,43 @@ function initialMessageFromRegistration(
 }
 
 /**
+ * The environment reference a session stores: the authorized scope, and for a V2
+ * environment the branch each repository resolved to. A V2 reference needs the
+ * launch repository to tell it from the additional ones.
+ */
+function environmentReferenceFromRegistration(
+  input: Pick<
+    GroupedRegisterSessionInput,
+    'environment' | 'repository' | 'requestedEnvironmentRepositories'
+  >,
+  generatedBranch: string
+):
+  | { ok: true; reference: SessionMetadata['environment'] | undefined }
+  | { ok: false; error: string } {
+  const scope = input.environment;
+  if (scope === undefined) return { ok: true, reference: undefined };
+  if (scope.repositories === undefined) {
+    return { ok: true, reference: scope };
+  }
+  const launch = input.repository ? launchRepositoryIdentity(input.repository) : undefined;
+  if (launch === undefined) {
+    return {
+      ok: false,
+      error: 'Invalid metadata: a multi-repository environment needs a launch repository',
+    };
+  }
+  return {
+    ok: true,
+    reference: sessionReferenceOf(scope, {
+      generatedBranch,
+      launch,
+      launchBranch: input.repository?.branch,
+      requested: input.requestedEnvironmentRepositories ?? [],
+    }),
+  };
+}
+
+/**
  * Builds and validates the grouped `SessionMetadata` a registration persists.
  * The error strings match the legacy `registerSession` rejections exactly so the
  * Worker maps a rejection to the same failure as before.
@@ -195,6 +237,10 @@ export async function buildSessionMetadataFromRegistration(
     };
   }
 
+  const generatedBranch = `kilo/${generateBranchSlug()}`;
+  const environment = environmentReferenceFromRegistration(input, generatedBranch);
+  if (!environment.ok) return environment;
+
   const initialMessage = initialMessageFromRegistration(input.message);
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
@@ -216,12 +262,13 @@ export async function buildSessionMetadataFromRegistration(
     },
     finalization: input.finalization,
     profile: input.profile,
-    ...(input.environment ? { environment: input.environment } : {}),
+    ...(environment.reference ? { environment: environment.reference } : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-      branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
+      branchName: repository?.upstreamBranch ?? generatedBranch,
+      ...(environment.reference?.repositories ? { generatedBranchName: generatedBranch } : {}),
     },
     lifecycle: {
       version: now,

@@ -3180,6 +3180,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3325,6 +3328,24 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+
+  services/scim-sync:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260605.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.4
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260707.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
       wrangler:
         specifier: 'catalog:'
         version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -11108,6 +11129,7 @@ packages:
   '@smithy/core@3.24.4':
     resolution: {integrity: sha512-3UNRKEyQyAgVgM0LGlerCLm+ChZWZ1GPfde+jBEW6bm6bSBGU1p0EbblaUV3unbhwvidjLA5Zs3sOs7mnZwvAw==}
     engines: {node: '>=18.0.0'}
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.2.12':
     resolution: {integrity: sha512-cr2lR792vNZcYMriSIj+Um3x9KWrjcu98kn234xA6reOAFMmbRpQMOv8KPgEmLLtx3eldU6c5wALKFqNOhugmg==}
@@ -11228,6 +11250,7 @@ packages:
   '@smithy/smithy-client@4.12.5':
     resolution: {integrity: sha512-UqwYawyqSr/aog8mnLnfbPurS0gi4G7IYDcD28cUIBhsvWs1+rQcL2IwkUQ+QZ7dibaoRzhNF99fAQ9AUcO00w==}
     engines: {node: '>=18.0.0'}
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/types@4.13.1':
     resolution: {integrity: sha512-787F3yzE2UiJIQ+wYW1CVg2odHjmaWLGksnKQHUrK/lYZSEcy1msuLVvxaR/sI2/aDe9U+TBuLsXnr3vod1g0g==}
@@ -16733,6 +16756,7 @@ packages:
   http-call@5.3.0:
     resolution: {integrity: sha512-ahwimsC23ICE4kPl9xTBjKB4inbRaeLyZeRunC/1Jy/Z6X8tv22MEAjK+KBOMSVLaqXPTTmd8638waVIKLGx2w==}
     engines: {node: '>=8.0.0'}
+    deprecated: Renamed to @heroku/http-call — please install @heroku/http-call instead.
 
   http-errors@1.7.3:
     resolution: {integrity: sha512-ZTTX0MWrsQ2ZAhA1cejAwDLycFsd7I7nVtnkT3Ol0aqodaKW+0CTZDQ1uBv5whptCnc8e8HeRRJxRs0kmm/Qfw==}

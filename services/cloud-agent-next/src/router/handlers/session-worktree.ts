@@ -284,7 +284,8 @@ function canonicalRepositoryUrl(repository: WorktreeSource['repository']): strin
   );
 }
 
-/** Origins whose hosted roots may act as a workspace source for a sibling. */
+/** Original source origins for each endpoint; inherited child origins are additive. */
+const LEGACY_WORKTREE_SOURCE_ORIGINS = new Set(['cloud-agent-web']);
 const HOSTED_WORKSPACE_SOURCE_ORIGINS = new Set(['cloud-agent-web', 'agent-manager']);
 
 type SourceRequirements = {
@@ -311,6 +312,10 @@ async function loadSourceMetadata(
   const metadata = parsedMetadata.data;
   const workspace = metadata.workspace;
   const repository = metadata.repository;
+  const sourceOriginAllowed =
+    requirements.allowedOrigins.has(ownership.createdOnPlatform) ||
+    (metadata.parentCloudAgentSessionId !== undefined &&
+      isInteractiveSessionOrigin(ownership.createdOnPlatform));
   if (
     !workspace ||
     !repository ||
@@ -323,7 +328,7 @@ async function loadSourceMetadata(
     metadata.identity.sessionId !== ownership.cloudAgentSessionId ||
     metadata.auth.kiloSessionId !== ownership.kiloSessionId ||
     metadata.identity.createdOnPlatform !== ownership.createdOnPlatform ||
-    !requirements.allowedOrigins.has(ownership.createdOnPlatform) ||
+    !sourceOriginAllowed ||
     (requirements.requireSourceScopeId !== undefined &&
       ownership.cloudAgentSessionScopeId !== requirements.requireSourceScopeId) ||
     metadata.identity.botId !== undefined ||
@@ -391,7 +396,7 @@ async function loadWorktreeSource(
   const source = await loadSourceMetadata(ctx, ownership, worktreeId, {
     organizationId: input.kilocodeOrganizationId,
     requireSourceScopeId: input.sourceCloudAgentSessionId,
-    allowedOrigins: new Set(['cloud-agent-web']),
+    allowedOrigins: LEGACY_WORKTREE_SOURCE_ORIGINS,
   });
   if (!source) throw sourceRejected();
   return source;
@@ -672,6 +677,7 @@ async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<v
 
 function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
   return (
+    source.metadata.allowSubagentSessions !== false &&
     isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform) &&
     source.workspace.sandboxAllocation !== 'cloudflare-shared' &&
     source.workspace.sandboxKind !== 'shared' &&

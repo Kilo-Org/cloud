@@ -273,6 +273,7 @@ describe('scanRequest', () => {
         expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
           '[enkrypt-guardrail] decision',
           expect.objectContaining({
+            scan: 'blocking',
             decision: 'error_fail_closed',
             error: expectedError,
             attempts: 1,
@@ -345,7 +346,7 @@ describe('scanRequest', () => {
       expect(result).toEqual({
         verdict: {
           action: 'block',
-          message: expect.stringContaining('cannot scan more than 500,000 characters'),
+          message: expect.stringContaining('cannot scan more than 3,000,000 characters'),
         },
         usageRecords: [],
       });
@@ -551,6 +552,106 @@ describe('scanRequest', () => {
         usageRecords: [],
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
+  });
+  describe('a log-only scan', () => {
+    const logOnlyConfig = {
+      scanToolResults: true,
+      status: 'ready',
+      detectors: { pii: { enabled: true, entities: ['secrets'] } },
+      blockingDetectors: [],
+    } satisfies EnkryptGuardrailScan['config'];
+
+    it('allows and logs a detection', async () => {
+      const result = await scanRequest(
+        makeScan({ config: logOnlyConfig }),
+        deps(async () =>
+          detectResponse(
+            { summary: { pii: 1 }, result_message: 'redacted <SECRET_0> text' },
+            { credits: '1' }
+          )
+        )
+      );
+
+      expect(result).toEqual({
+        verdict: { action: 'allow' },
+        usageRecords: [expect.objectContaining({ decision: 'allowed', creditsCost: 1 })],
+      });
+      expect(console.debug).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ scan: 'log_only', decision: 'allowed', detectors_fired: ['pii'] })
+      );
+      expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toContain('SECRET');
+    });
+
+    it.each([
+      [
+        'a persistent server error',
+        async () => detectResponse({ summary: {} }, { status: 503, credits: '1' }),
+        'http_503',
+        2,
+      ],
+      [
+        'a timeout',
+        (_input: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          }),
+        'timeout',
+        1,
+      ],
+    ])('allows and only logs %s', async (_name, failure, error, attempts) => {
+      const result = await scanRequest(
+        makeScan({ config: logOnlyConfig }),
+        deps(failure, { timeoutMs: 20 })
+      );
+
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.usageRecords).toHaveLength(attempts);
+      expect(result.usageRecords.every(usageRecord => usageRecord.decision === 'error')).toBe(true);
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ scan: 'log_only', decision: 'error_logged', error, attempts })
+      );
+    });
+
+    it.each([
+      ['above the scan limit', { text: 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1) }, {}],
+      ['without an API key', {}, { apiKey: undefined }],
+    ])(
+      'allows a request %s without calling Enkrypt',
+      async (_name, scanOverrides, depsOverrides) => {
+        const dependencies = deps(async () => detectResponse({ summary: {} }), depsOverrides);
+
+        const result = await scanRequest(
+          makeScan({ config: logOnlyConfig, ...scanOverrides }),
+          dependencies
+        );
+
+        expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [] });
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+        expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ scan: 'log_only', decision: 'error_logged' })
+        );
+      }
+    );
+
+    it('records only charged calls when the client disconnects', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await scanRequest(
+        makeScan({ config: logOnlyConfig }),
+        deps(async () => detectResponse({ summary: {} }), { signal: controller.signal })
+      );
+
+      expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [] });
+      expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
+      expect(console.debug).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ scan: 'log_only', decision: 'client_aborted' })
+      );
     });
   });
 });

@@ -329,7 +329,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         <View
           className={cn(
             'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            stackBalance ? 'items-stretch' : 'flex-row items-center'
+            // A stacked card ends on the Add credits button, whose own line
+            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
+            // it than the card's 7 dp top padding gives the amount above it, so
+            // the bottom edge does not read as tighter than the top.
+            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
           )}
         >
           <Animated.View

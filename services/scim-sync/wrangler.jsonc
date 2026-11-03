@@ -58,6 +58,17 @@
       "secret_name": "WORKOS_CLIENT_ID",
     },
   ],
+  // Shared PostgreSQL, same instance and Hyperdrive config as every other
+  // service in this repo. Workers cannot hold long-lived connections, so
+  // Hyperdrive owns the regional pool and `getWorkerDb` opens a `max: 1` pool
+  // per call against the string it hands out.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -97,6 +108,13 @@
           "binding": "WORKOS_CLIENT_ID",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "WORKOS_CLIENT_ID",
+        },
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
       "durable_objects": {

@@ -1,10 +1,11 @@
 /**
- * Durable Object RPC result shapes.
+ * Durable Object RPC and status shapes.
  *
  * These are internal contracts between the Worker and its Durable Object, not
  * data crossing an IO boundary, so they are plain types rather than Zod
  * schemas. The WorkOS response is validated by the SDK's own deserializers and
- * typed by its exported `Event` union.
+ * typed by its exported `Event` union; PostgreSQL rows are typed by Drizzle's
+ * `$inferSelect` off the shared schema.
  */
 
 /** Outcome of one poll, persisted so `/status` survives hibernation. */
@@ -24,4 +25,12 @@ export type ScimSyncDOStatus = {
   cursor: string | null;
   nextAlarmAt: number | null;
   lastPoll: PollResult | null;
+};
+
+/** Result of the `/status` PostgreSQL reachability probe. */
+export type DatabaseStatus = {
+  reachable: boolean;
+  organizationCount: number | null;
+  latencyMs: number;
+  error: string | null;
 };

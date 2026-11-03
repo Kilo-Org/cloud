@@ -44,7 +44,7 @@ the value can be copied forward by hand.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Interval, cursor, next alarm time, and the last poll result. |
+| `GET /status` | Interval, cursor, next alarm time, the last poll result, and PostgreSQL reachability. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is
@@ -85,6 +85,44 @@ npx wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 \
   --name WORKOS_API_KEY --scopes workers
 ```
 
+## Database
+
+Reads the shared PostgreSQL through the `HYPERDRIVE` binding — the same
+instance and Hyperdrive config as every other service in this repo. Workers
+cannot hold long-lived connections, so Hyperdrive owns the regional pool and
+`getPgDb` opens a `max: 1` pool per call against the string it hands out.
+
+**Read-only for now.** The query modules under `src/db/` only select; nothing
+writes. The poll loop does not use them yet, so `/status` is their only caller.
+
+`getPgDb` must be called per operation and never cached in module scope. A
+cached client outlives the request or Durable Object context that created it,
+and its I/O then fails in whatever context picks it up next. Calling per use is
+also why the probe recovers on its own after a database restart.
+
+Four schema facts the query modules encode, each easy to get wrong:
+
+- **`organizations.deleted_at IS NULL` on every org query.** The unique indexes
+  on `directory_group_id` and `external_org_id` are *partial*, scoped to live
+  rows, so a soft-deleted organization can hold the same binding as a live one.
+  Omit the filter and those lookups stop being deterministic.
+- **`organization_memberships` has no foreign keys** on either column, so a row
+  does not prove the organization or user exists, and neither side is cleaned
+  up when the other goes away.
+- **`kilocode_users.external_id` is not unique**, so `findUsersByExternalId`
+  returns an array. A caller needing exactly one must decide what a duplicate
+  means rather than taking the first row.
+- **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
+  validate, parse, or cast one as a UUID.
+
+Group assignments are the exception to the missing-FK rule: a composite foreign
+key on `(organization_id, kilo_user_id)` points at `organization_memberships`,
+so an assignment cannot exist without a membership and is cascaded away with it.
+
+Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
+strict ISO validators such as `z.string().datetime()` reject. Normalize before
+sending them across a strict boundary.
+
 ## Commands
 
 ```sh
@@ -99,9 +137,21 @@ pnpm types       # regenerate worker-configuration.d.ts after config changes
 curl http://127.0.0.1:8819/cdn-cgi/local/scheduled
 ```
 
-There are no tests. The poll has one branch worth asserting — the interval
-clamp — and everything else is the SDK's behavior or WorkOS's; tests arrive with
-the cursor persistence that has real invariants.
+```sh
+pnpm test:postgres   # query modules against a real database
+```
+
+Needs a running local PostgreSQL (`dev/docker-compose.yml`) with migrations
+applied. If a query fails on a missing column, the local database is behind the
+schema:
+
+```sh
+POSTGRES_URL='postgres://postgres:postgres@localhost:5432/postgres' \
+  NODE_ENV=development pnpm drizzle migrate
+```
+
+The poll loop itself has no tests: its one branch worth asserting is the
+interval clamp, and everything else is the SDK's behavior or WorkOS's.
 
 ## Deployment
 

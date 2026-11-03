@@ -1,9 +1,12 @@
 # Queue delivery diagnostics
 
 `USAGE_INGEST_DIAGNOSTICS=all` enables 100% diagnostic logging on the staging
-publisher/consumer. No random sampling is applied: each valid test usage ID can
-join across stages. An absent or different value disables the extra logs.
-Production omits the setting. Existing processing outcome logs remain enabled,
+publisher/consumer. No random sampling is applied in this mode: each valid test
+usage ID can join across stages. Otherwise ingress logs 1% of successful sends,
+all sends taking at least 1,000 ms, and all failed sends. One percent provides a
+modest baseline while limiting normal log volume; one second highlights a sizable
+publication delay. These records contain only the validated usage ID, outcome and
+monotonic send duration. Failures and slow sends are not volume capped. Existing processing outcome logs remain enabled,
 including `queue` for old/EU filters. Disable diagnostic settings after the
 investigation to reduce log volume.
 

@@ -7,11 +7,10 @@ import {
   shouldRouteToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
-  DirectUserByokInferenceProviderIdSchema,
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
-  VercelUserByokInferenceProviderIdSchema,
-  openRouterToVercelInferenceProviderId,
+  getRequestIgnoredVercelProviderIds,
+  getVercelProviderIdForUserByok,
   isGatewayUserByokProviderId,
   isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
@@ -490,20 +489,9 @@ async function getGatewayRoutedByokKeyStates(
   return keys.filter(key => key.isEnabled && candidateProviders.includes(key.providerId));
 }
 
-/**
- * Whether the request's own `provider.ignore` names the Vercel provider of a key. Kilo's provider
- * preferences are added to the request later and never apply to the caller's keys.
- */
 function createRequestIgnoreCheck(request: GatewayRequest) {
-  const ignored = new Set(
-    (request.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
-  );
-  return (providerId: UserByokProviderId) =>
-    ignored.has(
-      providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
-        ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-        : providerId
-    );
+  const ignored = getRequestIgnoredVercelProviderIds(request.body.provider);
+  return (providerId: UserByokProviderId) => ignored.has(getVercelProviderIdForUserByok(providerId));
 }
 
 const noProviderAllowList = async () => undefined;

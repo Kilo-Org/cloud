@@ -1,9 +1,10 @@
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  DirectUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
+  getRequestIgnoredVercelProviderIds,
+  getVercelProviderIdForUserByok,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -245,10 +246,9 @@ export function getAnthropicProviderOptionsForVercel(
 export function getVercelInferenceProviderConfigForUserByok(
   provider: BYOKResult
 ): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
-  const key =
-    provider.providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
-      ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-      : VercelUserByokInferenceProviderIdSchema.parse(provider.providerId);
+  const key = VercelUserByokInferenceProviderIdSchema.parse(
+    getVercelProviderIdForUserByok(provider.providerId)
+  );
 
   const list = new Array<VercelInferenceProviderConfig>();
 
@@ -291,9 +291,7 @@ export async function applyVercelSettings(
     // `isVercelUserByokProviderAllowed`). Filtering by `provider.only` again
     // would also drop keys whose provider has no OpenRouter slug, which the
     // allow-list cannot name.
-    const ignoredProviders = new Set(
-      (requestToMutate.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
-    );
+    const ignoredProviders = getRequestIgnoredVercelProviderIds(requestToMutate.body.provider);
     const allByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
     const retainedByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
     for (const provider of userByok) {

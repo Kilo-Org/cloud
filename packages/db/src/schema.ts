@@ -10653,8 +10653,9 @@ export const enkrypt_usage = pgTable(
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
     // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the request's final call, so it is counted once per request; null on a retried call or when
-    // the request returned before awaiting the verdict.
+    // the final call of the request's blocking scan, or of its log-only scan when no blocking call
+    // was recorded, so it is counted once per request; null on other calls or when the request
+    // returned before awaiting the verdict.
     added_latency_ms: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },

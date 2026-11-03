@@ -53,6 +53,7 @@ const OVERVIEW_SURFACES = [
   'merge-request',
   'overview-no-checks',
   'overview-multi-group',
+  'overview-auto-merge',
   'merge-request-missing',
   'merge-request-error',
 ] as const;

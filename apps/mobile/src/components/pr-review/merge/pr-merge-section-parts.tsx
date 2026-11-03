@@ -12,7 +12,10 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
-import { type MergeBlockedReason } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import {
+  type MergeBlockedReason,
+  prMergeMethodName,
+} from '@/lib/pr-review/merge/merge-blocked-reasons';
 
 // Mid-sentence lowercase noun (common.*) vs the capitalized standalone
 // label (prReview.terms.*) — see providerPrTermKey.
@@ -160,13 +163,19 @@ export function AutoMergeEnabledBanner({
 }: Readonly<{ method: string; onDisable: () => void; isDisabling: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg bg-accent-soft p-4">
+    // The notice is secondary: the accent tints the surface and the hairline,
+    // while the copy stays on the secondary ink. The accent foreground is
+    // already the filled merge button's fill, and the muted foreground measures
+    // under 4.5:1 on this tint, so `--ink2` is the ink that still reads as a
+    // quiet second line here. Taking the accent as ink turned the sentence into
+    // a second saturated accent next to the merge action, worst in dark mode.
+    <View className="gap-3 rounded-lg border border-accent-soft-tint-foreground bg-accent-soft-tint p-4 dark:border-accent-soft-tint">
       <View className="gap-1">
-        <Text className="text-sm font-medium text-accent-soft-foreground">
+        <Text className="text-sm font-medium text-foreground">
           {t('prReview.merge.autoMergeOn')}
         </Text>
-        <Text className="text-xs text-accent-soft-foreground">
-          {t('prReview.merge.autoMergeDescription', { method: method.toLowerCase() })}
+        <Text className="text-xs text-ink2">
+          {t('prReview.merge.autoMergeDescription', { method: prMergeMethodName(method) })}
         </Text>
       </View>
       <Button

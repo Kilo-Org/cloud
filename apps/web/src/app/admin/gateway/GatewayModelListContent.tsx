@@ -172,7 +172,7 @@ export function GatewayModelListContent({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm">{model}</span>
                         {name && <span className="text-muted-foreground text-sm">{name}</span>}
-                        {!name && catalogQuery.isSuccess && (
+                        {list === 'preferred_models' && !name && catalogQuery.isSuccess && (
                           <Badge variant="secondary">Not in catalog</Badge>
                         )}
                       </div>

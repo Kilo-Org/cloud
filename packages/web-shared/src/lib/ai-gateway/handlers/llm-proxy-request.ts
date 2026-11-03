@@ -1,4 +1,4 @@
-import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { NextResponse, type NextRequest, type NextResponse as NextResponseType } from 'next/server';
 import type { z } from 'zod';
 import type {
   GatewayMessagesRequest,
@@ -8,6 +8,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
+  extractHeaderAndLimitLength,
   invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
@@ -27,6 +28,29 @@ type ParsedLlmProxyRequest =
       ipAddress: string;
     }
   | { ok: false; response: NextResponseType<unknown> };
+
+export type LlmProxyRequestHeaders = ReturnType<typeof readLlmProxyHeaders>;
+
+export function readLlmProxyHeaders(request: NextRequest) {
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid');
+  return {
+    mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
+    taskId,
+    // `x-kilo-session` is the fallback session id for clients that send no
+    // `x-kilocode-taskid` (e.g. non-kilocode clients).
+    sessionId: taskId ?? extractHeaderAndLimitLength(request, 'x-kilo-session'),
+    // Per-message id from the kilocode client. Joinable to PostHog
+    // `Feedback Submitted.parentMessageID`.
+    clientRequestId: extractHeaderAndLimitLength(request, 'x-kilo-request'),
+    machineId: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+    editorName: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+    // Vercel's per-invocation request id. Logged on the disconnect and upstream
+    // failure paths so a client disconnect can be correlated with the upstream
+    // error it causes, and with the platform logs for the same invocation.
+    vercelRequestId: extractHeaderAndLimitLength(request, 'x-vercel-id'),
+  };
+}
 
 function hasModelId(request: GatewayRequest): request is ValidatedGatewayRequest {
   return typeof request.body.model === 'string' && request.body.model.trim().length > 0;

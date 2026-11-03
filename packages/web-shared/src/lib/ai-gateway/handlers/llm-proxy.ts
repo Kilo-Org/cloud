@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
@@ -17,13 +16,11 @@ import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-rou
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
-  createDirectByokReferenceResolver,
   findDirectByokProvider,
   getDirectByokModel,
   getDirectByokPolicyProviderId,
-  supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -52,16 +49,10 @@ import {
   makeErrorReadable,
   modelNotAllowedResponse,
   efficientPoolBlockedResponse,
-  extractHeaderAndLimitLength,
-  noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
-  customRouterErrorResponse,
-  autoRoutingUnavailableResponse,
-  invalidAutoDecisionResponse,
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
-  temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
   apiKindNotSupportedResponse,
@@ -102,42 +93,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import {
-  isKiloAutoModel,
-  KILO_AUTO_BALANCED_MODEL,
-  KILO_AUTO_EFFICIENT_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
-  ORG_AUTO_MODEL,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  applyResolvedAutoModel,
-  applyResolvedModel,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
-import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
-import {
-  fetchCustomRouterDecision,
-  fetchEfficientAutoDecision,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  AUTO_DECISION_HEADER,
-  customRouterModelId,
-  isCustomRouterModelId,
-  type AutoRouter,
-  type CustomRouterReference,
-} from '@kilocode/auto-routing-contracts';
-import {
-  collectDataCollectionRequiredAutoRoutingModelIds,
-  collectDeniedAutoRoutingModelIds,
-  dataCollectionRequiredAutoRoutingCandidates,
-  deniedAutoRoutingCandidates,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
-import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
-import type {
-  MicrodollarUsageContext,
-  MicrodollarUsageStats,
-} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { AUTO_DECISION_HEADER } from '@kilocode/auto-routing-contracts';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
@@ -151,7 +109,6 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
-  type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
@@ -170,8 +127,14 @@ import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gatewa
 import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
+  readLlmProxyHeaders,
   type LlmProxyPath,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
+import {
+  autoRoutingFailureResponse,
+  billLegacyClassifierCost,
+  resolveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
 
 function llmProxyPath(url: URL): LlmProxyPath | null {
   switch (url.pathname) {
@@ -204,26 +167,6 @@ async function resolveFreeModelRateLimitSubject(
   return user && !authFailedResponse
     ? { kind: 'account', kiloUserId: user.id }
     : { kind: 'ip', ipAddress };
-}
-
-/**
- * The catalog id that replaces an auto-routed bespoke direct BYOK id when the caller's key for it
- * is in catalog mode. Null when the id needs no replacement or has no catalog id; an unmapped id
- * then gets the catalog-only error from `getProvider`.
- */
-async function catalogModeModelForRoutedModel(
-  model: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
-): Promise<string | null> {
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider.id)) return null;
-  const { user, authFailedResponse, organizationId } = await authPromise;
-  if (!user || authFailedResponse) return null;
-  const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(user.id, organizationId)
-  );
-  const resolved = await resolveReference(model);
-  return resolved === model ? null : resolved;
 }
 
 export async function handleLlmProxyRequest(
@@ -297,13 +240,6 @@ export async function handleLlmProxyRequest(
         )
       : anonymousBalance
   );
-  const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
-    ([auth, balanceAndSettings]) => ({
-      organizationId: auth.organizationId,
-      settings: balanceAndSettings.settings,
-      plan: balanceAndSettings.plan,
-    })
-  );
   const organizationGroupPolicyPromise = authPromise.then(async auth => {
     if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
     const context = await getOrganizationGroupPolicyContext({
@@ -317,20 +253,7 @@ export async function handleLlmProxyRequest(
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
 
-  const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid');
-  // Per-message id from the kilocode client. Joinable to PostHog
-  // `Feedback Submitted.parentMessageID`.
-  const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
-  // `x-kilo-session` is the fallback session id for clients that send no
-  // `x-kilocode-taskid` (e.g. non-kilocode clients).
-  const sessionId = taskId ?? extractHeaderAndLimitLength(request, 'x-kilo-session');
-  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
-  const editorName = extractHeaderAndLimitLength(request, 'x-kilocode-editorname');
-  // Vercel's per-invocation request id. Logged on the disconnect and upstream
-  // failure paths so a client disconnect can be correlated with the upstream
-  // error it causes, and with the platform logs for the same invocation.
-  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
+  const headers = readLlmProxyHeaders(request);
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
   // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
@@ -341,11 +264,11 @@ export async function handleLlmProxyRequest(
       const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
       if (!config) return null;
       return {
-        sessionId,
+        sessionId: headers.sessionId,
         organizationId: auth.organizationId,
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
-        clientRequestId,
+        clientRequestId: headers.clientRequestId,
         text: extractRequestText(requestBodyParsed, {
           includeToolResults: config.scanToolResults,
         }),
@@ -366,9 +289,9 @@ export async function handleLlmProxyRequest(
       {
         path,
         elapsed_ms: Math.round(performance.now() - requestStartedAt),
-        client_request_id: clientRequestId,
-        session_id: sessionId,
-        vercel_request_id: vercelRequestId,
+        client_request_id: headers.clientRequestId,
+        session_id: headers.sessionId,
+        vercel_request_id: headers.vercelRequestId,
       }
     );
   };
@@ -390,178 +313,22 @@ export async function handleLlmProxyRequest(
   // Snapshot normalized privacy before model-specific provider transforms.
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
-  let autoModel: string | null = null;
-  // Organization Auto can resolve through an intermediate route target before
-  // reaching a concrete model. Keep that target for direct-BYOK ownership
-  // validation after resolution.
-  let routingTarget: string | null = null;
-  let legacyClassifierCostUsd = 0;
-  let autoRoutingUnavailable = false;
-  // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
-  // the org policy check below so a failed routing decision gets a specific
-  // auto-routing error instead of the generic model-not-allowed error.
-  let isAutoRoutedRequest = false;
-  // Custom routers and signed CLI decisions bill an account, so they never fall through to
-  // anonymous handling.
-  const authenticatedRoutingCaller = async () => {
-    const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
-    if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
-    if (!user || authFailedResponse) return paidModelAuthRequiredResponse();
-    return { userId: user.id, organizationId: organizationId ?? null };
-  };
-  const autoRoutingDenials = async (
-    fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-    fromPrivacy: () => Promise<string[]>
-  ) => {
-    const groupPolicy = await organizationGroupPolicyPromise;
-    const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-      groupPolicy ? fromPolicy(groupPolicy) : [],
-      isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
-    ]);
-    return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy])];
-  };
-  const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
-    apiKind: requestBodyParsed.kind,
-    body: requestBodyParsed.body,
+  const modelResolution = await resolveModel({
+    request: requestBodyParsed,
+    requestBodyText,
+    autoDecisionToken: request.headers.get(AUTO_DECISION_HEADER),
+    ipAddress,
+    headers,
     providerHints: autoRoutingProviderHints,
-    bodyBytes: Buffer.byteLength(requestBodyText),
-    userId: caller.userId,
-    organizationId: caller.organizationId,
-    sessionId,
-    machineId: machineIdHeader,
-    clientRequestId,
-    mode: modeHeader,
-    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+    effectivePrivacy,
+    authPromise,
+    balanceAndSettingsPromise,
+    organizationGroupPolicyPromise,
   });
-
-  const autoDecisionToken = request.headers.get(AUTO_DECISION_HEADER);
-  if (autoDecisionToken !== null) {
-    const caller = await authenticatedRoutingCaller();
-    if (caller instanceof NextResponse) return caller;
-    if (!AUTO_ROUTING_DECISION_SECRET) {
-      console.error(`${AUTO_DECISION_HEADER} received but AUTO_ROUTING_DECISION_SECRET is unset`);
-      return temporarilyUnavailableResponse();
-    }
-    const check = await checkAutoDecision({
-      token: autoDecisionToken,
-      secret: AUTO_ROUTING_DECISION_SECRET,
-      nowMs: Date.now(),
-      userId: caller.userId,
-      organizationId: caller.organizationId,
-      model: requestedModel,
-    });
-    if (check.kind === 'rejected') return invalidAutoDecisionResponse(check.reason);
-    applyResolvedModel(requestBodyParsed, check.resolved);
-    autoModel = check.routerModelId;
-  } else if (isKiloAutoModel(requestedModelLowerCased)) {
-    if (isCustomRouterModelId(requestedModelLowerCased)) {
-      const caller = await authenticatedRoutingCaller();
-      if (caller instanceof NextResponse) return caller;
-    }
-    autoModel = requestedModelLowerCased;
-    const isAutoEfficientId =
-      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
-      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
-    const decisionForRouter = async (router: AutoRouter) => {
-      const { user, authFailedResponse, organizationId } = await authPromise;
-      // The classifier uses Kilo's paid credential. Unauthenticated callers
-      // must never spend classification without a user to attribute it to.
-      if (!user || authFailedResponse) return null;
-      const owner = { userId: user.id, organizationId: organizationId ?? null };
-      const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, router),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(router)
-      );
-      const result = await fetchEfficientAutoDecision({
-        ...decisionRequest(owner),
-        ...(router === 'frontier' ? { router } : {}),
-        requestedModel,
-        deniedModelIds,
-      });
-      legacyClassifierCostUsd = result?.costUsd ?? 0;
-      return result?.decision ?? null;
-    };
-    const customRouterDecision = async (reference: CustomRouterReference) => {
-      const caller = await authenticatedRoutingCaller();
-      if (caller instanceof NextResponse) {
-        return {
-          kind: 'rejected',
-          code: 'unauthorized',
-          message: 'Custom routers require an authenticated user',
-        } as const;
-      }
-      return await decideCustomRouter({
-        reference,
-        ...caller,
-        deniedModelIds: candidateIds =>
-          autoRoutingDenials(
-            policy => deniedAutoRoutingCandidates(policy, candidateIds),
-            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds)
-          ),
-        decide: async (router, deniedModelIds) => {
-          const outcome = await fetchCustomRouterDecision({
-            ...decisionRequest(caller),
-            router: router.baseRouter,
-            customRouter: reference,
-            requestedModel: customRouterModelId(router.ownerType, router.slug),
-            deniedModelIds,
-          });
-          if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
-          return outcome;
-        },
-      });
-    };
-    const efficientDecision =
-      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id
-        ? () => decisionForRouter('efficient')
-        : undefined;
-    const frontierDecision =
-      requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
-      requestedModelLowerCased === ORG_AUTO_MODEL.id
-        ? () => decisionForRouter('frontier')
-        : undefined;
-    const autoResult = await applyResolvedAutoModel(
-      {
-        model: requestedModelLowerCased,
-        modeHeader,
-        sessionId: taskId,
-        apiKind: requestBodyParsed.kind,
-        clientIp: ipAddress ?? null,
-        efficientDecision,
-        frontierDecision,
-        customRouterDecision,
-        organizationContext: organizationContextPromise,
-        isAutoFreeCandidateAllowed: async modelId => {
-          const policy = await organizationGroupPolicyPromise;
-          return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
-        },
-      },
-      requestBodyParsed,
-      authPromise.then(res => res.user),
-      balanceAndSettingsPromise.then(res => res.balance)
-    );
-    if (autoResult.kind === 'no_free_models_available') {
-      return noFreeModelsAvailableResponse();
-    }
-    if (autoResult.kind === 'organization_auto_configuration_error') {
-      return organizationAutoConfigurationResponse(autoResult.message);
-    }
-    if (autoResult.kind === 'custom_router_error') {
-      return customRouterErrorResponse(autoResult.code, autoResult.message);
-    }
-    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
-    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
-  }
-
-  if (autoModel) {
-    // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
-    // the catalog id then goes through the organization policy check below.
-    const catalogModelId = await catalogModeModelForRoutedModel(
-      requestBodyParsed.body.model,
-      authPromise
-    );
-    if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
+  // An unavailable router yields to the caller's auth failure and still owes classifier cost, so
+  // it is answered after admission.
+  if (modelResolution.kind === 'rejected' && modelResolution.failure.kind !== 'unavailable') {
+    return autoRoutingFailureResponse(modelResolution.failure, requestedModelLowerCased);
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -667,83 +434,29 @@ export async function handleLlmProxyRequest(
         )
       : bouncer.decide();
 
-  // New workers persist classifier usage themselves and return zero. Retain
-  // positive-cost billing only for workers still running the previous protocol.
-  if (legacyClassifierCostUsd > 0 && !isAnonymousContext(user)) {
-    const priorMicrodollarUsage = user.microdollars_used;
-    after(
-      (async () => {
-        try {
-          const classifierStats: MicrodollarUsageStats = {
-            messageId: null,
-            model: 'auto-routing/classifier',
-            responseContent: '',
-            hasError: false,
-            inference_provider: null,
-            upstream_id: null,
-            finish_reason: null,
-            latency: null,
-            moderation_latency: null,
-            generation_time: null,
-            streamed: false,
-            cancelled: false,
-            status_code: 200,
-            cost_mUsd: toMicrodollars(legacyClassifierCostUsd),
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheWriteTokens: 0,
-            cacheHitTokens: 0,
-            is_byok: false,
-          };
-          const classifierContext: MicrodollarUsageContext = {
-            api_kind: requestBodyParsed.kind,
-            kiloUserId: user.id,
-            fraudHeaders,
-            organizationId,
-            provider: 'openrouter',
-            requested_model: requestedModelLowerCased,
-            is_free: false,
-            custom_llm_pricing: null,
-            promptInfo: {
-              system_prompt_prefix: '',
-              system_prompt_length: 0,
-              user_prompt_prefix: '',
-            },
-            max_tokens: null,
-            has_middle_out_transform: null,
-            reasoning_setting: null,
-            isStreaming: false,
-            prior_microdollar_usage: priorMicrodollarUsage,
-            // No posthog_distinct_id: this internal overhead row must not emit
-            // the generic first_usage / first_microdollar_usage lifecycle
-            // events (those are gated on posthog_distinct_id in processUsage).
-            // Otherwise the classifier row could race the primary usage row and
-            // mis-attribute `auto-routing/classifier` as the user's first model.
-            // DB billing is unaffected — it keys on kiloUserId.
-            posthog_distinct_id: undefined,
-            project_id: projectId,
-            status_code: 200,
-            editor_name: editorName,
-            machine_id: machineIdHeader,
-            user_byok: false,
-            has_tools: false,
-            botId,
-            tokenSource,
-            feature,
-            session_id: sessionId,
-            mode: modeHeader,
-            auto_model: autoModel,
-            ttfb_ms: null,
-            clientRequestId,
-          };
-          await logMicrodollarUsage(classifierStats, classifierContext);
-        } catch (error) {
-          console.error('Failed to bill classifier cost for auto routing', error);
-        }
-      })()
-    );
+  if (!isAnonymousContext(user)) {
+    billLegacyClassifierCost({
+      resolution: modelResolution,
+      user,
+      usage: {
+        api_kind: requestBodyParsed.kind,
+        fraudHeaders,
+        organizationId,
+        requested_model: requestedModelLowerCased,
+        project_id: projectId,
+        botId,
+        tokenSource,
+        feature,
+      },
+      headers,
+    });
   }
-  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
+  if (modelResolution.kind === 'rejected') {
+    return autoRoutingFailureResponse(modelResolution.failure, requestedModelLowerCased);
+  }
+  const autoModel = modelResolution.kind === 'routed' ? modelResolution.autoModel : null;
+  const routingTarget = modelResolution.kind === 'routed' ? modelResolution.routingTarget : null;
+  const isAutoRoutedRequest = modelResolution.kind === 'routed' && modelResolution.poolRouted;
 
   async function resolveAccessCheck(modelId: string) {
     const { settings } = await balanceAndSettingsPromise;
@@ -961,19 +674,19 @@ export async function handleLlmProxyRequest(
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: editorName,
-    machine_id: machineIdHeader,
+    editor_name: headers.editorName,
+    machine_id: headers.machineId,
     user_byok: !!providerResult.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
     feature,
-    session_id: sessionId,
-    mode: modeHeader,
+    session_id: headers.sessionId,
+    mode: headers.mode,
     auto_model: autoModel,
     ttfb_ms: null,
     requestStartedAt,
-    clientRequestId,
+    clientRequestId: headers.clientRequestId,
     usageId,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
@@ -1031,13 +744,13 @@ export async function handleLlmProxyRequest(
     fraudHeaders,
     userId: user.id,
     organizationId: organizationId ?? null,
-    sessionId,
-    taskId,
+    sessionId: headers.sessionId,
+    taskId: headers.taskId,
     isNonTrialEnterprise,
     search: url.search,
     method: request.method,
     signal: request.signal,
-    vercelRequestId,
+    vercelRequestId: headers.vercelRequestId,
   };
 
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
@@ -1049,7 +762,7 @@ export async function handleLlmProxyRequest(
     user: maybeUser,
     organization_id: organizationId || null,
     session_id: usageContext.session_id,
-    vercel_request_id: vercelRequestId,
+    vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
@@ -1106,7 +819,7 @@ export async function handleLlmProxyRequest(
       isAnonymous: isAnonymousContext(user),
       isStreaming: requestBodyParsed.body.stream === true,
       userByok: !!providerResult.userByok,
-      mode: modeHeader || undefined,
+      mode: headers.mode || undefined,
       provider: providerResult.provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
@@ -1150,7 +863,7 @@ export async function handleLlmProxyRequest(
     !usageContext.isStreaming &&
     autoModel === null &&
     usageContext.session_id?.startsWith('agent-briefing:') &&
-    clientRequestId === usageContext.session_id
+    headers.clientRequestId === usageContext.session_id
   ) {
     const generationId = usageContext.session_id;
     after(

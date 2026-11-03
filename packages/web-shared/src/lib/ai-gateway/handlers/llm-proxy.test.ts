@@ -334,7 +334,7 @@ function makeRequest(
   body: unknown,
   headers?: HeadersInit,
   path = '/chat/completions',
-  prefix = '/api/openrouter/v1'
+  prefix = '/api/v1'
 ) {
   return new NextRequest(`http://localhost:3000${prefix}${path}`, {
     method: 'POST',
@@ -432,7 +432,7 @@ function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
   });
 }
 
-describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
+describe('POST /api/v1/chat/completions bearer audiences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
@@ -753,7 +753,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
   });
 });
 
-describe('POST /api/openrouter/v1/chat/completions request handling', () => {
+describe('POST /api/v1/chat/completions request handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
@@ -807,22 +807,26 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(true);
   });
 
-  it('accepts the ai-gateway app /api/v1 path', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+  it.each(['/api/gateway/v1', '/api/openrouter/v1', '/api/gateway', '/api/openrouter'])(
+    'rejects the legacy %s prefix, which apps/web rewrites to /api/v1',
+    async prefix => {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
 
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(), undefined, '/chat/completions', '/api/v1') as never
-    );
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), undefined, '/chat/completions', prefix) as never
+      );
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error_type: 'invalid_path' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects unknown paths under /api/v1', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(), undefined, '/unknown', '/api/v1') as never
+      makeRequest(makeBody(), undefined, '/unknown') as never
     );
 
     expect(response.status).toBe(400);
@@ -4321,7 +4325,7 @@ describe('Enkrypt input guardrail', () => {
     setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
     const depth = 10_000;
-    const request = new NextRequest('http://localhost:3000/api/openrouter/v1/chat/completions', {
+    const request = new NextRequest('http://localhost:3000/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
       body:

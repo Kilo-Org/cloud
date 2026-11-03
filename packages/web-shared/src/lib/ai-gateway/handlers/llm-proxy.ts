@@ -182,40 +182,21 @@ import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-g
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
-/**
- * Checks if a string starts with a required prefix and removes it.
- * @param str The input string to check
- * @param prefix The required prefix to check for and remove
- * @returns The string with the prefix removed if it starts with the prefix, otherwise null
- */
-function stripRequiredPrefix(str: string, prefix: string): string | null {
-  if (str.startsWith(prefix)) {
-    return str.slice(prefix.length);
-  }
-  return null;
-}
-
 function validatePath(
   url: URL
 ):
   | { path: '/chat/completions' | '/responses' | '/messages' }
   | { errorResponse: ReturnType<typeof invalidPathResponse> } {
-  const pathSuffix =
-    stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
-    stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
-    stripRequiredPrefix(url.pathname, '/api/gateway') ??
-    stripRequiredPrefix(url.pathname, '/api/openrouter') ??
-    // The ai-gateway app serves the proxy under /api/v1.
-    stripRequiredPrefix(url.pathname, '/api/v1');
-
-  if (
-    pathSuffix === '/chat/completions' ||
-    pathSuffix === '/responses' ||
-    pathSuffix === '/messages'
-  ) {
-    return { path: pathSuffix };
+  switch (url.pathname) {
+    case '/api/v1/chat/completions':
+      return { path: '/chat/completions' };
+    case '/api/v1/responses':
+      return { path: '/responses' };
+    case '/api/v1/messages':
+      return { path: '/messages' };
+    default:
+      return { errorResponse: invalidPathResponse() };
   }
-  return { errorResponse: invalidPathResponse() };
 }
 
 /**

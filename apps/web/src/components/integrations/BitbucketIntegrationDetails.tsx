@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import { BitbucketConnectSetup } from './BitbucketConnectSetup';
 import { BitbucketConnectedManagement } from './BitbucketConnectedManagement';
+import { resolveConnectionErrorMessage } from './connection-error-message';
 
 type BitbucketIntegrationDetailsProps = {
   organizationId: string;
@@ -31,8 +32,10 @@ const bitbucketConnectionErrorMessages: Record<string, string> = {
 };
 
 export function getBitbucketConnectionErrorMessage(error: string): string {
-  return (
-    bitbucketConnectionErrorMessages[error] ?? 'Bitbucket could not be connected. Try OAuth again.'
+  return resolveConnectionErrorMessage(
+    bitbucketConnectionErrorMessages,
+    error,
+    'Bitbucket could not be connected. Try OAuth again.'
   );
 }
 

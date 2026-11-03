@@ -12,9 +12,16 @@ import {
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   creditsBlockedResponse,
+  getOrganizationProviderPrivacy,
   invalidTokenResponse,
+  modelNotAllowedResponse,
   paidModelAuthRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
@@ -99,4 +106,37 @@ export function paidUsageRejection(params: {
       organizationId,
       balanceLimitedByUserAllowance: account.balanceLimitedByUserAllowance,
     });
+}
+
+/**
+ * The provider preferences the organization requires: its data collection
+ * policy and the member decision's provider routes, with the request's own
+ * privacy merged in. `provider` is undefined when the organization requires
+ * neither, so the request's provider preferences stand.
+ */
+export function organizationProviderPreferences(params: {
+  decision: EffectiveModelDecision | undefined;
+  settings: OrganizationSettings | undefined;
+  requestProvider: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> | undefined;
+}):
+  | { kind: 'rejected'; response: NextResponse }
+  | { kind: 'allowed'; provider: OpenRouterProviderConfig | undefined } {
+  const { decision, settings, requestProvider } = params;
+  if (decision && !decision.allowed) {
+    return { kind: 'rejected', response: modelNotAllowedResponse() };
+  }
+  const only = decision?.eligibleProviderRoutes
+    ? withoutVirtualProvider([...decision.eligibleProviderRoutes])
+    : undefined;
+  if (only?.length === 0) return { kind: 'rejected', response: modelNotAllowedResponse() };
+  const organizationPrivacy = getOrganizationProviderPrivacy(settings);
+  if (!organizationPrivacy && !only) return { kind: 'allowed', provider: undefined };
+  return {
+    kind: 'allowed',
+    provider: {
+      ...organizationPrivacy,
+      ...getEffectiveProviderPrivacy(requestProvider, settings?.data_collection),
+      ...(only && { only }),
+    },
+  };
 }

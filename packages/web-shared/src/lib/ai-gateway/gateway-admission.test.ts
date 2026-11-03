@@ -6,6 +6,7 @@ import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-prox
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
+  organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
@@ -154,4 +155,61 @@ describe('paidUsageRejection', () => {
       error_type: ProxyErrorType.usage_limit_exceeded,
     });
   });
+});
+
+describe('organizationProviderPreferences', () => {
+  it('leaves the request provider alone when the organization requires nothing', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: { allowed: true },
+        settings: {},
+        requestProvider: { zdr: true },
+      })
+    ).toEqual({ kind: 'allowed', provider: undefined });
+  });
+
+  it.each([
+    { allowed: false },
+    { allowed: true, eligibleProviderRoutes: new Set<string>() },
+    { allowed: true, eligibleProviderRoutes: new Set(['virtual']) },
+  ])('rejects a decision without a usable route: %j', decision => {
+    const preferences = organizationProviderPreferences({
+      decision,
+      settings: undefined,
+      requestProvider: undefined,
+    });
+
+    expect(preferences.kind).toBe('rejected');
+    if (preferences.kind === 'rejected') expect(preferences.response.status).toBe(404);
+  });
+
+  it('limits routing to the real eligible providers and keeps the request privacy', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['openai', 'virtual']) },
+        settings: undefined,
+        requestProvider: { data_collection: 'allow', zdr: false },
+      })
+    ).toEqual({
+      kind: 'allowed',
+      provider: { only: ['openai'], data_collection: 'allow', zdr: false },
+    });
+  });
+
+  it.each([
+    { organization: 'allow', request: 'deny' },
+    { organization: 'deny', request: 'allow' },
+    { organization: 'deny', request: undefined },
+  ] as const)(
+    'denies collection for organization=$organization and request=$request',
+    ({ organization, request }) => {
+      expect(
+        organizationProviderPreferences({
+          decision: undefined,
+          settings: { data_collection: organization },
+          requestProvider: { data_collection: request },
+        })
+      ).toEqual({ kind: 'allowed', provider: { data_collection: 'deny' } });
+    }
+  );
 });

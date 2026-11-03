@@ -14,7 +14,6 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
-  getOrganizationProviderPrivacy,
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
   extractFraudAndProjectHeaders,
@@ -22,7 +21,6 @@ import {
   invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
-  modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -34,6 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
@@ -62,7 +61,6 @@ import type {
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 async function embeddingProxyRequest(params: {
   body: Record<string, unknown>;
@@ -257,21 +255,13 @@ export async function handleEmbeddingsRequest(
     });
     if (creditsBlocked) return await creditsBlocked();
 
-    const providerConfig = getOrganizationProviderPrivacy(settings);
-
-    if (organizationDecision) {
-      const decision = organizationDecision;
-      if (!decision.allowed) return modelNotAllowedResponse();
-      if (decision.eligibleProviderRoutes) {
-        const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
-        if (only.length === 0) return modelNotAllowedResponse();
-        requestBodyParsed.provider = { ...providerConfig, only };
-      } else if (providerConfig) {
-        requestBodyParsed.provider = providerConfig;
-      }
-    } else if (providerConfig) {
-      requestBodyParsed.provider = providerConfig;
-    }
+    const preferences = organizationProviderPreferences({
+      decision: organizationDecision,
+      settings,
+      requestProvider: requestPrivacy.data,
+    });
+    if (preferences.kind === 'rejected') return preferences.response;
+    if (preferences.provider) requestBodyParsed.provider = preferences.provider;
   }
 
   sentryRootSpan()?.setAttribute(

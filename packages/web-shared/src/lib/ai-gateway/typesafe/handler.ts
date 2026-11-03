@@ -11,13 +11,12 @@ import {
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
-  getOrganizationProviderPrivacy,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  organizationProviderPreferences,
   paidUsageRejection,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
@@ -45,7 +44,6 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -170,30 +168,26 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const providerConfig = getOrganizationProviderPrivacy(settings);
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    parsed.data.provider,
-    settings?.data_collection
-  );
-  let providerPolicy =
-    Object.keys(effectivePrivacy).length > 0
-      ? { ...providerConfig, ...effectivePrivacy }
-      : providerConfig;
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: resolvedModel,
-      providerLookup: getProviderSlugsForModel,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes) {
-      const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
-      if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerPolicy, only };
-    }
-  }
+  const organizationDecision = organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId,
+          kiloUserId: user.id,
+          modelId: resolvedModel,
+          providerLookup: getProviderSlugsForModel,
+          fromDb: readDb,
+        })
+      ).decision
+    : undefined;
+  const preferences = organizationProviderPreferences({
+    decision: organizationDecision,
+    settings,
+    requestProvider: parsed.data.provider,
+  });
+  if (preferences.kind === 'rejected') return preferences.response;
+  const requestPrivacy = getEffectiveProviderPrivacy(parsed.data.provider);
+  const providerPolicy =
+    preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);

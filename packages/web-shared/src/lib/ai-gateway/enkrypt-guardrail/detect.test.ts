@@ -346,7 +346,7 @@ describe('scanRequest', () => {
       expect(result).toEqual({
         verdict: {
           action: 'block',
-          message: expect.stringContaining('cannot scan more than 500,000 characters'),
+          message: expect.stringContaining('cannot scan more than 3,000,000 characters'),
         },
         usageRecords: [],
       });

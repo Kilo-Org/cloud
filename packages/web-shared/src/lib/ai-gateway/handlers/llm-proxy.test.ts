@@ -4222,7 +4222,7 @@ describe('Enkrypt input guardrail', () => {
       makeRequest({
         model: 'openai/gpt-4o',
         messages: [
-          { role: 'user', content: 'a'.repeat(500_000) },
+          { role: 'user', content: 'a'.repeat(3_000_000) },
           { role: 'assistant', content: 'old answer' },
           { role: 'user', content: 'continue' },
         ],
@@ -4234,7 +4234,7 @@ describe('Enkrypt input guardrail', () => {
       error_type: 'guardrail_blocked',
       error: expect.objectContaining({
         message: expect.stringMatching(
-          /500,000 characters of conversation text.*Compact or prune earlier conversation history/
+          /3,000,000 characters of conversation text.*Compact or prune earlier conversation history/
         ),
       }),
     });

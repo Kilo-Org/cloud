@@ -28,8 +28,9 @@ const MAX_ATTEMPTS = 2;
 /**
  * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
+ * The limit is about 1M tokens of code, which tokenizes at roughly 3 characters per token.
  */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
+export const ENKRYPT_MAX_SCAN_CHARACTERS = 3_000_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 

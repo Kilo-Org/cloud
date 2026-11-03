@@ -32,6 +32,10 @@ import {
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
 import {
+  profileResolutionPolicyForSessionCreateOrigin,
+  resolveEffectiveSessionConfiguration,
+} from '../router/handlers/session-creation-preflight.js';
+import {
   admitOperation,
   markReconcilePending,
   recordOperationProgress,
@@ -645,6 +649,21 @@ export function isTrustedWorktreeCreateOrigin(
   );
 }
 
+/**
+ * A scoped Cloud Agent launch is authenticated by the parent authority in the
+ * request context, not by caller-selected provenance or origin.
+ */
+export function isAuthenticatedChildWorktreeCreate(
+  input: Pick<SessionRegistrationInput, 'parentCloudAgentSessionId' | 'options'>,
+  ctx: Pick<SessionRegistrationContext, 'cloudAgentAuthority'>
+): boolean {
+  return (
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId
+  );
+}
+
 export function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
@@ -664,10 +683,11 @@ export function isEligibleFirstWorktreeSession(
     );
   }
   return (
-    isTrustedWorktreeCreateOrigin(
+    (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
-    ) &&
+    ) ||
+      isAuthenticatedChildWorktreeCreate(input, ctx)) &&
     input.initialTurn !== undefined &&
     input.clone === undefined
   );
@@ -2037,9 +2057,25 @@ async function assertCreateIntentUnchanged(
   if (typeof stored !== 'string' || stored.length === 0) {
     return;
   }
-  if ((await sessionCreateIntentFingerprint(input)) !== stored) {
-    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+  const current = await sessionCreateIntentFingerprint(input);
+  if (current === stored) return;
+  // Deployed scoped children used the forced origin's profile policy, without web defaults.
+  const scopedChild =
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId;
+  if (scopedChild) {
+    const legacyInput = await resolveEffectiveSessionConfiguration(
+      ctx,
+      {
+        ...input,
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+        profile: { id: input.profile?.id, overrides: input.profile?.overrides },
+      },
+      profileResolutionPolicyForSessionCreateOrigin('cloud-agent')
+    );
+    if ((await sessionCreateIntentFingerprint(legacyInput)) === stored) return;
   }
+  throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
 }
 
 /**

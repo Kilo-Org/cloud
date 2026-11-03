@@ -1024,6 +1024,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    return (await this.getCloudAgentSpawnContext(authority)).token;
+  }
+
+  async getCloudAgentSpawnContext(
+    authority: CloudAgentAuthority
+  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
     await this.initialized;
     const scope = CloudAgentAuthoritySchema.safeParse(authority);
     const authorization = RuntimeAuthorizationSchema.safeParse(
@@ -1053,7 +1059,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
     assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
-    return issued.token;
+    return {
+      token: issued.token,
+      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
+    };
   }
 
   async authorizeCloudAgentChild(input: {

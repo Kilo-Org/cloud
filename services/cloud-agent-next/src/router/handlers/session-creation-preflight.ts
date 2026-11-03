@@ -33,6 +33,7 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'cloud-agent-web',
@@ -337,18 +338,31 @@ export async function preflightSessionCreation(
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
     }
     let token: string;
+    let parentCreatedOnPlatform: string | undefined;
     try {
-      token = await withDORetry(
+      const parent = await withDORetry(
         () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
-        stub => stub.getCloudAgentSpawnRuntimeToken(authority),
-        'getCloudAgentSpawnRuntimeToken'
+        stub => stub.getCloudAgentSpawnContext(authority),
+        'getCloudAgentSpawnContext'
       );
+      token = parent.token;
+      parentCreatedOnPlatform = parent.createdOnPlatform;
     } catch {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Cloud Agent parent authorization unavailable',
       });
     }
+    if (!isInteractiveSessionOrigin(parentCreatedOnPlatform)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    }
+    request.options = {
+      ...request.options,
+      createdOnPlatform: parentCreatedOnPlatform,
+    };
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&

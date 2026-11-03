@@ -64,6 +64,108 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe('scoped folder authority', () => {
+  const worktreeId = 'worktree_33333333-3333-4333-8333-333333333333';
+  const cloudAgentSessionId = 'workspace_44444444-4444-4444-8444-444444444444';
+  const folderId = '55555555-5555-4555-8555-555555555555';
+
+  it.each([null, organizationId])(
+    'permits only scoped folder discovery and child workspace moves for %s',
+    org => {
+      const authority = { ...scope, organizationId: org };
+      const listing = { organizationId: org };
+      const assignment = { ...listing, cloudAgentSessionId, worktreeId, folderId };
+      expect(
+        validateCloudAgentAuthorityRequest(authority, 'workspaceFolders.list', listing)
+      ).toEqual(listing);
+      expect(
+        validateCloudAgentAuthorityRequest(authority, 'workspaceFolders.moveWorktree', assignment)
+      ).toEqual(assignment);
+      expect(
+        validateCloudAgentAuthorityRequest(authority, 'workspaceFolders.moveWorktree', {
+          ...assignment,
+          folderId: null,
+        })
+      ).toEqual({ ...assignment, folderId: null });
+      expect(cloudAgentAuthorityProcedureKind('workspaceFolders.list')).toBe('query');
+      expect(cloudAgentAuthorityProcedureKind('workspaceFolders.moveWorktree')).toBe('mutation');
+      expect(
+        isCloudAgentAuthorityHttpPathAllowed(
+          authority,
+          '/api/trpc/workspaceFolders.list,workspaceFolders.moveWorktree'
+        )
+      ).toBe(true);
+      expect(
+        cloudAgentAuthorityInputSchema(authority, 'workspaceFolders.moveWorktree')
+      ).toMatchObject({
+        properties: { organizationId: { const: org } },
+        required: expect.arrayContaining([
+          'organizationId',
+          'cloudAgentSessionId',
+          'worktreeId',
+          'folderId',
+        ]),
+      });
+    }
+  );
+
+  it.each([
+    undefined,
+    { organizationId },
+    { organizationId: null, worktreeId },
+    { organizationId: null, parentSessionId: scope.parentSessionId },
+  ])('refuses missing or widened personal listing scope: %j', input => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'workspaceFolders.list', input)
+    ).toThrow();
+  });
+
+  it.each([
+    { organizationId: null, worktreeId, folderId },
+    { organizationId: null, cloudAgentSessionId, folderId },
+    { organizationId: null, cloudAgentSessionId, worktreeId },
+    { organizationId, cloudAgentSessionId, worktreeId, folderId },
+    { organizationId: null, cloudAgentSessionId, worktreeId: 'not-a-worktree', folderId },
+    { organizationId: null, cloudAgentSessionId, worktreeId, folderId: 'not-a-folder' },
+    {
+      organizationId: null,
+      cloudAgentSessionId,
+      worktreeId,
+      folderId,
+      allowSubagentSessions: true,
+    },
+  ])('refuses incomplete or widened folder moves: %j', input => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'workspaceFolders.moveWorktree', input)
+    ).toThrow();
+  });
+
+  it.each([
+    'workspaceFolders.create',
+    'workspaceFolders.update',
+    'workspaceFolders.delete',
+    'workspaceFolders.reorder',
+    'organizations.workspaceFolders.list',
+  ])('does not grant %s', procedure => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, { organizationId: null })
+    ).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/workspaceFolders.list,${procedure}`)
+    ).toBe(false);
+  });
+
+  it('refuses expired folder authority', () => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        { ...scope, expiresAt: now - 1 },
+        'workspaceFolders.list',
+        { organizationId: null }
+      )
+    ).toThrow();
+  });
+});
+
 describe('Cloud Agent authority contract', () => {
   it('accepts session-bound authority without repository, model, or depth policy', () => {
     expect(CloudAgentAuthoritySchema.parse(scope)).toEqual(scope);
@@ -324,6 +426,117 @@ describe('Cloud Agent authority contract', () => {
         '/api/trpc/cloudAgentNext.getSession,organizations.cloudAgentNext.getSession'
       )
     ).toBe(false);
+  });
+
+  it('allows only the models.list discovery query for personal and organization authority', () => {
+    expect(cloudAgentAuthorityProcedures(scope)).toEqual([
+      'cloudAgentNext.prepareSession',
+      'cloudAgentNext.listChildSessions',
+      'cloudAgentNext.getSession',
+      'cloudAgentNext.getMessageResult',
+      'cloudAgentNext.interruptSession',
+      'cloudAgentNext.sendMessage',
+      'models.list',
+      'workspaceFolders.list',
+      'workspaceFolders.moveWorktree',
+    ]);
+    expect(cloudAgentAuthorityProcedures({ ...scope, organizationId })).toEqual([
+      'organizations.cloudAgentNext.prepareSession',
+      'organizations.cloudAgentNext.listChildSessions',
+      'organizations.cloudAgentNext.getSession',
+      'organizations.cloudAgentNext.getMessageResult',
+      'organizations.cloudAgentNext.interruptSession',
+      'organizations.cloudAgentNext.sendMessage',
+      'models.list',
+      'workspaceFolders.list',
+      'workspaceFolders.moveWorktree',
+    ]);
+    expect(cloudAgentAuthorityProcedureKind('models.list')).toBe('query');
+  });
+
+  it.each([
+    ['personal', scope],
+    ['organization', { ...scope, organizationId }],
+  ] as const)('accepts strict models.list discovery for %s authority', (_label, authority) => {
+    expect(validateCloudAgentAuthorityRequest(authority, 'models.list', undefined)).toBeUndefined();
+    expect(validateCloudAgentAuthorityRequest(authority, 'models.list', {})).toEqual({});
+    expect(cloudAgentAuthorityInputSchema(authority, 'models.list')).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+    });
+    expect(cloudAgentAuthorityInputSchema(authority, 'models.list')).not.toHaveProperty(
+      'properties.organizationId'
+    );
+    expect(isCloudAgentAuthorityHttpPathAllowed(authority, '/api/trpc/models.list')).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['array', []],
+    ['extra field', { extra: true }],
+    ['organizationId', { organizationId }],
+    ['limit', { limit: 1 }],
+  ] as const)('rejects widened models.list input: %s', (_label, input) => {
+    expect(() => validateCloudAgentAuthorityRequest(scope, 'models.list', input)).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest({ ...scope, organizationId }, 'models.list', input)
+    ).toThrow();
+  });
+
+  it.each([
+    'models.preferred',
+    'models.customPricing',
+    'models.get',
+    'organizations.models.list',
+    'organizations.cloudAgentNext.models.list',
+  ])('does not permit adjacent models path %s', procedure => {
+    expect(cloudAgentAuthorityProcedures(scope)).not.toContain(procedure);
+    expect(() => cloudAgentAuthorityProcedureKind(procedure)).toThrow();
+    expect(() => cloudAgentAuthorityInputSchema(scope, procedure)).toThrow();
+    expect(() => validateCloudAgentAuthorityRequest(scope, procedure, {})).toThrow();
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(false);
+  });
+
+  it('expires models.list discovery with the authority', () => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'models.list', {}, scope.expiresAt)
+    ).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, expiresAt: now - 1 },
+        '/api/trpc/models.list'
+      )
+    ).toBe(false);
+  });
+
+  it('rejects HTTP batches mixing models.list with a forbidden or cross-scope path', () => {
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,models.preferred')
+    ).toBe(false);
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,user.getMe')).toBe(
+      false
+    );
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        scope,
+        '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
+      )
+    ).toBe(false);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, organizationId },
+        '/api/trpc/models.list,cloudAgentNext.getSession'
+      )
+    ).toBe(false);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(scope, '/api/trpc/models.list,cloudAgentNext.getSession')
+    ).toBe(true);
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, organizationId },
+        '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
+      )
+    ).toBe(true);
   });
 });
 

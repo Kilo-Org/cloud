@@ -55,9 +55,10 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
       <CardHeader>
         <CardTitle>Gateways</CardTitle>
         <CardDescription>
-          Kilo routes model requests through the Vercel AI Gateway or OpenRouter. When the Vercel AI
-          Gateway is off, requests Kilo would send there go through OpenRouter instead. Chat
-          requests that still end up on a disabled gateway fail with an error.
+          Kilo routes chat requests through the Vercel AI Gateway or OpenRouter. When the Vercel AI
+          Gateway is off, chat requests Kilo would send there go through OpenRouter instead. Chat
+          requests that still end up on a disabled gateway fail with an error. These settings do not
+          apply to embeddings yet.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -106,8 +107,8 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
                 </SelectContent>
               </Select>
               <p id={`${id}-region-help`} className="text-muted-foreground text-sm">
-                Pins requests routed through the Vercel AI Gateway to this region. Requests for a
-                model that is not available in the region fail with an error.
+                Pins chat requests routed through the Vercel AI Gateway to this region. Requests for
+                a model that is not available in the region fail with an error.
               </p>
             </div>
           )}
@@ -128,9 +129,9 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Disabling a gateway also blocks BYOK keys that route through it: a Vercel AI Gateway or
-          OpenRouter key, and provider keys Kilo sends through the Vercel AI Gateway. Requests that
-          would use those keys fail instead of falling back.
+          Disabling a gateway also blocks BYOK keys that route chat requests through it: a Vercel AI
+          Gateway or OpenRouter key, and provider keys Kilo sends through the Vercel AI Gateway.
+          Chat requests that would use those keys fail instead of falling back.
         </p>
 
         {!canEdit && (

@@ -232,9 +232,7 @@ const HEADER_VALUE = new RegExp(
 // A command-line flag that names a credential carries its value in the following
 // whitespace-separated argument, which no assignment separator marks.
 const CREDENTIAL_FLAG = new RegExp(
-  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` +
-    QUOTED_VALUE +
-    String.raw`|(?!\\?["'])[^\s,;"'&]+)`,
+  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'&]+)`,
   'g'
 );
 // Credential value shapes that carry no key name of their own. An opaque run is 48

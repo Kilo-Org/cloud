@@ -27,6 +27,7 @@ import {
   getProvider,
   type GetProviderProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
@@ -826,6 +827,80 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     expect(response.status).toBe(400);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('archives the routing decision under the id of the usage row it bills', async () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    fakeR2.objects.clear();
+    const env = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_ACCOUNT_ID: 'test-metadata-account',
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'user',
+      steps: [
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'openrouter',
+          bounded_spending: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'openrouter',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    };
+    mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+      onDecision?.(decision);
+      return {
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    let response: Response;
+    try {
+      response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      expect(fakeR2.objects.size).toBe(0);
+      await Promise.all(
+        jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+      );
+    } finally {
+      env.restore();
+    }
+
+    expect(response.status).toBe(200);
+    const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+    expect(usageId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/kilo/${usageId}.json`]);
+    expect(
+      JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${usageId}.json`) ?? '')
+    ).toEqual({
+      schema_version: 1,
+      usage_id: usageId,
+      created_at: expect.any(String),
+      ...decision,
+    });
   });
 
   it('passes the Vercel request ID to request logging', async () => {

@@ -19,6 +19,9 @@ import test from 'node:test';
 // assertions, so the fixture tree mirrors the repository layout.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
+// Every module under tools/lib the checker imports, copied into each fixture so
+// the checker runs from a root that mirrors the repository layout.
+const SHARED_SCANNERS = ['js-scan.mjs', 'source-files.mjs'];
 
 function makeFixture(context, files) {
   const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
@@ -37,7 +40,9 @@ function makeFixture(context, files) {
     new URL('./check-classes.mjs', import.meta.url),
     join(root, 'tools/nativewind/check-classes.mjs')
   );
-  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
+  for (const name of SHARED_SCANNERS) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
+  }
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
   return root;
@@ -55,7 +60,7 @@ function runChecker(context, files) {
 }
 
 /**
- * A root holding only the checker and its shared scanner: no source tree, no
+ * A root holding only the checker and its shared scanners: no source tree, no
  * global.css, no installed dependencies. Anything the module does beyond
  * declaring its exports fails here.
  */
@@ -68,7 +73,9 @@ function importOnlyRoot(context) {
     new URL('./check-classes.mjs', import.meta.url),
     join(root, 'tools/nativewind/check-classes.mjs')
   );
-  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
+  for (const name of SHARED_SCANNERS) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
+  }
   return root;
 }
 
@@ -338,6 +345,34 @@ test('accepts theme tokens without an opacity modifier', context => {
   assert.equal(result.status, 0);
 });
 
+test('flags a runtime Text import under any name and allows the type-only forms', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/bare.tsx': "import { Text } from 'react-native';\n",
+    'apps/mobile/src/aliased.tsx': "import { Text as RNText } from 'react-native';\n",
+    'apps/mobile/src/mixed.tsx':
+      "import {\n  Pressable,\n  Text as RNText,\n  type TextStyle,\n} from 'react-native';\n",
+    'apps/mobile/src/type-aliased.tsx': "import { type Text as RNText } from 'react-native';\n",
+    'apps/mobile/src/type-import.tsx': "import type { Text } from 'react-native';\n",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /bare\.tsx:1: imports Text from 'react-native'/);
+  assert.match(result.stderr, /aliased\.tsx:1: imports Text from 'react-native'/);
+  assert.match(result.stderr, /mixed\.tsx:1: imports Text from 'react-native'/);
+  assert.doesNotMatch(result.stderr, /type-aliased/);
+  assert.doesNotMatch(result.stderr, /type-import/);
+});
+
+test('ignores test scaffolding', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/components/screen.mounted.test.tsx': "import { Text } from 'react-native';\n",
+    'apps/mobile/src/components/screen.mounted.test-helpers.ts':
+      "import { Text } from 'react-native';\n",
+    'apps/mobile/src/components/screen.test.tsx': "import { Text } from 'react-native';\n",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('importing the module neither scans nor runs the compiler probes', context => {
   const root = importOnlyRoot(context);
   // A static import from a root with no source dirs, no global.css and no
@@ -386,4 +421,125 @@ test('checkSourceFile reports one file and keeps no state between calls', contex
   // A second call sees this call's problems only, and a clean file sees none.
   assert.deepEqual(second, first);
   assert.deepEqual(clean, []);
+});
+
+test('reads the container classes past a nested template literal', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <ScrollView\n' +
+      '    renderItem={() => (\n' +
+      "      <View accessibilityLabel={`${rows.map(row => `${row.name}'s`).join(', ')}`} />\n" +
+      '    )}\n' +
+      '    className="px-4"\n' +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /screen\.tsx:2: <ScrollView> carries "px-4" on its own className/);
+});
+
+test('reports each ban at its own line from one whole-text scan', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/bans.ts':
+      'const a = 1;\n' +
+      '\n' +
+      'const b = "text-start";\n' +
+      'const c = 2;\n' +
+      'const d = "ltr: leading-9";\n' +
+      '// "bg-primary/50" in the rule comment is documentation\n' +
+      ' * text-start in a block-comment body\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(
+    result.stderr.split('\n').filter(line => line.startsWith('apps/')),
+    [
+      `apps/mobile/src/bans.ts:3: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+      `apps/mobile/src/bans.ts:5: "ltr:" the ltr: variant also matches in RTL; express the rule with rtl: instead`,
+      `apps/mobile/src/bans.ts:5: "leading-9" a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]`,
+    ]
+  );
+});
+
+test('keeps the Intl scan line-shaped across a line break', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts':
+      'export const a = Intl.NumberFormat\n' +
+      '  ("en-US");\n' +
+      'export const b = new Intl.DateTimeFormat\n' +
+      '  ("en-US");\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /"new Intl\.DateTimeFormat" builds its own formatter/);
+  // The constructor called on the next line stays out, as it did line by line.
+  assert.doesNotMatch(result.stderr, /"Intl\.NumberFormat"/);
+});
+
+test('reports a constructor whose new ends the previous line', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts': 'export const a = new\nIntl.DateTimeFormat("en");\n',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  // The line-by-line scan reported the call on its own line; the rejected
+  // `new\nIntl…` match must not swallow it.
+  assert.match(result.stderr, /format\.ts:2: "Intl\.DateTimeFormat\(" builds its own formatter/);
+});
+
+test('reads one relative path the same however it is spelled', context => {
+  const widget = 'apps/mobile/src/glanceable-ios/active-agents-widget.tsx';
+  const root = makeFixture(context, {
+    'apps/mobile/src/panel.tsx':
+      "import { Text } from 'react-native';\n" + "export const a = Intl.DateTimeFormat('en-US');\n",
+    'apps/mobile/src/glanceable-ios/active-agents-widget.tsx':
+      "export const a = Intl.DateTimeFormat('en-US');\n",
+  });
+  const source =
+    "import { Text } from 'react-native';\n" + "export const a = Intl.DateTimeFormat('en-US');\n";
+  writeFileSync(
+    join(root, 'probe.mjs'),
+    [
+      "import { checkSourceFile } from './tools/nativewind/check-classes.mjs';",
+      'const paths = [',
+      '  "apps/mobile/src/panel.tsx",',
+      '  "./apps/mobile/src/panel.tsx",',
+      '  "/apps/mobile/src/panel.tsx",',
+      '];',
+      'const widget = "apps/mobile/src/glanceable-ios/active-agents-widget.tsx";',
+      `const source = ${JSON.stringify(source)};`,
+      'const results = {};',
+      'for (const path of paths) {',
+      `  results[path] = checkSourceFile(path, ${JSON.stringify(join(root, 'apps/mobile/src/panel.tsx'))}, source);`,
+      '}',
+      'for (const path of [widget, `/${widget}`, `./${widget}`]) {',
+      `  results[path] = checkSourceFile(path, ${JSON.stringify(join(root, widget))}, "export const a = Intl.DateTimeFormat('en-US');\\n");`,
+      '}',
+      'console.log(JSON.stringify(results));',
+    ].join('\n')
+  );
+  const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const results = JSON.parse(result.stdout);
+  const plain = results['apps/mobile/src/panel.tsx'];
+  assert.equal(plain.length, 2);
+  // Every diagnostic names the normalised path, so the finding is the same file.
+  assert.deepEqual(
+    results['./apps/mobile/src/panel.tsx'],
+    plain,
+    'a ./ prefix must not change the verdict'
+  );
+  assert.deepEqual(
+    results['/apps/mobile/src/panel.tsx'],
+    plain,
+    'a leading slash must not change the verdict'
+  );
+  // The widget-process exemption reads the same normalised path as every check.
+  const widgetPlain = results[widget];
+  assert.deepEqual(widgetPlain, [], 'the widget layout keeps its exemption');
+  assert.deepEqual(results[`/${widget}`], widgetPlain);
+  assert.deepEqual(results[`./${widget}`], widgetPlain);
 });

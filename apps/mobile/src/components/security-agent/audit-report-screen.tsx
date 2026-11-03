@@ -126,14 +126,21 @@ function AuditReportSkeleton() {
   );
 }
 
+// The report's window is a UTC calendar range. `start` is an instant rendered in
+// UTC; `displayEnd` is a date-only calendar day, not an instant, so its calendar
+// components are formatted as they are. The header and the empty state both
+// render these values through `periodUtc`, so neither can describe the window in
+// the reader's own calendar days without saying which zone it is.
+function reportPeriod(report: SecurityAgentAuditReport) {
+  return {
+    start: formatDate(parseTimestamp(report.period.start), i18n.language, { timeZone: 'UTC' }),
+    end: formatCalendarDate(report.period.displayEnd, i18n.language),
+  };
+}
+
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
-  const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-    timeZone: 'UTC',
-  });
-  // `displayEnd` is a date-only calendar day, not an instant: format its
-  // calendar components so its rendered day matches the backend value.
-  const end = formatCalendarDate(report.period.displayEnd, i18n.language);
+  const { start, end } = reportPeriod(report);
   const generatedAt = formatUtcTimestamp(report.generatedAt);
 
   return (
@@ -186,21 +193,32 @@ function AuditReportView({
 }: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-      timeZone: 'UTC',
-    });
-    const end = formatCalendarDate(report.period.displayEnd, i18n.language);
+    const period = reportPeriod(report);
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).
+    // The heading says there is no recorded activity; the only other datum the
+    // empty state has is the window, so `periodUtc` states it once, with the
+    // invariant UTC marker, at the same size the non-empty header uses. A
+    // second sentence saying the same thing in words was removed: it restated
+    // the heading and pointed at this line. The owner line is the header's
+    // first line, so an empty report identifies whose window it covers instead
+    // of leaving that to the screen the reader came from.
     return (
-      <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
-        <EmptyState
-          placement="static"
-          icon={FileText}
-          title={t('securityAgent.auditReport.noActivity')}
-          description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
-        />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
+        <Text className="px-6 pt-4 text-sm font-medium">{report.owner.displayName}</Text>
+        <View className="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={FileText}
+            title={t('securityAgent.auditReport.noActivity')}
+            description={
+              <Text variant="muted" className="text-xs text-center">
+                {t('securityAgent.auditReport.periodUtc', period)}
+              </Text>
+            }
+          />
+        </View>
       </TabScreenScrollView>
     );
   }

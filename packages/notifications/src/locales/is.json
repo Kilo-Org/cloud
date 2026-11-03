@@ -9,6 +9,7 @@
       "lowBalance": "Staðan þín þarfnast athygli",
       "spendAlert": "Útgjöldin þín þarfnast athygli",
       "securityFinding": "Öryggisfundur þarfnast athygli",
+      "securityUpdate": "Öryggisathugun hefur uppfærslu",
       "activeAgentsGlanceable": "Virk umboð hafa uppfærslu"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Öryggisfundur þarfnast athygli"
+      "body": "Öryggisathugun hefur uppfærslu"
     }
   },
   "instanceLifecycle": {

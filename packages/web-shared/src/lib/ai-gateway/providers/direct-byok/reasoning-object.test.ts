@@ -32,7 +32,7 @@ async function transform(provider: DirectByokProvider, request: GatewayRequest) 
     extraHeaders: {},
     kilo_user_id: 'user-1',
     session_id: 'session-1',
-    provider: { id: 'direct-byok', apiKey: 'test-api-key' },
+    provider: { type: 'direct-byok', apiKey: 'test-api-key' },
   } as unknown as TransformRequestContext);
   const { responseTransforms } = await provider.resolveUpstream({
     credential: 'test-api-key',

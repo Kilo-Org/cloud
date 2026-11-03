@@ -52,7 +52,9 @@ Publication requires these approved and provisioned resources:
 
 An automatic run publishes only when `runtime-targets.json` at the source SHA has a downloaded default
 or named target. The admission job reads that catalog through the GitHub API for the exact SHA.
-A preinstalled-only catalog skips the publish job, so ordinary main CI runs build nothing.
+A preinstalled-only catalog skips the publish job. With the checked-in downloaded default, every
+eligible successful main-push CI run publishes its exact-SHA handoff, even without runtime changes.
+The publisher reuses a verified cached base when its inputs have not changed.
 
 A manual `workflow_dispatch` run accepts an exact main SHA and requires a successful trusted CI push
 run for that SHA. A manual run publishes whatever the catalog contains.

@@ -228,6 +228,8 @@ function containsCacheControl(value: unknown): boolean {
 }
 
 export function addCacheBreakpoints(request: GatewayRequest) {
+  const breakpoints: string[] = [];
+
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
@@ -235,18 +237,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   ) {
     const systemMessage = request.body.messages.find(msg => msg.role === 'system');
     if (systemMessage) {
-      console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
-      );
+      breakpoints.push('chat_completions.system');
       setCacheControlOnChatCompletionsMessage(systemMessage);
     }
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
     );
     if (lastMessage) {
-      console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.role} chat completions message`
-      );
+      breakpoints.push(`chat_completions.last.${lastMessage.role}`);
       setCacheControlOnChatCompletionsMessage(lastMessage);
     }
   } else if (
@@ -258,18 +256,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       msg => msg.type === 'message' && (msg.role === 'system' || msg.role === 'developer')
     );
     if (instructionsMessage) {
-      console.debug(
-        '[addCacheBreakpoints] setting cache breakpoint on instructions responses message'
-      );
+      breakpoints.push('responses.instructions');
       setPromptCacheBreakpointOnResponsesMessage(instructionsMessage);
     }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
     );
     if (lastMessage) {
-      console.debug(
-        `[addCacheBreakpoints] setting cache breakpoint on last ${lastMessage.type} responses message`
-      );
+      breakpoints.push(`responses.last.${lastMessage.type}`);
       setPromptCacheBreakpointOnResponsesMessage(lastMessage);
     }
   } else if (
@@ -281,14 +275,22 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     const cacheControl = request.body.cache_control ?? { type: 'ephemeral' };
     delete request.body.cache_control;
     if (request.body.system) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on messages system prompt');
+      breakpoints.push('messages.system');
       request.body.system = setCacheControlOnMessagesSystem(request.body.system, cacheControl);
     }
     const lastMessage = request.body.messages.findLast(hasCacheableMessagesContent);
     if (lastMessage) {
-      console.debug('[addCacheBreakpoints] setting cache breakpoint on last messages message');
+      breakpoints.push('messages.last');
       setCacheControlOnMessagesMessage(lastMessage, cacheControl);
     }
+  }
+
+  // One record per request: the per-breakpoint records put two lines on every transformed
+  // request. The record names the breakpoints that were set, never message content.
+  if (breakpoints.length > 0) {
+    console.debug(
+      `[addCacheBreakpoints] set ${breakpoints.length} cache breakpoints for ${request.kind}: ${breakpoints.join(', ')}`
+    );
   }
 }
 

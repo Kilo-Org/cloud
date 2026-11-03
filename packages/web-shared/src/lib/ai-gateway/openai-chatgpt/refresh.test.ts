@@ -32,7 +32,10 @@ import {
 import {
   OPENAI_CHATGPT_RECONNECT_MESSAGE,
   OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS,
+  OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS,
+  OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS,
   resolveOpenAiChatGptAccessToken,
+  type OpenAiChatGptAccessTokenOutcome,
 } from './refresh';
 import type { OpenAiChatGptOwner } from './store';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
@@ -557,6 +560,125 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       accessToken: 'new-access-token',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the token request under the exported request budget', async () => {
+    storedRow = encryptedRow(buildConnection());
+    fetchMock.mockResolvedValue(
+      jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+    );
+    const timeouts = jest.spyOn(AbortSignal, 'timeout');
+    const budgets = () => timeouts.mock.calls.map(([ms]) => ms);
+
+    try {
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+      });
+      expect(budgets()).toEqual([OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS]);
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    } finally {
+      timeouts.mockRestore();
+    }
+  });
+
+  it('releases the row lock and retries each attempt its budget cuts off', async () => {
+    storedRow = encryptedRow(buildConnection());
+    const events: string[] = [];
+    mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+      events.push('lock:acquire');
+      try {
+        return await callback({
+          select: jest.fn(txSelectChain),
+          update: jest.fn(() => ({
+            set: jest.fn((values: Record<string, unknown>) => {
+              txUpdateSetCalls.push(values);
+              return { where: jest.fn(() => Promise.resolve(undefined)) };
+            }),
+          })),
+        });
+      } finally {
+        events.push('lock:release');
+      }
+    });
+
+    // The endpoint accepts the connection and never answers, so the only thing
+    // that can end a request is its own budget aborting it.
+    const controllers: AbortController[] = [];
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      return controller.signal;
+    });
+    fetchMock.mockImplementation(() => {
+      events.push('fetch');
+      controllers[controllers.length - 1].abort();
+      return Promise.reject(new DOMException('The request was aborted.', 'TimeoutError'));
+    });
+
+    const delays = captureRetryDelays();
+    let outcome: OpenAiChatGptAccessTokenOutcome;
+    try {
+      outcome = await resolveOpenAiChatGptAccessToken(USER_OWNER);
+    } finally {
+      delays.restore();
+      timeouts.mockRestore();
+    }
+
+    expect(outcome).toEqual({ kind: 'failed' });
+    // Every attempt was issued with its own budget, and the stall consumed all
+    // of them before the outcome failed.
+    expect(controllers).toHaveLength(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
+    // The row lock and the pool connection go back before the next attempt, so a
+    // stalled endpoint cannot hold either across the retries.
+    expect(events).toEqual([
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+    ]);
+    expect(delays.values).toHaveLength(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS - 1);
+    // A budget that runs out is transient: the stored credential stays as it is.
+    expect(txUpdateSetCalls).toHaveLength(0);
+    expect(markUpdateSetCalls).toHaveLength(0);
+  });
+
+  it('treats a body that outlives the request budget as a stall', async () => {
+    storedRow = encryptedRow(buildConnection());
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      // The budget ran out while the body was still arriving: the read yields
+      // nothing, which must not be read as an OAuth answer.
+      controller.abort();
+      return controller.signal;
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: () => Promise.reject(new DOMException('The request was aborted.', 'AbortError')),
+      } as unknown as Response)
+    );
+
+    const delays = captureRetryDelays();
+    let outcome: OpenAiChatGptAccessTokenOutcome;
+    try {
+      outcome = await resolveOpenAiChatGptAccessToken(USER_OWNER);
+    } finally {
+      delays.restore();
+      timeouts.mockRestore();
+    }
+
+    expect(outcome).toEqual({ kind: 'failed' });
+    expect(fetchMock).toHaveBeenCalledTimes(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
+    expect(txUpdateSetCalls).toHaveLength(0);
   });
 
   it('never logs the client secret, the access token or the refresh token', async () => {

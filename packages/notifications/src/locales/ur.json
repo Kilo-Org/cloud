@@ -9,6 +9,7 @@
       "lowBalance": "آپ کے بیلنس پر توجہ کی ضرورت ہے",
       "spendAlert": "آپ کے خرچ پر توجہ کی ضرورت ہے",
       "securityFinding": "سیکیورٹی کے معاملے پر توجہ کی ضرورت ہے",
+      "securityUpdate": "سیکیورٹی چیک میں اپڈیٹ ہے",
       "activeAgentsGlanceable": "فعال ایجنٹس میں اپڈیٹ ہے"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "سیکیورٹی کے معاملے پر توجہ کی ضرورت ہے"
+      "body": "سیکیورٹی چیک میں اپڈیٹ ہے"
     }
   },
   "instanceLifecycle": {

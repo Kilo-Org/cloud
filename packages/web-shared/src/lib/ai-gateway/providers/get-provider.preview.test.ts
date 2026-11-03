@@ -6,11 +6,13 @@ import {
   type ByokRoutePreviewStep,
   type GetProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   findDirectByokCatalogModels,
   type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
 import {
   getByokCredentials,
   getCatalogModeByokCredentials,
@@ -97,6 +99,9 @@ function catalogModel(
     provider: {
       id,
       models_dev_id: id,
+      ...(id === 'zai-coding'
+        ? { openrouter_inference_provider_id: 'z-ai' as const }
+        : { provider_listing: syntheticDefinition.provider_listing }),
       ...apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
         supportedChatApis,
@@ -171,7 +176,7 @@ type RouteSignature =
 function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
   if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
   const { provider, userByok } = result;
-  if (provider.id === 'direct-byok') {
+  if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
       ? { route: 'direct-byok', providerId }
@@ -180,7 +185,7 @@ function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteS
   if (!userByok) {
     if (provider === VERCEL_AI_GATEWAY) return { route: 'kilo', gateway: 'vercel' };
     if (provider === OPENROUTER) return { route: 'kilo', gateway: 'openrouter' };
-    throw new Error(`unexpected Kilo provider ${provider.id}`);
+    throw new Error(`unexpected Kilo provider ${provider.type}`);
   }
   if (provider === VERCEL_AI_GATEWAY) {
     return { route: 'vercel-byok', providerIds: userByok.map(byok => byok.providerId) };
@@ -242,12 +247,17 @@ describe('previewByokRouting', () => {
         jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(gatewayProviders);
         const scenario = { keys, apiKind, vercelServes, gatewayProviders };
 
+        const decisions: ProviderRoutingDecision[] = [];
         const routed = await getProvider({
           requestedModel: MODEL,
           request: request(apiKind),
           user,
           organizationId: owner.type === 'organization' ? owner.id : undefined,
+          onDecision: decision => decisions.push(decision),
         });
+        expect(decisions.map(decision => decision.result)).toEqual([
+          expect.objectContaining({ route: routeOf(routed, apiKind).route }),
+        ]);
 
         jest.mocked(decryptApiKey).mockClear();
         jest.mocked(getByokCredentials).mockClear();
@@ -272,6 +282,128 @@ describe('previewByokRouting', () => {
         );
         if (directKeyServes) {
           expect(preview.steps.map(step => step.route)).not.toContain('unsupported-api-kind');
+        }
+      }
+    }
+  );
+
+  test.each([
+    { priorities: undefined, expected: 'synthetic' },
+    { priorities: { synthetic: 1, 'zai-coding': 0 }, expected: 'zai-coding' },
+    { priorities: { synthetic: 0, 'zai-coding': 1 }, expected: 'synthetic' },
+  ])(
+    'serves a catalog id with the first catalog-mode key in the owner order: $expected',
+    async ({ priorities, expected }) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values(
+        (['zai-coding', 'synthetic'] as const).map(providerId => ({
+          kilo_user_id: user.id,
+          provider_id: providerId,
+          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: true, priority: priorities?.[providerId] },
+        }))
+      );
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+
+      const routed = await getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+      });
+      const preview = await previewByokRouting({
+        fromDb: db,
+        owner: { type: 'user', id: user.id },
+        requestedModel: MODEL,
+        apiKind: 'chat_completions',
+      });
+
+      if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+      expect(routeOf(routed, 'chat_completions')).toEqual({
+        route: 'direct-byok',
+        providerId: expected,
+      });
+      expect(previewRouteOf(preview.steps)).toEqual({ route: 'direct-byok', providerId: expected });
+    }
+  );
+
+  function permutations<T>(items: readonly T[]): T[][] {
+    if (items.length <= 1) return [[...items]];
+    return items.flatMap((item, index) =>
+      permutations(items.toSpliced(index, 1)).map(rest => [item, ...rest])
+    );
+  }
+
+  const PRIORITIZED_PROVIDERS = ['zai-coding', 'moonshotai', 'bedrock', 'openrouter'] as const;
+
+  function expectedRoute(
+    providerId: (typeof PRIORITIZED_PROVIDERS)[number],
+    apiKind: GatewayChatApiKind,
+    gatewayProviders: GatewayUserByokProviderId[]
+  ): RouteSignature | null {
+    switch (providerId) {
+      case 'zai-coding':
+        return apiKind === 'messages' ? null : { route: 'direct-byok', providerId };
+      case 'moonshotai':
+      case 'bedrock':
+        return { route: 'vercel-byok', providerIds: [providerId] };
+      case 'openrouter':
+        return gatewayProviders.includes(providerId) ? { route: 'gateway-byok', providerId } : null;
+    }
+  }
+
+  test.each(permutations(PRIORITIZED_PROVIDERS))(
+    'uses the first key that serves in the owner order %s',
+    async (...order) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values(
+        order.map((providerId, priority) => ({
+          kilo_user_id: user.id,
+          provider_id: providerId,
+          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: providerId === 'zai-coding', priority },
+        }))
+      );
+      jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'bedrock']);
+      jest.mocked(canRouteToVercel).mockResolvedValue(true);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+      for (const apiKind of ['chat_completions', 'messages'] as const) {
+        for (const gatewayProviders of [
+          ['openrouter'],
+          [],
+        ] satisfies GatewayUserByokProviderId[][]) {
+          jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(gatewayProviders);
+          const expected = order
+            .map(providerId => expectedRoute(providerId, apiKind, gatewayProviders))
+            .find(route => route !== null);
+
+          const routed = await getProvider({
+            requestedModel: MODEL,
+            request: request(apiKind),
+            user,
+            organizationId: undefined,
+          });
+          const preview = await previewByokRouting({
+            fromDb: db,
+            owner: { type: 'user', id: user.id },
+            requestedModel: MODEL,
+            apiKind,
+          });
+
+          if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+          const scenario = { apiKind, gatewayProviders };
+          expect({ scenario, route: routeOf(routed, apiKind) }).toEqual({
+            scenario,
+            route: expected,
+          });
+          expect({ scenario, route: previewRouteOf(preview.steps) }).toEqual({
+            scenario,
+            route: expected,
+          });
         }
       }
     }
@@ -303,6 +435,249 @@ describe('previewByokRouting', () => {
       { route: 'kilo', outcome: 'unreached' },
     ]);
   });
+
+  test.each([
+    { catalogPriority: 0, expected: 'serves' },
+    { catalogPriority: 2, expected: 'fails closed' },
+  ])(
+    'decrypts only the key it uses: catalog key at priority $catalogPriority $expected',
+    async ({ catalogPriority, expected }) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values([
+        {
+          kilo_user_id: user.id,
+          provider_id: 'zai-coding',
+          encrypted_api_key: encryptApiKey('zai-coding-secret', BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: true, priority: catalogPriority },
+        },
+        {
+          kilo_user_id: user.id,
+          provider_id: 'moonshotai',
+          encrypted_api_key: encryptApiKey('moonshotai-secret', randomBytes(32).toString('base64')),
+          created_by: user.id,
+          settings: { priority: 1 },
+        },
+      ]);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+      jest.mocked(decryptApiKey).mockClear();
+
+      const routed = getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+      });
+
+      if (expected === 'serves') {
+        expect(routeOf(await routed, 'chat_completions')).toEqual({
+          route: 'direct-byok',
+          providerId: 'zai-coding',
+        });
+        expect(decryptApiKey).toHaveBeenCalledTimes(1);
+      } else {
+        await expect(routed).rejects.toThrow();
+      }
+    }
+  );
+
+  test('never decrypts a catalog key ranked below the gateway key that serves', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values([
+      {
+        kilo_user_id: user.id,
+        provider_id: 'openrouter',
+        encrypted_api_key: encryptApiKey('openrouter-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority: 0 },
+      },
+      {
+        kilo_user_id: user.id,
+        provider_id: 'zai-coding',
+        encrypted_api_key: encryptApiKey('zai-coding-secret', randomBytes(32).toString('base64')),
+        created_by: user.id,
+        settings: { serve_catalog_models: true, priority: 1 },
+      },
+    ]);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+
+    const routed = await getProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(routeOf(routed, 'chat_completions')).toEqual({
+      route: 'gateway-byok',
+      providerId: 'openrouter',
+    });
+  });
+
+  test('ranks a key without a priority by its place in the whole key list, not among the eligible keys', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values([
+      {
+        kilo_user_id: user.id,
+        provider_id: 'openrouter',
+        encrypted_api_key: encryptApiKey('openrouter-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority: 0 },
+      },
+      {
+        kilo_user_id: user.id,
+        provider_id: 'anthropic',
+        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority: 1 },
+      },
+      {
+        kilo_user_id: user.id,
+        provider_id: 'moonshotai',
+        encrypted_api_key: encryptApiKey('moonshotai-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      },
+    ]);
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai']);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const routed = await getProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'user', id: user.id },
+      requestedModel: MODEL,
+      apiKind: 'chat_completions',
+    });
+
+    if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+    const expected = { route: 'gateway-byok', providerId: 'openrouter' };
+    expect(routeOf(routed, 'chat_completions')).toEqual(expected);
+    expect(previewRouteOf(preview.steps)).toEqual(expected);
+  });
+
+  test('logs the selected key and why higher-ranked keys were skipped', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values(
+      (['anthropic', 'bedrock'] as const).map((providerId, priority) => ({
+        kilo_user_id: user.id,
+        provider_id: providerId,
+        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { priority },
+      }))
+    );
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic', 'bedrock']);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      await getProvider({
+        requestedModel: MODEL,
+        request: {
+          kind: 'chat_completions',
+          body: { model: MODEL, messages: [], provider: { ignore: ['anthropic'] } },
+        },
+        user,
+        organizationId: undefined,
+      });
+
+      expect(debug).toHaveBeenCalledWith('[getProvider] BYOK route selected', {
+        requestedModel: MODEL,
+        selected: 'bedrock',
+        candidates: 2,
+        skipped: [{ providerId: 'anthropic', reason: 'ignored-by-request' }],
+      });
+    } finally {
+      debug.mockRestore();
+    }
+  });
+
+  describe("the request's own provider.ignore", () => {
+    async function routeWithIgnore(ignore: string[], providerIds: UserByokProviderId[]) {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values(
+        providerIds.map((providerId, priority) => ({
+          kilo_user_id: user.id,
+          provider_id: providerId,
+          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { priority },
+        }))
+      );
+      jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+      jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic', 'bedrock']);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+      const routed = await getProvider({
+        requestedModel: MODEL,
+        request: {
+          kind: 'chat_completions',
+          body: { model: MODEL, messages: [], provider: { ignore } },
+        },
+        user,
+        organizationId: undefined,
+      });
+      return routeOf(routed, 'chat_completions');
+    }
+
+    test('passes over an ignored provider key for the next key that serves', async () => {
+      await expect(routeWithIgnore(['anthropic'], ['anthropic', 'bedrock'])).resolves.toEqual({
+        route: 'vercel-byok',
+        providerIds: ['bedrock'],
+      });
+      await expect(routeWithIgnore(['anthropic'], ['anthropic', 'openrouter'])).resolves.toEqual({
+        route: 'gateway-byok',
+        providerId: 'openrouter',
+      });
+    });
+
+    test('still uses an ignored provider key when no other key serves', async () => {
+      await expect(routeWithIgnore(['anthropic'], ['anthropic'])).resolves.toEqual({
+        route: 'vercel-byok',
+        providerIds: ['anthropic'],
+      });
+    });
+  });
+
+  test('puts the ChatGPT connection ahead of a gateway key the owner ranked above a catalog key', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values(
+      (['openrouter', 'zai-coding'] as const).map((providerId, priority) => ({
+        kilo_user_id: user.id,
+        provider_id: providerId,
+        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+        settings: { serve_catalog_models: providerId === 'zai-coding', priority },
+      }))
+    );
+    jest.mocked(getOpenAiChatGptCandidateModel).mockResolvedValueOnce('gpt-test');
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'user', id: user.id },
+      requestedModel: MODEL,
+      apiKind: 'responses',
+    });
+
+    if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+    expect(preview.steps.map(({ route, outcome }) => ({ route, outcome }))).toEqual([
+      { route: 'chatgpt', outcome: 'conditional' },
+      { route: 'gateway-byok', outcome: 'used' },
+      { route: 'direct-byok', outcome: 'unreached' },
+      { route: 'kilo', outcome: 'unreached' },
+    ]);
+  });
 });
 
 describe('getProvider with an organization provider allow-list', () => {
@@ -313,11 +688,12 @@ describe('getProvider with an organization provider allow-list', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization(`Allow ${crypto.randomUUID()}`, user.id, 0);
     await db.insert(byok_api_keys).values(
-      providerIds.map(providerId => ({
+      providerIds.map((providerId, index) => ({
         organization_id: organization.id,
         provider_id: providerId,
         encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
         created_by: user.id,
+        created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
       }))
     );
     jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
@@ -390,6 +766,17 @@ describe('getProvider with an organization provider allow-list', () => {
         getAllowedProviders: async () => new Set(['moonshotai']),
       })
     ).rejects.toThrow();
+  });
+
+  test('uses the next key in order when the allow-list rejects the first one', async () => {
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'anthropic']);
+
+    await expect(routeForOrganizationKeys(['moonshotai', 'anthropic'], undefined)).resolves.toEqual(
+      { route: 'vercel-byok', providerIds: ['moonshotai'] }
+    );
+    await expect(
+      routeForOrganizationKeys(['moonshotai', 'anthropic'], new Set(['anthropic']))
+    ).resolves.toEqual({ route: 'vercel-byok', providerIds: ['anthropic'] });
   });
 
   test('skips every provider key when no allowed provider serves the model', async () => {

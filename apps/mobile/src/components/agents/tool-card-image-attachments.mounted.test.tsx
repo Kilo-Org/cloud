@@ -10,7 +10,7 @@ import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-c
 type FileInstance = {
   exists: boolean;
   uri: string;
-  writeSync: (content: string) => void;
+  write: (content: string) => Promise<void>;
   filename: string;
 };
 
@@ -28,7 +28,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     const instance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      writeSync: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
       filename,
       directory,
     };
@@ -187,6 +187,53 @@ describe('ToolCardImageAttachments mounted', () => {
     await unmount(renderer);
   });
 
+  it('shows a busy placeholder instead of the unavailable row while the cache write is pending', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        exists: false,
+        uri: `file:///cache/tool-card-images/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+        directory,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    await act(async () => {
+      await Promise.resolve();
+      seedImageCache();
+    });
+    const renderer = await mount(makeToolPart([makeAttachment('att-1', 'image/png', '')]));
+    const root = renderer.root;
+
+    expect(previewButtons(root)).toHaveLength(0);
+    expect(texts(root)).not.toContain('Image preview unavailable in this session.');
+    expect(texts(root)).not.toContain('Image unavailable');
+    const busy = root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    );
+    expect(busy.props.accessibilityLabel).toBe('Loading image');
+    expect(root.findAll(node => (node.type as string) === 'Skeleton').length).toBeGreaterThan(0);
+
+    write.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(previewButtons(root)).toHaveLength(1);
+    expect(texts(root)).not.toContain('Image preview unavailable in this session.');
+
+    await unmount(renderer);
+  });
+
   it('shows one unavailable row and no preview when the cache is empty', async () => {
     const part = makeToolPart([
       makeAttachment('att-1', 'image/png', ''),
@@ -237,20 +284,24 @@ describe('ToolCardImageAttachments mounted', () => {
   });
 
   it('clears a standalone decode failure when the cached URI changes', async () => {
-    seedImageCache();
+    await act(async () => {
+      await Promise.resolve();
+      seedImageCache();
+    });
     const renderer = await mount(makeToolPart([makeAttachment('att-1', 'image/png', '')]));
     const image = renderer.root.find(node => (node.type as string) === 'Image');
     act(() => {
       (image.props.onError as () => void)();
     });
     expect(texts(renderer.root)).toContain('Image unavailable');
-    act(() => {
+    await act(async () => {
       __resetToolCardImageCacheForTests();
       cacheToolAttachment('part-1', {
         mime: 'image/png',
         dataUrl: 'data:image/png;base64,QUJD',
         filename: 'replacement.png',
       });
+      await Promise.resolve();
     });
     expect(previewButtons(renderer.root)).toHaveLength(1);
     expect(texts(renderer.root)).not.toContain('Image unavailable');

@@ -23,6 +23,7 @@ export const BASE_ROUTER_OPTIONS: Array<{ value: AutoRouter; label: string }> = 
 export const MODE_OPTIONS: Array<{ value: AutoRoutingMode; label: string }> = [
   { value: 'cost_per_accuracy', label: 'Best accuracy per dollar' },
   { value: 'best_accuracy', label: 'Best accuracy' },
+  { value: 'cheapest', label: 'Cheapest' },
 ];
 
 export const CUSTOM_ROUTERS_POLL_INTERVAL_MS = 15_000;

@@ -84,6 +84,35 @@ export function changeText(root: ReactTestInstance, label: string, value: string
   changeField(findField(root, label), value);
 }
 
+type TestSwitchProps = { value: boolean; onValueChange: (value: boolean) => void };
+
+/** The form's secret toggle; the mocked `react-native` renders it as a node. */
+function findSwitch(root: ReactTestInstance): ReactTestInstance {
+  const node = findAll(root, 'Switch')[0];
+  if (!node) {
+    throw new Error('the form rendered no Switch');
+  }
+  return node;
+}
+
+export function isSecretToggleOn(root: ReactTestInstance): boolean {
+  const props: Record<string, unknown> = findSwitch(root).props;
+  return props.value === true;
+}
+
+export function toggleSecret(root: ReactTestInstance, value: boolean): void {
+  const props: Record<string, unknown> = findSwitch(root).props;
+  const onValueChange = props.onValueChange;
+  if (typeof onValueChange !== 'function') {
+    throw new TypeError('the secret toggle rendered no onValueChange');
+  }
+  // The renderer's props are untyped records; the node above is the Switch itself.
+  const handler = onValueChange as TestSwitchProps['onValueChange'];
+  act(() => {
+    handler(value);
+  });
+}
+
 type TestConfirmRequest = { onConfirm?: () => void };
 
 /** The mock surface `useConfirmDialog().confirm` exposes to the harness. */

@@ -60,6 +60,8 @@ const mockSeedUserGithubToken =
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
+const mockGetPrimaryGitHubIntegrationForOrganization =
+  jest.fn<(organizationId: string) => Promise<PlatformIntegration | null>>();
 const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
 const mockCheckUserPendingInstallation =
   jest.fn<
@@ -133,6 +135,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
   syncIntegrationInstallationDetails: (integrationId: string, details: Record<string, unknown>) =>
     mockSyncIntegrationInstallationDetails(integrationId, details),
+  getPrimaryGitHubIntegrationForOrganization: (organizationId: string) =>
+    mockGetPrimaryGitHubIntegrationForOrganization(organizationId),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   canUninstallGitHubInstallation: jest.fn(
@@ -280,6 +284,7 @@ describe('githubAppsRouter organization install capability', () => {
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
     mockListIntegrations.mockResolvedValue([]);
+    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
     mockUninstallApp.mockResolvedValue({ success: true, message: 'GitHub App uninstalled' });
   });
 
@@ -477,27 +482,31 @@ describe('githubAppsRouter organization install capability', () => {
     });
   });
 
-  it('refuses to mint another install state outside the allowlist', async () => {
+  it('refuses to mint another install state while the live workflow connection holds the slot', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockListIntegrations.mockResolvedValue([organizationIntegration()]);
+    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(organizationIntegration());
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+    expect(mockGetPrimaryGitHubIntegrationForOrganization).toHaveBeenCalledWith(organizationId);
     expect(mockCreateInstallState).not.toHaveBeenCalled();
   });
 
-  it('mints an install state when the only existing connection is locally disconnected', async () => {
+  it('mints an install state when the organization has no live workflow connection', async () => {
+    // A locally disconnected association, a pending request awaiting a GitHub
+    // organization admin's approval and a suspended association all leave the
+    // slot free; the DB-level contract for those rows lives with the workflow
+    // connection predicate (`github-installations.test.ts`).
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockListIntegrations.mockResolvedValue([
-      { ...organizationIntegration(), github_disconnected_at: '2026-01-02T00:00:00.000Z' },
-    ]);
+    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     await expect(caller.mintInstallState({ organizationId })).resolves.toEqual({
       token: 'install-token',
     });
+    expect(mockGetPrimaryGitHubIntegrationForOrganization).toHaveBeenCalledWith(organizationId);
     expect(mockCreateInstallState).toHaveBeenCalledWith(
       expect.objectContaining({ ownerId: organizationId })
     );

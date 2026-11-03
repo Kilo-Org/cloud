@@ -58,6 +58,10 @@ export {
   type TransitionSecurityAgentCommandInput,
 } from './security-agent-command-repository';
 export {
+  organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
+} from './organization-github-connection';
+export {
   getSecurityAgentRepositorySyncState,
   recordSecurityAgentRepositorySyncAttempt,
   recordSecurityAgentRepositorySyncFailure,

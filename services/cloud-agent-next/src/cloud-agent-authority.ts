@@ -21,6 +21,8 @@ import {
 import { backendUrlForSandbox } from './kilo/kilo-targets.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 
+export const CLOUD_AGENT_PARENT_AUTHORITY_DENIED = 'Cloud Agent parent authority denied';
+
 export function assertCloudAgentIsolatedAllocation(
   scoped: boolean,
   allocation: string | undefined
@@ -98,6 +100,7 @@ const workerPreparationMetadataSchema = z
     githubAccessPurpose: z.enum(['agent', 'workflow']).optional(),
     clientProvenance: z.enum(['browser', 'mobile']).optional(),
     kilocodeOrganizationId: z.string().optional(),
+    githubIntegrationId: z.uuid().optional(),
   })
   .passthrough();
 
@@ -122,6 +125,7 @@ export function assertCloudAgentParentAuthority(
   const scope = CloudAgentAuthoritySchema.parse(authority);
   if (
     !metadata ||
+    !isWorkspaceAnchorMetadata(metadata) ||
     metadata.allowSubagentSessions !== true ||
     metadata.workspace?.sandboxAllocation === 'cloudflare-shared' ||
     metadata.workspace?.sandboxRoute?.kind === 'shared' ||
@@ -140,7 +144,7 @@ export function assertCloudAgentParentAuthority(
     scope.expiresAt * 1000 <= now ||
     scope.expiresAt * 1000 > Date.parse(authorization.delegationExpiresAt)
   ) {
-    throw new Error('Cloud Agent parent authority denied');
+    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   }
 }
 

@@ -9,11 +9,13 @@ export function EnvironmentVariablesEditor({
   onChange,
   removedKeys,
   error,
+  readOnly = false,
 }: {
   text: string;
   onChange: (text: string) => void;
   removedKeys: readonly string[];
   error: string | null;
+  readOnly?: boolean;
 }) {
   const id = useId();
   return (
@@ -24,6 +26,7 @@ export function EnvironmentVariablesEditor({
       <Textarea
         id={id}
         value={text}
+        readOnly={readOnly}
         onChange={event => onChange(event.target.value)}
         placeholder={
           'NODE_ENV=production\nAPI_KEY="your value"\n\n# Quote multiline values\nCONFIG="first line\nsecond line"'
@@ -39,8 +42,14 @@ export function EnvironmentVariablesEditor({
         aria-describedby={`${id}-help${error ? ` ${id}-error` : ''}`}
       />
       <p id={`${id}-help`} className="text-muted-foreground text-xs leading-5">
-        New and replaced values are encrypted. Keep <code>&lt;unchanged&gt;</code> to retain a saved
-        value. Delete its line to remove it.
+        {readOnly ? (
+          'Secret values are hidden. Only their names are shown.'
+        ) : (
+          <>
+            New and replaced values are encrypted. Keep <code>&lt;unchanged&gt;</code> to retain a
+            saved value. Delete its line to remove it.
+          </>
+        )}
       </p>
       {removedKeys.length > 0 && (
         <p role="status" className="text-status-warning text-xs">

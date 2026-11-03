@@ -131,7 +131,8 @@ describe('readNativeLiveOperation', () => {
       tool: { messageID: 'msg_captured', callID: 'call_write' },
     };
     const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
-    const projectedPatch = `Index: ${publicDirectory}\n===================================================================\n--- ${publicDirectory}\n+++ ${publicDirectory}\n@@ -0,0 +1,2 @@\n+permission-e2e\n+Keep /workspace/app/native-permission.txt\n\\ No newline at end of file\n`;
+    const publicFile = `${publicDirectory}/native-permission.txt`;
+    const projectedPatch = `Index: ${publicFile}\n===================================================================\n--- ${publicFile}\n+++ ${publicFile}\n@@ -0,0 +1,2 @@\n+permission-e2e\n+Keep /workspace/app/native-permission.txt\n\\ No newline at end of file\n`;
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'permission.list' }, async () => ({ ok: true, result: [permission] }))
     );
@@ -142,11 +143,11 @@ describe('readNativeLiveOperation', () => {
           ...permission,
           metadata: {
             ...permission.metadata,
-            filepath: publicDirectory,
+            filepath: publicFile,
             diff: projectedPatch,
             filediff: {
               ...permission.metadata.filediff,
-              file: publicDirectory,
+              file: publicFile,
               patch: projectedPatch,
             },
           },
@@ -369,7 +370,7 @@ describe('native todo and diff shapes', () => {
           additions: 1,
           deletions: 0,
           status: 'added',
-          patch: `--- /dev/null\n+++ ${publicDirectory}\n@@ -0,0 +1 @@\n+/workspace/app/content`,
+          patch: `--- /dev/null\n+++ ${publicDirectory}/a.ts\n@@ -0,0 +1 @@\n+/workspace/app/content`,
         },
       ],
     });

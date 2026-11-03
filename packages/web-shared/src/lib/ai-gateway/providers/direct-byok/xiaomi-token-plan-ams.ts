@@ -7,6 +7,7 @@ import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-g
 
 export default {
   id: 'xiaomi-token-plan-ams',
+  openrouter_inference_provider_id: 'xiaomi',
   models_dev_id: 'xiaomi-token-plan-ams',
   ...apiKeyUpstream({
     apiUrl: 'https://token-plan-ams.xiaomimimo.com/v1',

@@ -4,7 +4,7 @@ import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   NotYetCostedUsageStats,
@@ -18,17 +18,16 @@ type OpenRouterCostFields = {
   cost_details?: { upstream_inference_cost?: number | null };
 };
 
-function byokFee_USD(provider: ProviderId, upstreamInferenceCost_USD: number) {
+function byokFee_USD(provider: ProviderType, upstreamInferenceCost_USD: number) {
   return provider === 'vercel' ? 0 : upstreamInferenceCost_USD / OPENROUTER_BYOK_COST_MULTIPLIER;
 }
 
 /**
  * Whether the provider reports `usage.is_byok` next to `usage.cost`. OpenRouter
  * does on chat completions, Messages, Responses and embeddings, and Vercel AI
- * Gateway does on chat completions. Martian reports `cost` in the same shape but
- * never `is_byok`.
+ * Gateway does on chat completions.
  */
-export function providerReportsIsByok(provider: ProviderId): boolean {
+export function providerReportsIsByok(provider: ProviderType): boolean {
   return provider === 'openrouter' || provider === 'vercel';
 }
 
@@ -41,7 +40,7 @@ export function providerReportsIsByok(provider: ProviderId): boolean {
  * Vercel charges no fee.
  */
 export function byokNonInferenceCost_mUsd(
-  provider: ProviderId,
+  provider: ProviderType,
   gatewayCost_USD: number,
   upstreamInferenceCost_USD: number
 ): number {
@@ -54,7 +53,7 @@ export function byokNonInferenceCost_mUsd(
 /** The billed cost of OpenRouter-style usage cost fields, which Vercel also returns. */
 export function computeOpenRouterCosts(
   usage: OpenRouterCostFields,
-  provider: ProviderId
+  provider: ProviderType
 ): Pick<JustTheCostsUsageStats, 'cost_mUsd' | 'nonInferenceCost_mUsd'> {
   const cost_USD = usage.cost ?? 0;
   if (!usage.is_byok) {
@@ -83,7 +82,7 @@ export function computeOpenRouterCostFields(
   coreProps: NotYetCostedUsageStats,
   source: string,
   requireIsByok: boolean,
-  provider: ProviderId
+  provider: ProviderType
 ): Pick<JustTheCostsUsageStats, 'cost_mUsd' | 'nonInferenceCost_mUsd' | 'is_byok'> {
   const is_byok = usage.is_byok ?? null;
   const openrouterCost_USD = usage.cost ?? 0;
@@ -156,7 +155,7 @@ export function selectUsageCostFields(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats,
   source: string,
-  provider: ProviderId
+  provider: ProviderType
 ): Pick<JustTheCostsUsageStats, 'cost_mUsd' | 'nonInferenceCost_mUsd' | 'is_byok'> {
   if (usage?.cost != null || usage?.is_byok != null) {
     return computeOpenRouterCostFields(

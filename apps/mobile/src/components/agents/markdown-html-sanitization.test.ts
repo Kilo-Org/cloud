@@ -1,6 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { htmlSanitizesToEmpty } from './markdown-html-sanitization';
+import {
+  clearHtmlEmptinessCacheForTests,
+  htmlSanitizesToEmpty,
+} from './markdown-html-sanitization';
+
+/** All-white nesting `depth` levels deep, with one text leaf inside. */
+function nestedEmptyContainers(depth: number): string {
+  return `${'<div>'.repeat(depth)}   ${'</div>'.repeat(depth)}`;
+}
+
+const replacesOf = (value: string) => {
+  const spy = vi.spyOn(String.prototype, 'replace');
+  htmlSanitizesToEmpty(value);
+  const calls = spy.mock.calls.length;
+  spy.mockRestore();
+  return calls;
+};
+
+beforeEach(() => {
+  clearHtmlEmptinessCacheForTests();
+});
 
 describe('htmlSanitizesToEmpty', () => {
   it('is true for whitespace-only text with no HTML', () => {
@@ -21,6 +41,43 @@ describe('htmlSanitizesToEmpty', () => {
   it('is false when text survives the removals', () => {
     expect(htmlSanitizesToEmpty('<b>bold</b>')).toBe(false);
     expect(htmlSanitizesToEmpty('<style>.x{}</style>visible')).toBe(false);
+  });
+
+  it('collapses nested emptied containers', () => {
+    expect(htmlSanitizesToEmpty(nestedEmptyContainers(4))).toBe(true);
+    expect(htmlSanitizesToEmpty(`<div><span></span></div>`)).toBe(true);
+  });
+
+  it('reports nesting past the pass bound as visible instead of looping', () => {
+    // Each pass only collapses the innermost emptied element, so a value nests
+    // deeper than the bound still changes on its last pass. The answer then has
+    // to be "visible": the part renders, which is the direction that cannot hide
+    // a message.
+    expect(htmlSanitizesToEmpty(nestedEmptyContainers(200))).toBe(false);
+  });
+
+  it('bounds the passes over one value independently of its nesting depth', () => {
+    // Regression: the loop ran to a fixpoint, so each pass re-replaced the whole
+    // value and a deeply nested one cost depth × length on the JS thread — on
+    // every streamed publish. One pass is four replaces; the bound is eight.
+    const shallow = replacesOf(nestedEmptyContainers(1));
+    const deep = replacesOf(nestedEmptyContainers(200));
+    expect(shallow).toBe(8);
+    expect(deep).toBe(32);
+  });
+
+  it('answers a repeated value from the memo', () => {
+    // The transcript rebuilds ask about the same part text again on every
+    // publish; the answer is pure, so only the first ask pays for the removals.
+    const value = '<div><span></span></div>';
+    expect(htmlSanitizesToEmpty(value)).toBe(true);
+    expect(replacesOf(value)).toBe(0);
+  });
+
+  it('memoizes the visible answer too', () => {
+    const value = '<b>bold</b>';
+    expect(htmlSanitizesToEmpty(value)).toBe(false);
+    expect(replacesOf(value)).toBe(0);
   });
 
   it('agrees with the slow path across mixed streamed chunks', () => {

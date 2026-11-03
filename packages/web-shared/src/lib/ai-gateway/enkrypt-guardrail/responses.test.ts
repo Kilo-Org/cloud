@@ -63,10 +63,34 @@ describe('enkryptGuardrailRejectionResponse', () => {
       },
     ],
   ] as const)('returns a retryable error when failing closed on %s', async (kind, body) => {
-    const response = enkryptGuardrailRejectionResponse(kind, { action: 'unavailable' });
+    const response = enkryptGuardrailRejectionResponse(kind, {
+      action: 'unavailable',
+      reason: 'transient',
+    });
 
     expect(response?.status).toBe(503);
     expect(response?.headers.get('retry-after')).toBe('1');
+    expect(response?.headers.get('x-should-retry')).toBeNull();
     expect(await response?.json()).toEqual(body);
   });
+
+  it.each([
+    ['timeout', /did not finish checking this request in time.*compact or prune/],
+    ['failed', /could not check this request, so it was not sent\. Try again later\.$/],
+  ] as const)(
+    'tells clients not to retry automatically after a %s failure',
+    async (reason, message) => {
+      const response = enkryptGuardrailRejectionResponse('chat_completions', {
+        action: 'unavailable',
+        reason,
+      });
+
+      expect(response?.status).toBe(503);
+      expect(response?.headers.get('retry-after')).toBeNull();
+      expect(response?.headers.get('x-should-retry')).toBe('false');
+      expect(await response?.json()).toMatchObject({
+        error: { message: expect.stringMatching(message), code: 'guardrail_unavailable' },
+      });
+    }
+  );
 });

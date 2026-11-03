@@ -25,6 +25,7 @@ export type FakeWrapperHelloInput = {
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
   installsSkillsSh?: boolean;
+  sessionSnapshots?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -169,6 +170,7 @@ export class FakeWrapper {
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
+      ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
     });
     return this.next();
   }

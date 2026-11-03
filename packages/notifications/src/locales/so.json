@@ -9,6 +9,7 @@
       "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
       "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
       "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
+      "securityUpdate": "Hubin ammin ayaa leh cusboonaysiin",
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Natiijo ammin ayaa u baahan feejignaan"
+      "body": "Hubin ammin ayaa leh cusboonaysiin"
     }
   },
   "instanceLifecycle": {

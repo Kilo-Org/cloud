@@ -169,6 +169,7 @@ describe('createAiSdkProvider resolved upstream', () => {
   function providerWith(upstream: DirectByokUpstream): DirectByokProvider {
     return {
       id: 'chutes-byok',
+      openrouter_inference_provider_id: 'chutes',
       supportedChatApis: upstream.supportedChatApis,
       resolveUpstream: async () => upstream,
       transformRequest() {},

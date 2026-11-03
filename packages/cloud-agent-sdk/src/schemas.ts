@@ -1093,6 +1093,7 @@ const maxCommitMessageBytes = 16 * 1024;
  * synchronized declarations.
  */
 const commitRecordShape = {
+  repository: z.string().min(1).max(500).optional(),
   commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
   commitMessage: z
     .string()
@@ -1108,6 +1109,7 @@ const commitRecordShape = {
 export const sessionCommitDataSchema = z.object(commitRecordShape);
 
 export const autocommitCompletedDataSchema = z.object({
+  repository: commitRecordShape.repository.catch(undefined),
   messageId: commitRecordShape.messageId,
   success: z.boolean().catch(false),
   message: z.string().optional(),

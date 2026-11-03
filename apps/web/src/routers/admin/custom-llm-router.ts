@@ -14,7 +14,6 @@ import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
@@ -25,9 +24,7 @@ function badRequest(message: string): never {
 
 /**
  * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter or direct BYOK model. A Kilo-exclusive model's id may be
- * claimed: the Kilo-exclusive model takes precedence until it is removed, so the
- * custom LLM can replace it without a gap. Existing rows keep their id, so this
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
  * only runs when an id is claimed.
  */
 async function assertPublicIdIsClaimable(publicId: string) {
@@ -43,9 +40,8 @@ async function assertPublicIdIsClaimable(publicId: string) {
     badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
   }
   // Anonymous callers may request free model ids, so a private custom LLM with
-  // one would answer them differently from an unknown id. A free Kilo-exclusive
-  // id stops being a built-in free id once the custom LLM replaces it.
-  if (!isKiloExclusiveModel(modelId) && isFreeModelExcludingCustomLlms(modelId)) {
+  // one would answer them differently from an unknown id.
+  if (isFreeModelExcludingCustomLlms(modelId)) {
     badRequest(`public_id "${modelId}" matches a built-in free model id`);
   }
   if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
@@ -92,12 +88,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
       })
       .from(custom_llm2)
       .orderBy(asc(custom_llm2.public_id));
-    return {
-      items: rows.map(row => ({
-        ...row,
-        shadowedByKiloExclusiveModel: isKiloExclusiveModel(row.public_id.toLowerCase()),
-      })),
-    };
+    return { items: rows };
   }),
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {

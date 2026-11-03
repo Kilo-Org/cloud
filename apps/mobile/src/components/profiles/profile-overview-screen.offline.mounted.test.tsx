@@ -41,8 +41,9 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  usePreventRemove: () => undefined,
 }));
-vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => vi.fn() }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {

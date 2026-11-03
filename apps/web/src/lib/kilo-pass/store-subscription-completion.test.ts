@@ -3,6 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
+  analytics_event_outbox,
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
@@ -1584,7 +1585,7 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(ledgerRow?.status).toBe('reconcile_pending');
   });
 
-  it('still returns the result when the completed settle fails', async () => {
+  it('leaves the purchase row reclaimable when the completed settle keeps failing', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();
 
@@ -1601,6 +1602,8 @@ describe('completeStoreKiloPassPurchase', () => {
     }));
     jest.resetModules();
 
+    // `jest.doMock` + `resetModules` require re-importing the module after the
+    // mock registry changes, so this test cannot use a static import.
     const { completeStoreKiloPassPurchase: isolatedComplete } =
       await import('./store-subscription-completion');
     const freshDrizzle = await import('@kilocode/web-shared/lib/drizzle');
@@ -1617,8 +1620,123 @@ describe('completeStoreKiloPassPurchase', () => {
       });
 
       expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+
+      const [ledgerRow] = await db
+        .select()
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, user.id),
+            eq(operation_ledgers.domain, 'purchase'),
+            eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+          )
+        );
+      expect(ledgerRow?.status).toBe('reconcile_pending');
     } finally {
       await freshDrizzle.closeAllDrizzleConnections();
     }
+  });
+
+  it('keeps a committed purchase recoverable when the completed settle hits a database failure', async () => {
+    const email = `settle-recovery-${crypto.randomUUID()}@example.com`;
+    const user = await insertTestUser({
+      google_user_email: email,
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const purchase = applePurchase();
+    const triggerName = `test_reject_purchase_settled_${crypto.randomUUID().replace(/-/g, '')}`;
+
+    // The settle writes the terminal status and its outbox row in one
+    // transaction, so rejecting the insert at the database boundary fails the
+    // settle exactly as a real write failure would, and rolls it back.
+    await db.execute(sql`
+      CREATE FUNCTION ${sql.raw(triggerName)}() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.event_name = 'purchase_settled' AND NEW.distinct_id = ${sql.raw(`'${email}'`)} THEN
+          RAISE EXCEPTION 'simulated outbox write failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER ${sql.raw(triggerName)}
+        BEFORE INSERT ON analytics_event_outbox
+        FOR EACH ROW EXECUTE FUNCTION ${sql.raw(triggerName)}()
+    `);
+
+    try {
+      await expect(completeStoreKiloPassPurchase({ user, purchase })).resolves.toMatchObject({
+        tier: KiloPassTier.Tier49,
+        alreadyProcessed: false,
+      });
+
+      const [failingRow] = await db
+        .select()
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, user.id),
+            eq(operation_ledgers.domain, 'purchase'),
+            eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+          )
+        );
+      expect(failingRow?.status).toBe('reconcile_pending');
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.distinct_id, email))
+      ).toHaveLength(0);
+    } finally {
+      await db.execute(
+        sql`DROP TRIGGER IF EXISTS ${sql.raw(triggerName)} ON analytics_event_outbox`
+      );
+      await db.execute(sql`DROP FUNCTION IF EXISTS ${sql.raw(triggerName)}()`);
+    }
+
+    const creditsBefore = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditsBefore.length).toBeGreaterThan(0);
+
+    // The next same-key retry claims the reconciliation lease, re-runs the
+    // idempotent effect, and finishes the bookkeeping with its event.
+    await expect(completeStoreKiloPassPurchase({ user, purchase })).resolves.toMatchObject({
+      tier: KiloPassTier.Tier49,
+      alreadyProcessed: true,
+    });
+
+    const [recoveredRow] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, user.id),
+          eq(operation_ledgers.domain, 'purchase'),
+          eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+        )
+      );
+    expect(recoveredRow).toMatchObject({ status: 'completed', outcome_code: 'ok' });
+
+    const outboxRows = await db
+      .select()
+      .from(analytics_event_outbox)
+      .where(
+        and(
+          eq(analytics_event_outbox.distinct_id, email),
+          eq(analytics_event_outbox.event_name, 'purchase_settled')
+        )
+      );
+    expect(outboxRows).toHaveLength(1);
+    expect(outboxRows[0]?.properties).toMatchObject({ outcome: 'completed' });
+
+    const creditsAfter = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditsAfter).toHaveLength(creditsBefore.length);
   });
 });

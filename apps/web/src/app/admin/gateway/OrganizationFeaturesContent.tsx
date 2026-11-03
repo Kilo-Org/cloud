@@ -55,6 +55,7 @@ export function OrganizationFeaturesContent() {
   const mutation = useMutation(
     trpc.admin.gatewayConfig.setOrganizationFeatures.mutationOptions({
       onSuccess: () => {
+        setHasChanges(false);
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.gatewayConfig.getOrganizationFeatures.queryKey(),
         });

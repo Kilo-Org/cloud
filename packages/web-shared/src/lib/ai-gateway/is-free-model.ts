@@ -4,16 +4,15 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import {
-  findCustomLlm,
-  isCustomLlm,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
-/** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
-export async function isFreeModel(model: string): Promise<boolean> {
+/**
+ * Whether Kilo charges nothing for the model, judged by its id alone. Custom
+ * LLMs follow the same rule; the admin router rejects pricing on a custom LLM
+ * whose id matches it.
+ */
+export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
-  const customLlm = await findCustomLlm(modelId);
-  if (customLlm) return !customLlm.definition.pricing;
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
@@ -25,7 +24,12 @@ export async function isFreeModel(model: string): Promise<boolean> {
   );
 }
 
-/** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
+/**
+ * Free models are assumed to train on prompts, and so are custom LLMs unless
+ * their definition sets `may_train_on_prompts: false`.
+ */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (await isCustomLlm(model)) || (await isFreeModel(model));
+  const customLlm = await findCustomLlm(model);
+  if (customLlm) return customLlm.definition.may_train_on_prompts !== false;
+  return isFreeModel(model);
 }

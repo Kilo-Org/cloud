@@ -173,7 +173,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!isFreeModel(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -287,7 +287,7 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const freeRequest = await isFreeModel(requestedModelLowerCased);
+    const freeRequest = isFreeModel(requestedModelLowerCased);
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
       await getBalanceAndOrgSettings(
         organizationId,

@@ -253,7 +253,7 @@ export async function handleAudioTranscriptionsRequest(
     kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: await isFreeModel(requestedModelLowerCased),
+    is_free: isFreeModel(requestedModelLowerCased),
     custom_llm_pricing: null,
     promptInfo,
     max_tokens: null,
@@ -290,7 +290,7 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const freeRequest = await isFreeModel(requestedModelLowerCased);
+  const freeRequest = isFreeModel(requestedModelLowerCased);
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
     await getBalanceAndOrgSettings(organizationId, user, readDb, freeRequest ? undefined : 'usage');
 

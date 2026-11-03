@@ -25,39 +25,37 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
  * that same provider. It serves anonymous callers, so a custom LLM is a
- * candidate only when it is public, unpriced, unrestricted by country, and
+ * candidate only when it is public, free, unrestricted by country, and
  * serves Chat Completions.
  */
-export async function isAutoFreeEligibleModelId(
+export function isAutoFreeEligibleModelId(
   model: string,
   customLlm: CustomLlm | undefined
-): Promise<boolean> {
+): boolean {
   if (isKiloAutoModel(model)) {
     return false;
   }
   if (customLlm) {
     return (
       isPublicCustomLlm(customLlm.definition) &&
-      !customLlm.definition.pricing &&
+      isFreeModel(customLlm.public_id) &&
       !customLlm.definition.country_deny_list?.length &&
       getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
     );
   }
-  return getAiSdkProvider(model, null) === undefined && (await isFreeModel(model));
+  return isFreeModel(model) && getAiSdkProvider(model, null) === undefined;
 }
 
-export async function getIneligibleAutoFreeModelIds(
+export function getIneligibleAutoFreeModelIds(
   config: AutoFreeConfig,
   customLlms: ReadonlyArray<CustomLlm>
-): Promise<string[]> {
+): string[] {
   const customLlmsById = new Map(
     customLlms.map(customLlm => [customLlm.public_id.toLowerCase(), customLlm])
   );
-  const models = config.models.map(({ model }) => model);
-  const eligible = await Promise.all(
-    models.map(model => isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())))
-  );
-  return models.filter((_, index) => !eligible[index]);
+  return config.models
+    .map(({ model }) => model)
+    .filter(model => !isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())));
 }
 
 /** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */

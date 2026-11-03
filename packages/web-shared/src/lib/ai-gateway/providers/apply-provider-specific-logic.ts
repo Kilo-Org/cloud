@@ -326,7 +326,7 @@ export async function applyProviderSpecificLogic(
 
   removeModelsFallback(requestedModel, requestToMutate);
   if (
-    (!isCustomLlmProvider && (await isFreeModel(requestedModel))) ||
+    (!isCustomLlmProvider && isFreeModel(requestedModel)) ||
     (userByok !== null && !usesUserGatewayKey)
   ) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);

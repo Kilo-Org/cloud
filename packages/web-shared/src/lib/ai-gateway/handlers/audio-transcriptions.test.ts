@@ -109,7 +109,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
   });
 
@@ -348,7 +348,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(true);
+    mockedIsFreeModel.mockReturnValue(true);
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
@@ -371,7 +371,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
     const response = await handleAudioTranscriptionsRequest(
@@ -392,7 +392,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');

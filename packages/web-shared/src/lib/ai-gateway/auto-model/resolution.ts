@@ -88,17 +88,14 @@ async function getEligibleAutoFreeModels(
     getOpenRouterModelsFromDatabase(),
     getCustomLlmsById(),
   ]);
-  const eligibility = await Promise.all(
-    configuredModels.map(async ({ model }) => {
-      const customLlm = customLlmsById.get(model.toLowerCase());
-      if (!(await isAutoFreeEligibleModelId(model, customLlm))) return false;
-      if (customLlm) {
-        return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
-      }
-      return openRouterModels.has(model);
-    })
-  );
-  const eligibleModels = configuredModels.filter((_, index) => eligibility[index]);
+  const eligibleModels = configuredModels.filter(({ model }) => {
+    const customLlm = customLlmsById.get(model.toLowerCase());
+    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
+    if (customLlm) {
+      return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
+    }
+    return openRouterModels.has(model);
+  });
   return eligibleModels.length > 0 ? eligibleModels : [AUTO_FREE_FALLBACK_MODEL];
 }
 

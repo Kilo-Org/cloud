@@ -175,7 +175,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     provider: editProvider,
     requested_model: requestBody.model,
-    is_free: await isFreeModel(requestBody.model),
+    is_free: isFreeModel(requestBody.model),
     custom_llm_pricing: null,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,

@@ -6,32 +6,32 @@ import { getRandomNumber } from './getRandomNumber';
 describe('isFreeModel', () => {
   describe('free models', () => {
     test('should return true for models ending with :free', async () => {
-      await expect(isFreeModel('gpt-4:free')).resolves.toBe(true);
-      await expect(isFreeModel('claude-3:free')).resolves.toBe(true);
-      await expect(isFreeModel('some-model:free')).resolves.toBe(true);
-      await expect(isFreeModel(':free')).resolves.toBe(true);
+      expect(isFreeModel('gpt-4:free')).toBe(true);
+      expect(isFreeModel('claude-3:free')).toBe(true);
+      expect(isFreeModel('some-model:free')).toBe(true);
+      expect(isFreeModel(':free')).toBe(true);
     });
 
     test('should return true for openrouter/free', async () => {
-      await expect(isFreeModel('openrouter/free')).resolves.toBe(true);
+      expect(isFreeModel('openrouter/free')).toBe(true);
     });
 
     test('should return true for models ending with -free', async () => {
-      await expect(isFreeModel('acme/model-free')).resolves.toBe(true);
-      await expect(isFreeModel('model-free')).resolves.toBe(true);
+      expect(isFreeModel('acme/model-free')).toBe(true);
+      expect(isFreeModel('model-free')).toBe(true);
     });
 
     test('should return true for stealth models', async () => {
-      await expect(isFreeModel('stealth/ox-alpha')).resolves.toBe(true);
-      await expect(isFreeModel('stealth/model-beta')).resolves.toBe(true);
-      await expect(isFreeModel('stealth/glyph-cluster')).resolves.toBe(true);
-      await expect(isFreeModel('openrouter/model-alpha')).resolves.toBe(false);
+      expect(isFreeModel('stealth/ox-alpha')).toBe(true);
+      expect(isFreeModel('stealth/model-beta')).toBe(true);
+      expect(isFreeModel('stealth/glyph-cluster')).toBe(true);
+      expect(isFreeModel('openrouter/model-alpha')).toBe(false);
     });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
       'treats %s as free',
       async model => {
-        await expect(isFreeModel(model)).resolves.toBe(true);
+        expect(isFreeModel(model)).toBe(true);
       }
     );
 
@@ -53,59 +53,59 @@ describe('isFreeModel', () => {
 
   describe('non-free models', () => {
     test('should return false for regular model names', async () => {
-      await expect(isFreeModel('gpt-4')).resolves.toBe(false);
-      await expect(isFreeModel('claude-3.7-sonnet')).resolves.toBe(false);
-      await expect(isFreeModel('anthropic/claude-sonnet-4')).resolves.toBe(false);
-      await expect(isFreeModel('google/gemini-2.5-pro')).resolves.toBe(false);
+      expect(isFreeModel('gpt-4')).toBe(false);
+      expect(isFreeModel('claude-3.7-sonnet')).toBe(false);
+      expect(isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
+      expect(isFreeModel('google/gemini-2.5-pro')).toBe(false);
     });
 
     test('should return false for models with "free" in the middle', async () => {
-      await expect(isFreeModel('free-model')).resolves.toBe(false);
-      await expect(isFreeModel('model-free-version')).resolves.toBe(false);
-      await expect(isFreeModel('freemium')).resolves.toBe(false);
+      expect(isFreeModel('free-model')).toBe(false);
+      expect(isFreeModel('model-free-version')).toBe(false);
+      expect(isFreeModel('freemium')).toBe(false);
     });
 
     test('should return false for OpenRouter models including alpha/beta', async () => {
-      await expect(isFreeModel('openrouter/model')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/model-gamma')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/model-stable')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/model-alpha')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/model-beta')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/sonoma-dusk-alpha')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/sonoma-sky-beta')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/auto-beta')).resolves.toBe(false);
+      expect(isFreeModel('openrouter/model')).toBe(false);
+      expect(isFreeModel('openrouter/model-gamma')).toBe(false);
+      expect(isFreeModel('openrouter/model-stable')).toBe(false);
+      expect(isFreeModel('openrouter/model-alpha')).toBe(false);
+      expect(isFreeModel('openrouter/model-beta')).toBe(false);
+      expect(isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(false);
+      expect(isFreeModel('openrouter/sonoma-sky-beta')).toBe(false);
+      expect(isFreeModel('openrouter/auto-beta')).toBe(false);
     });
 
     test('should return false for non-OpenRouter models ending with -alpha or -beta', async () => {
-      await expect(isFreeModel('anthropic/model-alpha')).resolves.toBe(false);
-      await expect(isFreeModel('google/model-beta')).resolves.toBe(false);
-      await expect(isFreeModel('model-alpha')).resolves.toBe(false);
+      expect(isFreeModel('anthropic/model-alpha')).toBe(false);
+      expect(isFreeModel('google/model-beta')).toBe(false);
+      expect(isFreeModel('model-alpha')).toBe(false);
     });
   });
 
   describe('edge cases', () => {
     test('should return false for empty string', async () => {
-      await expect(isFreeModel('')).resolves.toBe(false);
+      expect(isFreeModel('')).toBe(false);
     });
 
     test('should return false for null/undefined', async () => {
-      await expect(isFreeModel(null as unknown as string)).resolves.toBe(false);
-      await expect(isFreeModel(undefined as unknown as string)).resolves.toBe(false);
+      expect(isFreeModel(null as unknown as string)).toBe(false);
+      expect(isFreeModel(undefined as unknown as string)).toBe(false);
     });
 
     test('should be case-sensitive', async () => {
-      await expect(isFreeModel('model:FREE')).resolves.toBe(false);
-      await expect(isFreeModel('model:Free')).resolves.toBe(false);
-      await expect(isFreeModel('OPENROUTER/FREE')).resolves.toBe(false);
-      await expect(isFreeModel('model-FREE')).resolves.toBe(false);
-      await expect(isFreeModel('Stealth/model')).resolves.toBe(false);
+      expect(isFreeModel('model:FREE')).toBe(false);
+      expect(isFreeModel('model:Free')).toBe(false);
+      expect(isFreeModel('OPENROUTER/FREE')).toBe(false);
+      expect(isFreeModel('model-FREE')).toBe(false);
+      expect(isFreeModel('Stealth/model')).toBe(false);
     });
 
     test('should handle whitespace correctly', async () => {
-      await expect(isFreeModel('model:free ')).resolves.toBe(false);
-      await expect(isFreeModel(' model:free')).resolves.toBe(true);
-      await expect(isFreeModel(' openrouter/free')).resolves.toBe(false);
-      await expect(isFreeModel('openrouter/free ')).resolves.toBe(false);
+      expect(isFreeModel('model:free ')).toBe(false);
+      expect(isFreeModel(' model:free')).toBe(true);
+      expect(isFreeModel(' openrouter/free')).toBe(false);
+      expect(isFreeModel('openrouter/free ')).toBe(false);
     });
   });
 });

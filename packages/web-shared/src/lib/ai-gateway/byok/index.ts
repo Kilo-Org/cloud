@@ -66,14 +66,14 @@ async function deriveModelInferenceUserByokProviders(
  * them over. A custom LLM can share an id with a gateway catalog model, so
  * callers that may see custom LLM ids exclude them separately.
  */
-export async function isGatewayUserByokEligibleModel(modelId: string): Promise<boolean> {
-  return !(await isFreeModel(modelId));
+export function isGatewayUserByokEligibleModel(modelId: string): boolean {
+  return !isFreeModel(modelId);
 }
 
 export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
-  if (!(await isGatewayUserByokEligibleModel(modelId))) {
+  if (!isGatewayUserByokEligibleModel(modelId)) {
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([

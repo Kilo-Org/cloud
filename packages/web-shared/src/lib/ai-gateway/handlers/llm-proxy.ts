@@ -380,7 +380,7 @@ export async function handleLlmProxyRequest(
           res.organizationId,
           res.user,
           readDb,
-          (await isFreeModel(requestedModelLowerCased)) ? undefined : 'usage'
+          isFreeModel(requestedModelLowerCased) ? undefined : 'usage'
         )
       : anonymousBalance
   );
@@ -669,8 +669,7 @@ export async function handleLlmProxyRequest(
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
-  const isPubliclyFreeModel =
-    !isPrivateCustomLlm && (await isFreeModel(effectiveModelIdLowerCased));
+  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(

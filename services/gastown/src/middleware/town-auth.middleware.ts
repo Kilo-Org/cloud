@@ -98,6 +98,17 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     }
   }
 
+  if (targetKind === 'user') {
+    // Only the admin-capability path is user-bound: `/api/users/:userId/...`
+    // must not read a town owned by someone else (or an org) through that
+    // capability. Ordinary owner/member access above is unchanged.
+    const targetUserId = c.req.param('userId');
+    const ownerId = config.owner_id ?? config.owner_user_id;
+    if (!targetUserId || config.owner_type === 'org' || !ownerId || ownerId !== targetUserId) {
+      return c.json(resError('Forbidden'), 403);
+    }
+  }
+
   const decision = await decide();
   if (decision.allowed) return next();
   if (decision.status === 503) {

@@ -207,11 +207,11 @@ const CREDENTIAL_KEY = new RegExp(
 // escape a quote with a backslash, and it ends on its line. A shell command that
 // embeds JSON escapes the quotes themselves (`{\"password\":\"...\"}`), so a value may
 // also open and close with an escaped quote, which then has to end at a boundary
-// outside the quoted string. Unquoted values stop at whitespace, quotes, list
-// separators, closing brackets and the separators of a following pair, so one pair
-// never swallows the next (`user=bob&password=...`), and they never start on a quote.
-// Only a character that starts a following pair bounds a value; any other punctuation
-// stays inside it, so such a value is still replaced as a whole.
+// outside the quoted string. An unquoted value never starts on a quote and stops only
+// at whitespace, a quote, a list separator, or the `&` that starts a following pair,
+// so one pair never swallows the next (`user=bob&password=...`). Every other
+// punctuation character stays inside the value, so a value containing one is still
+// replaced as a whole.
 const QUOTED_VALUE =
   String.raw`"(?:[^"\\\n]|\\.)*"` +
   '|' +
@@ -221,12 +221,25 @@ const QUOTED_VALUE =
   '|' +
   String.raw`\\'[^'\\\n]*\\'(?=[\s,;:.!?})\]]|$)`;
 const ASSIGNMENT_VALUE = new RegExp(
-  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'\]})&|]+)`
+  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'&]+)`
 );
-// Credential value shapes that carry no key name of their own. Opaque runs must mix
-// letters with digits: 32 characters or more in the identifier alphabet, and 48 or
-// more when hyphens are allowed, so file paths, words, and short identifiers in
-// evidence survive.
+// A header value carries an authentication scheme together with its payload, so an
+// unquoted value may also span whitespace there. Closing brackets stay outside it to
+// keep surrounding structure intact.
+const HEADER_VALUE = new RegExp(
+  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\n,;"'&\]})]+)`
+);
+// A command-line flag that names a credential carries its value in the following
+// whitespace-separated argument, which no assignment separator marks.
+const CREDENTIAL_FLAG = new RegExp(
+  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` +
+    QUOTED_VALUE +
+    String.raw`|(?!\\?["'])[^\s,;"'&]+)`,
+  'g'
+);
+// Credential value shapes that carry no key name of their own. An opaque run is 48
+// characters or more, or 32 or more when it mixes letters with digits, so file paths,
+// words, and short identifiers in evidence survive.
 const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
   [
     /\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b/g,
@@ -236,12 +249,21 @@ const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
   [/\b(?:sk-|ghp_|github_pat_|glpat-|xox[baprs]-)[A-Za-z0-9_-]+/g, '[redacted token]'],
   [/\bnpm_[A-Za-z0-9]{36}\b/g, '[redacted token]'],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted token]'],
-  [/\b(?=[A-Za-z0-9_-]*[0-9])(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{48,}\b/g, '[redacted value]'],
+  [/\b[A-Za-z0-9_-]{48,}\b/g, '[redacted value]'],
   [/\b(?=[A-Za-z0-9_]*[0-9])(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]{32,}\b/g, '[redacted value]'],
 ];
 const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
 const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
 const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
+// A token that continues a credential past the value screening replaces is still
+// treated as credential material when it mixes letter case, mixes letters with
+// digits, or is long enough that no ordinary word or identifier reaches it. Prose
+// after a value stays above these bounds.
+const RESIDUAL_OPAQUE_TOKEN = new RegExp(
+  String.raw`^(?:(?=.*[a-z])(?=.*[A-Z])[A-Za-z0-9+/=_-]{8,}` +
+    String.raw`|(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9+/=_-]{6,}` +
+    String.raw`|[A-Za-z0-9+/=_-]{24,})$`
+);
 
 function splitCredentialKeyTokens(key: string): string[] {
   return key
@@ -272,15 +294,57 @@ function isCredentialKeyName(key: string): boolean {
   return splitCredentialKeyTokens(key).some(isCredentialToken);
 }
 
-/** True when screened text still carries credential material after redaction. */
+/**
+ * The value that screening replaces for a credential key at `from`. An authorization
+ * header carries an authentication scheme and its payload as one value, so it may
+ * span whitespace.
+ */
+function credentialValue(name: string, text: string, from: number): string | undefined {
+  const pattern = splitCredentialKeyTokens(name).includes('authorization')
+    ? HEADER_VALUE
+    : ASSIGNMENT_VALUE;
+  return pattern.exec(text.slice(from))?.[0];
+}
+
+/**
+ * True when screening leaves credential material in an excerpt: a value it cannot
+ * resolve, or an opaque token that continues a credential past the value it replaces.
+ */
 function briefingExcerptCarriesCredential(text: string): boolean {
+  const tailAfter = (from: number): string | undefined => {
+    const tail = (text.slice(from).split('\n')[0] ?? '').trim();
+    return tail.length === 0 ? undefined : tail;
+  };
+  const isOpaque = (tail: string): boolean =>
+    RESIDUAL_OPAQUE_TOKEN.test(tail.split(/\s+/)[0] ?? '');
   for (const match of text.matchAll(CREDENTIAL_KEY)) {
     const name = match[1];
     if (!name || !isCredentialKeyName(name)) continue;
-    const assigned = (text.slice((match.index ?? 0) + match[0].length).split('\n')[0] ?? '').trim();
-    if (assigned.length > 0 && !REDACTION_PLACEHOLDER.test(assigned)) return true;
+    const valueStart = (match.index ?? 0) + match[0].length;
+    const value = credentialValue(name, text, valueStart);
+    const tail = tailAfter(valueStart + (value?.length ?? 0));
+    if (tail === undefined) continue;
+    if (value === undefined || isOpaque(tail)) return true;
   }
-  return CREDENTIAL_VALUE_SHAPES.some(([shape]) => text.match(shape) !== null);
+  for (const match of text.matchAll(CREDENTIAL_FLAG)) {
+    const flag = match[2];
+    if (!flag || !isCredentialKeyName(flag.replace(/^-+/, ''))) continue;
+    const tail = tailAfter((match.index ?? 0) + match[0].length);
+    if (tail !== undefined && isOpaque(tail)) return true;
+  }
+  return false;
+}
+
+/** Replaces the value of every credential flag. */
+function redactCredentialFlags(text: string): string {
+  return text.replace(
+    CREDENTIAL_FLAG,
+    (match: string, lead: string, flag: string, gap: string, value: string) => {
+      if (!isCredentialKeyName(flag.replace(/^-+/, ''))) return match;
+      if (REDACTION_PLACEHOLDER.test(value)) return match;
+      return `${lead}${flag}${gap}[redacted credential]`;
+    }
+  );
 }
 
 /** Replaces the value of every credential assignment. */
@@ -293,7 +357,7 @@ function redactCredentialAssignments(text: string): string {
     const start = key.index ?? 0;
     if (start < cursor) continue;
     const valueStart = start + key[0].length;
-    const assigned = ASSIGNMENT_VALUE.exec(text.slice(valueStart))?.[0];
+    const assigned = credentialValue(name, text, valueStart);
     if (!assigned || REDACTION_PLACEHOLDER.test(assigned)) continue;
     pieces.push(text.slice(cursor, start), '[redacted credential]');
     cursor = valueStart + assigned.length;
@@ -310,7 +374,7 @@ export function redactBriefingExcerpt(
   let redacted = value
     .replace(PRIVATE_KEY_BLOCK, '[redacted key]')
     .replace(BEARER_VALUE, '[redacted credential]');
-  redacted = redactCredentialAssignments(redacted);
+  redacted = redactCredentialAssignments(redactCredentialFlags(redacted));
   for (const [shape, replacement] of CREDENTIAL_VALUE_SHAPES) {
     redacted = redacted.replace(shape, replacement);
   }
@@ -328,7 +392,7 @@ export function redactBriefingExcerptOrDrop(
   maxBytes = BRIEFING_MAX_EXCERPT_BYTES
 ): string | undefined {
   const redacted = redactBriefingExcerpt(value, maxBytes);
-  return briefingExcerptCarriesCredential(redacted) ? undefined : redacted;
+  return briefingExcerptCarriesCredential(value) ? undefined : redacted;
 }
 
 /**

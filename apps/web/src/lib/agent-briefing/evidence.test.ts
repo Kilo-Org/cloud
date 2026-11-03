@@ -131,7 +131,7 @@ it('withholds an excerpt that screening cannot clear and keeps a cleared one', (
       briefing_excerpt: {
         messageId: 'done',
         completedAt: '2026-10-28T07:00:00.000Z',
-        text: 'Stopped after ' + 'client_' + `secret=]` + 'wJalrXUtnFEMI/K7MDENG',
+        text: 'Stopped after ' + 'client_' + `secret="` + 'wJalrXUtnFEMI/K7MDENG',
       },
     },
   ]);

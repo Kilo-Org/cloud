@@ -95,11 +95,38 @@ describe('briefing evidence screening', () => {
   });
 
   it('screens a punctuated value as a whole', () => {
-    const text = redactBriefingExcerpt('password=' + 'p@ss' + '?word more');
-    expect(text).toBe('[redacted credential] more');
-    expect(redactBriefingExcerptOrDrop('password=' + 'p@ss' + '?word more')).toBe(
-      '[redacted credential] more'
+    for (const separator of ['?', '|', ')']) {
+      const text = 'password=' + 'p@ss' + separator + 'word more';
+      expect(redactBriefingExcerpt(text)).toBe('[redacted credential] more');
+      expect(redactBriefingExcerptOrDrop(text)).toBe('[redacted credential] more');
+    }
+  });
+
+  it('screens an authentication scheme with its payload', () => {
+    const header = 'curl -H "Authorization: Basic ' + 'dXNlcjpwYXNz' + '" https://x.test/a';
+    expect(redactBriefingExcerpt(header)).toBe('curl -H "[redacted credential]" https://x.test/a');
+    expect(redactBriefingExcerptOrDrop(header)).toBe(
+      'curl -H "[redacted credential]" https://x.test/a'
     );
+  });
+
+  it('screens a credential flag with its argument', () => {
+    const command = 'run --password ' + 'hunter' + '2';
+    expect(redactBriefingExcerpt(command)).toBe('run --password [redacted credential]');
+    expect(redactBriefingExcerptOrDrop(command)).toBe('run --password [redacted credential]');
+  });
+
+  it('withholds an excerpt when a credential continues past its screened value', () => {
+    const text = 'password=' + 'hunter' + ' ' + 'dXNlcjpwYXNz';
+    expect(redactBriefingExcerpt(text)).toBe('[redacted credential] dXNlcjpwYXNz');
+    expect(redactBriefingExcerptOrDrop(text)).toBeUndefined();
+  });
+
+  it('screens an opaque run that uses a single character class', () => {
+    for (const value of ['1234567890'.repeat(5), 'abcdefghijklmnopqrstuvwxyz'.repeat(2)]) {
+      const text = redactBriefingExcerpt(`Observed ${value} in the transcript.`);
+      expect(text).not.toContain(value);
+    }
   });
 
   it('screens a quoted key and its value', () => {

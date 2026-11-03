@@ -85,11 +85,11 @@ async function createRequestLogCapture(
   extraError: Record<string, string> | null
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  const loggingParams = {
+  const loggingMode = await getDynamicRequestLoggingMode({
     accountId: user?.id ?? null,
     organizationId: organization_id,
-  };
-  if ((await getDynamicRequestLoggingMode(loggingParams)) === null) {
+  });
+  if (loggingMode === null) {
     return null;
   }
   const status = response.status;
@@ -111,8 +111,6 @@ async function createRequestLogCapture(
     // resolves when the response stream completes (or fails), which happens
     // before after() callbacks are awaited.
     const result = await captured;
-    const loggingMode = await getDynamicRequestLoggingMode(loggingParams);
-    if (loggingMode === null) return;
     const responseText = 'text' in result ? result.text : undefined;
     const responseReadError = 'readError' in result ? result.readError : undefined;
     if (responseReadError !== undefined) {

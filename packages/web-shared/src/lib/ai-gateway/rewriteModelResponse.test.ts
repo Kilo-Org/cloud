@@ -67,8 +67,7 @@ const freeUsageContext = {
 } satisfies RewriteResponseParams['usageContext'];
 
 beforeEach(() => {
-  mockedOptIn.mockReset();
-  mockedOptIn.mockResolvedValue(null);
+  mockedOptIn.mockClear();
   mockedLog.mockClear();
   mockedAfter.mockClear();
 });
@@ -2766,7 +2765,7 @@ describe('rewriteModelResponse', () => {
   });
 
   test('processes paid-model responses when request logging is enabled', async () => {
-    mockedOptIn.mockResolvedValue('all');
+    mockedOptIn.mockResolvedValueOnce('all');
     const result = await rewriteModelResponse({
       response: jsonResponse({ model: 'openai/gpt-5' }),
       model: 'openai/gpt-5',
@@ -2840,7 +2839,7 @@ describe('rewriteModelResponse', () => {
   });
 
   test('logs custom models with opt-in', async () => {
-    mockedOptIn.mockResolvedValue('all');
+    mockedOptIn.mockResolvedValueOnce('all');
     await rewriteModelResponse({
       response: jsonResponse({ model: 'kilo-internal/my-model' }),
       model: 'kilo-internal/my-model',
@@ -2897,7 +2896,7 @@ describe('api_request_log storage', () => {
     mode: RequestLoggingMode,
     error: Record<string, string> | null
   ) {
-    mockedOptIn.mockResolvedValue(mode);
+    mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
       response,
       model: 'kilo-internal/my-model',
@@ -3039,29 +3038,6 @@ describe('api_request_log storage', () => {
     await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all', null);
 
     expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
-  });
-
-  test('skips the log when the opt-in expires before the response is written', async () => {
-    mockedOptIn.mockResolvedValueOnce('all');
-    await logUnrewrittenResponse({
-      response: jsonResponse({ model: 'kilo-internal/my-model' }),
-      model: 'kilo-internal/my-model',
-      providerId: 'custom',
-      error: null,
-      logging: makeLogging({ vercel_request_id: vercelRequestId }),
-    });
-    await runScheduledLogInsert();
-
-    expect(await selectLoggedRows()).toHaveLength(0);
-    expect(fakeR2.objects.size).toBe(0);
-  });
-
-  test('re-checks the opt-in for the same target when the response is written', async () => {
-    await logUpstreamError();
-
-    expect(mockedOptIn).toHaveBeenCalledTimes(2);
-    expect(mockedOptIn).toHaveBeenNthCalledWith(1, { accountId: null, organizationId: null });
-    expect(mockedOptIn).toHaveBeenNthCalledWith(2, { accountId: null, organizationId: null });
   });
 
   test.each<RequestLoggingMode>(['all', 'errors_only'])(

@@ -39,7 +39,7 @@ export function useOrganizationModels(
     organizationId,
     enabled,
     'member',
-    { staleTime: CLOUD_AGENT_METADATA_STALE_TIME }
+    { staleTime: CLOUD_AGENT_METADATA_STALE_TIME, gcTime: CLOUD_AGENT_METADATA_STALE_TIME }
   );
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);

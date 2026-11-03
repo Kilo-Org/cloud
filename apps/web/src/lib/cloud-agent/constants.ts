@@ -1,4 +1,4 @@
-export const CLOUD_AGENT_METADATA_STALE_TIME = 5 * 60 * 1000;
+export const CLOUD_AGENT_METADATA_STALE_TIME = 15 * 60 * 1000;
 
 /**
  * Image upload constraints for Cloud Agent messages

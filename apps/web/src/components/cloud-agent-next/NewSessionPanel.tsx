@@ -190,6 +190,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const { data: modelsData } = useModelSelectorList(organizationId, true, 'member', {
     staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
@@ -455,6 +456,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           forceRefresh: false,
         })),
     staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
 
   const {
@@ -472,6 +474,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           forceRefresh: false,
         })),
     staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
 
   const {
@@ -486,6 +489,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     }),
     enabled: Boolean(organizationId),
     staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
   const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
     ...trpc.organizations.bitbucket.getStatus.queryOptions({
@@ -493,6 +497,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     }),
     enabled: Boolean(organizationId),
     staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
 
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);

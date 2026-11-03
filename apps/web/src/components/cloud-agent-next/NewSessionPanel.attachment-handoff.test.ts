@@ -397,7 +397,8 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
         expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
           expect.objectContaining({
             __testKind: `${repositoryScope}.list${provider}Repositories`,
-            staleTime: 5 * 60_000,
+            staleTime: 15 * 60_000,
+            gcTime: 15 * 60_000,
             input: {
               forceRefresh: false,
               ...(scenario.organizationId ? { organizationId: scenario.organizationId } : {}),
@@ -409,7 +410,8 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
         expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
           expect.objectContaining({
             __testKind: `organizations.${procedure}`,
-            staleTime: 5 * 60_000,
+            staleTime: 15 * 60_000,
+            gcTime: 15 * 60_000,
             enabled: Boolean(scenario.organizationId),
           })
         );

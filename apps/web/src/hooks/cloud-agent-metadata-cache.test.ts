@@ -43,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   queryClient.clear();
+  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 
@@ -74,6 +75,7 @@ describe.each([
     useMetadata: () =>
       useModelSelectorList(undefined, true, 'member', {
         staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }),
   },
   {
@@ -81,6 +83,7 @@ describe.each([
     useMetadata: () =>
       useModelSelectorList('org-1', true, 'member', {
         staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }),
   },
   { name: 'personal profiles', useMetadata: () => useProfiles() },
@@ -92,14 +95,14 @@ describe.each([
   },
   { name: 'repository profile bindings', useMetadata: () => useRepoBindings() },
 ])('$name cache', ({ useMetadata }) => {
-  it('reuses metadata on remount for five minutes, then refreshes', async () => {
+  it('reuses metadata on remount for fifteen minutes, then refreshes', async () => {
     const now = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
     const queryFn = jest.fn(async () => ({ orgProfiles: [], personalProfiles: [] }));
     const options = { ...readQueryOptions(useMetadata), queryFn };
     await queryClient.query(options);
 
-    clock.mockReturnValue(now + 4 * 60_000);
+    clock.mockReturnValue(now + 14 * 60_000);
     const observer = new QueryObserver(queryClient, options);
     const unsubscribe = observer.subscribe(() => {});
     expect(observer.getCurrentResult().data).toMatchObject({
@@ -110,9 +113,24 @@ describe.each([
     expect(queryFn).toHaveBeenCalledTimes(1);
     unsubscribe();
 
-    clock.mockReturnValue(now + 5 * 60_000);
+    clock.mockReturnValue(now + 15 * 60_000);
     await queryClient.query(options);
     expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains inactive metadata beyond five minutes until the fifteen-minute retention expires', async () => {
+    jest.useFakeTimers();
+    const queryFn = jest.fn(async () => ({ orgProfiles: [], personalProfiles: [] }));
+    const options = { ...readQueryOptions(useMetadata), queryFn };
+    await queryClient.query(options);
+
+    await jest.advanceTimersByTimeAsync(14 * 60_000);
+    expect(queryClient.getQueryData(options.queryKey)).toBeDefined();
+    await queryClient.query(options);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(queryClient.getQueryData(options.queryKey)).toBeUndefined();
   });
 
   it('allows invalidation and manual refresh before the TTL expires', async () => {

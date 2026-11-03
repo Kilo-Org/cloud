@@ -148,6 +148,7 @@ export function useProfiles(options: UseProfilesOptions = {}) {
       {
         enabled,
         staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }
     )
   );
@@ -171,6 +172,7 @@ export function useProfile(profileId: string, options: UseProfileOptions = {}) {
       {
         enabled: enabled && !!profileId,
         staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }
     )
   );
@@ -483,6 +485,7 @@ export function useCombinedProfiles(options: UseCombinedProfilesOptions) {
       {
         enabled,
         staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
         select: data => ({
           ...data,
           allProfiles: [...data.orgProfiles, ...data.personalProfiles],
@@ -801,7 +804,11 @@ export function useRepoBindings(options: UseRepoBindingsOptions = {}) {
   return useQuery(
     trpc.agentProfiles.listRepoBindings.queryOptions(
       { organizationId },
-      { enabled, staleTime: CLOUD_AGENT_METADATA_STALE_TIME }
+      {
+        enabled,
+        staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+      }
     )
   );
 }

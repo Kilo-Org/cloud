@@ -111,7 +111,7 @@ export function useModelSelectorList(
   organizationId: string | undefined,
   enabled = true,
   audience: OrganizationModelAudience = 'member',
-  cacheOptions?: { staleTime: number }
+  cacheOptions?: { staleTime: number; gcTime: number }
 ) {
   const query = useQuery({
     ...cacheOptions,

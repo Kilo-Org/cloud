@@ -13,7 +13,7 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import {
-  applyAutoSmallFreeModelSettings,
+  autoSmallFreeModelUpstreamId,
   isAutoSmallFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
@@ -379,7 +379,7 @@ export async function applyProviderSpecificLogic(
     getCustomPricing(await getCustomPricingConfig(), requestedModel)
   );
   if (isAutoSmallFreeModel(requestedModel)) {
-    applyAutoSmallFreeModelSettings(requestToMutate);
+    requestToMutate.body.model = autoSmallFreeModelUpstreamId(requestedModel);
   }
 
   if (isClaudeModel(requestedModel)) {

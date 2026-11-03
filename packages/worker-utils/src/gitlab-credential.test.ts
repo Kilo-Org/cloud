@@ -211,10 +211,38 @@ describe('GitLab credential contract', () => {
     ).toEqual({ providerCredentialId: '987', expiresOn: '2031-01-15' });
 
     expect(
+      GitLabProjectAccessTokenMetadataSchema.parse({
+        providerCredentialId: '987',
+        expiresOn: '2031-01-15',
+        authorizedAccountId: '12345',
+        unusableReason: 'account-changed',
+      })
+    ).toEqual({
+      providerCredentialId: '987',
+      expiresOn: '2031-01-15',
+      authorizedAccountId: '12345',
+      unusableReason: 'account-changed',
+    });
+
+    expect(
       GitLabProjectAccessTokenMetadataSchema.safeParse({ providerCredentialId: '987' }).success
     ).toBe(false);
     expect(
       GitLabProjectAccessTokenMetadataSchema.safeParse({ expiresOn: '2031-01-15' }).success
+    ).toBe(false);
+    expect(
+      GitLabProjectAccessTokenMetadataSchema.safeParse({
+        providerCredentialId: '987',
+        expiresOn: '2031-01-15',
+        authorizedAccountId: 'not-decimal',
+      }).success
+    ).toBe(false);
+    expect(
+      GitLabProjectAccessTokenMetadataSchema.safeParse({
+        providerCredentialId: '987',
+        expiresOn: '2031-01-15',
+        unusableReason: 'unknown-reason',
+      }).success
     ).toBe(false);
     expect(
       GitLabProjectAccessTokenMetadataSchema.safeParse({
@@ -332,6 +360,12 @@ describe('GitLab credential contract', () => {
     };
 
     expect(GitLabProjectAccessTokenCredentialRowSchema.parse(row)).toEqual(row);
+    expect(
+      GitLabProjectAccessTokenCredentialRowSchema.parse({
+        ...row,
+        provider_metadata: { ...row.provider_metadata, authorizedAccountId: '12345' },
+      }).provider_metadata
+    ).toEqual({ ...row.provider_metadata, authorizedAccountId: '12345' });
     expect(
       GitLabProjectAccessTokenCredentialRowSchema.safeParse({
         ...row,

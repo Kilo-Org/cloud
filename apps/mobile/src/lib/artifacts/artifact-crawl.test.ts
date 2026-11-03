@@ -17,15 +17,19 @@ import {
 
 const fakeFs = vi.hoisted(() => {
   type Tracked = {
+    created: boolean;
     deleted: boolean;
     size: number;
+    streamed: number;
     writes: { content: string; encoding?: string }[];
   };
   const files: Tracked[] = [];
 
   class FileMock {
+    created = false;
     deleted = false;
     size = 0;
+    streamed = 0;
     writes: Tracked['writes'] = [];
 
     constructor() {
@@ -38,18 +42,39 @@ const fakeFs = vi.hoisted(() => {
       this.size = content.length;
     }
 
+    create(): void {
+      if (fakeFs.failCreate) {
+        throw new Error('cannot create the target');
+      }
+      this.created = true;
+      this.size = 0;
+      this.writes = [];
+    }
+
+    writableStream(): WritableStream<Uint8Array> {
+      return new WritableStream<Uint8Array>({
+        write: chunk => {
+          this.streamed += chunk.byteLength;
+          this.size += chunk.byteLength;
+        },
+      });
+    }
+
     delete(): void {
       this.deleted = true;
     }
   }
 
-  return {
+  const state = {
     File: FileMock,
     files,
+    failCreate: false,
     reset: () => {
       files.length = 0;
+      state.failCreate = false;
     },
   };
+  return state;
 });
 
 vi.mock('expo-file-system', () => ({ Directory: vi.fn(), File: fakeFs.File, Paths: {} }));
@@ -68,6 +93,10 @@ const UUID = '11111111-2222-4333-8444-555555555555';
 const SANDBOX_URL = `file:///tmp/attachments/session-1/user-1/${UUID}/shot.png`;
 const DATA_URL = 'data:image/png;base64,QUJD';
 const UPDATED_AT = '2026-01-01T00:00:00.000Z';
+/** An R2 account id is the storage endpoint's only host label. */
+const R2_ACCOUNT = '0123456789abcdef0123456789abcdef';
+const ALLOWED_URL = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/f1.bin`;
+const SIGNED_URL = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/signed.png?X-Amz-Signature=abc`;
 
 type TrackedFile = (typeof fakeFs.files)[number];
 
@@ -183,9 +212,9 @@ describe('extractSessionArtifacts', () => {
 });
 
 describe('materializeArtifact', () => {
-  it('presigns a sandbox reference and passes an http(s) URL straight through', async () => {
+  it('presigns a sandbox reference and mirrors a URL on the storage origin', async () => {
     const { file } = target();
-    const presignAttachmentDownload = presignResolving('https://r2.example.com/signed');
+    const presignAttachmentDownload = presignResolving(SIGNED_URL);
     const downloadFile = downloadResolving(42);
     const probeContentLength = vi.fn<ArtifactCrawlDeps['probeContentLength']>(async () => null);
 
@@ -199,17 +228,17 @@ describe('materializeArtifact', () => {
       messageUuid: UUID,
       filename: 'shot.png',
     });
-    expect(downloadFile).toHaveBeenCalledWith('https://r2.example.com/signed', file);
+    expect(downloadFile).toHaveBeenCalledWith(SIGNED_URL, file);
     expect(sandboxed).toEqual({ ok: true, size: 42 });
 
     const direct = await materializeArtifact(
-      { id: 'file-2', mime: 'text/plain', url: 'https://x/a.txt' },
+      { id: 'file-2', mime: 'text/plain', url: ALLOWED_URL },
       file,
       { downloadFile, presignAttachmentDownload, probeContentLength }
     );
 
     expect(presignAttachmentDownload).toHaveBeenCalledTimes(1);
-    expect(downloadFile).toHaveBeenLastCalledWith('https://x/a.txt', file);
+    expect(downloadFile).toHaveBeenLastCalledWith(ALLOWED_URL, file);
     expect(direct).toEqual({ ok: true, size: 42 });
   });
 
@@ -230,7 +259,7 @@ describe('materializeArtifact', () => {
     expect(result).toEqual({ ok: true, size: 3 });
   });
 
-  it('reports a failed download, a failed presign, and an unfetchable URL without throwing', async () => {
+  it('reports a failed download, a failed presign, and a local path without throwing', async () => {
     const offline = vi
       .fn<ArtifactCrawlDeps['downloadFile']>()
       .mockRejectedValue(new Error('offline'));
@@ -239,14 +268,10 @@ describe('materializeArtifact', () => {
       .mockRejectedValue(new Error('no auth'));
 
     await expect(
-      materializeArtifact(
-        { id: 'file-1', mime: 'text/plain', url: 'https://x/a.txt' },
-        new File(),
-        {
-          downloadFile: offline,
-          probeContentLength: vi.fn(async () => null),
-        }
-      )
+      materializeArtifact({ id: 'file-1', mime: 'text/plain', url: ALLOWED_URL }, new File(), {
+        downloadFile: offline,
+        probeContentLength: vi.fn(async () => null),
+      })
     ).resolves.toEqual({ ok: false, reason: 'download-failed' });
 
     await expect(
@@ -269,7 +294,7 @@ describe('materializeArtifact', () => {
     const probeContentLength = vi.fn<ArtifactCrawlDeps['probeContentLength']>(async () => null);
 
     const result = await materializeArtifact(
-      { id: 'file-1', mime: 'text/plain', url: 'https://x/big.bin' },
+      { id: 'file-1', mime: 'text/plain', url: ALLOWED_URL },
       file,
       { downloadFile, probeContentLength }
     );
@@ -286,13 +311,13 @@ describe('materializeArtifact', () => {
     );
 
     const result = await materializeArtifact(
-      { id: 'file-1', mime: 'text/plain', url: 'https://x/big.bin' },
+      { id: 'file-1', mime: 'text/plain', url: ALLOWED_URL },
       file,
       { downloadFile, probeContentLength }
     );
 
     expect(result).toEqual({ ok: false, reason: 'too-large' });
-    expect(probeContentLength).toHaveBeenCalledWith('https://x/big.bin');
+    expect(probeContentLength).toHaveBeenCalledWith(ALLOWED_URL);
     // The whole point of the pre-check: no byte of body reached the target.
     expect(downloadFile).not.toHaveBeenCalled();
     expect(tracked.deleted).toBe(false);
@@ -301,7 +326,7 @@ describe('materializeArtifact', () => {
 
   it('sizes a GET-presigned attachment from Content-Range before downloading it', async () => {
     const { file, tracked } = target();
-    const signedUrl = 'https://r2.example.com/signed';
+    const signedUrl = SIGNED_URL;
     const downloadFile = downloadResolving(MAX_ARTIFACT_BYTES + 1);
     // SigV4 binds the method: HEAD is forbidden for a GetObject signature.
     probeFetch.mockImplementation(async (_url, init) =>
@@ -327,6 +352,7 @@ describe('materializeArtifact', () => {
     expect(probeFetch).toHaveBeenCalledWith(signedUrl, {
       method: 'GET',
       headers: { Range: 'bytes=0-0' },
+      redirect: 'manual',
       signal: expect.any(AbortSignal),
     });
     expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
@@ -345,7 +371,7 @@ describe('materializeArtifact', () => {
       const downloadFile = downloadResolving(size);
 
       expect(
-        await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, file, {
+        await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file, {
           downloadFile,
         })
       ).toEqual({ ok: true, size });
@@ -363,7 +389,7 @@ describe('materializeArtifact', () => {
     );
     const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
     expect(
-      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, new File(), {
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, new File(), {
         downloadFile,
       })
     ).toEqual({ ok: false, reason: 'too-large' });
@@ -386,7 +412,7 @@ describe('materializeArtifact', () => {
     const downloadFile = downloadResolving(MAX_ARTIFACT_BYTES + 1);
 
     expect(
-      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, file, {
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file, {
         downloadFile,
       })
     ).toEqual({ ok: false, reason: 'too-large' });
@@ -398,11 +424,224 @@ describe('materializeArtifact', () => {
   it('still downloads an empty artifact when the probe is unavailable', async () => {
     probeFetch.mockRejectedValue(new Error('offline'));
     expect(
-      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, new File(), {
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, new File(), {
         downloadFile: downloadResolving(0),
       })
     ).toEqual({ ok: true, size: 0 });
     expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it.each<[string, string]>([
+    ['a cleartext URL', `http://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/f1.bin`],
+    ['a third-party https URL', 'https://outside.example/f1.bin'],
+    ['a userinfo URL', `https://user:pw@${R2_ACCOUNT}.r2.cloudflarestorage.com/f1.bin`],
+    ['a non-default port', `https://${R2_ACCOUNT}.r2.cloudflarestorage.com:8443/f1.bin`],
+    ['an account-shaped but unlisted host', 'https://0123.r2.cloudflarestorage.com/f1.bin'],
+    ['a lookalike suffix', `https://${R2_ACCOUNT}.r2.cloudflarestorage.com.outside.example/f1.bin`],
+    ['a loopback URL', 'http://127.0.0.1:3000/local.png'],
+    ['a LAN URL', 'http://192.168.1.10/local.png'],
+    ['a link-local URL', 'http://169.254.169.254/latest/meta-data/'],
+  ])('reports %s as unsupported without issuing any request', async (_case, url) => {
+    const { file, tracked } = target();
+    const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url }, file, { downloadFile })
+    ).resolves.toEqual({ ok: false, reason: 'unsupported' });
+
+    expect(probeFetch).not.toHaveBeenCalled();
+    expect(downloadFile).not.toHaveBeenCalled();
+    expect(tracked.created).toBe(false);
+    expect(tracked.streamed).toBe(0);
+    expect(tracked.writes).toEqual([]);
+  });
+
+  it('follows a redirect that stays on the storage origin', async () => {
+    const redirected = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/real.bin`;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (url === ALLOWED_URL) {
+        return new Response(null, { status: 302, headers: { location: '/attachments/real.bin' } });
+      }
+      if (url === redirected) {
+        return init?.headers === undefined
+          ? new Response('hello', { status: 200 })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            });
+      }
+      throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+    });
+    const { file, tracked } = target();
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).toEqual({ ok: true, size: 5 });
+    expect(probeFetch.mock.calls.map(call => call[0])).toEqual([
+      ALLOWED_URL,
+      redirected,
+      ALLOWED_URL,
+      redirected,
+    ]);
+    expect(tracked.streamed).toBe(5);
+  });
+
+  it('resolves a relative redirect against the request path', async () => {
+    // The served URL is `/attachments/f1.bin`, so `real.bin` names its sibling
+    // under `/attachments/`, not the origin root.
+    const redirected = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/attachments/real.bin`;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (url === ALLOWED_URL) {
+        return new Response(null, { status: 302, headers: { location: 'real.bin' } });
+      }
+      if (url === redirected) {
+        return init?.headers === undefined
+          ? new Response('hello', { status: 200 })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            });
+      }
+      throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+    });
+    const { file } = target();
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).toEqual({ ok: true, size: 5 });
+    expect(probeFetch.mock.calls.map(call => call[0])).toEqual([
+      ALLOWED_URL,
+      redirected,
+      ALLOWED_URL,
+      redirected,
+    ]);
+  });
+
+  it('keeps a dot segment of a relative redirect below the origin root', async () => {
+    const redirected = `https://${R2_ACCOUNT}.r2.cloudflarestorage.com/real.bin`;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (url === ALLOWED_URL) {
+        return new Response(null, { status: 302, headers: { location: '../../real.bin' } });
+      }
+      if (url === redirected) {
+        return init?.headers === undefined
+          ? new Response('hello', { status: 200 })
+          : new Response('x', {
+              status: 206,
+              headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+            });
+      }
+      throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+    });
+    const { file } = target();
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).toEqual({ ok: true, size: 5 });
+    expect(probeFetch.mock.calls.map(call => call[0])).toEqual([
+      ALLOWED_URL,
+      redirected,
+      ALLOWED_URL,
+      redirected,
+    ]);
+  });
+
+  it('releases the body of a status it does not keep', async () => {
+    let cancelled = false;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (init?.headers !== undefined) {
+        return new Response('x', {
+          status: 206,
+          headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+        });
+      }
+      if (url !== ALLOWED_URL) {
+        throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+      }
+      return new Response(
+        new ReadableStream({
+          cancel: () => {
+            cancelled = true;
+          },
+        }),
+        { status: 500 }
+      );
+    });
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    expect(cancelled).toBe(true);
+    expect(tracked.created).toBe(false);
+  });
+
+  it('releases the body when the target cannot be created', async () => {
+    let cancelled = false;
+    probeFetch.mockImplementation(async (url, init) => {
+      if (init?.headers !== undefined) {
+        return new Response('x', {
+          status: 206,
+          headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+        });
+      }
+      if (url !== ALLOWED_URL) {
+        throw new Error(`unexpected fetch ${typeof url === 'string' ? url : 'request'}`);
+      }
+      return new Response(
+        new ReadableStream({
+          cancel: () => {
+            cancelled = true;
+          },
+        }),
+        { status: 200 }
+      );
+    });
+    const { file, tracked } = target();
+    fakeFs.failCreate = true;
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    expect(cancelled).toBe(true);
+    expect(tracked.streamed).toBe(0);
+  });
+
+  it.each<[string, string]>([
+    ['cleartext link-local', 'http://169.254.169.254/latest/meta-data/'],
+    ['an outside origin', 'https://outside.example/collect.png'],
+    ['a scheme-relative reference', '//outside.example/collect.png'],
+    ['a local file', 'file:///etc/passwd'],
+    ['userinfo on the storage host', `https://user:pw@${R2_ACCOUNT}.r2.cloudflarestorage.com/x`],
+  ])('follows no redirect to %s and writes no file', async (_case, location) => {
+    probeFetch.mockImplementation(async url =>
+      url === ALLOWED_URL
+        ? new Response(null, { status: 302, headers: { location } })
+        : new Response('leaked', { status: 200 })
+    );
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    // The hop is never followed: no request leaves the allowed origin.
+    expect(probeFetch.mock.calls.every(call => call[0] === ALLOWED_URL)).toBe(true);
+    expect(tracked.created).toBe(false);
+    expect(tracked.streamed).toBe(0);
+    expect(tracked.writes).toEqual([]);
+  });
+
+  it('stops a redirect loop instead of following it forever', async () => {
+    probeFetch.mockResolvedValue(
+      new Response(null, { status: 307, headers: { location: ALLOWED_URL } })
+    );
+    const { file, tracked } = target();
+
+    await expect(
+      materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file)
+    ).resolves.toEqual({ ok: false, reason: 'download-failed' });
+    expect(probeFetch.mock.calls.length).toBeLessThanOrEqual(12);
+    expect(tracked.created).toBe(false);
   });
 });
 

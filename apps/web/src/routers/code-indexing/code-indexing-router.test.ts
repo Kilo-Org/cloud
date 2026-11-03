@@ -101,6 +101,7 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
           otherOrganization.id,
           owner.id,
           member.id,
+          admin.id,
         ])
       );
   });
@@ -114,6 +115,7 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
           otherOrganization.id,
           owner.id,
           member.id,
+          admin.id,
         ])
       );
   });
@@ -197,10 +199,10 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
     expect(await manifestFiles(organization.id)).toEqual([]);
   });
 
-  test('keeps personal cleanup available without an organization', async () => {
+  test('keeps personal cleanup available to an entitled account without an organization', async () => {
     await insertManifestRow({
-      organizationId: member.id,
-      kiloUserId: member.id,
+      organizationId: admin.id,
+      kiloUserId: admin.id,
       projectId: 'me/local',
       filePath: 'src/old.ts',
       createdAt: OLD,
@@ -213,14 +215,42 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
       createdAt: OLD,
     });
 
-    const caller = await createCallerForUser(member.id);
+    const caller = await createCallerForUser(admin.id);
 
     await expect(caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })).resolves.toEqual({
       success: true,
     });
 
-    expect(await manifestFiles(member.id)).toEqual([]);
+    expect(await manifestFiles(admin.id)).toEqual([]);
     expect(await manifestFiles(organization.id)).toEqual(['src/org.ts']);
+  });
+
+  test('refuses the personal scope for an account without the entitlement', async () => {
+    await insertManifestRow({
+      organizationId: member.id,
+      kiloUserId: member.id,
+      projectId: 'me/local',
+      filePath: 'src/old.ts',
+      createdAt: OLD,
+    });
+
+    const caller = await createCallerForUser(member.id);
+
+    await expect(
+      caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Code indexing is not enabled for this account',
+    });
+    await expect(
+      caller.codeIndexing.search({
+        query: 'where is the retry helper',
+        projectId: 'me/local',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(await manifestFiles(member.id)).toEqual(['src/old.ts']);
+    expect(milvusDeletes()).toHaveLength(0);
   });
 
   test('keeps per-file deletes available to organization members', async () => {

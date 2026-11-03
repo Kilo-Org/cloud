@@ -44,10 +44,12 @@ export type OrgKiloPassRowState = {
   attention: boolean;
   /**
    * What pressing the row does. `manage` opens the web detail page, `setup`
-   * opens the web setup flow, `retry` refetches the summary, `none` renders
-   * an inert row. Loading and query-error states must not offer a web action:
-   * loading has nothing to open yet, and an unresolved summary could send the
-   * user somewhere misleading.
+   * opens the web setup flow, `retry` refetches the payload that could not
+   * load (the summary, or the membership payload that decides whether this
+   * organization has one), `none` renders an inert row. Loading and
+   * query-error states must not offer a web action: loading has nothing to
+   * open yet, and an unresolved summary could send the user somewhere
+   * misleading.
    */
   action: 'none' | 'retry' | 'setup' | 'manage';
   /** Trailing action label (only for `retry`). */

@@ -3,12 +3,12 @@ import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  MAX_ENKRYPT_CREDITS_PER_CALL,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptUnavailableReason,
 } from './detect';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from './usage-write';
 
 const mockedWarnExceptInTest = jest.fn();
 

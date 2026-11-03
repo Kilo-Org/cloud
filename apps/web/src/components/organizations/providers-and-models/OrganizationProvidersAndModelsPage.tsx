@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  useOrganizationAvailableModels,
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
@@ -102,9 +101,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const availableModels = useOrganizationAvailableModels(organizationId, {
-    enabled: organizationData?.plan === 'enterprise',
-  });
   const trpc = useTRPC();
   const { data: gatewaySettings } = useQuery(
     trpc.organizations.settings.getGatewaySettings.queryOptions(
@@ -119,7 +115,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     isLoading: isOpenRouterLoading,
   } = useOpenRouterModelsAndProviders();
 
-  const { state, actions, selectors } = useProvidersAndModelsAllowListsState({
+  const { state, actions, selectors, dispatch } = useProvidersAndModelsAllowListsState({
     openRouterModels,
     openRouterProviders,
   });
@@ -506,17 +502,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               isLoading={isLoading}
               canEdit={canEdit}
               search={state.modelSearch}
-              selectedOnly={state.modelSelectedOnly}
+              enabledOnly={state.modelSelectedOnly}
               onSearchChange={actions.setModelSearch}
-              onSelectedOnlyChange={actions.setModelSelectedOnly}
+              onEnabledOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
-              availableModelCount={
-                availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
-              }
               enabledProviderSlugs={enabledProviderSlugs}
               byokOnlyProviderSlugs={byokOnlyProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
+              onSetModelsAllowed={(modelIds, nextAllowed) => {
+                if (canEdit) dispatch({ type: 'SET_MODELS_ALLOWED', modelIds, nextAllowed });
+              }}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>
@@ -540,6 +536,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
+              onSetProvidersEnabled={(providerSlugs, nextEnabled) => {
+                if (canEdit)
+                  dispatch({ type: 'SET_PROVIDERS_ENABLED', providerSlugs, nextEnabled });
+              }}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>

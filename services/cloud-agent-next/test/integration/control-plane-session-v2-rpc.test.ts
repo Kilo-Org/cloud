@@ -997,7 +997,7 @@ describe('SandboxSessionV2 generated titles', () => {
 
     const aiCalls = await readGeneratedTitleAiCalls(session.stub);
     expect(aiCalls).toHaveLength(1);
-    expect(aiCalls[0]?.model).toContain('llama-3.2-3b-instruct');
+    expect(aiCalls[0]?.model).toContain('glm-4.7-flash');
     expect(aiCalls[0]?.input.max_tokens).toBe(64);
     expect(aiCalls[0]?.input.temperature).toBe(0);
     expect(JSON.stringify(aiCalls[0]?.input.messages)).toContain('Summarize this change');

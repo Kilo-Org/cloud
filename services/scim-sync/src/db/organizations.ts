@@ -3,6 +3,21 @@ import { and, count, eq, isNull } from 'drizzle-orm';
 
 import type { WorkerDb } from './pg';
 
+/**
+ * The WorkOS directory hierarchy maps onto the organization hierarchy:
+ *
+ * | WorkOS | Kilo | Binding |
+ * |---|---|---|
+ * | directory | parent organization | `directory_id` |
+ * | directory group | **sub-organization** | `directory_group_id`, `directory_idp_id` |
+ * | group membership | membership on that sub-organization | — |
+ *
+ * The binding columns live on every `organizations` row, parent or child, which
+ * is what makes a sub-organization the thing a directory group resolves to.
+ * Kilo's `organization_groups` table is unrelated: it holds capability policy
+ * sets and is not populated by directory sync.
+ */
+
 export type OrganizationRow = typeof organizations.$inferSelect;
 
 /**
@@ -27,7 +42,10 @@ export async function findOrganizationById(
   return rows.at(0) ?? null;
 }
 
-/** The primary WorkOS binding: the directory group backing an organization. */
+/**
+ * Resolve the sub-organization a directory group is bound to. This is the
+ * central lookup for a `dsync.group.*` event.
+ */
 export async function findOrganizationByDirectoryGroupId(
   db: WorkerDb,
   directoryGroupId: string
@@ -41,11 +59,12 @@ export async function findOrganizationByDirectoryGroupId(
 }
 
 /**
- * The identity-provider group ID, which survives a directory
+ * Resolve by identity-provider group ID, which survives a directory
  * disconnect/reconnect that mints a new `directory_group_id`.
  *
  * Returns every match rather than one: this index is deliberately non-unique,
- * because one IdP group can map to two live organizations during a reconnect.
+ * because a reconnect can leave two live sub-organizations briefly sharing an
+ * IdP group while the new `directory_group_id` is adopted.
  */
 export async function findOrganizationsByDirectoryIdpId(
   db: WorkerDb,
@@ -71,9 +90,13 @@ export async function findOrganizationByExternalOrgId(
 }
 
 /**
- * Direct children of an organization. The hierarchy is one level deep — a
- * child cannot itself be a parent — so this is the whole subtree, not just the
- * first layer. Depth is enforced in application code, not by the schema.
+ * The sub-organizations under a parent — which is also the set of directory
+ * groups bound to that directory, since a directory group maps to a
+ * sub-organization.
+ *
+ * The hierarchy is one level deep (a child cannot itself be a parent), so this
+ * is the whole subtree rather than just the first layer. Depth is enforced in
+ * application code, not by the schema.
  */
 export async function findChildOrganizations(
   db: WorkerDb,

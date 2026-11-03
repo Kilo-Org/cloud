@@ -95,6 +95,20 @@ cannot hold long-lived connections, so Hyperdrive owns the regional pool and
 **Read-only for now.** The query modules under `src/db/` only select; nothing
 writes. The poll loop does not use them yet, so `/status` is their only caller.
 
+The WorkOS directory hierarchy maps onto the organization hierarchy:
+
+| WorkOS | Kilo | Binding |
+|---|---|---|
+| directory | parent organization | `directory_id` |
+| directory group | **sub-organization** | `directory_group_id`, `directory_idp_id` |
+| directory user | user | `kilocode_users.external_id` |
+| group membership | membership on that sub-organization | — |
+
+The binding columns live on every `organizations` row, parent or child, which is
+what makes a sub-organization the thing a directory group resolves to. So
+`findOrganizationByDirectoryGroupId` is the group-resolution query and
+`findChildOrganizations` lists a directory's groups.
+
 `getPgDb` must be called per operation and never cached in module scope. A
 cached client outlives the request or Durable Object context that created it,
 and its I/O then fails in whatever context picks it up next. Calling per use is
@@ -115,11 +129,12 @@ Four schema facts the query modules encode, each easy to get wrong:
 - **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
   validate, parse, or cast one as a UUID.
 
-Not read here: Kilo's `organization_groups` are capability policy sets, not
-WorkOS directory groups, and nothing populates them from directory sync. Worth
-knowing anyway, because deleting a membership cascades a user's group
-assignments away through a composite foreign key — so a membership write has
-authorization consequences no directory event names.
+Kilo's `organization_groups` table is unrelated and is not read: it holds
+capability policy sets (`read`, `edit`, `browser`, `command`, `mcp`), and
+nothing populates it from directory sync. Worth knowing anyway, because
+deleting a membership cascades a user's assignments in that table away through a
+composite foreign key — so a membership write has authorization consequences no
+directory event names.
 
 Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
 strict ISO validators such as `z.string().datetime()` reject. Normalize before

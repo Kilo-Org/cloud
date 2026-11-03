@@ -41,6 +41,7 @@ const deletedOrgId = randomUUID();
 // stray `::uuid` cast or UUID validation would fail the test.
 const userId = `oauth/scim-sync-test-${suffix}`;
 const externalId = `directory_user_${suffix}`;
+const directoryId = `directory_${suffix}`;
 const directoryGroupId = `directory_group_${suffix}`;
 const directoryIdpId = `idp_group_${suffix}`;
 const externalOrgId = `external_org_${suffix}`;
@@ -58,25 +59,30 @@ beforeAll(async () => {
     external_id: externalId,
   });
 
+  // Mirrors the real mapping: the directory binds to the parent organization,
+  // and a directory group binds to a sub-organization.
   await client.db.insert(organizations).values([
     {
       id: parentOrgId,
       name: `SCIM Parent ${suffix}`,
-      directory_group_id: directoryGroupId,
-      directory_idp_id: directoryIdpId,
+      directory_id: directoryId,
       external_org_id: externalOrgId,
     },
     {
       id: childOrgId,
       name: `SCIM Child ${suffix}`,
       parent_organization_id: parentOrgId,
+      directory_id: directoryId,
+      directory_group_id: directoryGroupId,
+      directory_idp_id: directoryIdpId,
     },
-    // Soft-deleted, and deliberately holding the same directory and IdP
-    // bindings as the live parent. The partial unique indexes permit this, so
-    // a query missing `deleted_at IS NULL` can return the wrong row.
+    // Soft-deleted, and deliberately holding the same directory-group and IdP
+    // bindings as the live sub-organization. The partial unique indexes permit
+    // this, so a query missing `deleted_at IS NULL` can return the wrong row.
     {
       id: deletedOrgId,
       name: `SCIM Deleted ${suffix}`,
+      parent_organization_id: parentOrgId,
       directory_group_id: directoryGroupId,
       directory_idp_id: directoryIdpId,
       external_org_id: externalOrgId,
@@ -113,35 +119,52 @@ afterAll(async () => {
 });
 
 describe('organizations', () => {
-  it('reads a live organization and its WorkOS bindings', async () => {
+  it('reads the parent organization and its directory binding', async () => {
     const org = await findOrganizationById(db, parentOrgId);
 
     expect(org?.name).toBe(`SCIM Parent ${suffix}`);
-    expect(org?.directory_group_id).toBe(directoryGroupId);
+    expect(org?.directory_id).toBe(directoryId);
     expect(org?.external_org_id).toBe(externalOrgId);
+    // The directory group binds to the sub-organization, not here.
+    expect(org?.directory_group_id).toBeNull();
+  });
+
+  it('reads the sub-organization and its directory-group binding', async () => {
+    const org = await findOrganizationById(db, childOrgId);
+
+    expect(org?.parent_organization_id).toBe(parentOrgId);
+    expect(org?.directory_group_id).toBe(directoryGroupId);
+    expect(org?.directory_idp_id).toBe(directoryIdpId);
   });
 
   it('excludes soft-deleted organizations', async () => {
     expect(await findOrganizationById(db, deletedOrgId)).toBeNull();
   });
 
-  it('resolves the live organization when a soft-deleted one shares its directory binding', async () => {
-    // The unique index is partial on `deleted_at IS NULL`, so both rows hold
-    // this binding and only the live one may be returned.
-    expect((await findOrganizationByDirectoryGroupId(db, directoryGroupId))?.id).toBe(parentOrgId);
+  it('resolves a directory group to the sub-organization, not its parent', async () => {
+    // A directory group binds to a sub-organization. The parent carries only
+    // the directory binding, so the group lookup must not return it.
+    expect((await findOrganizationByDirectoryGroupId(db, directoryGroupId))?.id).toBe(childOrgId);
+  });
+
+  it('resolves the live row when a soft-deleted one shares the same binding', async () => {
+    // The unique index is partial on `deleted_at IS NULL`, so both the live
+    // sub-organization and the deleted row hold this group binding.
+    expect((await findOrganizationByDirectoryGroupId(db, directoryGroupId))?.id).toBe(childOrgId);
     expect((await findOrganizationByExternalOrgId(db, externalOrgId))?.id).toBe(parentOrgId);
   });
 
   it('returns every live match for a non-unique IdP group id', async () => {
     const matches = await findOrganizationsByDirectoryIdpId(db, directoryIdpId);
 
-    expect(matches.map(row => row.id)).toEqual([parentOrgId]);
+    expect(matches.map(row => row.id)).toEqual([childOrgId]);
   });
 
-  it('finds child organizations by parent', async () => {
+  it('lists a directory group set as the sub-organizations under its parent', async () => {
     const children = await findChildOrganizations(db, parentOrgId);
 
     expect(children.map(row => row.id)).toEqual([childOrgId]);
+    // Depth is one level, so a sub-organization has no children of its own.
     expect(await findChildOrganizations(db, childOrgId)).toEqual([]);
   });
 });

@@ -758,7 +758,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
     actionClass: 'sensitive_write',
     surface: 'rest',
-    occurrences: 3,
+    occurrences: 2,
   },
   {
     id: 'internal.lib.admin.requirePrivilegedActor',

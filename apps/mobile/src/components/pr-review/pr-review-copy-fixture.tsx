@@ -35,7 +35,9 @@ import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { TRPCProvider } from '@/lib/trpc';
 
 // In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge,tabs}
-// through the app's native link scheme.
+// through the app's native link scheme; the overview surfaces are
+// dev/pr-review-copy-fixture/{overview,overview-blocked,overview-merged,merge-request,
+// merge-request-missing,merge-request-error}.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -46,8 +48,12 @@ const triple = { owner: 'sample', repo: 'review-copy', number: 1 };
 const headSha = '0123456789abcdef0123456789abcdef01234567';
 const OVERVIEW_SURFACES = [
   'overview',
+  'overview-blocked',
+  'overview-merged',
+  'merge-request',
   'overview-no-checks',
   'overview-multi-group',
+  'overview-auto-merge',
   'merge-request-missing',
   'merge-request-error',
 ] as const;
@@ -276,7 +282,10 @@ export function PrReviewCopyFixture() {
       </PendingReviewProvider>
     );
   } else if (isOverviewSurface(surface)) {
-    content = <PrReviewOverviewCopyFixture surface={surface} />;
+    // Keyed by surface: each surface answers the same query keys, so a second
+    // surface opened on this route would otherwise read the first one's cached
+    // reads (staleTime: Infinity) and appear not to change the screen.
+    content = <PrReviewOverviewCopyFixture key={surface} surface={surface} />;
   } else if (surface === 'submit') {
     content = (
       <FeedbackPromptProvider>

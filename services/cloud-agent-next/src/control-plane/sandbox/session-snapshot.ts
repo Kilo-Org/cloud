@@ -4,7 +4,9 @@ import type {
   ControlPlaneCredentialSource,
   ControlPlaneRouteSpec,
 } from '../../shared/control-plane-protocol.js';
+import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import type { ProviderAdapter } from '../../sandbox-control/provider.js';
+import type { ControlDiagnosticFields } from '../../sandbox-control/diagnostics.js';
 import type { AllocationState } from './allocation.js';
 import type { RouteRecord } from './routes.js';
 
@@ -79,27 +81,68 @@ export function readSessionSnapshotAllocation(storage: Storage) {
   return parsed.success ? parsed.data : undefined;
 }
 
-function compatibleRuntimeIdentity(captured: string, selected: string): boolean {
+function parseRuntimeIdentity(raw: string): { mode: string; image: string } | null {
   try {
-    const left = runtimeIdentitySchema.parse(JSON.parse(captured));
-    const right = runtimeIdentitySchema.parse(JSON.parse(selected));
-    return left.mode === right.mode && left.image === right.image;
+    const parsed = runtimeIdentitySchema.parse(JSON.parse(raw));
+    return { mode: parsed.mode, image: parsed.image };
   } catch {
-    return false;
+    return null;
   }
+}
+
+function compatibleRuntimeIdentity(captured: string, selected: string): boolean {
+  const left = parseRuntimeIdentity(captured);
+  const right = parseRuntimeIdentity(selected);
+  return left !== null && right !== null && left.mode === right.mode && left.image === right.image;
 }
 
 export function selectSessionSnapshot(
   storage: Storage,
   identity: Identity,
-  runtimeIdentity: string
+  runtimeIdentity: string,
+  diagnose = false
 ) {
-  const parsed = descriptorSchema.safeParse(storage.get(SESSION_SNAPSHOT_KEY));
-  return parsed.success &&
-    sameSessionSnapshotIdentity(parsed.data, identity) &&
-    compatibleRuntimeIdentity(parsed.data.runtimeIdentity, runtimeIdentity)
-    ? parsed.data
-    : null;
+  const log = (fields: ControlDiagnosticFields) => {
+    if (diagnose) logControlDiagnostic('session_snapshot_lookup', fields);
+  };
+  const stored = storage.get(SESSION_SNAPSHOT_KEY);
+  const parsed = descriptorSchema.safeParse(stored);
+  if (!parsed.success) {
+    log({
+      reason: stored === undefined ? 'no_snapshot' : 'invalid_descriptor',
+      sandboxId: identity.sandboxId,
+      sessionId: identity.sessionId,
+    });
+    return null;
+  }
+  const identityMatch = sameSessionSnapshotIdentity(parsed.data, identity);
+  const runtimeMatch = identityMatch
+    ? compatibleRuntimeIdentity(parsed.data.runtimeIdentity, runtimeIdentity)
+    : undefined;
+  const reason = !identityMatch
+    ? 'identity_mismatch'
+    : runtimeMatch === false
+      ? 'runtime_mismatch'
+      : 'selected';
+  if (diagnose) {
+    const expectedRuntime = parseRuntimeIdentity(runtimeIdentity);
+    const capturedRuntime = parseRuntimeIdentity(parsed.data.runtimeIdentity);
+    log({
+      reason,
+      sandboxId: identity.sandboxId,
+      sessionId: identity.sessionId,
+      capturedSandboxId: parsed.data.sandboxId,
+      capturedSessionId: parsed.data.sessionId,
+      sourceAllocationId: parsed.data.sourceAllocationId,
+      identityMatch,
+      runtimeMatch,
+      expectedMode: expectedRuntime?.mode,
+      expectedImage: expectedRuntime?.image,
+      capturedMode: capturedRuntime?.mode,
+      capturedImage: capturedRuntime?.image,
+    });
+  }
+  return identityMatch && runtimeMatch === true ? parsed.data : null;
 }
 
 export function snapshotRestorePending(storage: Storage, allocationId: string | null): boolean {
@@ -133,41 +176,79 @@ export function sessionSnapshotFrame(
 }
 
 type CaptureContext = { state: AllocationState; routes: RouteRecord[]; capable: boolean };
+type SnapshotAllocation = NonNullable<ReturnType<typeof readSessionSnapshotAllocation>>;
+type CaptureAttempt =
+  | {
+      ok: true;
+      state: AllocationState;
+      disk: SnapshotAllocation;
+      route: RouteRecord;
+      providerRef: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+      state: AllocationState;
+      disk: SnapshotAllocation | undefined;
+      route: RouteRecord | undefined;
+    };
+
 export async function captureIdleSessionSnapshot(input: {
   storage: Storage;
+  sandboxId: string;
   provider: NonNullable<ProviderAdapter['sessionSnapshots']>;
   idleMs: number;
   read(): Promise<CaptureContext>;
   enqueue<T>(operation: () => Promise<T>): Promise<T>;
   eligible(route: RouteRecord): boolean;
 }): Promise<void> {
-  const candidate = async (attempt = false) => {
+  const logCapture = (
+    phase: 'skipped' | 'started' | 'provider_result' | 'discarded' | 'stored',
+    fields: Record<string, string | number | boolean | null | undefined>,
+    coalesceIdentity?: string
+  ) =>
+    logControlDiagnostic(
+      'session_snapshot_capture',
+      { sandboxId: input.sandboxId, phase, ...fields },
+      'info',
+      coalesceIdentity === undefined ? undefined : { coalesceIdentity }
+    );
+  const candidate = async (attempt = false): Promise<CaptureAttempt> => {
     const { state, routes, capable } = await input.read();
     const disk = readSessionSnapshotAllocation(input.storage);
     const route = routes[0];
-    if (
-      state.kind !== 'connected' ||
-      state.providerRef === null ||
-      state.connectionId === null ||
-      state.lastActivityAt === null ||
-      disk?.allocationId !== state.allocationId ||
-      disk.idleConnectionId !== state.connectionId
-    )
-      return null;
+    const reject = (reason: string): CaptureAttempt => {
+      if (attempt)
+        logCapture(
+          'skipped',
+          {
+            reason,
+            allocationId: state.allocationId,
+            connectionId: state.connectionId,
+            sessionId: route?.sessionId ?? disk?.owner.sessionId,
+          },
+          `session_snapshot_skip:${input.sandboxId}`
+        );
+      return { ok: false, reason, state, disk, route };
+    };
+    if (state.kind !== 'connected') return reject('not_connected');
+    if (state.providerRef === null) return reject('no_provider_ref');
+    if (state.connectionId === null) return reject('no_connection');
+    if (state.lastActivityAt === null) return reject('no_activity');
+    if (disk === undefined) return reject('untracked');
+    if (disk.allocationId !== state.allocationId) return reject('allocation_mismatch');
+    if (disk.idleConnectionId !== state.connectionId) return reject('idle_connection_mismatch');
     if (attempt) {
-      if (
-        disk.attemptedIdleAt === state.lastActivityAt ||
-        Date.now() < state.lastActivityAt + input.idleMs
-      )
-        return null;
+      if (disk.attemptedIdleAt === state.lastActivityAt) return reject('already_attempted');
+      if (Date.now() < state.lastActivityAt + input.idleMs) return reject('not_idle');
     }
+    if (disk.contaminated) return reject('contaminated');
+    if (!capable) return reject('not_capable');
+    if (routes.length !== 1) return reject('route_count');
+    if (route === undefined || route.state !== 'ready') return reject('route_not_ready');
+    if (!input.eligible(route)) return reject('route_ineligible');
+    if (route.credentialSource === null) return reject('no_credentials');
     if (
-      disk.contaminated ||
-      !capable ||
-      routes.length !== 1 ||
-      route?.state !== 'ready' ||
-      !input.eligible(route) ||
-      route.credentialSource === null ||
       !sameSessionSnapshotIdentity(
         disk.owner,
         sessionSnapshotIdentity(
@@ -178,29 +259,82 @@ export async function captureIdleSessionSnapshot(input: {
         )
       )
     )
-      return null;
+      return reject('identity_mismatch');
     if (attempt)
       input.storage.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
         ...disk,
         attemptedIdleAt: state.lastActivityAt,
       });
-    return { state, disk, route, providerRef: state.providerRef };
+    return { ok: true, state, disk, route, providerRef: state.providerRef };
   };
   const fence = await input.enqueue(() => candidate(true));
-  if (fence === null) return;
+  if (!fence.ok) return;
+  logCapture('started', {
+    allocationId: fence.state.allocationId,
+    connectionId: fence.state.connectionId,
+    sessionId: fence.route.sessionId,
+    attemptId: fence.route.attemptId,
+  });
   const result = await input.provider.capture(fence.providerRef, crypto.randomUUID());
+  logCapture('provider_result', {
+    status: result.status,
+    reason: result.status === 'failed' ? result.reason : undefined,
+    allocationId: fence.state.allocationId,
+    sessionId: fence.route.sessionId,
+  });
   if (result.status !== 'stored') return;
   await input.enqueue(async () => {
     const current = await candidate();
-    if (
-      current === null ||
-      current.state.allocationId !== fence.state.allocationId ||
-      current.state.connectionId !== fence.state.connectionId ||
-      current.state.lastActivityAt !== fence.state.lastActivityAt ||
-      current.disk.invalidationGeneration !== fence.disk.invalidationGeneration ||
-      current.route.attemptId !== fence.route.attemptId
-    )
+    if (!current.ok) {
+      logCapture('discarded', {
+        sessionId: fence.route.sessionId,
+        reason: current.reason,
+        expectedAllocationId: fence.state.allocationId,
+        currentAllocationId: current.state.allocationId,
+        expectedConnectionId: fence.state.connectionId,
+        currentConnectionId: current.state.connectionId,
+        expectedActivityAt: fence.state.lastActivityAt,
+        currentActivityAt: current.state.lastActivityAt,
+        expectedGeneration: fence.disk.invalidationGeneration,
+        currentGeneration: current.disk?.invalidationGeneration,
+        expectedAttemptId: fence.route.attemptId,
+        currentAttemptId: current.route?.attemptId,
+      });
       return;
+    }
+    const comparison = {
+      sessionId: fence.route.sessionId,
+      expectedAllocationId: fence.state.allocationId,
+      currentAllocationId: current.state.allocationId,
+      expectedConnectionId: fence.state.connectionId,
+      currentConnectionId: current.state.connectionId,
+      expectedActivityAt: fence.state.lastActivityAt,
+      currentActivityAt: current.state.lastActivityAt,
+      expectedGeneration: fence.disk.invalidationGeneration,
+      currentGeneration: current.disk.invalidationGeneration,
+      expectedAttemptId: fence.route.attemptId,
+      currentAttemptId: current.route.attemptId,
+    };
+    if (current.state.allocationId !== fence.state.allocationId) {
+      logCapture('discarded', { reason: 'allocation_changed', ...comparison });
+      return;
+    }
+    if (current.state.connectionId !== fence.state.connectionId) {
+      logCapture('discarded', { reason: 'connection_changed', ...comparison });
+      return;
+    }
+    if (current.state.lastActivityAt !== fence.state.lastActivityAt) {
+      logCapture('discarded', { reason: 'activity_changed', ...comparison });
+      return;
+    }
+    if (current.disk.invalidationGeneration !== fence.disk.invalidationGeneration) {
+      logCapture('discarded', { reason: 'generation_changed', ...comparison });
+      return;
+    }
+    if (current.route.attemptId !== fence.route.attemptId) {
+      logCapture('discarded', { reason: 'route_attempt_changed', ...comparison });
+      return;
+    }
     input.storage.put(
       SESSION_SNAPSHOT_KEY,
       descriptorSchema.parse({
@@ -212,5 +346,11 @@ export async function captureIdleSessionSnapshot(input: {
         capturedAt: result.capturedAt,
       })
     );
+    logCapture('stored', {
+      allocationId: fence.state.allocationId,
+      connectionId: fence.state.connectionId,
+      sessionId: fence.route.sessionId,
+      attemptId: fence.route.attemptId,
+    });
   });
 }

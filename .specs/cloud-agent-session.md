@@ -298,7 +298,9 @@ repository.
    the user-set worktree name, otherwise the first surviving chat's non-default
    title, otherwise the repository and branch. This fallback MUST NOT depend on
    which chats are visible in the current search or recent-session page.
-   Selecting the worktree MUST open its latest chat. The row MUST remain visibly
+   Selecting the worktree MUST open its latest open chat; when all its listed
+   chats are closed, it MUST open the worktree without reopening any of them.
+   The row MUST remain visibly
    selected while any sibling is active and MUST reflect busy, question, or
    permission activity across all its chats. Its timestamp and overflow menu
    MUST share the session-row action slot. Associated pull-request information
@@ -343,7 +345,12 @@ repository.
 10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
     or stop its running work. Closed-tab preferences and tab order MUST survive
     refresh and remain scoped to the current user and personal or organization
-    context.
+    context. A closed chat MUST reopen only when the user opens that chat
+    itself, for example from the Sessions list or its own link. Selecting its
+    worktree, closing it while the app is still switching to it, going back
+    from the closed tab, refreshing or restoring a window, or another window
+    still showing the chat MUST NOT reopen it; a window
+    showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
     Most recently closed chats MUST appear first, including after refresh;
@@ -375,6 +382,48 @@ repository.
     lineage, owner and organization. It MUST NOT manage the parent itself,
     sibling chats or unrelated sessions. Child completion callbacks MUST target
     the canonical workspace parent, not an arbitrary invoking sibling.
+
+### Watch PR (Observation-Only Pilot)
+
+Implementation status: lifecycle controls and activity are backend/API and MCP
+capabilities. Client watch controls and confirmation described below remain
+planned; the current client only shows passive PR hover-card observation counts.
+Watch PR admission is best-effort: observer errors do not fail the enclosing
+webhook. Only successfully persisted state survives; bounded Redis CI receipts
+are not a complete recovery mechanism. Exact recovery limits are documented in
+`docs/plans/cloud-agent-watch-pr.md`.
+
+1. An eligible verified GitHub PR MUST offer an accessible watch control without
+   requiring hover. Enabling a watch MUST require a writable grouped Cloud Agent
+   worktree, current repository access, an open same-repository PR, and pilot
+   enablement. Arbitrary PR URLs, fork PRs, and legacy ungrouped sessions MUST NOT
+   be eligible.
+2. The confirmation MUST state that this pilot observes future delivered webhook
+   events only. Pre-existing reviews and checks MAY be missing. It MUST clearly
+   state that no automatic repair, agent run, edit, or push occurs. Saved repair
+   preferences MUST NOT authorize present or future automatic writes, and MUST
+   NOT hide observed problems.
+3. Watch state and observations MUST survive closing the browser and sleeping
+   compute. Waiting MUST NOT start or keep an environment awake or incur agent
+   usage charges. Watching MUST NOT promise complete GitHub delivery coverage or
+   merge readiness.
+4. Details MUST distinguish Watching, Paused, Finished, observed problems, and
+   observations needing attention. Empty evidence MAY say **No observed problems**
+   only alongside future-event coverage and last-received timing. Pending,
+   ambiguous, and truncated evidence MUST NOT be presented as merge readiness.
+5. The user MUST be able to Pause, Resume when pilot enablement permits it, Stop
+   watching, and inspect recent activity. Pause MUST preserve observations and
+   MUST NOT cause automated execution. Stop, confirmed PR closure/merge, expiry,
+   and source worktree deletion MUST fence further watch work. A finished watch
+   MUST NOT restart from a delayed webhook or PR reopen event.
+6. **Recheck PR lifecycle** MUST be an explicit user action. This pilot's recheck
+   MUST state that it verifies PR identity and open/closed/merged lifecycle only,
+   not review or check completeness. Refreshing the watch display MUST NOT fetch
+   GitHub state. Existing watches MUST remain manageable when new enablement is
+   disabled.
+7. One PR's control MUST NOT display or mutate a different PR's watch, including
+   sibling chats and worktrees reused for another PR. Stale controls MUST fail
+   visibly and allow refreshing rather than silently overwriting newer state.
 
 ### Sandbox Status
 
@@ -596,6 +645,13 @@ The following use SHOULD and are not enforced today:
   base image, consumed by sessions of the same environment and an equal or
   newer revision, with a bounded lookup and one fresh fallback.
 - Removed session capture and the "saving the repository" preparation step.
+
+### 2026-10-15 -- Observation-only Watch PR pilot
+
+- Added the flagged observation-only contract, lifecycle controls, future-event
+  coverage, and lifecycle-only manual recheck. Automatic repairs remain blocked
+  on exclusive runtime admission and revocable publication enforcement; this is
+  not the automatic-repair MVP in `docs/plans/cloud-agent-watch-pr.md`.
 
 ### 2026-10-07 -- Repository environments
 

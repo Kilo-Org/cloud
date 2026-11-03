@@ -1162,6 +1162,25 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
       (await applyToClaude(false, [{ providerId: 'anthropic', decryptedAPIKey: 'key' }]))?.ignore
     ).toBeUndefined();
   });
+  it("adds no Kilo provider order to a request served by the user's own provider key", async () => {
+    const request = makeRequest(USER_GATEWAY_TEST_MODEL);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      USER_GATEWAY_TEST_MODEL,
+      request,
+      {},
+      [{ providerId: 'bedrock', decryptedAPIKey: 'key' }],
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      'org-1',
+      null,
+      null,
+      false
+    );
+
+    expect(request.body.provider).toBeUndefined();
+  });
 });
 
 describe('withIgnoredProviders', () => {

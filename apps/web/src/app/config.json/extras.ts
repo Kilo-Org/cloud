@@ -47,7 +47,8 @@ const hookEvents = {
   PermissionRequest:
     'When Kilo shows a permission prompt for a tool call. A JSON deny denies the call; hooks cannot approve.',
   TaskCreated: 'When a todo is added. A block rolls back that todo.',
-  TaskCompleted: 'When a todo is marked completed. A block keeps that todo open.',
+  TaskCompleted:
+    'When a todo is marked completed. A block keeps that todo open; exit 2 from a missing script does not.',
   UserPromptSubmit:
     'When a prompt or command is submitted. A block rejects it; stdout or additionalContext is added to the prompt.',
   UserPromptExpansion: 'When a custom command, skill or MCP prompt expands. Matcher: command name.',
@@ -60,8 +61,9 @@ const hookEvents = {
   SessionEnd: 'When a session is deleted or Kilo exits. Matcher: other, prompt_input_exit.',
   InstructionsLoaded:
     'When an instruction file (AGENTS.md, CLAUDE.md) is loaded. Matcher: session_start, nested_traversal, compact.',
-  Stop: 'When the agent finishes responding. A block makes it continue (at most 8 times in a row).',
-  SubagentStop: 'When a subagent finishes. A block makes it continue. Matcher: agent type.',
+  Stop: 'When the agent finishes responding. A block makes it continue (at most 8 times in a row); exit 2 from a missing script does not.',
+  SubagentStop:
+    'When a subagent finishes. A block makes it continue; exit 2 from a missing script does not. Matcher: agent type.',
   SubagentStart:
     'When a subagent starts. additionalContext is added to its first prompt. Matcher: agent type.',
   StopFailure: 'When a turn ends with an API error. Matcher: error type.',
@@ -71,7 +73,8 @@ const hookEvents = {
     'When Kilo is waiting for you. Matcher: permission_prompt, agent_needs_input, idle_prompt.',
   ConfigChange:
     'After Kilo changes its config. Matcher: user_settings, project_settings. Cannot block; not read from Claude Code settings.',
-  FileChanged: 'When a watched file changes. Matcher: file names to watch, separated by |.',
+  FileChanged:
+    'When a watched file changes. Matcher: files to watch, relative to the project folder, separated by |.',
   CwdChanged: 'When a shell command runs in a different directory than the previous one.',
   GoalReport:
     'Kilo only. Before a /goal is marked complete or blocked. A block keeps the goal running. Matcher: complete, blocked.',
@@ -93,7 +96,7 @@ const hookGroups = {
     properties: {
       matcher: {
         description:
-          'What it matches depends on the event (tool name, source, trigger, ...): "*" or omitted matches everything, "a|b" matches exact names, anything else is a regular expression. Ignored on events without a matcher.',
+          'What it matches depends on the event (tool name, source, trigger, ...): "*" or omitted matches everything, "a|b" matches exact names, anything else is a regular expression. On StopFailure only letters, digits, "_" and "|" make exact names. On FileChanged it lists the files to watch, as names or paths relative to the project folder, each taken literally ("*" is a file named *); without a matcher, the hook runs only for paths added with watchPaths. Ignored on events without a matcher.',
         type: 'string',
       },
       hooks: {
@@ -125,7 +128,7 @@ const hookGroups = {
             },
             timeout: {
               description:
-                'Timeout in seconds. Default: 600; 30 for UserPromptSubmit and the model-switch events; 10 for BranchName; see the docs for the rest. A hook that times out does not block unless onFailure is "block"; on PreModelSwitch a timeout always blocks.',
+                'Timeout in seconds. Default: 600; 30 for UserPromptSubmit and the model-switch events; 10 for BranchName; see the docs for the rest. SessionEnd hooks share one 1.5 s budget per exit or deleted session, raised to the largest SessionEnd timeout (at most 60 s, or 3 s when kilo serve or the TUI exits). A hook that times out does not block unless onFailure is "block"; on PreModelSwitch a timeout always blocks.',
               type: 'integer',
               exclusiveMinimum: 0,
             },

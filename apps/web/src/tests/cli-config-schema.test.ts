@@ -270,6 +270,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.remote_control).toBeDefined();
     expect(props.web_search).toBeDefined();
     expect(props.privacy_mode).toBeDefined();
+    expect(props.hooks).toBeDefined();
     expect(props.existing).toEqual({ type: 'boolean' });
 
     const agent = props.agent as { properties: Record<string, unknown> };

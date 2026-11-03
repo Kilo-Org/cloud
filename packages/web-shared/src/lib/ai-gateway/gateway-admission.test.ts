@@ -1,9 +1,19 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import {
+  paidUsageRejection,
+  readGatewayBalance,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
+  getBalanceAndOrgSettings: jest.fn(),
+}));
 
 const user = { id: 'user-1', google_user_email: 'user@example.com', microdollars_used: 5 } as User;
 
@@ -92,5 +102,56 @@ describe('resolveGatewayCaller', () => {
     });
 
     expect(caller).toEqual({ kind: 'rejected', response: auth.authFailedResponse });
+  });
+});
+
+describe('readGatewayBalance', () => {
+  beforeEach(() => {
+    jest.mocked(getBalanceAndOrgSettings).mockReset().mockResolvedValue({ balance: 3 });
+  });
+
+  it('reads a paid model balance from the replica as usage funding', async () => {
+    await expect(readGatewayBalance(user, 'org-1', 'openai/gpt-4o')).resolves.toEqual({
+      balance: 3,
+    });
+    expect(jest.mocked(getBalanceAndOrgSettings).mock.calls).toEqual([
+      ['org-1', user, readDb, 'usage'],
+    ]);
+  });
+
+  it('reads a free model balance from the replica without usage funding', async () => {
+    await readGatewayBalance(user, undefined, 'vendor/model:free');
+    expect(jest.mocked(getBalanceAndOrgSettings).mock.calls).toEqual([
+      [undefined, user, readDb, undefined],
+    ]);
+  });
+});
+
+describe('paidUsageRejection', () => {
+  it.each([
+    { balance: 0.01, exempt: false },
+    { balance: 0, exempt: true },
+    { balance: -1, exempt: true },
+  ])('admits balance $balance when exempt is $exempt', ({ balance, exempt }) => {
+    expect(
+      paidUsageRejection({ user, organizationId: undefined, account: { balance }, exempt })
+    ).toBeNull();
+  });
+
+  it('blocks a spent balance with the credits response', async () => {
+    const creditsBlocked = paidUsageRejection({
+      user,
+      organizationId: 'org-1',
+      account: { balance: 0, balanceLimitedByUserAllowance: true },
+      exempt: false,
+    });
+
+    expect(creditsBlocked).not.toBeNull();
+    const response = await creditsBlocked?.();
+    expect(response?.status).toBe(402);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { balance: 0 },
+      error_type: ProxyErrorType.usage_limit_exceeded,
+    });
   });
 });

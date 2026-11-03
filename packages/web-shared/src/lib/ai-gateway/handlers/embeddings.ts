@@ -1,5 +1,4 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -12,10 +11,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   getOrganizationProviderPrivacy,
@@ -27,21 +23,21 @@ import {
   malformedJsonResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
-  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getBalanceAndOrgSettings,
-  type BalancePayer,
-} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  paidUsageRejection,
+  readGatewayBalance,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -246,27 +242,20 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const freeRequest = await isFreeModel(requestedModelLowerCased);
-    const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(
-        organizationId,
-        user,
-        readDb,
-        freeRequest ? undefined : 'usage'
-      );
+    const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
+    const { balance, settings, plan, payer } = account;
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-      return await creditsBlockedResponse({
-        user,
-        balance,
-        organizationId,
-        balanceLimitedByUserAllowance,
-      });
-    }
+    const creditsBlocked = paidUsageRejection({
+      user,
+      organizationId,
+      account,
+      exempt: usageContext.is_free || !!userByok,
+    });
+    if (creditsBlocked) return await creditsBlocked();
 
     const providerConfig = getOrganizationProviderPrivacy(settings);
 

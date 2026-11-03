@@ -4,8 +4,16 @@ import {
   createAnonymousContext,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
+  getBalanceAndOrgSettings,
+  type BalanceAndOrgSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  creditsBlockedResponse,
   invalidTokenResponse,
   paidModelAuthRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -55,4 +63,40 @@ export function resolveGatewayCaller(
     return { kind: 'anonymous', user: createAnonymousContext(opts.ipAddress) };
   }
   return { kind: 'rejected', response: paidModelAuthRequiredResponse() };
+}
+
+/** Free models are not usage-funded, so reading their balance skips auto top-up. */
+export async function readGatewayBalance(
+  user: User,
+  organizationId: string | undefined,
+  model: string
+): Promise<BalanceAndOrgSettings> {
+  return await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    readDb,
+    (await isFreeModel(model)) ? undefined : 'usage'
+  );
+}
+
+/**
+ * Null when the account can spend or the request is exempt from paid usage.
+ * Otherwise a builder for the credits-blocked response, which is lazy because
+ * that response reads payment and top-up state.
+ */
+export function paidUsageRejection(params: {
+  user: User;
+  organizationId: string | undefined;
+  account: Pick<BalanceAndOrgSettings, 'balance' | 'balanceLimitedByUserAllowance'>;
+  exempt: boolean;
+}): (() => Promise<NextResponse>) | null {
+  const { user, organizationId, account, exempt } = params;
+  if (exempt || canSpendPaidUsage(account.balance)) return null;
+  return () =>
+    creditsBlockedResponse({
+      user,
+      balance: account.balance,
+      organizationId,
+      balanceLimitedByUserAllowance: account.balanceLimitedByUserAllowance,
+    });
 }

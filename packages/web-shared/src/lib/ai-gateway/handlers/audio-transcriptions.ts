@@ -1,4 +1,3 @@
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -19,7 +18,6 @@ import {
   invalidRequestResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
-  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -28,12 +26,8 @@ import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -46,7 +40,11 @@ import {
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  paidUsageRejection,
+  readGatewayBalance,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -267,20 +265,18 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const freeRequest = await isFreeModel(requestedModelLowerCased);
-  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb, freeRequest ? undefined : 'usage');
+  const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
+  const { balance, settings, plan, payer } = account;
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return await creditsBlockedResponse({
-      user,
-      balance,
-      organizationId,
-      balanceLimitedByUserAllowance,
-    });
-  }
+  const creditsBlocked = paidUsageRejection({
+    user,
+    organizationId,
+    account,
+    exempt: usageContext.is_free || !!userByok,
+  });
+  if (creditsBlocked) return await creditsBlocked();
 
   // OpenRouter's transcription endpoint accepts the same provider preferences
   // as chat, so the organization data-collection policy is forwarded with the

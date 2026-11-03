@@ -2,7 +2,6 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -13,13 +12,15 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   getOrganizationProviderPrivacy,
-  creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  paidUsageRejection,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -136,11 +137,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
   const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
-  if (!canSpendPaidUsage(balance)) {
-    return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
-  }
+  // Unlike `readGatewayBalance`, System One funds free models from usage and
+  // blocks them at a zero balance too.
+  const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
+  const { balance, settings, plan, payer } = account;
+  const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
+  if (creditsBlocked) return await creditsBlocked();
 
   // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
   // carry, and the bound prices those bytes plus the answer generation at the model's current

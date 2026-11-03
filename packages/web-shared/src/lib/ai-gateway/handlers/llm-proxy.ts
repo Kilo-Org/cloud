@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
@@ -42,7 +41,6 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
   isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
@@ -73,7 +71,6 @@ import {
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
   temporarilyUnavailableResponse,
-  creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -88,10 +85,7 @@ import {
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getBalanceAndOrgSettings,
-  type BalanceAndOrgSettings,
-} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteModelResponse,
@@ -99,6 +93,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  paidUsageRejection,
+  readGatewayBalance,
   resolveGatewayCaller,
   type GatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
@@ -374,14 +370,9 @@ export async function handleLlmProxyRequest(
     settings: undefined,
     plan: undefined,
   };
-  const balanceAndSettingsPromise = callerPromise.then(async caller =>
+  const balanceAndSettingsPromise = callerPromise.then(caller =>
     caller.kind === 'signed-in'
-      ? getBalanceAndOrgSettings(
-          caller.organizationId,
-          caller.user,
-          readDb,
-          (await isFreeModel(requestedModelLowerCased)) ? undefined : 'usage'
-        )
+      ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
   const organizationContextPromise = Promise.all([callerPromise, balanceAndSettingsPromise]).then(
@@ -988,21 +979,17 @@ export async function handleLlmProxyRequest(
   }
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (
-    !isAnonymousContext(user) &&
-    !effectiveProviderContext.isFree &&
-    !effectiveProviderContext.userByok &&
-    !effectiveProviderContext.skipBalanceCheck
-  ) {
-    const { balance, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
-    if (!canSpendPaidUsage(balance)) {
-      return await creditsBlockedResponse({
-        user,
-        balance,
-        organizationId,
-        balanceLimitedByUserAllowance,
-      });
-    }
+  if (!isAnonymousContext(user)) {
+    const creditsBlocked = paidUsageRejection({
+      user,
+      organizationId,
+      account: await balanceAndSettingsPromise,
+      exempt:
+        effectiveProviderContext.isFree ||
+        !!effectiveProviderContext.userByok ||
+        !!effectiveProviderContext.skipBalanceCheck,
+    });
+    if (creditsBlocked) return await creditsBlocked();
   }
 
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {

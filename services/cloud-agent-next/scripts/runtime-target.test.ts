@@ -34,7 +34,7 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog defaults production to runtime-free without an org restriction', async () => {
+it('the committed catalog defaults every environment to runtime-free without an org restriction', async () => {
   const catalog: unknown = JSON.parse(
     await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
   );
@@ -50,10 +50,10 @@ it('the committed catalog defaults production to runtime-free without an org res
     release,
   });
   expect(output.vars).not.toHaveProperty('RUNTIME_INTERACTIVE_ORG_IDS');
-  for (const target of ['dev', 'isolated'])
+  for (const target of ['dev', 'isolated', 'new-target'])
     expect(selectRuntimeTarget(catalog, target)).toEqual({
-      mode: 'preinstalled',
-      image: 'all-in-one',
+      mode: 'downloaded',
+      image: 'runtime-free',
     });
 });
 it('renders both real Wrangler targets without publication credentials', async () => {

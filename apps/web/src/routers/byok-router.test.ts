@@ -19,7 +19,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 });
 
 import { createCallerForUser } from '@/routers/test-utils';
-import { getByokKeyPriority } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -307,21 +306,20 @@ describe('BYOK Router', () => {
       ]);
     });
 
-    test('gives keys created at the same time distinct priorities', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic']);
-      await caller.byok.reorder({ keyIds: ids });
+    test('ranks a key inserted outside byok.create, as coding plans do, by its default rank', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      await caller.byok.reorder({ keyIds: [ids[1], ids[0]] });
+      const [planKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'minimax',
+          encrypted_api_key: encryptApiKey('plan-key', BYOK_ENCRYPTION_KEY),
+          created_by: ownerUser.id,
+        })
+        .returning({ id: byok_api_keys.id });
 
-      await Promise.all(
-        (['mistral', 'openai', 'xai', 'deepseek'] as const).map(provider_id =>
-          caller.byok.create({ provider_id, api_key: `key-${provider_id}` })
-        )
-      );
-
-      const rows = await db
-        .select({ settings: byok_api_keys.settings })
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
-      expect(rows.map(row => getByokKeyPriority(row.settings)).toSorted()).toEqual([0, 1, 2, 3, 4]);
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([ids[1], ids[0], planKey.id]);
     });
 
     test('rejects an order that leaves out one of the caller keys', async () => {

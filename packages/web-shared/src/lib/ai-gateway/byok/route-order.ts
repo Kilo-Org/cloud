@@ -20,20 +20,26 @@ export function getByokKeyDefaultRank(providerId: string): number {
 }
 
 /**
- * Requests use the first key in this order that can serve them: prioritized keys by priority, then
- * the rest by `getByokKeyDefaultRank`. The sort is stable, so keys of equal rank keep their order.
+ * Requests use the first key in this order that can serve them. Prioritized keys come in priority
+ * order. Each key without a priority, such as one added after the owner reordered or installed by
+ * a coding plan, joins after the last key whose default rank is the same or lower, so a new provider
+ * key is never ranked below the owner's gateway keys. Without priorities this is the default order.
  */
 export function sortByokKeysInRouteOrder<T>(
   items: readonly T[],
   keyOf: (item: T) => { providerId: string; priority?: number }
 ): T[] {
-  const rank = (item: T) => {
-    const { providerId, priority } = keyOf(item);
-    return [priority ?? Number.MAX_SAFE_INTEGER, getByokKeyDefaultRank(providerId)] as const;
-  };
-  return items.toSorted((a, b) => {
-    const [priorityA, defaultA] = rank(a);
-    const [priorityB, defaultB] = rank(b);
-    return priorityA - priorityB || defaultA - defaultB;
-  });
+  const defaultRank = (item: T) => getByokKeyDefaultRank(keyOf(item).providerId);
+  const byDefaultRank = (a: T, b: T) => defaultRank(a) - defaultRank(b);
+  const ordered = items
+    .filter(item => keyOf(item).priority !== undefined)
+    .toSorted((a, b) => (keyOf(a).priority ?? 0) - (keyOf(b).priority ?? 0) || byDefaultRank(a, b));
+  const unprioritized = items
+    .filter(item => keyOf(item).priority === undefined)
+    .toSorted(byDefaultRank);
+  for (const item of unprioritized) {
+    const rank = defaultRank(item);
+    ordered.splice(ordered.findLastIndex(other => defaultRank(other) <= rank) + 1, 0, item);
+  }
+  return ordered;
 }

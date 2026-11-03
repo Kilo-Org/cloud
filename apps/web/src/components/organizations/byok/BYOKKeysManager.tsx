@@ -638,7 +638,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
     );
     setPendingFocus({ keyId: movedId, index: target, direction });
-    reorderMutation.mutate({ keyIds: reordered });
+    reorderMutation.mutate(
+      { keyIds: reordered },
+      {
+        // The rollback can disable the focused button, so focus follows the key back.
+        onError: () =>
+          setPendingFocus({
+            keyId: movedId,
+            index,
+            direction: direction === 'up' ? 'down' : 'up',
+          }),
+      }
+    );
   };
 
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {

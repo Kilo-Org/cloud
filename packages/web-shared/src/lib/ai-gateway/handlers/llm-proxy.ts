@@ -404,14 +404,15 @@ export async function handleLlmProxyRequest(
   void organizationGroupPolicyPromise.catch(() => {});
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid');
   // Per-message id from the kilocode client. Joinable to PostHog
   // `Feedback Submitted.parentMessageID`.
   const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
-  // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
-  // non-kilocode clients). `taskId` still wins when both are present.
-  const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
+  // `x-kilo-session` is the fallback session id for clients that send no
+  // `x-kilocode-taskid` (e.g. non-kilocode clients).
+  const sessionId = taskId ?? extractHeaderAndLimitLength(request, 'x-kilo-session');
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  const editorName = extractHeaderAndLimitLength(request, 'x-kilocode-editorname');
   // Vercel's per-invocation request id. Logged on the disconnect and upstream
   // failure paths so a client disconnect can be correlated with the upstream
   // error it causes, and with the platform logs for the same invocation.
@@ -426,7 +427,7 @@ export async function handleLlmProxyRequest(
       const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
       if (!config) return null;
       return {
-        sessionId: taskId ?? sessionHeader ?? null,
+        sessionId,
         organizationId: auth.organizationId,
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
@@ -452,7 +453,7 @@ export async function handleLlmProxyRequest(
         path,
         elapsed_ms: Math.round(performance.now() - requestStartedAt),
         client_request_id: clientRequestId,
-        session_id: taskId ?? sessionHeader,
+        session_id: sessionId,
         vercel_request_id: vercelRequestId,
       }
     );
@@ -515,7 +516,7 @@ export async function handleLlmProxyRequest(
     bodyBytes: Buffer.byteLength(requestBodyText),
     userId: caller.userId,
     organizationId: caller.organizationId,
-    sessionId: taskId ?? sessionHeader,
+    sessionId,
     machineId: machineIdHeader,
     clientRequestId,
     mode: modeHeader,
@@ -613,7 +614,7 @@ export async function handleLlmProxyRequest(
       {
         model: requestedModelLowerCased,
         modeHeader,
-        sessionId: taskId ?? null,
+        sessionId: taskId,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
@@ -823,14 +824,14 @@ export async function handleLlmProxyRequest(
             posthog_distinct_id: undefined,
             project_id: projectId,
             status_code: 200,
-            editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+            editor_name: editorName,
             machine_id: machineIdHeader,
             user_byok: false,
             has_tools: false,
             botId,
             tokenSource,
             feature,
-            session_id: taskId ?? sessionHeader ?? null,
+            session_id: sessionId,
             mode: modeHeader,
             auto_model: autoModel,
             ttfb_ms: null,
@@ -1083,14 +1084,14 @@ export async function handleLlmProxyRequest(
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    editor_name: editorName,
     machine_id: machineIdHeader,
     user_byok: !!effectiveProviderContext.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
     feature,
-    session_id: taskId ?? sessionHeader ?? null,
+    session_id: sessionId,
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
@@ -1153,8 +1154,8 @@ export async function handleLlmProxyRequest(
     fraudHeaders,
     userId: user.id,
     organizationId: organizationId ?? null,
-    sessionId: usageContext.session_id,
-    taskId: taskId ?? null,
+    sessionId,
+    taskId,
     isNonTrialEnterprise,
     search: url.search,
     method: request.method,

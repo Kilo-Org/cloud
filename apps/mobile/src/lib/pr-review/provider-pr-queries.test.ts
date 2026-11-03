@@ -86,7 +86,9 @@ describe('namespace selection', () => {
     const overview = loose(buildPrOverviewQueryOptions(trpc, githubScope));
     expect(overview.procedure).toBe('github.getPullRequest');
     expect(overview.input).toEqual({ owner: 'octocat', repo: 'hello', number: 7 });
-    expect(loose(buildPrChecksQueryOptions(trpc, githubScope, 'abc')).input).toEqual({
+    expect(
+      loose(buildPrChecksQueryOptions(trpc, githubScope, { headSha: 'abc', enabled: true })).input
+    ).toEqual({
       owner: 'octocat',
       repo: 'hello',
       ref: 'abc',
@@ -197,7 +199,9 @@ describe('organization readiness', () => {
     const scope = { ...bitbucketScope, organizationId: null };
     expect(isProviderScopeReady(scope)).toBe(false);
     expect(loose(buildPrOverviewQueryOptions(trpc, scope)).enabled).toBe(false);
-    expect(loose(buildPrChecksQueryOptions(trpc, scope, 'sha')).enabled).toBe(false);
+    expect(
+      loose(buildPrChecksQueryOptions(trpc, scope, { headSha: 'sha', enabled: true })).enabled
+    ).toBe(false);
     expect(loose(buildPrFilesQueryOptions(trpc, scope, true)).enabled).toBe(false);
   });
 
@@ -282,7 +286,9 @@ describe('normalizeProviderChecks', () => {
 
   it('routes the provider checks arm through that normalizer, so the section reads the bucketed rollup', () => {
     const { trpc } = makeTrpc();
-    const select = loose(buildPrChecksQueryOptions(trpc, gitlabScope, 'head')).select;
+    const select = loose(
+      buildPrChecksQueryOptions(trpc, gitlabScope, { headSha: 'head', enabled: true })
+    ).select;
     if (typeof select !== 'function') {
       throw new TypeError('the provider checks arm carries no select');
     }

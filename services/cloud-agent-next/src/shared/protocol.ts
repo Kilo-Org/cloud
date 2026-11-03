@@ -92,6 +92,8 @@ export type KilocodeEventData = {
 export type AutocommitStartedData = {
   message: string;
   messageId?: string;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -108,6 +110,8 @@ export type AutocommitCompletedData = {
   committedAt?: string;
   pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
   commitMessageTruncated?: true;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**

@@ -226,6 +226,12 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     async createSessionForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async setGeneratedTitleForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async canGenerateTitleForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async deleteSessionForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
@@ -240,5 +246,5 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
       throw new Error('connect is not implemented on the test SESSION_INGEST double');
     },
     ...methods,
-  } as SessionIngestBinding;
+  };
 }

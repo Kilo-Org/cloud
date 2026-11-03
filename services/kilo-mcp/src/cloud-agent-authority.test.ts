@@ -597,6 +597,10 @@ describe('Cloud Agent MCP authority', () => {
 
       if (organizationIdValue !== null) {
         for (const result of outcome.results) {
+          if (result.path === 'models.list') {
+            expect(result.inputSchema).not.toHaveProperty('properties.organizationId');
+            continue;
+          }
           expect(result.inputSchema).toMatchObject({
             properties: { organizationId: { const: organizationIdValue } },
             required: expect.arrayContaining(['organizationId']),
@@ -646,15 +650,24 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.instructions).toContain(
         'do not launch a child from a child session, and do not ask a child to launch one'
       );
-      expect(body.result.instructions).toContain(cloudAgentAuthorityProcedure(authority));
+      expect(body.result.instructions).toContain('spawn_session');
+      expect(body.result.instructions).toContain('search_models');
+      expect(body.result.instructions).toContain('generate_message_id');
+      expect(body.result.instructions).toContain('There is no implicit model default');
+      expect(body.result.instructions).toContain('follow-ups do not inherit it');
+      expect(body.result.instructions).toContain(
+        'never generate a replacement after an uncertain send'
+      );
+      expect(body.result.instructions).toContain('Example launch sequence:');
+      expect(body.result.instructions).toContain('Example follow-up sequence:');
+      expect(body.result.instructions).not.toContain('Search before every call');
     }
   );
 
   it.each([null, organizationId])(
-    'derives search scope from the verified organization: %s',
+    'publishes dedicated tools without caller-selected organization scope: %s',
     async organizationIdValue => {
       const authority = organizationIdValue === null ? scope : organizationScope;
-      const expectedPaths = cloudAgentAuthorityProcedures(authority);
       const scopedAuth = forwardedAuthFromProps({
         ...props,
         organizationId: organizationIdValue,
@@ -663,12 +676,6 @@ describe('Cloud Agent MCP authority', () => {
       const handler = createMcpHandler({
         catalog,
         webBaseUrl: 'https://fixture.invalid',
-        semanticCandidates: async () => [
-          { path: 'user.getMe', score: 1 },
-          { path: 'cloudAgentNext.prepareSession', score: 1 },
-          { path: 'organizations.cloudAgentNext.prepareSession', score: 1 },
-          ...expectedPaths.map(path => ({ path, score: 1 })),
-        ],
       });
       const response = await handler(
         new Request('https://fixture.invalid/mcp', {
@@ -676,26 +683,30 @@ describe('Cloud Agent MCP authority', () => {
           body: JSON.stringify({
             jsonrpc: '2.0',
             id: 1,
-            method: 'tools/call',
-            params: { name: 'search', arguments: { query: 'session', limit: 50 } },
+            method: 'tools/list',
           }),
         }),
         scopedAuth
       );
-      const body = (await response.json()) as { result: { content: Array<{ text: string }> } };
-      const payload = JSON.parse(body.result.content[0].text) as {
-        results: Array<{ path: string; inputSchema: Record<string, unknown> }>;
+      const body = (await response.json()) as {
+        result: { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> };
       };
-      expect(payload.results.map(row => row.path).sort()).toEqual([...expectedPaths].sort());
-      for (const row of payload.results) {
-        expect(row.inputSchema).toEqual(cloudAgentAuthorityInputSchema(authority, row.path));
-        expect(row.inputSchema).not.toHaveProperty('properties.parentCloudAgentSessionId');
-        if (organizationIdValue !== null) {
-          expect(row.inputSchema).toMatchObject({
-            properties: { organizationId: { const: organizationIdValue } },
-            required: expect.arrayContaining(['organizationId']),
-          });
-        }
+      expect(body.result.tools.map(tool => tool.name)).toEqual([
+        'search_models',
+        'generate_message_id',
+        'spawn_session',
+        'list_child_sessions',
+        'get_session',
+        'get_message_result',
+        'send_message',
+        'interrupt_session',
+        'list_folders',
+        'assign_workspace_to_folder',
+      ]);
+      for (const tool of body.result.tools) {
+        expect(tool.inputSchema).not.toHaveProperty('properties.parentCloudAgentSessionId');
+        expect(tool.inputSchema).not.toHaveProperty('properties.organizationId');
+        expect(tool.inputSchema).not.toHaveProperty('properties.autoInitiate');
       }
     }
   );

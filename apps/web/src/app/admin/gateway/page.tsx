@@ -13,7 +13,7 @@ import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListCon
 import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
-import { EnkryptGuardrailChargesContent } from '@/app/admin/gateway/EnkryptGuardrailChargesContent';
+import { EnkryptUsageContent } from '@/app/admin/gateway/EnkryptUsageContent';
 import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
@@ -114,7 +114,7 @@ export default function AdminGatewayPage() {
               API Request Log
             </TabsTrigger>
             <TabsTrigger value="enkrypt-charges" className={tabTriggerClass}>
-              Enkrypt Charges
+              Enkrypt Usage
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -180,7 +180,7 @@ export default function AdminGatewayPage() {
             </div>
           </TabsContent>
           <TabsContent value="enkrypt-charges" className="mt-4">
-            <EnkryptGuardrailChargesContent />
+            <EnkryptUsageContent />
           </TabsContent>
         </Tabs>
       </div>

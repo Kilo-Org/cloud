@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the rename-control geometry and the Kilo Pass placeholder suites share one fixture and mock harness in this file. */
 // The organization hub's rename control is icon-only. Before this slice it
 // rendered a bare `<Pencil size={16} />`, so its accessibility node was the
 // 16dp glyph and the audit read it below the 28dp floor. This suite pins the
@@ -5,12 +6,15 @@
 // proves its tap opens the rename sheet. The role gate (`showMoney`) still
 // decides whether the control exists at all.
 
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
 import { OrganizationHubScreen } from './hub-screen';
@@ -94,8 +98,22 @@ vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
+// Every other suite keeps the Kilo Pass row out of the tree (`null`); the
+// placeholder suite below sets the loading state the real mapper returns while
+// the summary query has no data (`org-kilo-pass-row-state.ts`).
+const kiloPassRowState = vi.hoisted(() => ({
+  current: null as null | {
+    subtitle: string;
+    attention: boolean;
+    action: 'manage' | 'setup' | 'retry' | 'none';
+    actionLabel: string | null;
+    accessibilityHint: string | null;
+    loading: boolean;
+  },
+}));
+
 vi.mock('@/components/organization/org-kilo-pass-row-state', () => ({
-  getOrgKiloPassRowState: () => null,
+  getOrgKiloPassRowState: () => kiloPassRowState.current,
 }));
 
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
@@ -205,6 +223,7 @@ beforeEach(() => {
   boundary.role = 'owner';
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  kiloPassRowState.current = null;
   routerPush.mockClear();
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -314,6 +333,121 @@ describe('OrganizationHubScreen rename control', () => {
     expect(findRenameControl(renderer.root)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'KvRow').length).toBeGreaterThan(0);
     unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass placeholder', () => {
+  const loadingState = {
+    subtitle: 'Loading…',
+    attention: false,
+    action: 'none',
+    actionLabel: null,
+    accessibilityHint: null,
+    loading: true,
+  } as const;
+
+  function skeletonClasses(root: TestRenderer.ReactTestInstance): string[] {
+    return root
+      .findAll(node => String(node.type) === 'Skeleton')
+      .map(node => String(node.props.className));
+  }
+
+  function subtitleNode(root: TestRenderer.ReactTestInstance, subtitle = 'Not subscribed') {
+    return root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === subtitle
+    )[0];
+  }
+
+  it('renders the loading bar on the subtitle line box, not above it', async () => {
+    // Compile the box the subtitle actually lays out, from the class the screen
+    // renders, then the bar's. Both go through the installed Tailwind and
+    // react-native-css compilers, so this is the box the emulator paints rather
+    // than a hand-written utility map. `h-3` (10.5dp) fails here: it drops the
+    // text block below the 30dp icon tile and the whole row with it.
+    kiloPassRowState.current = { ...loadingState, loading: false, subtitle: 'Not subscribed' };
+    const loaded = await renderHub();
+    const subtitleClass = String(subtitleNode(loaded.renderer.root)?.props.className);
+    loaded.unmount();
+
+    kiloPassRowState.current = { ...loadingState };
+    const loading = await renderHub();
+    const bar = skeletonClasses(loading.renderer.root)[0];
+    loading.unmount();
+
+    // `text-xs` carries a unitless line height (`calc(1 / 0.75)`), so its line
+    // box is that multiple of the font size; both halves compile through the
+    // installed Tailwind and react-native-css compilers, and the product is the
+    // 14dp the emulator measures for a loaded subtitle. `h-3` (10.5dp) fails
+    // here: it drops the text block below the 30dp icon tile and the row with it.
+    const fontSize = await compiledLengthDp(subtitleClass, 'fontSize');
+    const leading = await compiledLengthDp(subtitleClass, 'lineHeight');
+    const lineBox = Math.round(fontSize * leading);
+    // 1 rem at this app's 14-point rem: the height the row keeps in both states.
+    expect(lineBox).toBe(14);
+
+    if (bar === undefined) {
+      throw new Error('Kilo Pass placeholder missing');
+    }
+    expect(Math.round(await compiledLengthDp(bar, 'height'))).toBe(lineBox);
+  });
+
+  it('paints the bar in the token that differs from the card it sits on', async () => {
+    kiloPassRowState.current = { ...loadingState };
+
+    const { renderer, unmount } = await renderHub();
+    const classes = skeletonClasses(renderer.root)[0] ?? '';
+    const tokens = classes.split(/\s+/).filter(Boolean);
+
+    // `bg-muted` equals the `bg-secondary` row card in both palettes, so the
+    // default bar drew nothing on this screen.
+    expect(tokens).toContain('bg-muted-soft');
+    expect(tokens).not.toContain('bg-muted');
+
+    unmount();
+  });
+
+  it('swaps the bar for the status line once the summary resolves', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: null,
+      accessibilityHint: null,
+      loading: false,
+    };
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(skeletonClasses(renderer.root)).toHaveLength(0);
+    const subtitle = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === 'Not subscribed'
+    );
+    expect(subtitle).toHaveLength(1);
+    expect(String(subtitle[0]?.props.className)).toContain('text-xs');
+
+    unmount();
+  });
+
+  it('guards the theme tokens: bg-muted collides with the card, bg-muted-soft does not', () => {
+    const css = readFileSync(new URL('../../global.css', import.meta.url), 'utf8');
+    const values = (name: string) =>
+      [...css.matchAll(new RegExp(`--${name}:\\s*([^;]+);`, 'g'))].map(match =>
+        (match[1] ?? '').trim().toLowerCase()
+      );
+    const secondary = values('secondary');
+    const muted = values('muted');
+    const mutedSoft = values('muted-soft');
+
+    // Both theme blocks are present.
+    expect(secondary.length).toBeGreaterThanOrEqual(2);
+    expect(muted).toHaveLength(secondary.length);
+    expect(mutedSoft).toHaveLength(secondary.length);
+    // The collision that made the default bar invisible on the organization
+    // card, pinned so the token assertions above stay meaningful.
+    expect(muted).toEqual(secondary);
+    for (const [index, soft] of mutedSoft.entries()) {
+      expect(soft).not.toBe(secondary[index]);
+    }
   });
 });
 

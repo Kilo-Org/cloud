@@ -110,7 +110,7 @@ export function ModelAccessPolicyEditor({
       .map(provider => ({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         modelCount: provider.models.filter(model => model.endpoint).length,
         trains: provider.dataPolicy.training,
         retainsPrompts: provider.dataPolicy.retainsPrompts,

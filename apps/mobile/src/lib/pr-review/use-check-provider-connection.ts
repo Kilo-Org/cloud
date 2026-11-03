@@ -22,6 +22,18 @@ export type CheckProviderConnectionInput = {
 };
 
 /**
+ * What the check learned. `connected` is whether the provider answered a live
+ * connection; `instanceUrl` is the GitLab instance that connection serves, so
+ * the caller can tell a connection to *another* instance from one that can
+ * read the opened merge request — the same comparison the review read makes on
+ * the server. Bitbucket Cloud has one host, so its answer never carries one.
+ */
+export type ProviderConnectionStatus = {
+  readonly connected: boolean;
+  readonly instanceUrl: string | null;
+};
+
+/**
  * Force-fresh provider connection check. Bitbucket Cloud is
  * organization-context only, so a personal scope has nothing to check and
  * the mutation reports not-connected without a call.
@@ -32,7 +44,7 @@ export function useCheckProviderConnection() {
 
   const fetchProviderStatus = async (
     input: CheckProviderConnectionInput
-  ): Promise<{ connected: boolean }> => {
+  ): Promise<ProviderConnectionStatus> => {
     if (input.platform === 'gitlab') {
       if (input.organizationId) {
         const status = await queryClient.query({
@@ -41,16 +53,22 @@ export function useCheckProviderConnection() {
           }),
           staleTime: 0,
         });
-        return { connected: status.connected };
+        return {
+          connected: status.connected,
+          instanceUrl: status.integration?.instanceUrl ?? null,
+        };
       }
       const status = await queryClient.query({
         ...trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
         staleTime: 0,
       });
-      return { connected: status.connected };
+      return {
+        connected: status.connected,
+        instanceUrl: status.integration?.instanceUrl ?? null,
+      };
     }
     if (!input.organizationId) {
-      return { connected: false };
+      return { connected: false, instanceUrl: null };
     }
     const status = await queryClient.query({
       ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
@@ -58,7 +76,8 @@ export function useCheckProviderConnection() {
       }),
       staleTime: 0,
     });
-    return { connected: status.connected };
+    // Bitbucket Cloud is a single host, so there is no instance to name.
+    return { connected: status.connected, instanceUrl: null };
   };
 
   return useMutation({

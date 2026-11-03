@@ -26,6 +26,7 @@ function makePr(overrides: Partial<AssociatedPr> = {}): AssociatedPr {
     reviewDecision: null,
     reviewDecisionPending: false,
     platform: 'github',
+    observations: null,
     ...overrides,
   };
 }

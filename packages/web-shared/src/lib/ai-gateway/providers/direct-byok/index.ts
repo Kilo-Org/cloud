@@ -19,7 +19,6 @@ import {
   isValidOpenRouterModelId,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -167,9 +166,8 @@ function isCatalogModeKey(key: EnabledByokProvider): boolean {
 }
 
 // The catalog can drift between syncs, so a stored mapping only counts while its id is current.
-// Kilo-exclusive models are never served from a user's key.
 async function isLiveCatalogModelId(catalogModelId: string): Promise<boolean> {
-  return !isKiloExclusiveModel(catalogModelId) && (await isValidOpenRouterModelId(catalogModelId));
+  return isValidOpenRouterModelId(catalogModelId);
 }
 
 /** The catalog id that replaces `model`'s bespoke id in catalog mode, or null when unmapped. */

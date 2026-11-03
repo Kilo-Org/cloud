@@ -66,8 +66,16 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>,
+  boundedSpending: boolean
 ) {
+  if (boundedSpending) {
+    console.debug(
+      `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because a spend ceiling is set`
+    );
+    return false;
+  }
+
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (!routingConfig.vercelEnabled) {
     return false;

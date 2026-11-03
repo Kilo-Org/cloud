@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
 import {
-  recordEnkryptGuardrailCharge,
+  recordEnkryptUsage,
   type EnkryptGuardrailCall,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   scanRequest,
   type EnkryptGuardrailScan,
@@ -15,11 +15,11 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<Record<string, unknown>>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => ({
   ...jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges'
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage'
   ),
-  recordEnkryptGuardrailCharge: jest.fn(),
+  recordEnkryptUsage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -32,7 +32,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 
 const mockedAfter = jest.mocked(after);
-const mockedRecordCharge = jest.mocked(recordEnkryptGuardrailCharge);
+const mockedRecordUsage = jest.mocked(recordEnkryptUsage);
 const mockedScanRequest = jest.mocked(scanRequest);
 const signal = new AbortController().signal;
 
@@ -64,7 +64,7 @@ async function runAfterTasks() {
 
 beforeEach(() => {
   mockedAfter.mockReset();
-  mockedRecordCharge.mockReset().mockResolvedValue(undefined);
+  mockedRecordUsage.mockReset().mockResolvedValue(undefined);
   mockedScanRequest.mockReset();
 });
 
@@ -87,12 +87,12 @@ describe('startEnkryptInputGuardrail', () => {
 
       expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'failed' });
       await runAfterTasks();
-      expect(mockedRecordCharge).not.toHaveBeenCalled();
+      expect(mockedRecordUsage).not.toHaveBeenCalled();
     }
   );
 
   it('starts the request scan with a 30-second timeout', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [] });
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [] });
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await guardrail.awaitVerdict();
@@ -106,7 +106,7 @@ describe('startEnkryptInputGuardrail', () => {
   it('records the wait for the verdict on the final call of the request only', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
-      charges: [call({ decision: 'error', creditsCost: null }), call()],
+      usageRecords: [call({ decision: 'error', creditsCost: null }), call()],
     };
     mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
@@ -115,19 +115,19 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
     await runAfterTasks();
 
-    expect(mockedRecordCharge.mock.calls).toEqual([
+    expect(mockedRecordUsage.mock.calls).toEqual([
       [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
       [{ ...call(), addedLatencyMs: 237 }],
     ]);
   });
 
   it('records no added latency when the request never awaited the verdict', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, charges: [call()] });
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
 
     startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await runAfterTasks();
 
-    expect(mockedRecordCharge.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
   });
 
   it('skips the scan and records nothing without a guardrail', async () => {
@@ -137,6 +137,6 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedScanRequest).not.toHaveBeenCalled();
-    expect(mockedRecordCharge).not.toHaveBeenCalled();
+    expect(mockedRecordUsage).not.toHaveBeenCalled();
   });
 });

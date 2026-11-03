@@ -2,6 +2,37 @@ import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
+export const watchPrPolicySchema = z
+  .object({
+    version: z.literal(1),
+    model: z.string().trim().min(1).max(200),
+    profileId: z.string().uuid().nullable(),
+    categories: z.object({
+      reviews: z.boolean(),
+      failedChecks: z.boolean(),
+      baseUpdates: z.boolean(),
+    }),
+    branchStrategy: z.enum(['merge', 'rebase']),
+    historyRewriteConsent: z.boolean(),
+    maxAttemptsPerProblem: z.number().int().min(1).max(2),
+    maxTotalAttempts: z.number().int().min(1).max(10),
+    observationOnlyConsent: z.literal(true),
+    futureEventsOnlyConsent: z.literal(true),
+    noHardSpendCapConsent: z.literal(true),
+  })
+  .strict()
+  .refine(value => value.branchStrategy !== 'rebase' || value.historyRewriteConsent, {
+    message: 'Rebase requires explicit history-rewrite consent',
+    path: ['historyRewriteConsent'],
+  })
+  .refine(value => value.maxAttemptsPerProblem <= value.maxTotalAttempts, {
+    message: 'Per-problem attempts cannot exceed total attempts',
+    path: ['maxAttemptsPerProblem'],
+  });
+
+export type WatchPrPolicy = z.infer<typeof watchPrPolicySchema>;
+export type WatchPrStatus = 'watching' | 'paused' | 'finished';
+
 // =============================================================================
 // A. Runtime Values (used in enumCheck() or .default())
 // =============================================================================
@@ -889,6 +920,9 @@ export const AdminActionAuditAction = z.enum([
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
+  'request_logging_opt_in.create',
+  'request_logging_opt_in.delete',
+  'api_request_log.download',
   'organization.member.invite',
   'organization.member.role.update',
   'organization.member.remove',
@@ -900,6 +934,8 @@ export const AdminActionAuditAction = z.enum([
   'credit_campaign.create',
   'credit_campaign.update',
   'credit_campaign.set_active',
+  'service_fee.rollback_refund',
+  'service_fee.rollback_reconcile',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -2569,9 +2605,12 @@ export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
  * Per-key BYOK settings. Every field is optional so new settings need no backfill.
  * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
  * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
  */
 export const ByokApiKeySettingsSchema = z.object({
   serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
 });
 
 export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;

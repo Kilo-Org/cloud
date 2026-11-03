@@ -6,14 +6,15 @@ usage ID can join across stages. Otherwise ingress logs 1% of successful sends,
 all sends taking at least 1,000 ms, and all failed sends. One percent provides a
 modest baseline while limiting normal log volume; one second highlights a sizable
 publication delay. These records contain only the validated usage ID, outcome and
-monotonic send duration. Failures and slow sends are not volume capped. Existing processing outcome logs remain enabled,
-including `queue` for old/EU filters. Disable diagnostic settings after the
-investigation to reduce log volume.
+monotonic send duration. Failures and slow sends are not volume capped. Existing
+processing outcome logs remain enabled, including `queue` for old/EU filters.
+Disable diagnostic settings after the investigation to reduce log volume.
 
 | Event | Fields and boundary |
 |---|---|
 | `usage_ingest_enqueue_start` | Validated `usage_id`, `publisher_entry_at_ms`, `before_send_at_ms`; emitted before the existing single send |
-| `usage_ingest_enqueue` | `accepted` / `unavailable`, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
+| `usage_ingest_enqueue` (non-`all`) | Validated `usage_id`, `accepted` / `unavailable` outcome, monotonic `send_duration_ms` |
+| `usage_ingest_enqueue` (`all`) | Validated `usage_id`, `accepted` / `unavailable` outcome, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
 | `usage_ingest_handler_entry` | `queue`, local invocation `batch_id`, actual `batch_size`, handler entry and per-message start epochs, queue message ID/timestamp, attempts, validated usage ID/event timestamp, optional batch backlog sample; emitted before that message's writer call |
 | `usage_ingest_processing` | Existing per-message writer duration/outcome/disposition plus `queue` and, when enabled, the same batch identity and handler entry |
 

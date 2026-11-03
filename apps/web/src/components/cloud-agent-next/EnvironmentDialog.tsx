@@ -25,7 +25,6 @@ import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbo
 import {
   useCloudAgentEnvironment,
   useCloudAgentEnvironmentMutations,
-  useMultiRepositoryEnvironmentsEnabled,
   type EnvironmentRepository,
   type EnvironmentResponse,
 } from '@/hooks/useCloudAgentEnvironments';
@@ -122,17 +121,12 @@ function EnvironmentForm({
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
   const [page, setPage] = useState<EditorPage>('overview');
-  const multiRepository = useMultiRepositoryEnvironmentsEnabled(organizationId);
-  // New environments wait for the owner's repository capabilities before saving.
-  const kindPending = !existing && multiRepository.isPending;
   const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
     existing ? repositoriesForEnvironment(existing) : repository ? [repository] : []
   );
   const [repositories, setRepositories] = useState(initialRepositories);
   const repositoriesChanged = !sameRepositories(initialRepositories, repositories);
-  const isMultiRepository = existing
-    ? existing.repositories !== undefined || repositoriesChanged
-    : multiRepository.enabled;
+  const isMultiRepository = !existing || existing.repositories !== undefined || repositoriesChanged;
   const launchName = repositories[0] ? repositoryName(repositories[0]) : (repositoryLabel ?? '');
   const defaultName = splitRepositoryName(launchName).name.slice(
     0,
@@ -211,7 +205,7 @@ function EnvironmentForm({
           organizationId,
           environmentId: existing.id,
           name: savedName,
-          repositories: multiRepository.enabled && repositoriesChanged ? repositories : undefined,
+          repositories: repositoriesChanged ? repositories : undefined,
           plainVars: variables.plainVars,
           secrets: variables.secrets,
           commands,
@@ -231,7 +225,7 @@ function EnvironmentForm({
         const created = await createEnvironment.mutateAsync({
           organizationId,
           name: savedName,
-          ...(isMultiRepository ? { repositories } : { repository: repositories[0] }),
+          repositories,
           plainVars: variables.plainVars,
           secrets,
           commands,
@@ -307,7 +301,7 @@ function EnvironmentForm({
                   maxLength={ENVIRONMENT_LIMITS.MAX_NAME_LENGTH}
                 />
               </div>
-              <fieldset disabled={!canManage || !multiRepository.enabled} className="min-w-0">
+              <fieldset disabled={!canManage} className="min-w-0">
                 <EnvironmentRepositoriesField
                   organizationId={organizationId}
                   repositories={repositories}
@@ -445,7 +439,6 @@ function EnvironmentForm({
               disabled={
                 isSaving ||
                 deleteEnvironment.isPending ||
-                kindPending ||
                 profileQuery.isLoading ||
                 profileQuery.isError
               }

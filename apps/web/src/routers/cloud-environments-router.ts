@@ -23,11 +23,7 @@ import {
   type EnvironmentPlatform,
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
-import {
-  assertAllocationSupportsMultiRepository,
-  assertMultiRepositoryEnvironmentsEnabled,
-  isMultiRepositoryEnvironmentsEnabled,
-} from '@/lib/cloud-agent/multi-repository-environments';
+import { assertAllocationSupportsMultiRepository } from '@/lib/cloud-agent/multi-repository-environments';
 import {
   canonicalGitLabProjectUrl,
   createRepositorySchema,
@@ -265,21 +261,6 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
       return listEnvironmentsForOwner(db, owner);
     }),
 
-  /**
-   * Whether the owner can create and edit multi-repository environments. The
-   * flag is evaluated for the owner id, so the browser cannot read it from its
-   * own PostHog identity.
-   */
-  multiRepositoryEnabled: baseProcedure
-    .input(z.object({ organizationId: z.uuid().optional() }))
-    .output(z.boolean())
-    .query(async ({ ctx, input }) => {
-      if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
-      }
-      return isMultiRepositoryEnvironmentsEnabled(getOwner(input.organizationId, ctx.user.id));
-    }),
-
   get: baseProcedure
     .input(z.object({ organizationId: z.uuid().optional(), environmentId: z.uuid() }))
     .output(environmentResponseSchema)
@@ -321,7 +302,6 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
       const owner = getOwner(input.organizationId, ctx.user.id);
       const submitted = input.repositories ?? (input.repository ? [input.repository] : []);
       if (input.repositories) {
-        await assertMultiRepositoryEnvironmentsEnabled(owner);
         assertAllocationSupportsMultiRepository(input.sandboxAllocation);
       }
       const entries = await Promise.all(
@@ -380,7 +360,6 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      if (input.repositories) await assertMultiRepositoryEnvironmentsEnabled(owner);
       const repositories = input.repositories
         ? await Promise.all(
             input.repositories.map(repository =>

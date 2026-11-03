@@ -121,24 +121,6 @@ type UseEnvironmentOptions = {
   enabled?: boolean;
 };
 
-/**
- * Whether the owner can create multi-repository environments. The server
- * evaluates the flag for the owner, so the answer matches what it accepts.
- */
-export function useMultiRepositoryEnvironmentsEnabled(organizationId?: string): {
-  enabled: boolean;
-  isPending: boolean;
-} {
-  const trpc = useTRPC();
-  const { data, isPending } = useQuery(
-    trpc.cloudEnvironments.multiRepositoryEnabled.queryOptions(
-      { organizationId },
-      { staleTime: 5 * 60_000 }
-    )
-  );
-  return { enabled: data === true, isPending };
-}
-
 /** Every environment for the owner, across repositories (settings view). */
 export function useCloudAgentEnvironmentsForOwner(options: UseEnvironmentOptions) {
   const trpc = useTRPC();

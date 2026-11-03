@@ -20,12 +20,10 @@ import {
 import {
   environmentMembers,
   useCloudAgentEnvironmentsForOwner,
-  useMultiRepositoryEnvironmentsEnabled,
   useEnvironmentBuildStatus,
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
-import { findRepositoryEnvironments } from '../environment-display';
 import { EnvironmentDialog } from '../EnvironmentDialog';
 import { snapshotBadge } from '../environment-build-display';
 
@@ -43,7 +41,6 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
   const [dialogRepository, setDialogRepository] = useState<EnvironmentRepository | undefined>();
 
   const repoChoices = useEnvironmentRepositoryChoices(organizationId);
-  const { enabled: multiRepositoryEnabled } = useMultiRepositoryEnvironmentsEnabled(organizationId);
 
   const environments = query.data ?? [];
 
@@ -67,9 +64,9 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         <div>
           <h3 className="text-sm font-medium">Environments</h3>
           <p className="text-muted-foreground text-xs">
-            Setup commands, variables, secrets, and a sandbox size for a repository
-            {multiRepositoryEnabled ? ' or a group of repositories' : ''}. New sessions use the
-            environment that contains their repository. When several do, you choose one.
+            Setup commands, variables, secrets, and a sandbox size for a repository or a group of
+            repositories. New sessions use the environment that contains their repository. When
+            several do, you choose one.
           </p>
         </div>
         {canManage && (
@@ -99,34 +96,19 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
                               : 'Bitbucket'
                         }
                       >
-                        {choices.map(choice => {
-                          // A single-repository environment is the repository's only one, so
-                          // choosing it again edits it. With multi-repository environments on,
-                          // choosing a repository starts a new environment.
-                          const existing = multiRepositoryEnabled
-                            ? undefined
-                            : findRepositoryEnvironments(environments, choice.repository).find(
-                                environment => environment.repositories === undefined
-                              );
-                          return (
-                            <CommandItem
-                              key={`${platform}:${choice.label}`}
-                              value={`${platform}:${choice.label}`}
-                              onSelect={() =>
-                                existing ? openEdit(existing.id) : openCreate(choice)
-                              }
-                              className="flex items-center gap-2"
-                            >
-                              <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-                              <span className="flex-1 truncate" title={choice.label}>
-                                {choice.label}
-                              </span>
-                              {existing && (
-                                <span className="text-muted-foreground shrink-0 text-xs">Edit</span>
-                              )}
-                            </CommandItem>
-                          );
-                        })}
+                        {choices.map(choice => (
+                          <CommandItem
+                            key={`${platform}:${choice.label}`}
+                            value={`${platform}:${choice.label}`}
+                            onSelect={() => openCreate(choice)}
+                            className="flex items-center gap-2"
+                          >
+                            <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                            <span className="flex-1 truncate" title={choice.label}>
+                              {choice.label}
+                            </span>
+                          </CommandItem>
+                        ))}
                       </CommandGroup>
                     );
                   })}

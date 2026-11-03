@@ -79,7 +79,6 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
     isError: false,
   }),
   useEnvironmentBuildStatus: () => ({ data: undefined }),
-  useMultiRepositoryEnvironmentsEnabled: () => ({ enabled: false, isPending: false }),
 }));
 
 jest.mock('@/hooks/useEnvironmentRepositoryChoices', () => ({
@@ -473,8 +472,8 @@ describe('environment access for members and managers', () => {
   });
 });
 
-test('keeps V2 membership read-only for a manager when the feature flag is off', () => {
-  mockCanManage = true;
+test.each([false, true])('V2 membership is editable only for managers: canManage=%s', canManage => {
+  mockCanManage = canManage;
   mockEnvironment = {
     ...environmentDetail,
     platform: undefined,
@@ -489,11 +488,17 @@ test('keeps V2 membership read-only for a manager when the feature flag is off',
   };
   const mounted = mount(chipElement());
   try {
-    click(findButton(mounted.container, 'Edit environment'));
+    click(findButton(mounted.container, canManage ? 'Edit environment' : 'View environment'));
     const remove = mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]');
     expect(remove).not.toBeNull();
-    expect(remove?.closest('fieldset')?.hasAttribute('disabled')).toBe(true);
-    expect(findButton(mounted.container, 'Save environment')?.disabled).toBe(false);
+    expect(remove?.closest('fieldset')?.hasAttribute('disabled')).toBe(!canManage);
+    if (canManage) {
+      click(remove);
+      expect(mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]')).toBeNull();
+      expect(findButton(mounted.container, 'Save environment')?.disabled).toBe(false);
+    } else {
+      expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
+    }
   } finally {
     mounted.cleanup();
   }

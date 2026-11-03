@@ -40,10 +40,9 @@ they appear in all capitals, as shown here.
   size -- distinct from the sandbox Environment. A repository MAY belong to
   several environments of one owner.
 - **Multi-repository environment** (V2): a repository environment that lists its
-  repositories. Only an owner with the flag
-  `cloud-agent-multi-repository-environments` can create or change one. While
-  the flag is on, the editor creates every new environment as V2, also with one
-  repository. A saved V2 environment still applies when the flag is off. An environment
+  repositories. Multi-repository environments are available to all personal and
+  organization accounts, subject to existing environment management permissions.
+  The editor creates every new environment as V2, also with one repository. An environment
   without a list (V1) belongs to one repository and behaves as before.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request

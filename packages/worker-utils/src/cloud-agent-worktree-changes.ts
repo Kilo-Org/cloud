@@ -151,11 +151,8 @@ const savedWorktreeChangesSnapshotSchema = z
     /**
      * Only the snapshot of a multi-repository (V2) environment has this; a V1
      * snapshot is saved without the key. A reader that does not know the key
-     * rejects the snapshot (the schema is strict), so a deploy must ship this
-     * schema before the Worker that writes the key. That order holds by
-     * construction: a V2 session exists only after the
-     * `cloud-agent-multi-repository-environments` flag is on, and the flag is
-     * switched on after the web app deploys.
+     * rejects the snapshot (the schema is strict), so deploy this reader before
+     * any Worker can write multi-repository snapshots.
      */
     repositories: z
       .array(savedWorktreeChangesRepositorySchema)

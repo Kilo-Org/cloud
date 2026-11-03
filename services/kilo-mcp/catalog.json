@@ -9313,28 +9313,6 @@
     ],
     "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
   },
-  "cloudEnvironments.multiRepositoryEnabled": {
-    "path": "cloudEnvironments.multiRepositoryEnabled",
-    "kind": "query",
-    "summary": "Check whether multi-repository cloud environments are enabled for a user or an organization. Returns true if the feature flag is on for the owner.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      }
-    },
-    "tags": [
-      "cloudenvironments",
-      "multirepositoryenabled",
-      "organizationid"
-    ],
-    "searchBlob": "cloudEnvironments.multiRepositoryEnabled Check whether multi-repository cloud environments are enabled for a user or an organization. Returns true if the feature flag is on for the owner. cloudenvironments multirepositoryenabled organizationid organizationId"
-  },
   "cloudEnvironments.update": {
     "path": "cloudEnvironments.update",
     "kind": "mutation",

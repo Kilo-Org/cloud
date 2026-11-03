@@ -1055,6 +1055,7 @@
       "prOpened": "Пулреквест для REVIEW.md відкрито",
       "alreadyPresent": "Настанови вже є в REVIEW.md",
       "status": {
+        "open": "Відкрито",
         "edited": "Відредаговано",
         "opening_change_request": "Відкриття PR",
         "change_request_failed": "Не вдалося відкрити PR",
@@ -1193,6 +1194,10 @@
       "triageReasoning": "Обґрунтування первинної оцінки",
       "watchInCloudAgent": "Переглянути в хмарному агенті",
       "whereFound": "Місця виявлення ({{displayCount}})",
+      "whereFound_one": "Місця виявлення ({{displayCount}})",
+      "whereFound_few": "Місця виявлення ({{displayCount}})",
+      "whereFound_many": "Місця виявлення ({{displayCount}})",
+      "whereFound_other": "Місця виявлення ({{displayCount}})",
       "yes": "Так",
       "action": {
         "analyzeCodebase": "Проаналізувати кодову базу",
@@ -1372,6 +1377,10 @@
       "breakdownMediumLow_other": "середній та низький: {{displayCount}}",
       "dueThisWeek": "Термін спливає цього тижня",
       "dueThisWeekDetail": "З них {{exploitable}} з підтвердженою можливістю атаки",
+      "dueThisWeekDetail_one": "З них {{exploitable}} з підтвердженою можливістю атаки",
+      "dueThisWeekDetail_few": "З них {{exploitable}} з підтвердженою можливістю атаки",
+      "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
+      "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
       "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
@@ -3088,7 +3097,6 @@
         "squash": "Об'єднання"
       },
       "terminal": {
-        "alreadyMerged": "Уже злито",
         "closed": "Цей запит на злиття закрито",
         "closedMergeRequest": "Цей merge-запит закрито"
       },
@@ -3105,7 +3113,6 @@
         "requiredReviewsTitle": "Бракує обов'язкових перевірок коду",
         "requiredReviewsDetail": "Ще не отримано схвалення від усіх, хто має перевірити код.",
         "failingChecksTitle": "Помилки в обов'язкових перевірках",
-        "failingChecksDetail": "Обов'язкові перевірки стану завершуються з помилками.",
         "unstableTitle": "Деякі перевірки завершуються з помилками",
         "unstableDetail": "Необов'язкові перевірки завершуються з помилками. Це не блокує злиття.",
         "draftTitle": "Чернетка запиту на злиття",
@@ -3218,7 +3225,16 @@
       "pendingComment_other": "ненадісланого коментаря",
       "pendingComment_one": "ненадісланий коментар",
       "summaryOptional": "Підсумок (необов'язково)",
-      "partialPostedMessage": "Опубліковано коментарів: {{displayFreshCount}}. У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
+      "partialPostedFresh": "Опубліковано коментарів: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Опубліковано коментарів: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Опубліковано коментарів: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Опубліковано коментарів: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Опубліковано коментарів: {{displayFreshCount}}. ",
+      "partialPostedStale": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
+      "partialPostedStale_one": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
+      "partialPostedStale_few": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
+      "partialPostedStale_many": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
+      "partialPostedStale_other": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
       "submitReview": "Надіслати результати перевірки",
       "pendingComment_few": "ненадіслані коментарі",

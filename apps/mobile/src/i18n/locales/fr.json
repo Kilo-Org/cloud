@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request pour REVIEW.md ouverte",
       "alreadyPresent": "Les consignes figurent déjà dans REVIEW.md",
       "status": {
+        "open": "Ouverte",
         "edited": "Modifiée",
         "opening_change_request": "Ouverture de la PR",
         "change_request_failed": "Échec de l’ouverture de la PR",
@@ -1156,6 +1157,9 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
+      "whereFound_one": "Emplacements détectés ({{displayCount}})",
+      "whereFound_many": "Emplacements détectés ({{displayCount}})",
+      "whereFound_other": "Emplacements détectés ({{displayCount}})",
       "yes": "Oui",
       "action": {
         "analyzeCodebase": "Analyser la base de code",
@@ -1331,6 +1335,9 @@
       "breakdownMediumLow_zero": "{{displayCount}} de gravité moyenne ou faible",
       "dueThisWeek": "Échéance cette semaine",
       "dueThisWeekDetail": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_one": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_many": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_other": "Dont {{exploitable}} confirmés exploitables",
       "noDeadline": "Aucune échéance",
       "reviewSlaAssignment": "Vérifier l'attribution des SLA",
       "allOpenFindingsTracked": "Tous les signalements ouverts sont suivis"
@@ -3049,7 +3056,6 @@
         "squash": "Regroupement"
       },
       "terminal": {
-        "alreadyMerged": "Déjà fusionnée",
         "closed": "Demande de fusion fermée",
         "closedMergeRequest": "Ce merge request est fermé"
       },
@@ -3066,7 +3072,6 @@
         "requiredReviewsTitle": "Revues requises manquantes",
         "requiredReviewsDetail": "Les personnes dont la revue est requise n'ont pas encore donné leur approbation.",
         "failingChecksTitle": "Échec des vérifications requises",
-        "failingChecksDetail": "Les vérifications d'état requises échouent.",
         "unstableTitle": "Certaines vérifications échouent",
         "unstableDetail": "Certaines vérifications facultatives échouent. Elles ne bloquent pas la fusion.",
         "draftTitle": "PR en brouillon",
@@ -3176,7 +3181,14 @@
       "pendingComment_other": "commentaires en attente",
       "pendingComment_one": "commentaire en attente",
       "summaryOptional": "Résumé (facultatif)",
-      "partialPostedMessage": "Commentaires publiés : {{displayFreshCount}}. Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedFresh": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedStale": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_one": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_many": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_other": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
       "submitReview": "Envoyer la revue",
       "pendingComment_many": "commentaires en attente",

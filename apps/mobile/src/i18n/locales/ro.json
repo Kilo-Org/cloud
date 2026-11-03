@@ -449,7 +449,6 @@
         "rebase": "Rebazare"
       },
       "terminal": {
-        "alreadyMerged": "Deja îmbinat",
         "closed": "PR închis",
         "closedMergeRequest": "Merge request închis"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Lipsesc revizuirile obligatorii",
         "requiredReviewsDetail": "Lipsesc aprobările persoanelor desemnate să revizuiască modificările sau acestea sunt încă în așteptare.",
         "failingChecksTitle": "Verificări obligatorii eșuate",
-        "failingChecksDetail": "Verificările de stare obligatorii au eșuat.",
         "unstableTitle": "Unele verificări au eșuat",
         "unstableDetail": "Unele verificări opționale au eșuat. Acestea nu vor bloca îmbinarea.",
         "draftTitle": "PR în stadiu de ciornă",
@@ -725,7 +723,14 @@
       "pendingComment_other": "comentarii în așteptare",
       "submitCountOfTotal": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
       "submitReview": "Trimite revizuirea",
-      "partialPostedMessage": "Comentarii publicate: {{displayFreshCount}}. Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_few": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
       "pendingComment_few": "comentarii în așteptare",
       "blockedRequestChanges": "Adaugă un rezumat sau cel puțin un comentariu pentru a cere modificări.",
       "blockedComment": "Adaugă un rezumat sau cel puțin un comentariu pentru a trimite o revizuire de tip comentariu."
@@ -1551,6 +1556,7 @@
       "prOpened": "Pull request pentru REVIEW.md deschis",
       "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
       "status": {
+        "open": "Deschisă",
         "edited": "Editată",
         "opening_change_request": "Se deschide PR-ul",
         "change_request_failed": "Deschiderea PR-ului a eșuat",
@@ -1776,6 +1782,9 @@
       "exploitabilityReasoning": "Justificarea exploatabilității",
       "suggestedFix": "Remediere sugerată",
       "whereFound": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_one": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_few": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_other": "Locuri în care a fost identificată ({{displayCount}})",
       "fullReport": "Raport complet generat",
       "yes": "Da",
       "no": "Nu",
@@ -1862,6 +1871,9 @@
       "breakdownMediumLow_other": "{{displayCount}} cu gravitate medie și scăzută",
       "dueThisWeek": "Cu termen săptămâna aceasta",
       "dueThisWeekDetail": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_one": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_few": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_other": "{{exploitable}} dintre acestea confirmate ca exploatabile",
       "noDeadline": "Fără termen limită",
       "reviewSlaAssignment": "Verifică atribuirea termenelor SLA",
       "allOpenFindingsTracked": "Toate constatările deschise sunt urmărite"

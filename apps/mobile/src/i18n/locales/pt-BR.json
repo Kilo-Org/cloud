@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request para o REVIEW.md aberto",
       "alreadyPresent": "As orientações já estão no REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "Abrindo PR",
         "change_request_failed": "Falha ao abrir PR",
@@ -1156,6 +1157,9 @@
       "triageReasoning": "Justificativa da triagem",
       "watchInCloudAgent": "Acompanhar no agente na nuvem",
       "whereFound": "Locais da ocorrência ({{displayCount}})",
+      "whereFound_one": "Locais da ocorrência ({{displayCount}})",
+      "whereFound_many": "Locais da ocorrência ({{displayCount}})",
+      "whereFound_other": "Locais da ocorrência ({{displayCount}})",
       "yes": "Sim",
       "action": {
         "analyzeCodebase": "Analisar base de código",
@@ -1331,6 +1335,9 @@
       "breakdownMediumLow_zero": "{{displayCount}} médias e baixas",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destas confirmadas como exploráveis",
+      "dueThisWeekDetail_one": "{{exploitable}} destas confirmadas como exploráveis",
+      "dueThisWeekDetail_many": "{{exploitable}} destas confirmadas como exploráveis",
+      "dueThisWeekDetail_other": "{{exploitable}} destas confirmadas como exploráveis",
       "noDeadline": "Sem prazo",
       "reviewSlaAssignment": "Revisar atribuição de SLA",
       "allOpenFindingsTracked": "Todas as ocorrências em aberto estão sendo acompanhadas"
@@ -3049,7 +3056,6 @@
         "squash": "Agrupar"
       },
       "terminal": {
-        "alreadyMerged": "Já mesclado",
         "closed": "Este pull request está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -3066,7 +3072,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "Ainda faltam aprovações dos revisores exigidos.",
         "failingChecksTitle": "Verificações obrigatórias com falha",
-        "failingChecksDetail": "As verificações de status obrigatórias estão falhando.",
         "unstableTitle": "Algumas verificações estão falhando",
         "unstableDetail": "Algumas verificações opcionais estão falhando, mas não impedem a mesclagem.",
         "draftTitle": "PR em rascunho",
@@ -3176,7 +3181,14 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_one": "comentário pendente",
       "summaryOptional": "Resumo (opcional)",
-      "partialPostedMessage": "Comentários publicados: {{displayFreshCount}}. Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
+      "partialPostedStale_many": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "pendingComment_many": "comentários pendentes",

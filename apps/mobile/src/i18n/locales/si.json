@@ -442,7 +442,6 @@
         "rebase": "රීබේස්"
       },
       "terminal": {
-        "alreadyMerged": "දැනටමත් ඒකාබද්ධ කර ඇත",
         "closed": "මෙම පුල් ඉල්ලීම වසා ඇත",
         "closedMergeRequest": "මෙම මර්ජ ඉල්ලීම වසා ඇත"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "අවශ්‍ය සමාලෝචන නොමැත",
         "requiredReviewsDetail": "අවශ්‍ය සමාලෝචකයන්ගේ අනුමැති ලැබී නොමැත හෝ තවමත් ලැබීමට නියමිතයි.",
         "failingChecksTitle": "අසමත් වන අනිවාර්ය පරීක්ෂණ",
-        "failingChecksDetail": "අනිවාර්ය තත්ත්ව පරීක්ෂණ අසමත් වෙමින් පවතී.",
         "unstableTitle": "සමහර පරීක්ෂණ අසමත් වෙමින් පවතී",
         "unstableDetail": "අනිවාර්ය නොවන පරීක්ෂණ අසමත් වෙමින් පවතී. ඒවා ඒකාබද්ධ කිරීම අවහිර නොකරයි.",
         "draftTitle": "කෙටුම්පත් PR",
@@ -710,7 +708,12 @@
       "pendingComment_other": "යැවීමට ඇති අදහස්",
       "submitCountOfTotal": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
-      "partialPostedMessage": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. අදහස් {{displayStaleCount}} ක් පැරණි කමිට් එකකට අදාළ බැවින් ඔබේ පෝලිමේ තබා ඇත.",
+      "partialPostedFresh": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
+      "partialPostedFresh_one": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
+      "partialPostedFresh_other": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
+      "partialPostedStale": "අදහස් {{displayStaleCount}} ක් පැරණි කමිට් එකකට අදාළ බැවින් ඔබේ පෝලිමේ තබා ඇත.",
+      "partialPostedStale_one": "අදහස් {{displayStaleCount}} ක් පැරණි කමිට් එකකට අදාළ බැවින් ඔබේ පෝලිමේ තබා ඇත.",
+      "partialPostedStale_other": "අදහස් {{displayStaleCount}} ක් පැරණි කමිට් එකකට අදාළ බැවින් ඔබේ පෝලිමේ තබා ඇත.",
       "blockedRequestChanges": "වෙනස්කම් ඉල්ලීමට සාරාංශයක් හෝ අවම වශයෙන් එක් අදහසක් එක් කරන්න.",
       "blockedComment": "අදහස් සහිත සමාලෝචනයක් පළ කිරීමට සාරාංශයක් හෝ අවම වශයෙන් එක් අදහසක් එක් කරන්න."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md සඳහා pull request එකක් විවෘත කරන ලදී",
       "alreadyPresent": "මාර්ගෝපදේශ දැනටමත් REVIEW.md තුළ ඇත",
       "status": {
+        "open": "විවෘතයි",
         "edited": "සංස්කරණය කරන ලදී",
         "opening_change_request": "PR විවෘත කරමින් පවතී",
         "change_request_failed": "PR අසාර්ථක විය",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "ප්‍රහාරයකට යොදාගත හැකිද යන්න තීරණය කිරීමට පදනම් වූ හේතු",
       "suggestedFix": "යෝජිත විසඳුම",
       "whereFound": "මෙය හමු වූ ස්ථාන ({{displayCount}})",
+      "whereFound_one": "මෙය හමු වූ ස්ථාන ({{displayCount}})",
+      "whereFound_other": "මෙය හමු වූ ස්ථාන ({{displayCount}})",
       "fullReport": "සැකසූ සම්පූර්ණ වාර්තාව",
       "yes": "ඔව්",
       "no": "නැත",
@@ -1836,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} මධ්‍යම හා පහළ",
       "dueThisWeek": "මෙම සතිය තුළ නිම කළ යුතුයි",
       "dueThisWeekDetail": "මේවායින් {{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
+      "dueThisWeekDetail_one": "මේවායින් {{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
+      "dueThisWeekDetail_other": "මේවායින් {{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
       "noDeadline": "නියමිත කාලයක් නැත",
       "reviewSlaAssignment": "SLA පැවරීම සමාලෝචනය කරන්න",
       "allOpenFindingsTracked": "සියලුම විවෘත සොයාගැනීම් නිරීක්ෂණය වේ"

@@ -442,7 +442,6 @@
         "rebase": "Endurgrunnun"
       },
       "terminal": {
-        "alreadyMerged": "Þegar sameinað",
         "closed": "Þessi sameiningarbeiðni er lokuð",
         "closedMergeRequest": "Þessi merge request er lokuð"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Áskildar yfirferðir vantar",
         "requiredReviewsDetail": "Samþykki frá tilskildum yfirlesurum vantar eða er enn í bið.",
         "failingChecksTitle": "Áskildar athuganir standast ekki",
-        "failingChecksDetail": "Áskildar stöðuathuganir standast ekki.",
         "unstableTitle": "Sumar athuganir standast ekki",
         "unstableDetail": "Athuganir sem ekki eru áskildar standast ekki. Þær hindra ekki sameiningu.",
         "draftTitle": "Drög að samrunabeiðni",
@@ -710,7 +708,12 @@
       "pendingComment_other": "ósendar athugasemdir",
       "submitCountOfTotal": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
       "submitReview": "Senda rýni",
-      "partialPostedMessage": "Fjöldi birtra athugasemda: {{displayFreshCount}}. Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedFresh": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedStale": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
       "blockedRequestChanges": "Bættu við samantekt eða að minnsta kosti einni athugasemd til að biðja um breytingar.",
       "blockedComment": "Bættu við samantekt eða að minnsta kosti einni athugasemd til að senda yfirferð með athugasemdum."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Samrunabeiðni fyrir REVIEW.md opnuð",
       "alreadyPresent": "Leiðbeiningarnar eru þegar í REVIEW.md",
       "status": {
+        "open": "Opið",
         "edited": "Breytt",
         "opening_change_request": "Opna PR",
         "change_request_failed": "Ekki tókst að opna PR",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Rökstuðningur um mögulega misnotkun",
       "suggestedFix": "Tillaga að lagfæringu",
       "whereFound": "Staðsetningar fráviks ({{displayCount}})",
+      "whereFound_one": "Staðsetningar fráviks ({{displayCount}})",
+      "whereFound_other": "Staðsetningar fráviks ({{displayCount}})",
       "fullReport": "Sjálfvirk skýrsla í heild",
       "yes": "Já",
       "no": "Nei",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} á miðlungs og lágu stigi",
       "dueThisWeek": "Frestur rennur út í vikunni",
       "dueThisWeekDetail": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
+      "dueThisWeekDetail_one": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
+      "dueThisWeekDetail_other": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
       "noDeadline": "Enginn frestur",
       "reviewSlaAssignment": "Yfirfara úthlutun SLA-fresta",
       "allOpenFindingsTracked": "Fylgst með öllum opnum frávikum"

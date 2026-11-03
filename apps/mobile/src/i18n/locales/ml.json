@@ -442,7 +442,6 @@
         "rebase": "റീബേസ്"
       },
       "terminal": {
-        "alreadyMerged": "ഇതിനകം മെർജ് ചെയ്തു",
         "closed": "ഈ പുൾ റിക്വസ്റ്റ് അടച്ചു",
         "closedMergeRequest": "ഈ മെർജ് റിക്വസ്റ്റ് അടച്ചു"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ആവശ്യമായ അവലോകനങ്ങൾ ലഭിച്ചിട്ടില്ല",
         "requiredReviewsDetail": "അംഗീകാരം നൽകേണ്ട അവലോകകരുടെ അംഗീകാരങ്ങൾ ലഭിച്ചിട്ടില്ല അല്ലെങ്കിൽ അവയ്ക്കായി കാത്തിരിക്കുന്നു.",
         "failingChecksTitle": "നിർബന്ധമായ പരിശോധനകൾ പരാജയപ്പെടുന്നു",
-        "failingChecksDetail": "ആവശ്യമായ സ്റ്റാറ്റസ് പരിശോധനകൾ പരാജയപ്പെടുന്നു.",
         "unstableTitle": "ചില പരിശോധനകൾ പരാജയപ്പെടുന്നു",
         "unstableDetail": "നിർബന്ധമല്ലാത്ത പരിശോധനകൾ പരാജയപ്പെടുന്നു. അവ മെർജ് തടയില്ല.",
         "draftTitle": "ഡ്രാഫ്റ്റ് പുൾ റിക്വസ്റ്റ്",
@@ -710,7 +708,12 @@
       "pendingComment_other": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "പരിശോധന സമർപ്പിക്കുക",
-      "partialPostedMessage": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. {{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedFresh": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedStale": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedStale_one": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedStale_other": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
       "blockedRequestChanges": "മാറ്റങ്ങൾ അഭ്യർത്ഥിക്കാൻ ഒരു സംഗ്രഹമോ കുറഞ്ഞത് ഒരു അഭിപ്രായമോ ചേർക്കുക.",
       "blockedComment": "അഭിപ്രായം മാത്രമുള്ള അവലോകനം പോസ്റ്റ് ചെയ്യാൻ ഒരു സംഗ്രഹമോ കുറഞ്ഞത് ഒരു അഭിപ്രായമോ ചേർക്കുക."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md പുൾ റിക്വസ്റ്റ് തുറന്നു",
       "alreadyPresent": "മാർഗ്ഗനിർദ്ദേശങ്ങൾ REVIEW.md-ൽ ഇതിനകം ഉണ്ട്",
       "status": {
+        "open": "തുറന്നത്",
         "edited": "തിരുത്തി",
         "opening_change_request": "PR തുറക്കുന്നു",
         "change_request_failed": "PR പരാജയപ്പെട്ടു",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "ചൂഷണസാധ്യത വിലയിരുത്തിയതിന്റെ അടിസ്ഥാനം",
       "suggestedFix": "നിർദ്ദേശിച്ച പരിഹാരം",
       "whereFound": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
+      "whereFound_one": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
+      "whereFound_other": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
       "fullReport": "തയ്യാറാക്കിയ പൂർണ്ണ റിപ്പോർട്ട്",
       "yes": "അതെ",
       "no": "ഇല്ല",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} ഇടത്തരം, കുറഞ്ഞത്",
       "dueThisWeek": "ഈ ആഴ്ച സമയപരിധി അവസാനിക്കുന്നവ",
       "dueThisWeekDetail": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
+      "dueThisWeekDetail_one": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
+      "dueThisWeekDetail_other": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "noDeadline": "സമയപരിധിയില്ല",
       "reviewSlaAssignment": "നൽകിയ SLA സമയപരിധികൾ പരിശോധിക്കുക",
       "allOpenFindingsTracked": "തീർപ്പാകാത്ത എല്ലാ കണ്ടെത്തലുകളും നിരീക്ഷണത്തിലാണ്"

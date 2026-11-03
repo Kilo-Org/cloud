@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request per REVIEW.md aperta",
       "alreadyPresent": "Le indicazioni sono già presenti in REVIEW.md",
       "status": {
+        "open": "Aperta",
         "edited": "Modificata",
         "opening_change_request": "Apertura della PR",
         "change_request_failed": "Apertura della PR non riuscita",
@@ -1156,6 +1157,9 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_one": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_many": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_other": "Punti di rilevamento ({{displayCount}})",
       "yes": "Sì",
       "action": {
         "analyzeCodebase": "Analizza codebase",
@@ -1325,6 +1329,9 @@
       "breakdownMediumLow_other": "{{displayCount}} di gravità media e bassa",
       "dueThisWeek": "In scadenza questa settimana",
       "dueThisWeekDetail": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_one": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_many": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_other": "{{exploitable}} di queste con sfruttabilità confermata",
       "noDeadline": "Nessuna scadenza",
       "reviewSlaAssignment": "Verifica l'assegnazione degli SLA",
       "allOpenFindingsTracked": "Tutte le segnalazioni aperte sono monitorate"
@@ -3043,7 +3050,6 @@
         "squash": "Accorpamento"
       },
       "terminal": {
-        "alreadyMerged": "Già unita",
         "closed": "Questa pull request è chiusa",
         "closedMergeRequest": "Questo merge request è chiuso"
       },
@@ -3060,7 +3066,6 @@
         "requiredReviewsTitle": "Revisioni obbligatorie mancanti",
         "requiredReviewsDetail": "Le approvazioni dei revisori designati mancano o sono ancora in attesa.",
         "failingChecksTitle": "Controlli obbligatori non superati",
-        "failingChecksDetail": "I controlli di stato obbligatori non sono stati superati.",
         "unstableTitle": "Alcuni controlli non sono stati superati",
         "unstableDetail": "Alcuni controlli facoltativi non sono stati superati. Non impediranno l'unione.",
         "draftTitle": "PR in bozza",
@@ -3170,7 +3175,14 @@
       "pendingComment_other": "commenti da inviare",
       "pendingComment_one": "commento in attesa di invio",
       "summaryOptional": "Riepilogo (facoltativo)",
-      "partialPostedMessage": "Commenti pubblicati: {{displayFreshCount}}. I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedFresh": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedStale": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_one": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_many": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_other": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "submitCountOfTotal": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
       "submitReview": "Invia revisione",
       "pendingComment_many": "commenti in sospeso",

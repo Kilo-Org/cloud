@@ -442,7 +442,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Redan sammanslagen",
         "closed": "Den här PR:en är stängd",
         "closedMergeRequest": "Den här merge requesten är stängd"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Obligatoriska granskningar saknas",
         "requiredReviewsDetail": "De granskare som måste godkänna ändringarna har ännu inte gjort det.",
         "failingChecksTitle": "Misslyckade obligatoriska kontroller",
-        "failingChecksDetail": "Obligatoriska statuskontroller har misslyckats.",
         "unstableTitle": "Vissa kontroller har misslyckats",
         "unstableDetail": "Kontroller som inte är obligatoriska har misslyckats. De blockerar inte sammanslagningen.",
         "draftTitle": "PR-utkast",
@@ -710,7 +708,12 @@
       "pendingComment_other": "oskickade kommentarer",
       "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
-      "partialPostedMessage": "Antal publicerade kommentarer: {{displayFreshCount}}. Antal kommentarer som gäller en äldre incheckning och finns kvar i kön: {{displayStaleCount}}.",
+      "partialPostedFresh": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
+      "partialPostedStale": "Antal kommentarer som gäller en äldre incheckning och finns kvar i kön: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Antal kommentarer som gäller en äldre incheckning och finns kvar i kön: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Antal kommentarer som gäller en äldre incheckning och finns kvar i kön: {{displayStaleCount}}.",
       "blockedRequestChanges": "Lägg till en sammanfattning eller minst en kommentar för att begära ändringar.",
       "blockedComment": "Lägg till en sammanfattning eller minst en kommentar för att skicka en granskning med kommentarer."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Pull request för REVIEW.md har öppnats",
       "alreadyPresent": "Riktlinjerna finns redan i REVIEW.md",
       "status": {
+        "open": "Öppen",
         "edited": "Redigerat",
         "opening_change_request": "Öppnar PR",
         "change_request_failed": "PR misslyckades",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Bedömning av om sårbarheten kan utnyttjas",
       "suggestedFix": "Föreslagen korrigering",
       "whereFound": "Här hittades fyndet ({{displayCount}})",
+      "whereFound_one": "Här hittades fyndet ({{displayCount}})",
+      "whereFound_other": "Här hittades fyndet ({{displayCount}})",
       "fullReport": "Fullständig genererad rapport",
       "yes": "Ja",
       "no": "Nej",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "Medel och låg: {{displayCount}}",
       "dueThisWeek": "Tidsfristen löper ut denna vecka",
       "dueThisWeekDetail": "{{exploitable}} av dessa har bekräftats kunna utnyttjas",
+      "dueThisWeekDetail_one": "{{exploitable}} av dessa har bekräftats kunna utnyttjas",
+      "dueThisWeekDetail_other": "{{exploitable}} av dessa har bekräftats kunna utnyttjas",
       "noDeadline": "Ingen tidsfrist",
       "reviewSlaAssignment": "Granska SLA-tilldelningen",
       "allOpenFindingsTracked": "Alla öppna fynd följs upp"

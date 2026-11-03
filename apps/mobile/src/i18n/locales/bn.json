@@ -442,7 +442,6 @@
         "rebase": "রিবেস"
       },
       "terminal": {
-        "alreadyMerged": "ইতিমধ্যে মার্জ হয়েছে",
         "closed": "এই পুল রিকোয়েস্ট বন্ধ",
         "closedMergeRequest": "এই মার্জ রিকোয়েস্ট বন্ধ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "প্রয়োজনীয় রিভিউ বাকি",
         "requiredReviewsDetail": "যাঁদের রিভিউ প্রয়োজন, তাঁদের অনুমোদন এখনও পাওয়া যায়নি বা অপেক্ষমাণ।",
         "failingChecksTitle": "প্রয়োজনীয় চেক ব্যর্থ হচ্ছে",
-        "failingChecksDetail": "প্রয়োজনীয় স্ট্যাটাস চেকগুলো ব্যর্থ হচ্ছে।",
         "unstableTitle": "কিছু চেক ব্যর্থ হচ্ছে",
         "unstableDetail": "বাধ্যতামূলক নয় এমন কিছু চেক ব্যর্থ হচ্ছে। এগুলো মার্জে বাধা দেবে না।",
         "draftTitle": "খসড়া পুল রিকোয়েস্ট",
@@ -710,7 +708,12 @@
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
-      "partialPostedMessage": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। {{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_other": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedStale": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_one": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_other": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
       "blockedRequestChanges": "পরিবর্তনের অনুরোধ করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।",
       "blockedComment": "মন্তব্যসহ রিভিউ পোস্ট করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।"
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md-এর পুল রিকোয়েস্ট খোলা হয়েছে",
       "alreadyPresent": "নির্দেশনা ইতিমধ্যেই REVIEW.md-এ রয়েছে",
       "status": {
+        "open": "খোলা",
         "edited": "সম্পাদিত",
         "opening_change_request": "PR খোলা হচ্ছে",
         "change_request_failed": "PR ব্যর্থ হয়েছে",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "আক্রমণে কাজে লাগানোর সম্ভাবনার যুক্তি",
       "suggestedFix": "প্রস্তাবিত সমাধান",
       "whereFound": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_one": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_other": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
       "fullReport": "তৈরি করা সম্পূর্ণ রিপোর্ট",
       "yes": "হ্যাঁ",
       "no": "না",
@@ -1836,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}}টি মাঝারি ও নিম্ন",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
       "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_one": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_other": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
       "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"

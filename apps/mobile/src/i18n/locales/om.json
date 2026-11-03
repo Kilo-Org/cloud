@@ -442,7 +442,6 @@
         "rebase": "Bu'uura jijjiiruu"
       },
       "terminal": {
-        "alreadyMerged": "Duraan walitti makameera",
         "closed": "Gaaffiin walitti makuu kun cufameera",
         "closedMergeRequest": "Gaaffiin walitti makuu kun cufameera"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Gamaaggamni barbaachisu hin jiru",
         "requiredReviewsDetail": "Mirkaneessi gamaaggamtoota barbaachisan irraa argamuu qabu hin jiru ykn eegamaa jira.",
         "failingChecksTitle": "Qorannoowwan barbaachisoo hin milkoofne",
-        "failingChecksDetail": "Qorannoowwan haalaa barbaachisoo ta'an hin milkoofne.",
         "unstableTitle": "Qorannoowwan tokko tokko hin milkoofne",
         "unstableDetail": "Qorannoowwan dirqama hin taane hin milkoofne. Isaan walitti makuu hin dhorkan.",
         "draftTitle": "Wixinee gaaffii walitti makuu",
@@ -710,7 +708,12 @@
       "pendingComment_other": "yaadota erguu eeggatan",
       "submitCountOfTotal": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
       "submitReview": "Sakatta'a ergi",
-      "partialPostedMessage": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. Yaadonni {{displayStaleCount}} galmee jijjiiramaa durii waan eeraniif tarree kee keessa hafaniiru.",
+      "partialPostedFresh": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
+      "partialPostedFresh_one": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
+      "partialPostedFresh_other": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
+      "partialPostedStale": "Yaadonni {{displayStaleCount}} galmee jijjiiramaa durii waan eeraniif tarree kee keessa hafaniiru.",
+      "partialPostedStale_one": "Yaadonni {{displayStaleCount}} galmee jijjiiramaa durii waan eeraniif tarree kee keessa hafaniiru.",
+      "partialPostedStale_other": "Yaadonni {{displayStaleCount}} galmee jijjiiramaa durii waan eeraniif tarree kee keessa hafaniiru.",
       "blockedRequestChanges": "Jijjiirama gaafachuuf cuunfaa ykn yoo xiqqaate yaada tokko dabali.",
       "blockedComment": "Gamaaggama yaadaa maxxansuuf cuunfaa ykn yoo xiqqaate yaada tokko dabali."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Pull request REVIEW.md banameera",
       "alreadyPresent": "Qajeelfamni duraanuu REVIEW.md keessa jira",
       "status": {
+        "open": "Banameera",
         "edited": "Gulaalameera",
         "opening_change_request": "PR banaa jira",
         "change_request_failed": "PR hin milkoofne",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Sababoota saaxilamummaa haleellaa",
       "suggestedFix": "Furmaata gorfame",
       "whereFound": "Bakkeewwan itti argame ({{displayCount}})",
+      "whereFound_one": "Bakkeewwan itti argame ({{displayCount}})",
+      "whereFound_other": "Bakkeewwan itti argame ({{displayCount}})",
       "fullReport": "Gabaasa guutuu uumame",
       "yes": "Eeyyee",
       "no": "Lakki",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "giddu galeessaa fi gadi aanaa {{displayCount}}",
       "dueThisWeek": "Torban kana xumuramuu qabu",
       "dueThisWeekDetail": "Kana keessaa {{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
+      "dueThisWeekDetail_one": "Kana keessaa {{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
+      "dueThisWeekDetail_other": "Kana keessaa {{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
       "noDeadline": "Guyyaan xumuraa hin jiru",
       "reviewSlaAssignment": "Ramaddii SLA sakatta'i",
       "allOpenFindingsTracked": "Argamoonni banaan hundi hordofamaa jiru"

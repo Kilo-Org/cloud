@@ -442,7 +442,6 @@
         "rebase": "Αλλαγή βάσης"
       },
       "terminal": {
-        "alreadyMerged": "Ήδη συγχωνευμένο",
         "closed": "Αυτό το αίτημα ενσωμάτωσης είναι κλειστό",
         "closedMergeRequest": "Αυτό το αίτημα συγχώνευσης είναι κλειστό"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Εκκρεμούν απαιτούμενες αξιολογήσεις",
         "requiredReviewsDetail": "Λείπουν ή εκκρεμούν εγκρίσεις από τους απαιτούμενους αξιολογητές.",
         "failingChecksTitle": "Αποτυχία απαιτούμενων ελέγχων",
-        "failingChecksDetail": "Οι απαιτούμενοι έλεγχοι κατάστασης αποτυγχάνουν.",
         "unstableTitle": "Αποτυγχάνουν ορισμένοι έλεγχοι",
         "unstableDetail": "Ορισμένοι μη υποχρεωτικοί έλεγχοι αποτυγχάνουν. Δεν εμποδίζουν τη συγχώνευση.",
         "draftTitle": "Πρόχειρο αίτημα ενσωμάτωσης",
@@ -710,7 +708,12 @@
       "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αξιολόγησης",
-      "partialPostedMessage": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedFresh": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedStale": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
       "blockedRequestChanges": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να ζητήσεις αλλαγές.",
       "blockedComment": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να υποβάλεις αξιολόγηση με σχόλια."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Το pull request για το REVIEW.md άνοιξε",
       "alreadyPresent": "Οι οδηγίες υπάρχουν ήδη στο REVIEW.md",
       "status": {
+        "open": "Ανοιχτή",
         "edited": "Τροποποιήθηκε",
         "opening_change_request": "Άνοιγμα PR",
         "change_request_failed": "Το PR απέτυχε",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Αιτιολόγηση δυνατότητας εκμετάλλευσης",
       "suggestedFix": "Προτεινόμενη διόρθωση",
       "whereFound": "Σημεία εντοπισμού ({{displayCount}})",
+      "whereFound_one": "Σημεία εντοπισμού ({{displayCount}})",
+      "whereFound_other": "Σημεία εντοπισμού ({{displayCount}})",
       "fullReport": "Πλήρης παραγόμενη αναφορά",
       "yes": "Ναι",
       "no": "Όχι",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} μέτριας και χαμηλής σοβαρότητας",
       "dueThisWeek": "Λήγουν αυτή την εβδομάδα",
       "dueThisWeekDetail": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
+      "dueThisWeekDetail_one": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
+      "dueThisWeekDetail_other": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
       "noDeadline": "Χωρίς προθεσμία",
       "reviewSlaAssignment": "Έλεγχος ορισμού προθεσμιών SLA",
       "allOpenFindingsTracked": "Όλα τα ανοιχτά ευρήματα παρακολουθούνται"

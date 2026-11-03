@@ -442,7 +442,6 @@
         "rebase": "Ny basis"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne pull request er lukket",
         "closedMergeRequest": "Denne merge request er lukket"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Påkrævede gennemgange mangler",
         "requiredReviewsDetail": "Godkendelser fra de påkrævede gennemlæsere mangler eller afventes stadig.",
         "failingChecksTitle": "Påkrævede kontroller fejler",
-        "failingChecksDetail": "Påkrævede statuskontroller fejler.",
         "unstableTitle": "Nogle kontroller fejler",
         "unstableDetail": "Nogle valgfrie kontroller fejler. De blokerer ikke fletningen.",
         "draftTitle": "PR-kladde",
@@ -710,7 +708,12 @@
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
       "submitReview": "Send gennemgang",
-      "partialPostedMessage": "{{displayFreshCount}} kommentar(er) er sendt. {{displayStaleCount}} kommentar(er) henviser til en ældre commit og er stadig i køen.",
+      "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er sendt. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er sendt. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kommentar(er) er sendt. ",
+      "partialPostedStale": "{{displayStaleCount}} kommentar(er) henviser til en ældre commit og er stadig i køen.",
+      "partialPostedStale_one": "{{displayStaleCount}} kommentar(er) henviser til en ældre commit og er stadig i køen.",
+      "partialPostedStale_other": "{{displayStaleCount}} kommentar(er) henviser til en ældre commit og er stadig i køen.",
       "blockedRequestChanges": "Tilføj et resumé eller mindst én kommentar for at anmode om ændringer.",
       "blockedComment": "Tilføj et resumé eller mindst én kommentar for at sende en gennemgang med kommentarer."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Pull request til REVIEW.md åbnet",
       "alreadyPresent": "Retningslinjerne findes allerede i REVIEW.md",
       "status": {
+        "open": "Åben",
         "edited": "Redigeret",
         "opening_change_request": "Åbner PR",
         "change_request_failed": "PR mislykkedes",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Vurdering af, om sårbarheden kan udnyttes",
       "suggestedFix": "Foreslået løsning",
       "whereFound": "Fundsteder ({{displayCount}})",
+      "whereFound_one": "Fundsteder ({{displayCount}})",
+      "whereFound_other": "Fundsteder ({{displayCount}})",
       "fullReport": "Den fulde genererede rapport",
       "yes": "Ja",
       "no": "Nej",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} med middel og lav alvorlighed",
       "dueThisWeek": "Frist i denne uge",
       "dueThisWeekDetail": "{{exploitable}} af disse fund er bekræftet udnyttelige",
+      "dueThisWeekDetail_one": "{{exploitable}} af disse fund er bekræftet udnyttelige",
+      "dueThisWeekDetail_other": "{{exploitable}} af disse fund er bekræftet udnyttelige",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gennemgå tildelingen af SLA-frister",
       "allOpenFindingsTracked": "Alle åbne fund har en frist"

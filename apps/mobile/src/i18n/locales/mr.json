@@ -442,7 +442,6 @@
         "rebase": "रिबेस"
       },
       "terminal": {
-        "alreadyMerged": "आधीच मर्ज झाली",
         "closed": "ही पुल रिक्वेस्ट बंद आहे",
         "closedMergeRequest": "ही मर्ज रिक्वेस्ट बंद आहे"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "आवश्यक पुनरावलोकने बाकी",
         "requiredReviewsDetail": "आवश्यक पुनरावलोककांकडून मंजुरी मिळालेली नाही किंवा अजून प्रलंबित आहे.",
         "failingChecksTitle": "आवश्यक तपासण्या अयशस्वी",
-        "failingChecksDetail": "आवश्यक स्थिती तपासण्या अयशस्वी होत आहेत.",
         "unstableTitle": "काही तपासण्या अयशस्वी होत आहेत",
         "unstableDetail": "ऐच्छिक तपासण्या अयशस्वी होत आहेत. त्यामुळे मर्ज करणे अडणार नाही.",
         "draftTitle": "पुल रिक्वेस्टचा मसुदा",
@@ -710,7 +708,12 @@
       "pendingComment_other": "प्रलंबित टिप्पण्या",
       "submitCountOfTotal": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
       "submitReview": "समीक्षा सादर करा",
-      "partialPostedMessage": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. {{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
+      "partialPostedFresh": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
+      "partialPostedStale": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
+      "partialPostedStale_one": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
+      "partialPostedStale_other": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
       "blockedRequestChanges": "बदलांची विनंती करण्यासाठी सारांश किंवा किमान एक टिप्पणी जोडा.",
       "blockedComment": "टिप्पणीच्या स्वरूपात पुनरावलोकन पोस्ट करण्यासाठी सारांश किंवा किमान एक टिप्पणी जोडा."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md साठी पुल रिक्वेस्ट उघडली",
       "alreadyPresent": "मार्गदर्शक सूचना REVIEW.md मध्ये आधीच आहेत",
       "status": {
+        "open": "उघडा",
         "edited": "संपादित",
         "opening_change_request": "PR उघडत आहे",
         "change_request_failed": "PR अयशस्वी झाली",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "गैरफायदा घेता येण्याबाबतची कारणे",
       "suggestedFix": "सुचवलेले निराकरण",
       "whereFound": "आढळलेली ठिकाणे ({{displayCount}})",
+      "whereFound_one": "आढळलेली ठिकाणे ({{displayCount}})",
+      "whereFound_other": "आढळलेली ठिकाणे ({{displayCount}})",
       "fullReport": "तयार केलेला संपूर्ण अहवाल",
       "yes": "होय",
       "no": "नाही",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} मध्यम व कमी",
       "dueThisWeek": "या आठवड्यात मुदत",
       "dueThisWeekDetail": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
+      "dueThisWeekDetail_one": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
+      "dueThisWeekDetail_other": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
       "noDeadline": "मुदत नाही",
       "reviewSlaAssignment": "ठरवलेल्या SLA मुदतींचे पुनरावलोकन करा",
       "allOpenFindingsTracked": "सर्व प्रलंबित निष्कर्षांचा मागोवा घेतला जात आहे"

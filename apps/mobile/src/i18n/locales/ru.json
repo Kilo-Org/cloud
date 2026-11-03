@@ -1055,6 +1055,7 @@
       "prOpened": "Пул-реквест для REVIEW.md открыт",
       "alreadyPresent": "Рекомендации уже есть в REVIEW.md",
       "status": {
+        "open": "Открыто",
         "edited": "Изменено",
         "opening_change_request": "Открытие PR",
         "change_request_failed": "Не удалось открыть PR",
@@ -1193,6 +1194,10 @@
       "triageReasoning": "Обоснование первичной оценки",
       "watchInCloudAgent": "Открыть в облачном агенте",
       "whereFound": "Места обнаружения ({{displayCount}})",
+      "whereFound_one": "Места обнаружения ({{displayCount}})",
+      "whereFound_few": "Места обнаружения ({{displayCount}})",
+      "whereFound_many": "Места обнаружения ({{displayCount}})",
+      "whereFound_other": "Места обнаружения ({{displayCount}})",
       "yes": "Да",
       "action": {
         "analyzeCodebase": "Проанализировать кодовую базу",
@@ -1372,6 +1377,10 @@
       "breakdownMediumLow_other": "средний и низкий: {{displayCount}}",
       "dueThisWeek": "Срок истекает на этой неделе",
       "dueThisWeekDetail": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
+      "dueThisWeekDetail_one": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
+      "dueThisWeekDetail_few": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
+      "dueThisWeekDetail_many": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
+      "dueThisWeekDetail_other": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "noDeadline": "Без срока",
       "reviewSlaAssignment": "Проверить назначенные сроки SLA",
       "allOpenFindingsTracked": "Все открытые уязвимости отслеживаются"
@@ -3088,7 +3097,6 @@
         "squash": "Объединение"
       },
       "terminal": {
-        "alreadyMerged": "Слияние уже выполнено",
         "closed": "Запрос на слияние закрыт",
         "closedMergeRequest": "Этот запрос на слияние закрыт"
       },
@@ -3105,7 +3113,6 @@
         "requiredReviewsTitle": "Нет обязательных одобрений",
         "requiredReviewsDetail": "Ещё не получены все обязательные одобрения от участников ревью.",
         "failingChecksTitle": "Обязательные проверки не пройдены",
-        "failingChecksDetail": "Обязательные проверки статуса завершились с ошибками.",
         "unstableTitle": "Некоторые проверки не пройдены",
         "unstableDetail": "Необязательные проверки завершились с ошибками. Это не блокирует слияние.",
         "draftTitle": "Черновик пул-реквеста",
@@ -3218,7 +3225,16 @@
       "pendingComment_other": "неотправленного комментария",
       "pendingComment_one": "неотправленный комментарий",
       "summaryOptional": "Итоговый комментарий (необязательно)",
-      "partialPostedMessage": "Опубликовано комментариев: {{displayFreshCount}}. Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "partialPostedFresh": "Опубликовано комментариев: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Опубликовано комментариев: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Опубликовано комментариев: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Опубликовано комментариев: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Опубликовано комментариев: {{displayFreshCount}}. ",
+      "partialPostedStale": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "partialPostedStale_few": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "partialPostedStale_many": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
       "submitReview": "Отправить результаты проверки",
       "pendingComment_few": "неотправленных комментария",

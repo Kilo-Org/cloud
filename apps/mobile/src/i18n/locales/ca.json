@@ -449,7 +449,6 @@
         "rebase": "Canvi de base"
       },
       "terminal": {
-        "alreadyMerged": "Ja fusionada",
         "closed": "Sol·licitud d'integració tancada",
         "closedMergeRequest": "Sol·licitud de fusió tancada"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Falten revisions obligatòries",
         "requiredReviewsDetail": "Encara no s'han rebut totes les aprovacions dels revisors obligatoris.",
         "failingChecksTitle": "Comprovacions obligatòries fallides",
-        "failingChecksDetail": "Les comprovacions d'estat obligatòries fallen.",
         "unstableTitle": "Algunes comprovacions fallen",
         "unstableDetail": "Les comprovacions opcionals fallen. No bloquejaran la fusió.",
         "draftTitle": "PR en esborrany",
@@ -725,7 +723,14 @@
       "pendingComment_other": "comentaris pendents",
       "submitCountOfTotal": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
       "submitReview": "Envia la revisió",
-      "partialPostedMessage": "Comentaris publicats: {{displayFreshCount}}. Comentaris que fan referència a una comissió anterior i continuen a la cua: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentaris publicats: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentaris publicats: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Comentaris publicats: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentaris publicats: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentaris que fan referència a una comissió anterior i continuen a la cua: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentaris que fan referència a una comissió anterior i continuen a la cua: {{displayStaleCount}}.",
+      "partialPostedStale_many": "Comentaris que fan referència a una comissió anterior i continuen a la cua: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentaris que fan referència a una comissió anterior i continuen a la cua: {{displayStaleCount}}.",
       "pendingComment_many": "comentaris pendents",
       "blockedRequestChanges": "Afegeix un resum o com a mínim un comentari per sol·licitar canvis.",
       "blockedComment": "Afegeix un resum o com a mínim un comentari per enviar una revisió amb comentaris."
@@ -1551,6 +1556,7 @@
       "prOpened": "Pull request de REVIEW.md oberta",
       "alreadyPresent": "Les pautes ja són a REVIEW.md",
       "status": {
+        "open": "Oberta",
         "edited": "Editada",
         "opening_change_request": "S'està obrint la PR",
         "change_request_failed": "La PR ha fallat",
@@ -1776,6 +1782,9 @@
       "exploitabilityReasoning": "Justificació de l'explotabilitat",
       "suggestedFix": "Correcció suggerida",
       "whereFound": "On s'ha trobat ({{displayCount}})",
+      "whereFound_one": "On s'ha trobat ({{displayCount}})",
+      "whereFound_many": "On s'ha trobat ({{displayCount}})",
+      "whereFound_other": "On s'ha trobat ({{displayCount}})",
       "fullReport": "Informe complet generat",
       "yes": "Sí",
       "no": "Negatiu",
@@ -1862,6 +1871,9 @@
       "breakdownMediumLow_other": "{{displayCount}} de nivell mitjà i baix",
       "dueThisWeek": "Vencen aquesta setmana",
       "dueThisWeekDetail": "{{exploitable}} d'aquestes confirmades com a explotables",
+      "dueThisWeekDetail_one": "{{exploitable}} d'aquestes confirmades com a explotables",
+      "dueThisWeekDetail_many": "{{exploitable}} d'aquestes confirmades com a explotables",
+      "dueThisWeekDetail_other": "{{exploitable}} d'aquestes confirmades com a explotables",
       "noDeadline": "Sense termini",
       "reviewSlaAssignment": "Revisa l'assignació de l'SLA",
       "allOpenFindingsTracked": "Es fa el seguiment de totes les incidències obertes"

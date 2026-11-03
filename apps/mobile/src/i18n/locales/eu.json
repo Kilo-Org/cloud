@@ -442,7 +442,6 @@
         "rebase": "Oinarri-aldaketa"
       },
       "terminal": {
-        "alreadyMerged": "Dagoeneko bateratuta",
         "closed": "Bateratze-eskaera hau itxita dago",
         "closedMergeRequest": "Merge-eskaera hau itxita dago"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Beharrezko berrikuspenak falta dira",
         "requiredReviewsDetail": "Beharrezko berrikusleen onespenak falta dira edo jasotzeko daude.",
         "failingChecksTitle": "Beharrezko egiaztapenek huts egiten dute",
-        "failingChecksDetail": "Beharrezko egoera-egiaztapenek huts egiten dute.",
         "unstableTitle": "Egiaztapen batzuek huts egiten dute",
         "unstableDetail": "Beharrezkoak ez diren egiaztapenek huts egiten dute. Ez dute bateratzea eragotziko.",
         "draftTitle": "Bateratze-eskaeraren zirriborroa",
@@ -710,7 +708,12 @@
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
-      "partialPostedMessage": "{{displayFreshCount}} iruzkin argitaratu dira. Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedStale": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_one": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_other": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
       "blockedRequestChanges": "Gehitu laburpen bat edo gutxienez iruzkin bat aldaketak eskatzeko.",
       "blockedComment": "Gehitu laburpen bat edo gutxienez iruzkin bat berrikuspena iruzkin gisa argitaratzeko."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
       "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
       "status": {
+        "open": "Irekita",
         "edited": "Editatuta",
         "opening_change_request": "PRa irekitzen",
         "change_request_failed": "PRak huts egin du",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Ustiagarritasunari buruzko arrazoibidea",
       "suggestedFix": "Proposatutako konponketa",
       "whereFound": "Non aurkitu den ({{displayCount}})",
+      "whereFound_one": "Non aurkitu den ({{displayCount}})",
+      "whereFound_other": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
       "no": "Ez",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} larritasun ertaineko eta txikiko",
       "dueThisWeek": "Aste honetan amaitzen da",
       "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_one": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_other": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
       "reviewSlaAssignment": "Berrikusi SLAren esleipena",
       "allOpenFindingsTracked": "Aurkikuntza ireki guztien jarraipena egiten da"

@@ -1049,6 +1049,7 @@
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada di REVIEW.md",
       "status": {
+        "open": "Terbuka",
         "edited": "Diedit",
         "opening_change_request": "Membuka PR",
         "change_request_failed": "PR gagal dibuka",
@@ -1185,6 +1186,8 @@
       "triageReasoning": "Dasar penilaian triase",
       "watchInCloudAgent": "Pantau di Agen cloud",
       "whereFound": "Lokasi temuan ({{displayCount}})",
+      "whereFound_one": "Lokasi temuan ({{displayCount}})",
+      "whereFound_other": "Lokasi temuan ({{displayCount}})",
       "yes": "Ya",
       "action": {
         "analyzeCodebase": "Analisis basis kode",
@@ -1344,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} sedang dan rendah",
       "dueThisWeek": "Jatuh tempo minggu ini",
       "dueThisWeekDetail": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail_one": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail_other": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
       "noDeadline": "Tanpa tenggat",
       "reviewSlaAssignment": "Tinjau penetapan SLA",
       "allOpenFindingsTracked": "Semua temuan terbuka sudah dilacak"
@@ -2998,7 +3003,6 @@
         "squash": "Ringkas"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "PR ini sudah ditutup",
         "closedMergeRequest": "Merge request ini sudah ditutup"
       },
@@ -3015,7 +3019,6 @@
         "requiredReviewsTitle": "Tinjauan wajib belum lengkap",
         "requiredReviewsDetail": "Persetujuan dari peninjau wajib belum ada atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan opsional gagal. Kegagalan ini tidak menghalangi penggabungan.",
         "draftTitle": "Draf PR",
@@ -3122,7 +3125,12 @@
       "pendingComment_other": "komentar belum dikirim",
       "pendingComment_one": "komentar dalam antrean",
       "summaryOptional": "Ringkasan (opsional)",
-      "partialPostedMessage": "{{displayFreshCount}} komentar terkirim. {{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedFresh": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedStale": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedStale_one": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedStale_other": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",

@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.md için pull request açıldı",
       "alreadyPresent": "Yönergeler REVIEW.md dosyasında zaten mevcut",
       "status": {
+        "open": "Açık",
         "edited": "Düzenlendi",
         "opening_change_request": "PR açılıyor",
         "change_request_failed": "PR başarısız oldu",
@@ -1185,6 +1186,8 @@
       "triageReasoning": "Ön değerlendirme gerekçesi",
       "watchInCloudAgent": "Bulut ajanında izle",
       "whereFound": "Bulunduğu yerler ({{displayCount}})",
+      "whereFound_one": "Bulunduğu yerler ({{displayCount}})",
+      "whereFound_other": "Bulunduğu yerler ({{displayCount}})",
       "yes": "Evet",
       "action": {
         "analyzeCodebase": "Kod tabanını analiz et",
@@ -1344,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} orta ve düşük",
       "dueThisWeek": "Süresi bu hafta doluyor",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail_one": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail_other": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",
       "reviewSlaAssignment": "SLA atamasını incele",
       "allOpenFindingsTracked": "Tüm açık bulgular takip ediliyor"
@@ -2998,7 +3003,6 @@
         "squash": "Sıkıştırma"
       },
       "terminal": {
-        "alreadyMerged": "Zaten birleştirildi",
         "closed": "Bu çekme isteği kapalı",
         "closedMergeRequest": "Bu birleştirme isteği kapalı"
       },
@@ -3015,7 +3019,6 @@
         "requiredReviewsTitle": "Gerekli incelemeler eksik",
         "requiredReviewsDetail": "Gerekli incelemelerin onayları eksik veya henüz verilmedi.",
         "failingChecksTitle": "Başarısız olan gerekli kontroller",
-        "failingChecksDetail": "Gerekli durum kontrolleri başarısız.",
         "unstableTitle": "Bazı kontroller başarısız",
         "unstableDetail": "Gerekli olmayan kontroller başarısız. Bunlar birleştirmeyi engellemez.",
         "draftTitle": "Taslak çekme isteği",
@@ -3122,7 +3125,12 @@
       "pendingComment_other": "bekleyen yorum",
       "pendingComment_one": "bekleyen yorum",
       "summaryOptional": "Özet (isteğe bağlı)",
-      "partialPostedMessage": "{{displayFreshCount}} yorum gönderildi. {{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedFresh": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedStale": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",

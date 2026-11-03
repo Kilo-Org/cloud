@@ -442,7 +442,6 @@
         "rebase": "Famindrana fototra"
       },
       "terminal": {
-        "alreadyMerged": "Efa nampiraisina",
         "closed": "Nakatona ity fangatahana fampiraisana ity",
         "closedMergeRequest": "Nakatona ity fangatahana fampiraisana ity"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Tsy ampy ny fandinihana takina",
         "requiredReviewsDetail": "Mbola tsy azo na mbola andrasana ny fankatoavan'ireo mpandinika voatendry.",
         "failingChecksTitle": "Tsy mahomby ny fanamarinana takina",
-        "failingChecksDetail": "Tsy mahomby ny fanamarinana sata takina.",
         "unstableTitle": "Misy fanamarinana tsy mahomby",
         "unstableDetail": "Tsy mahomby ny fanamarinana tsy takina. Tsy hanakana ny fampiraisana izany.",
         "draftTitle": "PR mbola volavola",
@@ -710,7 +708,12 @@
       "pendingComment_other": "fanehoan-kevitra miandry",
       "submitCountOfTotal": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
       "submitReview": "Alefaso ny fandinihana",
-      "partialPostedMessage": "Hevitra {{displayFreshCount}} no navoaka. Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedFresh": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedFresh_one": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedFresh_other": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedStale": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedStale_one": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedStale_other": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
       "blockedRequestChanges": "Ampio famintinana na hevitra farafahakeliny iray mba hangatahana fanovana.",
       "blockedComment": "Ampio famintinana na hevitra iray farafahakeliny mba handefasana fandinihana maneho hevitra."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Nosokafana ny PR ho an'ny REVIEW.md",
       "alreadyPresent": "Efa ao amin'ny REVIEW.md ny torolalana",
       "status": {
+        "open": "Misokatra",
         "edited": "Voahitsy",
         "opening_change_request": "Manokatra PR",
         "change_request_failed": "Tsy nety nosokafana ny PR",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Fanazavana ny fahafahana manararaotra ilay olana",
       "suggestedFix": "Fanamboarana soso-kevitra",
       "whereFound": "Toerana nahitana ilay olana ({{displayCount}})",
+      "whereFound_one": "Toerana nahitana ilay olana ({{displayCount}})",
+      "whereFound_other": "Toerana nahitana ilay olana ({{displayCount}})",
       "fullReport": "Tatitra feno noforonina",
       "yes": "Eny",
       "no": "Tsia",
@@ -1836,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} antonony na ambany hamafy",
       "dueThisWeek": "Fe-potoana farany amin'ity herinandro ity",
       "dueThisWeekDetail": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
+      "dueThisWeekDetail_one": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
+      "dueThisWeekDetail_other": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
       "noDeadline": "Tsy misy fe-potoana",
       "reviewSlaAssignment": "Hamarino ny famaritana ny SLA",
       "allOpenFindingsTracked": "Arahi-maso ny olana hita rehetra mbola misokatra"

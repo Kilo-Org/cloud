@@ -203,6 +203,7 @@ export function buildLocalizedMetrics(
           label: i18n.t('securityAgent.dashboardMetrics.dueThisWeek'),
           value: number(data.sla.dueSoon.total),
           detail: i18n.t('securityAgent.dashboardMetrics.dueThisWeekDetail', {
+            count: data.sla.dueSoon.exploitable,
             exploitable: number(data.sla.dueSoon.exploitable),
           }),
         });

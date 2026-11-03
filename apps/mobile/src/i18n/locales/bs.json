@@ -449,7 +449,6 @@
         "rebase": "Promjena osnove"
       },
       "terminal": {
-        "alreadyMerged": "Već spojeno",
         "closed": "Ovaj zahtjev za spajanje je zatvoren",
         "closedMergeRequest": "Ovaj merge request je zatvoren"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Nedostaju obavezni pregledi",
         "requiredReviewsDetail": "Nedostaju odobrenja obaveznih recenzenata ili se još čekaju.",
         "failingChecksTitle": "Neuspješne obavezne provjere",
-        "failingChecksDetail": "Obavezne provjere statusa nisu uspješne.",
         "unstableTitle": "Neke provjere nisu uspješne",
         "unstableDetail": "Neke provjere koje nisu obavezne nisu uspješne. One neće spriječiti spajanje.",
         "draftTitle": "Nacrt zahtjeva za spajanje",
@@ -725,7 +723,14 @@
       "pendingComment_other": "komentara na čekanju",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
-      "partialPostedMessage": "Broj objavljenih komentara: {{displayFreshCount}}. Komentari koji se odnose na stariju reviziju ostali su na čekanju. Njihov broj je {{displayStaleCount}}.",
+      "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedStale": "Komentari koji se odnose na stariju reviziju ostali su na čekanju. Njihov broj je {{displayStaleCount}}.",
+      "partialPostedStale_one": "Komentari koji se odnose na stariju reviziju ostali su na čekanju. Njihov broj je {{displayStaleCount}}.",
+      "partialPostedStale_few": "Komentari koji se odnose na stariju reviziju ostali su na čekanju. Njihov broj je {{displayStaleCount}}.",
+      "partialPostedStale_other": "Komentari koji se odnose na stariju reviziju ostali su na čekanju. Njihov broj je {{displayStaleCount}}.",
       "pendingComment_few": "komentara na čekanju",
       "blockedRequestChanges": "Dodaj sažetak ili barem jedan komentar da zatražiš promjene.",
       "blockedComment": "Dodaj sažetak ili barem jedan komentar da objaviš pregled s komentarom."
@@ -1551,6 +1556,7 @@
       "prOpened": "Pull request za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u REVIEW.md",
       "status": {
+        "open": "Otvoreno",
         "edited": "Uređeno",
         "opening_change_request": "Otvaranje PR-a",
         "change_request_failed": "PR nije uspio",
@@ -1776,6 +1782,9 @@
       "exploitabilityReasoning": "Obrazloženje iskoristivosti",
       "suggestedFix": "Predloženo rješenje",
       "whereFound": "Mjesta pronalaska ({{displayCount}})",
+      "whereFound_one": "Mjesta pronalaska ({{displayCount}})",
+      "whereFound_few": "Mjesta pronalaska ({{displayCount}})",
+      "whereFound_other": "Mjesta pronalaska ({{displayCount}})",
       "fullReport": "Cjelovit generirani izvještaj",
       "yes": "Da",
       "no": "Ne",
@@ -1862,6 +1871,9 @@
       "breakdownMediumLow_other": "srednje i nisko: {{displayCount}}",
       "dueThisWeek": "Rok istječe ove sedmice",
       "dueThisWeekDetail": "{{exploitable}} od njih potvrđeno iskoristivi",
+      "dueThisWeekDetail_one": "{{exploitable}} od njih potvrđeno iskoristivi",
+      "dueThisWeekDetail_few": "{{exploitable}} od njih potvrđeno iskoristivi",
+      "dueThisWeekDetail_other": "{{exploitable}} od njih potvrđeno iskoristivi",
       "noDeadline": "Nema roka",
       "reviewSlaAssignment": "Provjeri dodjelu rokova prema SLA-u",
       "allOpenFindingsTracked": "Svi otvoreni nalazi se prate"

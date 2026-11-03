@@ -449,7 +449,6 @@
         "rebase": "Reaplicar"
       },
       "terminal": {
-        "alreadyMerged": "Já integrado",
         "closed": "Este PR está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "As aprovações dos revisores obrigatórios estão em falta ou pendentes.",
         "failingChecksTitle": "Verificações obrigatórias com falhas",
-        "failingChecksDetail": "As verificações de estado obrigatórias estão a falhar.",
         "unstableTitle": "Algumas verificações estão a falhar",
         "unstableDetail": "Algumas verificações não obrigatórias estão a falhar, mas não impedem a integração.",
         "draftTitle": "PR em rascunho",
@@ -725,7 +723,14 @@
       "pendingComment_other": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
-      "partialPostedMessage": "Comentários publicados: {{displayFreshCount}}. Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_many": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
       "pendingComment_many": "comentários pendentes",
       "blockedRequestChanges": "Adiciona um resumo ou pelo menos um comentário para pedir alterações.",
       "blockedComment": "Adiciona um resumo ou pelo menos um comentário para publicar uma revisão com comentários."
@@ -1551,6 +1556,7 @@
       "prOpened": "Pull request para o REVIEW.md aberto",
       "alreadyPresent": "As orientações já constam do REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "A abrir PR",
         "change_request_failed": "Falha ao abrir PR",
@@ -1776,6 +1782,9 @@
       "exploitabilityReasoning": "Justificação da explorabilidade",
       "suggestedFix": "Correção sugerida",
       "whereFound": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_one": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_many": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_other": "Locais onde foi detetada ({{displayCount}})",
       "fullReport": "Relatório completo gerado",
       "yes": "Sim",
       "no": "Não",
@@ -1868,6 +1877,9 @@
       "breakdownMediumLow_zero": "{{displayCount}} de gravidade média e baixa",
       "dueThisWeek": "Prazo termina esta semana",
       "dueThisWeekDetail": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_one": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_many": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_other": "{{exploitable}} destas com exploração possível confirmada",
       "noDeadline": "Sem prazo",
       "reviewSlaAssignment": "Rever a atribuição de prazos do SLA",
       "allOpenFindingsTracked": "Todas as ocorrências abertas acompanhadas"

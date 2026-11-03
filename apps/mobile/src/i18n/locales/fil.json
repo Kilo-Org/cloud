@@ -442,7 +442,6 @@
         "rebase": "Pag-rebase"
       },
       "terminal": {
-        "alreadyMerged": "Na-merge na",
         "closed": "Nakasara ang pull request na ito",
         "closedMergeRequest": "Nakasara ang merge request na ito"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Kulang ang mga kinakailangang pagsusuri",
         "requiredReviewsDetail": "Kulang o hinihintay pa ang pag-apruba ng mga kinakailangang tagasuri.",
         "failingChecksTitle": "Hindi pumasa ang mga kinakailangang pagsusuri",
-        "failingChecksDetail": "Hindi pumasa ang mga kinakailangang pagsusuri ng status.",
         "unstableTitle": "May mga pagsusuring hindi pumasa",
         "unstableDetail": "Hindi pumasa ang ilang opsyonal na pagsusuri. Hindi nito pipigilan ang pag-merge.",
         "draftTitle": "Burador na PR",
@@ -710,7 +708,12 @@
       "pendingComment_other": "na nakabinbing komento",
       "submitCountOfTotal": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
       "submitReview": "Isumite ang pagsusuri",
-      "partialPostedMessage": "Na-post ang {{displayFreshCount}} na komento. Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedFresh": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_one": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_other": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedStale": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_one": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_other": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
       "blockedRequestChanges": "Magdagdag ng buod o kahit isang komento para humingi ng pagbabago.",
       "blockedComment": "Magdagdag ng buod o kahit isang komento para makapagsumite ng pagsusuri na komento lang."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
       "alreadyPresent": "Nasa REVIEW.md na ang gabay",
       "status": {
+        "open": "Nakaopen",
         "edited": "Na-edit",
         "opening_change_request": "Binubuksan ang PR",
         "change_request_failed": "Nabigong buksan ang PR",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Batayan kung maaaring samantalahin",
       "suggestedFix": "Iminungkahing pag-aayos",
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_one": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_other": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
       "no": "Hindi",
@@ -1836,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_one": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_other": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"

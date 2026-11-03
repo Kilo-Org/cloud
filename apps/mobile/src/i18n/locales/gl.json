@@ -442,7 +442,6 @@
         "rebase": "Cambio de base"
       },
       "terminal": {
-        "alreadyMerged": "Xa fusionada",
         "closed": "Solicitude de integración pechada",
         "closedMergeRequest": "Solicitude de fusión pechada"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Faltan revisións obrigatorias",
         "requiredReviewsDetail": "Faltan as aprobacións dos revisores obrigatorios ou aínda están pendentes.",
         "failingChecksTitle": "Comprobacións obrigatorias con erros",
-        "failingChecksDetail": "As comprobacións de estado obrigatorias dan erro.",
         "unstableTitle": "Algunhas comprobacións dan erro",
         "unstableDetail": "As comprobacións non obrigatorias dan erro, pero non bloquearán a fusión.",
         "draftTitle": "Solicitude de cambios en borrador",
@@ -710,7 +708,12 @@
       "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar a revisión",
-      "partialPostedMessage": "Comentarios publicados: {{displayFreshCount}}. Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
       "blockedRequestChanges": "Engade un resumo ou polo menos un comentario para solicitar cambios.",
       "blockedComment": "Engade un resumo ou polo menos un comentario para enviar unha revisión con comentarios."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
       "alreadyPresent": "As pautas xa están en REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "Abrindo a PR",
         "change_request_failed": "Erro ao abrir a PR",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Xustificación da explotabilidade",
       "suggestedFix": "Corrección suxerida",
       "whereFound": "Localizacións do achado ({{displayCount}})",
+      "whereFound_one": "Localizacións do achado ({{displayCount}})",
+      "whereFound_other": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
       "no": "Non",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} de gravidade media e baixa",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_one": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_other": "{{exploitable}} destes confirmados como explotables",
       "noDeadline": "Sen prazo",
       "reviewSlaAssignment": "Revisar a asignación do SLA",
       "allOpenFindingsTracked": "Todos os achados abertos en seguimento"

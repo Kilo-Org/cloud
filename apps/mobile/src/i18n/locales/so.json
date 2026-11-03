@@ -442,7 +442,6 @@
         "rebase": "Saldhig-beddel"
       },
       "terminal": {
-        "alreadyMerged": "Hore ayaa la isugu daray",
         "closed": "Codsigan isku-darka waa xiran yahay",
         "closedMergeRequest": "Codsigan merge request waa xiran yahay"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Dib-u-eegisyadii loo baahnaa ayaa maqan",
         "requiredReviewsDetail": "Ansixinta dib-u-eegayaasha loo baahan yahay ayaa maqan ama weli la sugayaa.",
         "failingChecksTitle": "Hubinno loo baahan yahay oo fashilmaya",
-        "failingChecksDetail": "Hubinnada xaaladda ee loo baahan yahay ayaa fashilmaya.",
         "unstableTitle": "Hubinnada qaar ayaa fashilmaya",
         "unstableDetail": "Hubinnada aan khasabka ahayn ayaa fashilmaya. Ma hor istaagi doonaan isku-darka.",
         "draftTitle": "Codsi isku-darid oo qabyo ah",
@@ -710,7 +708,12 @@
       "pendingComment_other": "faallooyin aan weli la gudbin",
       "submitCountOfTotal": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
       "submitReview": "Gudbi dib-u-eegista",
-      "partialPostedMessage": "Waxaa la daabacay {{displayFreshCount}} faallo. {{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedFresh": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedFresh_one": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedFresh_other": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedStale": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedStale_one": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedStale_other": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
       "blockedRequestChanges": "Ku dar soo koobid ama ugu yaraan hal faallo si aad u codsato isbeddello.",
       "blockedComment": "Ku dar soo koobid ama ugu yaraan hal faallo si aad u gudbiso dib-u-eegis faallo ah."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Pull request-ka REVIEW.md waa la furay",
       "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
       "status": {
+        "open": "Furan",
         "edited": "Wax laga beddelay",
         "opening_change_request": "Waa la furayaa PR",
         "change_request_failed": "PR wuu fashilmay",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Sababaha qiimaynta suurtagalnimada weerarka",
       "suggestedFix": "Hagaajin la soo jeediyay",
       "whereFound": "Meelaha laga helay ({{displayCount}})",
+      "whereFound_one": "Meelaha laga helay ({{displayCount}})",
+      "whereFound_other": "Meelaha laga helay ({{displayCount}})",
       "fullReport": "Warbixin dhammaystiran oo la soo saaray",
       "yes": "Haa",
       "no": "Maya",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} dhexdhexaad iyo hoose",
       "dueThisWeek": "Waqtigoodu wuxuu dhammaanayaa toddobaadkan",
       "dueThisWeekDetail": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
+      "dueThisWeekDetail_one": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
+      "dueThisWeekDetail_other": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
       "noDeadline": "Ma jiro waqti kama-dambays ah",
       "reviewSlaAssignment": "Dib u eeg qoondaynta SLA",
       "allOpenFindingsTracked": "Dhammaan natiijooyinka furan waa lala socdaa"

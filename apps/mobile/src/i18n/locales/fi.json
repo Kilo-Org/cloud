@@ -442,7 +442,6 @@
         "rebase": "Uudelleenperustus"
       },
       "terminal": {
-        "alreadyMerged": "Jo yhdistetty",
         "closed": "Muutospyyntö suljettu",
         "closedMergeRequest": "Yhdistämispyyntö suljettu"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Pakolliset katselmoinnit puuttuvat",
         "requiredReviewsDetail": "Pakollisten katselmoijien hyväksynnät puuttuvat tai niitä odotetaan vielä.",
         "failingChecksTitle": "Pakollisia tarkistuksia epäonnistui",
-        "failingChecksDetail": "Pakollisia tilatarkistuksia on epäonnistunut.",
         "unstableTitle": "Osa tarkistuksista epäonnistui",
         "unstableDetail": "Osa valinnaisista tarkistuksista on epäonnistunut. Ne eivät estä yhdistämistä.",
         "draftTitle": "Muutospyyntöluonnos",
@@ -710,7 +708,12 @@
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä katselmointi",
-      "partialPostedMessage": "Julkaistuja kommentteja: {{displayFreshCount}}. Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedFresh": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedStale": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
       "blockedRequestChanges": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit pyytää muutoksia.",
       "blockedComment": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit lähettää kommentoivan katselmoinnin."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md-tiedoston pull request avattu",
       "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
       "status": {
+        "open": "Avoin",
         "edited": "Muokattu",
         "opening_change_request": "Avataan PR:ää",
         "change_request_failed": "PR:n avaaminen epäonnistui",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Hyödynnettävyyden perustelut",
       "suggestedFix": "Ehdotettu korjaus",
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
+      "whereFound_one": "Havainnon sijainnit ({{displayCount}})",
+      "whereFound_other": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
       "no": "Ei",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} keskivakavaa ja lievää",
       "dueThisWeek": "Määräaika tällä viikolla",
       "dueThisWeekDetail": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
+      "dueThisWeekDetail_one": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
+      "dueThisWeekDetail_other": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
       "noDeadline": "Ei määräaikaa",
       "reviewSlaAssignment": "Tarkista SLA-määräajan asetus",
       "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"

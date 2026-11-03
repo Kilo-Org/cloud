@@ -442,7 +442,6 @@
         "rebase": "ប្តូរមូលដ្ឋាន"
       },
       "terminal": {
-        "alreadyMerged": "បានបញ្ចូលរួច",
         "closed": "សំណើបញ្ចូលកូដនេះបានបិទ",
         "closedMergeRequest": "សំណើបញ្ចូលនេះបានបិទ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ខ្វះការពិនិត្យចាំបាច់",
         "requiredReviewsDetail": "មិនទាន់ទទួលបានការអនុម័តពីអ្នកពិនិត្យដែលត្រូវអនុម័តនៅឡើយទេ។",
         "failingChecksTitle": "ការត្រួតពិនិត្យចាំបាច់មិនជោគជ័យ",
-        "failingChecksDetail": "ការត្រួតពិនិត្យស្ថានភាពចាំបាច់មិនជោគជ័យទេ។",
         "unstableTitle": "ការត្រួតពិនិត្យមួយចំនួនមិនជោគជ័យ",
         "unstableDetail": "ការត្រួតពិនិត្យមិនចាំបាច់មួយចំនួនមិនជោគជ័យទេ។ វាមិនរារាំងការបញ្ចូលទេ។",
         "draftTitle": "សេចក្តីព្រាងសំណើបញ្ចូលកូដ",
@@ -710,7 +708,12 @@
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
       "submitReview": "ដាក់ស្នើលទ្ធផលពិនិត្យ",
-      "partialPostedMessage": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedFresh": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedFresh_one": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedFresh_other": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedStale": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedStale_one": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedStale_other": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
       "blockedRequestChanges": "បន្ថែមសេចក្តីសង្ខេប ឬមតិយោបល់យ៉ាងហោចណាស់មួយ ដើម្បីស្នើសុំការកែប្រែ។",
       "blockedComment": "បន្ថែមសេចក្តីសង្ខេប ឬមតិយោបល់យ៉ាងហោចណាស់មួយ ដើម្បីដាក់ស្នើការពិនិត្យបែបបញ្ចេញមតិ។"
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "បានបើក pull request សម្រាប់ REVIEW.md",
       "alreadyPresent": "ការណែនាំមានរួចហើយនៅក្នុង REVIEW.md",
       "status": {
+        "open": "បើក",
         "edited": "បានកែសម្រួល",
         "opening_change_request": "កំពុងបើក PR",
         "change_request_failed": "ការបើក PR បានបរាជ័យ",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "ហេតុផលនៃលទ្ធភាពកេងប្រវ័ញ្ច",
       "suggestedFix": "វិធីជួសជុលដែលបានណែនាំ",
       "whereFound": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
+      "whereFound_one": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
+      "whereFound_other": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
       "fullReport": "របាយការណ៍ពេញលេញដែលបានបង្កើត",
       "yes": "បាទ/ចាស",
       "no": "ទេ",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "និងមធ្យម និងទាប {{displayCount}}",
       "dueThisWeek": "ដល់កំណត់សប្តាហ៍នេះ",
       "dueThisWeekDetail": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
+      "dueThisWeekDetail_one": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
+      "dueThisWeekDetail_other": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
       "noDeadline": "គ្មានកាលកំណត់",
       "reviewSlaAssignment": "ពិនិត្យការកំណត់ SLA",
       "allOpenFindingsTracked": "បានតាមដានបញ្ហាដែលរកឃើញនៅបើកទាំងអស់"

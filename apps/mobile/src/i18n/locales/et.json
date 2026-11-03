@@ -442,7 +442,6 @@
         "rebase": "Ümberbaseerimine"
       },
       "terminal": {
-        "alreadyMerged": "Juba ühendatud",
         "closed": "See tõmbetaotlus on suletud",
         "closedMergeRequest": "See liitmistaotlus on suletud"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Nõutud ülevaatused puuduvad",
         "requiredReviewsDetail": "Nõutud ülevaatajate kinnitused puuduvad või on ootel.",
         "failingChecksTitle": "Nõutud kontrollid ebaõnnestusid",
-        "failingChecksDetail": "Nõutud olekukontrollid ebaõnnestusid.",
         "unstableTitle": "Mõned kontrollid ebaõnnestusid",
         "unstableDetail": "Valikulised kontrollid ebaõnnestusid. Need ei takista ühendamist.",
         "draftTitle": "Tõmbetaotluse mustand",
@@ -710,7 +708,12 @@
       "pendingComment_other": "ootel kommentaari",
       "submitCountOfTotal": "Esita {{displayFreshCount}}/{{displayTotalCount}} kommentaari",
       "submitReview": "Esita ülevaatus",
-      "partialPostedMessage": "Postitatud kommentaare: {{displayFreshCount}}. Vanemale kommitile viitavaid kommentaare jäi järjekorda {{displayStaleCount}}.",
+      "partialPostedFresh": "Postitatud kommentaare: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Postitatud kommentaare: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Postitatud kommentaare: {{displayFreshCount}}. ",
+      "partialPostedStale": "Vanemale kommitile viitavaid kommentaare jäi järjekorda {{displayStaleCount}}.",
+      "partialPostedStale_one": "Vanemale kommitile viitavaid kommentaare jäi järjekorda {{displayStaleCount}}.",
+      "partialPostedStale_other": "Vanemale kommitile viitavaid kommentaare jäi järjekorda {{displayStaleCount}}.",
       "blockedRequestChanges": "Muudatuste nõudmiseks lisa kokkuvõte või vähemalt üks kommentaar.",
       "blockedComment": "Kommenteeriva ülevaatuse esitamiseks lisa kokkuvõte või vähemalt üks kommentaar."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
       "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
       "status": {
+        "open": "Avatud",
         "edited": "Muudetud",
         "opening_change_request": "PR-i avamine",
         "change_request_failed": "PR ebaõnnestus",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Ärakasutatavuse põhjendus",
       "suggestedFix": "Soovitatud parandus",
       "whereFound": "Leiu asukohad ({{displayCount}})",
+      "whereFound_one": "Leiu asukohad ({{displayCount}})",
+      "whereFound_other": "Leiu asukohad ({{displayCount}})",
       "fullReport": "Loodud aruande täistekst",
       "yes": "Jah",
       "no": "Ei",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} keskmise ja madala raskusastmega",
       "dueThisWeek": "Tähtajaga sel nädalal",
       "dueThisWeekDetail": "Neist kinnitatud ärakasutatavaid: {{exploitable}}",
+      "dueThisWeekDetail_one": "Neist kinnitatud ärakasutatavaid: {{exploitable}}",
+      "dueThisWeekDetail_other": "Neist kinnitatud ärakasutatavaid: {{exploitable}}",
       "noDeadline": "Tähtaega pole",
       "reviewSlaAssignment": "Vaata üle SLA tähtaegade määramine",
       "allOpenFindingsTracked": "Kõiki avatud leide jälgitakse"

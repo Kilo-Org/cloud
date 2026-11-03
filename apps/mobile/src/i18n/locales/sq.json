@@ -442,7 +442,6 @@
         "rebase": "Ribazim"
       },
       "terminal": {
-        "alreadyMerged": "Tashmë e bashkuar",
         "closed": "Kjo kërkesë për bashkim është mbyllur",
         "closedMergeRequest": "Kjo kërkesë integrimi është mbyllur"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Mungojnë rishikimet e detyrueshme",
         "requiredReviewsDetail": "Miratimet e rishikuesve të caktuar mungojnë ose janë në pritje.",
         "failingChecksTitle": "Kontrolle të detyrueshme të dështuara",
-        "failingChecksDetail": "Kontrollet e detyrueshme të statusit po dështojnë.",
         "unstableTitle": "Disa kontrolle po dështojnë",
         "unstableDetail": "Kontrollet opsionale po dështojnë. Ato nuk do ta bllokojnë bashkimin.",
         "draftTitle": "Kërkesë bashkimi paraprake",
@@ -710,7 +708,12 @@
       "pendingComment_other": "komente në pritje",
       "submitCountOfTotal": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
       "submitReview": "Dërgo shqyrtimin",
-      "partialPostedMessage": "Komente të postuara: {{displayFreshCount}}. Komente që i referohen një depozitimi më të vjetër dhe mbetën në radhën tënde: {{displayStaleCount}}.",
+      "partialPostedFresh": "Komente të postuara: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Komente të postuara: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Komente të postuara: {{displayFreshCount}}. ",
+      "partialPostedStale": "Komente që i referohen një depozitimi më të vjetër dhe mbetën në radhën tënde: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Komente që i referohen një depozitimi më të vjetër dhe mbetën në radhën tënde: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Komente që i referohen një depozitimi më të vjetër dhe mbetën në radhën tënde: {{displayStaleCount}}.",
       "blockedRequestChanges": "Shto një përmbledhje ose të paktën një koment për të kërkuar ndryshime.",
       "blockedComment": "Shto një përmbledhje ose të paktën një koment për të postuar një rishikim me koment."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "U hap pull request për REVIEW.md",
       "alreadyPresent": "Udhëzimet janë tashmë në REVIEW.md",
       "status": {
+        "open": "Hapur",
         "edited": "Redaktuar",
         "opening_change_request": "Duke hapur PR",
         "change_request_failed": "PR dështoi",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Arsyetimi i shfrytëzueshmërisë",
       "suggestedFix": "Korrigjimi i sugjeruar",
       "whereFound": "Ku u gjet ({{displayCount}})",
+      "whereFound_one": "Ku u gjet ({{displayCount}})",
+      "whereFound_other": "Ku u gjet ({{displayCount}})",
       "fullReport": "Raporti i plotë i gjeneruar",
       "yes": "Po",
       "no": "Jo",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} me rrezik të mesëm ose të ulët",
       "dueThisWeek": "Afati këtë javë",
       "dueThisWeekDetail": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
+      "dueThisWeekDetail_one": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
+      "dueThisWeekDetail_other": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
       "noDeadline": "Pa afat",
       "reviewSlaAssignment": "Shqyrto caktimin e SLA-së",
       "allOpenFindingsTracked": "Të gjitha gjetjet e hapura gjurmohen"

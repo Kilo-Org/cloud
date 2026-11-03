@@ -1049,6 +1049,7 @@
       "prOpened": "Pull request voor REVIEW.md geopend",
       "alreadyPresent": "De richtlijnen staan al in REVIEW.md",
       "status": {
+        "open": "Open",
         "edited": "Bewerkt",
         "opening_change_request": "PR openen",
         "change_request_failed": "PR mislukt",
@@ -1185,6 +1186,8 @@
       "triageReasoning": "Onderbouwing van de eerste beoordeling",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Gevonden op deze locaties ({{displayCount}})",
+      "whereFound_one": "Gevonden op deze locaties ({{displayCount}})",
+      "whereFound_other": "Gevonden op deze locaties ({{displayCount}})",
       "yes": "Ja",
       "action": {
         "analyzeCodebase": "Codebasis analyseren",
@@ -1344,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} gemiddeld en laag",
       "dueThisWeek": "Deadline deze week",
       "dueThisWeekDetail": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail_one": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail_other": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
       "noDeadline": "Geen deadline",
       "reviewSlaAssignment": "SLA-toewijzing controleren",
       "allOpenFindingsTracked": "Alle open bevindingen bijgehouden"
@@ -2998,7 +3003,6 @@
         "squash": "Squashen"
       },
       "terminal": {
-        "alreadyMerged": "Al samengevoegd",
         "closed": "Deze PR is gesloten",
         "closedMergeRequest": "Deze merge request is gesloten"
       },
@@ -3015,7 +3019,6 @@
         "requiredReviewsTitle": "Vereiste beoordelingen ontbreken",
         "requiredReviewsDetail": "De vereiste beoordelaars hebben nog geen goedkeuring gegeven.",
         "failingChecksTitle": "Vereiste controles mislukt",
-        "failingChecksDetail": "Vereiste statuscontroles mislukken.",
         "unstableTitle": "Sommige controles mislukken",
         "unstableDetail": "Niet-verplichte controles mislukken. Ze blokkeren het samenvoegen niet.",
         "draftTitle": "Concept-PR",
@@ -3122,7 +3125,12 @@
       "pendingComment_other": "nog niet verzonden opmerkingen",
       "pendingComment_one": "nog niet verzonden opmerking",
       "summaryOptional": "Samenvatting (optioneel)",
-      "partialPostedMessage": "Geplaatste opmerkingen: {{displayFreshCount}}. Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedFresh": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedStale": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",

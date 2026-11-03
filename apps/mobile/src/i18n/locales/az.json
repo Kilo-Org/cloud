@@ -442,7 +442,6 @@
         "rebase": "Bazanı dəyişmə"
       },
       "terminal": {
-        "alreadyMerged": "Artıq birləşdirilib",
         "closed": "Bu birləşdirmə sorğusu bağlanıb",
         "closedMergeRequest": "Bu merge sorğusu bağlanıb"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Məcburi kod baxışları tamamlanmayıb",
         "requiredReviewsDetail": "Kodu nəzərdən keçirməli olan şəxslərin təsdiqləri yoxdur və ya hələ gözlənilir.",
         "failingChecksTitle": "Məcburi yoxlamalar uğursuzdur",
-        "failingChecksDetail": "Məcburi status yoxlamaları uğursuzdur.",
         "unstableTitle": "Bəzi yoxlamalar uğursuzdur",
         "unstableDetail": "Məcburi olmayan yoxlamalar uğursuzdur. Bunlar birləşdirməyə mane olmayacaq.",
         "draftTitle": "Qaralama birləşdirmə sorğusu",
@@ -710,7 +708,12 @@
       "pendingComment_other": "göndərilməmiş şərh",
       "submitCountOfTotal": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
       "submitReview": "Yoxlamanı göndər",
-      "partialPostedMessage": "{{displayFreshCount}} şərh göndərildi. {{displayStaleCount}} şərh əvvəlki kommitə aiddir və növbəndə qaldı.",
+      "partialPostedFresh": "{{displayFreshCount}} şərh göndərildi. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} şərh göndərildi. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} şərh göndərildi. ",
+      "partialPostedStale": "{{displayStaleCount}} şərh əvvəlki kommitə aiddir və növbəndə qaldı.",
+      "partialPostedStale_one": "{{displayStaleCount}} şərh əvvəlki kommitə aiddir və növbəndə qaldı.",
+      "partialPostedStale_other": "{{displayStaleCount}} şərh əvvəlki kommitə aiddir və növbəndə qaldı.",
       "blockedRequestChanges": "Dəyişiklik tələb etmək üçün xülasə və ya ən azı bir şərh əlavə et.",
       "blockedComment": "Kod baxışını şərh kimi göndərmək üçün xülasə və ya ən azı bir şərh əlavə et."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md üçün pull sorğusu açıldı",
       "alreadyPresent": "Təlimatlar artıq REVIEW.md faylında mövcuddur",
       "status": {
+        "open": "Açıqdır",
         "edited": "Redaktə edilib",
         "opening_change_request": "PR açılır",
         "change_request_failed": "PR uğursuz oldu",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "İstismar imkanının əsaslandırılması",
       "suggestedFix": "Təklif olunan düzəliş",
       "whereFound": "Aşkar edildiyi yerlər ({{displayCount}})",
+      "whereFound_one": "Aşkar edildiyi yerlər ({{displayCount}})",
+      "whereFound_other": "Aşkar edildiyi yerlər ({{displayCount}})",
       "fullReport": "Hazırlanmış tam hesabat",
       "yes": "Bəli",
       "no": "Xeyr",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} orta və aşağı",
       "dueThisWeek": "Bu həftə bitir",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
+      "dueThisWeekDetail_one": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
+      "dueThisWeekDetail_other": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
       "noDeadline": "Müddət yoxdur",
       "reviewSlaAssignment": "SLA müddətinin təyinatını yoxla",
       "allOpenFindingsTracked": "Bütün açıq tapıntılar izlənir"

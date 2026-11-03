@@ -442,7 +442,6 @@
         "rebase": "Chanjman baz"
       },
       "terminal": {
-        "alreadyMerged": "Deja fizyonnen",
         "closed": "Demann fizyon sa a fèmen",
         "closedMergeRequest": "Merge request sa a fèmen"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Gen revizyon obligatwa ki manke",
         "requiredReviewsDetail": "Moun ki dwe revize yo poko bay tout apwobasyon ki nesesè yo.",
         "failingChecksTitle": "Verifikasyon obligatwa ki echwe",
-        "failingChecksDetail": "Verifikasyon estati obligatwa yo ap echwe.",
         "unstableTitle": "Kèk verifikasyon ap echwe",
         "unstableDetail": "Verifikasyon ki pa obligatwa yo ap echwe. Yo p ap bloke fizyon an.",
         "draftTitle": "Demann fizyon an bwouyon",
@@ -710,7 +708,12 @@
       "pendingComment_other": "kòmantè an atant",
       "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon an",
-      "partialPostedMessage": "{{displayFreshCount}} kòmantè pibliye. {{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedFresh": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedStale": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_one": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_other": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
       "blockedRequestChanges": "Ajoute yon rezime oswa omwen yon kòmantè pou mande chanjman.",
       "blockedComment": "Ajoute yon rezime oswa omwen yon kòmantè pou pibliye yon revizyon kòm kòmantè."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "Pull request pou REVIEW.md ouvri",
       "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
       "status": {
+        "open": "Louvri",
         "edited": "Modifye",
         "opening_change_request": "Ap ouvri PR",
         "change_request_failed": "Ouvèti PR la echwe",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "Rezon ki jistifye si li ka eksplwate",
       "suggestedFix": "Koreksyon ki rekòmande",
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_one": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_other": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
       "no": "Non",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} mwayen ak ba",
       "dueThisWeek": "Dat limit semèn sa a",
       "dueThisWeekDetail": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_one": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_other": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
       "noDeadline": "Pa gen dat limit",
       "reviewSlaAssignment": "Revize SLA ki asiyen yo",
       "allOpenFindingsTracked": "Tout konsta ouvè yo gen swivi"

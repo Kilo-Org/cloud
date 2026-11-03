@@ -1052,6 +1052,7 @@
       "prOpened": "נפתחה בקשת משיכה עבור REVIEW.md",
       "alreadyPresent": "ההנחיות כבר קיימות בקובץ REVIEW.md",
       "status": {
+        "open": "פתוחה",
         "edited": "נערכה",
         "opening_change_request": "פתיחת PR מתבצעת",
         "change_request_failed": "פתיחת PR נכשלה",
@@ -1189,6 +1190,9 @@
       "triageReasoning": "נימוקי המיון הראשוני",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_one": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_two": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_other": "מיקומי הממצא ({{displayCount}})",
       "yes": "כן",
       "action": {
         "analyzeCodebase": "נתח את בסיס הקוד",
@@ -1358,6 +1362,9 @@
       "breakdownMediumLow_other": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
       "dueThisWeek": "המועד האחרון חל השבוע",
       "dueThisWeekDetail": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_one": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_two": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_other": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
       "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
@@ -3043,7 +3050,6 @@
         "squash": "איחוד קומיטים"
       },
       "terminal": {
-        "alreadyMerged": "כבר מוזגה",
         "closed": "בקשת המשיכה הזו סגורה",
         "closedMergeRequest": "בקשת המיזוג הזו סגורה"
       },
@@ -3060,7 +3066,6 @@
         "requiredReviewsTitle": "חסרות סקירות נדרשות",
         "requiredReviewsDetail": "חסרים אישורים מהסוקרים הנדרשים, או שעדיין ממתינים להם.",
         "failingChecksTitle": "בדיקות חובה נכשלו",
-        "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלו.",
         "unstableTitle": "חלק מהבדיקות נכשלו",
         "unstableDetail": "בדיקות שאינן חובה נכשלו. הן לא יחסמו את המיזוג.",
         "draftTitle": "טיוטת PR",
@@ -3170,7 +3175,14 @@
       "pendingComment_other": "תגובות ממתינות",
       "pendingComment_one": "תגובה ממתינה",
       "summaryOptional": "סיכום (לא חובה)",
-      "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedFresh": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_one": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_two": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_other": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedStale": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_one": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_two": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_other": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
       "pendingComment_two": "תגובות ממתינות",

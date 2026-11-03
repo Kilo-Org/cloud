@@ -442,7 +442,6 @@
         "rebase": "రీబేస్"
       },
       "terminal": {
-        "alreadyMerged": "ఇప్పటికే మెర్జ్ అయింది",
         "closed": "ఈ పుల్ రిక్వెస్ట్ మూసివేయబడింది",
         "closedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్ మూసివేయబడింది"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "అవసరమైన సమీక్షలు లేవు",
         "requiredReviewsDetail": "అవసరమైన సమీక్షకుల ఆమోదాలు లేవు లేదా ఇంకా రావాల్సి ఉంది.",
         "failingChecksTitle": "విఫలమవుతున్న తప్పనిసరి తనిఖీలు",
-        "failingChecksDetail": "తప్పనిసరి స్థితి తనిఖీలు విఫలమవుతున్నాయి.",
         "unstableTitle": "కొన్ని తనిఖీలు విఫలమవుతున్నాయి",
         "unstableDetail": "ఐచ్ఛిక తనిఖీలు విఫలమవుతున్నాయి. అవి మెర్జ్‌ను అడ్డుకోవు.",
         "draftTitle": "ముసాయిదా పుల్ రిక్వెస్ట్",
@@ -710,7 +708,12 @@
       "pendingComment_other": "ఇంకా పంపని వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
-      "partialPostedMessage": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. పాత కమిట్‌కు సంబంధించినందున జాబితాలోనే మిగిలిన వ్యాఖ్యల సంఖ్య: {{displayStaleCount}}.",
+      "partialPostedFresh": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
+      "partialPostedStale": "పాత కమిట్‌కు సంబంధించినందున జాబితాలోనే మిగిలిన వ్యాఖ్యల సంఖ్య: {{displayStaleCount}}.",
+      "partialPostedStale_one": "పాత కమిట్‌కు సంబంధించినందున జాబితాలోనే మిగిలిన వ్యాఖ్యల సంఖ్య: {{displayStaleCount}}.",
+      "partialPostedStale_other": "పాత కమిట్‌కు సంబంధించినందున జాబితాలోనే మిగిలిన వ్యాఖ్యల సంఖ్య: {{displayStaleCount}}.",
       "blockedRequestChanges": "మార్పులను అభ్యర్థించడానికి సారాంశం లేదా కనీసం ఒక వ్యాఖ్యను జోడించండి.",
       "blockedComment": "వ్యాఖ్యతో సమీక్షను సమర్పించడానికి సారాంశం లేదా కనీసం ఒక వ్యాఖ్యను జోడించండి."
     },
@@ -1529,6 +1532,7 @@
       "prOpened": "REVIEW.md పుల్ రిక్వెస్ట్ తెరవబడింది",
       "alreadyPresent": "మార్గదర్శకాలు ఇప్పటికే REVIEW.mdలో ఉన్నాయి",
       "status": {
+        "open": "తెరిచి ఉంది",
         "edited": "సవరించబడింది",
         "opening_change_request": "PR తెరుస్తోంది",
         "change_request_failed": "PR విఫలమైంది",
@@ -1752,6 +1756,8 @@
       "exploitabilityReasoning": "దుర్వినియోగ అవకాశంపై అంచనాకు ఆధారం",
       "suggestedFix": "సూచించిన పరిష్కారం",
       "whereFound": "గుర్తించిన చోటులు ({{displayCount}})",
+      "whereFound_one": "గుర్తించిన చోటులు ({{displayCount}})",
+      "whereFound_other": "గుర్తించిన చోటులు ({{displayCount}})",
       "fullReport": "రూపొందించిన పూర్తి నివేదిక",
       "yes": "అవును",
       "no": "లేదు",
@@ -1830,6 +1836,8 @@
       "breakdownMediumLow_other": "మధ్యస్థ, తక్కువ తీవ్రత గలవి {{displayCount}}",
       "dueThisWeek": "ఈ వారం గడువు",
       "dueThisWeekDetail": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
+      "dueThisWeekDetail_one": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
+      "dueThisWeekDetail_other": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
       "noDeadline": "గడువు లేదు",
       "reviewSlaAssignment": "SLA కేటాయింపును సమీక్షించండి",
       "allOpenFindingsTracked": "అన్ని పెండింగ్ సమస్యల గడువులను పర్యవేక్షిస్తున్నాము"

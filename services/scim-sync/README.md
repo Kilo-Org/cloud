@@ -107,7 +107,13 @@ The WorkOS directory hierarchy maps onto the organization hierarchy:
 The binding columns live on every `organizations` row, parent or child, which is
 what makes a sub-organization the thing a directory group resolves to. So
 `findOrganizationByDirectoryGroupId` is the group-resolution query and
-`findChildOrganizations` lists a directory's groups.
+`findDirectoryBoundChildOrganizations` lists a directory's groups.
+
+Not every sub-organization is a directory group: `createChildOrganization`
+makes children with no directory binding, so a parent can hold a mix.
+`findChildOrganizations` returns all of them and
+`findDirectoryBoundChildOrganizations` only the bound ones — enumerating groups
+with the former would treat a hand-made sub-organization as a directory group.
 
 `getPgDb` must be called per operation and never cached in module scope. A
 cached client outlives the request or Durable Object context that created it,

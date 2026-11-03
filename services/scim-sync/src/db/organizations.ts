@@ -1,5 +1,5 @@
 import { organizations } from '@kilocode/db/schema';
-import { and, count, eq, isNull } from 'drizzle-orm';
+import { and, count, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import type { WorkerDb } from './pg';
 
@@ -90,9 +90,14 @@ export async function findOrganizationByExternalOrgId(
 }
 
 /**
- * The sub-organizations under a parent — which is also the set of directory
- * groups bound to that directory, since a directory group maps to a
- * sub-organization.
+ * Every live sub-organization under a parent, directory-bound or not.
+ *
+ * This is **not** the set of a directory's groups. A sub-organization can be
+ * created by hand with no directory binding at all — `createChildOrganization`
+ * in `apps/web/src/lib/organizations/organization-hierarchy.ts:102` sets none,
+ * and both the organization and admin routers call it — so a parent can hold a
+ * mix of directory-synced and manually created children. Use
+ * `findDirectoryBoundChildOrganizations` to enumerate groups.
  *
  * The hierarchy is one level deep (a child cannot itself be a parent), so this
  * is the whole subtree rather than just the first layer. Depth is enforced in
@@ -106,6 +111,29 @@ export async function findChildOrganizations(
     .select()
     .from(organizations)
     .where(and(eq(organizations.parent_organization_id, parentOrganizationId), isLive));
+}
+
+/**
+ * The sub-organizations under a parent that are bound to a directory group —
+ * that is, the directory's groups as Kilo stores them.
+ *
+ * Excludes manually created sub-organizations, which carry no binding and are
+ * not directory groups however much they look like siblings.
+ */
+export async function findDirectoryBoundChildOrganizations(
+  db: WorkerDb,
+  parentOrganizationId: string
+): Promise<OrganizationRow[]> {
+  return db
+    .select()
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, parentOrganizationId),
+        isNotNull(organizations.directory_group_id),
+        isLive
+      )
+    );
 }
 
 /** Reachability probe. Counts in SQL rather than materializing every row. */

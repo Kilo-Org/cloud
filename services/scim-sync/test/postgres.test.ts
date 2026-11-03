@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   findChildOrganizations,
+  findDirectoryBoundChildOrganizations,
   findOrganizationByDirectoryGroupId,
   findOrganizationByExternalOrgId,
   findOrganizationById,
@@ -36,6 +37,9 @@ const db = client.db;
 const suffix = randomUUID();
 const parentOrgId = randomUUID();
 const childOrgId = randomUUID();
+// A sub-organization created by hand, with no directory binding. Real data has
+// these: `createChildOrganization` sets no directory columns.
+const manualChildOrgId = randomUUID();
 const deletedOrgId = randomUUID();
 // A user ID is an arbitrary string, not a UUID. Use an OAuth-shaped one so a
 // stray `::uuid` cast or UUID validation would fail the test.
@@ -46,7 +50,7 @@ const directoryGroupId = `directory_group_${suffix}`;
 const directoryIdpId = `idp_group_${suffix}`;
 const externalOrgId = `external_org_${suffix}`;
 
-const allOrgIds = [parentOrgId, childOrgId, deletedOrgId];
+const allOrgIds = [parentOrgId, childOrgId, manualChildOrgId, deletedOrgId];
 
 beforeAll(async () => {
   await client.db.insert(kilocode_users).values({
@@ -75,6 +79,13 @@ beforeAll(async () => {
       directory_id: directoryId,
       directory_group_id: directoryGroupId,
       directory_idp_id: directoryIdpId,
+    },
+    // A sibling sub-organization created by hand: same parent, no directory
+    // binding. Enumerating a directory's groups must not return it.
+    {
+      id: manualChildOrgId,
+      name: `SCIM Manual Child ${suffix}`,
+      parent_organization_id: parentOrgId,
     },
     // Soft-deleted, and deliberately holding the same directory-group and IdP
     // bindings as the live sub-organization. The partial unique indexes permit
@@ -110,9 +121,12 @@ afterAll(async () => {
   await client.db
     .delete(organization_memberships)
     .where(inArray(organization_memberships.organization_id, allOrgIds));
+  // The self-referential foreign key is ON DELETE RESTRICT, so every child has
+  // to go before the parent. Derived from `allOrgIds` rather than listed by
+  // hand, so adding a fixture cannot silently break teardown.
   await client.db
     .delete(organizations)
-    .where(inArray(organizations.id, [childOrgId, deletedOrgId]));
+    .where(inArray(organizations.parent_organization_id, allOrgIds));
   await client.db.delete(organizations).where(eq(organizations.id, parentOrgId));
   await client.db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
   await client.pool.end();
@@ -160,12 +174,20 @@ describe('organizations', () => {
     expect(matches.map(row => row.id)).toEqual([childOrgId]);
   });
 
-  it('lists a directory group set as the sub-organizations under its parent', async () => {
+  it('lists every sub-organization, directory-bound or not', async () => {
     const children = await findChildOrganizations(db, parentOrgId);
 
-    expect(children.map(row => row.id)).toEqual([childOrgId]);
+    expect(children.map(row => row.id).toSorted()).toEqual(
+      [childOrgId, manualChildOrgId].toSorted()
+    );
     // Depth is one level, so a sub-organization has no children of its own.
     expect(await findChildOrganizations(db, childOrgId)).toEqual([]);
+  });
+
+  it('lists a directory group set without the hand-made sub-organization', async () => {
+    const groups = await findDirectoryBoundChildOrganizations(db, parentOrgId);
+
+    expect(groups.map(row => row.id)).toEqual([childOrgId]);
   });
 });
 

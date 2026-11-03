@@ -15,7 +15,13 @@ import {
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { captureException } from '@sentry/nextjs';
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+}));
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
@@ -278,6 +284,25 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       data_collection: 'allow',
       zdr: false,
     });
+  });
+
+  it('answers malformed JSON without reporting the body to Sentry', async () => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: '{"model": "secret-prompt',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(

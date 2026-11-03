@@ -7,7 +7,7 @@ import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gatewa
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
@@ -25,6 +25,7 @@ import {
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   invalidTokenResponse,
+  malformedJsonResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   creditsBlockedResponse,
@@ -117,11 +118,7 @@ export async function handleEmbeddingsRequest(
   try {
     requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
   } catch (e) {
-    captureException(e, {
-      extra: { requestBodyText },
-      tags: { source: 'embedding-proxy' },
-    });
-    return invalidRequestResponse();
+    return malformedJsonResponse(e);
   }
 
   if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {

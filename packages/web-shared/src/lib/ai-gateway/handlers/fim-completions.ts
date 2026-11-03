@@ -2,7 +2,7 @@ import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/con
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -16,6 +16,7 @@ import {
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
   invalidTokenResponse,
+  malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
   extractHeaderAndLimitLength,
@@ -87,8 +88,6 @@ const FIMRequestBody = z.object({
   stream: z.boolean().optional(),
 });
 
-type FIMRequestBody = z.infer<typeof FIMRequestBody>;
-
 export async function handleFimCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
@@ -111,23 +110,16 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const requestBodyText = await requesBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 
-  // Parse request body
-  let requestBody: FIMRequestBody;
+  let requestJson: unknown;
   try {
-    const { success, data, error } = FIMRequestBody.safeParse(JSON.parse(requestBodyText));
-
-    if (!success) {
-      sentryLogger('fim-proxy')('request failed to parse', {
-        extra: { kiloUserId: user.id, error, organizationId },
-        tags: { source: 'fim-proxy' },
-        user: { id: user.id },
-      });
-      return invalidRequestResponse();
-    }
-    requestBody = data;
+    requestJson = JSON.parse(requestBodyText);
   } catch (e) {
-    captureException(e, {
-      extra: { kiloUserId: user.id },
+    return malformedJsonResponse(e);
+  }
+  const { success, data: requestBody, error } = FIMRequestBody.safeParse(requestJson);
+  if (!success) {
+    sentryLogger('fim-proxy')('request failed to parse', {
+      extra: { kiloUserId: user.id, error, organizationId },
       tags: { source: 'fim-proxy' },
       user: { id: user.id },
     });

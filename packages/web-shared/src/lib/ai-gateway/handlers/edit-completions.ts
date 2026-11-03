@@ -2,7 +2,7 @@ import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -16,6 +16,7 @@ import {
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
   invalidTokenResponse,
+  malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
   extractHeaderAndLimitLength,
@@ -78,8 +79,6 @@ const EditRequestBody = z.object({
   stream: z.literal(false).optional(),
 });
 
-type EditRequestBody = z.infer<typeof EditRequestBody>;
-
 export async function handleEditCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
@@ -102,30 +101,25 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const requestBodyText = await requestBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 
-  let requestBody: EditRequestBody;
+  let requestJson: unknown;
   try {
-    const { success, data, error } = EditRequestBody.safeParse(JSON.parse(requestBodyText));
-    if (!success) {
-      if (error.issues.some(issue => issue.path[0] === 'stream')) {
-        return NextResponse.json(
-          {
-            error: 'Streaming is not supported for edit completions',
-            error_type: ProxyErrorType.unsupported_field,
-          },
-          { status: 400 }
-        );
-      }
-      sentryLogger('edit-proxy')('request failed to parse', {
-        extra: { kiloUserId: user.id, error, organizationId },
-        tags: { source: 'edit-proxy' },
-        user: { id: user.id },
-      });
-      return invalidRequestResponse();
-    }
-    requestBody = data;
+    requestJson = JSON.parse(requestBodyText);
   } catch (e) {
-    captureException(e, {
-      extra: { kiloUserId: user.id },
+    return malformedJsonResponse(e);
+  }
+  const { success, data: requestBody, error } = EditRequestBody.safeParse(requestJson);
+  if (!success) {
+    if (error.issues.some(issue => issue.path[0] === 'stream')) {
+      return NextResponse.json(
+        {
+          error: 'Streaming is not supported for edit completions',
+          error_type: ProxyErrorType.unsupported_field,
+        },
+        { status: 400 }
+      );
+    }
+    sentryLogger('edit-proxy')('request failed to parse', {
+      extra: { kiloUserId: user.id, error, organizationId },
       tags: { source: 'edit-proxy' },
       user: { id: user.id },
     });

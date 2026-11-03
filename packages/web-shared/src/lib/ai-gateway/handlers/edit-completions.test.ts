@@ -197,6 +197,27 @@ describe('POST /api/edit/completions', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('answers malformed JSON without reporting it to Sentry', async () => {
+    setOrganizationAuth();
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      new Request('http://localhost:3000/api/edit/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: '{"model": ',
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('answers a rejected credential with INVALID_TOKEN', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,

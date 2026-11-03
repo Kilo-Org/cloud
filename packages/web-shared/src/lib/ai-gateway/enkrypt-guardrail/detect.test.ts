@@ -36,6 +36,13 @@ function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardra
     apiKind: 'chat_completions',
     clientRequestId: 'client-request-1',
     text: 'tool output',
+    coverage: {
+      cache: 'miss',
+      totalCharacters: 11,
+      totalSegments: 1,
+      cachedCharacters: 0,
+      cachedSegments: 0,
+    },
     config,
     ...overrides,
   };
@@ -332,6 +339,66 @@ describe('scanRequest', () => {
 
     expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [] });
     expect(dependencies.fetch).not.toHaveBeenCalled();
+    expect(console.debug).not.toHaveBeenCalled();
+  });
+
+  it('logs how much of the conversation was scanned and how much was cached', async () => {
+    const coverage = {
+      cache: 'hit',
+      totalCharacters: 9_000,
+      totalSegments: 12,
+      cachedCharacters: 8_000,
+      cachedSegments: 10,
+    } as const;
+
+    await scanRequest(
+      makeScan({ coverage }),
+      deps(async () => detectResponse({ summary: {} }, { credits: '3' }))
+    );
+
+    expect(console.debug).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({
+        decision: 'allowed',
+        scanned_characters: 11,
+        total_characters: 9_000,
+        total_segments: 12,
+        verdict_cache: 'hit',
+        cached_characters: 8_000,
+        cached_segments: 10,
+      })
+    );
+  });
+
+  it('allows and logs a fully cached request without calling Enkrypt', async () => {
+    const dependencies = deps(async () => detectResponse({ summary: {} }));
+
+    const result = await scanRequest(
+      makeScan({
+        text: '',
+        coverage: {
+          cache: 'hit',
+          totalCharacters: 900,
+          totalSegments: 3,
+          cachedCharacters: 900,
+          cachedSegments: 3,
+        },
+      }),
+      dependencies
+    );
+
+    expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [] });
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+    expect(console.debug).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({
+        decision: 'allowed',
+        scanned_characters: 0,
+        cached_segments: 3,
+        attempts: 0,
+        credits_cost: null,
+      })
+    );
   });
 
   describe('a request above the scan limit', () => {

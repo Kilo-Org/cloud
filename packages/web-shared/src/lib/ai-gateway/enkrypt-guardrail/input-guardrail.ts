@@ -8,14 +8,25 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
-  scanRequest,
-  type EnkryptGuardrailScan,
-  type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import {
+  ENKRYPT_VERDICT_CACHE_ENABLED,
+  rememberAllowedRequest,
+  scanRequestWithVerdictCache,
+  type EnkryptCachedScanResult,
+  type EnkryptGuardrailRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 
-const notScanned: EnkryptGuardrailScanResult = { verdict: { action: 'skip' }, usageRecords: [] };
+const notScanned: EnkryptCachedScanResult = {
+  verdict: { action: 'skip' },
+  usageRecords: [],
+  allowedKey: null,
+};
+
+const verdictCacheStore = ENKRYPT_VERDICT_CACHE_ENABLED ? redisClient : null;
 
 export type EnkryptInputGuardrail = {
   /**
@@ -30,29 +41,43 @@ export type EnkryptInputGuardrail = {
  * is off) makes no Enkrypt call.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
- * early still accounts for a scan Enkrypt performed.
+ * early still accounts for a scan Enkrypt performed. An allowed request's verdict cache entry is
+ * written as soon as the verdict is known, so the agent's next step can already use it, and
+ * `after()` keeps the function alive until the write finishes.
  */
 export function startEnkryptInputGuardrail(
-  scan: Promise<EnkryptGuardrailScan | null>,
+  scan: Promise<EnkryptGuardrailRequest | null>,
   signal: AbortSignal
 ): EnkryptInputGuardrail {
   const result = scan
     .then(resolved =>
       resolved
-        ? scanRequest(resolved, {
+        ? scanRequestWithVerdictCache(resolved, {
             apiKey: ENKRYPT_API_KEY,
             fetch,
             timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
             signal,
+            store: verdictCacheStore,
           })
         : notScanned
     )
-    .catch((error: unknown): EnkryptGuardrailScanResult => {
+    .catch((error: unknown): EnkryptCachedScanResult => {
       console.error('[enkrypt-guardrail] scan failed unexpectedly; request rejected', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return { verdict: { action: 'unavailable', reason: 'failed' }, usageRecords: [] };
+      return {
+        verdict: { action: 'unavailable', reason: 'failed' },
+        usageRecords: [],
+        allowedKey: null,
+      };
     });
+  after(
+    result.then(async ({ allowedKey }) => {
+      if (allowedKey && verdictCacheStore) {
+        await rememberAllowedRequest(allowedKey, verdictCacheStore);
+      }
+    })
+  );
   let addedLatencyMs: number | null = null;
   after(async () => {
     const { usageRecords: calls } = await result;

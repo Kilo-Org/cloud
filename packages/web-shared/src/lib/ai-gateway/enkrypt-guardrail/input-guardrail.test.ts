@@ -6,9 +6,14 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   scanRequest,
-  type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import {
+  ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+  verdictCacheKeys,
+  type EnkryptGuardrailRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { startEnkryptInputGuardrail } from './input-guardrail';
 
 jest.mock('next/server', () => ({
@@ -30,20 +35,32 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
 }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { mget: jest.fn(), set: jest.fn() },
+}));
 
 const mockedAfter = jest.mocked(after);
 const mockedRecordUsage = jest.mocked(recordEnkryptUsage);
 const mockedScanRequest = jest.mocked(scanRequest);
+const mockedRedisMget = jest.mocked(redisClient.mget);
+const mockedRedisSet = jest.mocked(redisClient.set);
 const signal = new AbortController().signal;
 
-const scan: EnkryptGuardrailScan = {
+const config = {
+  scanToolResults: true,
+  status: 'ready',
+  detectors: {},
+  blockingDetectors: [],
+} satisfies EnkryptGuardrailRequest['config'];
+
+const scan: EnkryptGuardrailRequest = {
   sessionId: 'ses_guardrail',
   organizationId: '00000000-0000-4000-8000-000000000002',
   kiloUserId: 'oauth/google:123',
   apiKind: 'messages',
   clientRequestId: null,
-  text: 'tool output',
-  config: { scanToolResults: true, status: 'ready', detectors: {}, blockingDetectors: [] },
+  segments: ['system prompt', 'tool output'],
+  config,
 };
 
 function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCall {
@@ -59,13 +76,17 @@ function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCa
 }
 
 async function runAfterTasks() {
-  await Promise.all(mockedAfter.mock.calls.map(([task]) => (task as () => Promise<void>)()));
+  await Promise.all(
+    mockedAfter.mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+  );
 }
 
 beforeEach(() => {
   mockedAfter.mockReset();
   mockedRecordUsage.mockReset().mockResolvedValue(undefined);
   mockedScanRequest.mockReset();
+  mockedRedisMget.mockReset().mockResolvedValue([null, null]);
+  mockedRedisSet.mockReset().mockResolvedValue('OK');
 });
 
 afterEach(() => {
@@ -98,9 +119,45 @@ describe('startEnkryptInputGuardrail', () => {
     await guardrail.awaitVerdict();
 
     expect(mockedScanRequest).toHaveBeenCalledWith(
-      scan,
+      expect.objectContaining({ text: 'system prompt\n\ntool output' }),
       expect.objectContaining({ timeoutMs: 30_000, signal })
     );
+  });
+
+  it('caches an allowed request by its full content while after() keeps the function alive', async () => {
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [] });
+
+    startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+    expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
+    await runAfterTasks();
+
+    const finalKey = verdictCacheKeys(scan, config, scan.segments).at(-1);
+    expect(mockedRedisSet.mock.calls).toEqual([
+      [finalKey, '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }],
+    ]);
+  });
+
+  it.each<[string, EnkryptGuardrailScanResult['verdict']]>([
+    ['blocked', { action: 'block', message: 'blocked' }],
+    ['unavailable', { action: 'unavailable', reason: 'timeout' }],
+  ])('does not cache a %s request', async (_name, verdict) => {
+    mockedScanRequest.mockResolvedValue({ verdict, usageRecords: [call()] });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+    await guardrail.awaitVerdict();
+    await runAfterTasks();
+
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+  });
+
+  it('keeps recording usage when the cache write fails', async () => {
+    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+    mockedRedisSet.mockRejectedValue(new Error('timeout'));
+
+    startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+    await runAfterTasks();
+
+    expect(mockedRecordUsage).toHaveBeenCalledTimes(1);
   });
 
   it('records the wait for the verdict on the final call of the request only', async () => {
@@ -138,5 +195,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     expect(mockedScanRequest).not.toHaveBeenCalled();
     expect(mockedRecordUsage).not.toHaveBeenCalled();
+    expect(mockedRedisMget).not.toHaveBeenCalled();
+    expect(mockedRedisSet).not.toHaveBeenCalled();
   });
 });

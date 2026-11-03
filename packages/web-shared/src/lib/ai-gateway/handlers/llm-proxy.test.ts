@@ -226,6 +226,17 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => (
   ),
   recordEnkryptUsage: jest.fn(async () => undefined),
 }));
+const mockRedisValues = new Map<string, string>();
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(async () => null),
+    mget: jest.fn(async (keys: string[]) => keys.map(key => mockRedisValues.get(key) ?? null)),
+    set: jest.fn(async (key: string, value: string) => {
+      mockRedisValues.set(key, value);
+      return 'OK';
+    }),
+  },
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -3966,6 +3977,7 @@ describe('Enkrypt input guardrail', () => {
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockRedisValues.clear();
     fetchSpy = jest.spyOn(global, 'fetch');
   });
 
@@ -4052,6 +4064,37 @@ describe('Enkrypt input guardrail', () => {
       }),
     ]);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('scans only the new part of the conversation on the next agent step', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
+    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
+    const history = [
+      { role: 'system', content: 'system prompt' },
+      { role: 'user', content: 'x'.repeat(5_000) },
+    ];
+
+    await handleLlmProxyRequest(makeRequest({ model: 'openai/gpt-4o', messages: history }));
+    await Promise.all(
+      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+    );
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        model: 'openai/gpt-4o',
+        messages: [
+          ...history,
+          { role: 'assistant', content: 'answer' },
+          { role: 'user', content: 'next question' },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(enkryptRequestBodies().map(({ text }) => text)).toEqual([
+      `system prompt\n\n${'x'.repeat(5_000)}`,
+      `${'x'.repeat(2_000)}\n\nanswer\n\nnext question`,
+    ]);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
   });
 
   it.each([

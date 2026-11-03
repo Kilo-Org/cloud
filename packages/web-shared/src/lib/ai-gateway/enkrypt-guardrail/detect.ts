@@ -46,6 +46,18 @@ const detectResponseSchema = z.object({
   result_message: z.string().nullish(),
 });
 
+/**
+ * How much of the request `text` covers. With a cached prefix, `text` is only the uncached suffix
+ * plus an overlap of already-scanned text.
+ */
+export type EnkryptScanCoverage = {
+  cache: 'off' | 'miss' | 'hit' | 'error';
+  totalCharacters: number;
+  totalSegments: number;
+  cachedCharacters: number;
+  cachedSegments: number;
+};
+
 export type EnkryptGuardrailScan = {
   sessionId: string | null;
   organizationId: string;
@@ -53,6 +65,7 @@ export type EnkryptGuardrailScan = {
   apiKind: EnkryptGuardrailApiKind;
   clientRequestId: string | null;
   text: string;
+  coverage: EnkryptScanCoverage;
   config: EnkryptInputGuardrailConfig;
 };
 
@@ -259,9 +272,7 @@ export async function scanRequest(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
-  const { text, config } = scan;
-  if (text.length === 0) return { verdict: { action: 'allow' }, usageRecords: [] };
-
+  const { text, config, coverage } = scan;
   const baseLogFields = {
     organization_id: scan.organizationId,
     session_id: scan.sessionId,
@@ -269,7 +280,25 @@ export async function scanRequest(
     api_kind: scan.apiKind,
     scan_tool_results: config.scanToolResults,
     scanned_characters: text.length,
+    total_characters: coverage.totalCharacters,
+    total_segments: coverage.totalSegments,
+    verdict_cache: coverage.cache,
+    cached_characters: coverage.cachedCharacters,
+    cached_segments: coverage.cachedSegments,
   };
+
+  if (text.length === 0) {
+    if (coverage.cachedSegments > 0) {
+      console.debug('[enkrypt-guardrail] decision', {
+        ...baseLogFields,
+        decision: 'allowed',
+        latency_ms: 0,
+        attempts: 0,
+        credits_cost: null,
+      });
+    }
+    return { verdict: { action: 'allow' }, usageRecords: [] };
+  }
 
   if (config.status === 'invalid') {
     return failedVerdict([], baseLogFields, { error: 'invalid_config', latencyMs: 0 });

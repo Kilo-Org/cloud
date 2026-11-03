@@ -127,6 +127,17 @@ describe('generateSessionTitle', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('truncates without splitting an astral character', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ response: `${'x'.repeat(199)}😀${'y'.repeat(10)}` });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    const title = persist.mock.calls[0]?.[0].title;
+    expect(title).toBe('x'.repeat(199));
+    expect(title).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+
   it('removes a trailing period', async () => {
     const { env, run, persist } = setup();
     run.mockResolvedValue({ response: 'Fix login form validation.' });

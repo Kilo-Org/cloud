@@ -28,9 +28,13 @@ function normalizeSessionTitle(value: string): string {
     .replace(/\s+/g, ' ')
     .replace(/[.。]+$/, '')
     .trim();
-  return normalized.length > MAX_TITLE_CHARACTERS
-    ? normalized.slice(0, MAX_TITLE_CHARACTERS).trim()
-    : normalized;
+  if (normalized.length <= MAX_TITLE_CHARACTERS) return normalized;
+  let truncated = '';
+  for (const character of normalized) {
+    if (truncated.length + character.length > MAX_TITLE_CHARACTERS) break;
+    truncated += character;
+  }
+  return truncated.trim();
 }
 
 function readTitleResponse(output: unknown): string {

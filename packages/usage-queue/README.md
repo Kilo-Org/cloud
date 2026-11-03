@@ -311,6 +311,13 @@ publishing, weaken validation or add a failed-event ACK to make the check pass.
 
 ### Fair comparison and measurement
 
+The Cloudflare column below is a **historical source-pinned comparator**, not a
+statement of current or deployed settings. The current checkout's production
+source config uses batch 6, parallelism 2, cap 200 and 20 retries; see the
+[Cloudflare runbook](../../services/usage-ingest/README.md#queue-policy). Before a
+comparison, verify the deployed Worker revision, effective queue configuration,
+and active consumers; source values alone do not prove what is deployed.
+
 | Control | Cloudflare pinned source / deployed comparator | Vercel candidate |
 |---|---|---|
 | Ceiling and scope | Pinned main uses one global queue at `max_concurrency=200`; record actual queue identity/location, deployed Worker revision and all consumers | Staging trigger omits `maxConcurrency`; record platform limits and inventory old deployment partitions |
@@ -335,11 +342,12 @@ A historical CF400/Vercel200 scenario is an **unmatched whole-system
 comparison**, even if both consumer settings say 200. If CF200 is compared
 with a cap-4 smoke variant, label it
 **unmatched whole-system configurations (CF200/Vercel4)**, not transport isolation.
-The intentional Vercel policy remains **20 total deliveries with 60s retry**;
-CF has three retries after the first attempt, **four total attempts**. For each valid
-queued message whose attempts reach the writer, Vercel therefore permits up to
-**5× the configured attempt budget** (20 versus 4), independent of the concurrency
-setting.
+The historical pinned CF comparator has three retries after the first attempt,
+**four total attempts**. Against the intentional Vercel policy of **20 total
+deliveries with 60s retry**, that historical comparison permits up to **5× the
+configured attempt budget** (20 versus 4), independent of concurrency. This is
+not the ratio against the current source's 20 CF retries (21 total attempts).
+Verify the deployed policies before calculating a current comparison.
 Delivery failures before the writer can consume budget without an HTTP write;
 measure actual writer calls, retries and DB pressure rather than inferring them.
 Failure/saturation tests are **not matched on retry pressure** and must be labeled

@@ -891,7 +891,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/routers/github-apps-router.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 2,
+    occurrences: 3,
   },
   {
     id: 'internal.routers.organizationCodeReviews',
@@ -920,6 +920,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'platform_read',
     surface: 'trpc',
     occurrences: 1,
+  },
+  {
+    id: 'internal.user.nextAuthOptions',
+    file: 'apps/web/src/lib/user/next-auth-options.ts',
+    actionClass: 'platform_read',
+    surface: 'server-component',
+    occurrences: 3,
   },
   {
     id: 'internal.webShared.trpcInit',

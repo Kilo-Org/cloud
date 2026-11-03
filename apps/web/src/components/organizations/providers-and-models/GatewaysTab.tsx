@@ -51,56 +51,31 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
   const disabled = !canEdit || mutation.isPending;
 
   return (
-    <div className="space-y-6">
-      {settings.features.gateway_disable_toggles && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Gateways</CardTitle>
-            <CardDescription>
-              Kilo routes model requests through OpenRouter or the Vercel AI Gateway. Chat requests
-              that would be routed through a disabled gateway fail with an error.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id={`${id}-openrouter`}
-                checked={!settings.disable_openrouter}
-                disabled={disabled}
-                onCheckedChange={checked =>
-                  mutation.mutate({ organizationId, disable_openrouter: !checked })
-                }
-              />
-              <Label htmlFor={`${id}-openrouter`}>OpenRouter</Label>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                id={`${id}-vercel`}
-                checked={!settings.disable_vercel_ai_gateway}
-                disabled={disabled}
-                onCheckedChange={checked =>
-                  mutation.mutate({ organizationId, disable_vercel_ai_gateway: !checked })
-                }
-              />
-              <Label htmlFor={`${id}-vercel`}>Vercel AI Gateway</Label>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {settings.features.data_region && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Data region</CardTitle>
-            <CardDescription>
-              Pins chat requests routed through the Vercel AI Gateway to the selected region.
-              Requests for a model that is not available in the region fail with an error. Requests
-              routed through OpenRouter are not pinned to a region.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="max-w-sm space-y-2">
-              <Label htmlFor={`${id}-region`}>Region</Label>
+    <Card>
+      <CardHeader>
+        <CardTitle>Gateways</CardTitle>
+        <CardDescription>
+          Kilo routes model requests through the Vercel AI Gateway or OpenRouter. When the Vercel AI
+          Gateway is off, requests Kilo would send there go through OpenRouter instead. Chat
+          requests that still end up on a disabled gateway fail with an error.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Switch
+              id={`${id}-vercel`}
+              checked={!settings.disable_vercel_ai_gateway}
+              disabled={disabled}
+              onCheckedChange={checked =>
+                mutation.mutate({ organizationId, disable_vercel_ai_gateway: !checked })
+              }
+            />
+            <Label htmlFor={`${id}-vercel`}>Vercel AI Gateway</Label>
+          </div>
+          {!settings.disable_vercel_ai_gateway && (
+            <div className="ml-12 max-w-sm space-y-2">
+              <Label htmlFor={`${id}-region`}>Inference region</Label>
               <Select
                 value={settings.data_region ?? GLOBAL_REGION}
                 disabled={disabled}
@@ -112,7 +87,11 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
                   })
                 }
               >
-                <SelectTrigger id={`${id}-region`} className="min-h-11 w-full">
+                <SelectTrigger
+                  id={`${id}-region`}
+                  aria-describedby={`${id}-region-help`}
+                  className="min-h-11 w-full"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -126,16 +105,40 @@ export function GatewaysTab({ organizationId, canEdit, settings }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              <p id={`${id}-region-help`} className="text-muted-foreground text-sm">
+                Pins requests routed through the Vercel AI Gateway to this region. Requests for a
+                model that is not available in the region fail with an error.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+          <div className="flex items-center gap-3">
+            <Switch
+              id={`${id}-openrouter`}
+              checked={!settings.disable_openrouter}
+              disabled={disabled}
+              onCheckedChange={checked =>
+                mutation.mutate({ organizationId, disable_openrouter: !checked })
+              }
+            />
+            <Label htmlFor={`${id}-openrouter`}>OpenRouter</Label>
+          </div>
+          <p className="text-muted-foreground ml-12 text-sm">
+            OpenRouter requests are not pinned to a region.
+          </p>
+        </div>
 
-      {!canEdit && (
         <p className="text-muted-foreground text-sm">
-          Only organization owners and admins can change gateway settings.
+          Disabling a gateway also blocks BYOK keys that route through it: a Vercel AI Gateway or
+          OpenRouter key, and provider keys Kilo sends through the Vercel AI Gateway. Requests that
+          would use those keys fail instead of falling back.
         </p>
-      )}
-    </div>
+
+        {!canEdit && (
+          <p className="text-muted-foreground text-sm">
+            Only organization owners and admins can change gateway settings.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

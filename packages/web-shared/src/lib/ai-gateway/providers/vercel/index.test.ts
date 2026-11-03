@@ -1,3 +1,7 @@
+import {
+  OrganizationDataRegionSchema,
+  type OrganizationDataRegion,
+} from '@kilocode/db/schema-types';
 import { afterEach, describe, it, expect, jest } from '@jest/globals';
 
 import {
@@ -694,6 +698,22 @@ describe('applyVercelSettings BYOK pinning', () => {
     ).rejects.toThrow('Failed to parse Google Vertex credentials');
   });
 
+  it('pins BYOK inference to the data region', async () => {
+    const request = byokRequest([]);
+
+    await applyVercelSettings(
+      'openai/gpt-5',
+      request,
+      [{ decryptedAPIKey: 'sk-user-openai', providerId: 'openai' }],
+      'eu'
+    );
+
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      only: ['openai'],
+      inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+    });
+  });
+
   it('forwards user OpenAI BYOK credentials', async () => {
     const request = byokRequest([]);
 
@@ -731,7 +751,8 @@ describe('applyVercelSettings managed requests', () => {
   async function applyManagedVercelSettings(
     requestedModel: string,
     request: GatewayRequest,
-    vercelInferenceProviders: string[] | null = ['openai']
+    vercelInferenceProviders: string[] | null = ['openai'],
+    dataRegion: OrganizationDataRegion | null = null
   ) {
     jest.resetModules();
     const getVercelInferenceProvidersMock = jest
@@ -744,9 +765,31 @@ describe('applyVercelSettings managed requests', () => {
     const { applyVercelSettings: applyManagedSettings } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel');
 
-    await applyManagedSettings(requestedModel, request, null);
+    await applyManagedSettings(requestedModel, request, null, dataRegion);
     return getVercelInferenceProvidersMock;
   }
+
+  it.each(OrganizationDataRegionSchema.options)(
+    'pins managed inference to the %s data region',
+    async region => {
+      const request = managedRequest({ only: ['openai'] });
+
+      await applyManagedVercelSettings('moonshotai/kimi-k3', request, ['openai'], region);
+
+      expect(request.body.providerOptions?.gateway).toMatchObject({
+        only: ['openai'],
+        inferenceRegion: { scope: 'zone', geoRegion: region },
+      });
+    }
+  );
+
+  it('leaves the region unset without a data region', async () => {
+    const request = managedRequest();
+
+    await applyManagedVercelSettings('moonshotai/kimi-k3', request);
+
+    expect(request.body.providerOptions?.gateway?.inferenceRegion).toBeUndefined();
+  });
 
   function managedRequest(provider?: GatewayRequest['body']['provider']): GatewayRequest {
     return {

@@ -24,7 +24,7 @@ import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-p
 import {
   getOrganizationGatewaySettings,
   isManagedGatewayDisabled,
-  withDataRegion,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -944,6 +944,13 @@ export async function handleLlmProxyRequest(
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
   const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
+  const organizationGatewaySettings = organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        organizationId,
+        (await balanceAndSettingsPromise).settings
+      )
+    : NO_ORGANIZATION_GATEWAY_SETTINGS;
 
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
@@ -952,6 +959,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     boundedSpending: requestCostLimit !== null,
+    vercelDisabled: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
@@ -981,25 +989,10 @@ export async function handleLlmProxyRequest(
         )
       : directByokCatalogOnlyResponse(message);
   }
-  const organizationGatewaySettings = organizationId
-    ? getOrganizationGatewaySettings(
-        await getRuntimeOrganizationFeatures(),
-        organizationId,
-        (await balanceAndSettingsPromise).settings
-      )
-    : null;
-  if (
-    organizationGatewaySettings &&
-    isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.type)
-  ) {
+  if (isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.type)) {
     return managedGatewayDisabledResponse(providerResult.provider.type);
   }
-  const effectiveProviderContext = organizationGatewaySettings?.dataRegion
-    ? {
-        ...providerResult,
-        provider: withDataRegion(providerResult.provider, organizationGatewaySettings.dataRegion),
-      }
-    : providerResult;
+  const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
@@ -1201,6 +1194,7 @@ export async function handleLlmProxyRequest(
     method: request.method,
     signal: request.signal,
     vercelRequestId,
+    dataRegion: organizationGatewaySettings.dataRegion,
   };
 
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict

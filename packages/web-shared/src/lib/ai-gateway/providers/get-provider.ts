@@ -483,9 +483,12 @@ async function checkGatewayBYOK(
 async function selectKiloGateway(
   requestedModel: string,
   boundedSpending: boolean,
+  vercelDisabled: boolean,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ): Promise<'vercel' | 'openrouter'> {
-  return !boundedSpending && (await shouldRouteToVercel(requestedModel, getRoutingProviderConfig))
+  return !boundedSpending &&
+    !vercelDisabled &&
+    (await shouldRouteToVercel(requestedModel, getRoutingProviderConfig))
     ? 'vercel'
     : 'openrouter';
 }
@@ -514,6 +517,10 @@ export type GetProviderInput = {
   /** The request carries a spend ceiling. Only a provider that can cap the
    * price of the route it serves may take it. */
   boundedSpending?: boolean;
+  /** The organization turned the Vercel AI Gateway off, so Kilo's own route falls back to
+   * OpenRouter, like the global Vercel routing switch. BYOK routes are unaffected; the caller
+   * rejects a route through a disabled gateway. */
+  vercelDisabled?: boolean;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
 };
@@ -537,6 +544,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     isDirectByokProviderAllowed = everyDirectByokProviderAllowed,
     kiloIgnoredProviders = [],
     boundedSpending = false,
+    vercelDisabled = false,
     countryCode = null,
   } = input;
 
@@ -626,8 +634,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return directByokUnsupportedApiKind.result;
   }
 
-  const kiloGateway = await selectKiloGateway(requestedModel, boundedSpending, async () =>
-    withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
+  const kiloGateway = await selectKiloGateway(
+    requestedModel,
+    boundedSpending,
+    vercelDisabled,
+    async () => withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
   );
   return {
     kind: 'provider',
@@ -825,7 +836,7 @@ export async function previewByokRouting({
   steps.push({
     route: 'kilo',
     outcome: 'used',
-    gateway: await selectKiloGateway(requestedModel, false, noProviderRestrictions),
+    gateway: await selectKiloGateway(requestedModel, false, false, noProviderRestrictions),
   });
   return { kind: 'routes', steps: markUnreachedSteps(steps) };
 }

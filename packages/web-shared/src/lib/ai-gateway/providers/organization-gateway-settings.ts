@@ -10,21 +10,24 @@ export type OrganizationGatewaySettings = {
   dataRegion: OrganizationDataRegion | null;
 };
 
+export const NO_ORGANIZATION_GATEWAY_SETTINGS: OrganizationGatewaySettings = {
+  disabledGateways: new Set(),
+  dataRegion: null,
+};
+
 /** The organization's gateway settings that its enabled organization features let take effect. */
 export function getOrganizationGatewaySettings(
   features: OrganizationFeatures,
-  organizationId: string | null | undefined,
+  organizationId: string,
   settings: OrganizationSettings | undefined
 ): OrganizationGatewaySettings {
-  const disabledGateways = new Set<ManagedGatewayId>();
-  if (isOrganizationFeatureEnabled(features, 'gateway_disable_toggles', organizationId)) {
-    if (settings?.disable_openrouter) disabledGateways.add('openrouter');
-    if (settings?.disable_vercel_ai_gateway) disabledGateways.add('vercel');
+  if (!settings || !isOrganizationFeatureEnabled(features, 'gateway_settings', organizationId)) {
+    return NO_ORGANIZATION_GATEWAY_SETTINGS;
   }
-  const dataRegion = isOrganizationFeatureEnabled(features, 'data_region', organizationId)
-    ? (settings?.data_region ?? null)
-    : null;
-  return { disabledGateways, dataRegion };
+  const disabledGateways = new Set<ManagedGatewayId>();
+  if (settings.disable_openrouter) disabledGateways.add('openrouter');
+  if (settings.disable_vercel_ai_gateway) disabledGateways.add('vercel');
+  return { disabledGateways, dataRegion: settings.data_region ?? null };
 }
 
 export function isManagedGatewayDisabled(
@@ -35,30 +38,4 @@ export function isManagedGatewayDisabled(
     (providerType === 'openrouter' || providerType === 'vercel') &&
     settings.disabledGateways.has(providerType)
   );
-}
-
-/**
- * Pins Vercel AI Gateway inference to the data region with
- * `providerOptions.gateway.inferenceRegion`, which fails the request instead of leaving the region
- * (https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference). OpenRouter's
- * regional hosts need a Business plan we do not have, so OpenRouter and other providers are unchanged.
- */
-export function withDataRegion(provider: Provider, dataRegion: OrganizationDataRegion): Provider {
-  if (provider.type === 'vercel') {
-    return {
-      ...provider,
-      async transformRequest(context) {
-        await provider.transformRequest(context);
-        const body = context.request.body;
-        body.providerOptions = {
-          ...body.providerOptions,
-          gateway: {
-            ...body.providerOptions?.gateway,
-            inferenceRegion: { scope: 'zone', geoRegion: dataRegion },
-          },
-        };
-      },
-    };
-  }
-  return provider;
 }

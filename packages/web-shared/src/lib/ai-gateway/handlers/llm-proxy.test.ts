@@ -1434,7 +1434,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     ] as const)(
       'rejects a request routed through a disabled %s gateway',
       async (_gateway, selectedProvider, settings, gatewayName) => {
-        setOrganization(settings, { gateway_disable_toggles: ['org-1'] });
+        setOrganization(settings, { gateway_settings: ['org-1'] });
         mockedGetProvider.mockResolvedValue({
           kind: 'provider',
           provider: selectedProvider,
@@ -1465,8 +1465,60 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).toHaveBeenCalled();
     });
 
+    it('rejects a BYOK route through a disabled Vercel AI Gateway', async () => {
+      setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: vercelProvider,
+        userByok: [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(403);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{ disable_vercel_ai_gateway: true }, ['org-1'], true],
+      [{ disable_vercel_ai_gateway: true }, [], false],
+      [{ disable_openrouter: true }, ['org-1'], false],
+    ] as const)(
+      'tells provider selection whether the organization turned Vercel off (%j, %j)',
+      async (settings, organizationIds, vercelDisabled) => {
+        setOrganization(settings, { gateway_settings: [...organizationIds] });
+
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(mockedGetProvider.mock.calls[0]?.[0].vercelDisabled).toBe(vercelDisabled);
+      }
+    );
+
+    it('pins Vercel AI Gateway requests to the data region', async () => {
+      setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: vercelProvider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(
+        mockedUpstreamRequest.mock.calls[0]?.[0].body.providerOptions?.gateway?.inferenceRegion
+      ).toEqual({ scope: 'zone', geoRegion: 'jp' });
+    });
+
     it('keeps OpenRouter requests on the global base URL when a data region is set', async () => {
-      setOrganization({ data_region: 'eu' }, { data_region: ['org-1'] });
+      setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] });
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);

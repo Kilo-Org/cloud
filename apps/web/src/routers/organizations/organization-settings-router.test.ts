@@ -1393,11 +1393,8 @@ describe('organizations settings trpc router', () => {
   });
 
   describe('gateway settings', () => {
-    async function enableGatewayFeatures(features: {
-      gateway_disable_toggles?: string[];
-      data_region?: string[];
-    }) {
-      const config = { organization_features: features };
+    async function enableGatewaySettings(organizationIds: string[]) {
+      const config = { organization_features: { gateway_settings: organizationIds } };
       await db
         .insert(ai_gateway_config)
         .values({ config })
@@ -1409,25 +1406,22 @@ describe('organizations settings trpc router', () => {
       await updateOrganizationSettings(testOrganization.id, {});
     });
 
-    it('reports which gateway features are enabled', async () => {
-      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+    it('reports whether gateway settings are available', async () => {
+      await enableGatewaySettings([testOrganization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(
         caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
       ).resolves.toEqual({
-        features: { gateway_disable_toggles: false, data_region: true },
+        available: true,
         disable_openrouter: false,
         disable_vercel_ai_gateway: false,
         data_region: null,
       });
     });
 
-    it('saves gateway settings for enabled features and records an audit log', async () => {
-      await enableGatewayFeatures({
-        gateway_disable_toggles: [testOrganization.id],
-        data_region: [testOrganization.id],
-      });
+    it('saves gateway settings and records an audit log', async () => {
+      await enableGatewaySettings([testOrganization.id]);
       const caller = await createCallerForUser(owner.id);
 
       const result = await caller.organizations.settings.updateGatewaySettings({
@@ -1453,8 +1447,8 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it('rejects gateway settings whose feature is not enabled', async () => {
-      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+    it('rejects gateway settings while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
@@ -1469,7 +1463,7 @@ describe('organizations settings trpc router', () => {
     });
 
     it('rejects gateway settings changes by members', async () => {
-      await enableGatewayFeatures({ data_region: [testOrganization.id] });
+      await enableGatewaySettings([testOrganization.id]);
       const caller = await createCallerForUser(member.id);
 
       await expect(

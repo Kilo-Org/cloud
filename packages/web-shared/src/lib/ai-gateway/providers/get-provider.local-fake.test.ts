@@ -294,6 +294,18 @@ describe('getProvider exclusive model routing', () => {
     expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
     expect(shouldRouteToVercel).not.toHaveBeenCalled();
   });
+
+  test('falls back to OpenRouter when the organization turned the Vercel AI Gateway off', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const result = await getProvider({
+      ...providerInput('openai/gpt-5-nano'),
+      vercelDisabled: true,
+    });
+
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProvider ChatGPT connection routing order', () => {

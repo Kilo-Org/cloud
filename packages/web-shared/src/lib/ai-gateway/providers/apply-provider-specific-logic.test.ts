@@ -806,7 +806,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       createUserVercelAiGatewayProvider('user-key')
     );
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null, null);
   });
 
   it('passes inference provider keys to the Vercel settings', async () => {
@@ -814,7 +814,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 
     const request = await apply(userByok, VERCEL_AI_GATEWAY);
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok, null);
   });
 
   it.each(['openrouter', 'vercel-ai-gateway'] as const)(

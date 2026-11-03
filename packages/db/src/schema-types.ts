@@ -1408,10 +1408,10 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
-  // Apply only while the `gateway_disable_toggles` organization feature is enabled in the gateway configuration
+  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
+  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
   disable_openrouter: z.boolean().optional(),
   disable_vercel_ai_gateway: z.boolean().optional(),
-  // Applies only while the `data_region` organization feature is enabled; null or absent routes globally
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 

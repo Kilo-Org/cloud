@@ -22,8 +22,7 @@ type FeatureValues = Record<OrganizationFeature, string>;
 function toFeatureValues(features: OrganizationFeatures): FeatureValues {
   return {
     experimental_byok: features.experimental_byok.join('\n'),
-    gateway_disable_toggles: features.gateway_disable_toggles.join('\n'),
-    data_region: features.data_region.join('\n'),
+    gateway_settings: features.gateway_settings.join('\n'),
   };
 }
 
@@ -88,8 +87,7 @@ export function OrganizationFeaturesContent() {
     if (!values) return;
     const parsed = OrganizationFeaturesInputSchema.safeParse({
       experimental_byok: parseOrganizationIds(values.experimental_byok),
-      gateway_disable_toggles: parseOrganizationIds(values.gateway_disable_toggles),
-      data_region: parseOrganizationIds(values.data_region),
+      gateway_settings: parseOrganizationIds(values.gateway_settings),
     });
     if (!parsed.success) {
       setValidationError(formatZodError(parsed.error));

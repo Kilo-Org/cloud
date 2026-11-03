@@ -323,25 +323,18 @@ const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
 });
 
 const GatewaySettingsResponseSchema = z.object({
-  features: z.object({
-    gateway_disable_toggles: z.boolean(),
-    data_region: z.boolean(),
-  }),
+  available: z.boolean(),
   disable_openrouter: z.boolean(),
   disable_vercel_ai_gateway: z.boolean(),
   data_region: OrganizationDataRegionSchema.nullable(),
 });
 
-async function getGatewayFeatures(organizationId: string) {
-  const features = await readOrganizationFeatures(db);
-  return {
-    gateway_disable_toggles: isOrganizationFeatureEnabled(
-      features,
-      'gateway_disable_toggles',
-      organizationId
-    ),
-    data_region: isOrganizationFeatureEnabled(features, 'data_region', organizationId),
-  };
+async function isGatewaySettingsAvailable(organizationId: string) {
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(db),
+    'gateway_settings',
+    organizationId
+  );
 }
 
 function createGatewaySettingsDiffMessage(
@@ -378,7 +371,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
       return {
-        features: await getGatewayFeatures(input.organizationId),
+        available: await isGatewaySettingsAvailable(input.organizationId),
         disable_openrouter: organization.settings.disable_openrouter ?? false,
         disable_vercel_ai_gateway: organization.settings.disable_vercel_ai_gateway ?? false,
         data_region: organization.settings.data_region ?? null,
@@ -390,16 +383,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, disable_openrouter, disable_vercel_ai_gateway, data_region } = input;
-      const features = await getGatewayFeatures(organizationId);
-      const changesGatewayToggles =
-        disable_openrouter !== undefined || disable_vercel_ai_gateway !== undefined;
-      if (
-        (changesGatewayToggles && !features.gateway_disable_toggles) ||
-        (data_region !== undefined && !features.data_region)
-      ) {
+      if (!(await isGatewaySettingsAvailable(organizationId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'This gateway setting is not available for this organization.',
+          message: 'Gateway settings are not available for this organization.',
         });
       }
 

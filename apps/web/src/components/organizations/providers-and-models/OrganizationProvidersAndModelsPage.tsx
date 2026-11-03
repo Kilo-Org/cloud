@@ -125,9 +125,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       { enabled: organizationData?.plan === 'enterprise' }
     )
   );
-  const showGatewaysTab =
-    gatewaySettings !== undefined &&
-    (gatewaySettings.features.gateway_disable_toggles || gatewaySettings.features.data_region);
+  const showGatewaysTab = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,

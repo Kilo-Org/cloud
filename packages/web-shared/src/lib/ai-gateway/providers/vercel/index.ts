@@ -1,4 +1,5 @@
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -269,7 +270,8 @@ export function getVercelInferenceProviderConfigForUserByok(
 export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  userByok: BYOKResult[] | null
+  userByok: BYOKResult[] | null,
+  dataRegion: OrganizationDataRegion | null = null
 ) {
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
@@ -328,6 +330,15 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
+  }
+
+  if (dataRegion && requestToMutate.body.providerOptions?.gateway) {
+    // Vercel fails the request instead of leaving the region, for BYOK credentials too.
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    requestToMutate.body.providerOptions.gateway.inferenceRegion = {
+      scope: 'zone',
+      geoRegion: dataRegion,
+    };
   }
 
   if (requestToMutate.body.providerOptions) {

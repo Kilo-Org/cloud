@@ -82,15 +82,13 @@ describe('adminGatewayConfigRouter', () => {
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId.toUpperCase()],
-      gateway_disable_toggles: [],
-      data_region: [organizationId],
+      gateway_settings: [organizationId],
     });
     await caller.admin.gatewayConfig.set(input);
 
     await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual({
       experimental_byok: [organizationId],
-      gateway_disable_toggles: [],
-      data_region: [organizationId],
+      gateway_settings: [organizationId],
     });
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
       vercel_routing_enabled: false,
@@ -104,8 +102,7 @@ describe('adminGatewayConfigRouter', () => {
     await caller.admin.gatewayConfig.set(input);
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [],
-      gateway_disable_toggles: ['00000000-0000-4000-8000-000000000001'],
-      data_region: [],
+      gateway_settings: ['00000000-0000-4000-8000-000000000001'],
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
@@ -121,8 +118,7 @@ describe('adminGatewayConfigRouter', () => {
     await expect(
       caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: ['not-an-id'],
-        gateway_disable_toggles: [],
-        data_region: [],
+        gateway_settings: [],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);

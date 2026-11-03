@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { endOfComment, endOfQuoted, endOfQuotedOrComment, endOfTemplate } from '../lib/js-scan.mjs';
+import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
@@ -261,17 +261,13 @@ function ownClassStrings(attributes) {
   const strings = [];
   let depth = 0;
   for (let index = 0; index < attributes.length; index++) {
+    const skipped = endOfQuotedOrComment(attributes, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = attributes[index];
-    if (char === '"' || char === "'") {
-      index = endOfQuoted(attributes, index) - 1;
-    } else if (char === '`') {
-      // A template's `${…}` may nest another template; `endOfQuoted` would stop
-      // at the inner backtick and read the rest of the attributes as code.
-      index = endOfTemplate(attributes, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(attributes, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '{') {
+    if (char === '{') {
       depth++;
     } else if (char === '}') {
       depth--;
@@ -370,11 +366,12 @@ const RAW_TEXT_EXEMPT = new Set([
 /**
  * Whether one named specifier brings the runtime component in: a bare `Text`
  * and `Text as <name>` do, while `type Text` and `type Text as <name>` are the
- * annotations callers type refs with.
+ * annotations callers type refs with. The `as` split leaves that leading
+ * `type` in the imported name, so the name comparison alone excludes them.
  */
 function importsRuntimeText(specifier) {
   const [imported] = specifier.split(/\s+as\s+/);
-  return imported.trim() === 'Text' && !specifier.trim().startsWith('type ');
+  return imported.trim() === 'Text';
 }
 
 export function checkRawText(relative, text, index = lineIndex(text)) {

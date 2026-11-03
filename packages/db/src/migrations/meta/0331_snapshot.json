@@ -1,5 +1,5 @@
 {
-  "id": "894abec5-32f7-4078-a01c-3ab58a533074",
+  "id": "5dfdae11-7b91-4fe8-bf4e-cdb75cb99643",
   "prevId": "ddc770d9-2af5-4667-bd17-a9d0e7f6f31d",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -16189,6 +16139,47 @@
       },
       "isRLSEnabled": false
     },
+    "public.inference_region": {
+      "name": "inference_region",
+      "schema": "",
+      "columns": {
+        "inference_region_id": {
+          "name": "inference_region_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "inference_region": {
+          "name": "inference_region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_inference_region": {
+          "name": "UQ_inference_region",
+          "columns": [
+            {
+              "expression": "inference_region",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.ja4_digest": {
       "name": "ja4_digest",
       "schema": "",
@@ -23900,6 +23891,12 @@
         },
         "reasoning_setting_id": {
           "name": "reasoning_setting_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inference_region_id": {
+          "name": "inference_region_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false

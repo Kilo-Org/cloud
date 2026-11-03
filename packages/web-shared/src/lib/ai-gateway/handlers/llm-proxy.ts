@@ -418,7 +418,8 @@ export async function handleLlmProxyRequest(
   const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
-  // work and is awaited just before the upstream call.
+  // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
+  // never awaited.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
       if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;

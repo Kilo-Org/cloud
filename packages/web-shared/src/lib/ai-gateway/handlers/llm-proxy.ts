@@ -22,7 +22,7 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -942,6 +942,7 @@ export async function handleLlmProxyRequest(
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
 
   const usageId = randomUUID();
+  const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -955,7 +956,7 @@ export async function handleLlmProxyRequest(
     getAllowedProviders: accessCheckResolver.getAllowedProviders,
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
-    onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
+    onDecision: decision => providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -1121,6 +1122,7 @@ export async function handleLlmProxyRequest(
     requestStartedAt,
     clientRequestId,
     usageId,
+    providerMetadataCapture,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),

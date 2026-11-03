@@ -19,6 +19,7 @@ import {
   selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -86,7 +87,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -120,10 +122,12 @@ export async function parseResponsesMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
     const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
+    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -209,9 +213,11 @@ export async function parseResponsesMicrodollarUsageFromStream(
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderType
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;

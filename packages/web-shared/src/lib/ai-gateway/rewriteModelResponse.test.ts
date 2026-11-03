@@ -2044,7 +2044,7 @@ async function rewriteUsageFixture(
   return { payload: envelope.message ?? envelope.response ?? envelope, objects };
 }
 
-describe('Vercel provider metadata archival', () => {
+describe('Vercel provider metadata rewriting', () => {
   const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
     '@kilocode/web-shared/lib/r2/create-client'
   );
@@ -2067,6 +2067,7 @@ describe('Vercel provider metadata archival', () => {
   };
 
   beforeEach(() => {
+    jest.spyOn(fakeR2, 'send');
     jest.replaceProperty(process, 'env', {
       ...process.env,
       R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-ai-provider-metadata',
@@ -2078,22 +2079,16 @@ describe('Vercel provider metadata archival', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  async function uploadAndReadMetadata() {
+  function expectNoArchiveIO() {
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(fakeR2.send).not.toHaveBeenCalled();
     expect(fakeR2.objects.size).toBe(0);
-    expect(mockedAfter).toHaveBeenCalledTimes(1);
-    const callback = mockedAfter.mock.calls[0]?.[0];
-    if (typeof callback !== 'function') throw new Error('Expected an after callback');
-    await callback();
-    expect(fakeR2.objects.size).toBe(1);
-    return JSON.parse(
-      fakeR2.objects.get('test-ai-provider-metadata/vercel/gen_metadata_test.json') ?? ''
-    );
   }
 
   describe.each(usageShapes)('$kind', shape => {
     describe.each([false, true])('stream=%s', stream => {
       test.each(['provider_metadata', 'providerMetadata'])(
-        'archives %s without exposing it or storing the response body',
+        'strips %s without scheduling archive IO',
         async metadataKey => {
           const payload = {
             id: 'gen_metadata_test',
@@ -2138,14 +2133,14 @@ describe('Vercel provider metadata archival', () => {
 
           expect(output).not.toContain('provider_metadata');
           expect(output).not.toContain('providerMetadata');
-          expect(await uploadAndReadMetadata()).toEqual(metadata);
+          expectNoArchiveIO();
         }
       );
     });
   });
 
   test.each([false, true])(
-    'archives nested Chat Completions metadata without usage, stream=%s',
+    'strips nested Chat Completions metadata without usage or archive IO, stream=%s',
     async stream => {
       const choice = { content: 'answer', provider_metadata: metadata };
       const body = {
@@ -2166,31 +2161,11 @@ describe('Vercel provider metadata archival', () => {
       const output = stream ? await readOutputStream(result) : JSON.stringify(await result.json());
 
       expect(output).not.toContain('provider_metadata');
-      expect(await uploadAndReadMetadata()).toEqual(metadata);
+      expectNoArchiveIO();
     }
   );
 
-  test.each(['openrouter', 'custom'] as const)(
-    'does not archive metadata from %s',
-    async providerId => {
-      await rewriteModelResponse({
-        response: jsonResponse({ id: 'gen_metadata_test', provider_metadata: metadata }),
-        model: 'requested-model',
-        providerId,
-        kind: 'chat_completions',
-        isFree: false,
-        userByok: false,
-        customLlmPricing: null,
-        logging: makeLogging(),
-        responseTransforms: null,
-      });
-
-      expect(mockedAfter).not.toHaveBeenCalled();
-      expect(fakeR2.objects.size).toBe(0);
-    }
-  );
-
-  test('archives observed metadata even when the upstream stream disconnects', async () => {
+  test('does not perform archive IO for observed metadata before an upstream disconnect', async () => {
     const result = await rewriteModelResponse({
       response: failingResponse(
         'text/event-stream',
@@ -2208,7 +2183,7 @@ describe('Vercel provider metadata archival', () => {
     });
 
     expect(await readOutputStream(result)).toContain('upstream_disconnect');
-    expect(await uploadAndReadMetadata()).toEqual(metadata);
+    expectNoArchiveIO();
   });
 });
 

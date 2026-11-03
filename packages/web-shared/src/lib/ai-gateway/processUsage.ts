@@ -117,6 +117,7 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
 
@@ -1175,6 +1176,12 @@ export function countAndStoreUsage(
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
   const { requestStartedAt } = usageContext;
+  const metadataCapture =
+    usageContext.provider === 'vercel' ? usageContext.providerMetadataCapture : undefined;
+  const contentType = clonedReponse.headers.get('content-type');
+  const isStreaming = contentType?.includes('application/json')
+    ? false
+    : contentType?.includes('text/event-stream') || usageContext.isStreaming;
 
   const parseResponseText = async (
     body: ReadableStream<Uint8Array>,
@@ -1194,7 +1201,7 @@ export function countAndStoreUsage(
 
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseResponsesMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1202,18 +1209,20 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseResponsesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1221,19 +1230,21 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseMicrodollarUsageFromString(
               content,
               usageContext.kiloUserId,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
     if (usageContext.api_kind === 'messages') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseMessagesMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1241,18 +1252,21 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseMessagesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
   }
 
+  metadataCapture?.waitFor(usageStatsPromise);
   return usageStatsPromise.then(usageStats =>
     processTokenData(usageStats, usageContext, servingProvider)
   );
@@ -1294,7 +1308,8 @@ export async function parseMicrodollarUsageFromStream(
   provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1330,10 +1345,12 @@ export async function parseMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
     const json = JSON.parse(event.data) as ChatCompletionChunk;
+    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -1422,13 +1439,15 @@ export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
   statusCode: number,
-  provider: ProviderType
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
         MaybeHasOpenRouterUsage &
         MaybeHasVercelProviderMetaData)
     | null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   if (
     providerReportsIsByok(provider) &&

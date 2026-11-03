@@ -19,6 +19,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 type MaybeHasVercelProviderMetadata = {
   provider_metadata?: VercelProviderMetaData;
@@ -106,7 +107,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
   provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -141,12 +143,14 @@ export async function parseMessagesMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
     const json = JSON.parse(event.data) as
       | Anthropic.Messages.MessageStreamEvent
       | MessagesApiStreamErrorEvent;
+    metadataCapture?.captureVercelMetadata(json);
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -244,11 +248,13 @@ export async function parseMessagesMicrodollarUsageFromStream(
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderType
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
     | null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;

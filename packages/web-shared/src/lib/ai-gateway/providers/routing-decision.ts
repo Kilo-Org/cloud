@@ -196,6 +196,12 @@ export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.ext
   /** The `microdollar_usage` and `microdollar_usage_metadata` id of the request. */
   usage_id: z.uuid(),
   created_at: z.iso.datetime(),
+  vercel: z
+    .object({
+      generation_id: z.string().nullable(),
+      metadata: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;

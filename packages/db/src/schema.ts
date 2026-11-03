@@ -114,7 +114,6 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
-  EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
@@ -10537,32 +10536,6 @@ export const exa_usage_log = pgTable(
 );
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
-
-// Retained only for migration tracking; application code uses enkrypt_usage.
-export const enkrypt_guardrail_charges = pgTable(
-  'enkrypt_guardrail_charges',
-  {
-    id: uuid()
-      .notNull()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey(),
-    organization_id: uuid().notNull(),
-    kilo_user_id: text().notNull(),
-    session_id: text(),
-    api_kind: text().notNull().$type<EnkryptGuardrailApiKind>(),
-    decision: text().notNull().$type<EnkryptGuardrailDecision>(),
-    enkrypt_credits_cost: real(),
-    charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    added_latency_ms: integer(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_enkrypt_guardrail_charges_organization_created_at').on(
-      table.organization_id,
-      table.created_at
-    ),
-  ]
-);
 
 export const enkrypt_usage_decision = pgTable(
   'enkrypt_usage_decision',

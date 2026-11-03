@@ -239,7 +239,7 @@ describe('getProvider local fake deterministic routing', () => {
           isFree: true,
           bypassAccessCheck: false,
         });
-        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function));
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function), false);
       }
     );
   });
@@ -283,8 +283,8 @@ describe('getProvider exclusive model routing', () => {
     }
   );
 
-  test('keeps a spend-bounded request on the provider that can enforce its ceiling', async () => {
-    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+  test('forwards the spend ceiling to the Vercel routing decision', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
 
     const result = await getProvider({
       ...providerInput('openai/gpt-5-nano'),
@@ -292,7 +292,11 @@ describe('getProvider exclusive model routing', () => {
     });
 
     expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
-    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      'openai/gpt-5-nano',
+      expect.any(Function),
+      true
+    );
   });
 });
 

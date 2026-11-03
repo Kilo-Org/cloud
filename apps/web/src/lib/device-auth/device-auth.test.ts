@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import {
   generateUserCode,
@@ -18,6 +18,7 @@ import {
   cleanupExpiredDeviceAuthRequests,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+  DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
 } from './device-auth';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
@@ -268,6 +269,100 @@ describe('Device Auth', () => {
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
     });
+
+    test('keeps the live pending rows of one address within the limit under concurrent requests', async () => {
+      const ipAddress = `10.${(Date.now() * 13) % 254}.${(Date.now() * 17) % 254}.7`;
+      const concurrentRequests = 12;
+      const livePendingLimit = 5;
+
+      // Clean up any leftover rows.
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      const results = await Promise.allSettled(
+        Array.from({ length: concurrentRequests }, () => createDeviceAuthRequest({ ipAddress }))
+      );
+
+      expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(
+        livePendingLimit
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(DeviceAuthPendingLimitError);
+        }
+      }
+
+      const [rows] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(device_auth_requests)
+        .where(
+          and(
+            eq(device_auth_requests.ip_address, ipAddress),
+            eq(device_auth_requests.status, 'pending'),
+            gt(device_auth_requests.expires_at, new Date().toISOString())
+          )
+        );
+      expect(rows?.count).toBe(livePendingLimit);
+    });
+
+    test('refuses a request that cannot take the address lock within the wait bound', async () => {
+      const lockedAddress = `10.${(Date.now() * 19) % 254}.${(Date.now() * 23) % 254}.9`;
+      const otherAddress = `10.${(Date.now() * 29) % 254}.${(Date.now() * 31) % 254}.11`;
+      for (const address of [lockedAddress, otherAddress]) {
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, address));
+      }
+
+      // Hold the address's advisory lock in a transaction of its own, on the key
+      // the module takes (same namespace literal as PENDING_LIMIT_LOCK_NAMESPACE).
+      const lockHeld = Promise.withResolvers<void>();
+      const releaseLock = Promise.withResolvers<void>();
+      const lockHolder = db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('device_auth_request_pending'), hashtext(${lockedAddress}))`
+        );
+        lockHeld.resolve();
+        await releaseLock.promise;
+      });
+      await lockHeld.promise;
+
+      try {
+        const waitingStartedAt = Date.now();
+        const waiting = createDeviceAuthRequest({ ipAddress: lockedAddress });
+        // Observe the outcome without leaving an unhandled rejection when an
+        // earlier assertion below fails.
+        const waitingOutcome = waiting.then(
+          () => null,
+          (error: unknown) => error
+        );
+
+        // A request from another address is admitted while this address's lock is held.
+        const otherStartedAt = Date.now();
+        const other = await createDeviceAuthRequest({ ipAddress: otherAddress });
+        expect(other.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+        expect(Date.now() - otherStartedAt).toBeLessThan(1_000);
+
+        // The wait ends at the bound with the pending-limit refusal.
+        expect(await waitingOutcome).toBeInstanceOf(DeviceAuthPendingLimitError);
+        const waitedMs = Date.now() - waitingStartedAt;
+        expect(waitedMs).toBeGreaterThanOrEqual(DEVICE_AUTH_PENDING_LOCK_WAIT_MS - 250);
+        expect(waitedMs).toBeLessThan(DEVICE_AUTH_PENDING_LOCK_WAIT_MS + 10_000);
+
+        const [lockedRows] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(device_auth_requests)
+          .where(eq(device_auth_requests.ip_address, lockedAddress));
+        expect(lockedRows?.count).toBe(0);
+
+        releaseLock.resolve();
+        await lockHolder;
+
+        // Once the lock is free, the same address is admitted again.
+        const afterRelease = await createDeviceAuthRequest({ ipAddress: lockedAddress });
+        expect(afterRelease.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      } finally {
+        releaseLock.resolve();
+        await lockHolder;
+      }
+    }, 30_000);
   });
 
   describe('requesting client', () => {

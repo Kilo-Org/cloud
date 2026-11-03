@@ -262,7 +262,7 @@ describe('idle session disk checkpoint', () => {
     const test = await setup(scenario.options);
     const fields = vi.spyOn(logger, 'withFields');
     const wrapper = await test.start();
-    await test.idle(wrapper);
+    await test.idle(wrapper, 0);
     await runInDurableObject(test.sandbox, async instance => {
       await instance['armAlarm'](await instance.getAllocationState());
     });

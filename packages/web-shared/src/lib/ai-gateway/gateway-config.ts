@@ -62,7 +62,7 @@ export const GatewayConfigInputSchema = z.object({
 
 export const ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT = 1000;
 
-const storedOrganizationIds = z.array(z.string()).default([]);
+const storedOrganizationIds = z.array(z.string().transform(id => id.toLowerCase())).default([]);
 
 /**
  * Per-feature lists of the organizations a feature is enabled for, stored under

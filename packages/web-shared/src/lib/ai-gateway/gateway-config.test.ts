@@ -251,6 +251,14 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
   });
 });
 
+test('lowercases stored organization IDs', () => {
+  expect(
+    GatewayOrganizationFeaturesConfigSchema.parse({
+      organization_features: { gateway_settings: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'] },
+    }).organization_features.gateway_settings
+  ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+});
+
 describe('OrganizationFeaturesInputSchema', () => {
   test('lowercases and deduplicates organization IDs', () => {
     expect(

@@ -111,15 +111,31 @@ describe('briefing evidence screening', () => {
   });
 
   it('screens a credential flag with its argument', () => {
-    const command = 'run --password ' + 'hunter' + '2';
-    expect(redactBriefingExcerpt(command)).toBe('run --password [redacted credential]');
-    expect(redactBriefingExcerptOrDrop(command)).toBe('run --password [redacted credential]');
+    const commands = [
+      'run --password ' + 'hunter' + '2',
+      'run --verbose --password ' + 'hunter' + '2',
+    ];
+    for (const command of commands) {
+      const screened = command.replace('hunter' + '2', '[redacted credential]');
+      expect(redactBriefingExcerpt(command)).toBe(screened);
+      expect(redactBriefingExcerptOrDrop(command)).toBe(screened);
+    }
   });
 
   it('withholds an excerpt when a credential continues past its screened value', () => {
-    const text = 'password=' + 'hunter' + ' ' + 'dXNlcjpwYXNz';
-    expect(redactBriefingExcerpt(text)).toBe('[redacted credential] dXNlcjpwYXNz');
+    const continuation = 'c2VjcmV0OnZhbHVlOjAxMjM0NTY3ODk=';
+    const text = 'password=' + 'hunter' + ' ' + continuation;
+    expect(redactBriefingExcerpt(text)).toBe('[redacted credential] ' + continuation);
     expect(redactBriefingExcerptOrDrop(text)).toBeUndefined();
+  });
+
+  it('keeps an excerpt whose remaining text is an ordinary pair or identifier', () => {
+    expect(redactBriefingExcerptOrDrop('password=' + 'hunter' + ' user=abc123')).toBe(
+      '[redacted credential] user=abc123'
+    );
+    expect(redactBriefingExcerptOrDrop('password=' + 'hunter' + ' getUserById')).toBe(
+      '[redacted credential] getUserById'
+    );
   });
 
   it('screens an opaque run that uses a single character class', () => {

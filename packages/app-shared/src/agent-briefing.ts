@@ -232,7 +232,9 @@ const HEADER_VALUE = new RegExp(
 // A command-line flag that names a credential carries its value in the following
 // whitespace-separated argument, which no assignment separator marks.
 const CREDENTIAL_FLAG = new RegExp(
-  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'&]+)`,
+  String.raw`(^|\s)(--?[A-Za-z][\w-]*)(\s+)(` +
+    QUOTED_VALUE +
+    String.raw`|(?!\\?["'])(?!-)[^\s,;"'&]+)`,
   'g'
 );
 // Credential value shapes that carry no key name of their own. An opaque run is 48
@@ -253,14 +255,17 @@ const CREDENTIAL_VALUE_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
 const EMAIL_ADDRESS = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
 const URL_QUERY = /(https?:\/\/[^\s?]+)\?[^\s]+/g;
 const REDACTION_PLACEHOLDER = /^\s*["']?\[redacted/;
-// A token that continues a credential past the value screening replaces is still
-// treated as credential material when it mixes letter case, mixes letters with
-// digits, or is long enough that no ordinary word or identifier reaches it. Prose
-// after a value stays above these bounds.
+// A token that continues a credential past the value screening replaces is treated as
+// credential material only when it looks like an encoded secret rather than prose or an
+// identifier: 20 characters or more that mix letters with digits, 32 characters or more
+// in any mix, or 10 or more that carry an encoding character. The comparison stops at an
+// assignment, so a following pair is classified on its own key name.
 const RESIDUAL_OPAQUE_TOKEN = new RegExp(
-  String.raw`^(?:(?=.*[a-z])(?=.*[A-Z])[A-Za-z0-9+/=_-]{8,}` +
-    String.raw`|(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9+/=_-]{6,}` +
-    String.raw`|[A-Za-z0-9+/=_-]{24,})$`
+  String.raw`^(?:` +
+    String.raw`(?=[A-Za-z0-9+/=_-]{20,}$)(?=[A-Za-z0-9+/=_-]*[0-9])(?=[A-Za-z0-9+/=_-]*[A-Za-z])[A-Za-z0-9+/=_-]+` +
+    String.raw`|[A-Za-z0-9+/=_-]{32,}` +
+    String.raw`|(?=[A-Za-z0-9+/=_-]{10,}$)(?=.*[+/])[A-Za-z0-9+/=_-]+` +
+    String.raw`)$`
 );
 
 function splitCredentialKeyTokens(key: string): string[] {
@@ -314,7 +319,7 @@ function briefingExcerptCarriesCredential(text: string): boolean {
     return tail.length === 0 ? undefined : tail;
   };
   const isOpaque = (tail: string): boolean =>
-    RESIDUAL_OPAQUE_TOKEN.test(tail.split(/\s+/)[0] ?? '');
+    RESIDUAL_OPAQUE_TOKEN.test((tail.split(/\s+/)[0] ?? '').split('=')[0] ?? '');
   for (const match of text.matchAll(CREDENTIAL_KEY)) {
     const name = match[1];
     if (!name || !isCredentialKeyName(name)) continue;

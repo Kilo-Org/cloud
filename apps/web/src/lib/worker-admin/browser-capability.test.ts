@@ -108,29 +108,39 @@ describe('browserCapabilityHeader', () => {
   });
 
   it('re-mints instead of returning an expired cached capability', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            capability: 'stale',
-            capabilityExpiresAt: new Date(Date.now() + 25_000).toISOString(),
-          }),
-          { status: 200 }
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    try {
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              capability: 'cached',
+              capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+            }),
+            { status: 200 }
+          )
         )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            capability: 'fresh',
-            capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
-          }),
-          { status: 200 }
-        )
-      );
-    const request = params([{ path: 'gastown.getTown', input: { townId: 'town-9' } }]);
-    await expect(browserCapabilityHeader(request)).resolves.toBe('stale');
-    await expect(browserCapabilityHeader(request)).resolves.toBe('fresh');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              capability: 'fresh',
+              capabilityExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+            }),
+            { status: 200 }
+          )
+        );
+      const request = params([{ path: 'gastown.getTown', input: { townId: 'town-9' } }]);
+      await expect(browserCapabilityHeader(request)).resolves.toBe('cached');
+
+      // Stored expiry is real expiry minus the 30s safety pad, so advancing
+      // past that pad must re-mint; a missing expiry check returns "cached".
+      jest.setSystemTime(Date.now() + 271_000);
+      await expect(browserCapabilityHeader(request)).resolves.toBe('fresh');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('widens when an in-flight result does not cover a concurrent caller', async () => {

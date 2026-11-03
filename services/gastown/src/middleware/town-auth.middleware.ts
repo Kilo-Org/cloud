@@ -6,6 +6,7 @@ import {
   GASTOWN_ADMIN_AUDIENCE,
   capabilityTargetKind,
 } from '@kilocode/worker-utils/worker-admin-actions';
+import type { WorkerAdminDecision } from '@kilocode/worker-utils/worker-admin-capability';
 import {
   emitWorkerAdminDecision,
   getWorkerAdmin,
@@ -94,6 +95,25 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     const targetUserId = c.req.param('userId');
     const ownerId = config.owner_id ?? config.owner_user_id;
     if (!targetUserId || config.owner_type === 'org' || !ownerId || ownerId !== targetUserId) {
+      if (authority.hasCapability || authority.legacyClaim) {
+        const denial: WorkerAdminDecision = {
+          allowed: false,
+          source: authority.hasCapability ? 'capability' : 'legacy',
+          status: 403,
+          reason: 'target_mismatch',
+        };
+        const claims = c.get('kiloTokenClaims');
+        emitWorkerAdminDecision(c.env, denial, {
+          action,
+          userId,
+          townId,
+          jti: null,
+          lifetimeSeconds:
+            typeof claims?.exp === 'number' && typeof claims?.iat === 'number'
+              ? claims.exp - claims.iat
+              : null,
+        });
+      }
       return c.json(resError('Forbidden'), 403);
     }
   }

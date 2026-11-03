@@ -21,6 +21,8 @@ function app(params: {
   userId: string;
   memberships?: Array<{ orgId: string; role: string }>;
   decision: Decision;
+  hasCapability?: boolean;
+  legacyClaim?: boolean;
 }) {
   const decide = vi.fn(async () => ({
     allowed: params.decision.allowed,
@@ -35,7 +37,11 @@ function app(params: {
     c.set('kiloUserId', params.userId);
     c.set('kiloTokenClaims', { isAdmin: true, iat: 1, exp: 3601 });
     c.set('kiloOrgMemberships', params.memberships ?? []);
-    c.set('workerAdmin', { decide } as never);
+    c.set('workerAdmin', {
+      decide,
+      hasCapability: params.hasCapability ?? true,
+      legacyClaim: params.legacyClaim ?? false,
+    } as never);
     return next();
   });
   app.use('/api/towns/:townId/*', townAuthMiddleware);
@@ -150,6 +156,11 @@ describe('townAuthMiddleware', () => {
     );
     expect(response.status).toBe(403);
     expect(decide).not.toHaveBeenCalled();
+    expect(emitWorkerAdminDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowed: false, reason: 'target_mismatch' }),
+      expect.objectContaining({ townId: town })
+    );
   });
 
   it('rejects a user-target capability for an org-owned town', async () => {

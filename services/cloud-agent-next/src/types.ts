@@ -648,7 +648,7 @@ export type Env = {
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
   /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
-  /** Explicit organization IDs allowed to build and restore environment snapshots. Empty is off. */
+  /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
   ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
   SESSION_SNAPSHOT_ORG_IDS?: string;
   SESSION_SNAPSHOT_USER_IDS?: string;

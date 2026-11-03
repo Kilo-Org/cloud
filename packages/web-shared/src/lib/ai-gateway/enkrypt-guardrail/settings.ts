@@ -1,4 +1,5 @@
 import {
+  ENKRYPT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
   EnkryptInputGuardrailSettingsSchema,
   type EnkryptDetectorId,
@@ -81,5 +82,51 @@ export function resolveEnkryptInputGuardrail(
     status: 'ready',
     detectors: buildEnkryptDetectRequestDetectors(detectors),
     blockingDetectors: blockingEnkryptDetectorIds(detectors),
+  };
+}
+
+type EnkryptInputGuardrailSplit = {
+  blocking: EnkryptInputGuardrailConfig | null;
+  logOnly: EnkryptInputGuardrailConfig | null;
+};
+
+function selectDetectors(
+  detectors: EnkryptDetectRequestDetectors,
+  ids: readonly EnkryptDetectorId[]
+): EnkryptDetectRequestDetectors {
+  const selected: EnkryptDetectRequestDetectors = {};
+  const select = <Id extends EnkryptDetectorId>(id: Id) => {
+    selected[id] = detectors[id];
+  };
+  ids.forEach(select);
+  return selected;
+}
+
+/**
+ * Log-only detectors never gate a request, so they are scanned in their own Enkrypt call that the
+ * request does not wait for. Enkrypt bills each enabled detector per call, so the extra call only
+ * adds its 1-credit per-call minimum. An invalid configuration stays blocking, so it keeps failing
+ * closed.
+ */
+export function splitEnkryptInputGuardrail(
+  config: EnkryptInputGuardrailConfig
+): EnkryptInputGuardrailSplit {
+  if (config.status === 'invalid') return { blocking: config, logOnly: null };
+  const logOnlyDetectors = ENKRYPT_DETECTOR_IDS.filter(
+    id => config.detectors[id] !== undefined && !config.blockingDetectors.includes(id)
+  );
+  return {
+    blocking:
+      config.blockingDetectors.length === 0
+        ? null
+        : { ...config, detectors: selectDetectors(config.detectors, config.blockingDetectors) },
+    logOnly:
+      logOnlyDetectors.length === 0
+        ? null
+        : {
+            ...config,
+            detectors: selectDetectors(config.detectors, logOnlyDetectors),
+            blockingDetectors: [],
+          },
   };
 }

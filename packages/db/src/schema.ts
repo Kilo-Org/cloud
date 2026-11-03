@@ -2861,6 +2861,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     reasoning_setting_id: integer(),
+    inference_region_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     // Microdollars charged on top of BYOK inference, such as server tools, plugins
     // and PDF parsing, excluding OpenRouter's BYOK fee. Null when not reported separately.
@@ -3027,6 +3028,15 @@ export const reasoning_setting = pgTable(
     reasoning_setting: text().notNull(),
   },
   table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
+export const inference_region = pgTable(
+  'inference_region',
+  {
+    inference_region_id: serial().notNull().primaryKey(),
+    inference_region: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_inference_region').on(table.inference_region)]
 );
 
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
@@ -10653,8 +10663,9 @@ export const enkrypt_usage = pgTable(
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
     // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the request's final call, so it is counted once per request; null on a retried call or when
-    // the request returned before awaiting the verdict.
+    // the final call of the request's blocking scan, or of its log-only scan when no blocking call
+    // was recorded, so it is counted once per request; null on other calls or when the request
+    // returned before awaiting the verdict.
     added_latency_ms: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },

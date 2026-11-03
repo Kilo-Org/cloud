@@ -184,7 +184,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
       builderSandboxId: sandboxId,
       unsupportedReason: owner => {
         if (!isEnvironmentSnapshotsEnabled(env, owner)) {
-          return 'Snapshots are not enabled for this organization';
+          return 'Snapshots are not enabled for this account';
         }
         if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
         if (

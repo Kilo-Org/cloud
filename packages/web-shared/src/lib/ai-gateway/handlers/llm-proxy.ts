@@ -253,7 +253,6 @@ export async function handleLlmProxyRequest(
   if ('errorResponse' in pathResult) return pathResult.errorResponse;
   const { path } = pathResult;
 
-  // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = rawClientIp(request);
   const countryCode = requestCountryCode(request.headers);
 
@@ -278,7 +277,6 @@ export async function handleLlmProxyRequest(
     );
   }
 
-  // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
   const authPromise = getUserFromAuth({
     adminOnly: false,
@@ -681,7 +679,6 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const {
     user: maybeUser,
@@ -708,7 +705,6 @@ export async function handleLlmProxyRequest(
       return invalidTokenResponse();
     }
 
-    // No valid auth
     if (!isPubliclyFreeModel) {
       return paidModelAuthRequiredResponse();
     }
@@ -835,7 +831,7 @@ export async function handleLlmProxyRequest(
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
+    const { settings } = await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
     const providerConfig = getOrganizationProviderPrivacy(settings);
     let effectiveProviderConfig = providerConfig;
@@ -858,33 +854,18 @@ export async function handleLlmProxyRequest(
     }
     return {
       allowedProviders,
-      balance,
-      balanceLimitedByUserAllowance,
       effectiveProviderConfig: effectiveProviderConfig
         ? { ...effectiveProviderConfig, ...effectivePrivacy }
         : undefined,
       groupModelAllowed,
       groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
-      settings,
     };
   }
 
-  function createAccessCheckResolver(modelId: string) {
-    let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
-    const get = () => (accessCheck ??= resolveAccessCheck(modelId));
-    return {
-      get,
-      getRoutingProviderConfig: isAnonymousContext(user)
-        ? undefined
-        : async () => (await get()).effectiveProviderConfig,
-      getAllowedProviders: isAnonymousContext(user)
-        ? undefined
-        : async () => (await get()).allowedProviders,
-    };
-  }
-
-  const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
+  let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
+  const getAccessCheck = () => (accessCheck ??= resolveAccessCheck(effectiveModelIdLowerCased));
+  const isAnonymous = isAnonymousContext(user);
 
   async function isDirectByokProviderAllowed(policyProviderId: string): Promise<boolean> {
     const groupPolicy = await organizationGroupPolicyPromise;
@@ -919,8 +900,11 @@ export async function handleLlmProxyRequest(
     boundedSpending: requestCostLimit !== null,
     countryCode,
     getRoutingProviderConfig: async () =>
-      (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-    getAllowedProviders: accessCheckResolver.getAllowedProviders,
+      (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
+      requestBodyParsed.body.provider,
+    getAllowedProviders: isAnonymous
+      ? undefined
+      : async () => (await getAccessCheck()).allowedProviders,
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
     onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
@@ -947,12 +931,10 @@ export async function handleLlmProxyRequest(
         )
       : directByokCatalogOnlyResponse(message);
   }
-  const effectiveProviderContext = providerResult;
-
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
       const directByokTarget = await getDirectByokModel(routingTarget);
-      if (directByokTarget.provider && effectiveProviderContext.provider.type !== 'direct-byok') {
+      if (directByokTarget.provider && providerResult.provider.type !== 'direct-byok') {
         return organizationAutoConfigurationResponse(
           `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
         );
@@ -964,12 +946,12 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+  if (!providerResult.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis,
-      effectiveProviderContext.provider.type === 'direct-byok'
-        ? effectiveProviderContext.userByok?.[0]?.providerId
+      providerResult.provider.supportedChatApis,
+      providerResult.provider.type === 'direct-byok'
+        ? providerResult.userByok?.[0]?.providerId
         : undefined
     );
   }
@@ -982,9 +964,9 @@ export async function handleLlmProxyRequest(
   // Skip balance/org checks for anonymous users - they can only use free models
   if (
     !isAnonymousContext(user) &&
-    !effectiveProviderContext.isFree &&
-    !effectiveProviderContext.userByok &&
-    !effectiveProviderContext.skipBalanceCheck
+    !providerResult.isFree &&
+    !providerResult.userByok &&
+    !providerResult.skipBalanceCheck
   ) {
     const { balance, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
     if (!canSpendPaidUsage(balance)) {
@@ -997,20 +979,20 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
+  if (!isAnonymousContext(user) && !providerResult.bypassAccessCheck) {
     const {
       allowedProviders,
       effectiveProviderConfig,
       groupModelAllowed,
       groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
-    } = await accessCheckResolver.get();
+    } = await getAccessCheck();
 
-    if (effectiveProviderContext.provider.type === 'direct-byok') {
+    if (providerResult.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
       const directByokProvider = findDirectByokProvider(
-        effectiveProviderContext.userByok?.[0]?.providerId ?? ''
+        providerResult.userByok?.[0]?.providerId ?? ''
       );
       if (
         !directByokProvider ||
@@ -1019,7 +1001,7 @@ export async function handleLlmProxyRequest(
         return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
     } else {
-      const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
+      const modelAllowed = isInferenceProviderUserByok(providerResult.userByok)
         ? groupModelAllowedForInferenceProviderUserByok
         : groupModelAllowed;
       if (!modelAllowed) {
@@ -1027,8 +1009,8 @@ export async function handleLlmProxyRequest(
       }
       if (!groupProvidersAllowed) return modelNotAllowedResponse();
       if (
-        effectiveProviderContext.provider.type === 'vercel' &&
-        effectiveProviderContext.userByok?.some(
+        providerResult.provider.type === 'vercel' &&
+        providerResult.userByok?.some(
           byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
         )
       ) {
@@ -1041,18 +1023,17 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`, {
-    byokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
+  console.debug(`Routing request to ${providerResult.provider.type}`, {
+    byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
   });
 
-  // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
     api_kind: requestBodyParsed.kind,
     kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.type,
+    provider: providerResult.provider.type,
     requested_model: effectiveModelIdLowerCased,
-    is_free: effectiveProviderContext.isFree,
+    is_free: providerResult.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
@@ -1067,7 +1048,7 @@ export async function handleLlmProxyRequest(
     status_code: null,
     editor_name: editorName,
     machine_id: machineIdHeader,
-    user_byok: !!effectiveProviderContext.userByok,
+    user_byok: !!providerResult.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
@@ -1167,7 +1148,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: effectiveProviderContext.provider.type,
+      providerId: providerResult.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -1177,7 +1158,7 @@ export async function handleLlmProxyRequest(
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
-    providerContext: effectiveProviderContext,
+    providerContext: providerResult,
     request: requestBodyParsed,
     costLimit:
       requestCostLimit !== null && requestCostBalance
@@ -1209,9 +1190,9 @@ export async function handleLlmProxyRequest(
       organizationId,
       isAnonymous: isAnonymousContext(user),
       isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!effectiveProviderContext.userByok,
+      userByok: !!providerResult.userByok,
       mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.type,
+      provider: providerResult.provider.type,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
       toolsAvailable,
@@ -1224,14 +1205,14 @@ export async function handleLlmProxyRequest(
   );
   usageContext.status_code = response.status;
   const userByokProviderIds =
-    effectiveProviderContext.userByok === null
+    providerResult.userByok === null
       ? null
-      : effectiveProviderContext.userByok.map(byok => byok.providerId);
+      : providerResult.userByok.map(byok => byok.providerId);
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
-    providerId: effectiveProviderContext.provider.type,
-    isUserByok: !!effectiveProviderContext.userByok,
+    providerId: providerResult.provider.type,
+    isUserByok: !!providerResult.userByok,
     user,
     request: requestBodyParsed.body,
     organizationId,
@@ -1247,7 +1228,7 @@ export async function handleLlmProxyRequest(
     clonedReponse,
     usageContext,
     openrouterRequestSpan,
-    effectiveProviderContext.provider
+    providerResult.provider
   );
   const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
   if (
@@ -1278,7 +1259,7 @@ export async function handleLlmProxyRequest(
 
   {
     const errorResponse = await makeErrorReadable({
-      provider: effectiveProviderContext.provider.type,
+      provider: providerResult.provider.type,
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
@@ -1288,7 +1269,7 @@ export async function handleLlmProxyRequest(
       await logUnrewrittenResponse({
         response,
         model: effectiveModelIdLowerCased,
-        providerId: effectiveProviderContext.provider.type,
+        providerId: providerResult.provider.type,
         logging: requestLogging,
         error: null,
       });
@@ -1299,12 +1280,12 @@ export async function handleLlmProxyRequest(
   return await rewriteModelResponse({
     response,
     model: effectiveModelIdLowerCased,
-    providerId: effectiveProviderContext.provider.type,
+    providerId: providerResult.provider.type,
     kind: requestBodyParsed.kind,
     isFree: usageContext.is_free,
     userByok: usageContext.user_byok,
     customLlmPricing: usageContext.custom_llm_pricing,
     logging: requestLogging,
-    responseTransforms: effectiveProviderContext.provider.responseTransforms,
+    responseTransforms: providerResult.provider.responseTransforms,
   });
 }

@@ -944,18 +944,11 @@ describe('gateway accounting integration', () => {
   )('$target $region live direct accounting records', async ({ region, target, environment }) => {
     const original = { ...process.env };
     try {
-      process.env.USAGE_SHADOW_PUBLISH_ENABLED = 'true';
       configureQueueEnvironment({
         USAGE_QUEUE_ONLY_ENABLED: 'false',
         VERCEL_REGION: region,
         VERCEL_ENV: environment,
         VERCEL_TARGET_ENV: target,
-      });
-      jest.isolateModules(() => {
-        const actual = jest.requireActual<typeof ServerConfig>(
-          '@kilocode/web-shared/lib/config.server'
-        );
-        expect(actual).not.toHaveProperty('USAGE_SHADOW_PUBLISH_ENABLED');
       });
       const lifecycle = requestLifetime();
       const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));

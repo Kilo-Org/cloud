@@ -41,6 +41,16 @@ it('counts only selected sessions and reports omitted sessions without claiming 
     pullRequests: 'partial',
   });
 });
+it('screens snapshot titles with the excerpt rules', () => {
+  const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+  const facts = buildBriefingSnapshot([
+    { ...session(0), title: 'Deploy token=' + 'abc' + '123' },
+    { ...session(1), title: 'Plan for client_' + 'secret: "' + secretKey },
+  ]);
+  expect(facts.sessions[0]?.title).toBe('Deploy [redacted credential]');
+  expect(facts.sessions[1]?.title).toBe('Agent session');
+  expect(JSON.stringify(facts)).not.toContain(secretKey);
+});
 it('bounds serialized snapshots including duplicate source rendering and multibyte excerpts', () => {
   const rows = Array.from({ length: BRIEFING_MAX_SESSIONS }, (_, index) => ({
     ...session(index),
@@ -112,6 +122,24 @@ it('includes bounded plan, changes and failure metadata without duplicating fina
   const metadata = facts.sources.find(source => source.kind === 'artifact');
   expect(metadata?.excerpt).toContain('[redacted credential]');
   expect(metadata?.excerpt).not.toMatch(/private-value|thinking/);
+});
+
+it('withholds an excerpt that screening cannot clear and keeps a cleared one', () => {
+  const unsafe = buildBriefingSnapshot([
+    {
+      ...session(0),
+      briefing_excerpt: {
+        messageId: 'done',
+        completedAt: '2026-10-28T07:00:00.000Z',
+        text: 'Stopped after ' + 'client_' + `secret="` + 'wJalrXUtnFEMI/K7MDENG',
+      },
+    },
+  ]);
+  expect(unsafe.sources.find(source => source.kind === 'activity')?.excerpt).toBeUndefined();
+  const safe = buildBriefingSnapshot([session(1)]);
+  expect(safe.sources.find(source => source.kind === 'activity')?.excerpt).toBe(
+    'Completed response'
+  );
 });
 
 it('counts a verified pull request once across selected sessions', () => {

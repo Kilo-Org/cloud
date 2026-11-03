@@ -349,6 +349,7 @@ describe('GitLab OAuth callback replacement gate', () => {
     mockedStoreGitLabOAuthIntegration.mockResolvedValue({
       integrationId: crypto.randomUUID(),
       instanceChanged: false,
+      accountChanged: false,
     });
   }
 

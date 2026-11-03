@@ -831,6 +831,7 @@ export async function handleLlmProxyRequest(
             max_tokens: null,
             has_middle_out_transform: null,
             reasoning_setting: null,
+            inference_region: null,
             isStreaming: false,
             prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
@@ -1114,6 +1115,10 @@ export async function handleLlmProxyRequest(
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
+    inference_region:
+      effectiveProviderContext.provider.type === 'vercel'
+        ? organizationGatewaySettings.dataRegion
+        : null,
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,

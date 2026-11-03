@@ -556,6 +556,7 @@ describe('countAndStoreFimUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -932,6 +933,7 @@ describe('countAndStoreEditUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;

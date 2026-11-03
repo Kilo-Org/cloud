@@ -69,6 +69,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     ttfb_ms: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -129,6 +130,7 @@ export function createMockUsageContext(
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     ttfb_ms: null,
   };
 }

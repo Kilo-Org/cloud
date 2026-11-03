@@ -74,6 +74,7 @@ export async function buildGraderUsage(
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       market_cost: microdollars,
       non_inference_cost: null,
       is_free: false,

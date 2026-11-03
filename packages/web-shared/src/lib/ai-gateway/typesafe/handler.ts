@@ -255,6 +255,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     max_tokens: null,
     has_middle_out_transform: null,
     reasoning_setting: null,
+    inference_region: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,

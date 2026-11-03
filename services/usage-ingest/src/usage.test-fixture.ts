@@ -55,6 +55,7 @@ export const usage: UsageRecordRequest = {
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     market_cost: null,
     non_inference_cost: null,
     is_free: null,

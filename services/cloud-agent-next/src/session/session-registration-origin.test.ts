@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowsSubagentSessions,
+  isAuthenticatedChildWorktreeCreate,
   isEligibleFirstWorktreeSession,
   isTrustedWorktreeCreateOrigin,
 } from './session-registration.js';
@@ -146,6 +147,60 @@ describe('isTrustedWorktreeCreateOrigin', () => {
     ['agent-manager', undefined],
   ])('rejects an untrusted provenance/origin pair (%s, %s)', (provenance, origin) => {
     expect(isTrustedWorktreeCreateOrigin(provenance, origin)).toBe(false);
+  });
+});
+
+describe('isAuthenticatedChildWorktreeCreate', () => {
+  const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+  const authority = {
+    version: 1 as const,
+    ownerId: 'user-123',
+    parentSessionId,
+    organizationId: null,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt: 1_800_000_000,
+  };
+
+  it.each(['cloud-agent', 'cloud-agent-web', 'agent-manager', 'desktop', undefined])(
+    'recognizes a scoped child with inherited origin %s from its authenticated parent authority',
+    createdOnPlatform => {
+      expect(
+        isAuthenticatedChildWorktreeCreate(
+          {
+            parentCloudAgentSessionId: parentSessionId,
+            options: createdOnPlatform === undefined ? undefined : { createdOnPlatform },
+          },
+          { cloudAgentAuthority: authority }
+        )
+      ).toBe(true);
+    }
+  );
+
+  it.each([
+    ['missing parent lineage', { options: { createdOnPlatform: 'cloud-agent-web' } }],
+    [
+      'different parent lineage',
+      {
+        parentCloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+        options: { createdOnPlatform: 'cloud-agent-web' },
+      },
+    ],
+  ])('rejects %s even with a verified authority', (_label, input) => {
+    expect(isAuthenticatedChildWorktreeCreate(input, { cloudAgentAuthority: authority })).toBe(
+      false
+    );
+  });
+
+  it('rejects child lineage without a verified authority', () => {
+    expect(
+      isAuthenticatedChildWorktreeCreate(
+        {
+          parentCloudAgentSessionId: parentSessionId,
+          options: { createdOnPlatform: 'cloud-agent-web' },
+        },
+        {}
+      )
+    ).toBe(false);
   });
 });
 

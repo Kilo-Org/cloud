@@ -27,9 +27,8 @@ where
     and mu.total_input_tokens > 0
     and (
         mu.provider != 'custom'
-        or coalesce(mu.requested_model, mu.model) like 'reflection/%'
-        or coalesce(mu.requested_model, mu.model) like 'inclusionai/%'
-        or coalesce(mu.requested_model, mu.model) like 'stealth/%'
+        or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
+        or coalesce(mu.requested_model, mu.model) = 'stealth/glyph-cluster'
     )
 group by 1, 2, 3
 order by 1 desc, 4 desc;

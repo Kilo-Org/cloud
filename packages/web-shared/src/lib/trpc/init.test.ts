@@ -203,6 +203,9 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         .input(z.object({ sessionId: z.string() }).strict())
         .mutation(({ input }) => input),
     }),
+    models: createTRPCRouter({
+      list: baseProcedure.query(() => 'models'),
+    }),
     organizations: createTRPCRouter({
       cloudAgentNext: createTRPCRouter({
         getSession: baseProcedure
@@ -229,9 +232,15 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         .input(z.object({ cloudAgentSessionId: z.string() }).strict())
         .mutation(({ input }) => input),
     }),
+    models: createTRPCRouter({
+      list: baseProcedure.mutation(() => 'models'),
+    }),
   });
 
   const outsideAllowlistRouter = createTRPCRouter({
+    models: createTRPCRouter({
+      preferred: baseProcedure.query(() => 'preferred'),
+    }),
     user: createTRPCRouter({
       getMe: baseProcedure.query(() => 'me'),
     }),
@@ -264,6 +273,32 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
     await expect(
       caller.cloudAgentNext.interruptSession({ sessionId: childSessionId })
     ).resolves.toEqual({ sessionId: childSessionId });
+    await expect(caller.models.list()).resolves.toBe('models');
+  });
+
+  test('allows only strict empty models.list discovery for both scopes', async () => {
+    const personal = scopedCaller(context(authority));
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const organization = scopedCaller(context({ ...authority, organizationId }));
+
+    await expect(personal.models.list()).resolves.toBe('models');
+    await expect(organization.models.list()).resolves.toBe('models');
+    await expect((personal.models.list as (input: unknown) => Promise<unknown>)({})).resolves.toBe(
+      'models'
+    );
+    for (const caller of [personal, organization]) {
+      for (const input of [{ organizationId }, { extra: true }, null]) {
+        await expect(
+          (caller.models.list as (input: unknown) => Promise<unknown>)(input)
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
+    }
+  });
+
+  test('denies other models procedures even when the name is adjacent', async () => {
+    await expect(outsideCaller(context(authority)).models.preferred()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   test('denies a procedure whose registered kind does not match the authority kind', async () => {
@@ -272,6 +307,9 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         cloudAgentSessionId: childSessionId,
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(wrongKindCaller(context(authority)).models.list()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   test('denies procedures outside the authority allowlist', async () => {

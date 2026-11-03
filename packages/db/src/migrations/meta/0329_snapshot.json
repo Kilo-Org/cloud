@@ -1,5 +1,5 @@
 {
-  "id": "2fe94632-78e3-4bae-8eae-88697405f6c5",
+  "id": "df411b7f-8c0e-45e2-914b-5493e3b29d85",
   "prevId": "582329c3-2217-4a91-a1ae-2f7ff4928759",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -6528,6 +6478,492 @@
         "cloud_agent_pending_uploads_status_check": {
           "name": "cloud_agent_pending_uploads_status_check",
           "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'reaped')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_pr_watch_activity": {
+      "name": "cloud_agent_pr_watch_activity",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "watch_id": {
+          "name": "watch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_id": {
+          "name": "delivery_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_pr_watch_activity_delivery": {
+          "name": "UQ_cloud_agent_pr_watch_activity_delivery",
+          "columns": [
+            {
+              "expression": "watch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "delivery_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watch_activity_watch": {
+          "name": "IDX_cloud_agent_pr_watch_activity_watch",
+          "columns": [
+            {
+              "expression": "watch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watch_activity_created": {
+          "name": "IDX_cloud_agent_pr_watch_activity_created",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_pr_watch_activity_watch_id_cloud_agent_pr_watches_id_fk": {
+          "name": "cloud_agent_pr_watch_activity_watch_id_cloud_agent_pr_watches_id_fk",
+          "tableFrom": "cloud_agent_pr_watch_activity",
+          "tableTo": "cloud_agent_pr_watches",
+          "columnsFrom": [
+            "watch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_pr_watches": {
+      "name": "cloud_agent_pr_watches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "integration_id": {
+          "name": "integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installation_id": {
+          "name": "installation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_app_type": {
+          "name": "github_app_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repository_id": {
+          "name": "repository_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_url": {
+          "name": "repo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_number": {
+          "name": "pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_session_id": {
+          "name": "source_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_cloud_agent_session_id": {
+          "name": "source_cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "worktree_id": {
+          "name": "worktree_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "head_ref": {
+          "name": "head_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_ref": {
+          "name": "base_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "head_sha": {
+          "name": "head_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_sha": {
+          "name": "base_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'watching'"
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "pending_revision": {
+          "name": "pending_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "policy": {
+          "name": "policy",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "projection": {
+          "name": "projection",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lifecycle_reason": {
+          "name": "lifecycle_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_event_at": {
+          "name": "last_event_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_pr_watches_live_pr": {
+          "name": "UQ_cloud_agent_pr_watches_live_pr",
+          "columns": [
+            {
+              "expression": "repository_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_pr_watches\".\"status\" != 'finished'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watches_owner": {
+          "name": "IDX_cloud_agent_pr_watches_owner",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "worktree_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watches_updated": {
+          "name": "IDX_cloud_agent_pr_watches_updated",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watches_event_identity": {
+          "name": "IDX_cloud_agent_pr_watches_event_identity",
+          "columns": [
+            {
+              "expression": "installation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "github_app_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repository_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_pr_watches_head": {
+          "name": "IDX_cloud_agent_pr_watches_head",
+          "columns": [
+            {
+              "expression": "repository_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "head_sha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_pr_watches_kilo_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_pr_watches_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_pr_watches",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_pr_watches_organization_id_organizations_id_fk": {
+          "name": "cloud_agent_pr_watches_organization_id_organizations_id_fk",
+          "tableFrom": "cloud_agent_pr_watches",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_pr_watches_integration_id_platform_integrations_id_fk": {
+          "name": "cloud_agent_pr_watches_integration_id_platform_integrations_id_fk",
+          "tableFrom": "cloud_agent_pr_watches",
+          "tableTo": "platform_integrations",
+          "columnsFrom": [
+            "integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_pr_watches_status_check": {
+          "name": "cloud_agent_pr_watches_status_check",
+          "value": "\"cloud_agent_pr_watches\".\"status\" IN ('watching', 'paused', 'finished')"
+        },
+        "cloud_agent_pr_watches_app_type_check": {
+          "name": "cloud_agent_pr_watches_app_type_check",
+          "value": "\"cloud_agent_pr_watches\".\"github_app_type\" IN ('standard', 'lite')"
+        },
+        "cloud_agent_pr_watches_version_check": {
+          "name": "cloud_agent_pr_watches_version_check",
+          "value": "\"cloud_agent_pr_watches\".\"generation\" > 0 AND \"cloud_agent_pr_watches\".\"pending_revision\" >= 0 AND \"cloud_agent_pr_watches\".\"pr_number\" > 0"
+        },
+        "cloud_agent_pr_watches_repo_url_check": {
+          "name": "cloud_agent_pr_watches_repo_url_check",
+          "value": "\"cloud_agent_pr_watches\".\"repo_url\" = lower(\"cloud_agent_pr_watches\".\"repo_url\") AND \"cloud_agent_pr_watches\".\"repo_url\" ~ '^https://github[.]com/[^/]+/[^/]+$'"
         }
       },
       "isRLSEnabled": false
@@ -13141,6 +13577,12 @@
         "pr_head_sha": {
           "name": "pr_head_sha",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_observations": {
+          "name": "pr_observations",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

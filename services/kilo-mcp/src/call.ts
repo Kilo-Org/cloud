@@ -240,7 +240,7 @@ function protectedRequestsUnavailable(path: string): JsonRpcFailure {
  * `submit_otp`'s recorded-payload re-check all run these exact checks, so the
  * payload the user approves is exactly the payload the upstream receives.
  */
-function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown): boolean {
+export function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown): boolean {
   const schemaIsEmpty = isNoInputSchema(row.inputSchema);
   const sendInput = input !== undefined && input !== null;
   if (schemaIsEmpty && sendInput) {
@@ -320,6 +320,16 @@ export async function forwardCatalogCall(options: {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
+  return serializeWithCap(await fetchCatalogCall(options));
+}
+
+export async function fetchCatalogCall(options: {
+  row: CatalogRow;
+  input: unknown;
+  auth: ForwardedAuth;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<unknown> {
   const { row, input, auth, webBaseUrl } = options;
   assertScopedCall(auth, row.path, input, row.kind);
   const path = row.path;
@@ -416,8 +426,7 @@ export async function forwardCatalogCall(options: {
   }
   // A void procedure has no `data` key: serialize `null` so the agent gets a
   // success result instead of a false error for a write that landed.
-  const data = Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
-  return serializeWithCap(data);
+  return Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
 }
 
 /**

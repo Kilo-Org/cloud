@@ -280,9 +280,10 @@ export function isKeyPlanStep(step: RoutePlanStep): step is KeyPlanStep {
  * decrypts a key or calls KMS.
  *
  * - The keys come in the owner's route order, each with its decision.
- * - A "Sign in with ChatGPT" connection is not in the key list. It takes an eligible OpenAI
- *   responses request ahead of any provider or gateway key, but not ahead of a catalog-mode key
- *   that the owner ranked above them. The request's `provider.ignore` does not move it.
+ * - A "Sign in with ChatGPT" connection is not in the key list. For an eligible OpenAI responses
+ *   request it goes right before the first provider or gateway key that serves, so only the keys
+ *   ranked above that key come first; when no such key serves, it goes after every key. The
+ *   request's `provider.ignore` does not move it.
  * - A key the request ignores serves after every other key.
  * - BYOK requests are never billed to Kilo, so when no key serves a catalog id that a catalog-mode
  *   key serves over another API kind, the request fails with the unsupported-API error.

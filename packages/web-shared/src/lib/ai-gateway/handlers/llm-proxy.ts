@@ -721,14 +721,12 @@ export async function handleLlmProxyRequest(
     credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
-    tokenSource: authTokenSource,
   } = await authPromise;
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
   let botId: string | undefined = authBotId;
-  let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
     // A caller that presented a credential we could not verify is not the same
@@ -749,7 +747,6 @@ export async function handleLlmProxyRequest(
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
-    tokenSource = undefined;
   } else {
     user = maybeUser;
   }
@@ -841,8 +838,6 @@ export async function handleLlmProxyRequest(
             machine_id: machineIdHeader,
             user_byok: false,
             has_tools: false,
-            botId,
-            tokenSource,
             feature,
             session_id: taskId ?? sessionHeader ?? null,
             mode: modeHeader,
@@ -1111,8 +1106,6 @@ export async function handleLlmProxyRequest(
     machine_id: machineIdHeader,
     user_byok: !!effectiveProviderContext.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
-    botId,
-    tokenSource,
     feature,
     session_id: taskId ?? sessionHeader ?? null,
     mode: modeHeader,

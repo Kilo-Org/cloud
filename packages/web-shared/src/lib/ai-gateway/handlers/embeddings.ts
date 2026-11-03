@@ -153,8 +153,6 @@ export async function handleEmbeddingsRequest(
     authFailedResponse,
     credentialsRejected,
     organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
   } = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
@@ -163,8 +161,6 @@ export async function handleEmbeddingsRequest(
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
-  const botId: string | undefined = authBotId;
-  const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
     // A credential we could not verify is not the absence of one. Fail the
@@ -264,8 +260,6 @@ export async function handleEmbeddingsRequest(
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
     session_id: null,
     mode: null,

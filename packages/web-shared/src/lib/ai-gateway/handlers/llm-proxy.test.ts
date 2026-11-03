@@ -575,13 +575,15 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(balanceCall?.[1]).toBe(authenticatedUser);
     expect(balanceCall?.[2]).toBe(readDb);
     expect(mockedGetProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ user: authenticatedUser, organizationId: 'org-123' })
+      expect.objectContaining({
+        user: authenticatedUser,
+        organizationId: 'org-123',
+        botId: 'bot-123',
+      })
     );
     expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        botId: 'bot-123',
-        tokenSource: 'gateway-token',
         user_byok: true,
         is_free: false,
       }),

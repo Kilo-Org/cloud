@@ -448,8 +448,6 @@ describe('handleSystemOneRequest', () => {
         mode: 'code',
         user_byok: false,
         isStreaming: false,
-        botId: 'bot-123',
-        tokenSource: 'api-key',
         ttfb_ms: expect.any(Number),
       })
     );

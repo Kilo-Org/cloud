@@ -109,11 +109,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
 
-  const { user, authFailedResponse, credentialsRejected, organizationId, botId, tokenSource } =
-    await getUserFromAuth({
-      adminOnly: false,
-      expectedAudience: KILO_GATEWAY_AUDIENCE,
-    });
+  const { user, authFailedResponse, credentialsRejected, organizationId } = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  });
   if (authFailedResponse) return credentialsRejected ? invalidTokenResponse() : authFailedResponse;
 
   let body: unknown;
@@ -268,8 +267,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
     machine_id: machineId,
     user_byok: false,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
     session_id: sessionId,
     mode,

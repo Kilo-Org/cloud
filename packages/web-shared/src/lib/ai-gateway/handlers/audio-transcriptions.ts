@@ -196,8 +196,6 @@ export async function handleAudioTranscriptionsRequest(
     authFailedResponse,
     credentialsRejected,
     organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
   } = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
@@ -205,8 +203,6 @@ export async function handleAudioTranscriptionsRequest(
   authSpan.end();
 
   const organizationId: string | undefined = authOrganizationId;
-  const botId: string | undefined = authBotId;
-  const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
   if (authFailedResponse || !maybeUser) {
@@ -276,8 +272,6 @@ export async function handleAudioTranscriptionsRequest(
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
     session_id: null,
     mode: null,

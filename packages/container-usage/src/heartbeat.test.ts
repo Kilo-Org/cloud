@@ -196,7 +196,8 @@ describe('installBillingHeartbeat', () => {
 
       expect(enforceBudgetStop).toHaveBeenCalledWith(
         { verdict: 'stop' },
-        expect.objectContaining({ startEpochMs: 123 })
+        expect.objectContaining({ startEpochMs: 123 }),
+        'BILLING_UNAVAILABLE'
       );
       expect(recordStop).toHaveBeenCalledOnce();
       expect(await getBillingContext(storage)).toBeUndefined();

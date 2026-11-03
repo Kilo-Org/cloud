@@ -22,6 +22,13 @@
       "when": 1793529471344,
       "tag": "0002_aspiring_scourge",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793706594724,
+      "tag": "0003_great_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

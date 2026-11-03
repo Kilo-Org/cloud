@@ -404,24 +404,28 @@ describe('organization Pass consumption', () => {
       .where(
         eq(kilo_pass_org_issuance_snapshots.allocation_container_organization_id, organization.id)
       );
-    const [source] = await db
-      .insert(credit_transactions)
-      .values({
-        kilo_user_id: owner.id,
-        organization_id: organization.id,
-        amount_microdollars: -19_000_000,
-        is_free: false,
-        credit_category: `kpo:repair-source:${crypto.randomUUID()}`,
-        check_category_uniqueness: true,
+    await db.transaction(tx =>
+      recordOrganizationConsumption(tx, {
+        organizationId: organization.id,
+        kiloUserId: owner.id,
+        amountMicrodollars: 19_000_000,
+        occurredAt: '2025-05-15T12:00:00.000Z',
+        source: 'compute',
+        sourceId: `compute-repair-${crypto.randomUUID()}`,
       })
-      .returning({ id: credit_transactions.id });
-    await db.insert(kilo_pass_org_qualifying_spend_events).values({
-      issuance_snapshot_id: snapshot.id,
-      allocation_container_organization_id: organization.id,
-      credit_transaction_id: source.id,
-      spent_microdollars: 19_000_000,
-      occurred_at: '2025-05-15T12:00:00.000Z',
-    });
+    );
+    await db
+      .update(kilo_pass_org_issuance_snapshots)
+      .set({
+        qualifying_spend_microdollars: 0,
+        repair_completed_at: null,
+      })
+      .where(eq(kilo_pass_org_issuance_snapshots.id, snapshot.id));
+    await db
+      .delete(kilo_pass_org_audit_records)
+      .where(
+        eq(kilo_pass_org_audit_records.idempotency_key, `kpo:expired-bonus-miss:${snapshot.id}`)
+      );
 
     const first = await db.transaction(tx =>
       repairExpiredOrganizationPassBonuses(tx, '2027-07-01T00:00:00.000Z')

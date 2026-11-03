@@ -1,4 +1,5 @@
 import { type SafeFailureProjection } from './safe-failure-projection.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 
 export type CloudMessageFailedPayload = {
   messageId: string;
@@ -10,4 +11,5 @@ export type CloudMessageFailedPayload = {
   attempts?: number;
   error?: string;
   failure?: SafeFailureProjection;
+  billingFailure?: CustomerBillingFailure;
 };

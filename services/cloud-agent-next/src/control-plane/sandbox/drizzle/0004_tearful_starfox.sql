@@ -1,0 +1,1 @@
+ALTER TABLE `routes` ADD `billing_failure` text;

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The Buy credits screen composes the store banner, loading, empty, error, and pack-row surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -102,7 +102,7 @@ export function CreditPurchaseScreen() {
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
 
   const handlePackPress = (pack: StoreCreditProduct) => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     clearError();
     void purchase(pack);
   };

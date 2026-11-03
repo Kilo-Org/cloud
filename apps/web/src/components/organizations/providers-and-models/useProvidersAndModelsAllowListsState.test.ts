@@ -6,6 +6,48 @@ import {
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 
 describe('providersAndModelsAllowListsReducer', () => {
+  test('bulk selection preserves entries outside the requested models and providers', () => {
+    let state = providersAndModelsAllowListsReducer(
+      createProvidersAndModelsAllowListsInitialState(),
+      {
+        type: 'INIT_FROM_SERVER',
+        modelDenyList: ['vendor/a', 'vendor/hidden'],
+        providerAllowList: ['hidden', 'one'],
+      }
+    );
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_MODELS_ALLOWED',
+      modelIds: ['vendor/a', 'vendor/b'],
+      nextAllowed: true,
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_PROVIDERS_ENABLED',
+      providerSlugs: ['one', 'two'],
+      nextEnabled: true,
+    });
+    if (state.status !== 'ready') throw new Error('expected ready state');
+    expect(state.draftModelDenyList).toEqual(['vendor/hidden']);
+    expect(state.draftProviderAllowList).toEqual(['hidden', 'one', 'two']);
+
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_MODELS_ALLOWED',
+      modelIds: ['vendor/a', 'vendor/b'],
+      nextAllowed: false,
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_PROVIDERS_ENABLED',
+      providerSlugs: ['one', 'two'],
+      nextEnabled: false,
+    });
+    if (state.status !== 'ready') throw new Error('expected ready state');
+    expect(state.draftModelDenyList).toEqual(['vendor/a', 'vendor/b', 'vendor/hidden']);
+    expect(state.draftProviderAllowList).toEqual(['hidden']);
+    state = providersAndModelsAllowListsReducer(state, { type: 'RESET_TO_INITIAL' });
+    if (state.status !== 'ready') throw new Error('expected ready state');
+    expect(state.draftModelDenyList).toEqual(['vendor/a', 'vendor/hidden']);
+    expect(state.draftProviderAllowList).toEqual(['hidden', 'one']);
+  });
+
   test('init -> toggle -> reset returns to initial', () => {
     let state: ProvidersAndModelsAllowListsState = createProvidersAndModelsAllowListsInitialState();
 

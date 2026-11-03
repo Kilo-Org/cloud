@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LiveActivityEnvironment } from 'expo-widgets';
 
-import { SESSION_CARD_QUIET_AFTER_MS } from '@kilocode/notifications';
+import { SESSION_CARD_QUIET_AFTER_MS } from '@kilocode/notifications/schemas';
 
 import { sessionLiveActivityLayout } from './session-live-activity';
 

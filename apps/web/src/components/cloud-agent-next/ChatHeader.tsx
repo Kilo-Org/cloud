@@ -21,6 +21,8 @@ import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 
 type ChatHeaderProps = {
+  /** The signed-in user: worktree caches are partitioned by user. */
+  currentUserId: string;
   cloudAgentSessionId: string;
   changesCloudAgentSessionId?: string;
   worktreeId?: string;
@@ -51,6 +53,7 @@ type ChatHeaderProps = {
 };
 
 export function ChatHeader({
+  currentUserId,
   cloudAgentSessionId,
   changesCloudAgentSessionId = cloudAgentSessionId,
   worktreeId,
@@ -129,7 +132,8 @@ export function ChatHeader({
             instead of moving the other controls. */}
         {onToggleChanges && (
           <WorktreeChangesButton
-            key={`worktree-changes:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            key={`worktree-changes:${currentUserId}:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            userId={currentUserId}
             cloudAgentSessionId={changesCloudAgentSessionId}
             organizationId={organizationId}
             worktreeId={worktreeId}

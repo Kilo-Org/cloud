@@ -148,7 +148,12 @@ reuses recoverable output, and never begins a ledgered paid case again. A queued
 limit, and a resume keeps the running lease. The one-minute tick recovers abandoned claims;
 completion refills slots immediately without waiting for a tick. Recovery and
 infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
-and unbilled provider-throttle waits do not create model-failure rows.
+and unbilled provider-throttle waits do not create model-failure rows. A provider throttle
+refunds its claim and counts against a separate budget of 16 throttle deferrals (about an
+hour of backoff), so a briefly rate-limited model is paced instead of losing its lanes; after
+that budget, the chunk falls back to the six-claim limit, so a persistent throttle still fails
+its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
+from its free-model account limit; a `benchmarkUserId` override is limited like other accounts.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
 `(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
@@ -201,7 +206,11 @@ newer empty-output retry.
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease
 prevents the live and recovery paths from grading the same output twice.
-Unbilled throttle and catalog-load failures are cleared and deferred instead of measured.
+Unbilled throttle, provider-outage (5xx or "temporarily unavailable") and catalog-load
+failures are cleared and deferred instead of measured, including one that ends a multi-step
+run after partial text but before any billed answer. A CLI process killed by a signal before
+its first event gets the same single retry as an empty completion; a timeout, a kill after
+events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
@@ -258,6 +267,7 @@ measurements are included in routing-table version hashes.
 - Admission uses the authenticated catalog for the benchmark identity, including its organization context.
 - Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
 - The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
+- The drain also requires at least 20,000 input tokens after the completion budget the CLI reserves: catalog `context_length` minus `min(top_provider.max_completion_tokens || max_completion_tokens || 20% of the window, 32,000)`. The CLI harness prompt alone is about 16.6k tokens. A smaller pair is registered, then its profile fails with a context-window reason before any paid call. An absent context length is admitted.
 - Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
@@ -868,6 +878,11 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 - A case repetition reuses its stored score only after exit code 0, no timeout, and nonempty
   output. Nonzero exits, timeouts, and empty output remain in the plan; a new upload replaces
   the failed attempt.
+- A judged upload grades under a per-case claim (`client_case_grading_claims`, one row per
+  profile, case and repetition). The claim holder runs the judge; a parallel upload of the
+  same case returns the stored score once the holder finishes, and otherwise fails with
+  `internal_error` instead of starting a second grading. The claim is released when its
+  grading ends, and a lease lets the next upload take over one left by a vanished request.
 
 Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
 column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.

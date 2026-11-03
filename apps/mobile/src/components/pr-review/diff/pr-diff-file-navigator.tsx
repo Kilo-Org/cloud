@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
@@ -48,6 +49,7 @@ import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -274,7 +276,10 @@ export function PrDiffFileNavigator({
             onPress={() => {
               void query.refetch();
             }}
-            className="mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70"
+            className={cn(
+              STATE_ACTION_CLASS,
+              'mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70'
+            )}
             accessibilityRole="button"
             accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
@@ -409,7 +414,10 @@ export function PrDiffFileNavigator({
             <Text className="text-xs text-destructive">{retryMessage}</Text>
             <Pressable
               onPress={() => void retryAction()}
-              className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
+              className={cn(
+                STATE_ACTION_CLASS,
+                'rounded-md border border-border bg-card px-3 py-1 active:opacity-70'
+              )}
               accessibilityRole="button"
               accessibilityLabel={retryLabel}
             >

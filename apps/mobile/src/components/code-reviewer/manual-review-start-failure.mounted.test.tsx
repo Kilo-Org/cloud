@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -59,7 +59,10 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: status.push }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -104,6 +107,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: vi.fn(),
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({
@@ -141,6 +145,20 @@ function renderedTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
     const { children } = node.props as { children?: unknown };
     return typeof children === 'string' ? [children] : [];
   });
+}
+
+/** The footer's recovery control, present only when resending can help. */
+function retryButton(renderer: TestRenderer.ReactTestRenderer) {
+  return findAllOfType(renderer.root, 'Button').find(
+    node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+  );
+}
+
+/** The pinned start action, which every failure leaves in place. */
+function startAction(renderer: TestRenderer.ReactTestRenderer) {
+  return findAllOfType(renderer.root, 'Button').find(
+    node => (node.props as { loading?: boolean }).loading !== undefined
+  );
 }
 
 /** Fill the URL and tap the start action; returns the handlers the start passed. */
@@ -184,12 +202,75 @@ describe('ManualReviewScreen start failure copy', () => {
       'Could not read that pull request from GitHub. Check the URL and that the repository is accessible.'
     );
     expect(texts).not.toContain(SERVER_NOT_FOUND);
-    // The recovery control stays beside the failure.
-    expect(
-      findAllOfType(renderer.root, 'Button').some(
-        node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+    expect(startAction(renderer)).toBeDefined();
+    // A NOT_FOUND start cannot start working by being sent again: the pinned
+    // action is the single way forward.
+    expect(retryButton(renderer)).toBeUndefined();
+
+    unmount();
+  });
+
+  it('explains an expired organization trial and drops the duplicate retry', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const handlers = startReview(renderer);
+
+    act(() => handlers.onError?.(trpcError('FORBIDDEN', 'Organization trial has expired.')));
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(texts).not.toContain(
+      i18n.t('codeReviewer.manualReview.startNotAllowed', {
+        provider: 'GitHub',
+        requestNoun: i18n.t('common.pullRequest'),
+      })
+    );
+    // Resending the same request cannot restore a lapsed plan.
+    expect(retryButton(renderer)).toBeUndefined();
+    // The form keeps its one way forward.
+    expect(startAction(renderer)).toBeDefined();
+
+    unmount();
+  });
+
+  it('keeps the generic denial for a role the server does not explain', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const handlers = startReview(renderer);
+
+    act(() =>
+      handlers.onError?.(
+        trpcError(
+          'FORBIDDEN',
+          'You do not have the required organizational role to access this feature'
+        )
       )
-    ).toBe(true);
+    );
+
+    expect(renderedTexts(renderer)).toContain(
+      i18n.t('codeReviewer.manualReview.startNotAllowed', {
+        provider: 'GitHub',
+        requestNoun: i18n.t('common.pullRequest'),
+      })
+    );
+    expect(retryButton(renderer)).toBeUndefined();
+    expect(startAction(renderer)).toBeDefined();
+
+    unmount();
+  });
+
+  it('keeps the retry beside a failure that resending can clear', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const handlers = startReview(renderer);
+
+    act(() => handlers.onError?.(trpcError('TOO_MANY_REQUESTS', 'Rate limited')));
+
+    expect(renderedTexts(renderer)).toContain(
+      i18n.t('codeReviewer.manualReview.startRateLimited', {
+        provider: 'GitHub',
+        requestNoun: i18n.t('common.pullRequest'),
+      })
+    );
+    expect(retryButton(renderer)).toBeDefined();
+    expect(startAction(renderer)).toBeDefined();
 
     unmount();
   });

@@ -8,20 +8,28 @@ import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
+import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const OTHER_ORG_ID = '00000000-0000-4000-8000-000000000002';
 const user = { id: 'user-id' } as User;
+const pricing: CustomPricingTiers = [
+  {
+    start_context_length: 0,
+    pricing: {
+      prompt_per_million: 1,
+      completion_per_million: 2,
+      input_cache_read_per_million: null,
+      input_cache_write_per_million: null,
+    },
+  },
+];
 const encryptedApiKey = encryptApiKey(
   JSON.stringify({ type: 'api_key', api_key: 'sk-upstream' }),
   BYOK_ENCRYPTION_KEY
@@ -44,8 +52,6 @@ function providerInput(
 }
 
 describe('getProvider with public custom LLMs', () => {
-  useKiloExclusiveModel();
-
   beforeAll(async () => {
     await insertCustomLlmForTest(
       'acme/public-model',
@@ -63,13 +69,18 @@ describe('getProvider with public custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest(
-      kiloExclusiveModelFixture.public_id,
-      publicCustomLlmDefinition(['acme']),
+      'acme/private-model',
+      customLlmDefinition({ organization_ids: [ORG_ID] }),
       encryptedApiKey
     );
     await insertCustomLlmForTest(
-      'acme/private-model',
-      customLlmDefinition({ organization_ids: [ORG_ID] }),
+      'acme/priced-public-model',
+      publicCustomLlmDefinition(['acme'], { pricing }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      'acme/priced-private-model',
+      customLlmDefinition({ organization_ids: [ORG_ID], pricing }),
       encryptedApiKey
     );
     await insertCustomLlmForTest(
@@ -89,7 +100,8 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/public-web-model');
     await deleteCustomLlmForTest('acme/private-model');
     await deleteCustomLlmForTest('acme/multi-api-model');
-    await deleteCustomLlmForTest(kiloExclusiveModelFixture.public_id);
+    await deleteCustomLlmForTest('acme/priced-public-model');
+    await deleteCustomLlmForTest('acme/priced-private-model');
     await deleteCustomLlmForTest('acme/country-denied-public-model');
     await deleteCustomLlmForTest('acme/country-denied-private-model');
   });
@@ -107,13 +119,18 @@ describe('getProvider with public custom LLMs', () => {
     ['another country', 'US'],
     ['an unknown country', null],
   ])('serves a country-restricted custom LLM to %s', async (_name, countryCode) => {
-    for (const [model, caller, organizationId] of [
-      ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
-      ['acme/country-denied-private-model', user, ORG_ID],
+    for (const [model, caller, organizationId, providerId] of [
+      [
+        'acme/country-denied-public-model',
+        createAnonymousContext('127.0.0.1'),
+        undefined,
+        'custom-public',
+      ],
+      ['acme/country-denied-private-model', user, ORG_ID, 'custom'],
     ] as const) {
       await expect(
         getProvider({ ...providerInput(model, caller, organizationId), countryCode })
-      ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+      ).resolves.toMatchObject({ kind: 'provider', provider: { type: providerId } });
     }
   });
 
@@ -129,7 +146,11 @@ describe('getProvider with public custom LLMs', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
-      provider: { id: 'custom', apiUrl: 'https://upstream.example.com/v1', apiKey: 'sk-upstream' },
+      provider: {
+        type: 'custom-public',
+        apiUrl: 'https://upstream.example.com/v1',
+        apiKey: 'sk-upstream',
+      },
       bypassAccessCheck: false,
     });
   });
@@ -144,25 +165,65 @@ describe('getProvider with public custom LLMs', () => {
     expect(single).toMatchObject({ provider: { supportedChatApis: ['chat_completions'] } });
   });
 
-  test('routes a Kilo-exclusive id to the Kilo-exclusive model while it exists', async () => {
-    const result = await getProvider(
-      providerInput(kiloExclusiveModelFixture.public_id, user, undefined)
-    );
-
-    expect(result.kind).toBe('provider');
-    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.id);
-  });
-
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {
     await expect(
       getProvider(providerInput('acme/private-model', user, ORG_ID))
     ).resolves.toMatchObject({
       kind: 'provider',
-      provider: { id: 'custom' },
+      provider: { type: 'custom' },
       bypassAccessCheck: true,
     });
     await expect(
       getProvider(providerInput('acme/private-model', user, OTHER_ORG_ID))
+    ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test.each([
+    [
+      'public',
+      'an anonymous caller',
+      'acme/public-model',
+      createAnonymousContext('127.0.0.1'),
+      undefined,
+    ],
+    ['public', 'a signed-in user', 'acme/public-model', user, undefined],
+    ['private', 'a grantee', 'acme/private-model', user, ORG_ID],
+  ])(
+    'serves a %s custom LLM without pricing for free to %s',
+    async (_visibility, _caller, model, caller, organizationId) => {
+      await expect(
+        getProvider(providerInput(model, caller, organizationId))
+      ).resolves.toMatchObject({ kind: 'provider', isFree: true });
+    }
+  );
+
+  test('charges for a private custom LLM with pricing, still exempt from policy checks', async () => {
+    await expect(
+      getProvider(providerInput('acme/priced-private-model', user, ORG_ID))
+    ).resolves.toMatchObject({
+      kind: 'provider',
+      provider: { type: 'custom' },
+      isFree: false,
+      bypassAccessCheck: true,
+    });
+  });
+
+  test('charges a signed-in user for a public custom LLM with pricing', async () => {
+    await expect(
+      getProvider(providerInput('acme/priced-public-model', user, undefined))
+    ).resolves.toMatchObject({
+      kind: 'provider',
+      provider: { type: 'custom-public' },
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+  });
+
+  test('refuses a public custom LLM with pricing to an anonymous caller', async () => {
+    await expect(
+      getProvider(
+        providerInput('acme/priced-public-model', createAnonymousContext('127.0.0.1'), undefined)
+      )
     ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
   });
 

@@ -73,6 +73,17 @@ export function readApplyPatchFiles(value: unknown) {
   });
 }
 
+export function readApplyPatchInputPaths(patchText: unknown): string[] {
+  if (typeof patchText !== 'string') return [];
+  return [
+    ...new Set(
+      [...patchText.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)\r?$/gm)]
+        .map(match => match[1].trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
 export function getUnifiedPatch(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   if (!/^--- [^\r\n]+\r?\n\+\+\+ [^\r\n]+/m.test(value)) return undefined;

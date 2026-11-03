@@ -62,6 +62,7 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
 vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({ push, back, replace, canGoBack }),
 }));
 vi.mock('react-native-safe-area-context', () => ({

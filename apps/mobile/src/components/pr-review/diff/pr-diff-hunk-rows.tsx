@@ -11,9 +11,11 @@ import { Pressable, type ScrollViewProps, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
+import { cn } from '@/lib/utils';
 import { CenteredState } from '@/components/centered-state';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
@@ -72,7 +74,10 @@ export function ExpandSeparatorRow({
         onPress={() => {
           onLoad(DEFAULT_EXPAND_WINDOW);
         }}
-        className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70"
+        className={cn(
+          STATE_ACTION_CLASS,
+          'flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
+        )}
         accessibilityRole="button"
         accessibilityLabel={t('prReview.hunkRows.retryLoadingContext')}
       >

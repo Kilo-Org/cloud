@@ -50,6 +50,15 @@ export const SetBYOKKeyCatalogModeInputSchema = OptionalOrganizationIdSchema.ext
   serve_catalog_models: z.boolean(),
 });
 
+/** Personal keys only: every listed key of the caller, highest priority first. */
+export const ReorderBYOKKeysInputSchema = z.object({
+  keyIds: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(100)
+    .refine(ids => new Set(ids).size === ids.length, 'Key ids must be unique'),
+});
+
 // List schema with optional organizationId
 export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
@@ -69,4 +78,9 @@ export const BYOKApiKeyResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),
+});
+
+export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({
+  modelId: z.string().trim().min(1).max(256),
+  apiKind: z.enum(['chat_completions', 'responses', 'messages']).default('chat_completions'),
 });

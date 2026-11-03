@@ -47,25 +47,29 @@ export function countInFlightMessages(
 }
 
 /**
- * Re-sends a failed submission as a new one, then clears the original delivery
- * failure once the re-send is accepted so it stops showing (`.specs/
- * cloud-agent-session.md`, Errors 3: a message that will never be delivered
- * shows as failed and MUST stop showing after a successful retry). The failed
- * message id is final on the server and is never re-admitted, so the re-send
- * materialises its own row with its own delivery state; the original row keeps
- * only its content — a client-materialised row that existed for its failure
- * alone stops showing — and a re-send that fails again keeps its own footer.
+ * Re-sends a superseded turn as a new one, then records every row the retry
+ * replaces as resolved once the re-send is accepted, so they stop showing
+ * (`.specs/cloud-agent-session.md`, Errors 3: a message that will never be
+ * delivered shows as failed and MUST stop showing after a successful retry).
+ * The replaced message ids are final on the server and are never re-admitted,
+ * so the re-send materialises its own row with its own delivery state; a
+ * replaced row keeps only its content — a client-materialised row that existed
+ * for its failure alone stops showing — and a re-send that fails again keeps
+ * its own footer.
  *
- * A rejected re-send leaves the original footer alone: nothing was delivered,
- * so the failure is still the truth, and the manager has already surfaced it
+ * A retry of a failed user row replaces that row alone. A retry of a failed
+ * assistant response also replaces the user row whose prompt it re-sends: the
+ * re-send is a new user turn with the same text, so leaving the original
+ * would render the prompt twice, and the failed response row is superseded by
+ * the retried turn's own.
+ *
+ * A rejected re-send leaves the original rows alone: nothing was delivered, so
+ * the failure is still the truth, and the manager has already surfaced it
  * through its own toast. The rejection is swallowed here so the caller's
  * `void`ed promise never rejects.
- *
- * An assistant failure's row is left alone: a failed turn stays marked, and
- * `clearFailedMessage` is about a user message's delivery entry.
  */
 export async function retryFailedMessage(input: {
-  message: StoredMessage;
+  replacedMessageIds: readonly string[];
   send: () => Promise<void>;
   clearFailedMessage: (messageId: string) => void;
 }): Promise<void> {
@@ -74,35 +78,93 @@ export async function retryFailedMessage(input: {
   } catch {
     return;
   }
-  if (input.message.info.role !== 'user') {
-    return;
+  for (const messageId of input.replacedMessageIds) {
+    input.clearFailedMessage(messageId);
   }
-  input.clearFailedMessage(input.message.info.id);
 }
 
 /**
- * Resolves the retry prompt for a failed row. A user delivery failure re-sends
- * the row's own first human-authored text part; an assistant failure re-sends
- * the newest preceding user row's. Returns null when there is no human text
- * (e.g. a file-only row) or no preceding user row, which suppresses Retry.
+ * The rows a Retry tap replaces, and the prompt to re-send. A user delivery
+ * failure re-sends the row's own first human-authored text part and replaces
+ * that row; an assistant failure re-sends the text of the user row it answers
+ * and replaces the failed response plus, when the re-send reproduces it
+ * exactly, that user row. Returns null when no prompt can be identified or
+ * resolved, which suppresses Retry.
+ */
+export type RetryTarget = {
+  prompt: string;
+  /** The failed row first, then the user row when the re-send reproduces it. */
+  replacedMessageIds: readonly string[];
+};
+
+export function resolveRetryTarget(
+  message: StoredMessage,
+  messages: readonly StoredMessage[]
+): RetryTarget | null {
+  if (message.info.role === 'user') {
+    const text = firstHumanText(message.parts);
+    return text === '' ? null : { prompt: text, replacedMessageIds: [message.info.id] };
+  }
+  const promptRow = repliedToUserRow(message, messages);
+  if (promptRow === null) {
+    return null;
+  }
+  const prompt = firstHumanText(promptRow.parts);
+  if (prompt === '') {
+    return null;
+  }
+  // The re-send is the prompt text alone. Hiding a user row that carries more
+  // than that (an attachment, a second text part) would drop content the retry
+  // never sends, with no other surface left to show it, so the row stays and
+  // only the failed response is replaced.
+  return {
+    prompt,
+    replacedMessageIds: carriesOnlyPromptText(promptRow, prompt)
+      ? [message.info.id, promptRow.info.id]
+      : [message.info.id],
+  };
+}
+
+/**
+ * The user row an assistant message answers: its `parentID`, which is the
+ * authoritative link (`AssistantMessage.parentID`), not merely the nearest
+ * preceding user row. Order alone can pair a failed response with another
+ * prompt: a session can materialise a second user row before the first turn's
+ * assistant row exists. A parent that is not a loaded user row (an older page,
+ * or data without the link) has no prompt this tap can re-send, so Retry is
+ * suppressed rather than re-sending an unrelated row.
+ */
+function repliedToUserRow(
+  message: StoredMessage,
+  messages: readonly StoredMessage[]
+): StoredMessage | null {
+  if (message.info.role !== 'assistant') {
+    return null;
+  }
+  const parentId = message.info.parentID;
+  const parent = messages.find(candidate => candidate.info.id === parentId);
+  return parent?.info.role === 'user' ? parent : null;
+}
+
+/**
+ * Whether a user row renders nothing but the prompt text a retry re-sends: one
+ * text part and no other part whose content the re-send would omit.
+ */
+function carriesOnlyPromptText(message: StoredMessage, prompt: string): boolean {
+  const [part, ...rest] = message.parts;
+  return rest.length === 0 && part?.type === 'text' && part.text === prompt;
+}
+
+/**
+ * The text a Retry tap re-sends, or null when Retry is not available for this
+ * row. The transcript uses it as the availability gate; the tap itself reads
+ * the full target from `resolveRetryTarget`.
  */
 export function resolveRetryPrompt(
   message: StoredMessage,
   messages: readonly StoredMessage[]
 ): string | null {
-  if (message.info.role === 'user') {
-    const text = firstHumanText(message.parts);
-    return text === '' ? null : text;
-  }
-  const index = messages.findIndex(candidate => candidate.info.id === message.info.id);
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
-    if (candidate?.info.role === 'user') {
-      const text = firstHumanText(candidate.parts);
-      return text === '' ? null : text;
-    }
-  }
-  return null;
+  return resolveRetryTarget(message, messages)?.prompt ?? null;
 }
 
 type LastVisibleFailureInput = {

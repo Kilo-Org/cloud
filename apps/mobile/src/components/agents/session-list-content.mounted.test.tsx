@@ -130,11 +130,12 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
+  Plus: 'Plus',
 }));
 vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#999999' }),
+  useThemeColors: () => ({ mutedForeground: '#999999', primaryForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/session-attention', () => ({ getRevisionSnapshot: () => 17 }));
 
@@ -771,8 +772,9 @@ describe('AgentSessionListContent liveness', () => {
       platform: 'ios',
       fontScale: 1,
     });
-    // Only the bottom tab-bar clearance stays on the content container.
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    // The content container carries the status band's top padding and the
+    // bottom tab-bar clearance; the side insets stay off it.
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
 
     // The landscape side insets live on the wrapper around the list.
     expect(wrapperStyle()).toEqual({ paddingLeft: 0, paddingRight: 0 });
@@ -783,7 +785,7 @@ describe('AgentSessionListContent liveness', () => {
     act(() => {
       renderer.update(createElement(AgentSessionListContent, contentProps({ sections })));
     });
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
     expect(wrapperStyle()).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 

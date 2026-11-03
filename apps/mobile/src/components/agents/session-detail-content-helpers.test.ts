@@ -3,12 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
-  lastVisibleMessageFailure,
   resolveRetryPrompt,
+  resolveRetryTarget,
   retryFailedMessage,
 } from './session-detail-content-helpers';
 import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
+
+/** The assistant row that answers `parentID`, as server data links them. */
+function withParent(message: StoredMessage, parentID: string): StoredMessage {
+  if (message.info.role !== 'assistant') {
+    return message;
+  }
+  return { ...message, info: { ...message.info, parentID } };
+}
 
 describe('countInFlightMessages', () => {
   it('excludes a failed pending row from the in-flight count', () => {
@@ -36,47 +44,36 @@ describe('countInFlightMessages', () => {
 });
 
 describe('retryFailedMessage', () => {
-  it('re-sends the failed submission', async () => {
-    const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const clearFailedMessage = vi.fn<(messageId: string) => void>();
-    await retryFailedMessage({
-      message: userMessage('m1'),
-      send,
-      clearFailedMessage,
-    });
-    expect(send).toHaveBeenCalledTimes(1);
-  });
-
   it('clears the original delivery failure once the re-send is accepted', async () => {
-    const message = userMessage('m-failed');
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
-    await retryFailedMessage({ message, send, clearFailedMessage });
+    await retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage });
     expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('m-failed');
   });
 
   it('leaves the failed delivery state alone when the re-send rejects', async () => {
-    const message = userMessage('m-failed');
     const send = vi
       .fn<() => Promise<void>>()
       .mockRejectedValue(new Error('Failed to send message'));
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await expect(
-      retryFailedMessage({ message, send, clearFailedMessage })
+      retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage })
     ).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
     expect(clearFailedMessage).not.toHaveBeenCalled();
   });
 
-  it('does not clear an assistant failure row, which stays marked', async () => {
+  it('resolves every row an assistant retry replaces once the re-send is accepted', async () => {
+    // The retried turn's own user row carries the prompt; the failed response
+    // and the user row it re-sent both stop showing.
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await retryFailedMessage({
-      message: assistantMessage('m-asst'),
+      replacedMessageIds: ['m-asst', 'm-prompt'],
       send,
       clearFailedMessage,
     });
-    expect(clearFailedMessage).not.toHaveBeenCalled();
+    expect(clearFailedMessage.mock.calls).toEqual([['m-asst'], ['m-prompt']]);
   });
 
   it('swallows a rejected re-send so the caller never sees the rejection', async () => {
@@ -85,7 +82,7 @@ describe('retryFailedMessage', () => {
       .mockRejectedValue(new Error('Failed to send message'));
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await expect(
-      retryFailedMessage({ message: userMessage('m1'), send, clearFailedMessage })
+      retryFailedMessage({ replacedMessageIds: ['m1'], send, clearFailedMessage })
     ).resolves.toBeUndefined();
   });
 
@@ -109,7 +106,7 @@ describe('retryFailedMessage', () => {
     ).toEqual(['m-retried']);
 
     await retryFailedMessage({
-      message: submission,
+      replacedMessageIds: [submission.info.id],
       send: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       clearFailedMessage: messageId => {
         deliveryStates.delete(messageId);
@@ -127,7 +124,7 @@ describe('retryFailedMessage', () => {
     ]);
 
     await retryFailedMessage({
-      message: submission,
+      replacedMessageIds: [submission.info.id],
       send: vi.fn<() => Promise<void>>().mockRejectedValue(new Error('Failed to send message')),
       clearFailedMessage: messageId => {
         deliveryStates.delete(messageId);
@@ -139,6 +136,68 @@ describe('retryFailedMessage', () => {
       error: 'boom',
       reason: 'execution',
     });
+  });
+});
+
+describe('resolveRetryTarget', () => {
+  it('replaces only a failed user row', () => {
+    const message = userMessage('m1');
+    expect(resolveRetryTarget(message, [message])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m1'],
+    });
+  });
+
+  it('replaces the failed response and the user row it re-sends', () => {
+    const user = userMessage('m3');
+    const assistant = withParent(assistantMessage('m4'), 'm3');
+
+    expect(resolveRetryTarget(assistant, [user, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m4', 'm3'],
+    });
+  });
+
+  it('re-sends the row the failed response answers, not the nearest preceding row', () => {
+    // A second prompt can be materialised before the first turn's response
+    // exists, so order alone would re-send (and hide) the wrong prompt.
+    const answered = userMessage('m-answered');
+    const queued = userMessage('m-queued');
+    const assistant = withParent(assistantMessage('m-asst'), 'm-answered');
+
+    expect(resolveRetryTarget(assistant, [answered, queued, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m-asst', 'm-answered'],
+    });
+  });
+
+  it('keeps a prompt row that carries content the re-send would drop', () => {
+    const user = userMessage('m-with-file');
+    user.parts = [
+      ...user.parts,
+      {
+        id: 'm-with-file-file',
+        sessionID: 'ses_1',
+        messageID: 'm-with-file',
+        type: 'file',
+        mime: 'text/plain',
+        url: 'x',
+      },
+    ] as typeof user.parts;
+    const assistant = withParent(assistantMessage('m-asst'), 'm-with-file');
+
+    expect(resolveRetryTarget(assistant, [user, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m-asst'],
+    });
+  });
+
+  it('returns null when no user row can be identified as the prompt', () => {
+    const assistant = assistantMessage('m5');
+    expect(resolveRetryTarget(assistant, [assistant])).toBeNull();
+    // Order alone must not pair the response with an unrelated later prompt.
+    const other = userMessage('m-other');
+    expect(resolveRetryTarget(withParent(assistant, 'm-missing'), [other, assistant])).toBeNull();
   });
 });
 
@@ -198,124 +257,10 @@ describe('resolveRetryPrompt', () => {
     expect(resolveRetryPrompt(message, [message])).toBeNull();
   });
 
-  it('returns the preceding user row human text for an assistant failure', () => {
+  it('resolves the prompt through the same target the tap uses', () => {
     const user = userMessage('m3');
-    const assistant = assistantMessage('m4');
-    const messages: StoredMessage[] = [user, assistant];
-
-    expect(resolveRetryPrompt(assistant, messages)).toBe('hi');
-  });
-
-  it('returns null for an assistant row with no preceding user row', () => {
-    const assistant = assistantMessage('m5');
-    expect(resolveRetryPrompt(assistant, [assistant])).toBeNull();
-  });
-});
-
-describe('lastVisibleMessageFailure', () => {
-  function assistantMessageWithText(id: string): StoredMessage {
-    const message = assistantMessage(id);
-    message.parts = [
-      { id: `${id}-text`, sessionID: 'ses_1', messageID: id, type: 'text', text: 'reply' },
-    ] as typeof message.parts;
-    return message;
-  }
-
-  function assistantMessageWithError(id: string, errorName: string): StoredMessage {
-    const message = assistantMessageWithText(id);
-    (message.info as { error?: { name: string; data: unknown } }).error = {
-      name: errorName,
-      data: { message: 'raw' },
-    };
-    return message;
-  }
-
-  const noPending = new Map<string, MessageDeliveryState>();
-  const nothingCanceled = new Map<string, StoredMessage>();
-
-  it('returns null when the last row has no failure', () => {
-    const messages: StoredMessage[] = [userMessage('m1'), assistantMessageWithText('m2')];
-    expect(
-      lastVisibleMessageFailure({
-        displayedMessages: messages,
-        messages,
-        pendingMessages: noPending,
-        canceledQueuedMessages: nothingCanceled,
-      })
-    ).toBeNull();
-  });
-
-  it('returns the assistant failure the last row renders with a Retry', () => {
-    const messages: StoredMessage[] = [
-      userMessage('m1'),
-      assistantMessageWithError('m2', 'APIError'),
-    ];
-    const failure = lastVisibleMessageFailure({
-      displayedMessages: messages,
-      messages,
-      pendingMessages: noPending,
-      canceledQueuedMessages: nothingCanceled,
-    });
-    expect(failure?.kind).toBe('assistant');
-    expect(failure?.title).toBe('Response failed');
-    expect(failure?.detail).toBeNull();
-  });
-
-  it('returns null for an assistant failure with no preceding user row (no Retry)', () => {
-    const messages: StoredMessage[] = [assistantMessageWithError('m1', 'APIError')];
-    expect(
-      lastVisibleMessageFailure({
-        displayedMessages: messages,
-        messages,
-        pendingMessages: noPending,
-        canceledQueuedMessages: nothingCanceled,
-      })
-    ).toBeNull();
-  });
-
-  it('returns the delivery failure the last row renders', () => {
-    const messages: StoredMessage[] = [userMessage('m1')];
-    const pendingMessages = new Map<string, MessageDeliveryState>([
-      ['m1', { status: 'failed', error: 'nope', reason: 'exhausted' }],
-    ]);
-    const failure = lastVisibleMessageFailure({
-      displayedMessages: messages,
-      messages,
-      pendingMessages,
-      canceledQueuedMessages: nothingCanceled,
-    });
-    expect(failure?.kind).toBe('delivery');
-    expect(failure?.title).toBe('Failed to deliver');
-  });
-
-  it('ignores a cancelled queued row', () => {
-    const messages: StoredMessage[] = [userMessage('m1')];
-    const pendingMessages = new Map<string, MessageDeliveryState>([
-      ['m1', { status: 'failed', error: 'nope', reason: 'exhausted' }],
-    ]);
-    expect(
-      lastVisibleMessageFailure({
-        displayedMessages: messages,
-        messages,
-        pendingMessages,
-        canceledQueuedMessages: new Map<string, StoredMessage>([['m1', userMessage('m1')]]),
-      })
-    ).toBeNull();
-  });
-
-  it('ignores a failure that is not the last row', () => {
-    const messages: StoredMessage[] = [
-      userMessage('m1'),
-      assistantMessageWithError('m2', 'APIError'),
-      assistantMessageWithText('m3'),
-    ];
-    expect(
-      lastVisibleMessageFailure({
-        displayedMessages: messages,
-        messages,
-        pendingMessages: noPending,
-        canceledQueuedMessages: nothingCanceled,
-      })
-    ).toBeNull();
+    const assistant = withParent(assistantMessage('m4'), 'm3');
+    expect(resolveRetryPrompt(assistant, [user, assistant])).toBe('hi');
+    expect(resolveRetryPrompt(withParent(assistantMessage('m6'), 'm-missing'), [user])).toBeNull();
   });
 });

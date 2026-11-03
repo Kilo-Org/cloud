@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
 import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
@@ -61,7 +62,7 @@ export function KiloPassSubscriptionCard({
 
     const cardState = contentState.state;
 
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (cardState.action === 'open-web') {
       const webUrl = presentationQuery.data?.webUrl;
       if (webUrl) {
@@ -72,7 +73,7 @@ export function KiloPassSubscriptionCard({
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     void presentationQuery.refetch();
   };
 
@@ -80,7 +81,7 @@ export function KiloPassSubscriptionCard({
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
     <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
-      <KiloPassIcon size={19} color={colors.primary} />
+      <KiloPassIcon size={19} color={colors[rowTint('honey').hueThemeKey]} />
     </View>
   );
   const cardBody = (text: ReactNode, trailing?: ReactNode, tile: ReactNode = iconTile) =>

@@ -31,10 +31,14 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: ReactElement }) => props.children,
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useReviewConfig: () => ({ data: state.config }),

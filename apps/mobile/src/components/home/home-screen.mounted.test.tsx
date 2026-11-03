@@ -90,6 +90,7 @@ vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
 }));
 vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({
     canGoBack: () => false,
     push: (path: string) => {

@@ -13,7 +13,10 @@ const mutate = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({ View: 'View', ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'de', resolvedLanguage: 'de' },
+  }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate, isPending: false }),
@@ -25,7 +28,17 @@ vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/agent-briefing', () => ({
-  useBriefingPreferences: () => ({ data: { notificationsEnabled: false }, isError: false }),
+  useBriefingPreferences: () => ({
+    data: {
+      notificationsEnabled: false,
+      timezone: 'Europe/Berlin',
+      nightStart: '21:00',
+      morningStart: '07:00',
+      morningEnd: '11:00',
+      language: 'en',
+    },
+    isError: false,
+  }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
@@ -75,7 +88,14 @@ it('saves the brief preference from its Notifications category row', () => {
   act(() => {
     (switchOf(mounted).props.onValueChange as (value: boolean) => void)(true);
   });
-  expect(mutate).toHaveBeenCalledWith({ notificationsEnabled: true });
+  expect(mutate).toHaveBeenCalledWith({
+    notificationsEnabled: true,
+    timezone: 'Europe/Berlin',
+    language: 'de',
+    nightStart: '21:00',
+    morningStart: '07:00',
+    morningEnd: '11:00',
+  });
 
   act(() => {
     mounted.unmount();

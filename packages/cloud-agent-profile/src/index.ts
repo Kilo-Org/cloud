@@ -22,6 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
+  appliesImplicitProfiles,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,
@@ -56,6 +57,7 @@ export {
   deleteProfile,
   listProfiles,
   getProfile,
+  getProfileOverview,
   setDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
@@ -64,11 +66,11 @@ export {
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 
@@ -86,6 +88,7 @@ export {
   mcpRemoteServerInputSchema,
   mcpServerFullInputSchema,
   listMcpServersForProfile,
+  getProfileMcpServers,
   createMcpServer,
   updateMcpServer,
   deleteMcpServer,
@@ -112,6 +115,7 @@ export {
   skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
+  getProfileSkills,
   createCustomSkill,
   createSkillsShSkill,
   updateSkill,
@@ -137,6 +141,7 @@ export {
   agentCreateInputSchema,
   agentUpdateInputSchema,
   listAgentsForProfile,
+  getProfileAgents,
   createAgent,
   updateAgent,
   deleteAgent,
@@ -158,6 +163,7 @@ export {
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
+  getProfileKiloCommands,
   createKiloCommand,
   updateKiloCommand,
   deleteKiloCommand,
@@ -240,9 +246,19 @@ export {
   validateEnvironmentSecretValue,
   validateEnvironmentCommands,
   validateEnvironmentVarCount,
+  bitbucketCloneUrl,
+  repositoryLeaf,
+  isSafeRepositoryLeaf,
+  normalizeRepoFullName,
+  sameRepositoryIdentity,
   type EnvironmentOwner,
   type EnvironmentPlatform,
   type EnvironmentRepositoryIdentity,
+  type EnvironmentReferenceRepository,
+  type EnvironmentIdentityInput,
+  type EnvironmentIdentityResponse,
+  type EnvironmentV1CreateInput,
+  type EnvironmentV2CreateInput,
   type EnvironmentCreateInput,
   type EnvironmentSecretChange,
   type EnvironmentUpdateInput,
@@ -254,6 +270,11 @@ export {
   type EnvironmentSummary,
 } from './environment-contracts';
 export {
+  environmentRepositoryEntrySchema,
+  environmentRepositoriesSchema,
+  type EnvironmentRepositoryEntry,
+} from './environment-repository-entry';
+export {
   createEnvironment,
   updateEnvironment,
   deleteEnvironment,
@@ -264,5 +285,6 @@ export {
   loadEnvironmentBuildInput,
   readEnvironmentReference,
   lockActiveOrganization,
+  type EnvironmentSessionResolution,
   type EnvironmentTransaction,
 } from './environment-service';

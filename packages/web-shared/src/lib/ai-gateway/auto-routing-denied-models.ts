@@ -11,10 +11,15 @@ import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  allowsInferenceProviderUserByok,
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
   return (
@@ -73,13 +78,34 @@ export async function deniedAutoRoutingCandidates(
 
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();
+  const denied: string[] = [];
+  const allowedForInferenceProviderUserByok: string[] = [];
   await Promise.all(
     uniqueCandidates.map(async modelId => {
-      if ((await getEffectiveModelDecision(policy, modelId)).allowed) {
+      const decision = await getEffectiveModelDecision(policy, modelId);
+      if (decision.allowed) {
         allowed.add(modelId);
+        return;
+      }
+      denied.push(modelId);
+      if (allowsInferenceProviderUserByok(decision)) {
+        allowedForInferenceProviderUserByok.push(modelId);
       }
     })
   );
+  const directByokCatalogModelIds =
+    denied.length > 0
+      ? await getAllowedDirectByokCatalogModelIds(policy.customLlmGrantee.organizationId, policy)
+      : new Set<string>();
+  for (const modelId of denied) {
+    if (directByokCatalogModelIds.has(modelId)) allowed.add(modelId);
+  }
+  for (const modelId of await modelsServedByOrganizationInferenceProviderUserByok(
+    policy.customLlmGrantee.organizationId,
+    allowedForInferenceProviderUserByok
+  )) {
+    allowed.add(modelId);
+  }
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
 }
 

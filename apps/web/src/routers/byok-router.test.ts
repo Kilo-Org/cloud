@@ -13,12 +13,18 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     getOpenRouterModelsMetadataFromDatabase: jest.fn(
       actual.getOpenRouterModelsMetadataFromDatabase
     ),
+    getVercelModelsMetadataFromDatabase: jest.fn(actual.getVercelModelsMetadataFromDatabase),
+    getVercelModelsFromDatabase: jest.fn(actual.getVercelModelsFromDatabase),
   };
 });
 
 import { createCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -35,6 +41,8 @@ import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+
+type Caller = Awaited<ReturnType<typeof createCallerForUser>>;
 
 const VERTEX_CREDENTIALS = JSON.stringify({
   project: 'example-project',
@@ -185,6 +193,207 @@ describe('BYOK Router', () => {
 
       await expect(caller.byok.list({ organizationId: organizationA.id })).rejects.toThrow(
         'You do not have access to this organization'
+      );
+    });
+  });
+
+  describe('reorder', () => {
+    async function createPersonalKeys(
+      userId: string,
+      providers: Parameters<Caller['byok']['create']>[0]['provider_id'][]
+    ) {
+      const caller = await createCallerForUser(userId);
+      const ids: string[] = [];
+      for (const provider_id of providers) {
+        const key = await caller.byok.create({ provider_id, api_key: `key-${provider_id}` });
+        ids.push(key.id);
+      }
+      return { caller, ids };
+    }
+
+    test('lists personal keys oldest first until the owner reorders them', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, [
+        'anthropic',
+        'mistral',
+        'openrouter',
+      ]);
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual(ids);
+
+      const reordered = [ids[2], ids[0], ids[1]];
+      const result = await caller.byok.reorder({ keyIds: reordered });
+
+      expect(result.map(key => key.id)).toEqual(reordered);
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual(reordered);
+      const rows = await db
+        .select({ id: byok_api_keys.id, settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
+      expect(Object.fromEntries(rows.map(row => [row.id, row.settings]))).toEqual({
+        [ids[2]]: { priority: 0 },
+        [ids[0]]: { priority: 1 },
+        [ids[1]]: { priority: 2 },
+      });
+    });
+
+    test('keeps other settings and lists keys added later after the prioritized ones', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+      await db
+        .update(byok_api_keys)
+        .set({ settings: { serve_catalog_models: true } })
+        .where(eq(byok_api_keys.id, ids[0]));
+
+      await caller.byok.reorder({ keyIds: [ids[1], ids[0]] });
+      const added = await caller.byok.create({ provider_id: 'openai', api_key: 'key-openai' });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([ids[1], ids[0], added.id]);
+      const [catalogKey] = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, ids[0]));
+      expect(catalogKey?.settings).toEqual({ serve_catalog_models: true, priority: 1 });
+    });
+
+    test('lists keys that were never reordered in the default route order', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, [
+        'openrouter',
+        'anthropic',
+        'vercel-ai-gateway',
+      ]);
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([ids[1], ids[2], ids[0]]);
+      const rows = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
+      expect(rows.map(row => row.settings)).toEqual([{}, {}, {}]);
+    });
+
+    test('lists direct keys that were never reordered in the order routing considers them', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      // Providers no catalog-mode test uses, since their model lists are cached per process.
+      const [later, earlier] = await db
+        .insert(byok_api_keys)
+        .values(
+          (['ollama-cloud', 'chutes-byok'] as const).map((provider_id, index) => ({
+            kilo_user_id: ownerUser.id,
+            provider_id,
+            encrypted_api_key: encryptApiKey(`key-${provider_id}`, BYOK_ENCRYPTION_KEY),
+            created_by: ownerUser.id,
+            created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+            settings: { serve_catalog_models: true },
+          }))
+        )
+        .returning({ id: byok_api_keys.id });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([earlier.id, later.id]);
+    });
+
+    test('adds a new provider key above the gateway keys once the owner reordered', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      await caller.byok.reorder({ keyIds: ids });
+
+      const provider = await caller.byok.create({ provider_id: 'mistral', api_key: 'key-mistral' });
+      const gateway = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'key-vercel',
+      });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([
+        ids[0],
+        provider.id,
+        gateway.id,
+        ids[1],
+      ]);
+    });
+
+    test('ranks a key inserted outside byok.create, as coding plans do, by its default rank', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      await caller.byok.reorder({ keyIds: [ids[1], ids[0]] });
+      const [planKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'minimax',
+          encrypted_api_key: encryptApiKey('plan-key', BYOK_ENCRYPTION_KEY),
+          created_by: ownerUser.id,
+        })
+        .returning({ id: byok_api_keys.id });
+
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual([ids[1], ids[0], planKey.id]);
+    });
+
+    test('rejects an order that leaves out one of the caller keys', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+
+      await expect(caller.byok.reorder({ keyIds: [ids[1]] })).rejects.toThrow(
+        'Your API keys changed'
+      );
+      expect((await caller.byok.list({})).map(key => key.id)).toEqual(ids);
+    });
+
+    test('rejects another user key without changing it', async () => {
+      const { ids: ownerIds } = await createPersonalKeys(ownerUser.id, ['anthropic']);
+      const { caller: memberCaller, ids: memberIds } = await createPersonalKeys(memberUser.id, [
+        'mistral',
+      ]);
+      try {
+        await expect(
+          memberCaller.byok.reorder({ keyIds: [ownerIds[0], memberIds[0]] })
+        ).rejects.toThrow('Your API keys changed');
+        await expect(memberCaller.byok.reorder({ keyIds: [ownerIds[0]] })).rejects.toThrow(
+          'Your API keys changed'
+        );
+        const [ownerKey] = await db
+          .select({ settings: byok_api_keys.settings })
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.id, ownerIds[0]));
+        expect(ownerKey?.settings).toEqual({});
+      } finally {
+        await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, memberUser.id));
+      }
+    });
+
+    test('rejects organization keys, which keep their default order', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const orgKey = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'org-key',
+      });
+
+      await expect(caller.byok.reorder({ keyIds: [orgKey.id] })).rejects.toThrow(
+        'Your API keys changed'
+      );
+    });
+
+    test('ignores the ChatGPT connection row, which is not a listed key', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+      await db.insert(byok_api_keys).values({
+        kilo_user_id: ownerUser.id,
+        provider_id: 'openai-chatgpt',
+        encrypted_api_key: encryptApiKey('chatgpt-state', BYOK_ENCRYPTION_KEY),
+        created_by: ownerUser.id,
+      });
+
+      await caller.byok.reorder({ keyIds: [ids[1], ids[0]] });
+
+      const [chatGpt] = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'openai-chatgpt')
+          )
+        );
+      expect(chatGpt?.settings).toEqual({});
+    });
+
+    test('rejects duplicate ids', async () => {
+      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic']);
+
+      await expect(caller.byok.reorder({ keyIds: [ids[0], ids[0]] })).rejects.toThrow(
+        'Key ids must be unique'
       );
     });
   });
@@ -928,6 +1137,13 @@ describe('BYOK Router', () => {
                 max_completion_tokens: 32000,
                 catalog_model_id: 'z-ai/glm-5.2',
               },
+              {
+                id: 'glm-4.7',
+                name: 'GLM-4.7',
+                context_length: 200000,
+                max_completion_tokens: 32000,
+                catalog_model_id: 'z-ai/glm-4.7',
+              },
             ],
             synced_at,
           },
@@ -984,14 +1200,14 @@ describe('BYOK Router', () => {
       ).rejects.toThrow('Provider openai does not support Kilo catalog model IDs.');
     });
 
-    test('lists the catalog ids each provider serves in catalog mode', async () => {
+    test('lists the catalog ids each provider serves in catalog mode, sorted', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
       jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({});
 
       const result = await caller.byok.listCatalogModeSupportedModels();
 
-      expect(result['zai-coding']).toEqual(['GLM-5.2 (z-ai/glm-5.2)']);
+      expect(result['zai-coding']).toEqual(['GLM-4.7 (z-ai/glm-4.7)', 'GLM-5.2 (z-ai/glm-5.2)']);
       expect(result).not.toHaveProperty('morph-byok');
       expect(result).not.toHaveProperty('martian');
     });
@@ -1080,6 +1296,145 @@ describe('BYOK Router', () => {
       expect(logs.map(log => log.message)).toContain(
         'Enabled Kilo catalog model IDs for BYOK key for provider: zai-coding'
       );
+    });
+
+    describe('previewRouting', () => {
+      // Routing reads the Vercel catalog through process-wide caches, which must stay unfilled for
+      // the listSupportedModels test.
+      beforeEach(() => {
+        jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
+        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+      });
+
+      afterEach(() => {
+        const actual = jest.requireActual<typeof GatewayModelsCache>(
+          '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+        );
+        jest
+          .mocked(getVercelModelsMetadataFromDatabase)
+          .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
+        jest
+          .mocked(getVercelModelsFromDatabase)
+          .mockImplementation(actual.getVercelModelsFromDatabase);
+      });
+
+      async function createCatalogKey(
+        caller: Awaited<ReturnType<typeof createCallerForUser>>,
+        organizationId?: string
+      ) {
+        const created = await caller.byok.create({
+          ...(organizationId && { organizationId }),
+          provider_id: 'zai-coding',
+          api_key: 'zai-key',
+        });
+        await caller.byok.setCatalogMode({
+          ...(organizationId && { organizationId }),
+          id: created.id,
+          serve_catalog_models: true,
+        });
+        // A preview that decrypted this key would fail.
+        await db
+          .update(byok_api_keys)
+          .set({
+            encrypted_api_key: { iv: 'unreadable', data: 'unreadable', authTag: 'unreadable' },
+            encrypted_api_key_envelope: null,
+          })
+          .where(eq(byok_api_keys.id, created.id));
+        return created;
+      }
+
+      test('uses a catalog-mode key that serves the API kind, without decrypting it', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        await createCatalogKey(caller);
+
+        const preview = await caller.byok.previewRouting({ modelId: 'Z-AI/GLM-5.2' });
+
+        expect(preview.kind).toBe('routes');
+        if (preview.kind !== 'routes') return;
+        expect(preview.steps[0]).toEqual({
+          route: 'direct-byok',
+          providerId: 'zai-coding',
+          outcome: 'used',
+          reason: 'serves',
+          supportedApiKinds: ['chat_completions'],
+        });
+        expect(preview.steps.at(-1)).toMatchObject({ route: 'kilo', outcome: 'unreached' });
+      });
+
+      test('fails a request the catalog-mode keys cannot serve over the API kind', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        await createCatalogKey(caller);
+
+        const preview = await caller.byok.previewRouting({
+          modelId: 'z-ai/glm-5.2',
+          apiKind: 'responses',
+        });
+
+        if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+        expect(preview.steps).toEqual([
+          expect.objectContaining({
+            route: 'direct-byok',
+            outcome: 'skipped',
+            reason: 'unsupported-api-kind',
+          }),
+          expect.objectContaining({ route: 'unsupported-api-kind', outcome: 'used' }),
+          expect.objectContaining({ route: 'kilo', outcome: 'unreached' }),
+        ]);
+      });
+
+      test('skips disabled keys and keys outside catalog mode', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const created = await createCatalogKey(caller);
+
+        await caller.byok.setEnabled({ id: created.id, is_enabled: false });
+        const disabled = await caller.byok.previewRouting({ modelId: 'z-ai/glm-5.2' });
+        await caller.byok.setEnabled({ id: created.id, is_enabled: true });
+        await caller.byok.setCatalogMode({ id: created.id, serve_catalog_models: false });
+        const providerIds = await caller.byok.previewRouting({ modelId: 'z-ai/glm-5.2' });
+
+        for (const [preview, reason] of [
+          [disabled, 'disabled'],
+          [providerIds, 'not-catalog-mode'],
+        ] as const) {
+          if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+          expect(preview.steps[0]).toMatchObject({
+            route: 'direct-byok',
+            outcome: 'skipped',
+            reason,
+          });
+          expect(preview.steps.at(-1)).toMatchObject({ route: 'kilo', outcome: 'used' });
+        }
+      });
+
+      test('reports provider model IDs as outside the catalog', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        await expect(
+          caller.byok.previewRouting({ modelId: 'zai-coding/glm-5.2' })
+        ).resolves.toEqual({ kind: 'not-catalog-model' });
+      });
+
+      test('previews organization keys for members only', async () => {
+        await createCatalogKey(await createCallerForUser(ownerUser.id), organizationA.id);
+
+        const memberCaller = await createCallerForUser(memberUser.id);
+        const preview = await memberCaller.byok.previewRouting({
+          organizationId: organizationA.id,
+          modelId: 'z-ai/glm-5.2',
+        });
+        expect(preview.kind === 'routes' && preview.steps[0]).toMatchObject({
+          route: 'direct-byok',
+          outcome: 'used',
+        });
+
+        const outsiderCaller = await createCallerForUser(otherOrgOwner.id);
+        await expect(
+          outsiderCaller.byok.previewRouting({
+            organizationId: organizationA.id,
+            modelId: 'z-ai/glm-5.2',
+          })
+        ).rejects.toThrow('You do not have access to this organization');
+      });
     });
 
     test('rejects catalog mode changes for keys of others', async () => {

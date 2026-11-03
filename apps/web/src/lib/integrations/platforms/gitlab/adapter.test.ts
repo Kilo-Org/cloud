@@ -13,6 +13,7 @@ import { lookup } from 'dns/promises';
 import { EventEmitter } from 'events';
 import * as https from 'https';
 import { PassThrough } from 'stream';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import {
   buildGitLabOAuthUrl,
   exchangeGitLabOAuthCode,
@@ -25,6 +26,7 @@ import {
   deleteProjectWebhook,
   fetchGitLabProjects,
   fetchGitLabBranches,
+  fetchGitLabBoundToAddress,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
   findKiloReviewNote,
@@ -40,6 +42,9 @@ import {
   revokeProjectAccessToken,
   updateProjectWebhook,
   fetchMRInlineComments,
+  GITLAB_LISTING_TIMEOUT_MS,
+  MAX_GITLAB_LISTING_BYTES,
+  MAX_MR_NOTE_BODY_BYTES,
 } from './adapter';
 
 // Mock fetch globally
@@ -154,6 +159,30 @@ function createGitLabProjectDiscoveryResponse() {
       marked_for_deletion_at: '2026-07-01',
     },
   ];
+}
+
+const LISTING_PAGE_ITEM_PADDING_CHARS = 60_000;
+
+/**
+ * A projects page of about 6 MiB at the adapter's page size, and a branches page of about
+ * 6 MiB, for the tests that fill a read's cumulative byte budget.
+ */
+function createPaddedProjectsPage() {
+  return Array.from({ length: 100 }, (_, i) => ({
+    id: i + 1,
+    name: `project-${i}`,
+    path_with_namespace: `group/project-${i}`,
+    visibility: 'private',
+    archived: false,
+    description: 'x'.repeat(LISTING_PAGE_ITEM_PADDING_CHARS),
+  }));
+}
+
+function createPaddedBranchesPage() {
+  return Array.from({ length: 100 }, (_, i) => ({
+    name: `branch-${i}`,
+    commit: { id: 'abc', message: 'y'.repeat(LISTING_PAGE_ITEM_PADDING_CHARS) },
+  }));
 }
 
 describe('GitLab OAuth endpoint safety', () => {
@@ -511,6 +540,163 @@ describe('fetchGitLabProjects', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('stops a read that exceeds the cumulative byte budget', async () => {
+    const page = createPaddedProjectsPage();
+    let pageRequests = 0;
+    mockFetch.mockImplementation(() => {
+      pageRequests += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify(page), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'x-next-page': String(pageRequests + 1),
+          },
+        })
+      );
+    });
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      `GitLab pagination limit exceeded: project listing returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('covers every page of one read with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [],
+            headers: { get: (name: string) => (name === 'x-next-page' ? '2' : null) },
+          });
+        }
+        const { promise, reject } = Promise.withResolvers<Response>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
+          return promise;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
+
+      const read = fetchGitLabProjects('test-token');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(signals).toHaveLength(2);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      expect((signals[0].reason as Error).message).toBe(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops a self-hosted read that passes the total deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      mockHttpsRequest.mockImplementation(() => {
+        const request = new EventEmitter() as EventEmitter & {
+          write: jest.Mock;
+          end: jest.Mock;
+          destroy: jest.Mock;
+          setTimeout: jest.Mock;
+        };
+        request.write = jest.fn();
+        request.end = jest.fn();
+        request.destroy = jest.fn();
+        request.setTimeout = jest.fn();
+        return request as never;
+      });
+
+      const read = fetchGitLabProjects('test-token', 'https://gitlab.example.com');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the deadline over a host lookup that does not answer', async () => {
+    jest.useFakeTimers();
+    try {
+      mockLookup.mockImplementation(() => new Promise(() => {}));
+
+      const read = fetchGitLabProjects('test-token', 'https://gitlab.example.com');
+      const failure = expect(read).rejects.toThrow(
+        `GitLab pagination limit exceeded: project listing did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      await jest.advanceTimersByTimeAsync(GITLAB_LISTING_TIMEOUT_MS);
+      await failure;
+
+      expect(mockHttpsRequest).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('drops the deadline listener of a request once it settles', async () => {
+    mockHttpsRequest.mockImplementationOnce((_options, callback) => {
+      const response = new PassThrough() as PassThrough & {
+        statusCode?: number;
+        statusMessage?: string;
+        headers: Record<string, string>;
+      };
+      response.statusCode = 200;
+      response.statusMessage = 'OK';
+      response.headers = { 'content-type': 'application/json' };
+
+      const request = new EventEmitter() as EventEmitter & {
+        write: jest.Mock;
+        end: jest.Mock;
+        destroy: jest.Mock;
+        setTimeout: jest.Mock;
+      };
+      request.write = jest.fn();
+      request.destroy = jest.fn();
+      request.setTimeout = jest.fn();
+      request.end = jest.fn(() => {
+        callback?.(response as never);
+        response.end('[]');
+      });
+      return request as never;
+    });
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    } as unknown as AbortSignal;
+
+    await fetchGitLabBoundToAddress(
+      {
+        url: new URL('https://gitlab.example.com/api/v4/projects'),
+        address: '93.184.216.34',
+        family: 4,
+      },
+      { signal }
+    );
+
+    expect(signal.addEventListener).toHaveBeenCalledTimes(1);
+    expect(signal.removeEventListener).toHaveBeenCalledTimes(1);
+  });
+
   it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
     const branches = Array.from({ length: 100 }, (_, i) => ({
       name: `branch-${i}`,
@@ -558,6 +744,23 @@ describe('fetchGitLabProjects', () => {
     const branches = await fetchGitLabBranches('test-token', 123);
     expect(branches.map(b => b.name)).toEqual(['main', 'feature']);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops a branch listing that exceeds the cumulative byte budget', async () => {
+    const page = createPaddedBranchesPage();
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(page), {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'x-total-pages': '10' },
+        })
+      )
+    );
+
+    await expect(fetchGitLabBranches('test-token', 123)).rejects.toThrow(
+      `GitLab pagination limit exceeded: branch listing returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -1579,7 +1782,12 @@ describe('fetchMRInlineComments authorship', () => {
 
     const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
 
-    expect(comments.map(c => [c.id, c.authoredByKilo, c.user.username])).toEqual([
+    // Comments come back newest first, so compare by note id rather than arrival order.
+    expect(
+      comments
+        .map(c => [c.id, c.authoredByKilo, c.user.username] as [number, boolean, string])
+        .sort((left, right) => left[0] - right[0])
+    ).toEqual([
       [1, true, 'project_42_bot'],
       [2, false, 'contributor'],
     ]);
@@ -1633,5 +1841,253 @@ describe('fetchMRInlineComments authorship', () => {
         user: { username: 'project_42_bot' },
       }),
     ]);
+  });
+});
+
+const TOKEN_USER_ID = 42;
+
+function discussionPage(page: number, body: string) {
+  return Array.from({ length: 100 }, (_, index) =>
+    discussionWithNote({
+      discussionId: `d${page}-${index}`,
+      noteId: page * 100 + index,
+      authorId: 300,
+      authorUsername: 'contributor',
+      body,
+    })
+  );
+}
+
+/**
+ * Answers every merge-request discussion page with a full page of one body and reports
+ * `totalPages`, so only the retained-byte budget can end the read.
+ */
+function mockEndlessDiscussionPages(body: string, totalPages: number) {
+  mockFetch.mockImplementation(async (url: string) => {
+    if (url.endsWith('/api/v4/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      };
+    }
+    const page = Number(new URL(url).searchParams.get('page') ?? '1');
+    return {
+      ok: true,
+      json: async () => discussionPage(page, body),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? String(totalPages) : null),
+      },
+    };
+  });
+}
+
+function discussionFetchCount() {
+  return mockFetch.mock.calls.filter(([url]) => String(url).includes('/discussions')).length;
+}
+
+function requestedDiscussionPages() {
+  return mockFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter(url => url.includes('/discussions'))
+    .map(url => Number(new URL(url).searchParams.get('page') ?? '1'));
+}
+
+describe('merge request note reads', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('keeps the retained inline note text within the read budget', async () => {
+    const body = 'y'.repeat(200);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    const pagesRead = Math.ceil(expectedNotes / 100);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
+    expect(comments).toHaveLength(expectedNotes);
+    expect(totalBytes).toBeGreaterThanOrEqual(MAX_MR_NOTE_BODY_BYTES);
+    // One page reports the page count, then the read walks back from the newest page.
+    expect(discussionFetchCount()).toBe(pagesRead + 1);
+    expect(requestedDiscussionPages()).toEqual([
+      1,
+      ...Array.from({ length: pagesRead }, (_, index) => 100 - index),
+    ]);
+  });
+
+  it('ends a multi-byte inline note read before the page bound', async () => {
+    const body = '漢'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 100);
+    const bytesPerStoredBody = Buffer.byteLength(body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS));
+    expect(bytesPerStoredBody).toBe(MAX_INLINE_COMMENT_BODY_CHARS * 3);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerStoredBody);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toHaveLength(expectedNotes);
+    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100) + 1);
+    expect(comments.every(c => c.body.length === MAX_INLINE_COMMENT_BODY_CHARS)).toBe(true);
+  });
+
+  it('keeps the newest inline notes when the budget ends the read', async () => {
+    const body = 'y'.repeat(MAX_INLINE_COMMENT_BODY_CHARS);
+    const bytesPerPage = 100 * Buffer.byteLength(body);
+    const totalPages = 12;
+    const pagesConsumed = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerPage);
+    const oldestKeptPage = totalPages - pagesConsumed + 1;
+    expect(oldestKeptPage).toBeGreaterThan(1);
+    mockEndlessDiscussionPages(body, totalPages);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].id).toBe(totalPages * 100 + 99);
+    expect(comments.every(c => c.id >= oldestKeptPage * 100)).toBe(true);
+    // The oldest pages are dropped, and the read never walks back into them.
+    expect(requestedDiscussionPages().slice(1)).not.toContain(oldestKeptPage - 1);
+  });
+
+  it('returns inline comments newest first', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'oldest comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd2',
+            noteId: 2,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'middle comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd3',
+            noteId: 3,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'newest comment',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments.map(c => c.body)).toEqual([
+      'newest comment',
+      'middle comment',
+      'oldest comment',
+    ]);
+  });
+
+  it('stores each inline note body at the rendered length', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 5,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 40) + '\nsecond line',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].body).toBe('z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS));
+  });
+
+  it('does not count other accounts note text against the read budget', async () => {
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({ id: 1000 + index, body: 'w'.repeat(10_000), authorId: 77 })
+      ),
+      2
+    );
+    mockNotePage([makeNote({ id: 2000, body: 'summary <!-- kilo-review -->', authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 2000, body: 'summary <!-- kilo-review -->' });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns the summary note body whole for the provider update', async () => {
+    const body = `${'s'.repeat(MAX_INLINE_COMMENT_BODY_CHARS * 2)}<!-- kilo-review -->`;
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 3000, body, authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 3000, body });
+  });
+
+  it('stops a summary note read once the retained bodies reach the budget', async () => {
+    const body = `${'s'.repeat(6000)}<!-- kilo-review -->`;
+    const keptNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({
+          id: 4000 + index,
+          body,
+          authorId: 42,
+          updated_at: `2026-02-01T00:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(
+            index % 60
+          ).padStart(2, '0')}Z`,
+        })
+      ),
+      2
+    );
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 4000 + keptNotes - 1, body });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still refuses a note listing beyond the page bound', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 5000, body: 'note', authorId: 77 })], 101);
+
+    await expect(findKiloReviewNote('test-token', 'group/project', 7)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR note listing returned more than 100 pages'
+    );
+  });
+
+  it('still refuses a discussion listing beyond the page bound', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => discussionPage(1, 'comment body'),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? '101' : null),
+      },
+    });
+
+    await expect(fetchMRInlineComments('prat-token', 'group/project', 10)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR discussion listing returned more than 100 pages'
+    );
   });
 });

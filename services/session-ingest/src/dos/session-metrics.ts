@@ -337,24 +337,101 @@ export function computeSessionMetrics(
   };
 }
 
-export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }>): number {
+/**
+ * One assistant message's contribution to the session cost. Malformed values,
+ * non-assistant messages and out-of-range costs contribute the same clamp rule
+ * everywhere the session cost is summed.
+ */
+export function assistantMessageCostUsd(data: unknown): number {
+  const parsed = AssistantMessageSchema.safeParse(data);
+  return parsed.success ? clampAssistantCostUsd(parsed.data.cost) : 0;
+}
+
+/**
+ * Contribution of one stored message row. An R2-offloaded body is not read here,
+ * so it contributes nothing — the same rule the full recomputation applies.
+ */
+export function storedAssistantMessageCostUsd(
+  row: { item_data: string; item_data_r2_key: string | null } | null | undefined
+): number {
+  if (row === null || row === undefined || row.item_data_r2_key !== null) return 0;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(row.item_data);
+  } catch {
+    return 0;
+  }
+  return assistantMessageCostUsd(raw);
+}
+
+/** Running session cost after one stored row replaces another. */
+export function adjustRunningAssistantCostUsd(
+  runningUsd: number,
+  previousUsd: number,
+  nextUsd: number
+): number {
+  return nonNegative(runningUsd - previousUsd + nextUsd);
+}
+
+/**
+ * Contribution of the message row a new version replaces. A row stored with its
+ * contribution contributes that value; a row that predates the column, or that was
+ * copied without one, contributes what its body says — the rule the full
+ * recomputation applies to it.
+ */
+export function storedMessageCostUsd(
+  row:
+    | {
+        cost_usd: number | null;
+        /** The body, present only for a row without a stored contribution. */
+        legacy_item_data: string | null;
+        item_data_r2_key: string | null;
+      }
+    | null
+    | undefined
+): number {
+  if (row === null || row === undefined) return 0;
+  if (typeof row.cost_usd === 'number') return row.cost_usd;
+  if (row.legacy_item_data === null) return 0;
+  return storedAssistantMessageCostUsd({
+    item_data: row.legacy_item_data,
+    item_data_r2_key: row.item_data_r2_key,
+  });
+}
+
+export function computeRunningAssistantCostUsd(
+  rows: Array<{ item_data: string; item_data_r2_key?: string | null }>
+): number {
   let total = 0;
   for (const row of rows) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(row.item_data);
-    } catch {
-      continue;
-    }
-    const parsed = AssistantMessageSchema.safeParse(raw);
-    if (!parsed.success) continue;
-    total += clampAssistantCostUsd(parsed.data.cost);
+    total += storedAssistantMessageCostUsd({
+      item_data: row.item_data,
+      item_data_r2_key: row.item_data_r2_key ?? null,
+    });
   }
   return nonNegative(total);
 }
 
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 export const COST_PERSIST_THROTTLE_MS = 30_000;
+
+/**
+ * A close-path comparison of the running total against a recomputation over the
+ * stored rows tolerates one microdollar, the smallest unit the persisted column holds.
+ */
+export const COST_DIVERGENCE_TOLERANCE_USD = 1 / 1_000_000;
+
+/**
+ * `ingest_meta` key holding the session's running assistant cost in USD. It is
+ * maintained from the message items each batch stores, so the cost persist reads
+ * a stored total instead of re-reading the session's message history.
+ */
+export const RUNNING_ASSISTANT_COST_META_KEY = 'runningAssistantCostUsd';
+
+/** The stored cost column value for a running USD total. */
+export function runningAssistantCostMicrodollars(usd: number): number {
+  return Math.max(0, Math.round(usd * 1_000_000));
+}
 
 export type DecideLivePersistArgs = {
   nowMs: number;

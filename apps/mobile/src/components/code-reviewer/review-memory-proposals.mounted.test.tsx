@@ -4,6 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectText } from './review-memory-screen.test-helpers';
 import { i18n } from '@/i18n';
@@ -13,12 +15,13 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => {
-  const permission: PermissionState = { status: 'ready', canEdit: true };
+  const permission: PermissionState = { status: 'ready', canEdit: true, canManage: true };
   return {
     rows: [] as ReviewMemoryProposal[],
     permission: permission as PermissionState,
     saveFailure: false,
     approveFailure: false,
+    approveFailureMessage: 'Opening unavailable',
     saveGate: null as Promise<undefined> | null,
     list: vi.fn(),
     summary: vi.fn(),
@@ -30,6 +33,11 @@ const h = vi.hoisted(() => {
     success: vi.fn(),
     error: vi.fn(),
     openUrl: vi.fn(),
+    preventRemove: undefined as boolean | undefined,
+    preventRemoveHandler: undefined as
+      | ((options: { data: { action: { type: string } }; repeat: () => void }) => void)
+      | undefined,
+    focusEffect: undefined as (() => (() => void) | undefined) | undefined,
   };
 });
 
@@ -39,6 +47,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Switch: 'Switch',
   Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -58,6 +67,18 @@ vi.mock('@shopify/flash-list', () => ({
     ),
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('expo-router', () => ({
+  usePreventRemove: (
+    preventRemove: boolean,
+    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
+  ) => {
+    h.preventRemove = preventRemove;
+    h.preventRemoveHandler = handler;
+  },
+  useFocusEffect: (effect: () => (() => void) | undefined) => {
+    h.focusEffect = effect;
+  },
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -193,7 +214,7 @@ async function mountOpen() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.rows = [proposal()];
-  h.permission = { status: 'ready', canEdit: true };
+  h.permission = { status: 'ready', canEdit: true, canManage: true };
   h.saveFailure = false;
   h.approveFailure = false;
   h.saveGate = null;
@@ -259,7 +280,9 @@ beforeEach(() => {
     };
     h.rows = [updated];
     if (h.approveFailure) {
-      throw new Error('Opening unavailable');
+      throw Object.assign(new Error(h.approveFailureMessage), {
+        data: { code: 'BAD_REQUEST', message: h.approveFailureMessage },
+      });
     }
     return updated;
   });
@@ -277,7 +300,7 @@ describe('review memory proposal interaction', () => {
 
   it.each<PermissionState>([
     { status: 'loading' },
-    { status: 'ready', canEdit: false },
+    { status: 'ready', canEdit: false, canManage: false },
     {
       status: 'error',
       refetch: () => {
@@ -334,10 +357,11 @@ describe('review memory proposal interaction', () => {
     press(button(ui.renderer.root, 'common.save'));
     await waitFor(() =>
       hosts(ui.renderer.root, 'AccessibleStatus').some(
-        node => node.props.message === 'Save unavailable'
+        node => node.props.message === i18n.t('common.somethingWentWrong')
       )
     );
-    expect(h.error).toHaveBeenCalledWith('Save unavailable');
+    expect(collectText(ui.renderer.toJSON())).not.toContain('Save unavailable');
+    expect(h.error).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
     expect(hosts(ui.renderer.root, 'FormField')[0]?.props.defaultValue).toBe(
       'Keep operation context'
     );
@@ -403,16 +427,23 @@ describe('review memory proposal interaction', () => {
 
   it('refreshes failed approval status and allows recovery', async () => {
     h.approveFailure = true;
+    h.approveFailureMessage =
+      REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions;
     const ui = await mountOpen();
     press(button(ui.renderer.root, 'common.openPullRequest'));
     await waitFor(
       () =>
         hosts(ui.renderer.root, 'AccessibleStatus').some(
-          node => node.props.message === 'Opening unavailable'
+          node =>
+            node.props.message ===
+            i18n.t('codeReviewer.reviewMemory.changeRequestMissingPermissions')
         ) &&
         collectText(ui.renderer.toJSON()).includes(
           i18n.t('codeReviewer.reviewMemory.status.change_request_failed')
         )
+    );
+    expect(collectText(ui.renderer.toJSON())).not.toContain(
+      REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions
     );
     h.approveFailure = false;
     press(button(ui.renderer.root, 'common.retry'));
@@ -456,7 +487,7 @@ describe('review memory proposal interaction', () => {
       );
     });
     expect(hosts(ui.renderer.root, 'FormField')).toHaveLength(0);
-    h.permission = { status: 'ready', canEdit: true };
+    h.permission = { status: 'ready', canEdit: true, canManage: true };
     act(() => {
       ui.renderer.update(
         createElement(
@@ -510,6 +541,93 @@ describe('review memory proposal interaction', () => {
     expect(button(ui.renderer.root, 'common.save').props.disabled).toBe(true);
     expect(button(ui.renderer.root, 'common.openPullRequest').props.disabled).toBe(true);
     expect(h.save).not.toHaveBeenCalled();
+    ui.unmount();
+  });
+
+  it('keeps the sheet through a save and closes it on Back when the form is idle', async () => {
+    const gate = Promise.withResolvers<undefined>();
+    h.saveGate = gate.promise;
+    const ui = await mountOpen();
+    change(ui.renderer.root, 'codeReviewer.reviewMemory.proposalTitle', 'Guarded title');
+    press(button(ui.renderer.root, 'common.save'));
+    await waitFor(() => h.save.mock.calls.length === 1);
+
+    // The route is protected for as long as the sheet is presented: the iOS
+    // edge swipe has no sheet handler of its own, so the sheet owns the leave.
+    expect(h.preventRemove).toBe(true);
+    act(() => {
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
+    });
+    // A save in flight owns the screen: Back must neither close the form nor
+    // drop the outcome it is waiting for.
+    expect(hosts(ui.renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await gate.promise;
+    });
+    await waitFor(
+      () =>
+        button(ui.renderer.root, 'securityAgent.analysis.action.dismiss').props.disabled === false
+    );
+
+    // Idle and clean after the save settled: Back closes the form and leaves the
+    // user on the proposal list for the scope.
+    act(() => {
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
+    });
+    await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
+    expect(
+      hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
+    ).toHaveLength(1);
+    expect(h.rows[0]?.title).toBe('Guarded title');
+    ui.unmount();
+  });
+
+  it('guards Back behind the keep-editing confirm while the form holds edits', async () => {
+    const ui = await mountOpen();
+    change(ui.renderer.root, 'codeReviewer.reviewMemory.proposalTitle', 'Unsent draft');
+    act(() => {
+      h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
+    });
+    expect(hosts(ui.renderer.root, 'SessionPageSheet')).toHaveLength(1);
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ cancelLabel: i18n.t('common.keepEditing') })
+    );
+    ui.unmount();
+  });
+
+  it('closes the presented sheet when the route leaves the foreground', async () => {
+    const ui = await mountOpen();
+    expect(hosts(ui.renderer.root, 'SessionPageSheet')).toHaveLength(1);
+    // The sheet is a native window above the app: navigation that leaves this
+    // screen must take the form with it, or closing the form would reveal the
+    // destination instead of this list.
+    act(() => {
+      const cleanup = h.focusEffect?.();
+      expect(cleanup).toBeDefined();
+      cleanup?.();
+    });
+    await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
+    expect(
+      hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
+    ).toHaveLength(1);
+    ui.unmount();
+  });
+
+  it('lets forward navigation through: the sheet closes and the action is replayed', async () => {
+    const ui = await mountOpen();
+    change(ui.renderer.root, 'codeReviewer.reviewMemory.proposalTitle', 'Unsent draft');
+    const repeat = vi.fn<() => void>();
+    act(() => {
+      h.preventRemoveHandler?.({ data: { action: { type: 'REPLACE' } }, repeat });
+    });
+    // A replace or reset is the app's own redirect (sign-out, consent,
+    // force-update), not an abandoned screen: the form goes with it and the
+    // intercepted action still runs.
+    await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
+    expect(repeat).toHaveBeenCalledOnce();
+    expect(h.confirm).not.toHaveBeenCalled();
     ui.unmount();
   });
 });

@@ -8,10 +8,14 @@ import {
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  ByokRoutingPreviewSchema,
+  previewByokRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -22,7 +26,9 @@ import {
   SetBYOKKeyEnabledInputSchema,
   SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
+  ReorderBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
+  PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
@@ -46,6 +52,9 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  BYOK_KEY_ORDER,
+  byokOwner,
+  getByokKeyPriority,
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
@@ -54,7 +63,7 @@ import {
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -65,12 +74,15 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
   'API key test failed: the stored key could not be read. Try again later.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
   'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
+const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -115,13 +127,40 @@ const BYOK_KEY_COLUMNS = {
   settings: byok_api_keys.settings,
 };
 
+function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
+  return sortByokKeysInRouteOrder(keys, key => ({
+    providerId: key.provider_id,
+    priority: getByokKeyPriority(key.settings),
+  }));
+}
+
+function ownedPersonalKeys(userId: string) {
+  return and(
+    eq(byok_api_keys.kilo_user_id, userId),
+    ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+  );
+}
+
+async function writePersonalKeyPriorities(
+  tx: DrizzleTransaction,
+  userId: string,
+  keyIds: readonly string[]
+) {
+  for (const [priority, id] of keyIds.entries()) {
+    await tx
+      .update(byok_api_keys)
+      .set({ settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ priority })}::jsonb` })
+      .where(and(eq(byok_api_keys.id, id), ownedPersonalKeys(userId)));
+  }
+}
+
 type BYOKKeyRow = Omit<
   BYOKApiKeyResponse,
   'provider_name' | 'serve_catalog_models' | 'supports_catalog_mode' | 'can_change_catalog_mode'
 > & { settings: unknown };
 
 /**
- * Catalog mode decides whether organization model policies apply to the key, so on organization
+ * Catalog mode decides whether organization model and provider policies apply to the key, so on organization
  * keys only the roles that edit those policies may change it.
  */
 function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
@@ -174,10 +213,12 @@ async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[
   for (const provider of DIRECT_BYOK_PROVIDERS) {
     const entries = await listDirectByokCatalogModels(provider.id);
     if (entries.length === 0) continue;
-    result[provider.id] = entries.map(({ catalogModelId, model }) => {
-      const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
-      return `${name} (${catalogModelId})`;
-    });
+    result[provider.id] = entries
+      .map(({ catalogModelId, model }) => {
+        const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
+        return `${name} (${catalogModelId})`;
+      })
+      .sort();
   }
   return result;
 }
@@ -212,7 +253,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   };
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
-    if (isKiloExclusiveModel(openRouterModel.id)) continue;
+    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
     for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
       addSupportedModel(providerId, openRouterModel);
     }
@@ -283,10 +324,61 @@ export const byokRouter = createTRPCRouter({
           organizationId
             ? eq(byok_api_keys.organization_id, organizationId)
             : eq(byok_api_keys.kilo_user_id, ctx.user.id)
-        );
+        )
+        .orderBy(...BYOK_KEY_ORDER);
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
+      return Promise.all(
+        inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
+    }),
+
+  /**
+   * Sets the priority of every personal key: each request uses the first key in this order that can
+   * serve it. The ChatGPT connection is not a listed key and keeps its own step.
+   */
+  reorder: baseProcedure
+    .input(ReorderBYOKKeysInputSchema)
+    .output(z.array(BYOKApiKeyResponseSchema))
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
+      const keys = await db.transaction(async tx => {
+        const owned = await tx
+          .select({ id: byok_api_keys.id })
+          .from(byok_api_keys)
+          .where(ownedPersonalKeys(ctx.user.id))
+          .for('update');
+        const ownedIds = new Set(owned.map(key => key.id));
+        if (owned.length !== input.keyIds.length || input.keyIds.some(id => !ownedIds.has(id))) {
+          throw new TRPCError({ code: 'CONFLICT', message: KEYS_CHANGED_MESSAGE });
+        }
+        await writePersonalKeyPriorities(tx, ctx.user.id, input.keyIds);
+        return tx
+          .select(BYOK_KEY_COLUMNS)
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.kilo_user_id, ctx.user.id))
+          .orderBy(...BYOK_KEY_ORDER);
+      });
+      return Promise.all(inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, null)));
+    }),
+
+  /**
+   * The routes a request for a catalog model would try with the owner's keys, in order. Reads key
+   * metadata only and never decrypts a key.
+   */
+  previewRouting: baseProcedure
+    .input(PreviewBYOKRoutingInputSchema)
+    .output(ByokRoutingPreviewSchema)
+    .query(async ({ input, ctx }) => {
+      const { organizationId, modelId, apiKind } = input;
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId);
+      }
+      return previewByokRouting({
+        fromDb: db,
+        owner: byokOwner(ctx.user.id, organizationId),
+        requestedModel: modelId.toLowerCase(),
+        apiKind,
+      });
     }),
 
   create: baseProcedure

@@ -5,6 +5,10 @@ import { createHash } from 'node:crypto';
 import { GoogleAuth } from 'google-auth-library';
 
 const GOOGLE_CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
+
+/** Upper bound on cached auth clients per instance. */
+export const MAX_CACHED_AUTH_CLIENTS = 64;
+
 const authClients = new Map<string, GoogleAuth>();
 
 function getAuthClient(serviceAccount: GoogleServiceAccountSigningKey): GoogleAuth {
@@ -14,7 +18,16 @@ function getAuthClient(serviceAccount: GoogleServiceAccountSigningKey): GoogleAu
     .update(serviceAccount.private_key)
     .digest('base64url');
   const cached = authClients.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    authClients.delete(cacheKey);
+    authClients.set(cacheKey, cached);
+    return cached;
+  }
+
+  if (authClients.size >= MAX_CACHED_AUTH_CLIENTS) {
+    const evictedKey = authClients.keys().next().value;
+    if (evictedKey !== undefined) authClients.delete(evictedKey);
+  }
 
   const auth = new GoogleAuth({
     credentials: serviceAccount,

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { impactHaptic, notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -93,7 +94,7 @@ export function MemberRow({
       { memberId: member.id, role },
       {
         onSuccess: () => {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          impactHaptic(Haptics.ImpactFeedbackStyle.Light);
         },
       }
     );
@@ -109,7 +110,7 @@ export function MemberRow({
           { memberId: member.id },
           {
             onSuccess: () => {
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              notificationHaptic(Haptics.NotificationFeedbackType.Success);
             },
           }
         );

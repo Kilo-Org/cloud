@@ -155,15 +155,22 @@ export function claimAuthTerminalFailureReport(route: string, status: number): b
 
 /**
  * Report one terminal sign-in failure, at most once per process, with the
- * stable fingerprint above. Never throws; a no-op until a telemetry sink is
- * installed.
+ * stable fingerprint above. The expected expiry of the stored credential is a
+ * lifecycle event, so it is filed at warning level; every other terminal
+ * refusal names a defect and stays at error. Same tags and fingerprint either
+ * way, so one route and status keeps one issue and only its severity moves.
+ * Never throws; a no-op until a telemetry sink is installed.
  */
 export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
   if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
+  // The stored credential's own expiry is the expected end of a session: it
+  // was expired, revoked or already rotated, and the person signs in again.
+  // Every other terminal refusal names a defect, so only that one is a warning.
+  const expired = route === STORED_CREDENTIAL_ROUTE && status === 401;
   captureTelemetry({
-    level: 'error',
+    level: expired ? 'warning' : 'error',
     error: new Error(`Terminal sign-in failure: ${status} on ${route}`),
     tags: {
       'error.subsystem': 'auth',

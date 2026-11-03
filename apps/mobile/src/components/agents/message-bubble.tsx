@@ -11,8 +11,10 @@ import { useTranslation } from 'react-i18next';
 import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { cn } from '@/lib/utils';
 
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
@@ -22,7 +24,7 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
-import { selectMessageFailure } from './message-failure-state';
+import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
@@ -154,27 +156,33 @@ function MessageBubbleImpl({
     failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined;
+  // The footer is the failed row's status, so it sits under the row it names: a
+  // user row's bubble is end-aligned, so its title, detail and action row are
+  // too; an assistant row's stays on the leading edge. `items-end` is logical.
+  // `text-right` is how a line end-aligns here: NativeWind drops
+  // `text-align: end`, and RN resolves `right` against the interface direction,
+  // so the copy still ends on the trailing side in an RTL interface.
+  const trailingFailure = isUser;
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className="gap-1 px-4 py-1">
+      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
         <Text
-          className="text-sm text-destructive"
-          accessibilityLabel={
-            failure.canRetry
-              ? t('agentChat.messageBubble.failureRetryAvailable', { title: failure.title })
-              : t('agentChat.messageBubble.failure', { title: failure.title })
-          }
+          className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+          accessibilityLabel={messageFailureLabel(failure)}
         >
           {failure.title}
         </Text>
         {failure.detail !== null ? (
-          <Text className="text-xs text-muted-foreground">{failure.detail}</Text>
+          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+            {failure.detail}
+          </Text>
         ) : null}
         <View className="flex-row gap-2">
           {failure.canRetry && onRetryMessage ? (
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 onRetryMessage(message);
               }}
@@ -305,37 +313,39 @@ function MessageBubbleImpl({
 
   return (
     <View>
-      <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
-        <InMessageBubbleContext.Provider value>
-          <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
-            <View className="gap-2">
-              {condenseToolCalls
-                ? groupMessageParts(parts, { condense: true }).map(group =>
-                    group.kind === 'tool-run' ? (
-                      <MessageErrorBoundary key={group.parts[0]?.id}>
-                        <CondensedToolRunRow parts={group.parts} />
-                      </MessageErrorBoundary>
-                    ) : (
-                      group.parts.map(renderPart)
+      {parts.some(part => partRendersContent(part)) ? (
+        <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+          <InMessageBubbleContext.Provider value>
+            <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
+              <View className="gap-2">
+                {condenseToolCalls
+                  ? groupMessageParts(parts, { condense: true }).map(group =>
+                      group.kind === 'tool-run' ? (
+                        <MessageErrorBoundary key={group.parts[0]?.id}>
+                          <CondensedToolRunRow parts={group.parts} />
+                        </MessageErrorBoundary>
+                      ) : (
+                        group.parts.map(renderPart)
+                      )
                     )
-                  )
-                : parts.map(part => renderPart(part))}
-            </View>
-          </MessageLongPressProvider>
-        </InMessageBubbleContext.Provider>
-        {a11y.accessibilityActions.length > 0 ? (
-          <View
-            accessible
-            accessibilityRole={a11y.accessibilityRole}
-            accessibilityLabel={a11y.accessibilityLabel}
-            accessibilityHint={a11y.accessibilityHint}
-            accessibilityActions={a11y.accessibilityActions}
-            onAccessibilityAction={handleAccessibilityAction}
-            className="absolute inset-0 opacity-0"
-            pointerEvents="none"
-          />
-        ) : null}
-      </Pressable>
+                  : parts.map(part => renderPart(part))}
+              </View>
+            </MessageLongPressProvider>
+          </InMessageBubbleContext.Provider>
+          {a11y.accessibilityActions.length > 0 ? (
+            <View
+              accessible
+              accessibilityRole={a11y.accessibilityRole}
+              accessibilityLabel={a11y.accessibilityLabel}
+              accessibilityHint={a11y.accessibilityHint}
+              accessibilityActions={a11y.accessibilityActions}
+              onAccessibilityAction={handleAccessibilityAction}
+              className="absolute inset-0 opacity-0"
+              pointerEvents="none"
+            />
+          ) : null}
+        </Pressable>
+      ) : null}
       {failureFooter}
     </View>
   );

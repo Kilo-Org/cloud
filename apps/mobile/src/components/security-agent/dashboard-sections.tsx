@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
@@ -8,11 +8,15 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { KvRow } from '@/components/ui/kv-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
@@ -29,6 +33,8 @@ type SectionProps = Readonly<{
   data: DashboardStats;
   slaEnabled: boolean;
   repoFullName: string | undefined;
+  /** No sync has completed yet, so nothing here counts a measured result. */
+  neverSynced: boolean;
 }>;
 
 function repoTrailingLabel(
@@ -62,9 +68,32 @@ function findingsHref(
   return (query ? `${base}?${query}` : base) as Href;
 }
 
+/**
+ * A row's value before the first sync: the counts below it are not measured,
+ * so a dash replaces each number the row would otherwise claim as zero.
+ */
+function rowValue(neverSynced: boolean, rendered: string): string {
+  return neverSynced ? UNMEASURED_VALUE : rendered;
+}
+
+/** The status dot an unmeasured row shows: neutral, never a success or alarm colour. */
+function rowTone(
+  neverSynced: boolean,
+  measured: 'good' | 'warn' | 'danger' | 'muted'
+): 'good' | 'warn' | 'danger' | 'muted' {
+  return neverSynced ? 'muted' : measured;
+}
+
+/**
+ * The frame every section card and its placeholder share. The loading state
+ * repeats it instead of restating the classes, so the two cannot drift apart
+ * and change the page's height when the cards arrive.
+ */
+const SECTION_CARD_CLASS = 'gap-1 rounded-lg bg-secondary px-3';
+
 function SectionCard({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
-    <View className="gap-1 rounded-lg bg-secondary px-3">
+    <View className={SECTION_CARD_CLASS}>
       <Text variant="small" className="pt-3 uppercase tracking-wide text-muted-foreground">
         {title}
       </Text>
@@ -73,19 +102,47 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
   );
 }
 
-function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
-  const router = useRouter();
+function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: SectionProps) {
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const finding = data.priorityFinding;
 
+  // A scope that has never synced has found nothing yet because nothing ran,
+  // not because the codebase is clean: the green check and the all-clear line
+  // read as a verified result. The filter above already states that nothing
+  // has synced, so this card explains what it will hold instead of repeating
+  // the status, and it opens nothing: a lone dash left a content section
+  // looking broken.
+  if (neverSynced) {
+    return (
+      <SectionCard title={t('securityAgent.dashboard.actFirst')}>
+        <View className="py-3">
+          <Text variant="muted" className="text-sm">
+            {t('securityAgent.dashboard.priorityFindingsPending')}
+          </Text>
+        </View>
+      </SectionCard>
+    );
+  }
+
   if (!finding) {
+    // The all-clear row still opens the scope's open-findings list — the same
+    // list its own count describes — so it stays a destination on the screen
+    // even when that list is empty. Its whole row is the target, so the row
+    // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Pressable
-          className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
+          className={cn(
+            // The row's own node carries the touch target: its `py-3` frame
+            // alone renders under the design target, and `hitSlop` would not
+            // move the rect a control-size audit measures.
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between gap-2 py-3 active:opacity-70'
+          )}
           onPress={() => {
-            router.push(findingsHref(scope, { status: 'open' }));
+            pushOnce(findingsHref(scope, { status: 'open' }));
           }}
         >
           <View className="flex-row items-center gap-2">
@@ -104,9 +161,9 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   return (
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
       <Pressable
-        className="gap-1 py-3 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'gap-1 py-3 active:opacity-70')}
         onPress={() => {
-          router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
+          pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
       >
         <Text className="text-sm font-medium" numberOfLines={1}>
@@ -130,40 +187,15 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   );
 }
 
-function PostureSection({ data, slaEnabled }: SectionProps) {
+function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
   const { t } = useTranslation();
+  // With SLA deadlines on, the metric tiles above already carry this breakdown:
+  // the compliance tile captions how many findings are within their deadline and
+  // the deadline tile captions the same severity buckets. A second copy here read
+  // the same figures twice, so the section only adds the analysis posture the
+  // tiles leave out.
   if (slaEnabled) {
-    const { overall, bySeverity } = data.sla;
-    return (
-      <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
-        <KvRow
-          label={t('securityAgent.dashboard.withinDeadline')}
-          value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
-            overall.total,
-            i18n.language
-          )}`}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.criticalOverdue')}
-          value={formatNumber(bySeverity.critical.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.highOverdue')}
-          value={formatNumber(bySeverity.high.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
-        />
-        <KvRow
-          label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
-          valueTone="muted"
-          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
-          last
-        />
-      </SectionCard>
-    );
+    return null;
   }
 
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -176,35 +208,39 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
       <KvRow
         label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={formatNumber(data.analysis.exploitable, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
-        dotTone="danger"
+        valueFace="numeric"
+        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={formatNumber(data.analysis.needsReview, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
-        dotTone="warn"
+        valueFace="numeric"
+        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={formatNumber(analysisIncomplete, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
         valueTone="muted"
+        valueFace="numeric"
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
-        value={formatNumber(noImmediateAction, i18n.language)}
+        value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
-        dotTone="good"
+        valueFace="numeric"
+        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
         last
       />
     </SectionCard>
   );
 }
 
-function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps) {
-  const router = useRouter();
+function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProps) {
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
 
@@ -239,14 +275,6 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
       href: findingsHref(scope, { status: 'open', repoFullName }),
     },
   ];
-  if (slaEnabled) {
-    rows.push({
-      label: t('securityAgent.dashboard.noSlaDeadline'),
-      value: data.sla.untrackedCount,
-      tone: 'muted',
-      href: findingsHref(scope, { status: 'open', repoFullName }),
-    });
-  }
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
@@ -254,15 +282,21 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
         <Pressable
           key={row.label}
           onPress={() => {
-            router.push(row.href);
+            pushOnce(row.href);
           }}
+          // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as one
+          // column at the pitch every other `KvRow` group uses instead of the
+          // taller interactive-row frame. The slop carries the touch region past
+          // the design target without moving the frame the divider sits on.
+          hitSlop={DENSE_ROW_HIT_SLOP}
           className="active:opacity-70"
         >
           <KvRow
             label={row.label}
-            value={formatNumber(row.value, i18n.language)}
+            value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
-            dotTone={row.tone}
+            valueFace="numeric"
+            dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
             last={index === rows.length - 1}
           />
         </Pressable>
@@ -272,7 +306,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
 }
 
 function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -296,11 +330,18 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
         <Pressable
           key={repo.repoFullName}
           className={cn(
+            // The row's own node carries the touch target. A row sized by its
+            // content reports only what its lines need, so a repository row
+            // that paints its name line alone measures under the design
+            // target, and `hitSlop` would not move the rect a control-size
+            // audit reads. `py-3` keeps the card's row rhythm and
+            // `items-center` centres the block in the taller box.
+            ROW_TARGET_CLASS,
             'flex-row items-center justify-between gap-2 py-3 active:opacity-70',
             index < data.repoHealth.length - 1 && 'border-b-[0.5px] border-hair-soft'
           )}
           onPress={() => {
-            router.push(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
+            pushOnce(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
           }}
         >
           <View className="flex-1">
@@ -309,13 +350,13 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: formatNumber(repo.open, i18n.language),
-                critical: formatNumber(repo.critical, i18n.language),
-                high: formatNumber(repo.high, i18n.language),
+                open: severityCountPhrase('repoOpen', repo.open),
+                critical: severityCountPhrase('repoCritical', repo.critical),
+                high: severityCountPhrase('repoHigh', repo.high),
               })}
             </Text>
           </View>
-          <Text variant="mono" className="text-xs text-muted-foreground">
+          <Text className="text-xs text-muted-foreground tabular-nums">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
           <DirectionalArrowRight size={14} color={colors.mutedForeground} />
@@ -332,6 +373,63 @@ export function DashboardSections(props: SectionProps) {
       <PostureSection {...props} />
       <CoverageSection {...props} />
       <RepoHealthSection {...props} />
+    </>
+  );
+}
+
+/** One line of a row: a label/value row, or a title over its secondary line. */
+type SkeletonRow = 1 | 2;
+
+/** The primary line of a `text-sm` row, in dp at the app's default text size. */
+const SKELETON_PRIMARY_LINE_CLASS = 'h-[17.5px] rounded';
+/** The secondary line under it, and the section title's own line. */
+const SKELETON_SECONDARY_LINE_CLASS = 'h-4 rounded';
+
+/**
+ * A section card's placeholder. The card frame, the title's `pt-3`, and each
+ * row's `py-3` are the loaded card's own, and a row draws the same one or two
+ * line boxes the loaded row holds, so the card this replaces lands on the same
+ * height instead of moving the page when the reads resolve.
+ */
+function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }>) {
+  return (
+    <View className={SECTION_CARD_CLASS}>
+      <Skeleton className={cn('mt-3 w-28', SKELETON_SECONDARY_LINE_CLASS)} />
+      {rows.map((lines, index) => (
+        <View key={index} className="gap-1 py-3">
+          <Skeleton className={cn('w-full', SKELETON_PRIMARY_LINE_CLASS)} />
+          {lines === 2 ? <Skeleton className={cn('w-2/3', SKELETON_SECONDARY_LINE_CLASS)} /> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * What the sections look like while the dashboard reads: one placeholder per
+ * card `DashboardSections` will render for the same owner.
+ *
+ * The posture card is the one section this agent hides when SLA deadlines are
+ * on (`PostureSection` returns nothing, because the metric tiles already carry
+ * that breakdown), and its rows do not depend on whether deadlines are on. The
+ * repository card cannot know how many repositories the scope covers, so it
+ * stands in with a few two-line rows.
+ */
+export function DashboardSectionsSkeleton({
+  slaEnabled,
+  neverSynced = false,
+}: Readonly<{ slaEnabled: boolean; neverSynced?: boolean }>) {
+  return (
+    <>
+      {/* The Act-first card is the one section whose shape the sync-status read
+          decides on its own: before the first sync it holds a single line of
+          pending copy instead of a title over its repository, so the
+          placeholder drops that second line once the read has settled to that
+          scope. Without the answer the synced shape (the common one) stays. */}
+      <SectionCardSkeleton rows={neverSynced ? [1] : [2]} />
+      {slaEnabled ? null : <SectionCardSkeleton rows={[1, 1, 1, 1]} />}
+      <SectionCardSkeleton rows={[1, 1, 1, 1]} />
+      <SectionCardSkeleton rows={[2, 2, 2]} />
     </>
   );
 }

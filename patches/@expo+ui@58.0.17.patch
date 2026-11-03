@@ -14,10 +14,15 @@ index 451dea211d69e0b38f56af577fa31e3babf42312..aa70efbe9c41e845d50d57d01591e4f7
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..f4b9d0d0555892a0f7bc8dea165a5442b89d53bc 100644
+index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..6b64322285fce13a0f5d77610be924a887e9957a 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-@@ -8,6 +8,7 @@ import android.content.Context
+@@ -5,9 +5,12 @@ package expo.modules.ui
+ import android.app.Activity
+ import android.app.Dialog
+ import android.content.Context
++import android.content.res.Configuration
++import android.content.res.Resources
  import android.graphics.Color
  import android.view.KeyEvent
  import android.view.inputmethod.InputMethodManager
@@ -25,15 +30,49 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..f4b9d0d0555892a0f7bc8dea165a5442
  import androidx.compose.material3.BottomSheetDefaults
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.MaterialTheme
-@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
+@@ -16,12 +19,17 @@ import androidx.compose.material3.ModalBottomSheetProperties
+ import androidx.compose.material3.contentColorFor
+ import androidx.compose.material3.rememberModalBottomSheetState
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
  import androidx.compose.runtime.DisposableEffect
  import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.remember
  import androidx.compose.runtime.rememberCoroutineScope
 +import androidx.compose.runtime.rememberUpdatedState
  import androidx.compose.ui.graphics.Color as ComposeColor
  import androidx.compose.ui.graphics.luminance
  import androidx.compose.ui.graphics.takeOrElse
-@@ -74,7 +76,8 @@ private fun Activity.isAcceptingText(): Boolean {
++import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.platform.LocalResources
+ import androidx.compose.ui.platform.LocalView
+ import androidx.compose.ui.window.DialogWindowProvider
+ import expo.modules.kotlin.records.Field
+@@ -32,6 +40,7 @@ import expo.modules.kotlin.views.ComposeProps
+ import expo.modules.kotlin.views.FunctionalComposableScope
+ import expo.modules.kotlin.views.OptimizedComposeProps
+ import kotlinx.coroutines.withContext
++import java.util.Locale
+ import kotlin.coroutines.cancellation.CancellationException
+ 
+ @OptimizedRecord
+@@ -49,6 +58,15 @@ data class ModalBottomSheetViewProps(
+   val scrimColor: Color? = null,
+   val showDragHandle: Boolean = true,
+   val sheetGesturesEnabled: Boolean = true,
++  /**
++   * Repo-local: the app's UI language as a BCP-47 tag. Material3 paints strings of
++   * its own on the sheet (the scrim's dismiss label, the drag handle, the pane
++   * title) and resolves them against the device locale, which contradicts an app
++   * whose language differs from the device's. When set, the sheet resolves them
++   * against this locale instead; the rest of the configuration (layout direction,
++   * density, theme) stays the activity's.
++   */
++  val locale: String? = null,
+   val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
+   val modifiers: ModifierList = emptyList()
+ ) : ComposeProps
+@@ -74,7 +92,8 @@ private fun Activity.isAcceptingText(): Boolean {
   * Without this check, typing "rr" in a sheet TextInput reloads the app.
   */
  @Composable
@@ -43,7 +82,7 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..f4b9d0d0555892a0f7bc8dea165a5442
    val dialog = (LocalView.current.parent as? DialogWindowProvider)?.window?.callback as? Dialog
    if (dialog == null || activity == null) {
      return
-@@ -82,6 +85,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+@@ -82,6 +101,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
  
    DisposableEffect(dialog, activity) {
      dialog.setOnKeyListener { _, keyCode, event ->
@@ -54,38 +93,121 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..f4b9d0d0555892a0f7bc8dea165a5442
        val isForwardable = event.action == KeyEvent.ACTION_UP &&
          keyCode != KeyEvent.KEYCODE_BACK &&
          keyCode != KeyEvent.KEYCODE_ESCAPE &&
-@@ -171,12 +178,27 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
-       else -> null
-     },
-     properties = ModalBottomSheetProperties(
+@@ -94,6 +117,38 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+   }
+ }
+ 
++/**
++ * The resources Compose resolves platform strings from, for [localeTag]. The
++ * sheet's own platform strings (the scrim's dismiss label, the drag handle, the
++ * pane title) come from Material3 and resolve against whatever locale its
++ * resources carry — by default the device locale, which contradicts an app whose
++ * UI language is a different one. Only the locale is replaced: the configuration
++ * is a copy of the activity's, so layout direction, density and theme are
++ * unchanged.
++ */
++private fun localizedResources(context: Context?, localeTag: String?): Resources? {
++  if (context == null || localeTag.isNullOrEmpty()) {
++    return null
++  }
++  val configuration = Configuration(context.resources.configuration)
++  configuration.setLocale(Locale.forLanguageTag(localeTag))
++  return context.createConfigurationContext(configuration).resources
++}
++
++/** Runs [content] with platform strings resolved against [resources]' locale. */
++@Composable
++private fun AppLocaleResources(resources: Resources?, content: @Composable () -> Unit) {
++  if (resources == null) {
++    content()
++    return
++  }
++  CompositionLocalProvider(
++    LocalConfiguration provides resources.configuration,
++    LocalResources provides resources,
++    content = content
++  )
++}
++
+ @Composable
+ fun FunctionalComposableScope.ModalBottomSheetContent(
+   props: ModalBottomSheetViewProps,
+@@ -153,31 +208,51 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+     }
+   val resolvedScrimColor = props.scrimColor.composeOrNull ?: BottomSheetDefaults.ScrimColor
+   val dragHandleSlotView = findChildSlotView(view, "dragHandle")
++  val appLocaleResources = remember(props.locale) {
++    localizedResources(appContext.reactContext ?: appContext.currentActivity, props.locale)
++  }
+ 
+-  ModalBottomSheet(
+-    sheetState = sheetState,
+-    onDismissRequest = onDismissRequest,
+-    containerColor = resolvedContainerColor,
+-    contentColor = resolvedContentColor,
+-    scrimColor = resolvedScrimColor,
+-    sheetGesturesEnabled = props.sheetGesturesEnabled,
+-    dragHandle = when {
+-      dragHandleSlotView != null -> {
+-        { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
++  AppLocaleResources(appLocaleResources) {
++    ModalBottomSheet(
++      sheetState = sheetState,
++      onDismissRequest = onDismissRequest,
++      containerColor = resolvedContainerColor,
++      contentColor = resolvedContentColor,
++      scrimColor = resolvedScrimColor,
++      sheetGesturesEnabled = props.sheetGesturesEnabled,
++      dragHandle = when {
++        dragHandleSlotView != null -> {
++          { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
++        }
++        props.showDragHandle -> {
++          { BottomSheetDefaults.DragHandle() }
++        }
++        else -> null
++      },
++      properties = ModalBottomSheetProperties(
++        // Repo-local: Material3 answers a back press by hiding the sheet itself,
++        // before JavaScript hears the request, so a caller could never ask its own
++        // "Keep editing / Discard" question. The sheet answers Back below instead,
++        // and hides only when JavaScript drops the sheet.
++        shouldDismissOnBackPress = false,
++        shouldDismissOnClickOutside = props.properties.shouldDismissOnClickOutside
++      ),
++      modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
++    ) {
++      // Registered inside the dialog, so it runs before the wrapper's fallback.
++      if (props.properties.shouldDismissOnBackPress) {
++        BackHandler { onDismissRequest() }
+       }
+-      props.showDragHandle -> {
+-        { BottomSheetDefaults.DragHandle() }
++      ForwardKeyEventsToActivity(appContext.currentActivity) {
++        if (props.properties.shouldDismissOnBackPress && (!sheetState.isVisible || sheetState.isAnimationRunning)) {
++          onDismissRequest()
++          true
++        } else {
++          false
++        }
+       }
+-      else -> null
+-    },
+-    properties = ModalBottomSheetProperties(
 -      shouldDismissOnBackPress = props.properties.shouldDismissOnBackPress,
-+      // Repo-local: Material3 answers a back press by hiding the sheet itself,
-+      // before JavaScript hears the request, so a caller could never ask its own
-+      // "Keep editing / Discard" question. The sheet answers Back below instead,
-+      // and hides only when JavaScript drops the sheet.
-+      shouldDismissOnBackPress = false,
-       shouldDismissOnClickOutside = props.properties.shouldDismissOnClickOutside
-     ),
-     modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
-   ) {
+-      shouldDismissOnClickOutside = props.properties.shouldDismissOnClickOutside
+-    ),
+-    modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
+-  ) {
 -    ForwardKeyEventsToActivity(appContext.currentActivity)
-+    // Registered inside the dialog, so it runs before the wrapper's fallback.
-+    if (props.properties.shouldDismissOnBackPress) {
-+      BackHandler { onDismissRequest() }
+-    Children(UIComposableScope(), filter = { !isSlotView(it) })
++      Children(UIComposableScope(), filter = { !isSlotView(it) })
 +    }
-+    ForwardKeyEventsToActivity(appContext.currentActivity) {
-+      if (props.properties.shouldDismissOnBackPress && (!sheetState.isVisible || sheetState.isAnimationRunning)) {
-+        onDismissRequest()
-+        true
-+      } else {
-+        false
-+      }
-+    }
-     Children(UIComposableScope(), filter = { !isSlotView(it) })
    }
  
+   LaunchedEffect(Unit) {
 diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
-index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..c50c9b5888cfb7fe060e887a26ff48254375c56e 100644
+index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..3bc614f261d2b987aec00001598e56ff7b943432 100644
 --- a/build/community/bottom-sheet/BottomSheet.android.js
 +++ b/build/community/bottom-sheet/BottomSheet.android.js
 @@ -37,7 +37,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
@@ -93,7 +215,7 @@ index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..c50c9b5888cfb7fe060e887a26ff4825
   * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
   */ export function BottomSheet(props) {
 -    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
-+    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
      const { width } = useWindowDimensions();
      const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
      const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
@@ -187,12 +309,13 @@ index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..c50c9b5888cfb7fe060e887a26ff4825
          snapPointsProp
      ]);
      useImperativeHandle(ref, ()=>methods, [
-@@ -177,7 +182,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
+@@ -177,7 +182,8 @@ function findNearestSnapPointIndex(snapPoints, position) {
                      skipPartiallyExpanded: skipPartially,
                      initialFullyExpanded: hasMultipleSnapPoints && pendingIndexRef.current === maxIndex,
                      showDragHandle: handleComponent !== null,
 -                    sheetGesturesEnabled: enablePanDownToClose,
 +                    sheetGesturesEnabled: dismissGestures,
++                    locale: locale,
                      containerColor: containerColor,
                      properties: {
                          shouldDismissOnBackPress: enablePanDownToClose,
@@ -227,10 +350,10 @@ index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded717041
      ]);
      return /*#__PURE__*/ _jsx(BottomSheetInternalContext.Provider, {
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
-index cf72b27f4304b6772a844acd0eb144796c03b5c0..e7e37082a05174b6f4c2910917422f837af2e654 100644
+index cf72b27f4304b6772a844acd0eb144796c03b5c0..fb408e55eaff591d07d428677986380d967727aa 100644
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts
-@@ -169,6 +169,18 @@ export interface BottomSheetProps {
+@@ -169,6 +169,26 @@ export interface BottomSheetProps {
       * On Android, this also controls back button and scrim tap dismiss.
       */
      enablePanDownToClose?: boolean;
@@ -246,9 +369,35 @@ index cf72b27f4304b6772a844acd0eb144796c03b5c0..e7e37082a05174b6f4c2910917422f83
 +     * Repo-local.
 +     */
 +    onRequestDismiss?: () => boolean;
++    /**
++     * BCP-47 tag of the app's UI language. On Android the sheet paints platform
++     * strings of its own — the scrim's dismiss label, the drag handle, the pane
++     * title — and Material3 otherwise resolves them against the device locale, so
++     * an app whose UI language differs announces those controls in the device's
++     * language. Repo-local; ignored where the platform sheet has no such strings.
++     */
++    locale?: string;
      /**
       * Whether the sheet should automatically size to fit its content.
       * @default true
+diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+index 6d3806c8213034310a304287da1e609453d30243..a99ddcd3e17a3f806d37f7e40a19ddcf2448a85c 100644
+--- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
++++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+@@ -78,6 +78,13 @@ export interface ModalBottomSheetProps {
+      * @default true
+      */
+     sheetGesturesEnabled?: boolean;
++    /**
++     * BCP-47 tag of the app's UI language. The sheet paints platform strings of
++     * its own (the scrim's dismiss label, the drag handle, the pane title), and
++     * they otherwise resolve against the device locale. Repo-local.
++     * @platform android
++     */
++    locale?: string;
+     /**
+      * Properties for the modal window behavior.
+      */
 diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
 index 2a5e57bc85660a666fc95f42b5a284ba16ebaf53..121d743b4fdb52213a08fbd2b1b75a3d2e103445 100644
 --- a/build/swift-ui/Text/index.d.ts
@@ -310,10 +459,10 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad033
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896eecb54c6 100644
+index 419edefacdca8b98e318dc924c66575171e35124..b9643168830022aec3f61b2bb9a129793da1109b 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
-@@ -61,6 +61,11 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -61,6 +61,15 @@ export function BottomSheet(props: BottomSheetProps) {
      onClose,
      onDismiss,
      enablePanDownToClose = false,
@@ -322,10 +471,14 @@ index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896
 +    // turned back and the scrim off.
 +    dismissGestures = enablePanDownToClose,
 +    onRequestDismiss,
++    // Repo-local: the app's UI language, so the sheet's platform-painted
++    // strings (scrim label, drag handle, pane title) do not fall back to the
++    // device's language.
++    locale,
      enableDynamicSizing = true,
      handleComponent,
      backgroundStyle,
-@@ -97,6 +102,8 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -97,6 +106,8 @@ export function BottomSheet(props: BottomSheetProps) {
    onCloseRef.current = onClose;
    const onDismissRef = useRef(onDismiss);
    onDismissRef.current = onDismiss;
@@ -334,7 +487,7 @@ index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896
  
    const fireCloseCallbacks = useCallback(() => {
      if (closedRef.current) return;
-@@ -106,32 +113,47 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -106,32 +117,47 @@ export function BottomSheet(props: BottomSheetProps) {
      onChangeRef.current?.(-1);
    }, []);
  
@@ -394,7 +547,7 @@ index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896
          return;
        }
        const clampedIndex = clampIndex(index);
-@@ -152,13 +174,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -152,13 +178,7 @@ export function BottomSheet(props: BottomSheetProps) {
        onChangeRef.current?.(clampedIndex);
      };
  
@@ -409,7 +562,7 @@ index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896
  
      return {
        snapToIndex,
-@@ -171,7 +187,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -171,7 +191,7 @@ export function BottomSheet(props: BottomSheetProps) {
        present: () => snapToIndex(0),
        dismiss: close,
      };
@@ -418,12 +571,13 @@ index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896
  
    useImperativeHandle(ref, () => methods, [methods]);
  
-@@ -193,7 +209,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -193,7 +213,8 @@ export function BottomSheet(props: BottomSheetProps) {
              skipPartiallyExpanded={skipPartially}
              initialFullyExpanded={hasMultipleSnapPoints && pendingIndexRef.current === maxIndex}
              showDragHandle={handleComponent !== null}
 -            sheetGesturesEnabled={enablePanDownToClose}
 +            sheetGesturesEnabled={dismissGestures}
++            locale={locale}
              containerColor={containerColor}
              properties={{
                shouldDismissOnBackPress: enablePanDownToClose,
@@ -459,10 +613,10 @@ index d0eb811efbd9e87dc1b71be1fe6fc3288afd990a..0d4b403a109691f81958c6e6d55a4115
    ]);
  
 diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
-index 51326fbfdeb9642f52e6fe244093cc697fa585f7..1e04882719c9093b89e49d536a7aa0fbf8c48cd1 100644
+index 51326fbfdeb9642f52e6fe244093cc697fa585f7..cddd01b10241bc0d6e676123a0e463ac15028ba4 100644
 --- a/src/community/bottom-sheet/types.ts
 +++ b/src/community/bottom-sheet/types.ts
-@@ -191,6 +191,31 @@ export interface BottomSheetProps {
+@@ -191,6 +191,40 @@ export interface BottomSheetProps {
     */
    enablePanDownToClose?: boolean;
  
@@ -491,9 +645,36 @@ index 51326fbfdeb9642f52e6fe244093cc697fa585f7..1e04882719c9093b89e49d536a7aa0fb
 +   */
 +  onRequestDismiss?: () => boolean;
 +
++  /**
++   * BCP-47 tag of the app's UI language. On Android the sheet paints platform
++   * strings of its own — the scrim's dismiss label, the drag handle, the pane
++   * title — and Material3 otherwise resolves them against the device locale, so
++   * an app whose UI language differs announces those controls in the device's
++   * language. Repo-local; ignored where the platform sheet has no such strings.
++   */
++  locale?: string;
++
    /**
     * Whether the sheet should automatically size to fit its content.
     * @default true
+diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
+index c3225b1d9c7c0636d366203e2b23f536fec9e54e..829bcd50dbe832b99e3d8c80f2017b62222b35eb 100644
+--- a/src/jetpack-compose/ModalBottomSheet/index.tsx
++++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
+@@ -92,6 +92,13 @@ export interface ModalBottomSheetProps {
+    * @default true
+    */
+   sheetGesturesEnabled?: boolean;
++  /**
++   * BCP-47 tag of the app's UI language. The sheet paints platform strings of
++   * its own (the scrim's dismiss label, the drag handle, the pane title), and
++   * they otherwise resolve against the device locale. Repo-local.
++   * @platform android
++   */
++  locale?: string;
+   /**
+    * Properties for the modal window behavior.
+    */
 diff --git a/src/swift-ui/Text/index.tsx b/src/swift-ui/Text/index.tsx
 index 2351ee84db1984243d4b65ed4a52dec843a74906..e9c590fe23f939699c1f513e15f917f6bda70fad 100644
 --- a/src/swift-ui/Text/index.tsx

@@ -15,7 +15,10 @@ import {
   type OperationLedgerRow,
 } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { SECURITY_SYNC_PRECONDITION_CODES } from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
+import { parseSecurityAgentConfig } from '../core/constants';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -88,6 +91,7 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
+const mockHasSecurityReviewPermissions = jest.fn<(...args: unknown[]) => boolean>(() => true);
 const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: string, integrationId: string) => Promise<unknown[]>>();
 const mockUpdateRepositoriesForIntegration =
@@ -116,7 +120,8 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
   settleOperation: mockSettleOperation,
 }));
 jest.mock('../github/permissions', () => ({
-  hasSecurityReviewPermissions: () => true,
+  hasSecurityReviewPermissions: (integration: unknown) =>
+    mockHasSecurityReviewPermissions(integration),
   getReauthorizeUrl: mockGetReauthorizeUrl,
 }));
 jest.mock('../github/dependabot-api', () => ({
@@ -191,6 +196,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // `jest.clearAllMocks` keeps a mock's implementation, but an earlier test may
+  // have narrowed this one to the missing-permission branch.
+  mockHasSecurityReviewPermissions.mockImplementation(() => true);
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
@@ -495,6 +503,20 @@ describe('getConfig', () => {
       autoRemediationRequireApproval: true,
     });
   });
+
+  it('reports the remediation default when the stored config only sets the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 1,
+      storedConfig: { analysis_model_slug: 'analysis-model' },
+      config: parseSecurityAgentConfig({ analysis_model_slug: 'analysis-model' }),
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      analysisModelSlug: 'analysis-model',
+      remediationModelSlug: 'kilo-auto/balanced',
+    });
+  });
 });
 
 describe('setEnabled', () => {
@@ -636,7 +658,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -681,7 +703,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -832,6 +854,25 @@ describe('saveConfig', () => {
     );
   });
 
+  it('leaves the enabled state to the enable transition on a settings save', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: false,
+      configRevision: 3,
+      storedConfig: {},
+      config: { sla_notification_min_severity: 'high' },
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, slaNotificationMinSeverity: 'critical' },
+    });
+
+    const [saveParams] = mockSaveSecurityAgentConfigWithRevision.mock.calls[0] ?? [];
+    expect(saveParams).not.toHaveProperty('isEnabled');
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+
   it('propagates a stale-revision CONFLICT without a success receipt', async () => {
     mockSaveSecurityAgentConfigWithRevision.mockRejectedValue(
       new TRPCError({ code: 'CONFLICT', message: 'stale revision' })
@@ -856,6 +897,61 @@ describe('saveConfig', () => {
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
       expect.objectContaining({
         config: expect.objectContaining({ auto_remediation_require_approval: false }),
+      })
+    );
+  });
+
+  it('stores the remediation default when a save changes only the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {},
+      config: parseSecurityAgentConfig({}),
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'analysis-model',
+          remediation_model_slug: 'kilo-auto/balanced',
+        }),
+      })
+    );
+  });
+
+  it('keeps a stored remediation model when a save omits it', async () => {
+    const stored = parseSecurityAgentConfig({
+      analysis_model_slug: 'analysis-model',
+      remediation_model_slug: 'stored-remediation-model',
+    });
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {
+        analysis_model_slug: 'analysis-model',
+        remediation_model_slug: 'stored-remediation-model',
+      },
+      config: stored,
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'next-analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'next-analysis-model',
+          remediation_model_slug: 'stored-remediation-model',
+        }),
       })
     );
   });
@@ -1132,6 +1228,99 @@ describe('getAnalysis remediation timeline', () => {
     });
   });
 });
+
+describe('setEnabled precondition markers', () => {
+  it('marks the refusal that gates enabling without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    const error = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    // The English sentence stays the web surface's copy; the code is what a
+    // device maps onto its own catalog copy.
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub App does not have vulnerability_alerts permission',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.missingPermission);
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+  });
+
+  it('lets a disable through without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    await expect(
+      createHandlers().setEnabled.handler({ ctx: context, input: { isEnabled: false } })
+    ).resolves.toEqual({ success: true });
+  });
+
+  it('marks the refusal that gates enabling with no repository in scope', async () => {
+    const orgError = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(orgError).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(causeUpstreamCode(orgError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    // The personal router runs the same handler, so it marks the refusal too.
+    const personalError = await createPersonalHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+    expect(causeUpstreamCode(personalError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+});
+
+describe('triggerSync precondition markers', () => {
+  it('marks a rejection with no repository in the sync scope', async () => {
+    const error = await createHandlers()
+      .triggerSync.handler({ ctx: context, input: {} })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'No repositories configured for security reviews',
+    });
+    // `upstreamCode` is the value the mobile ledger maps onto translated copy;
+    // the English message stays for the web surface.
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+  });
+
+  it('marks a rejection caused by a missing or inactive integration', async () => {
+    const error = await createHandlersWithUnhealthyStatusIntegration()
+      .triggerSync.handler({ ctx: context, input: { repoFullName: 'kilo/repo' } })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub integration not found or inactive',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.integrationInactive);
+  });
+});
+
+/** The stable code the tRPC error formatter exposes as `data.upstreamCode`. */
+function causeUpstreamCode(error: unknown): string | undefined {
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  return cause instanceof UpstreamApiError ? cause.upstreamCode : undefined;
+}
 
 describe('queue-backed handlers', () => {
   it('returns sync command correlation', async () => {
@@ -1596,6 +1785,22 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
+  it('refuses an admission stored in another organization scope', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'organization_mismatch' });
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
   it('never returns a success receipt when the acceptance cannot be recorded', async () => {
     mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
     mockSubmitManualSecuritySync.mockResolvedValue(accepted);
@@ -1777,6 +1982,43 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
       expect.objectContaining({ operationKey })
     );
+  });
+
+  it('settles a dismissal failed when the Worker was never reached and surfaces the marker', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: ledgerRow({
+        intent: 'dismiss_finding',
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
+      }),
+    });
+    mockSubmitManualFindingDismissal.mockRejectedValue(
+      new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Security service is unavailable' })
+    );
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: { findingId, reason: 'not_used', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
+    });
+
+    // Nothing was enqueued, so the row settles instead of promising a
+    // reconciliation a same-key retry would only replay into a dead end.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+    expect(mockSettleOperation.mock.calls[0]?.[1]).toMatchObject({
+      rowId: 'ledger-row-id',
+      status: 'failed',
+      outcomeCode: 'pre_acceptance_rejected',
+    });
   });
 
   it('replays a settled dismissal without re-triggering the GitHub call', async () => {
@@ -2465,7 +2707,10 @@ describe('findings list DTO narrowing', () => {
 
 const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
+function createHandlersWithRepositorySnapshot(
+  repositories: unknown[] | null,
+  integrationFields: Record<string, unknown> = {}
+) {
   return createSecurityAgentHandlers({
     resolveOwner: () => ({ type: 'org', id: ORGANIZATION_ID, userId: 'user-123' }),
     resolveSecurityOwner: () => ({ organizationId: ORGANIZATION_ID }),
@@ -2478,6 +2723,7 @@ function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
         platform_installation_id: 'installation-123',
         github_app_type: 'standard',
         repositories,
+        ...integrationFields,
       }) as never,
     trackingExtras: () => ({}),
   });
@@ -2613,6 +2859,39 @@ describe('cached repository snapshot', () => {
     expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
     consoleError.mockRestore();
   });
+
+  it('answers a synchronized empty snapshot without a provider read or rewrite', async () => {
+    mockFetchGitHubRepositories.mockResolvedValue([]);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot([], {
+      repositories_synced_at: '2026-01-01T00:00:00.000Z',
+    }).getRepositories({ ctx: context, input: {} });
+
+    expect(repositories).toEqual([]);
+    expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { snapshot: [] as unknown[], syncedAt: null },
+    { snapshot: null, syncedAt: null },
+    { snapshot: null, syncedAt: '2026-01-01T00:00:00.000Z' },
+  ])(
+    'synchronizes $snapshot with syncedAt $syncedAt because it was never synchronized',
+    async testCase => {
+      const fetched = [{ id: 9, full_name: 'kilo/late', name: 'late', private: false }];
+      mockFetchGitHubRepositories.mockResolvedValue(fetched);
+      mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+      const repositories = await createHandlersWithRepositorySnapshot(testCase.snapshot, {
+        repositories_synced_at: testCase.syncedAt,
+      }).getRepositories({ ctx: context, input: {} });
+
+      expect(repositories.map(repository => repository.fullName)).toEqual(['kilo/late']);
+      expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    }
+  );
 });
 
 describe('cached repository snapshot with an unreadable id', () => {

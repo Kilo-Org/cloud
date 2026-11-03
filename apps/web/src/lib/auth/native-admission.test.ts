@@ -32,12 +32,14 @@ import {
   verifyAdmissionAsync,
   persistAttestedKey,
   DEV_SENTINEL_PAYLOAD,
+  MAX_ADMISSION_PAYLOAD_CHARS,
   ChallengeRateLimitError,
   KeyCollisionError,
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
 import { checkRateLimit } from '@vercel/firewall';
+import { __test__ as rateLimitTest } from './firewall-rate-limit';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -326,6 +328,38 @@ describe('validateAdmissionPayload', () => {
     expect(result?.platform).toBe('android');
     expect(result?.keyId).toBeUndefined();
   });
+
+  test('accepts a payload at MAX_ADMISSION_PAYLOAD_CHARS', () => {
+    const admission = {
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'abc123',
+      payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS),
+      keyId: 'key123',
+    };
+    expect(validateAdmissionPayload(admission)?.payload).toHaveLength(MAX_ADMISSION_PAYLOAD_CHARS);
+  });
+
+  test('refuses a payload longer than MAX_ADMISSION_PAYLOAD_CHARS on both platforms', () => {
+    const overlong = 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS + 1);
+    expect(
+      validateAdmissionPayload({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'abc123',
+        payload: overlong,
+        keyId: 'key123',
+      })
+    ).toBeUndefined();
+    expect(
+      validateAdmissionPayload({
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'abc123',
+        payload: overlong,
+      })
+    ).toBeUndefined();
+  });
 });
 
 // ── Proof requirement ──────────────────────────────────────────────────────
@@ -381,6 +415,36 @@ describe('requireAdmissionPayload', () => {
       requireAdmissionPayload({ admission: { platform: 'ios', kind: 'assertion' } })
     ).toBeUndefined();
   });
+
+  test('reports a payload longer than the limit on its own metric', () => {
+    resetAdmissionCountersForTests();
+    expect(
+      requireAdmissionPayload({
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch123',
+          payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS + 1),
+        },
+      })
+    ).toBeUndefined();
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_oversized: 1 });
+  });
+
+  test('reports nothing for a payload at the limit', () => {
+    resetAdmissionCountersForTests();
+    expect(
+      requireAdmissionPayload({
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch123',
+          payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS),
+        },
+      })
+    ).toBeDefined();
+    expect(pendingAdmissionCountsForTests()).toEqual({});
+  });
 });
 
 // ── Challenge issuance ─────────────────────────────────────────────────────
@@ -388,6 +452,7 @@ describe('requireAdmissionPayload', () => {
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
   });
 
   test('returns challenge and expiresIn in seconds', async () => {
@@ -411,6 +476,43 @@ describe('issueAdmissionChallenge', () => {
     await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
       ChallengeRateLimitError
     );
+  });
+
+  test('reports an errored limiter answer once per interval and still issues challenges', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+
+    const first = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+    const second = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+
+    expect(first.challenge).not.toBe(second.challenge);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'native-admission-challenge' is not configured",
+      { level: 'error', tags: { source: 'native_admission_challenge' } }
+    );
+  });
+
+  test('refuses a request whose limiter answer is a block', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  test('propagates a limiter failure instead of issuing a challenge', async () => {
+    mockCheckRateLimit.mockRejectedValue(
+      new Error("Unexpected rate-limit API response status 'native-admission-challenge': 500")
+    );
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      'Unexpected rate-limit API response status'
+    );
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

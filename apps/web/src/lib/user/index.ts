@@ -26,6 +26,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
   todo_lists,
   enrichment_data,
   source_embeddings,
@@ -36,6 +37,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_user_limits,
   organization_user_usage,
@@ -130,10 +132,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  agent_briefing_reports,
-  agent_briefing_events,
+  agent_briefing_snapshots,
   agent_briefing_context_preferences,
   agent_briefing_preferences,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -158,7 +160,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
@@ -356,6 +358,36 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
       )
     ),
   });
+}
+
+/**
+ * Resolves the account a delivered sign-in code belongs to.
+ *
+ * The code is delivered to one mailbox, so this match keeps a `+` suffix and
+ * Gmail dots and only ignores case. An alias of another account's address is a
+ * different address here and resolves to no account, unlike
+ * `findUserByNormalizedEmail`, which is for duplicate detection.
+ *
+ * The exact spelling is served by the unique index on `google_user_email`.
+ * A case-insensitive match runs only when no exact row exists, for legacy rows
+ * stored with other casing; those resolve to the oldest account so the answer is
+ * stable.
+ */
+export async function findUserBySignInCodeEmail(email: string): Promise<User | undefined> {
+  const deliveredEmail = getDeliveredEmailAddress(email);
+
+  const exact = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, deliveredEmail),
+  });
+  if (exact) return exact;
+
+  const [caseVariant] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(sql`lower(${kilocode_users.google_user_email})`, deliveredEmail))
+    .orderBy(kilocode_users.created_at, kilocode_users.id)
+    .limit(1);
+  return caseVariant;
 }
 
 async function recordSignupImpactTracking(args: {
@@ -965,7 +997,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * What is kept:
  * - The kilocode_users row (anonymized)
  * - Stripe link (stripe_customer_id unchanged)
- * - credit_transactions, microdollar_usage (billing records)
+ * - credit_transactions, microdollar_usage, enkrypt_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
@@ -995,6 +1027,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - personal byoc_connections rows (organization-owned
  *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
+ * - organization_guardrails (org-owned policy retained; created_by_kilo_user_id nulled)
+ * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
@@ -1151,8 +1185,10 @@ export async function anonymizeCloudUserData(
       is_super_admin: false,
       can_view_sessions: false,
       can_manage_credits: false,
+      can_export_api_request_logs: false,
       customer_source: null,
       signup_ip: null,
+      external_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1182,6 +1218,7 @@ export async function anonymizeCloudUserData(
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
   await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
+  await tx.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })
@@ -1606,8 +1643,13 @@ export async function anonymizeCloudUserData(
   // Recorded pushes hold the content that was sent to this account's devices
   // (titles, bodies, i18n params, payloads), so they go with the account.
   await tx.delete(user_notification_history).where(eq(user_notification_history.user_id, userId));
-  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
-  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .update(cli_sessions_v2)
+    .set({ briefing_excerpt: null, briefing_excerpt_scope_changed_at: sql`now()` })
+    .where(eq(cli_sessions_v2.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.kilo_user_id, userId));
   await tx
     .delete(agent_briefing_context_preferences)
     .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
@@ -1758,6 +1800,11 @@ export async function anonymizeCloudUserData(
     .update(organization_group_policy_settings)
     .set({ updated_by_kilo_user_id: null })
     .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
+  // Guardrails are org-owned policy, so they stay; only the creator reference is cleared.
+  await tx
+    .update(organization_guardrails)
+    .set({ created_by_kilo_user_id: null })
+    .where(eq(organization_guardrails.created_by_kilo_user_id, userId));
 
   // Security audit logs: keep org-owned entries, strip actor PII
   // (user-owned entries are cascade-deleted via owned_by_user_id FK)

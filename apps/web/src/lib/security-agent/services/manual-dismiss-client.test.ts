@@ -107,6 +107,28 @@ describe('submitManualFindingDismissal', () => {
     });
   });
 
+  it('classifies a refused connection as a definitive pre-acceptance rejection', async () => {
+    mockFetch.mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      })
+    );
+
+    await expect(
+      submitManualFindingDismissal({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        installationId: 'installation-123',
+        reason: 'not_used',
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
+    });
+  });
+
   it('classifies a 5xx status as ambiguous transport (BAD_GATEWAY)', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

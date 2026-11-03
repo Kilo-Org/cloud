@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { TranscriptionModelPickerSheet } from '@/components/transcription-model-picker-sheet';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   readGatewayTranscriptionModel,
   writeGatewayTranscriptionModel,
@@ -219,12 +220,12 @@ describe('TranscriptionModelPickerSheet', () => {
     // loaded row's check is transparent unless selected.
     const skeletons = findByType(renderer.root, 'Skeleton');
     expect(skeletons).toHaveLength(12);
-    // Each skeleton sits in a row reserved at the real row's height
-    // (min-h-11 + py-3), so loading → rows never jumps layout.
+    // Each skeleton sits in a row reserved at the real row's height (the shared
+    // row floor plus its padding), so loading → rows never jumps layout.
     const skeletonRows = findByType(renderer.root, 'View').filter(
       node =>
         typeof node.props.className === 'string' &&
-        node.props.className.includes('min-h-11') &&
+        node.props.className.includes(ROW_TARGET_CLASS) &&
         node.props.className.includes('py-3')
     );
     expect(skeletonRows).toHaveLength(6);

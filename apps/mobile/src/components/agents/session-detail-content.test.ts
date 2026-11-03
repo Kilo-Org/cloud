@@ -55,7 +55,7 @@ import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-na
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
-import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
+import { formatSessionCostBadge } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -117,7 +117,7 @@ const navigationRoutes = vi.hoisted(() => ['session-detail']);
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
 const profileRowsState = vi.hoisted(() => {
-  // profileId -> `agentProfiles.get` agents, so a test can prove the session's
+  // profileId -> `agentProfiles.agents` rows, so a test can prove the session's
   // own profile agents are the ones offered by the in-session role picker.
   const agentsById: Record<string, unknown[]> = {};
   return {
@@ -149,6 +149,7 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
@@ -178,6 +179,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
     getState: () => ({
@@ -578,13 +580,13 @@ vi.mock('@/lib/trpc', () => ({
           initialData: profileRowsState.combined,
         }),
       },
-      get: {
+      agents: {
         queryOptions: (input: { profileId?: string } = {}) => {
           const agents = profileRowsState.agentsById[input.profileId ?? ''] ?? [];
           return {
-            queryKey: ['agentProfiles', 'get', input.profileId ?? ''],
-            queryFn: () => ({ agents }),
-            initialData: { agents },
+            queryKey: ['agentProfiles', 'agents', input.profileId ?? ''],
+            queryFn: () => agents,
+            initialData: agents,
           };
         },
       },
@@ -1102,6 +1104,14 @@ function footerRowItems(view: { renderer: ReactTestRenderer }) {
   return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
 }
 
+/**
+ * The band a reserved header holds its text area's height with: a zero-width
+ * twin of the eyebrow and the title's line cap.
+ */
+function findReservedBand(header: ReactTestInstance) {
+  return header.findByProps({ className: 'w-0 overflow-hidden' });
+}
+
 function pressHeaderBack(renderer: ReactTestRenderer) {
   const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
     onPress: () => void;
@@ -1127,9 +1137,9 @@ describe('SessionDetailContent display scope', () => {
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -1190,7 +1200,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1?openedFrom=session');
   });
 
   it.each(['user', 'organization'] as const)(
@@ -1215,7 +1225,11 @@ describe('session detail active-profile indicator', () => {
         (chip.props.onPress as () => void)();
       });
       expect(navigationRoutes.at(-1)).toBe(
-        `/(app)/profile-management/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+        `/(app)/profile-management/p1${
+          ownerType === 'organization'
+            ? '?organizationId=org-a&openedFrom=session'
+            : '?openedFrom=session'
+        }`
       );
     }
   );
@@ -1243,7 +1257,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded?openedFrom=session');
   });
 
   it('falls back to the effective default only when the session recorded no profile', async () => {
@@ -1523,7 +1537,7 @@ describe('session detail header right cluster', () => {
     }
     priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
     expect(expected).not.toBeNull();
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
     const cost = metrics.find(
@@ -1854,6 +1868,138 @@ describe('session detail failed delivery retry', () => {
     // The accepted re-send records the resolution for the same session, so the
     // superseded row stays hidden after the round-trip lands.
     expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+});
+
+describe('session detail assistant response retry', () => {
+  type AssistantInfo = Extract<StoredMessage['info'], { role: 'assistant' }>;
+
+  function failedResponse(
+    id: string,
+    parentID: string,
+    error: NonNullable<AssistantInfo['error']>
+  ): StoredMessage {
+    const info: AssistantInfo = {
+      ...(assistantMessage(id).info as AssistantInfo),
+      id,
+      sessionID: ROOT_ID,
+      parentID,
+      error,
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: `text-${id}`,
+          sessionID: ROOT_ID,
+          messageID: id,
+          text: 'Partial answer',
+        }),
+      ],
+    };
+  }
+
+  function promptRow(id: string, text: string): StoredMessage {
+    const base = userMessage(id);
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [stubTextPart({ id: `text-${id}`, sessionID: ROOT_ID, messageID: id, text })],
+    };
+  }
+
+  it('shows the prompt once and replaces the failed response once the retry is accepted', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    // The failed response states its classified reason, not only the title.
+    expect(renderedText(view.renderer.root)).toContain('The provider returned an error.');
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    // Call through: the real send materialises the retry's own row, which is the
+    // duplicate the supersede must keep off screen.
+    const send = vi.spyOn(view.manager, 'send');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ payload: { prompt } });
+    // Both the failed response and the user row whose prompt it re-sent are
+    // resolved, so neither renders next to the retry's own row.
+    expect(clearFailedMessage.mock.calls).toEqual([
+      ['msg-response', ROOT_ID],
+      ['msg-prompt', ROOT_ID],
+    ]);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // The replaced response is gone, not merely outnumbered by the retry's row.
+    expect(renderedText(view.renderer.root)).not.toContain('Partial answer');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
+  });
+
+  it('restores the failed response and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the replaced rows are hidden, so the prompt is stated once.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's own row is gone, and the failed
+    // response is back with its Retry control.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
   });
 });
 
@@ -2468,9 +2614,9 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
@@ -4160,10 +4306,14 @@ describe('session detail duplicate failure state', () => {
 
   function rootFailedAssistantMessage(text: string): StoredMessage {
     const message = assistantMessage(ASSISTANT_ID);
-    message.info = { ...message.info, sessionID: ROOT_ID };
+    const info = message.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
     (message.info as { error?: { name: string; data: unknown } }).error = {
       name: 'APIError',
-      data: { message: 'raw provider text' },
+      data: { message: 'raw provider text', isRetryable: true },
     };
     return {
       info: message.info,

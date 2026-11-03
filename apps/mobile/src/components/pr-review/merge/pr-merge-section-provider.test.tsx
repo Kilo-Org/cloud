@@ -103,7 +103,7 @@ describe('PrMergeSectionProvider (s6)', () => {
 
   it('offers merge and enable-auto-merge on a GitLab merge request (capability supported)', async () => {
     const renderer = await mount(GITLAB_REF, 'open');
-    expect(findButtons(renderer, 'Merge merge request')).toBe(1);
+    expect(findButtons(renderer, 'Merge')).toBe(1);
     expect(findButtons(renderer, 'Enable auto-merge')).toBe(1);
     renderer.unmount();
   });
@@ -129,7 +129,7 @@ describe('PrMergeSectionProvider (s6)', () => {
   it('pushes the merge sheet inside the GitLab ref route on press', async () => {
     const renderer = await mount(GITLAB_REF, 'open');
     act(() => {
-      findButton(renderer, 'Merge merge request')?.();
+      findButton(renderer, 'Merge')?.();
     });
     expect(routerPush).toHaveBeenCalledWith(
       '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=merge'
@@ -148,18 +148,22 @@ describe('PrMergeSectionProvider (s6)', () => {
     renderer.unmount();
   });
 
-  it.each<['closed' | 'merged', string]>([
-    ['merged', 'Already merged'],
-    ['closed', 'This merge request is closed'],
-  ])(
-    'renders only the terminal chip with provider wording on a %s GitLab merge request',
-    async (state, label) => {
-      const renderer = await mount(GITLAB_REF, state);
-      expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
-      expect(
-        renderer.root.findAll(node => String(node.type) === 'Text' && node.props.children === label)
-      ).toHaveLength(1);
-      renderer.unmount();
-    }
-  );
+  it('renders only the closed sentence with provider wording on a closed GitLab merge request', async () => {
+    const renderer = await mount(GITLAB_REF, 'closed');
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node =>
+          String(node.type) === 'Text' && node.props.children === 'This merge request is closed'
+      )
+    ).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('renders nothing for a merged GitLab merge request', async () => {
+    const renderer = await mount(GITLAB_REF, 'merged');
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
+    renderer.unmount();
+  });
 });

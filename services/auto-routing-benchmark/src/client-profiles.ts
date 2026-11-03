@@ -5,10 +5,15 @@ import {
   type CustomRouterEntryRef,
   type OwnerType,
 } from '@kilocode/auto-routing-contracts';
-import { and, eq, inArray, not, sql } from 'drizzle-orm';
+import { and, eq, inArray, lte, not, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { CaseResultRow } from './db';
-import { clientCaseResults, clientProfiles, type ClientProfileStatus } from './db-schema';
+import {
+  clientCaseGradingClaims,
+  clientCaseResults,
+  clientProfiles,
+  type ClientProfileStatus,
+} from './db-schema';
 import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { summarize } from './run';
@@ -213,6 +218,60 @@ export async function saveClientCaseResult(
       .returning({ revision: clientCaseResults.revision }),
   ]);
   return stored[0]?.revision ?? null;
+}
+
+// A judged grading call is paid for, so one case identity admits one of them at a time. The
+// lease outlives the judge request (8 s) and the writes that follow it; a holder that vanishes
+// leaves a claim the next upload takes over.
+export const CLIENT_GRADING_LEASE_MS = 60_000;
+
+type ClientCaseGradingKey = { profileId: string; caseId: string; rep: number };
+
+/**
+ * Take the grading claim for one case identity. Returns whether this call holds it: a live
+ * claim held by another request means it does not. The caller re-reads the stored case after
+ * winning, because a grading that finished just before the claim leaves a result to return.
+ */
+export async function claimClientCaseGrading(
+  db: D1Database,
+  key: ClientCaseGradingKey,
+  token: string,
+  nowIso: string,
+  nowMs: number
+): Promise<boolean> {
+  const lease = { token, lease_until: nowMs + CLIENT_GRADING_LEASE_MS, created_at: nowIso };
+  const [claimed] = await drizzle(db)
+    .insert(clientCaseGradingClaims)
+    .values({ profile_id: key.profileId, case_id: key.caseId, rep: key.rep, ...lease })
+    .onConflictDoUpdate({
+      target: [
+        clientCaseGradingClaims.profile_id,
+        clientCaseGradingClaims.case_id,
+        clientCaseGradingClaims.rep,
+      ],
+      set: lease,
+      setWhere: lte(clientCaseGradingClaims.lease_until, nowMs),
+    })
+    .returning({ token: clientCaseGradingClaims.token });
+  return claimed?.token === token;
+}
+
+/** Release the grading claim this token holds; another holder's claim stays untouched. */
+export async function releaseClientCaseGrading(
+  db: D1Database,
+  key: ClientCaseGradingKey,
+  token: string
+): Promise<void> {
+  await drizzle(db)
+    .delete(clientCaseGradingClaims)
+    .where(
+      and(
+        eq(clientCaseGradingClaims.profile_id, key.profileId),
+        eq(clientCaseGradingClaims.case_id, key.caseId),
+        eq(clientCaseGradingClaims.rep, key.rep),
+        eq(clientCaseGradingClaims.token, token)
+      )
+    );
 }
 
 /** Remove one upload, matched by its revision, after its grading could not be billed. */

@@ -6,7 +6,8 @@
  * entry point: it re-exports the s2 list operations (`addCommand`,
  * `replaceCommand`, `removeCommand`, `moveCommand`) and the server's list/row
  * bounds (`MAX_SETUP_COMMANDS`, `MAX_SETUP_COMMAND_LENGTH`), and adds the
- * per-row position label plus the list comparison and payload helpers.
+ * per-row position label, the length-limit helpers, and the list comparison and
+ * payload helpers.
  */
 
 export {
@@ -17,6 +18,9 @@ export {
   removeCommand,
   replaceCommand,
 } from '@/lib/agent-profile-forms';
+
+/** Hide the remaining-characters counter until a command nears the bound. */
+export const COMMAND_COUNTER_VISIBLE_REMAINING = 50;
 
 /** Whether two lists hold the same commands in the same order. */
 export function sameCommands(a: readonly string[], b: readonly string[]): boolean {
@@ -37,17 +41,4 @@ export function nonBlankCommands(commands: readonly string[]): string[] {
  */
 export function commandRowA11yLabel(index: number, total: number): string {
   return `${index + 1} / ${total}`;
-}
-
-/**
- * One-based position among the commands alone, or `null` for a blank draft
- * row. Blank rows are not commands, so they must not claim a command number
- * that the saved list does not hold.
- */
-export function commandPosition(commands: readonly string[], index: number): number | null {
-  const row = commands[index];
-  if (row === undefined || row.trim().length === 0) {
-    return null;
-  }
-  return commands.slice(0, index + 1).filter(command => command.trim().length > 0).length;
 }

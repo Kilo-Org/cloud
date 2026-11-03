@@ -39,6 +39,7 @@ import {
 import { differenceInCalendarDays, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { StoredSession } from '../types';
+import type { AssociatedPr } from '../utils/github-pr-link';
 import { getChatDisplayTitle } from '../utils/session-title';
 import { getCachedWorktreeDetails, getLoadingWorktreeIds } from './worktree-details-placeholder';
 import {
@@ -303,7 +304,10 @@ function getSidebarSessionItemSortTime(
   return Number.isFinite(latest) ? latest : new Date(item.latestSession.updatedAt).getTime();
 }
 
-function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession): number {
+function compareStoredSessionsByUpdatedAtDesc(
+  a: Pick<StoredSession, 'sessionId' | 'updatedAt'>,
+  b: Pick<StoredSession, 'sessionId' | 'updatedAt'>
+): number {
   const difference = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   if (difference !== 0) return difference;
   return b.sessionId.localeCompare(a.sessionId);
@@ -460,6 +464,11 @@ export function getSidebarWorktreeActivity(
     }
   }
 
+  const latestSession = [...sessionsById.values()].reduce<SidebarSessionActivity | undefined>(
+    (latest, session) =>
+      !latest || compareStoredSessionsByUpdatedAtDesc(session, latest) < 0 ? session : latest,
+    undefined
+  );
   let selectedStatus: string | null = null;
   let selectedStatusUpdatedAt: string | null = null;
   let selectedPriority = 0;
@@ -493,6 +502,12 @@ export function getSidebarWorktreeActivity(
                 : (activeStatus ?? null),
             ];
     for (const status of statuses) {
+      if (
+        (status === 'failed' || status === 'system_interrupted') &&
+        session.sessionId !== latestSession?.sessionId
+      ) {
+        continue;
+      }
       const priority =
         status === 'question' || status === 'permission'
           ? 3
@@ -574,9 +589,10 @@ export function sessionCacheKey(s: {
     lastSyncedAt: string;
     reviewDecision: string | null;
     reviewDecisionPending: boolean;
+    observations?: AssociatedPr['observations'];
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
 }
 
 /**

@@ -9,7 +9,7 @@ import {
 export default {
   id: 'orcarouter',
   models_dev_id: 'orcarouter',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.orcarouter.ai/v1',
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

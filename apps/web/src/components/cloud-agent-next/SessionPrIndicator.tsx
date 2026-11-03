@@ -56,7 +56,8 @@ export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
       <HoverCardContent
         align="end"
         side="left"
-        className="w-72"
+        collisionPadding={8}
+        className="w-72 max-w-[var(--radix-hover-card-content-available-width)]"
         onClick={event => event.stopPropagation()}
       >
         <PrHoverCardContent

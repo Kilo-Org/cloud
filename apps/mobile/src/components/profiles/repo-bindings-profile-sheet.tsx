@@ -4,12 +4,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { EmptyState } from '@/components/empty-state';
+import { Button } from '@/components/ui/button';
 import { SlidersHorizontal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type AgentProfileListItem } from '@/lib/hooks/use-agent-profiles';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 type ProfilePickerSheetProps = Readonly<{
   profiles: readonly AgentProfileListItem[];
@@ -17,6 +20,13 @@ type ProfilePickerSheetProps = Readonly<{
   isError: boolean;
   isRefetching: boolean;
   selectedProfileId: string;
+  /** The empty state's explanation, worded for the context the list reads. */
+  emptyDescription: string;
+  /**
+   * Opens the profile create screen. Absent when this context cannot create a
+   * profile, so the empty state never points at an action it does not offer.
+   */
+  onCreateProfile?: (() => void) | undefined;
   onRetry: () => void;
   onSelect: (profileId: string) => void;
   onClose: () => void;
@@ -35,6 +45,8 @@ export function ProfilePickerSheet({
   isError,
   isRefetching,
   selectedProfileId,
+  emptyDescription,
+  onCreateProfile,
   onRetry,
   onSelect,
   onClose,
@@ -60,15 +72,22 @@ export function ProfilePickerSheet({
       <EmptyState
         icon={SlidersHorizontal}
         title={t('profiles.emptyTitle')}
-        description={t('profiles.emptyDescription')}
+        description={emptyDescription}
         placement="top"
+        action={
+          onCreateProfile === undefined ? undefined : (
+            <Button className={STATE_ACTION_CLASS} onPress={onCreateProfile}>
+              <Text>{t('profiles.createAction')}</Text>
+            </Button>
+          )
+        }
       />
     );
   } else {
     body = profiles.map(profile => (
       <Pressable
         key={profile.id}
-        className="min-h-11 flex-row items-center gap-2 px-4 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={profile.name}
         accessibilityState={{ selected: profile.id === selectedProfileId }}

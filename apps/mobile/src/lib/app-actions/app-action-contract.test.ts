@@ -52,6 +52,7 @@ const NULL_URL_CASES: readonly (readonly [string, string])[] = [
   ['a missing prompt', 'kiloapp:///actions/start-agent'],
   ['a blank prompt', 'kiloapp:///actions/start-agent?prompt='],
   ['a whitespace prompt', 'kiloapp:///actions/start-agent?prompt=%20%20'],
+  ['an invisible prompt', 'kiloapp:///actions/start-agent?prompt=%E2%80%8B'],
   ['a missing sessionId', 'kiloapp:///actions/open-session'],
   ['a blank sessionId', 'kiloapp:///actions/open-session?sessionId='],
   ['a key without a value', '/actions/open-session?sessionId'],
@@ -114,6 +115,13 @@ describe('parseAppActionPayload', () => {
     expect(parseAppActionPayload({ action: 'StartAgent' })).toEqual({
       action: 'StartAgent',
       prompt: '',
+    });
+    // An invisible-only prompt reads as blank in both layers: the payload is
+    // still the StartAgent action, and the request carries the prompt the
+    // preflight refuses.
+    expect(parseAppActionPayload({ action: 'start-agent', prompt: '\u200B\u200B' })).toEqual({
+      action: 'StartAgent',
+      prompt: '\u200B\u200B',
     });
     expect(parseAppActionPayload({ action: 'StartAgent', sessionId: ' ' })).toEqual({
       action: 'StartAgent',

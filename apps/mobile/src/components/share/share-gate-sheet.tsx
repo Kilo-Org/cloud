@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Share gate owns commit, destination admission, and CLI-spawn orchestration in one formSheet body. */
 import { useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
+import { resolveRemoteStartPlan } from '@/lib/remote-spawn-admission';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import {
   clearPendingShareIdDraft,
@@ -234,7 +235,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!reviewPr) {
       return;
     }
-    void Haptics.selectionAsync();
+    selectionHaptic();
     setPendingShareNavigation({
       href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
@@ -258,7 +259,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!shareId) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       committedShareIdRef.current = shareId;
       setPendingShareNavigation({ href, shareId });
       // Clear only this id's durable pending hint (value-scoped). A kill after
@@ -341,6 +342,19 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         return;
       }
 
+      // The remote start is a relay command, so the organization subscription
+      // gate never runs for it and the session would be created before the
+      // model request was refused. Refuse here, before the spawn, in the same
+      // words the cloud start path uses for the same organization state.
+      const plan = resolveRemoteStartPlan({
+        organizationId: organizationId ?? null,
+        organizations: memberships,
+      });
+      if (!plan.allowed) {
+        toast.error(plan.toast);
+        return;
+      }
+
       const admission = resolveShareDestinationAdmission({
         createdOnPlatform: 'cli',
         live: true,
@@ -416,6 +430,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       commitEnabled,
       getKey,
       isSpawning,
+      memberships,
+      organizationId,
       payload,
       refetchInstances,
       rotateKey,
@@ -434,7 +450,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const header = (
     <View className="border-b border-border bg-background pt-4">
-      <View className="min-h-11 flex-row items-center justify-center px-4">
+      <View className="min-h-[48px] flex-row items-center justify-center px-4">
         <Text
           className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
           accessibilityRole="header"
@@ -493,6 +509,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       destinations={destinations}
       onSelect={handleSelectDestination}
       onRetry={handleRetry}
+      onDismiss={dismiss}
       instances={instanceRows}
       spawningConnectionId={spawningConnectionId}
       instanceRowsDisabled={instanceRowsDisabled}

@@ -14,19 +14,21 @@ import { renderWithProviders } from '@/test/render-with-providers';
  * grows past the lint line budget.
  */
 
-/** The profile detail the mocked `useAgentProfile` returns. */
+/** The profile overview row the mocked `useAgentProfileOverview` returns. */
 export type TestProfileDetail = {
   id: string;
   name: string;
   description: string | null;
   isDefault: boolean;
+  createdAt: string;
   updatedAt: string;
-  vars: unknown[];
-  commands: unknown[];
-  kiloCommands: unknown[];
-  mcpServers: unknown[];
-  skills: unknown[];
-  agents: unknown[];
+  varCount: number;
+  commandCount: number;
+  kiloCommandCount: number;
+  mcpServerCount: number;
+  skillCount: number;
+  agentCount: number;
+  instructionCount: number;
 };
 
 type TestConfirmRequest = { onConfirm?: () => void };
@@ -40,13 +42,15 @@ export function testProfile(overrides: Partial<TestProfileDetail> = {}): TestPro
     name: 'Backend debugging',
     description: 'Old description',
     isDefault: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
-    vars: [],
-    commands: [],
-    kiloCommands: [],
-    mcpServers: [],
-    skills: [],
-    agents: [],
+    varCount: 0,
+    commandCount: 0,
+    kiloCommandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 0,
+    instructionCount: 0,
     ...overrides,
   };
 }

@@ -20,7 +20,12 @@ export function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): S
 
 export function renderRow(
   option: SessionModelOption,
-  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
+  overrides: Partial<{
+    selected: boolean;
+    acceptsVariant: boolean;
+    isFavorite: boolean;
+    showProvider: boolean;
+  }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
@@ -29,7 +34,9 @@ export function renderRow(
         option,
         selected: overrides.selected ?? false,
         selectedVariant: '',
+        acceptsVariant: overrides.acceptsVariant ?? true,
         isFavorite: overrides.isFavorite ?? false,
+        showProvider: overrides.showProvider ?? true,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
@@ -44,6 +51,7 @@ export function renderSelector(
     value: string;
     variant: string;
     options: SessionModelOption[];
+    acceptsVariant: boolean;
     isLoading: boolean;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
@@ -54,6 +62,7 @@ export function renderSelector(
         value: overrides.value ?? '',
         variant: overrides.variant ?? '',
         options: overrides.options ?? [],
+        acceptsVariant: overrides.acceptsVariant ?? true,
         isLoading: overrides.isLoading ?? false,
         onSelect: vi.fn<(modelId: string, variant: string) => void>(),
       })
@@ -88,6 +97,13 @@ export function countWithAccessibilityLabel(
 ): number {
   return root.findAll(node => (node.props.accessibilityLabel as string | undefined) === label)
     .length;
+}
+
+/** The thinking-effort chips a row renders, in render order. */
+export function radioChoices(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => node.props.accessibilityRole === 'radio');
 }
 
 export function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {

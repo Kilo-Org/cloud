@@ -1,3 +1,4 @@
+import { briefingHasActivity } from '@kilocode/app-shared/agent-briefing';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -21,13 +22,18 @@ import {
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
-  useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
+
+const SOURCE_LABEL_KEYS = {
+  pull_request: 'common.pullRequest',
+  blocker: 'agentBriefing.sourceBlocker',
+  artifact: 'agentBriefing.sourceMetadata',
+} as const;
 
 export function BriefingDetailScreen() {
   const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
@@ -37,16 +43,18 @@ export function BriefingDetailScreen() {
   const { t, i18n } = useTranslation();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
-  const preferences = useBriefingPreferences();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
-  const timeZone = briefingAccessDenied(preferences.error) ? undefined : preferences.data?.timezone;
   const [goneReportId, setGoneReportId] = useState<string | null>(null);
   const gone = goneReportId === reportId;
   const query = useQuery({
     ...trpc.agentBriefing.get.queryOptions({ reportId }),
     enabled: access.enabled && Boolean(reportId) && !gone,
-    refetchInterval: 15_000,
+    refetchInterval: state =>
+      state.state.data?.summary.status === 'pending' ||
+      state.state.data?.summary.status === 'running'
+        ? 15_000
+        : false,
     retry: (failureCount, error) => !briefingReportMissing(error) && failureCount < 3,
   });
   useBriefingInvalidation(query.error);
@@ -89,7 +97,7 @@ export function BriefingDetailScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t(report?.kind === 'one_off' ? 'agentBriefing.oneOff' : 'agentBriefing.title')}
+        title={t('agentBriefing.title')}
         showBackButton
         backFallback={BRIEFING_PATH as Href}
       />
@@ -116,11 +124,6 @@ export function BriefingDetailScreen() {
               {report.context.organizationId === null ? t('common.personal') : report.context.name}
             </Text>
             <BriefingPeriodLabel report={report} />
-            {report.revised ? (
-              <Text className="text-xs text-muted-foreground">
-                {t('agentBriefing.revised', { revision: report.revision })}
-              </Text>
-            ) : null}
             {offline || query.isError ? (
               <Text className="text-xs text-muted-foreground">
                 {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
@@ -130,46 +133,53 @@ export function BriefingDetailScreen() {
           <View className="overflow-hidden rounded-2xl border border-border bg-card">
             <BriefingScorecard report={report} />
           </View>
-          {Object.values(report.coverage).some(value => value !== 'complete') ? (
-            <Text className="text-xs text-muted-foreground">{t('agentBriefing.coverageHint')}</Text>
-          ) : null}
-          {report.kind === 'one_off' ? (
+          <Text className="text-xs text-muted-foreground">{t('agentBriefing.snapshotHint')}</Text>
+          {report.truncated ? (
             <Text className="text-xs text-muted-foreground">
-              {t('agentBriefing.historicalStateHint')}
+              {t('agentBriefing.snapshotTruncated')}
             </Text>
           ) : null}
-          {report.kind === 'one_off' &&
-          report.scorecard.sessions === 0 &&
-          report.summary.status === 'disabled' ? (
-            <Text className="text-sm">{t('agentBriefing.emptyPeriod')}</Text>
+          {!briefingHasActivity(report.scorecard) ? (
+            <Text className="text-sm">{t('agentBriefing.quietSnapshot')}</Text>
           ) : (
-            <BriefingSummary report={report} />
+            <>
+              <BriefingSummary report={report} />
+              <BriefingSessionList report={report} />
+              <View className="gap-2">
+                <Text className="font-semibold">{t('agentBriefing.sources')}</Text>
+                {report.sources.map(source => (
+                  <Pressable
+                    key={source.id}
+                    accessibilityRole="link"
+                    className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
+                    onPress={() => {
+                      const href = briefingSourceHref(report, source);
+                      if (href === null) {
+                        void openExternalUrl(source.url, { label: source.title });
+                        return;
+                      }
+                      setOrganizationId(report.context.organizationId);
+                      router.push(href);
+                    }}
+                  >
+                    <Text className="text-sm">
+                      {source.kind === 'activity'
+                        ? source.title
+                        : t(SOURCE_LABEL_KEYS[source.kind])}
+                    </Text>
+                    {source.excerpt ? (
+                      <Text className="text-sm text-muted-foreground" selectable>
+                        {source.excerpt}
+                      </Text>
+                    ) : null}
+                    <Text className="text-xs text-muted-foreground">
+                      {formatBriefingTimestamp(source.occurredAt, i18n.language, report.timezone)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
           )}
-          <BriefingSessionList report={report} />
-          <View className="gap-2">
-            <Text className="font-semibold">{t('agentBriefing.sources')}</Text>
-            {report.sources.map(source => (
-              <Pressable
-                key={source.id}
-                accessibilityRole="link"
-                className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
-                onPress={() => {
-                  const href = briefingSourceHref(report, source);
-                  if (href === null) {
-                    void openExternalUrl(source.url, { label: source.title });
-                    return;
-                  }
-                  setOrganizationId(report.context.organizationId);
-                  router.push(href);
-                }}
-              >
-                <Text className="text-sm">{source.title}</Text>
-                <Text className="text-xs text-muted-foreground">
-                  {formatBriefingTimestamp(source.occurredAt, i18n.language, timeZone)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
           <Button
             variant="outline"
             onPress={() => {

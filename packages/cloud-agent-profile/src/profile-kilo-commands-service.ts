@@ -105,6 +105,20 @@ export async function listKiloCommandsForProfile(
   return rows.map(toResponse);
 }
 
+/**
+ * A profile's slash commands for a caller who holds the profile, ownership
+ * checked. The profile editor's Slash commands screen renders these and
+ * nothing else the profile carries.
+ */
+export async function getProfileKiloCommands(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileKiloCommandResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listKiloCommandsForProfile(db, profileId);
+}
+
 export async function createKiloCommand(
   db: WorkerDb,
   profileId: string,

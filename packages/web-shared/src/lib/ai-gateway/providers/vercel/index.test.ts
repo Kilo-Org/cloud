@@ -286,17 +286,6 @@ describe('convertProviderOptions', () => {
 });
 
 describe('shouldRouteToVercel', () => {
-  function request(provider?: GatewayRequest['body']['provider']): GatewayRequest {
-    return {
-      kind: 'chat_completions',
-      body: {
-        model: 'anthropic/claude-sonnet-4.5',
-        messages: [{ role: 'user', content: 'hello' }],
-        provider,
-      },
-    };
-  }
-
   async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
@@ -317,20 +306,24 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), async () => ({
-        only: ['google-vertex'],
-      }))
+      shouldRouteToVercel(
+        'anthropic/claude-sonnet-4.5',
+        async () => ({
+          only: ['google-vertex'],
+        }),
+        false
+      )
     ).resolves.toBe(false);
   });
 
-  it('falls back to request preferences when no policy config is resolved', async () => {
+  it('routes to Vercel when the resolved provider policy allows a Vercel provider', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
       shouldRouteToVercel(
         'anthropic/claude-sonnet-4.5',
-        request({ only: ['anthropic'] }),
-        async () => undefined
+        async () => ({ only: ['anthropic'] }),
+        false
       )
     ).resolves.toBe(true);
   });
@@ -343,7 +336,7 @@ describe('shouldRouteToVercel', () => {
     };
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(provider), async () => provider)
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', async () => provider, false)
     ).resolves.toBe(true);
   });
 
@@ -351,7 +344,7 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), async () => undefined)
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', async () => undefined, false)
     ).resolves.toBe(true);
   });
 
@@ -360,7 +353,7 @@ describe('shouldRouteToVercel', () => {
     const getRoutingProviderConfig = jest.fn(async () => undefined);
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), getRoutingProviderConfig)
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, false)
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
@@ -370,7 +363,17 @@ describe('shouldRouteToVercel', () => {
     const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
 
     await expect(
-      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), getRoutingProviderConfig)
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, false)
+    ).resolves.toBe(false);
+    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+
+  it('leaves a spend-bounded request on OpenRouter without resolving provider policy', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+    const getRoutingProviderConfig = jest.fn(async () => undefined);
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', getRoutingProviderConfig, true)
     ).resolves.toBe(false);
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
@@ -718,6 +721,26 @@ describe('applyVercelSettings BYOK pinning', () => {
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       openai: [{ apiKey: 'sk-user-openai' }],
+    });
+  });
+
+  it('pins Cohere requests to the provider and forwards the user API key', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'cohere/command-a',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    await applyVercelSettings('cohere/command-a', request, [
+      { decryptedAPIKey: 'cohere-user-key', providerId: 'cohere' },
+    ]);
+
+    expect(request.body.model).toBe('cohere/command-a');
+    expect(request.body.providerOptions?.gateway).toMatchObject({
+      only: ['cohere'],
+      byok: { cohere: [{ apiKey: 'cohere-user-key' }] },
     });
   });
 });

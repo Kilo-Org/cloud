@@ -11,9 +11,11 @@ import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { useOrganization } from '@/lib/organization-context';
+import { cn } from '@/lib/utils';
 import {
   useGatewayTranscriptionModel,
   useGatewayTranscriptionModelLoaded,
@@ -39,7 +41,10 @@ function SkeletonRows() {
     <View className="px-4 pb-4 pt-1">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
         // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View key={index} className="min-h-11 flex-row items-center justify-between py-3">
+        <View
+          key={index}
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
+        >
           <View className="flex-1 gap-1.5 pr-3">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-3 w-28" />

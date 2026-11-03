@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Paths } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 
+import { hfGet, retryHfQuery } from './hf-request';
 import { type DeviceBudget, maxParametersFor } from './device-fit';
 import { useGgufModels } from './gguf-models';
 import {
@@ -17,28 +18,6 @@ import {
   smallestDownloadBytes,
 } from './hf-catalog';
 
-export class HfRequestError extends Error {
-  readonly status: number;
-
-  constructor(status: number) {
-    super(`Hugging Face answered ${status}`);
-    this.status = status;
-  }
-}
-
-async function hfGet(url: string, signal: AbortSignal) {
-  const response = await fetch(url, {
-    signal,
-    credentials: 'omit',
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new HfRequestError(response.status);
-  }
-  const body: unknown = await response.json();
-  return { body, link: response.headers.get('link') };
-}
-
 /** Free storage is read again when a model lands, goes, or a download starts or ends. */
 export function useDeviceBudget(): DeviceBudget {
   const { models, download } = useGgufModels();
@@ -49,10 +28,6 @@ export function useDeviceBudget(): DeviceBudget {
   }, [models, downloading]);
   return { memoryBytes: Device.totalMemory, freeBytes };
 }
-
-/** A missing repository does not appear on a retry. */
-const retry = (failures: number, error: Error) =>
-  failures < 2 && !(error instanceof HfRequestError && error.status === 404);
 
 export function useHfModelSearch(input: {
   readonly search: string;
@@ -72,7 +47,7 @@ export function useHfModelSearch(input: {
     },
     initialPageParam: firstPage,
     getNextPageParam: page => page.next,
-    retry,
+    retry: retryHfQuery,
     enabled: input.enabled ?? true,
   });
 }
@@ -86,7 +61,7 @@ export function useHfModelDetail(id: string) {
       const tree = await hfGet(hfTreeUrl(info.id, info.sha), signal);
       return readModelDetail(info, tree.body);
     },
-    retry,
+    retry: retryHfQuery,
   });
 }
 
@@ -104,6 +79,6 @@ export function useHfSmallestDownload(id: string, parameters: number | undefined
       return smallestDownloadBytes(tree.body, parameters) ?? null;
     },
     staleTime: 30 * 60 * 1000,
-    retry,
+    retry: retryHfQuery,
   });
 }

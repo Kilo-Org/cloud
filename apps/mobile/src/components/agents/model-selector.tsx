@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
 import {
   BookOpenCheck,
@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
@@ -40,6 +41,8 @@ type ModelSelectorProps = {
   value: string;
   variant: string;
   options: (ModelOption | SessionModelOption)[];
+  /** Whether this chip's `onSelect` stores the picked thinking effort. */
+  acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoading?: boolean;
@@ -99,16 +102,26 @@ export function openModelPicker(
     options: (ModelOption | SessionModelOption)[];
     value: string;
     variant: string;
+    /** Whether the caller stores the picked thinking effort; see `ModelPickerBridge`. */
+    acceptsVariant: boolean;
     onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
     selectionScope?: ModelPickerSelectionScopeContextValue;
   }
 ) {
-  const { options, value, variant, onSelect, selectionScope = UNFENCED_SELECTION_CONTEXT } = params;
+  const {
+    options,
+    value,
+    variant,
+    acceptsVariant,
+    onSelect,
+    selectionScope = UNFENCED_SELECTION_CONTEXT,
+  } = params;
   const routeKey = selectionScope.selectionScope.sessionId;
   modelPickerSlot.set(routeKey, {
     options: options.map(option => toSessionModelOption(option)),
     currentValue: value,
     currentVariant: variant,
+    acceptsVariant,
     selectionScope: selectionScope.selectionScope,
     isSelectionCurrent: selectionScope.isSelectionCurrent,
     onSelect: selection => {
@@ -128,6 +141,7 @@ export function ModelSelector({
   value,
   variant,
   options,
+  acceptsVariant,
   onSelect,
   disabled = false,
   isLoading = false,
@@ -198,6 +212,7 @@ export function ModelSelector({
       options: pickerOptions,
       value,
       variant,
+      acceptsVariant,
       onSelect,
       selectionScope: selectionContext,
     });
@@ -207,6 +222,9 @@ export function ModelSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
+      // The chip's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
@@ -250,7 +268,9 @@ export function ModelPickerOptionRow({
   option,
   selected,
   selectedVariant,
+  acceptsVariant,
   isFavorite,
+  showProvider,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -258,7 +278,19 @@ export function ModelPickerOptionRow({
   option: SessionModelOption;
   selected: boolean;
   selectedVariant: string;
+  /**
+   * Whether the picker's caller keeps a picked effort. When it does not, the
+   * row renders no effort chips: a chip here would close the sheet and drop the
+   * choice, because the caller stores only the model id.
+   */
+  acceptsVariant: boolean;
   isFavorite: boolean;
+  /**
+   * Whether the row shows its provider line. The list turns it off inside a
+   * provider section, whose header already names the provider; the row's
+   * accessibility label keeps the name either way.
+   */
+  showProvider: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -301,7 +333,7 @@ export function ModelPickerOptionRow({
   // it.
   return (
     <View className="border-b border-border">
-      <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
+      <View className="flex-row items-center gap-3 pr-4">
         <Pressable
           className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
           onPress={() => {
@@ -313,17 +345,25 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{name}</Text>
-            {option.modelRef ? (
+            {/* The disabled cue is the name's muted token, not a row opacity:
+             * the metadata below and the `unavailable` line stay readable,
+             * which a row-level 50% opacity took below 4.5:1. */}
+            <Text
+              className={cn(
+                'text-base',
+                option.unavailable ? 'text-muted-foreground' : 'text-foreground'
+              )}
+            >
+              {name}
+            </Text>
+            {option.modelRef && showProvider ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
               </Text>
             ) : null}
             {option.displayId ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
-                {option.modelRef
-                  ? t('agentChat.modelSelector.modelId', { id: option.displayId })
-                  : option.displayId}
+                {option.displayId}
               </Text>
             ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
@@ -333,6 +373,9 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {showFreeBadge || byok || collectsData || tools || images ? (
+              // The badges state facts about the model, not an affordance, so
+              // an unavailable row leaves their copy at full contrast: the
+              // row's cue is its muted name and the `unavailable` line.
               <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
@@ -362,11 +405,13 @@ export function ModelPickerOptionRow({
           </View>
         </Pressable>
         <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          {selected ? (
+            <Check size={18} color={option.unavailable ? colors.mutedForeground : colors.primary} />
+          ) : null}
         </View>
         <Pressable
           onPress={() => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             onToggleFavorite(option);
           }}
           hitSlop={12}
@@ -386,7 +431,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
       </View>
-      {selected && option.variants.length > 1 ? (
+      {acceptsVariant && selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('agentChat.modelSelector.thinkingEffort')}

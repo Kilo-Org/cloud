@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
@@ -97,11 +98,7 @@ export function useContinueCloudCreate(
       } catch {
         // Analytics is best-effort; stay silent.
       }
-      try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {
-        // A failed haptics call is cosmetic; stay silent and navigate.
-      }
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       try {
         // Arm the route's busy leave-lock bypass right before the replace so
         // the success navigation is not intercepted as an abandon.

@@ -14,6 +14,7 @@ import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
+import { localizedSecurityMarkerMessage } from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 async function invalidateRemediationQueries(
@@ -34,7 +35,7 @@ async function invalidateRemediationQueries(
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
     ]);
     scheduleCacheMaintenance(() => {
-      reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+      void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
     });
     return;
   }
@@ -54,7 +55,7 @@ async function invalidateRemediationQueries(
     }),
   ]);
   scheduleCacheMaintenance(() => {
-    reconcileFirstPage(
+    void reconcileFirstPage(
       queryClient,
       trpc.organizations.securityAgent.listFindings.queryKey(ownerInput)
     );
@@ -74,7 +75,7 @@ export function useStartSecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {
@@ -107,7 +108,7 @@ export function useRetrySecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(error.message);
+      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {

@@ -1,3 +1,4 @@
+import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import { selectOrgListErrorView } from './org-list-error-view';
@@ -45,6 +46,13 @@ describe('selectOrgListErrorView', () => {
   it('maps a 500-class code to server with retry', () => {
     expect(selectOrgListErrorView(makeTrpcError('INTERNAL_SERVER_ERROR'))).toEqual({
       variant: 'server',
+      showRetry: true,
+    });
+  });
+
+  it('names a deadline abort as the retryable slow-response state', () => {
+    expect(selectOrgListErrorView(new RequestDeadlineError(15_000))).toEqual({
+      variant: 'timeout',
       showRetry: true,
     });
   });

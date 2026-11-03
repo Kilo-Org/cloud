@@ -27,7 +27,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => ({ ...h.query, refetch: h.refetch }),
+  useAgentProfileOverview: () => ({ ...h.query, refetch: h.refetch }),
   useAgentProfileMutations: () => ({
     update: { mutateAsync: vi.fn(), isPending: false },
     deleteProfile: { mutateAsync: vi.fn(), isPending: false },
@@ -45,8 +45,9 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
+  usePreventRemove: () => undefined,
 }));
-vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {

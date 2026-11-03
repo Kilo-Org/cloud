@@ -23,11 +23,14 @@ import {
 } from '@/lib/auth/push-registration-reconciliation';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
+import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -105,6 +108,16 @@ function AppWideFreshnessMount() {
   return null;
 }
 
+export const unstable_settings = {
+  // The anchor a `withAnchor` navigation into `(app)` starts from (the relaunch
+  // repair and the pending-deep-link navigator both use it). Without it those
+  // navigations build the target as the group's only route, so the restored
+  // screen has no back stack: no back control in its header and no tab to
+  // return to. `/` itself resolves straight to this anchor: it seeds the tab
+  // navigator, so the group needs no `index` redirect of its own.
+  anchor: '(tabs)',
+};
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
@@ -125,6 +138,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <LeaveSettleMount />
       <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
@@ -148,6 +162,13 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              {/* The profile tree's screens land without a transition when the
+                  stack repair pushes them (`profile-route-stack.ts`), so a
+                  profile link opened without its parents does not slide the
+                  rebuilt screens past the reader. */}
+              {getProfileRouteNames('app').map(name => (
+                <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+              ))}
               <Stack.Screen
                 name="model-catalog/[owner]/[repo]"
                 options={{
@@ -184,7 +205,6 @@ export default function AppLayout() {
                 options={{ ...sheetOptions, gestureEnabled: false }}
               />
               <Stack.Screen name="agent-briefing/index" />
-              <Stack.Screen name="agent-briefing/create" />
               <Stack.Screen name="agent-briefing/[report-id]" />
               <Stack.Screen name="agent-briefing/settings" />
               <Stack.Screen name="share-gate" options={sheetOptions} />

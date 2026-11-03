@@ -9,10 +9,13 @@ import {
   createWorktreeChangesRefresher,
   deserializeWorktreeChangesViewMode,
   formatWorktreeChangesBaseBranch,
+  getWorktreeChangesFileKey,
   getWorktreeChangesQueryKey,
   getWorktreeChangesTotals,
   getWorktreeFileQueryKey,
   groupWorktreeChangesByDirectory,
+  groupWorktreeChangesByScope,
+  groupWorktreeChangesByRepository,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -53,6 +56,17 @@ function messages(overrides: Partial<Parameters<typeof worktreeChangesMessages>[
 }
 
 describe('getWorktreeChangesTotals', () => {
+  it('counts a file in both comparisons once', () => {
+    expect(
+      getWorktreeChangesTotals({
+        ...snapshot,
+        files: [
+          { ...snapshot.files[0], scope: 'uncommitted' },
+          { ...snapshot.files[0], scope: 'against-base-branch' },
+        ],
+      })
+    ).toEqual({ fileCount: 1, additions: 4, deletions: 2, countsComplete: true });
+  });
   it.each([null, undefined])('returns null for an unavailable snapshot: %p', missing => {
     expect(getWorktreeChangesTotals(missing)).toBeNull();
   });
@@ -184,6 +198,44 @@ describe('getWorktreeChangesTotals', () => {
   });
 });
 
+describe('scoped changes sections', () => {
+  const uncommitted: WorktreeChangesFile = { ...snapshot.files[0], scope: 'uncommitted' };
+  const committed: WorktreeChangesFile = { ...snapshot.files[0], scope: 'against-base-branch' };
+
+  it('orders uncommitted before against base branch and retains the same path in both', () => {
+    expect(groupWorktreeChangesByScope([committed, uncommitted])).toEqual([
+      { label: 'Uncommitted', scope: 'uncommitted', files: [uncommitted] },
+      { label: 'Against base branch', scope: 'against-base-branch', files: [committed] },
+    ]);
+  });
+
+  it('shows both sections even when one is empty', () => {
+    expect(groupWorktreeChangesByScope([committed])[0].files).toEqual([]);
+    expect(groupWorktreeChangesByScope([])).toHaveLength(2);
+  });
+
+  it('does not mislabel legacy combined captures as either comparison', () => {
+    expect(groupWorktreeChangesByScope(snapshot.files)[2]).toEqual({
+      label: 'Saved changes',
+      scope: undefined,
+      files: snapshot.files,
+    });
+  });
+
+  it('preserves selection by comparison and prefers uncommitted on removal', () => {
+    const committedKey = getWorktreeChangesFileKey(committed);
+    expect(resolveWorktreeChangesSelection(committedKey, [committed, uncommitted])).toBe(
+      committedKey
+    );
+    expect(resolveWorktreeChangesSelection(committedKey, [uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
+    expect(resolveWorktreeChangesSelection(null, [committed, uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
+  });
+});
+
 describe('worktree changes capability', () => {
   it('uses the control ID rather than a Kilo or legacy session ID', () => {
     expect(canOpenWorktreeChanges('workspace_12345678-1234-4234-9234-123456789abc', false)).toBe(
@@ -204,7 +256,11 @@ describe('worktree changes capability', () => {
 
 describe('saved worktree changes cache', () => {
   let queryClient: QueryClient;
-  const scope = { cloudAgentSessionId: 'workspace-chat-a', worktreeId: 'worktree-a' };
+  const scope = {
+    userId: 'user-alice',
+    cloudAgentSessionId: 'workspace-chat-a',
+    worktreeId: 'worktree-a',
+  };
   const queryKey = getWorktreeChangesQueryKey(scope);
 
   beforeEach(() => {
@@ -231,6 +287,16 @@ describe('saved worktree changes cache', () => {
   ])('does not replace newer or equal saved revisions', incoming => {
     expect(preserveNewerWorktreeChanges({ snapshot }, { snapshot: incoming })).toEqual({
       snapshot,
+    });
+  });
+
+  it('keeps the repositories of a multi-repository snapshot', () => {
+    const repositories = [
+      { path: 'web', repoFullName: 'acme/web', comparison: snapshot.comparison, truncated: false },
+    ];
+    const grouped = { ...snapshot, repositories };
+    expect(preserveNewerWorktreeChanges(undefined, { snapshot: grouped })).toEqual({
+      snapshot: grouped,
     });
   });
 
@@ -304,13 +370,50 @@ describe('saved worktree changes cache', () => {
   });
 
   it('falls back to isolated sessions without colliding with a worktree of the same name', () => {
-    const sessionKey = getWorktreeChangesQueryKey({ cloudAgentSessionId: 'worktree-a' });
+    const sessionKey = getWorktreeChangesQueryKey({
+      userId: scope.userId,
+      cloudAgentSessionId: 'worktree-a',
+    });
     queryClient.setQueryData(queryKey, { snapshot });
     expect(queryClient.getQueryData(sessionKey)).toBeUndefined();
     queryClient.setQueryData(sessionKey, { snapshot });
     expect(
       queryClient.getQueryData(
-        getWorktreeChangesQueryKey({ cloudAgentSessionId: 'workspace-chat-b' })
+        getWorktreeChangesQueryKey({
+          userId: scope.userId,
+          cloudAgentSessionId: 'workspace-chat-b',
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('serves nothing to another user for the same session, worktree and organization', () => {
+    queryClient.setQueryData(queryKey, { snapshot });
+    const aliceFileKey = getWorktreeFileQueryKey({
+      ...scope,
+      path: 'src/file.ts',
+      expectedRevision: snapshot.revision,
+    });
+    queryClient.setQueryDefaults(aliceFileKey, { structuralSharing: true });
+    queryClient.setQueryData(aliceFileKey, { revision: snapshot.revision, text: 'saved file' });
+    for (const other of [
+      { ...scope, userId: 'user-bob' },
+      { ...scope, userId: 'user-bob', organizationId: 'organization-a' },
+    ]) {
+      expect(queryClient.getQueryData(getWorktreeChangesQueryKey(other))).toBeUndefined();
+    }
+    expect(queryClient.getQueryData(aliceFileKey)).toEqual({
+      revision: snapshot.revision,
+      text: 'saved file',
+    });
+    expect(
+      queryClient.getQueryData(
+        getWorktreeFileQueryKey({
+          ...scope,
+          userId: 'user-bob',
+          path: 'src/file.ts',
+          expectedRevision: snapshot.revision,
+        })
       )
     ).toBeUndefined();
   });
@@ -329,6 +432,7 @@ describe('saved worktree changes cache', () => {
     for (const overrides of [
       { worktreeId: 'worktree-b' },
       { organizationId: 'organization-a' },
+      { userId: 'user-bob' },
       { path: 'src/other.ts' },
       { expectedRevision: 4 },
       { worktreeId: undefined },
@@ -341,7 +445,7 @@ describe('saved worktree changes cache', () => {
 });
 
 describe('worktree changes refresh coordination', () => {
-  const queryKey = ['worktree-changes', 'personal', 'workspace-a'];
+  const queryKey = ['worktree-changes', 'user-alice', null, ['session', 'workspace-a']] as const;
   const saved = (revision: number): GetWorktreeChangesOutput => ({
     snapshot: { ...snapshot, revision },
   });
@@ -454,7 +558,11 @@ describe('worktree changes refresh coordination', () => {
 
   it('discards queued reads on disposal without touching another session cache', async () => {
     queryClient.setQueryData(queryKey, saved(3));
-    const otherKey = ['worktree-changes', 'organization-b', 'workspace-b'];
+    const otherKey = getWorktreeChangesQueryKey({
+      userId: 'user-alice',
+      cloudAgentSessionId: 'workspace-b',
+      organizationId: 'organization-b',
+    });
     queryClient.setQueryData(otherKey, saved(1));
     const first = Promise.withResolvers<GetWorktreeChangesOutput>();
     const started = Promise.withResolvers<void>();
@@ -941,6 +1049,81 @@ describe('buildWorktreeChangesTree', () => {
           },
         ],
       },
+    ]);
+  });
+});
+
+describe('groupWorktreeChangesByRepository', () => {
+  const comparison = (baseRef: string) => ({
+    baseRef,
+    mergeBase: 'a'.repeat(40),
+    head: 'b'.repeat(40),
+  });
+  const file = (path: string): WorktreeChangesFile => ({
+    path,
+    revision: 3,
+    status: 'modified',
+    additions: 1,
+    deletions: 0,
+    tracked: true,
+    binary: false,
+    countsComplete: true,
+  });
+  const grouped = (
+    files: string[],
+    repositories: NonNullable<WorktreeChangesSnapshot['repositories']>
+  ): WorktreeChangesSnapshot => ({ ...snapshot, files: files.map(file), repositories });
+  const byRepository = (value: WorktreeChangesSnapshot | undefined) =>
+    groupWorktreeChangesByRepository(value, value?.files ?? []);
+  const web = {
+    path: 'web',
+    repoFullName: 'acme/web',
+    comparison: comparison('origin/main'),
+    truncated: false,
+  };
+  const api = {
+    path: 'api',
+    repoFullName: 'acme/api',
+    comparison: comparison('origin/dev'),
+    truncated: true,
+  };
+
+  it('shows the plain list for a V1 snapshot and for a single repository', () => {
+    expect(byRepository(snapshot)).toBeNull();
+    expect(byRepository(undefined)).toBeNull();
+    expect(byRepository(grouped(['src/a.ts'], [{ ...web, path: '' }]))).toBeNull();
+  });
+
+  it('groups files by repository in the order the snapshot lists them', () => {
+    const result = byRepository(grouped(['api/src/b.ts', 'web/a.ts', 'web/src/c.ts'], [web, api]));
+    expect(result?.map(group => [group.repoFullName, group.baseRef, group.truncated])).toEqual([
+      ['acme/web', 'origin/main', false],
+      ['acme/api', 'origin/dev', true],
+    ]);
+    expect(result?.map(group => group.files.map(f => f.path))).toEqual([
+      ['web/a.ts', 'web/src/c.ts'],
+      ['api/src/b.ts'],
+    ]);
+  });
+
+  it('does not match a path that only shares a name prefix with a repository', () => {
+    expect(byRepository(grouped(['web-extra/a.ts'], [web, api]))).toBeNull();
+  });
+
+  it('groups only the given files and leaves out a repository without files', () => {
+    const value = grouped(['web/a.ts', 'api/b.ts'], [web, api]);
+    const result = groupWorktreeChangesByRepository(value, [file('web/a.ts')]);
+    expect(result?.map(group => [group.repoFullName, group.files.map(f => f.path)])).toEqual([
+      ['acme/web', ['web/a.ts']],
+    ]);
+  });
+
+  it('gives a file to the repository with the longest matching path', () => {
+    const nested = { ...api, path: 'web/vendor/api' };
+    const result = byRepository(grouped(['web/vendor/api/x.ts', 'web/y.ts'], [web, nested]));
+    expect(result?.map(group => group.files.map(f => f.path))).toEqual([
+      ['web/y.ts'],
+      ['web/vendor/api/x.ts'],
     ]);
   });
 });

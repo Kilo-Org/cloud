@@ -1,3 +1,23 @@
+import { isFormSheetRoute, isFormSheetRouteHref } from '@/lib/form-sheet-routes';
+
+/**
+ * Gate and flow-control paths that own their screen transiently: the bootstrap
+ * gates (consent, force update), the post-sign-in tour/onboarding, and the
+ * picker that rides an RTL language reload. A record captured there would
+ * reopen a flow the next launch either resolves on its own (bootstrap gates) or
+ * cannot complete without its originating context (a gate opened on top of
+ * another screen). Every `formSheet` route is excluded separately through
+ * `isFormSheetRoute`.
+ */
+const GATE_PATHS: ReadonlySet<string> = new Set([
+  '/consent',
+  '/consent-details',
+  '/force-update',
+  '/onboarding',
+  '/tour',
+  '/kilo-pass',
+]);
+
 /**
  * Which concrete route paths may be recorded as the relaunch-restore target.
  *
@@ -16,23 +36,13 @@ export function isRecordableLastRoute(pathname: string, segments: readonly strin
   if (segments.length === 0 || segments[0] !== '(app)') {
     return false;
   }
-  // Gate and flow-control surfaces: the bootstrap gates (consent, force
-  // update), the share gate, the post-sign-in tour/onboarding, and the pickers
-  // that ride an RTL language reload own their screens transiently. A record
-  // captured there would reopen a flow the next launch either resolves on its
-  // own (bootstrap gates) or cannot complete without its originating context
-  // (a picker or gate opened on top of another screen).
-  const unrecordable = [
-    '/consent',
-    '/consent-details',
-    '/language-picker',
-    '/force-update',
-    '/share-gate',
-    '/onboarding',
-    '/tour',
-    '/kilo-pass',
-  ];
-  if (unrecordable.includes(pathname)) {
+  // A sheet is never the place the person was working: it is presented over the
+  // screen that opened it, so reopening one on its own leaves that screen — and
+  // its draft — behind. For the bridge pickers it is worse than a lost host:
+  // their options live in the module map of `lib/route-registry.ts`, which a
+  // fresh JS context starts empty, so the reopened sheet shows the "options
+  // expired" shell over the start route. The record stays on the opener.
+  if (GATE_PATHS.has(pathname) || isFormSheetRoute(segments)) {
     return false;
   }
   // The auth group is unreachable with `(app)` first, but the segments guard
@@ -41,6 +51,26 @@ export function isRecordableLastRoute(pathname: string, segments: readonly strin
     return false;
   }
   return true;
+}
+
+/** The group-free leaf path of a recorded href (`/(app)/a/b?x=1` -> `/a/b`). */
+function groupFreePath(href: string): string {
+  const queryStart = href.indexOf('?');
+  const path = queryStart === -1 ? href : href.slice(0, queryStart);
+  const parts = path.split('/').filter(part => part.length > 0 && !part.startsWith('('));
+  return `/${parts.join('/')}`;
+}
+
+/**
+ * Whether a persisted record names a route this rule refuses to restore.
+ *
+ * The record is written through `isRecordableLastRoute`, but a build before a
+ * route was excluded could have persisted it. Reading such a record as absent
+ * leaves the repair on the start route instead of replaying a gate or a sheet
+ * on its own.
+ */
+export function isUnrestorableLastRouteHref(href: string): boolean {
+  return GATE_PATHS.has(groupFreePath(href)) || isFormSheetRouteHref(href);
 }
 
 /**

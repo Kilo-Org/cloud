@@ -1,5 +1,4 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -129,7 +128,7 @@ export type OpenAiChatGptRoutingResult =
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim().toLowerCase();
-  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !findKiloExclusiveModel(model);
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model);
 }
 
 /**
@@ -141,6 +140,18 @@ async function resolveOpenAiChatGptUpstreamModel(modelId: string): Promise<strin
   const model = (await resolveOpenRouterModelAlias(modelId.trim())).trim();
   if (!isOpenAiChatGptModel(model)) return null;
   return model.replace(OPENAI_MODEL_PREFIX, '');
+}
+
+/**
+ * The api.openai.com model a ChatGPT connection could serve the request with, before the
+ * connection and served-model checks; null when the request can never take the delegated route.
+ */
+export async function getOpenAiChatGptCandidateModel(
+  apiKind: GatewayRequest['kind'],
+  requestedModel: string
+): Promise<string | null> {
+  if (apiKind !== 'responses') return null;
+  return resolveOpenAiChatGptUpstreamModel(requestedModel);
 }
 
 /**
@@ -191,10 +202,10 @@ async function eligibleUpstreamModelForOwner(
   input: OpenAiChatGptRoutingInput,
   owner: OpenAiChatGptOwner
 ): Promise<string | null> {
-  const { request, requestedModel } = input;
-
-  if (request.kind !== 'responses') return null;
-  const upstreamModel = await resolveOpenAiChatGptUpstreamModel(requestedModel);
+  const upstreamModel = await getOpenAiChatGptCandidateModel(
+    input.request.kind,
+    input.requestedModel
+  );
   if (!upstreamModel) return null;
 
   // The catalog can list an OpenAI model the plain API does not serve. A
@@ -278,7 +289,7 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    id: 'openai-chatgpt',
+    type: 'openai-chatgpt',
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

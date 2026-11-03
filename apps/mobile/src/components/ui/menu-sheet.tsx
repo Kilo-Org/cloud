@@ -5,6 +5,7 @@ import { Check } from '@/components/ui/icons';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -91,7 +92,8 @@ function MenuSheetBody({
         ? radioItemA11y({ label: option.label, checked: option.selected === true })
         : { accessibilityRole: 'button' as const, accessibilityLabel: option.label })}
       className={cn(
-        'min-h-11 flex-row items-center gap-2 px-4 py-3 active:bg-secondary',
+        ROW_TARGET_CLASS,
+        'flex-row items-center gap-2 px-4 py-3 active:bg-secondary',
         index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
       )}
       onPress={() => {
@@ -136,7 +138,10 @@ function MenuSheetBody({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}
-          className="mt-1 min-h-11 items-center justify-center px-4 py-3 active:bg-secondary"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'mt-1 items-center justify-center px-4 py-3 active:bg-secondary'
+          )}
           onPress={onClose}
         >
           <Text className="text-sm font-medium text-foreground">{cancelLabel}</Text>

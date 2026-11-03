@@ -9,7 +9,7 @@ import {
 export default {
   id: 'ollama-cloud',
   models_dev_id: 'ollama-cloud',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://ollama.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

@@ -9,6 +9,7 @@
       "lowBalance": "तपाईंको ब्यालेन्समा ध्यान चाहिन्छ",
       "spendAlert": "तपाईंको खर्चमा ध्यान चाहिन्छ",
       "securityFinding": "सुरक्षा फेला परेकोमा ध्यान चाहिन्छ",
+      "securityUpdate": "सुरक्षा जाँचमा अद्यावधिक छ",
       "activeAgentsGlanceable": "सक्रिय एजेन्टहरूमा अद्यावधिक छ"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "सुरक्षा फेला परेकोमा ध्यान चाहिन्छ"
+      "body": "सुरक्षा जाँचमा अद्यावधिक छ"
     }
   },
   "instanceLifecycle": {

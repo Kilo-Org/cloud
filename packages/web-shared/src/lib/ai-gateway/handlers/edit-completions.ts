@@ -7,6 +7,7 @@ import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gatewa
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
@@ -16,7 +17,6 @@ import {
   invalidRequestResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
-  captureProxyError,
   extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -168,6 +168,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])
     : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
+  const userByokEntry = userByok?.find(entry => entry.providerId === byokProviderKey);
 
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'edit_completions',
@@ -175,6 +176,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     provider: editProvider,
     requested_model: requestBody.model,
     is_free: isFreeModelExcludingCustomLlms(requestBody.model),
+    custom_llm_pricing: null,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null,
@@ -188,7 +190,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     status_code: null,
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-    user_byok: !!userByok,
+    user_byok: !!userByokEntry,
     has_tools: false,
     feature,
     session_id: taskId ?? null,
@@ -213,7 +215,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     model: requestBody.model,
     provider: editProvider,
     isFreeUsage: usageContext.is_free,
-    hasByok: !!userByok,
+    hasByok: !!userByokEntry,
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
@@ -224,7 +226,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   // carry the same classification.
 
   const systemKey = getSystemApiKey(editProvider);
-  const userByokEntry = userByok?.at(0);
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
 
   if (!apiKey) {
@@ -299,21 +300,19 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     );
   }
 
-  if (proxyRes.status >= 400) {
-    await captureProxyError({
-      user,
-      request: bodyForUpstream,
-      response: proxyRes,
-      organizationId,
-      model: requestBody.model,
-      errorMessage: `Edit provider returned error ${proxyRes.status}`,
-      trackInSentry: proxyRes.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response: proxyRes,
+    providerId: editProvider,
+    isUserByok: !!userByokEntry,
+    user,
+    request: bodyForUpstream,
+    organizationId,
+    model: requestBody.model,
+  });
 
   const clonedResponse = proxyRes.clone();
 
   countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
 
-  return wrapInSafeNextResponse(proxyRes);
+  return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

@@ -10,6 +10,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getTableName, sql } from 'drizzle-orm';
 import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
 import {
+  ORGANIZATION_MANAGE_ROLES,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
+import {
   elevateViaKiloAdmin,
   organizationTarget,
   userTarget,
@@ -19,7 +23,7 @@ import { codeIndexingAdminRouter } from './code-indexing-admin-router';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
-import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import { chunkCountToSizeKbSql, isEnabledForUser } from '@/lib/code-indexing/util';
 import {
   CODE_INDEXING_GONE_MESSAGE,
   isCodeIndexingEnabled,
@@ -145,13 +149,17 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 });
 
 type Input = { organizationId?: string | null | undefined };
-export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input) {
+export async function getCodeIndexOrganizationId(
+  ctx: TRPCContext,
+  input: Input,
+  roles?: OrganizationRole[]
+) {
   if (!isCodeIndexingEnabled()) {
     throw codeIndexingNotAvailable();
   }
 
   if (input.organizationId) {
-    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId);
+    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId, roles);
     if (org.settings.code_indexing_enabled === false) {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -159,6 +167,13 @@ export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input)
       });
     }
     return input.organizationId;
+  }
+
+  if (!isEnabledForUser(ctx.user)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Code indexing is not enabled for this account',
+    });
   }
 
   return getUserUUID(ctx.user);
@@ -547,7 +562,11 @@ export const codeIndexingRouter = createTRPCRouter({
   deleteBeforeDate: codeIndexingProcedure
     .input(CodebaseIndexingDeleteBeforeDateRequestSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await getCodeIndexOrganizationId(ctx, input);
+      const organizationId = await getCodeIndexOrganizationId(
+        ctx,
+        input,
+        ORGANIZATION_MANAGE_ROLES
+      );
 
       await getStorage().deleteByOrganizationBeforeDate({
         organizationId,

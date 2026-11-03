@@ -159,6 +159,7 @@ it.each([undefined, '', 'off', 'true'])(
   'leaves publisher diagnostics off for %s',
   async control => {
     const { env, send, logs } = setup();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     expect((await publish({ ...env, USAGE_INGEST_DIAGNOSTICS: control })).status).toBe(202);
     expect(send).toHaveBeenCalledTimes(1);
     expect(logs()).toEqual([]);

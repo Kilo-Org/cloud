@@ -269,6 +269,23 @@ export function makeTestQueryClient(): QueryClient {
   return client;
 }
 
+/**
+ * Seed the cache and settle the scope on that server result. A socket write never establishes one, and
+ * an unaccepted scope schedules its own replacement fetch, so tests about other
+ * follow-up reasons start from an accepted scope.
+ */
+export async function acceptScope(
+  qc: FakeQueryClient,
+  sync: ActiveSessionsLiveSync,
+  payload: CachedActiveSessionsData = emptySessionsData()
+): Promise<void> {
+  qc.__setCached(payload);
+  sync.scheduleRefresh('manual');
+  await sync.getFetchQueue();
+  qc.__triggerFetchResolve(payload);
+  await sync.getFetchCompletion();
+}
+
 export function seedMutationSessions(
   client: QueryClient,
   listKey: readonly unknown[],

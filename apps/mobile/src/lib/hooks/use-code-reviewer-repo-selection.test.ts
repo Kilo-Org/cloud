@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as TanStackQuery from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 import { clearRepoSelectionSenders, REPO_SELECTION_DEBOUNCE_MS } from './repo-selection-senders';
 import { useRepoSelectionToggle } from './use-code-reviewer-repo-selection';
@@ -205,7 +207,30 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
     deltaOptions.onError?.(new Error('Network unreachable'), vars);
 
     expect(reviewConfigCache?.selectedRepositoryIds).toEqual([1, 2]);
-    expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
+    // A transport failure has no explanation of its own: the save line, never
+    // the transport's own sentence.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
+  });
+
+  it('explains a trial refusal on the repository delta instead of quoting the server', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo('org-1', 'github');
+
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const vars = mutateMock.mock.calls[0]?.[0] as { optimisticSelection: unknown };
+    deltaOptions.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+      }),
+      vars
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 
   it('sends nothing when the net delta is empty', () => {

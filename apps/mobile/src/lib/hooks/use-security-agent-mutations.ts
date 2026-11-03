@@ -18,8 +18,10 @@ import {
   type SecurityAgentConfigPatch,
 } from '@/lib/security-agent';
 import {
-  isSecuritySyncRetryable,
+  isSecuritySyncInProgress,
   mapSecuritySyncOperationError,
+  securityConfigMutationMessage,
+  securityRetainsOperationKey,
   securitySyncIntentFingerprint,
 } from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -35,14 +37,29 @@ function useSecurityAgentConfigQueryKey(scope: string) {
     : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
 }
 
-export function useSaveSecurityAgentConfig(scope: string) {
+export function useSaveSecurityAgentConfig(
+  scope: string,
+  { announceSaved = true }: Readonly<{ announceSaved?: boolean }> = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast error.message.
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
   return useMutation({
+    // Reachability is the save's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles (the header keeps Save disabled
+    // with its spinner up and the draft stays dirty, with no failure surface),
+    // and the queued save lands silently once the connection returns.
+    // Attempting the request instead lets it fail through the normal path:
+    // onError restores the snapshot and toasts the failure, so Save returns to
+    // an enabled retry state with the draft intact.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
       // The server rejects a save whose revision is stale, so send the revision
@@ -77,9 +94,18 @@ export function useSaveSecurityAgentConfig(scope: string) {
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(error.message);
+      announcingToast.error(securityConfigMutationMessage(error));
     },
     onSuccess: result => {
+      // Saving pops the settings screen, and the screen it returns to can fail
+      // to load on a flaky connection. Confirming the write here keeps a
+      // persisted save from reading as a lost one wherever the navigation lands.
+      // A screen with a more specific outcome of its own (Automation's queued
+      // count) turns this off and announces in its place, so one save is one
+      // confirmation.
+      if (announceSaved) {
+        announcingToast.success(i18n.t('securityAgent.settingsSave.saved'));
+      }
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
       }
@@ -91,7 +117,7 @@ export function useSaveSecurityAgentConfig(scope: string) {
           queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
         });
         scheduleCacheMaintenance(() => {
-          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+          void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
         });
         return;
       }
@@ -101,7 +127,7 @@ export function useSaveSecurityAgentConfig(scope: string) {
         }),
       });
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(
+        void reconcileFirstPage(
           queryClient,
           trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
         );
@@ -119,8 +145,15 @@ export function useSetSecurityAgentEnabled(scope: string) {
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast error.message.
+  // and toast the localized config-write copy. The server's own sentence is
+  // English and stays untranslated on the device, so a marked refusal reads
+  // catalog copy and anything else reads the generic sentence.
   return useMutation({
+    // Same reason as the config save above: pausing while the connectivity
+    // manager reports offline keeps the switch in its optimistic position with
+    // no rollback and no toast, and the queued toggle lands silently after
+    // reconnecting. Attempting the request fails through the normal path.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -148,7 +181,7 @@ export function useSetSecurityAgentEnabled(scope: string) {
           old ? { ...old, isEnabled: previous.isEnabled } : old
         );
       }
-      announcingToast.error(error.message);
+      announcingToast.error(securityConfigMutationMessage(error));
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
@@ -198,6 +231,14 @@ export function useTriggerSecuritySync(scope: string) {
   const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
 
   return useMutation({
+    // A manual sync is a tap with a visible pending state, not a background
+    // job: pausing it while the connectivity manager reports offline leaves the
+    // dashboard's sync control spinning with no outcome until the connection
+    // returns. Attempting the request fails through the normal path, bounded by
+    // the transport deadline, and the reconcile-first row written above records
+    // the ambiguous outcome, so a relaunch offers the reconcile retry instead
+    // of blindly re-POSTing.
+    networkMode: 'always',
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {
@@ -232,16 +273,23 @@ export function useTriggerSecuritySync(scope: string) {
         await removeOutboxRow(fingerprint);
         return result;
       } catch (error) {
-        if (!isSecuritySyncRetryable(error)) {
+        if (!securityRetainsOperationKey(error)) {
           rotateKey();
           await removeOutboxRow(fingerprint);
         }
-        // A retryable (ambiguous) failure keeps the row: the server may have
-        // accepted the command, so a relaunch must reconcile, not re-POST.
+        // A retryable failure whose key survives is ambiguous: the server may
+        // have accepted the command, so a relaunch must reconcile, not re-POST.
+        // A settled intent keeps no row — its key can never be replayed.
         throw mapSecuritySyncOperationError(error);
       }
     },
     onError: error => {
+      // The in-progress conflict is the sync already running, not a failed
+      // action: the dashboard shows it as progress, so an error toast would
+      // contradict the control the reader is looking at.
+      if (isSecuritySyncInProgress(error)) {
+        return;
+      }
       announcingToast.error(error.message);
     },
     onSuccess: result => {

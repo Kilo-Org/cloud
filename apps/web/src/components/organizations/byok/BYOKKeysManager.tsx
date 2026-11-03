@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -37,6 +37,8 @@ import {
   ChevronRight,
   FlaskConical,
   AlertTriangle,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -55,6 +57,7 @@ import {
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
+import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
@@ -68,6 +71,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
   azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
+  cohere: 'Cohere',
   deepseek: 'DeepSeek',
   openai: 'OpenAI API key',
   inception: 'Inception',
@@ -229,12 +233,14 @@ function CatalogModeSetting({
         <p className="text-muted-foreground text-xs">
           Turn this on to serve catalog models such as moonshotai/kimi-k2.6 with this key, including
           for Auto models and custom routers.
-          {isOrganizationKey ? ' Organization model restrictions then apply to this key.' : ''}
+          {isOrganizationKey
+            ? ' Organization model and provider restrictions then apply to this key.'
+            : ''}
         </p>
       ) : null}
       {enabled && isOrganizationKey ? (
         <p className="text-muted-foreground text-xs">
-          Organization model restrictions apply to requests through this key.
+          Organization model and provider restrictions apply to requests through this key.
         </p>
       ) : null}
       {!canChange && isOrganizationKey ? (
@@ -242,6 +248,74 @@ function CatalogModeSetting({
           Only organization owners and admins can change this setting.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+type ReorderDirection = 'up' | 'down';
+
+function rank(keyIds: string[], id: string) {
+  const index = keyIds.indexOf(id);
+  return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function reorderButtonId(keyId: string, direction: ReorderDirection) {
+  return `byok-priority-${direction}-${keyId}`;
+}
+
+function KeyPriorityControls({
+  keyId,
+  providerName,
+  position,
+  count,
+  saving,
+  onMove,
+}: {
+  keyId: string;
+  providerName: string;
+  position: number;
+  count: number;
+  /** Moves wait for the previous save. The buttons stay focusable so keyboard focus survives. */
+  saving: boolean;
+  onMove: (direction: ReorderDirection) => void;
+}) {
+  const label = apiKeyObjectLabel(providerName);
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm tabular-nums">
+        <span className="@2xl:sr-only">Priority </span>
+        {position}
+      </span>
+      <div className="flex gap-1">
+        <Button
+          id={reorderButtonId(keyId, 'up')}
+          variant="secondary"
+          size="sm"
+          className="size-9 p-0 aria-disabled:opacity-50 @2xl:size-8"
+          onClick={() => {
+            if (!saving) onMove('up');
+          }}
+          disabled={position === 1}
+          aria-disabled={saving || undefined}
+          aria-label={`Move ${label} up`}
+        >
+          <ArrowUp className="size-4" />
+        </Button>
+        <Button
+          id={reorderButtonId(keyId, 'down')}
+          variant="secondary"
+          size="sm"
+          className="size-9 p-0 aria-disabled:opacity-50 @2xl:size-8"
+          onClick={() => {
+            if (!saving) onMove('down');
+          }}
+          disabled={position === count}
+          aria-disabled={saving || undefined}
+          aria-label={`Move ${label} down`}
+        >
+          <ArrowDown className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -289,6 +363,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const [reorderAnnouncement, setReorderAnnouncement] = useState('');
+  const [pendingFocus, setPendingFocus] = useState<{
+    keyId: string;
+    index: number;
+    direction: ReorderDirection;
+  } | null>(null);
 
   // Build query options - only include organizationId if provided
   const listQueryInput = organizationId ? { organizationId } : {};
@@ -310,12 +390,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
+  // Key changes alter the routes the preview shows.
+  const invalidateKeys = () => {
+    void queryClient.invalidateQueries({ queryKey: trpc.byok.list.queryKey(listQueryInput) });
+    void queryClient.invalidateQueries(trpc.byok.previewRouting.pathFilter());
+  };
+
   const createMutation = useMutation(
     trpc.byok.create.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key added successfully');
         closeDialog();
       },
@@ -328,9 +412,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const updateMutation = useMutation(
     trpc.byok.update.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key updated successfully');
         closeDialog();
       },
@@ -343,9 +425,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const deleteMutation = useMutation(
     trpc.byok.delete.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key deleted successfully');
       },
       onError: (error: { message: string }) => {
@@ -357,9 +437,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setEnabledMutation = useMutation(
     trpc.byok.setEnabled.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(data.is_enabled ? 'API key enabled' : 'API key disabled');
       },
       onError: (error: { message: string }) => {
@@ -371,9 +449,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setCatalogModeMutation = useMutation(
     trpc.byok.setCatalogMode.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(
           data.serve_catalog_models
             ? 'Key now serves Kilo catalog model IDs'
@@ -382,6 +458,32 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       },
       onError: (error: { message: string }) => {
         toast.error(`Failed to update catalog model IDs: ${error.message}`);
+      },
+    })
+  );
+
+  const listQueryKey = trpc.byok.list.queryKey(listQueryInput);
+  const reorderMutation = useMutation(
+    trpc.byok.reorder.mutationOptions({
+      onMutate: async ({ keyIds }) => {
+        await queryClient.cancelQueries({ queryKey: listQueryKey });
+        const previousKeys = queryClient.getQueryData(listQueryKey);
+        queryClient.setQueryData(listQueryKey, current =>
+          current?.toSorted((a, b) => rank(keyIds, a.id) - rank(keyIds, b.id))
+        );
+        return { previousKeys };
+      },
+      onSuccess: data => {
+        queryClient.setQueryData(listQueryKey, data);
+      },
+      onError: (error, _input, context) => {
+        queryClient.setQueryData(listQueryKey, context?.previousKeys);
+        setReorderAnnouncement('');
+        setPendingFocus(null);
+        toast.error(`Failed to save key priority: ${error.message}`);
+      },
+      onSettled: () => {
+        invalidateKeys();
       },
     })
   );
@@ -506,12 +608,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
             title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model restrictions no longer apply to requests through this key.' : ''}`,
+            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model and provider restrictions no longer apply to requests through this key.' : ''}`,
             confirmLabel: 'Use provider model IDs',
             destructive: !!organizationId,
           }
@@ -525,6 +627,31 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
   };
 
+  const handleMove = (keyIds: string[], index: number, direction: ReorderDirection) => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    const movedId = keyIds[index];
+    const swappedId = keyIds[target];
+    if (!movedId || !swappedId) return;
+    const reordered = keyIds.with(index, swappedId).with(target, movedId);
+    const movedKey = keys?.find(key => key.id === movedId);
+    setReorderAnnouncement(
+      `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
+    );
+    setPendingFocus({ keyId: movedId, index: target, direction });
+    reorderMutation.mutate(
+      { keyIds: reordered },
+      {
+        // The rollback can disable the focused button, so focus follows the key back.
+        onError: () =>
+          setPendingFocus({
+            keyId: movedId,
+            index,
+            direction: direction === 'up' ? 'down' : 'up',
+          }),
+      }
+    );
+  };
+
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
@@ -532,6 +659,29 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       is_enabled,
     });
   };
+
+  const listedKeyOrder =
+    keys
+      ?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID)
+      .map(key => key.id)
+      .join() ?? '';
+
+  // The optimistic reorder renders asynchronously, so focus follows the moved key once the
+  // committed list shows it at its new position. At an edge the button in the move direction is
+  // disabled, so focus goes to the other one.
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const order = listedKeyOrder.split(',');
+    if (order.indexOf(pendingFocus.keyId) !== pendingFocus.index) return;
+    const direction =
+      pendingFocus.index === 0
+        ? 'down'
+        : pendingFocus.index === order.length - 1
+          ? 'up'
+          : pendingFocus.direction;
+    document.getElementById(reorderButtonId(pendingFocus.keyId, direction))?.focus();
+    setPendingFocus(null);
+  }, [pendingFocus, listedKeyOrder]);
 
   if (keysLoading) {
     return (
@@ -558,6 +708,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // provider id, but it is not a pasted key: the card above the list owns it, so
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
+  // Organization keys keep their default order; only personal keys can be prioritized.
+  const canReorder = !organizationId && listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
   const getProviderModels = (providerId: string, serveCatalogModels = false): string[] => {
@@ -586,6 +739,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           </Button>
         </CardHeader>
         <CardContent>
+          {canReorder ? (
+            <p className="text-muted-foreground mb-4 text-sm">
+              Priority 1 is tried first. Each request uses the highest key in this list that can
+              serve its model, skipping disabled keys and keys whose provider does not offer it. A
+              connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
+              using Kilo catalog model IDs is ranked above the key that would otherwise serve.
+            </p>
+          ) : null}
+          <div aria-live="polite" className="sr-only">
+            {reorderAnnouncement}
+          </div>
           {listedKeys && listedKeys.length > 0 ? (
             // Narrow containers stack each key into a grid instead of table
             // columns. The explicit roles keep table semantics, which browsers
@@ -594,6 +758,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
               <table role="table" className="block w-full @2xl:table">
                 <thead role="rowgroup" className="sr-only @2xl:not-sr-only">
                   <tr role="row" className="bg-muted/50 border-b">
+                    {canReorder ? (
+                      <th role="columnheader" className="p-4 text-left font-medium">
+                        Priority
+                      </th>
+                    ) : null}
                     <th role="columnheader" className="p-4 text-left font-medium">
                       Provider
                     </th>
@@ -610,16 +779,19 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 </thead>
                 <tbody role="rowgroup" className="block @2xl:table-row-group">
                   {listedKeys.map(
-                    (key: {
-                      id: string;
-                      provider_id: string;
-                      created_at: string;
-                      management_source: 'user' | 'coding_plan';
-                      is_enabled: boolean;
-                      serve_catalog_models: boolean;
-                      supports_catalog_mode: boolean;
-                      can_change_catalog_mode: boolean;
-                    }) => {
+                    (
+                      key: {
+                        id: string;
+                        provider_id: string;
+                        created_at: string;
+                        management_source: 'user' | 'coding_plan';
+                        is_enabled: boolean;
+                        serve_catalog_models: boolean;
+                        supports_catalog_mode: boolean;
+                        can_change_catalog_mode: boolean;
+                      },
+                      index: number
+                    ) => {
                       const isManaged = !organizationId && key.management_source === 'coding_plan';
                       return (
                         <tr
@@ -630,6 +802,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             !key.is_enabled && 'bg-muted/20'
                           )}
                         >
+                          {canReorder ? (
+                            <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
+                              <KeyPriorityControls
+                                keyId={key.id}
+                                providerName={getProviderDisplayName(key.provider_id)}
+                                position={index + 1}
+                                count={listedKeyIds.length}
+                                saving={reorderMutation.isPending}
+                                onMove={direction => handleMove(listedKeyIds, index, direction)}
+                              />
+                            </td>
+                          ) : null}
                           <td
                             role="cell"
                             className={cn(
@@ -1060,7 +1244,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
-                              Organization model restrictions apply to requests through this key.
+                              Organization model and provider restrictions apply to requests through
+                              this key. The key is not used when the provider allow-list excludes
+                              this provider.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1084,7 +1270,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           {organizationId ? (
                             <p className="mt-2">
                               Models with the <strong>{directProvider.name}</strong> prefix are not
-                              subject to organization model restrictions.
+                              subject to organization model or provider restrictions.
                               {catalogModeSupportedModels?.[directProvider.id]?.length
                                 ? ' Owners and admins can switch this key to Kilo catalog model IDs in the key list, so these restrictions apply.'
                                 : ''}
@@ -1120,13 +1306,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If multiple keys apply to the
-                          same model, they are tried in unspecified order until one succeeds.
+                          requests one of the supported models above. If several of your keys can
+                          serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
-                            Models of this provider are subject to organization-configured model
-                            restrictions, but the provider itself is considered trusted.
+                            Organization-configured model and provider restrictions apply. The key
+                            is not used when the provider allow-list excludes this provider.
                           </p>
                         ) : null}
                       </AlertDescription>
@@ -1158,6 +1344,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           <BYOKSetupGuideLink />
         </CardFooter>
       </Card>
+      {listedKeys && listedKeys.length > 0 ? (
+        <BYOKRoutingPreview
+          organizationId={organizationId}
+          getProviderName={getProviderDisplayName}
+        />
+      ) : null}
     </div>
   );
 }

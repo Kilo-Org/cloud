@@ -6,11 +6,13 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
-import type { CustomLlmDefinition, StoredModel } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmDefinition,
+  CustomPricingTiers,
+  StoredModel,
+} from '@kilocode/db/schema-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { useKiloExclusiveModel } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
@@ -56,8 +58,6 @@ beforeEach(async () => {
 });
 
 describe('adminCustomLlmRouter', () => {
-  useKiloExclusiveModel();
-
   it('rejects a non-admin caller', async () => {
     const caller = await createCallerForUser(nonAdmin.id);
     await expect(caller.admin.customLlm.list()).rejects.toMatchObject({
@@ -280,6 +280,65 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
       expect(decrypted.api_key).toBe('sk-rotated-secret');
+    });
+  });
+
+  describe('pricing', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-pricing-secret' } as const;
+    const pricingTiers: CustomPricingTiers = [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 2,
+          completion_per_million: 8,
+          input_cache_read_per_million: 0.5,
+          input_cache_write_per_million: null,
+        },
+      },
+      {
+        start_context_length: 128_000,
+        pricing: {
+          prompt_per_million: 4,
+          completion_per_million: 16,
+          input_cache_read_per_million: null,
+          input_cache_write_per_million: null,
+        },
+      },
+    ];
+
+    it('stores a custom LLM with valid pricing tiers', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-priced';
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: { ...validDefinition, pricing: pricingTiers },
+        credentials,
+      });
+
+      expect(result.definition.pricing).toEqual(pricingTiers);
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.definition.pricing).toEqual(pricingTiers);
+    });
+
+    it('rejects pricing whose first tier does not start at context length 0', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-bad-pricing';
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: {
+            ...validDefinition,
+            pricing: [{ ...pricingTiers[0], start_context_length: 1000 }],
+          },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row).toBeUndefined();
     });
   });
 
@@ -511,54 +570,6 @@ describe('adminCustomLlmRouter', () => {
         code: 'BAD_REQUEST',
         message: expect.stringContaining('free model id'),
       });
-    });
-
-    it.each([
-      ['a private', validDefinition],
-      ['a public', publicDefinition],
-    ])('lets %s custom LLM claim a Kilo-exclusive model id', async (_access, definition) => {
-      const caller = await createCallerForUser(admin.id);
-
-      for (const exclusiveModel of kiloExclusiveModels.filter(
-        model => !model.public_id.includes(':')
-      )) {
-        await expect(
-          caller.admin.customLlm.upsert({
-            public_id: exclusiveModel.public_id,
-            definition,
-            credentials,
-          })
-        ).resolves.toMatchObject({ public_id: exclusiveModel.public_id });
-      }
-    });
-
-    it('lists whether a Kilo-exclusive model still serves the id', async () => {
-      const exclusiveModelId = kiloExclusiveModels.find(
-        model => !model.public_id.includes(':')
-      )?.public_id;
-      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
-      const caller = await createCallerForUser(admin.id);
-      await caller.admin.customLlm.upsert({
-        public_id: exclusiveModelId,
-        definition: publicDefinition,
-        credentials,
-      });
-      await caller.admin.customLlm.upsert({
-        public_id: 'acme/own-model',
-        definition: publicDefinition,
-        credentials,
-      });
-
-      const { items } = await caller.admin.customLlm.list();
-
-      expect(
-        items.map(item => [item.public_id, item.shadowedByKiloExclusiveModel]).toSorted()
-      ).toEqual(
-        [
-          ['acme/own-model', false],
-          [exclusiveModelId, true],
-        ].toSorted()
-      );
     });
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {

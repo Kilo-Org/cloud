@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +83,7 @@ export function SaveDraftAsTodoSheet({
       return;
     }
     void invalidateTodoQueries(queryClient, trpc);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     toast.success(t('todos.saveSheet.saved', { list: list.name }));
     setSavingListId(null);
     onSaved();

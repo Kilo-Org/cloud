@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
@@ -33,12 +34,21 @@ const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
   useGrouping: false,
 };
 
+/**
+ * A disclosure names the limit to the nearest hundredth of a minute, so a
+ * duration that is not a whole number of minutes reads as `0.13`, not as the
+ * full quotient. Locale formatting supplies the decimal separator.
+ */
+const SAFEGUARD_DISCLOSURE_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
+
 export function BriefingContextSettings({
   preference,
   defaultModel,
+  timezone,
 }: {
   readonly preference: ContextPreference;
   readonly defaultModel: string;
+  readonly timezone: string;
 }) {
   const { t, i18n } = useTranslation();
   const trpc = useTRPC();
@@ -88,7 +98,7 @@ export function BriefingContextSettings({
                     item.context.id === preference.context.id
                       ? {
                           ...item,
-                          aiEnabled: input.aiEnabled,
+                          enabled: input.enabled,
                           model: input.model ?? item.model,
                           maxDurationSeconds: input.maxDurationSeconds ?? item.maxDurationSeconds,
                           maxSpendMicrodollars:
@@ -138,7 +148,7 @@ export function BriefingContextSettings({
       t('agentBriefing.paidDisclosure', {
         estimate: briefingMoney(quote.estimatedCostMicrodollars, i18n.language),
         maximum: briefingMoney(quote.maximumCostMicrodollars, i18n.language),
-        minutes: quote.maxDurationSeconds / 60,
+        minutes: formatNumber(quote.maxDurationSeconds / 60, locale, SAFEGUARD_DISCLOSURE_FORMAT),
       }),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -147,7 +157,9 @@ export function BriefingContextSettings({
           onPress: () => {
             update.mutate({
               organizationId,
-              aiEnabled: true,
+              enabled: true,
+              timezone,
+              language: locale,
               model,
               ...limits,
               estimateToken: quote.estimateToken,
@@ -160,24 +172,26 @@ export function BriefingContextSettings({
   return (
     <View className="gap-4 rounded-2xl border border-border bg-card p-4">
       <Text className="font-semibold">
-        {t('agentBriefing.contextSettings', { context: contextName })}
+        {t('agentBriefing.scheduledContextSettings', { context: contextName })}
       </Text>
-      <Text className="text-sm text-muted-foreground">{t('agentBriefing.aiHint')}</Text>
+      <Text className="text-sm text-muted-foreground">
+        {t('agentBriefing.scheduledContextHint')}
+      </Text>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.aiOptIn')}</Text>
+        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.scheduledContextEnabled')}</Text>
         <Switch
-          value={preference.aiEnabled}
+          value={preference.enabled}
           disabled={offline || update.isPending}
-          accessibilityLabel={t('agentBriefing.aiOptIn')}
+          accessibilityLabel={t('agentBriefing.scheduledContextEnabled')}
           accessibilityState={{
-            checked: preference.aiEnabled,
+            checked: preference.enabled,
             disabled: offline || update.isPending,
           }}
           onValueChange={next => {
             if (next) {
               void enable();
             } else {
-              update.mutate({ organizationId, aiEnabled: false });
+              update.mutate({ organizationId, enabled: false, timezone, language: locale });
             }
           }}
         />
@@ -188,6 +202,9 @@ export function BriefingContextSettings({
         options={catalog.models}
         isLoading={catalog.isLoading}
         disabled={offline || update.isPending}
+        // The brief's context stores a model slug only, so the picker must not
+        // offer a thinking effort it would have to drop.
+        acceptsVariant={false}
         onSelect={id => {
           setModel(id);
         }}
@@ -233,7 +250,9 @@ export function BriefingContextSettings({
             updateLimits();
           }}
         />
-        <Text className="text-xs text-muted-foreground">{t('agentBriefing.safeguardHint')}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('agentBriefing.snapshotSafeguards')}
+        </Text>
         {!valid ? (
           <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
         ) : null}
@@ -254,6 +273,7 @@ export function BriefingContextSettings({
         <Button
           variant="ghost"
           size="sm"
+          className={STATE_ACTION_CLASS}
           onPress={() => {
             void estimate.refetch();
           }}
@@ -274,7 +294,7 @@ export function BriefingContextSettings({
           void enable();
         }}
       >
-        <Text>{t(preference.aiEnabled ? 'common.save' : 'agentBriefing.enable')}</Text>
+        <Text>{t(preference.enabled ? 'common.save' : 'agentBriefing.enable')}</Text>
       </Button>
     </View>
   );

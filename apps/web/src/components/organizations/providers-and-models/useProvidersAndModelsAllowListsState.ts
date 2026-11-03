@@ -9,6 +9,7 @@ import {
   computeEnabledProviderSlugs,
   setModelsAllowed as setModelsAllowedInDenyList,
   stringListsEqual,
+  sortUniqueStrings,
   toggleModelAllowed,
   toggleProviderEnabled,
   type OpenRouterModelSlugSnapshot,
@@ -69,6 +70,11 @@ export type ProvidersAndModelsAllowListsAction =
       type: 'SET_MODELS_ALLOWED';
       modelIds: ReadonlyArray<string>;
       nextAllowed: boolean;
+    }
+  | {
+      type: 'SET_PROVIDERS_ENABLED';
+      providerSlugs: string[];
+      nextEnabled: boolean;
     }
   | {
       type: 'RESET_TO_INITIAL';
@@ -190,6 +196,17 @@ export function providersAndModelsAllowListsReducer(
       return {
         ...state,
         draftModelDenyList: nextModelDenyList,
+      };
+    }
+
+    case 'SET_PROVIDERS_ENABLED': {
+      if (state.status !== 'ready') return state;
+      const providerSlugs = new Set(action.providerSlugs);
+      return {
+        ...state,
+        draftProviderAllowList: action.nextEnabled
+          ? sortUniqueStrings([...state.draftProviderAllowList, ...providerSlugs])
+          : state.draftProviderAllowList.filter(slug => !providerSlugs.has(slug)),
       };
     }
 

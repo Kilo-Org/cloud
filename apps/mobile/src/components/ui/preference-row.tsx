@@ -1,9 +1,10 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { Pressable, useColorScheme, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,21 @@ export function PreferenceRow({
   resolveValue,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
+  const isDark = useColorScheme() === 'dark';
+  // The shared `Switch` already paints the dark scheme: a light grip on the
+  // muted ink, which reads as a knob in a dark row. What it cannot know is this
+  // row's light surface: its off track is `mutedSoft`, 2.1:1 over the row's
+  // `#F0EEE6` card, and Android's own default before it was 1.02:1, so the off
+  // control read as two barely-visible grey marks. The light scheme therefore
+  // overrides both halves with the muted ink `#6F6A61` (4.6:1 on the row) under
+  // the white grip (5.2:1 over that track). The dark scheme passes nothing and
+  // takes the shared pair.
+  const switchColors = isDark
+    ? undefined
+    : {
+        thumbColor: colors.primaryForeground,
+        trackColor: { false: colors.mutedForeground, true: colors.primary },
+      };
   // Both ways of moving the switch flip the same value: a tap on the row and a
   // tap on the thumb can arrive in either order, and a burst must not build one
   // flip from the rendered value and the next from the native thumb state.
@@ -53,9 +69,14 @@ export function PreferenceRow({
     onValueChange(!(resolveValue?.() ?? value));
   };
   return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+    <View
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+    >
       <Pressable
-        className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70'
+        )}
         disabled={disabled}
         onPress={flip}
         accessible={false}
@@ -122,6 +143,8 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
+        thumbColor={switchColors?.thumbColor}
+        trackColor={switchColors?.trackColor}
         accessibilityLabel={title}
         accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}

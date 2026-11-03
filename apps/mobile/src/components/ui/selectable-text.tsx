@@ -7,6 +7,10 @@ import { cn } from '@/lib/utils';
 type SelectableTextProps = {
   children: string;
   className?: string;
+  /** The read-only value's accessible name, when its visible label names it. */
+  accessibilityLabel?: string;
+  /** Extra guidance for the value, as its editable counterpart carries. */
+  accessibilityHint?: string;
   onLayout?: (event: LayoutChangeEvent) => void;
 };
 
@@ -31,7 +35,13 @@ type SelectableTextProps = {
  * to its "unavailable" line and this input unmounts, which also ends the
  * selection. Neither case needs code here.
  */
-export function SelectableText({ children, className, onLayout }: Readonly<SelectableTextProps>) {
+export function SelectableText({
+  children,
+  className,
+  accessibilityLabel,
+  accessibilityHint,
+  onLayout,
+}: Readonly<SelectableTextProps>) {
   const textClass = useContext(TextClassContext);
   return (
     <TextInput
@@ -42,6 +52,8 @@ export function SelectableText({ children, className, onLayout }: Readonly<Selec
       multiline
       scrollEnabled={false}
       value={children}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       onLayout={onLayout}
     />
   );

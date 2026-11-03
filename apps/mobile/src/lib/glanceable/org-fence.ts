@@ -11,7 +11,7 @@ import {
   republishLastSnapshotStale,
   writeLostOrgSnapshotAndEnd,
 } from './cleanup';
-import { getLastGlanceableSnapshot } from './persist';
+import { getGlanceableSnapshotForSignedInScope } from './persist';
 
 /**
  * Org fence: a selected organization that is missing from a successful
@@ -38,7 +38,7 @@ export function useGlanceableOrgFence(): void {
       writeLostOrgSnapshotAndEnd();
     } else if (action === 'confirmed') {
       confirmGlanceableOrgMembership();
-    } else if (action === 'stale' && getLastGlanceableSnapshot() !== null) {
+    } else if (action === 'stale' && getGlanceableSnapshotForSignedInScope() !== null) {
       republishLastSnapshotStale();
     }
   }, [organizationId, orgs, isLoading, isError]);

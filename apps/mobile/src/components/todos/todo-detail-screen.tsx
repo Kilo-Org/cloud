@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ function TodoCompletionCircle({ todo }: Readonly<{ todo: TodoItemDetail }>) {
     <IconButton
       onPress={() => {
         if (!done) {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
         }
         update.mutate({ id: todo.id, done: !done });
       }}
@@ -67,7 +68,7 @@ function TodoDonePrompt({ todo }: Readonly<{ todo: TodoItemDetail }>) {
     <View className="flex-row px-4 pt-2">
       <Pressable
         onPress={() => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           update.mutate({ id: todo.id, done: true });
         }}
         accessibilityRole="button"

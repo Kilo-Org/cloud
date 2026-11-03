@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { agent_briefing_events, cli_sessions_v2 } from '@kilocode/db/schema';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
@@ -43,6 +43,8 @@ type SessionMetadataUpdates = Partial<
     | 'pr_head_ref'
     | 'pr_head_sha'
     | 'pr_link_verified_at'
+    | 'briefing_excerpt'
+    | 'briefing_excerpt_scope_changed_at'
   >
 >;
 
@@ -214,6 +216,7 @@ export async function applyMetadataChanges(
           worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
           gitUrl: cli_sessions_v2.git_url,
           prUrl: cli_sessions_v2.pr_url,
+          organizationId: cli_sessions_v2.organization_id,
         })
         .from(cli_sessions_v2)
         .where(
@@ -387,6 +390,11 @@ export async function applyMetadataChanges(
       }
     }
 
+    if (organizationIdWriteApplied && updates.organization_id !== currentRow.organizationId) {
+      updates.briefing_excerpt = null;
+      updates.briefing_excerpt_scope_changed_at = new Date().toISOString();
+    }
+
     if (Object.keys(updates).length > 0) {
       await tx
         .update(cli_sessions_v2)
@@ -395,17 +403,6 @@ export async function applyMetadataChanges(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
             eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-    if (organizationIdWriteApplied) {
-      await tx
-        .update(agent_briefing_events)
-        .set({ organization_id: updates.organization_id ?? null })
-        .where(
-          and(
-            eq(agent_briefing_events.kilo_user_id, kiloUserId),
-            eq(agent_briefing_events.session_id, sessionId)
           )
         );
     }
@@ -751,18 +748,6 @@ export async function resetAttentionStatusOnCliDisconnect(
 
     if (!persistedRow) return null;
     if (persistedRow.status !== CLI_DISCONNECT_ATTENTION_RESET_STATUS) return null;
-    await tx
-      .insert(agent_briefing_events)
-      .values({
-        id: JSON.stringify([kiloUserId, sessionId, 'status', statusUpdatedAt]),
-        kilo_user_id: kiloUserId,
-        session_id: sessionId,
-        organization_id: persistedRow.organization_id,
-        kind: 'status',
-        occurred_at: statusUpdatedAt,
-        status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
-      })
-      .onConflictDoNothing();
 
     return {
       previousStatus,

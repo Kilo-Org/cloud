@@ -54,8 +54,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
@@ -188,7 +190,7 @@ describe('processOpenRouterUsage', () => {
     );
 
     test('bills the reported cost from providers that never report is_byok', () => {
-      const result = processOpenRouterUsage(usage, coreProps, 'martian');
+      const result = processOpenRouterUsage(usage, coreProps, 'direct-byok');
 
       expect(result.cost_mUsd).toBe(75966);
       expect(result.is_byok).toBeNull();
@@ -933,6 +935,7 @@ describe('logMicrodollarUsage', () => {
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -1061,6 +1064,26 @@ describe('logMicrodollarUsage', () => {
     });
     expect(metadataRecord).toBeTruthy();
     expect(metadataRecord?.session_id).toBe('task-abc123');
+  });
+
+  test('stores the usage and metadata rows under the id chosen before the request', async () => {
+    const user = await insertTestUser({ microdollars_used: 0 });
+    const usageId = crypto.randomUUID();
+
+    const usageIdentity = await logMicrodollarUsage(
+      { ...BASE_USAGE_STATS, messageId: `test-msg-${usageId}` },
+      { ...createBaseUsageContext(user), usageId }
+    );
+
+    expect(usageIdentity?.usageId).toBe(usageId);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, usageId),
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, usageId),
+    });
+    expect(usageRecord?.kilo_user_id).toBe(user.id);
+    expect(metadataRecord?.message_id).toBe(`test-msg-${usageId}`);
   });
 
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
@@ -1703,7 +1726,7 @@ describe('logMicrodollarUsage', () => {
 
         expect(fetchGeneration).toHaveBeenCalledWith(
           'gen-stt-123',
-          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+          expect.objectContaining({ type: 'openrouter', apiKey: expectedApiKey })
         );
       }
     );
@@ -1842,24 +1865,74 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.is_free).toBe(true);
   });
 
-  test.each(['deleted', 'unavailable'] as const)(
-    'keeps a selected custom LLM free when its catalog entry is %s',
-    async catalogState => {
+  test('bills custom LLM usage at the custom LLM pricing instead of the upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'custom',
+        requested_model: 'acme/priced-custom-model',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({ provider: 'custom', cost: pricedCost });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
+  test.each([
+    ['custom', 'deleted'],
+    ['custom', 'unavailable'],
+    ['custom-public', 'deleted'],
+    ['custom-public', 'unavailable'],
+  ] as const)(
+    'preserves selected %s usage when its catalog entry is %s',
+    async (provider, catalogState) => {
       const user = await insertTestUser({
-        id: `test-${catalogState}-custom-llm-user`,
+        id: `test-${catalogState}-${provider}-llm-user`,
         microdollars_used: 1000,
-        google_user_email: `${catalogState}-custom-llm@example.com`,
+        google_user_email: `${catalogState}-${provider}-llm@example.com`,
       });
       const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
-      const modelId = `acme/${catalogState}-custom-model`;
-      await insertCustomLlmForTest(modelId);
+      const modelId = `acme/${catalogState}-${provider}-model`;
+      await insertCustomLlmForTest(
+        modelId,
+        provider === 'custom-public' ? publicCustomLlmDefinition(['acme']) : customLlmDefinition()
+      );
       const catalogReadSpy = jest.spyOn(readDb, 'select');
       try {
         expect(await isCustomLlm(modelId)).toBe(true);
         const usageContext: MicrodollarUsageContext = {
           ...createBaseUsageContext(user),
           organizationId: organization.id,
-          provider: 'custom',
+          provider,
           requested_model: modelId,
           is_free: true,
         };
@@ -1880,7 +1953,13 @@ describe('logMicrodollarUsage', () => {
         const usageRecord = await db.query.microdollar_usage.findFirst({
           where: eq(microdollar_usage.id, result.usageId),
         });
-        expect(usageRecord).toMatchObject({ provider: 'custom', cost: 0, cache_discount: 0 });
+        expect(usageRecord).toMatchObject({
+          provider,
+          model: modelId,
+          requested_model: modelId,
+          cost: 0,
+          cache_discount: 0,
+        });
         const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
           where: eq(microdollar_usage_metadata.id, result.usageId),
         });
@@ -2058,6 +2137,12 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage_metadata.id, result.usageId),
     });
     expect(metadataRecord).toMatchObject({ non_inference_cost: 7000, market_cost: 12_316 });
+    const [usageViewRecord] = await db
+      .select({ non_inference_cost: microdollar_usage_view.non_inference_cost })
+      .from(microdollar_usage_view)
+      .where(eq(microdollar_usage_view.id, result.usageId))
+      .limit(1);
+    expect(usageViewRecord?.non_inference_cost).toBe(7000);
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 13_316);
   });
 
@@ -2334,6 +2419,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       project_id: null,
       requested_model: 'provider/requested-model',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,

@@ -192,18 +192,31 @@ async function streamSessionItems(
   }
 }
 
-function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
+// An offloaded item crosses RPC as this projection: its storage identity plus the
+// metadata the DO folds into Postgres. Identity segments are ≤256 bytes and the
+// metadata fields are schema-bounded, so a projection is a few KiB at most; the
+// measured cap turns that into an invariant, including for `session`, whose loose item
+// data is not otherwise bounded by the schema.
+const MAX_PROJECTED_ITEM_BYTES = 8 * 1024;
+
+const projectionEncoder = new TextEncoder();
+
+function projectItemForRpc(item: SessionDataItem): SessionDataItem | null {
   switch (item.type) {
     case 'message':
       return { type: 'message', data: { id: item.data.id } };
     case 'part':
       return { type: 'part', data: { id: item.data.id, messageID: item.data.messageID } };
-    case 'agent_notification':
-      // Bounded: id ≤64 + message ≤500 ⇒ well under MAX_INGEST_ITEM_BYTES, so the slim
-      // path is never triggered for this kind. Return the item unchanged to keep the
-      // signal's `message` available to the DO's in-batch capture.
-      return item;
+    case 'agent_notification': {
+      // Bounded by its schema (id ≤64, message ≤500). The DO needs `message` to
+      // re-emit the signal on replay, so the projection carries it.
+      const { id, message } = item.data;
+      return { type: 'agent_notification', data: { id, message } };
+    }
     case 'session': {
+      // `title` and `parentID` are what the DO folds into Postgres. Both are
+      // unbounded in the loose item schema, so the measured budget in
+      // `slimItemForR2Reference` decides whether a projection can carry them.
       const data: Record<string, unknown> = {};
       if ('title' in item.data) data.title = item.data.title;
       if ('parentID' in item.data) data.parentID = item.data.parentID;
@@ -214,13 +227,52 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
     case 'model':
       return { type: 'model', data: [] };
     case 'session_open':
-    case 'session_close':
-    case 'session_status':
-    case 'kilo_meta':
-    case 'session_pr_link':
-      return item;
+      return { type: 'session_open', data: {} };
+    case 'session_close': {
+      const { reason } = item.data;
+      return { type: 'session_close', data: { reason } };
+    }
+    case 'session_status': {
+      const { status, scheduledAt, occurredAt, previousStatus, transitionId } = item.data;
+      return {
+        type: 'session_status',
+        data: { status, scheduledAt, occurredAt, previousStatus, transitionId },
+      };
+    }
+    case 'kilo_meta': {
+      const { platform, orgId, gitUrl, gitBranch } = item.data;
+      return { type: 'kilo_meta', data: { platform, orgId, gitUrl, gitBranch } };
+    }
+    case 'session_pr_link': {
+      const { platform, prUrl, prNumber, headRef, headSha } = item.data;
+      return { type: 'session_pr_link', data: { platform, prUrl, prNumber, headRef, headSha } };
+    }
+    default: {
+      // A union member this build does not know. Fail closed instead of handing its
+      // unbounded data to the DO; the compiler proves this branch is unreachable for
+      // the members above, so it only guards a future schema addition.
+      const unhandled: never = item;
+      void unhandled;
+      return null;
+    }
   }
 }
+
+/**
+ * The payload sent in place of an offloaded item. Returns null when the projection
+ * cannot be bounded, and the caller skips that item instead of overrunning one ingest
+ * RPC.
+ */
+function slimItemForR2Reference(item: SessionDataItem): SessionDataItem | null {
+  const projection = projectItemForRpc(item);
+  if (projection === null) return null;
+  return projectionEncoder.encode(JSON.stringify(projection)).byteLength <= MAX_PROJECTED_ITEM_BYTES
+    ? projection
+    : null;
+}
+
+// The `[` and `]` a chunk's item array adds around the per-item counts.
+const CHUNK_ARRAY_FRAMING_BYTES = 2;
 
 function createIngestChunker(
   env: Env,
@@ -284,14 +336,48 @@ function createIngestChunker(
     }
 
     // Offload data above the DO SQLite row limit to R2; the DO stores a
-    // reference and an empty inline blob. Send only identity fields over RPC so
-    // a single oversized item cannot exceed Cloudflare's RPC payload limit.
-    const itemForRpc = itemDataBytes > MAX_INGEST_ITEM_BYTES ? slimItemForR2Reference(item) : item;
-    const itemForRpcDataBytes =
-      itemDataBytes > MAX_INGEST_ITEM_BYTES
-        ? encoder.encode(JSON.stringify(itemForRpc.data)).byteLength
-        : itemDataBytes;
-    if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
+    // reference and an empty inline blob. Send only a bounded projection over RPC so
+    // a single item, whatever its kind, cannot exceed the RPC payload budget.
+    const offloadToR2 = itemDataBytes > MAX_INGEST_ITEM_BYTES;
+    const itemForRpc = offloadToR2 ? slimItemForR2Reference(item) : item;
+    if (itemForRpc === null) {
+      // Fail closed: the item has no projection within MAX_PROJECTED_ITEM_BYTES, so
+      // skipping it is the only way to keep the RPC bounded. Log the kind only.
+      console.warn('Skipping item without a bounded RPC projection', {
+        r2Key,
+        type: item.type,
+      });
+      return true;
+    }
+    const itemForRpcDataBytes = offloadToR2
+      ? encoder.encode(JSON.stringify(itemForRpc.data)).byteLength
+      : itemDataBytes;
+    // What the item adds to an ingest call: its `{"type":…,"data":…}` envelope, the
+    // data, its storage identity (also sent as an r2References key) and the array
+    // separator. Per-call framing is covered by the conservative budget.
+    const itemRpcBytes =
+      itemForRpcDataBytes +
+      encoder.encode(`{"type":"${item.type}","data":}`).byteLength +
+      encoder.encode(item_id).byteLength +
+      1;
+
+    // A single item that cannot fit one chunk would overrun the RPC budget on its own.
+    // Never send it; the other items in the payload still ingest.
+    if (itemRpcBytes + CHUNK_ARRAY_FRAMING_BYTES > INGEST_CHUNK_MAX_BYTES) {
+      console.warn('Skipping item larger than one ingest RPC', { r2Key, type: item.type });
+      return true;
+    }
+    // Flush before adding, so a chunk never exceeds the byte budget: splitting is still
+    // possible here, and nothing over-budget ever reaches the DO.
+    if (
+      chunk.length > 0 &&
+      chunkBytes + itemRpcBytes + CHUNK_ARRAY_FRAMING_BYTES > INGEST_CHUNK_MAX_BYTES
+    ) {
+      await flushChunkToSessionDO();
+      if (!accepted) return false;
+    }
+
+    if (offloadToR2) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       const staged = await withDORetry(
         () => getSessionIngestDO(env, { kiloUserId, sessionId }),
@@ -313,8 +399,10 @@ function createIngestChunker(
 
     chunk.push(itemForRpc);
     chunkItemIds.add(item_id);
-    chunkBytes += itemForRpcDataBytes;
-    if (chunk.length >= INGEST_CHUNK_MAX_ITEMS || chunkBytes >= INGEST_CHUNK_MAX_BYTES) {
+    chunkBytes += itemRpcBytes;
+    // Byte budget is enforced before an item is added, so only the item count can
+    // still cap a chunk here.
+    if (chunk.length >= INGEST_CHUNK_MAX_ITEMS) {
       await flushChunkToSessionDO();
     }
     return accepted;

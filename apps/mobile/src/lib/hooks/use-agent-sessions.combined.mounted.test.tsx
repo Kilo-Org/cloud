@@ -283,12 +283,11 @@ describe('combined and live refresh callers', () => {
       await flush();
     });
     expect(state.stored.mock.calls).toHaveLength(2);
-    // The queued refetch is a page-one reconcile, so it resets the cache as
-    // soon as the next page settles. The list holds the rows it had already
-    // painted (page two was never rendered before the reset) and refetches
-    // page one from `initialPageParam`.
+    // The queued refetch is a page-one reconcile: it refetches page one from
+    // `initialPageParam` and leaves the retained pages on screen until that
+    // page arrives, so the just-loaded next page is still painted.
     expect(state.stored.mock.calls[1]?.[0]).toMatchObject({ pageParam: null });
-    expect(combined().storedSessions.map(row => row.title)).toEqual(['Old history']);
+    expect(combined().storedSessions.map(row => row.title)).toEqual(['Old history', 'Next page']);
     await act(async () => {
       firstPage.resolve(history('New history'));
       await refresh;
@@ -390,9 +389,16 @@ describe('combined and live refresh callers', () => {
     // Exactly one `cliSessionsV2.list` request, from `initialPageParam`.
     expect(state.stored.mock.calls).toHaveLength(1);
     expect(state.stored.mock.calls[0]?.[0]).toMatchObject({ pageParam: null });
-    // The cached pages were reset...
-    expect(client.getQueryData(STORED_KEY)).toEqual({ pages: [], pageParams: [] });
-    // ...but the rows already painted were held, never blanked, across the reset.
+    // The retained pages stay cached and painted while page one is in flight,
+    // so a refresh that is slow, paused, or failed never blanks the list.
+    expect(client.getQueryData(STORED_KEY)).toEqual({
+      pages: [
+        { cliSessions: [stored('Page one', 'p1')], nextCursor: 'c1' },
+        { cliSessions: [stored('Page two', 'p2')], nextCursor: 'c2' },
+        { cliSessions: [stored('Page three', 'p3')], nextCursor: null },
+      ],
+      pageParams: [null, 'c1', 'c2'],
+    });
     expect(combined().storedSessions.map(row => row.title)).toEqual([
       'Page one',
       'Page two',
@@ -428,11 +434,11 @@ describe('combined and live refresh callers', () => {
     expect(combined().storedSessions.map(row => row.title)).toEqual(['Old history']);
   });
 
-  it('holds the painted rows when a foreground reconcile is paused offline', async () => {
-    // The reconcile empties the cache before refetching page one. Offline the
-    // refetch is paused, not fetching, so the hold must cover the unresolved
-    // refetch too: the list has to keep the rows the user was reading instead
-    // of blanking into its empty state until the network returns.
+  it('keeps the painted rows when a foreground reconcile is paused offline', async () => {
+    // The reconcile keeps the retained pages and refetches page one. Offline
+    // that fetch is paused, not fetching, so the list must keep rendering the
+    // rows the reader was looking at until the network returns — never blank
+    // into its empty state.
     client.setQueryData(STORED_KEY, {
       pages: [
         { cliSessions: [stored('Page one', 'p1')], nextCursor: 'c1' },
@@ -457,9 +463,8 @@ describe('combined and live refresh callers', () => {
 
     // No request ran: the page-one fetch is paused, not fetching.
     expect(state.stored.mock.calls).toHaveLength(0);
-    expect(client.getQueryData(STORED_KEY)).toEqual({ pages: [], pageParams: [] });
     expect(combined().storedIsPaused).toBe(true);
-    // The reset did not blank the list: the painted rows are still rendered.
+    // The cache still holds the pages, so the painted rows are still rendered.
     expect(combined().storedSessions.map(row => row.title)).toEqual([
       'Page one',
       'Page two',
@@ -486,10 +491,10 @@ describe('combined and live refresh callers', () => {
     expect(combined().storedSessions.map(row => row.title)).toEqual(['Reconnected']);
   });
 
-  it('holds the painted rows when a foreground reconcile fails', async () => {
-    // A failed page-one refetch leaves the cache empty and the query errored.
-    // The hold must survive it so the screen can show the inline error over the
-    // rows the user was reading instead of blanking into its full-screen error.
+  it('keeps the painted rows when a foreground reconcile fails', async () => {
+    // A failed page-one refetch keeps the retained pages and errors the query,
+    // so the screen can show the inline error over the rows the reader was
+    // looking at instead of blanking into its full-screen error.
     client.setQueryData(STORED_KEY, {
       pages: [
         { cliSessions: [stored('Page one', 'p1')], nextCursor: 'c1' },
@@ -522,22 +527,20 @@ describe('combined and live refresh callers', () => {
     expect(state.storedTitles.every(titles => titles.length > 0)).toBe(true);
   });
 
-  it('does not report rows cached by an earlier mount as delivered when the refetch fails', async () => {
-    // The focus refetch routes through `storedReconcile`, whose
-    // `reconcileFirstPage` reset is a cache write that advances `dataUpdatedAt`
-    // without delivering. The contract must still hold: rows only cached by an
-    // earlier mount are not "fetched since mount", so a failed fresh open shows
-    // the retryable full-screen error instead of stale rows as loaded.
+  it('does not report rows cached by an earlier mount as delivered when every read fails', async () => {
+    // Rows only cached by an earlier mount are not "fetched since mount": a
+    // fresh open whose reads all fail shows the retryable full-screen error
+    // instead of presenting stale rows as loaded, and a refresh that fails does
+    // not change that — it keeps the rows but delivers nothing.
     client.setQueryData(
       STORED_KEY,
       { pages: [history('Old history')], pageParams: [null] },
       { updatedAt: Date.now() - 60_000 }
     );
+    state.stored.mockRejectedValue(new Error('offline'));
     await render();
     expect(combined().storedFetchedSinceMount).toBe(false);
 
-    state.stored.mockClear();
-    state.stored.mockRejectedValueOnce(new Error('offline'));
     await act(async () => {
       await combined().refetch();
       await flush();
@@ -545,6 +548,8 @@ describe('combined and live refresh callers', () => {
 
     expect(combined().storedIsError).toBe(true);
     expect(combined().storedFetchedSinceMount).toBe(false);
+    // The failed refresh still shows the rows it already had.
+    expect(combined().storedSessions.map(row => row.title)).toEqual(['Old history']);
   });
 
   it('reports rows the refetch delivered this mount as fresh', async () => {

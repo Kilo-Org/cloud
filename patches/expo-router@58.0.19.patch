@@ -47,3 +47,37 @@ diff --git a/build/react-navigation/bottom-tabs/views/BottomTabBar.js b/build/re
                  style: sidebar ? styles.sideContent : styles.bottomContent,
                  children: routes.map((route, index)=>{
                      const focused = index === state.index;
+diff --git a/build/global-state/resolveNavigationDestination.js b/build/global-state/resolveNavigationDestination.js
+--- a/build/global-state/resolveNavigationDestination.js
++++ b/build/global-state/resolveNavigationDestination.js
+@@ -207,13 +207,29 @@
+         } : undefined
+     };
+     if (hasAnchor) {
++        /*
++         * START FORK
++         * The anchor route is minted by `createInitialState`, which gives it no
++         * params. When the anchor is itself dynamic (`[scope]/index`), it then
++         * mounts without the segment it is nested under, so a navigation that
++         * builds a fresh destination — the relaunch repair and every
++         * `withAnchor` deep link — puts a route with unvalidatable params
++         * beneath the target: Back lands on that route's invalid-param state
++         * instead of the parent screen. Expo Router already copies a route's
++         * dynamic params onto its descendants, so the target carries every
++         * param the anchor needs; hand them to the anchor.
++         */
++        const anchorRoute = {
++            ...destination.routes[0],
++            params: targetRoute.params ?? {}
++        };
+         return markState({
+             ...destination,
+             routeKeySeq: minter.routeKeySeq,
+             index: 1,
+             routes: [
+-                destination.routes[0],
++                anchorRoute,
+                 destinationRoute
+             ]
+         });
+     }

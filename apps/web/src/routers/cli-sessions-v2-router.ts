@@ -25,7 +25,6 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
-  agent_briefing_events,
   cloud_agent_session_runs,
   cloud_agent_worktrees,
   github_branch_pull_requests,
@@ -57,6 +56,7 @@ import {
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -79,12 +79,31 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import {
+  isGitHubOwnerName,
+  isGitHubRepositoryName,
+  parseGitHubOwnerRepo,
+} from '@/lib/integrations/platforms/github/repository-coordinates';
+import {
   pullRequestUrlMatchesRepo,
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import {
+  getPrObservationSummary,
+  prObservationSummarySchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -120,6 +139,9 @@ function isSessionNotFoundError(err: unknown): boolean {
 }
 
 const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
   'path',
   'file',
   'activeFile',
@@ -127,6 +149,9 @@ const privateTranscriptPathFields = new Set([
   'absolutePath',
   'filePath',
   'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
@@ -148,13 +173,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
 
   for (const [key, current] of Object.entries(value)) {
     if (typeof current === 'string') {
-      if (
-        key === 'directory' ||
-        key === 'cwd' ||
-        key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
-      ) {
-        Reflect.set(value, key, directory);
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
         Reflect.set(value, key, '');
       }
@@ -165,7 +185,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
         if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
-          current[index] = directory;
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
         }
@@ -202,47 +222,12 @@ const PG_MAX_INTEGER = 2_147_483_647;
 export const REFRESH_THROTTLE_MS = 60_000;
 
 /**
- * Parse a git URL into `{ owner, repo }` when it points at GitHub. Returns
- * `null` for non-GitHub hosts or URLs that cannot be parsed into exactly
- * `owner/repo`. Handles https, ssh:// and SCP-style
- * (`git@github.com:owner/repo.git`) URLs, plus trailing `.git` suffixes.
+ * Parse a git URL into `{ owner, repo }` when it points at GitHub and both
+ * parts stay inside GitHub's name charset. The canonical implementation lives
+ * in the GitHub platform module so the batch review-decision path and this
+ * router share one rule.
  */
-export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string } | null {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  let host: string;
-  let path: string;
-  if (sshMatch) {
-    host = sshMatch[1].toLowerCase();
-    path = sshMatch[2];
-  } else {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
-      return null;
-    }
-    host = parsed.hostname.toLowerCase();
-    path = parsed.pathname.replace(/^\/+/, '');
-  }
-
-  if (host !== 'github.com' && host !== 'www.github.com') {
-    return null;
-  }
-
-  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
-  const segments = cleaned.split('/').filter(Boolean);
-  if (segments.length !== 2) {
-    return null;
-  }
-  const [owner, repo] = segments;
-  if (!owner || !repo) {
-    return null;
-  }
-  return { owner, repo };
-}
+export { parseGitHubOwnerRepo };
 
 export const associatedPrSchema = z.object({
   url: z.string(),
@@ -250,6 +235,7 @@ export const associatedPrSchema = z.object({
   state: z.string(),
   title: z.string().nullable(),
   headSha: z.string().nullable(),
+  observations: prObservationSummarySchema.nullable(),
   lastSyncedAt: z.string(),
   reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
   // True when the server has flagged this PR for an async review-decision
@@ -268,6 +254,7 @@ type AssociatedPrRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -317,8 +304,9 @@ type SessionPrFields = {
 
 /**
  * Parse a GitHub pull-request URL into `{ owner, repo, number }`. Returns
- * `null` for non-GitHub hosts or URLs that do not resolve to
- * `owner/repo/pull/N`. Accepts a trailing subpath (e.g. `/files`), query
+ * `null` for non-GitHub hosts, URLs that do not resolve to
+ * `owner/repo/pull/N`, and owner or repo values outside GitHub's name charset.
+ * Accepts a trailing subpath (e.g. `/files`), query
  * string, and fragment, matching the mobile parser so a pasted PR URL is
  * never skipped during refresh. A PR URL has more than two path segments,
  * so `parseGitHubOwnerRepo` cannot parse it.
@@ -356,7 +344,10 @@ export function parseGitHubPrUrl(
   }
   const [owner, repo, , numberStr] = segments;
   const number = Number(numberStr);
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+  if (!isGitHubOwnerName(owner) || !isGitHubRepositoryName(repo)) {
+    return null;
+  }
+  if (!Number.isInteger(number) || number <= 0) {
     return null;
   }
   return { owner, repo, number };
@@ -387,6 +378,7 @@ function formatCacheRow(
     state: cache.pr_state,
     title: cache.pr_title,
     headSha: cache.pr_head_sha,
+    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
     lastSyncedAt: cache.pr_last_synced_at,
     reviewDecision,
     reviewDecisionPending: cache.review_decision_pending === true,
@@ -431,6 +423,7 @@ function pendingPartialFromSession(
     state: 'unknown',
     title: null,
     headSha: null,
+    observations: null,
     lastSyncedAt: session.updated_at
       ? new Date(session.updated_at).toISOString()
       : new Date().toISOString(),
@@ -604,6 +597,7 @@ const commonSessionFieldsWithPr = {
   pr_state: github_branch_pull_requests.pr_state,
   pr_title: github_branch_pull_requests.pr_title,
   pr_head_sha: github_branch_pull_requests.pr_head_sha,
+  pr_observations: github_branch_pull_requests.pr_observations,
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -669,6 +663,7 @@ export function projectAssociatedPr<
     pr_state,
     pr_title,
     pr_head_sha,
+    pr_observations,
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
@@ -707,6 +702,7 @@ export function projectAssociatedPr<
         pr_state,
         pr_title,
         pr_head_sha,
+        pr_observations,
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
@@ -1016,6 +1012,27 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {
@@ -1700,6 +1717,11 @@ export const cliSessionsV2Router = createTRPCRouter({
           : pageResult),
         watermarkEventId,
         preparationAttempts,
+        // The access check already read the row, so the page can answer the
+        // session's parent without a second full-session query. Always
+        // present: `null` means a root session, and a client that opens this
+        // session has no further read to make.
+        parentSessionId: session.parent_session_id,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),
@@ -1796,6 +1818,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1901,6 +1924,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_state: row.pr_state,
             pr_title: row.pr_title,
             pr_head_sha: row.pr_head_sha,
+            pr_observations: row.pr_observations,
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
@@ -1946,6 +1970,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1989,6 +2014,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: row.pr_state,
         pr_title: row.pr_title,
         pr_head_sha: row.pr_head_sha,
+        pr_observations: row.pr_observations,
         pr_last_synced_at: row.pr_last_synced_at,
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
@@ -2238,6 +2264,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -2251,41 +2278,20 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
 
       // The link passed verification; record it so the read path can show it.
-      await db.transaction(async tx => {
-        const verified = await tx
-          .update(cli_sessions_v2)
-          .set({ pr_link_verified_at: sql`now()` })
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, sessionId),
-              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
-              eq(cli_sessions_v2.pr_url, sessionPrUrl),
-              eq(cli_sessions_v2.git_url, gitUrl),
-              sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
-              sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
-              sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
-            )
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_link_verified_at: sql`now()` })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+            eq(cli_sessions_v2.pr_url, sessionPrUrl),
+            eq(cli_sessions_v2.git_url, gitUrl),
+            sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+            sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+            sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
           )
-          .returning({ organizationId: cli_sessions_v2.organization_id });
-        const matched = verified[0];
-        if (matched && fetched.createdAt && Number.isFinite(Date.parse(fetched.createdAt))) {
-          const openedAt = new Date(fetched.createdAt).toISOString();
-          await tx
-            .insert(agent_briefing_events)
-            .values({
-              id: JSON.stringify([ctx.user.id, sessionId, 'pull_request', sessionPrUrl]),
-              kilo_user_id: ctx.user.id,
-              session_id: sessionId,
-              organization_id: matched.organizationId,
-              kind: 'pull_request',
-              occurred_at: openedAt,
-              title: `Opened pull request #${fetched.number}`,
-              url: fetched.htmlUrl,
-              payload: { openedAt },
-            })
-            .onConflictDoNothing();
-        }
-      });
+        );
 
       const verifiedSessionPr: SessionPrFields = {
         ...sessionPr,

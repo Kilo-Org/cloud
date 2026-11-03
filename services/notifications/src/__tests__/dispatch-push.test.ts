@@ -56,7 +56,7 @@ function installDbMock(state: DbState) {
             if (state.briefingReadThrows) throw new Error('briefing read failed');
             return state.briefingEnabled === undefined ? [] : [{ enabled: state.briefingEnabled }];
           }
-          if (tableName === 'agent_briefing_reports') {
+          if (tableName === 'agent_briefing_snapshots') {
             state.onBriefingReportRead?.();
             return state.briefingReports ?? [];
           }
@@ -66,7 +66,12 @@ function installDbMock(state: DbState) {
           const result = readRows();
           return Object.assign(result, { limit: () => result });
         };
-        return { where, leftJoin: () => ({ where }) };
+        const query = {
+          where,
+          innerJoin: () => query,
+          leftJoin: () => query,
+        };
+        return query;
       },
     }),
     insert: (table: Parameters<typeof getTableName>[0]) => ({

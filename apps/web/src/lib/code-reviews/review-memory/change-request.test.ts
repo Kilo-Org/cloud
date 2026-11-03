@@ -1,9 +1,12 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { eq, inArray } from 'drizzle-orm';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import {
   code_review_memory_proposals,
   kilocode_users,
+  platform_integrations,
   type CodeReviewMemoryProposal,
 } from '@kilocode/db/schema';
 
@@ -15,12 +18,23 @@ import {
   upsertScopeProposal,
   type ReviewMemoryOwner,
 } from './db';
-import { buildChangeRequestBody, isStaleOpeningChangeRequest } from './change-request';
+import {
+  approveAndOpenReviewMemoryChangeRequest,
+  buildChangeRequestBody,
+  isStaleOpeningChangeRequest,
+} from './change-request';
 
 describe('review memory change requests', () => {
+  const integrationIds: string[] = [];
+
   afterEach(async () => {
     await db.delete(code_review_memory_proposals);
     await db.delete(kilocode_users);
+    if (integrationIds.length > 0) {
+      await db
+        .delete(platform_integrations)
+        .where(inArray(platform_integrations.id, integrationIds.splice(0)));
+    }
   });
 
   it('builds a change-request body with the marker and proposal sections', async () => {
@@ -72,6 +86,80 @@ describe('review memory change requests', () => {
     expect(isStaleOpeningChangeRequest('2026-06-01T11:31:00.000Z', now)).toBe(false);
     expect(isStaleOpeningChangeRequest('2026-06-01T11:30:00.000Z', now)).toBe(true);
     expect(isStaleOpeningChangeRequest('not-a-date', now)).toBe(false);
+  });
+
+  it('refuses approval with the shared sentence when the GitHub App lacks write access', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: '424242',
+        github_app_type: 'standard',
+        integration_status: 'active',
+        repository_access: 'all',
+        permissions: { contents: 'read', metadata: 'read', pull_requests: 'read' },
+      })
+      .returning();
+    integrationIds.push(integration.id);
+    const proposal = await seedProposal(owner, 'acme/widgets');
+
+    await expect(
+      approveAndOpenReviewMemoryChangeRequest({ owner, proposalId: proposal.id })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: 'ReviewMemoryChangeRequestError',
+        code: 'BAD_REQUEST',
+        reason: 'missing_github_app_permissions',
+        message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions,
+      })
+    );
+    const stored = await db
+      .select()
+      .from(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.id, proposal.id));
+    expect(stored[0]?.status).toBe('open');
+  });
+
+  it('refuses approval of a proposal that is no longer actionable', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await seedProposal(owner, 'acme/widgets');
+    await db
+      .update(code_review_memory_proposals)
+      .set({ status: 'rejected' })
+      .where(eq(code_review_memory_proposals.id, proposal.id));
+
+    await expect(
+      approveAndOpenReviewMemoryChangeRequest({ owner, proposalId: proposal.id })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        code: 'CONFLICT',
+        reason: 'proposal_not_actionable',
+        message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_actionable,
+      })
+    );
+  });
+
+  it('reports a missing proposal by reason rather than by a status sentence', async () => {
+    const user = await insertTestUser();
+
+    await expect(
+      approveAndOpenReviewMemoryChangeRequest({
+        owner: { type: 'user', id: user.id },
+        proposalId: '00000000-0000-4000-8000-00000000dead',
+      })
+    ).rejects.toEqual(
+      expect.objectContaining({
+        code: 'NOT_FOUND',
+        reason: 'proposal_not_found',
+        message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found,
+      })
+    );
   });
 });
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_reports } from '@kilocode/db/schema';
+import { agent_briefing_snapshots } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -22,7 +22,6 @@ async function fixture(organizationId?: string) {
     text: null,
     costMicrodollars: 120,
     chargeStatus: 'pending',
-    canRetry: false,
     retained: { value: 'preserved' },
     chargeAccounting: {
       baselineCostMicrodollars: 80,
@@ -32,16 +31,19 @@ async function fixture(organizationId?: string) {
   };
   const now = new Date().toISOString();
   const [report] = await db
-    .insert(agent_briefing_reports)
+    .insert(agent_briefing_snapshots)
     .values({
       kilo_user_id: user.id,
       context_key: organizationId ?? 'personal',
       organization_id: organizationId,
-      kind: 'one_off',
+      local_date: now.slice(0, 10),
+      timezone: 'UTC',
+      language: 'en',
+      captured_at: now,
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       night_start_at: now,
       cutoff_at: now,
       morning_end_at: now,
-      evidence_hash: 'receipt-test',
       facts: { retained: 'facts' },
       summary,
       generation_id: generationId,
@@ -59,8 +61,8 @@ async function fixture(organizationId?: string) {
 async function readReport(id: string) {
   const [report] = await db
     .select()
-    .from(agent_briefing_reports)
-    .where(eq(agent_briefing_reports.id, id));
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, id));
   if (!report) throw new Error('Report fixture was not found');
   return report;
 }
@@ -186,9 +188,9 @@ describe('recordBriefingUsage', () => {
     });
     expect(await readReport(prepared.report.id)).toEqual(prepared.report);
     await db
-      .update(agent_briefing_reports)
+      .update(agent_briefing_snapshots)
       .set({ generation_id: `agent-briefing:${randomUUID()}` })
-      .where(eq(agent_briefing_reports.id, prepared.report.id));
+      .where(eq(agent_briefing_snapshots.id, prepared.report.id));
     const changed = await readReport(prepared.report.id);
     await recordBriefingUsage({ ...prepared.input, usage: usage() });
     expect(await readReport(prepared.report.id)).toEqual(changed);
@@ -219,9 +221,9 @@ describe('recordBriefingUsage', () => {
       },
     ]) {
       await db
-        .update(agent_briefing_reports)
+        .update(agent_briefing_snapshots)
         .set({ summary: { ...prepared.summary, chargeAccounting } })
-        .where(eq(agent_briefing_reports.id, prepared.report.id));
+        .where(eq(agent_briefing_snapshots.id, prepared.report.id));
       const changed = await readReport(prepared.report.id);
       await recordBriefingUsage({ ...prepared.input, usage: usage() });
       expect(await readReport(prepared.report.id)).toEqual(changed);

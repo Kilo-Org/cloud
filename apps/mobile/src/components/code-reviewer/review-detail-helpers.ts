@@ -1,8 +1,31 @@
 // Pure helpers for the review-detail screen. Kept dependency-free so they can be
 // unit-tested without mounting the screen or importing React Native / tRPC.
 
+import { isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
+
+/**
+ * The catalog key for the findings section while it has no finding to draw.
+ * The copy is a function of the review's status, never of the empty list alone:
+ * "No findings" is a result, and only a review that ended with no result may
+ * claim one. A review still in flight has not produced findings yet, a failed
+ * review produced none, and a cancelled or interrupted review ended before it
+ * could — three different sentences, so the screen never reports a clean run
+ * for a review that has not finished.
+ */
+export function findingsEmptyCopyKey(status: string): string {
+  if (status === 'failed') {
+    return 'codeReviewer.reviewDetail.findingsUnavailable';
+  }
+  if (status === 'cancelled' || status === 'interrupted') {
+    return 'codeReviewer.reviewDetail.findingsEndedWithoutResults';
+  }
+  if (isInFlightReviewStatus(status)) {
+    return 'codeReviewer.reviewDetail.findingsInProgress';
+  }
+  return 'codeReviewer.reviewDetail.noFindings';
+}
 
 export function reviewFailureLabel(
   t: typeof i18n.t,

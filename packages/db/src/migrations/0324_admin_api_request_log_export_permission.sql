@@ -1,0 +1,2 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "can_export_api_request_logs" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "kilocode_users" ADD CONSTRAINT "kilocode_users_can_export_api_request_logs_requires_admin_check" CHECK (NOT "kilocode_users"."can_export_api_request_logs" OR "kilocode_users"."is_admin");

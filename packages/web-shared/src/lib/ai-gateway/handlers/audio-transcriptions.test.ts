@@ -338,6 +338,41 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
 
     expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: {
+        code: 'PAID_MODEL_AUTH_REQUIRED',
+        message: 'You need to sign in to use speech-to-text.',
+      },
+      error_type: 'paid_model_auth_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns an invalid-token response for rejected credentials', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('Unauthorized', { status: 401 }) as never,
+      credentialsRejected: true,
+      organizationId: undefined,
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    expect(await response.json()).toEqual({
+      error: {
+        code: 'INVALID_TOKEN',
+        message: 'Your authentication token is invalid. Please sign in again.',
+      },
+      error_type: 'authentication_required',
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 

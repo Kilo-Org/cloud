@@ -154,7 +154,14 @@ describe('recordEnkryptUsage region routing', () => {
       { usage_id: expect.any(String), reason }
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('test-internal-secret');
-    expect(await ledgerRows(usageRecord.organizationId)).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const handedOff = EnkryptUsageWriteSchema.parse(
+      JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
+    );
+    const rows = await ledgerRows(usageRecord.organizationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(handedOff.id);
+    expect(new Date(rows[0].created_at).toISOString()).toBe(handedOff.occurredAt);
     expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );

@@ -1,5 +1,8 @@
 import { after } from 'next/server';
-import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
+import {
+  KiloRoutingDecisionRecordSchema,
+  type ProviderRoutingDecision,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
@@ -106,7 +109,9 @@ test('uploads the decision after the response, keyed by the usage id', async () 
   });
   expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/kilo/${USAGE_ID}.json`]);
   expect(
-    JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${USAGE_ID}.json`) ?? '')
+    KiloRoutingDecisionRecordSchema.parse(
+      JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${USAGE_ID}.json`) ?? '')
+    )
   ).toEqual({
     schema_version: 1,
     usage_id: USAGE_ID,

@@ -1,4 +1,7 @@
-import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
+import type {
+  KiloRoutingDecisionRecord,
+  ProviderRoutingDecision,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   getAiProviderMetadataBucket,
   scheduleAiProviderMetadataArchive,
@@ -20,6 +23,11 @@ export function archiveKiloRoutingDecision(
     logContext: { usageId },
     key: `kilo/${usageId}.json`,
     body: () =>
-      JSON.stringify({ schema_version: 1, usage_id: usageId, created_at: createdAt, ...decision }),
+      JSON.stringify({
+        schema_version: 1,
+        usage_id: usageId,
+        created_at: createdAt,
+        ...decision,
+      } satisfies KiloRoutingDecisionRecord),
   });
 }

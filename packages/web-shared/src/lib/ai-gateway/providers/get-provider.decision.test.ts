@@ -3,7 +3,10 @@ import {
   getProvider,
   type GetProviderInput,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
+import {
+  KiloRoutingDecisionRecordSchema,
+  type ProviderRoutingDecision,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   findDirectByokCatalogModels,
   getDirectByokCatalogModelId,
@@ -133,6 +136,14 @@ async function routeAndRecord(
   expect(decisions).toHaveLength(1);
   const [decision] = decisions;
   const serialized = JSON.stringify(decision);
+  expect(
+    KiloRoutingDecisionRecordSchema.parse({
+      schema_version: 1,
+      usage_id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      ...JSON.parse(serialized),
+    })
+  ).toMatchObject(decision);
   expect(serialized).not.toMatch(/secret|hello|upstream-key/);
   if (input.organizationId) expect(serialized).not.toContain(input.organizationId);
   if (!isAnonymousContext(input.user)) {

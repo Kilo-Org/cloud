@@ -49,10 +49,11 @@ import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import type {
-  BYOKResult,
-  GatewayChatApiKind,
-  Provider,
+import {
+  GatewayChatApiKindSchema,
+  type BYOKResult,
+  type GatewayChatApiKind,
+  type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   createUserOpenRouterProvider,
@@ -918,12 +919,6 @@ async function selectProvider(
     bypassAccessCheck: false,
   };
 }
-
-export const GatewayChatApiKindSchema = z.enum([
-  'chat_completions',
-  'responses',
-  'messages',
-]) satisfies z.ZodType<GatewayChatApiKind>;
 
 /**
  * `used`: the step takes the request. `unreached`: it would, but an earlier step takes it.

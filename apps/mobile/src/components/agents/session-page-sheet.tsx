@@ -1,6 +1,4 @@
 import { type ReactNode } from 'react';
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StateSurface } from '@/components/centered-state-surface';
 import { Sheet } from '@/components/ui/sheet';
@@ -47,12 +45,15 @@ type SessionPageSheetProps = {
  * drag has already taken the native sheet down when the question is answered.
  *
  * It is a native sheet at the full detent, so it stacks above the session
- * screen and above another native sheet. The sheet owns the whole window, so a
- * header inside it would reserve a dead band above the title if it read the
- * window top inset: iOS presents the sheet below the status bar already, while
- * Android expands it over the status bar and this surface pads the top inset
- * itself. Callers pass `topInset="ios-page-sheet"` to their SheetHeader to drop
- * that inset on both platforms.
+ * screen and above another native sheet. The sheet presents in the platform's
+ * own sheet window, which already begins below the status bar — a Compose
+ * dialog window on Android, a page sheet on iOS. So neither the surface nor a
+ * header inside it reserves the window top inset: reading it in either place
+ * leaves a dead band above the title (measured: the full status-bar height,
+ * 52 dp, above the header row on Android, because the inset is the activity
+ * window's and the sheet window sits inside it). Callers pass
+ * `topInset="ios-page-sheet"` to their SheetHeader so it reserves nothing
+ * there either.
  */
 export function SessionPageSheet({
   visible,
@@ -62,10 +63,7 @@ export function SessionPageSheet({
   dismissible = false,
   children,
 }: Readonly<SessionPageSheetProps>) {
-  const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  // Android expands the sheet over the status bar; iOS presents it below.
-  const sheetTopInset = Platform.OS === 'ios' ? 0 : insets.top;
   // The guard answers after the native sheet was asked, and a drag has already
   // taken it off the screen by then, so a draggable sheet that asks can only
   // answer Keep editing into an empty window. The question outranks the drag.
@@ -82,11 +80,7 @@ export function SessionPageSheet({
       showHandle={false}
       background={colors.background}
     >
-      <StateSurface
-        style={{ paddingTop: sheetTopInset }}
-        className="flex-1 bg-background"
-        testID="session-page-sheet-surface"
-      >
+      <StateSurface className="flex-1 bg-background" testID="session-page-sheet-surface">
         {children}
       </StateSurface>
     </Sheet>

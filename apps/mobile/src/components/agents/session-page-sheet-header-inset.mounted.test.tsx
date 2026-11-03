@@ -130,14 +130,14 @@ describe('SessionPageSheet header top inset', () => {
     renderer.unmount();
   });
 
-  it('drops the window top inset on Android too, where the surface pads it', async () => {
+  it('drops the window top inset on Android too, where the sheet window is already below it', async () => {
     reactNativeMock.os = 'android';
     safeAreaMock.insets = { top: 24, bottom: 34, left: 0, right: 0 };
 
     const renderer = await mountHeaderInSheet();
-    // Android's Modal fills the window, so SessionPageSheet pads the top inset
-    // on its own surface; the header must not reserve the window inset as well
-    // or the clearance above the title would double.
+    // The sheet presents in its own window below the status bar, so neither the
+    // surface nor the header reserves the activity window's inset; the header
+    // would otherwise add a second band of that height above the title.
     expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
 
     renderer.unmount();

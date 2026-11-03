@@ -212,8 +212,9 @@ describe('ChildSessionSheet sheet surface', () => {
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // iOS presents the sheet below the status bar, so the surface pads nothing.
-    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
+    // The sheet presents below the status bar on its own, so the surface
+    // reserves no top inset on either platform.
+    expect(surface[0]?.props.style).toBeUndefined();
 
     // The native dismiss event flows through to the caller.
     await act(async () => {
@@ -223,7 +224,7 @@ describe('ChildSessionSheet sheet surface', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet that reserves no top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34, left: 0, right: 0 });
 
@@ -237,9 +238,10 @@ describe('ChildSessionSheet sheet surface', () => {
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // flex-1 fills the window; the padding clears the system status bar.
+    // flex-1 fills the sheet's own window, which already starts below the
+    // status bar, so the surface adds no inset on top of it.
     expect(surface[0]?.props.className).toContain('flex-1');
-    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+    expect(surface[0]?.props.style).toBeUndefined();
   });
 
   it('closes when the native sheet dismisses', async () => {

@@ -58,7 +58,7 @@ Users MUST be able to configure:
 
 The severity threshold MUST use the same severity vocabulary as Auto Analysis: `critical`, `high`, `medium`, and `all`. The default threshold SHOULD be `high`.
 
-The remediation model setting MUST be visible even when Auto Remediation is disabled. If no remediation model has been chosen yet, the system SHOULD default it from the Security Agent analysis model and then treat it as independently configurable.
+The remediation model setting MUST be visible even when Auto Remediation is disabled. The remediation model is an independent role with its own default: while the user has not stored one, it stays at the Security Agent remediation default, and an explicitly stored remediation model always wins. It MUST NOT be derived from the analysis model.
 
 ### Scenario: Auto Remediation Is Explicitly Enabled
 

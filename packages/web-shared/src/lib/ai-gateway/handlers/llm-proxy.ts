@@ -335,6 +335,27 @@ export async function handleLlmProxyRequest(
     }
   }
 
+  const requestProvider = requestBodyParsed.body.provider;
+  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  if (!requestPrivacy.success) return invalidRequestResponse();
+
+  if (!ipAddress) {
+    return NextResponse.json(
+      {
+        error: 'Unable to determine client IP',
+        error_type: ProxyErrorType.missing_client_ip,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    requestBodyParsed.kind === 'responses' &&
+    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
+  ) {
+    return storeAndPreviousResponseIdIsNotSupported();
+  }
+
   // Canonicalize once so routing, policy, and the upstream request all see the same id.
   requestBodyParsed.body.model = requestBodyParsed.body.model.trim();
   const requestedModel = requestBodyParsed.body.model;
@@ -444,9 +465,6 @@ export async function handleLlmProxyRequest(
   }
 
   const { settings: privacySettings } = await balanceAndSettingsPromise;
-  const requestProvider = requestBodyParsed.body.provider;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
   const effectivePrivacy = getEffectiveProviderPrivacy(
     requestPrivacy.data,
     privacySettings?.data_collection
@@ -643,16 +661,6 @@ export async function handleLlmProxyRequest(
       ? !customLlm.definition.pricing
       : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
-  if (!ipAddress) {
-    return NextResponse.json(
-      {
-        error: 'Unable to determine client IP',
-        error_type: ProxyErrorType.missing_client_ip,
-      },
-      { status: 400 }
-    );
-  }
-
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
@@ -822,13 +830,6 @@ export async function handleLlmProxyRequest(
     );
   }
   if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
-
-  if (
-    requestBodyParsed.kind === 'responses' &&
-    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
-  ) {
-    return storeAndPreviousResponseIdIsNotSupported();
-  }
 
   async function resolveAccessCheck(modelId: string) {
     const { settings } = await balanceAndSettingsPromise;
@@ -1205,9 +1206,7 @@ export async function handleLlmProxyRequest(
   );
   usageContext.status_code = response.status;
   const userByokProviderIds =
-    providerResult.userByok === null
-      ? null
-      : providerResult.userByok.map(byok => byok.providerId);
+    providerResult.userByok === null ? null : providerResult.userByok.map(byok => byok.providerId);
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,

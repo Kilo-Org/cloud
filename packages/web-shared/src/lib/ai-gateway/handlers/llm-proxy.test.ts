@@ -2323,6 +2323,35 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
+  it.each([{ store: true }, { previous_response_id: 'resp_1' }])(
+    'rejects %j before calling the paid classifier',
+    async field => {
+      const response = await handleLlmProxyRequest(
+        makeRequest(
+          { model: 'kilo-auto/efficient', input: 'hello', ...field },
+          undefined,
+          '/responses'
+        )
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error_type: 'unsupported_field' });
+      expect(mockedApplyResolvedAutoModel).not.toHaveBeenCalled();
+      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a request without a client IP before calling the paid classifier', async () => {
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('kilo-auto/efficient'), { 'x-forwarded-for': '' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'missing_client_ip' });
+    expect(mockedApplyResolvedAutoModel).not.toHaveBeenCalled();
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+  });
+
   it('keeps efficient routing on the default worker router without a flag check', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 

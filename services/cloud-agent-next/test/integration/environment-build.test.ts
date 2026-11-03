@@ -169,7 +169,7 @@ async function setup(): Promise<Harness> {
           owner
         )
           ? null
-          : 'Snapshots are not enabled for this organization',
+          : 'Snapshots are not enabled for this account',
       log: () => undefined,
     };
     host.coordinator = new EnvironmentBuildCoordinator(environmentId, deps);
@@ -602,6 +602,22 @@ describe('environment build lifecycle', () => {
 });
 
 describe('environment snapshot resolution', () => {
+  it.each(['organization', 'user'] as const)(
+    'uses account-neutral enrollment messaging for owner type %s',
+    async type => {
+      const environmentId = crypto.randomUUID();
+      const result = await namespace.getByName(environmentId).status({
+        environmentId,
+        owner: { type, id: crypto.randomUUID() },
+        configurationRevision: 1,
+      });
+      expect(result).toMatchObject({
+        supported: false,
+        unsupportedReason: 'Snapshots are not enabled for this account',
+      });
+    }
+  );
+
   const sessionReference = (harness: Harness, revision: number) => ({
     environmentId: harness.environmentId,
     owner: OWNER,

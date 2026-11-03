@@ -942,7 +942,7 @@ describe('gateway accounting integration', () => {
       { region, target: 'production', environment: 'production' },
     ])
   )(
-    'legacy shadow env cannot publish on $target $region direct accounting',
+    '$target $region live direct accounting ignores the legacy shadow env',
     async ({ region, target, environment }) => {
       const original = { ...process.env };
       try {

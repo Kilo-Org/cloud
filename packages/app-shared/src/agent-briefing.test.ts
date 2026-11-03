@@ -134,6 +134,15 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingExcerptOrDrop(text)).not.toContain('def' + 'SECRET');
   });
 
+  it('screens a credential pair whose quotes are escaped', () => {
+    const text = 'curl -d "{\\"password\\":\\"' + 'hunter' + '2\\"}" https://x.test/hook';
+    expect(redactBriefingExcerpt(text)).toBe(
+      'curl -d "{\\"[redacted credential]}" https://x.test/hook'
+    );
+    expect(redactBriefingExcerptOrDrop(text)).not.toContain('hunter' + '2');
+    expect(redactBriefingTitle(text)).not.toContain('hunter' + '2');
+  });
+
   it('screens titles with the excerpt rules and keeps a neutral title otherwise', () => {
     expect(redactBriefingTitle('Captured session')).toBe('Captured session');
     expect(redactBriefingTitle('Deploy ' + 'AWS_SECRET_ACCESS_KEY=' + secretKey)).toBe(

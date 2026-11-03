@@ -197,17 +197,30 @@ const PRIVATE_KEY_BLOCK = /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*P
 const BEARER_VALUE = /\bbearer\s+[^\s,;"}]+/gi;
 // A key name and its assignment separator. Key names are scanned on their own, apart
 // from the value they assign. `(?![=>])` keeps comparison operators and arrows from
-// being read as an assignment, and a closing quote between the name and the separator
-// belongs to a quoted key.
+// being read as an assignment, and a quote between the name and the separator belongs
+// to a quoted key, bare or escaped (`{"password":`, `{\"password\":`).
 const CREDENTIAL_KEY = new RegExp(
-  String.raw`([A-Za-z_$][\w$.-]{0,63})["']?\s*(?::=|[:=])(?![=>])\s*`,
+  String.raw`([A-Za-z_$][\w$.-]{0,63})\\?["']?\s*(?::=|[:=])(?![=>])\s*`,
   'g'
 );
 // The value a scanned key assigns, at the position the key ended. A quoted value may
-// escape a quote with a backslash, and it ends on its line. Unquoted values stop at
-// whitespace, quotes, list separators, closing brackets and the separators of a
-// following pair, so one pair never swallows the next (`user=bob&password=...`).
-const ASSIGNMENT_VALUE = /^(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|[^\s,;"'\]})&|?]+)/;
+// escape a quote with a backslash, and it ends on its line. A shell command that
+// embeds JSON escapes the quotes themselves (`{\"password\":\"...\"}`), so a value may
+// also open and close with an escaped quote, which then has to end at a boundary
+// outside the quoted string. Unquoted values stop at whitespace, quotes, list
+// separators, closing brackets and the separators of a following pair, so one pair
+// never swallows the next (`user=bob&password=...`), and they never start on a quote.
+const QUOTED_VALUE =
+  String.raw`"(?:[^"\\\n]|\\.)*"` +
+  '|' +
+  String.raw`\\"[^"\\\n]*\\"(?=[\s,;:.!?})\]]|$)` +
+  '|' +
+  String.raw`'(?:[^'\\\n]|\\.)*'` +
+  '|' +
+  String.raw`\\'[^'\\\n]*\\'(?=[\s,;:.!?})\]]|$)`;
+const ASSIGNMENT_VALUE = new RegExp(
+  String.raw`^(?:` + QUOTED_VALUE + String.raw`|(?!\\?["'])[^\s,;"'\]})&|?]+)`
+);
 // Credential value shapes that carry no key name of their own. Opaque runs must mix
 // letters with digits: 32 characters or more in the identifier alphabet, and 48 or
 // more when hyphens are allowed, so file paths, words, and short identifiers in
@@ -260,7 +273,8 @@ function isCredentialKeyName(key: string): boolean {
 /** True when screened text still carries credential material after redaction. */
 function briefingExcerptCarriesCredential(text: string): boolean {
   for (const match of text.matchAll(CREDENTIAL_KEY)) {
-    if (!isCredentialKeyName(match[1])) continue;
+    const name = match[1];
+    if (!name || !isCredentialKeyName(name)) continue;
     const assigned = (text.slice((match.index ?? 0) + match[0].length).split('\n')[0] ?? '').trim();
     if (assigned.length > 0 && !REDACTION_PLACEHOLDER.test(assigned)) return true;
   }
@@ -272,7 +286,8 @@ function redactCredentialAssignments(text: string): string {
   const pieces: string[] = [];
   let cursor = 0;
   for (const key of text.matchAll(CREDENTIAL_KEY)) {
-    if (!isCredentialKeyName(key[1])) continue;
+    const name = key[1];
+    if (!name || !isCredentialKeyName(name)) continue;
     const start = key.index ?? 0;
     if (start < cursor) continue;
     const valueStart = start + key[0].length;

@@ -95,3 +95,22 @@ export function formatStepUpRemaining(expiresAt: string, now: number = Date.now(
   if (minutes < 1) return 'less than a minute left';
   return `${minutes} min left`;
 }
+
+const STEP_UP_HTTP_CODES: ReadonlySet<string> = STEP_UP_CODES;
+
+/** Read the REST 403 `{ error: code }` contract used by adminOnly routes. */
+export async function stepUpRequirementFromResponse(
+  response: Response
+): Promise<StepUpRequirement | null> {
+  if (response.status !== 403) return null;
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return null;
+  }
+  if (typeof body !== 'object' || body === null) return null;
+  const code = (body as { error?: unknown }).error;
+  if (typeof code !== 'string' || !STEP_UP_HTTP_CODES.has(code)) return null;
+  return { code: code as StepUpErrorCode };
+}

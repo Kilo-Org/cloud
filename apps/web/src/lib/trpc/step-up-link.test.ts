@@ -81,6 +81,50 @@ describe('stepUpLink', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('retries every concurrent operation after one shared verification', async () => {
+    let resolveVerification!: (verified: boolean) => void;
+    const shared = new Promise<boolean>(resolve => {
+      resolveVerification = resolve;
+    });
+    const handler = jest.fn((_requirement: unknown) => shared);
+    registerStepUpHandler(handler);
+
+    const first = runOperation(stepUpError, true);
+    const second = runOperation(stepUpError, true);
+    resolveVerification(true);
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(a.nextCalls).toBe(2);
+    expect(b.nextCalls).toBe(2);
+    expect(a.value).toEqual({ result: { data: 'ok' } });
+    expect(b.value).toEqual({ result: { data: 'ok' } });
+  });
+
+  it('does not run a retried operation after unsubscription', async () => {
+    let resolveVerification!: (verified: boolean) => void;
+    const shared = new Promise<boolean>(resolve => {
+      resolveVerification = resolve;
+    });
+    registerStepUpHandler(() => shared);
+    let nextCalls = 0;
+    const operationLink = stepUpLink()({} as never);
+    const link = operationLink({
+      op: { path: 'admin.test' } as never,
+      next: (() =>
+        observable(subscriber => {
+          nextCalls += 1;
+          subscriber.error(stepUpError);
+        })) as never,
+    });
+    const subscription = link.subscribe({ next: () => {}, error: () => {} });
+    await Promise.resolve();
+    subscription.unsubscribe();
+    resolveVerification(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(nextCalls).toBe(1);
+  });
+
   it('does not retry more than once', async () => {
     const handler = jest.fn(async (_requirement: unknown) => true);
     registerStepUpHandler(handler);

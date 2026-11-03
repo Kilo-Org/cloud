@@ -14,6 +14,11 @@ export function registerStepUpHandler(next: StepUpHandler | null): void {
   handler = next;
 }
 
+/** Ask the mounted admin provider to verify; false when none is mounted. */
+export async function verifyStepUpWithHandler(requirement: StepUpRequirement): Promise<boolean> {
+  return handler ? handler(requirement) : false;
+}
+
 /**
  * When a tRPC operation refuses with `data.stepUp`, open the verification
  * dialog and retry that operation exactly once. Batched requests are retried
@@ -25,9 +30,11 @@ export function stepUpLink(): TRPCLink<RootRouter> {
     ({ op, next }) =>
       observable(observer => {
         let retried = false;
+        let closed = false;
         let subscription: { unsubscribe: () => void } | undefined;
 
         const run = () => {
+          if (closed) return;
           subscription = next(op).subscribe({
             next: value => observer.next(value),
             error: error => {
@@ -45,6 +52,7 @@ export function stepUpLink(): TRPCLink<RootRouter> {
               retried = true;
               void handler(requirement).then(
                 verified => {
+                  if (closed) return;
                   if (verified) run();
                   else observer.error(error);
                 },
@@ -56,6 +64,9 @@ export function stepUpLink(): TRPCLink<RootRouter> {
         };
 
         run();
-        return () => subscription?.unsubscribe();
+        return () => {
+          closed = true;
+          subscription?.unsubscribe();
+        };
       });
 }

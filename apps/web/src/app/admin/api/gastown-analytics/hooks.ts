@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 
 export type OverviewData = {
   total_events: number;
@@ -60,7 +61,7 @@ function useGastownQuery<T>(queryType: QueryType, hours: number) {
   return useQuery<AnalyticsEngineResponse<T>>({
     queryKey: ['gastown-analytics', queryType, hours],
     queryFn: async () => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/gastown-analytics?query=${queryType}&hours=${hours}`
       );
       if (!response.ok) {

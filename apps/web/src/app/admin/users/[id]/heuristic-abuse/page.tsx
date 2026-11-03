@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminHeuristicAbuse } from '@/app/admin/components/UserAdmin/UserAdminHeuristicAbuse';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { redirect } from 'next/navigation';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
   BreadcrumbItem,
@@ -9,16 +8,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 
 export default async function UserHeuristicAbusePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

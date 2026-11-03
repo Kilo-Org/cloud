@@ -87,21 +87,25 @@ describe('runStepUpCeremony', () => {
 });
 
 describe('StepUpRequestQueue', () => {
-  it('settles an earlier request as cancelled when a second request begins', async () => {
+  it('returns the same pending promise to concurrent callers', async () => {
     const queue = new StepUpRequestQueue();
     const first = queue.begin();
     const second = queue.begin();
+    expect(second).toBe(first);
 
-    await expect(first).resolves.toBe(false);
     queue.settle(true);
+    await expect(first).resolves.toBe(true);
     await expect(second).resolves.toBe(true);
   });
 
-  it('settles a pending request only once', async () => {
+  it('starts a new promise after the previous one settles', async () => {
     const queue = new StepUpRequestQueue();
-    const pending = queue.begin();
+    const first = queue.begin();
     queue.settle(false);
+    const second = queue.begin();
+
+    expect(second).not.toBe(first);
     queue.settle(true);
-    await expect(pending).resolves.toBe(false);
+    await expect(second).resolves.toBe(true);
   });
 });

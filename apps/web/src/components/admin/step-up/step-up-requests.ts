@@ -1,29 +1,26 @@
 type Resolver = (verified: boolean) => void;
 
 /**
- * Keeps at most one step-up dialog request pending. A second request
- * deterministically settles the first as cancelled instead of leaving its
- * promise unresolved when the resolver ref is overwritten.
+ * One pending verification promise for every caller. Concurrent refused
+ * operations share the same dialog and all retry once it settles, instead of
+ * cancelling each other and surfacing raw FORBIDDEN errors.
  */
 export class StepUpRequestQueue {
-  private pending: Resolver | null = null;
+  private pending: Promise<boolean> | null = null;
+  private resolvePending: Resolver | null = null;
 
   begin(): Promise<boolean> {
-    this.supersedePending();
-    return new Promise(resolve => {
-      this.pending = resolve;
+    if (this.pending) return this.pending;
+    this.pending = new Promise(resolve => {
+      this.resolvePending = resolve;
     });
+    return this.pending;
   }
 
   settle(verified: boolean): void {
-    const resolve = this.pending;
+    const resolve = this.resolvePending;
+    this.resolvePending = null;
     this.pending = null;
     resolve?.(verified);
-  }
-
-  private supersedePending(): void {
-    const resolve = this.pending;
-    this.pending = null;
-    resolve?.(false);
   }
 }

@@ -1034,6 +1034,32 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
   });
 
+  it.each<{ headers: Record<string, string>; feature: string; clientAttributed: boolean }>([
+    { headers: {}, feature: 'direct-gateway', clientAttributed: false },
+    {
+      headers: { 'x-kilocode-version': '5.0.0' },
+      feature: 'direct-gateway',
+      clientAttributed: true,
+    },
+    {
+      headers: { 'x-kilocode-feature': 'vscode-extension' },
+      feature: 'vscode-extension',
+      clientAttributed: true,
+    },
+  ])(
+    'attributes the client from its own headers, not the fallback feature: %j',
+    async ({ headers, feature, clientAttributed }) => {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(), headers) as never);
+
+      expect(response.status).toBe(200);
+      const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+      expect(usageContext?.feature).toBe(feature);
+      expect(usageContext?.bouncer?.clientAttributed).toBe(clientAttributed);
+    }
+  );
+
   it.each(['not-an-address', 'fe80::1%eth0'])(
     'still reports usage and decides without an ip when the header is %s',
     async forwardedFor => {

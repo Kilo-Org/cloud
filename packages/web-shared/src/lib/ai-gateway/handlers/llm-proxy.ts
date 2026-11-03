@@ -1123,7 +1123,9 @@ export async function handleLlmProxyRequest(
     usageId,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed:
+        validateFeatureHeader(request.headers.get(FEATURE_HEADER)) !== null ||
+        Boolean(xKiloCodeVersion),
       requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
       samples: requestedSamples(requestBodyParsed.body),
       // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the

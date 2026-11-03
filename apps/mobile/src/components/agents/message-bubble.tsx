@@ -313,37 +313,39 @@ function MessageBubbleImpl({
 
   return (
     <View>
-      <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
-        <InMessageBubbleContext.Provider value>
-          <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
-            <View className="gap-2">
-              {condenseToolCalls
-                ? groupMessageParts(parts, { condense: true }).map(group =>
-                    group.kind === 'tool-run' ? (
-                      <MessageErrorBoundary key={group.parts[0]?.id}>
-                        <CondensedToolRunRow parts={group.parts} />
-                      </MessageErrorBoundary>
-                    ) : (
-                      group.parts.map(renderPart)
+      {parts.some(part => partRendersContent(part)) ? (
+        <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+          <InMessageBubbleContext.Provider value>
+            <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
+              <View className="gap-2">
+                {condenseToolCalls
+                  ? groupMessageParts(parts, { condense: true }).map(group =>
+                      group.kind === 'tool-run' ? (
+                        <MessageErrorBoundary key={group.parts[0]?.id}>
+                          <CondensedToolRunRow parts={group.parts} />
+                        </MessageErrorBoundary>
+                      ) : (
+                        group.parts.map(renderPart)
+                      )
                     )
-                  )
-                : parts.map(part => renderPart(part))}
-            </View>
-          </MessageLongPressProvider>
-        </InMessageBubbleContext.Provider>
-        {a11y.accessibilityActions.length > 0 ? (
-          <View
-            accessible
-            accessibilityRole={a11y.accessibilityRole}
-            accessibilityLabel={a11y.accessibilityLabel}
-            accessibilityHint={a11y.accessibilityHint}
-            accessibilityActions={a11y.accessibilityActions}
-            onAccessibilityAction={handleAccessibilityAction}
-            className="absolute inset-0 opacity-0"
-            pointerEvents="none"
-          />
-        ) : null}
-      </Pressable>
+                  : parts.map(part => renderPart(part))}
+              </View>
+            </MessageLongPressProvider>
+          </InMessageBubbleContext.Provider>
+          {a11y.accessibilityActions.length > 0 ? (
+            <View
+              accessible
+              accessibilityRole={a11y.accessibilityRole}
+              accessibilityLabel={a11y.accessibilityLabel}
+              accessibilityHint={a11y.accessibilityHint}
+              accessibilityActions={a11y.accessibilityActions}
+              onAccessibilityAction={handleAccessibilityAction}
+              className="absolute inset-0 opacity-0"
+              pointerEvents="none"
+            />
+          ) : null}
+        </Pressable>
+      ) : null}
       {failureFooter}
     </View>
   );

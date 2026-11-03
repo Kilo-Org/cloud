@@ -33,21 +33,21 @@ describe('describeRouteStep', () => {
     });
   });
 
-  it('names every key Vercel AI Gateway receives', () => {
+  it('names the key Vercel AI Gateway receives', () => {
     expect(
       describeRouteStep(
         {
           route: 'vercel-byok',
           outcome: 'used',
-          providerIds: ['anthropic', 'bedrock'],
+          providerIds: ['bedrock'],
           reason: 'serves',
         },
         getProviderName,
         false
       )
     ).toEqual({
-      title: 'Anthropic, AWS Bedrock keys via Vercel AI Gateway',
-      detail: 'Vercel AI Gateway tries these keys in unspecified order.',
+      title: 'AWS Bedrock key via Vercel AI Gateway',
+      detail: 'Serves this model with the key.',
     });
   });
 

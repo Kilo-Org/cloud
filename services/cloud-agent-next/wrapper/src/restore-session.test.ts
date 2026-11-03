@@ -2162,6 +2162,131 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(fs.existsSync(path.join(workspace, 'legacy.txt'))).toBe(false);
   });
 
+  describe('with several git roots', () => {
+    function initRepo(directory: string, file: string, content: string): void {
+      fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+      const run = (args: string[]) =>
+        Bun.spawnSync(['git', ...args], { cwd: directory, stdout: 'pipe', stderr: 'pipe' });
+      fs.mkdirSync(directory, { recursive: true });
+      run(['init']);
+      run(['config', 'user.email', 'test@example.com']);
+      run(['config', 'user.name', 'Test User']);
+      fs.writeFileSync(path.join(directory, file), content);
+      run(['add', '.']);
+      run(['commit', '-m', 'initial']);
+    }
+
+    function absolutePatch(absoluteFile: string): string {
+      return [
+        `Index: ${absoluteFile}`,
+        '===================================================================',
+        `--- ${absoluteFile}`,
+        `+++ ${absoluteFile}`,
+        '@@ -1 +1 @@',
+        '-before',
+        '+after',
+        '',
+      ].join('\n');
+    }
+
+    function sessionDiffSnapshot(files: Array<{ file: string; patch: string }>): string {
+      return JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: files.map(entry => ({
+          ...entry,
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        })),
+        messages: [],
+      });
+    }
+
+    it('applies a patch at the root that contains its absolute path', async () => {
+      const web = path.join(workspace, 'web');
+      const api = path.join(workspace, 'api');
+      initRepo(web, 'src/index.ts', 'before\n');
+      initRepo(api, 'src/index.ts', 'before\n');
+      mockFetchOk(
+        sessionDiffSnapshot([
+          {
+            file: path.join(api, 'src/index.ts'),
+            patch: absolutePatch(path.join(api, 'src/index.ts')),
+          },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web, api] },
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      });
+      expect(fs.readFileSync(path.join(api, 'src/index.ts'), 'utf8')).toBe('after\n');
+      expect(fs.readFileSync(path.join(web, 'src/index.ts'), 'utf8')).toBe('before\n');
+    });
+
+    it('skips a path outside every root, including a sibling that shares a root prefix', async () => {
+      const web = path.join(workspace, 'web');
+      const sibling = path.join(workspace, 'website');
+      initRepo(web, 'src/index.ts', 'before\n');
+      fs.mkdirSync(sibling, { recursive: true });
+      mockFetchOk(
+        makeSnapshot([
+          { file: path.join(web, 'src/new.ts'), after: 'inside', status: 'modified' },
+          { file: path.join(sibling, 'a.ts'), after: 'sibling', status: 'modified' },
+          { file: '/etc/outside.ts', after: 'outside', status: 'modified' },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web] },
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: {
+          applied: 1,
+          skipped: 2,
+          total: 3,
+          skippedDiffs: [
+            { file: path.join(sibling, 'a.ts'), reason: 'outside_workspace' },
+            { file: '/etc/outside.ts', reason: 'outside_workspace' },
+          ],
+        },
+      });
+      expect(fs.readFileSync(path.join(web, 'src/new.ts'), 'utf8')).toBe('inside');
+      expect(fs.existsSync(path.join(sibling, 'a.ts'))).toBe(false);
+    });
+
+    it('leaves a recovered root to its saved worktree snapshot', async () => {
+      const web = path.join(workspace, 'web');
+      const api = path.join(workspace, 'api');
+      fs.mkdirSync(web, { recursive: true });
+      fs.mkdirSync(api, { recursive: true });
+      mockFetchOk(
+        makeSnapshot([
+          { file: path.join(web, 'a.ts'), after: 'older', status: 'modified' },
+          { file: path.join(api, 'b.ts'), after: 'restored', status: 'modified' },
+        ])
+      );
+
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        roots: { directories: [web, api], recovered: [web] },
+      });
+
+      expect(result).toMatchObject({ ok: true, diffs: { applied: 1, skipped: 0, total: 1 } });
+      expect(fs.existsSync(path.join(web, 'a.ts'))).toBe(false);
+      expect(fs.readFileSync(path.join(api, 'b.ts'), 'utf8')).toBe('restored');
+    });
+  });
+
   it('succeeds with zero diffs when messages array is empty', async () => {
     mockFetchOk(JSON.stringify({ info: snapshotInfo(), messages: [] }));
 

@@ -1,4 +1,4 @@
-import { act, createElement, type ElementType } from 'react';
+import { act, createElement, type ElementType, useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { CenteredState } from '@/components/centered-state';
@@ -15,7 +15,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck' }));
+vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck', Info: 'Info' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -154,4 +154,37 @@ it('keeps a reported launch failure through the next attempt and clears it when 
     await Promise.resolve();
   });
   expect(failureLine()).toBeNull();
+});
+
+it('drops the failed-press line when a refusal takes the action’s place', async () => {
+  // A caller the server refuses keeps the press until the mint answers; when the
+  // notice replaces the button, the press it came from is no longer the screen's
+  // state, so its error line must not stay under an action-less body.
+  function RefusingSetup() {
+    const [refused, setRefused] = useState(false);
+    return createElement(SecurityAgentSetup, {
+      title: 'Connect GitHub',
+      description: 'Authorize the GitHub App.',
+      buttonLabel: 'Connect',
+      readOnlyNotice: refused ? 'Ask an organization owner or admin to connect GitHub.' : undefined,
+      resolveUrl: () => {
+        setRefused(true);
+        return Promise.resolve(undefined);
+      },
+      onConnected: vi.fn().mockResolvedValue(undefined),
+    });
+  }
+  mounted = await renderWithProviders(createElement(RefusingSetup));
+  const body = mounted.renderer.root.findByType(CenteredState);
+  act(body.findByType(Button).props.onPress as () => void);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(body.findAllByType(Button)).toHaveLength(0);
+  expect(body.findAllByType('Text' as ElementType).map(node => node.props.children)).toContain(
+    'Ask an organization owner or admin to connect GitHub.'
+  );
+  // The notice is an info callout, not a bare line: the cue travels with it.
+  expect(body.findAllByType('Info' as ElementType)).toHaveLength(1);
+  expect(body.findByType('AccessibleStatus' as ElementType).props.message).toBeNull();
 });

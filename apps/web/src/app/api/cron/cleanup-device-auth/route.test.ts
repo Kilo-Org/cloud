@@ -20,6 +20,9 @@ jest.mock('@/lib/kiloclaw/access-codes', () => ({ cleanupExpiredAccessCodes: jes
 jest.mock('@/lib/integrations/github/install-state', () => ({
   cleanupExpiredInstallStates: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
+  cleanupExpiredSessionStepUpRows: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
@@ -33,6 +36,7 @@ import {
 } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
+import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
 
@@ -49,6 +53,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
     jest.mocked(cleanupExpiredPasskeySignInTickets).mockResolvedValue(6);
     jest.mocked(cleanupExpiredAccessCodes).mockResolvedValue(3);
     jest.mocked(cleanupExpiredInstallStates).mockResolvedValue(4);
+    jest.mocked(cleanupExpiredSessionStepUpRows).mockResolvedValue({ challenges: 8, proofs: 9 });
 
     const response = await GET(
       new Request('http://localhost/api/cron/cleanup-device-auth', {
@@ -66,6 +71,8 @@ describe('GET /api/cron/cleanup-device-auth', () => {
       deleted_passkey_sign_in_ticket_count: 6,
       deleted_access_code_count: 3,
       deleted_install_state_count: 4,
+      deleted_step_up_challenge_count: 8,
+      deleted_step_up_proof_count: 9,
     });
   });
 

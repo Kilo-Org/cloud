@@ -7,6 +7,7 @@ import {
   getUnifiedPatch,
   MAX_TOOL_DIFF_CHARACTERS,
   readApplyPatchFiles,
+  readApplyPatchInputPaths,
   sumFileChanges,
 } from './toolDiffUtils';
 import type { ToolPart } from './types';
@@ -25,8 +26,13 @@ const changeLabels = {
 export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
   const state = toolPart.state;
   const files = readApplyPatchFiles(state.status === 'pending' ? undefined : state.metadata);
-  const single = files.length === 1 ? files[0] : undefined;
   const patchText = typeof state.input.patchText === 'string' ? state.input.patchText : undefined;
+  const filePaths =
+    files.length > 0
+      ? files.map(file =>
+          cloudAgentFileLabel(file.relativePath ?? file.movePath ?? file.filePath ?? '')
+        )
+      : readApplyPatchInputPaths(patchText).map(cloudAgentFileLabel);
   const error = state.status === 'error' ? state.error : undefined;
 
   return (
@@ -34,10 +40,13 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
       icon={FileDiff}
       title="Apply patch"
       subtitle={
-        single ? (
-          <ToolFilePath filePath={single.relativePath ?? single.movePath ?? single.filePath} />
-        ) : files.length > 0 ? (
-          `${files.length} files`
+        filePaths.length === 1 ? (
+          <ToolFilePath filePath={filePaths[0]} />
+        ) : filePaths.length > 0 ? (
+          <span title={filePaths.join(', ')}>
+            {files.length > 0 ? `${files.length} files · ` : ''}
+            {filePaths.join(', ')}
+          </span>
         ) : undefined
       }
       badge={<ToolDiffStats {...sumFileChanges(files)} />}

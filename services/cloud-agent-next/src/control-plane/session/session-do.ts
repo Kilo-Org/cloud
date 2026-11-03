@@ -69,6 +69,7 @@ import {
 } from '../../sandbox-session/sandbox-control-event.js';
 import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
 import { createMessageId } from '../../session/message-id.js';
+import { generateSessionTitle } from '../../session/generate-session-title.js';
 import type {
   SafeMessageResultResponse,
   MessageResultRPCResponse,
@@ -1023,6 +1024,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    return (await this.getCloudAgentSpawnContext(authority)).token;
+  }
+
+  async getCloudAgentSpawnContext(
+    authority: CloudAgentAuthority
+  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
     await this.initialized;
     const scope = CloudAgentAuthoritySchema.safeParse(authority);
     const authorization = RuntimeAuthorizationSchema.safeParse(
@@ -1052,7 +1059,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
     assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
-    return issued.token;
+    return {
+      token: issued.token,
+      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
+    };
   }
 
   async authorizeCloudAgentChild(input: {
@@ -1508,6 +1518,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.persistMessages(reduction.changed);
       for (const message of reduction.changed) this.emitQueued(message);
       this.ensureReportAnchor(reduction.changed[0]);
+      if (this.messages.length === 1 && this.metadata !== null) {
+        this.ctx.waitUntil(generateSessionTitle(this.env, this.metadata, parsed.turn));
+      }
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';

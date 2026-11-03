@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import { appliesImplicitProfiles } from '@kilocode/cloud-agent-profile';
 import {
   AlertCircle,
   Brain,
@@ -50,12 +51,10 @@ import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
 import { EnvironmentProfileSetupNotice } from '@/components/cloud-agent-next/EnvironmentProfileSetupNotice';
-import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
 import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
-import {
-  useRepositoryEnvironment,
-  type EnvironmentRepository,
-} from '@/hooks/useCloudAgentEnvironments';
+import { environmentBlocksStart } from '@/components/cloud-agent-next/environment-selection';
+import { useSessionEnvironment } from '@/hooks/useSessionEnvironment';
+import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
   Command as UICommand,
@@ -95,6 +94,7 @@ import {
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
+  CLOUD_AGENT_METADATA_STALE_TIME,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
@@ -187,7 +187,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  const { data: modelsData } = useModelSelectorList(organizationId);
+  const { data: modelsData } = useModelSelectorList(organizationId, true, 'member', {
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
@@ -228,6 +231,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
+  const [showEnvironmentRequiredMessage, setShowEnvironmentRequiredMessage] = useState(false);
   // Dev-only: clone a public repository by URL when no source-control
   // integration is configured. See `public-repo-url`.
   const [publicRepoUrl, setPublicRepoUrl] = useState('');
@@ -387,87 +391,41 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     }
   }, [allProfiles, selectedProfileId, setSelectedProfileId]);
 
-  // Resolve the profile whose custom agents should appear in the mode picker.
-  // Prefers an explicit selection; otherwise falls back to the effective
-  // default (personal default wins over org default). This mirrors the
-  // server-side resolution in mergeProfileConfiguration for a useful preview.
-  const effectiveAgentProfileId =
-    selectedProfileId ??
-    (organizationId
-      ? combinedProfilesData?.effectiveDefaultId
-      : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
-    null;
-  const effectiveAgentProfileOrg =
-    effectiveAgentProfileId && organizationId
-      ? combinedProfilesData?.orgProfiles.some(p => p.id === effectiveAgentProfileId)
-        ? organizationId
-        : undefined
-      : undefined;
-  const { data: selectedProfileDetails } = useProfile(effectiveAgentProfileId ?? '', {
-    organizationId: effectiveAgentProfileOrg,
-    enabled: !!effectiveAgentProfileId,
-  });
-  // Expose only agents that would actually surface in the chat picker:
-  // not disabled, not hidden, and not subagent-only. Matches the
-  // extension's `session.agents().filter(a => a.mode !== 'subagent' && !a.hidden)`.
-  const visibleCustomAgents = (selectedProfileDetails?.agents ?? []).filter(
-    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
-  );
-  const customModeOptions: ModeOption<AgentMode>[] = visibleCustomAgents.map(a => ({
-    value: a.slug as AgentMode,
-    label: a.name,
-    description: a.config.description ?? '',
-  }));
-
-  // When a custom agent pins a `model`, the override wins over the user's
-  // model combobox selection. The agent's `variant` is only meaningful when
-  // it also pins a model (variants are model-specific, validated at write
-  // time in AgentConfigSchema), so it travels with the locked model.
-  const selectedCustomAgent = visibleCustomAgents.find(a => a.slug === mode);
-  const agentModelOverride = selectedCustomAgent?.config.model?.trim() || undefined;
-  const hasAgentModelOverride = !!agentModelOverride;
-  const agentVariantOverride = hasAgentModelOverride
-    ? selectedCustomAgent?.config.variant?.trim() || undefined
-    : undefined;
-  const displayModel = agentModelOverride ?? model;
-  const displayModelOption = modelOptions.find(m => m.id === displayModel);
-  const displayModelLabel = displayModelOption
-    ? formatShortModelDisplayName(displayModelOption.name)
-    : displayModel;
-  const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
-  const displayVariants = hasAgentModelOverride ? [] : availableVariants;
-
   const {
     data: githubRepoData,
     isLoading: isLoadingGitHubRepos,
     error: githubRepoError,
     refetch: refetchGitHubRepositories,
-  } = useQuery(
-    organizationId
+  } = useQuery({
+    ...(organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
       : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
           forceRefresh: false,
-        })
-  );
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
 
   const {
     data: gitlabRepoData,
     isLoading: isLoadingGitLabRepos,
     error: gitlabRepoError,
     refetch: refetchGitLabRepositories,
-  } = useQuery(
-    organizationId
+  } = useQuery({
+    ...(organizationId
       ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
       : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
           forceRefresh: false,
-        })
-  );
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
 
   const {
     data: bitbucketRepoData,
@@ -480,12 +438,16 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       forceRefresh: false,
     }),
     enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
   const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
     ...trpc.organizations.bitbucket.getStatus.queryOptions({
       organizationId: organizationId ?? '',
     }),
     enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
   });
 
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
@@ -532,6 +494,99 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     return [...github, ...gitlab, ...bitbucket];
   }, [githubRepositories, gitlabRepositories, bitbucketRepositories]);
 
+  const bitbucketRepo = useMemo(() => {
+    if (!organizationId || selectedPlatform !== 'bitbucket') return undefined;
+    const repository = unifiedRepositories.find(
+      repository => repository.fullName === selectedRepo && repository.platform === 'bitbucket'
+    );
+    if (!repository || typeof repository.id !== 'string' || !repository.workspaceUuid) {
+      return undefined;
+    }
+    return {
+      fullName: selectedRepo,
+      workspaceUuid: repository.workspaceUuid,
+      repositoryUuid: repository.id,
+    };
+  }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
+
+  const environmentRepository = useMemo<EnvironmentRepository | undefined>(() => {
+    if (hasPublicRepo || !selectedRepo) return undefined;
+    if (selectedPlatform === 'bitbucket') {
+      if (!bitbucketRepo) return undefined;
+      return {
+        platform: 'bitbucket',
+        fullName: bitbucketRepo.fullName,
+        workspaceUuid: bitbucketRepo.workspaceUuid,
+        repositoryUuid: bitbucketRepo.repositoryUuid,
+      };
+    }
+    if (selectedPlatform === 'gitlab') {
+      return { platform: 'gitlab', projectPath: selectedRepo };
+    }
+    return { platform: 'github', fullName: selectedRepo };
+  }, [hasPublicRepo, selectedRepo, selectedPlatform, bitbucketRepo]);
+  const sessionEnvironment = useSessionEnvironment({
+    organizationId,
+    repository: environmentRepository,
+  });
+  const repositoryEnvironment = sessionEnvironment.environment;
+  const { requestedEnvironment } = sessionEnvironment;
+  const environmentChoiceRequired =
+    showEnvironmentRequiredMessage && sessionEnvironment.selection.status === 'choose';
+
+  // Resolve the profile whose custom agents should appear in the mode picker.
+  // Prefers an explicit selection; otherwise falls back to the effective
+  // default (personal default wins over org default). This mirrors the
+  // server-side resolution in mergeProfileConfiguration for a useful preview.
+  // A V2 environment applies no implicit default, only an explicit selection.
+  const effectiveAgentProfileId =
+    selectedProfileId ??
+    (!appliesImplicitProfiles(repositoryEnvironment)
+      ? null
+      : organizationId
+        ? combinedProfilesData?.effectiveDefaultId
+        : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
+    null;
+  const effectiveAgentProfileOrg =
+    effectiveAgentProfileId && organizationId
+      ? combinedProfilesData?.orgProfiles.some(p => p.id === effectiveAgentProfileId)
+        ? organizationId
+        : undefined
+      : undefined;
+  const { data: selectedProfileDetails } = useProfile(effectiveAgentProfileId ?? '', {
+    organizationId: effectiveAgentProfileOrg,
+    enabled: !!effectiveAgentProfileId,
+  });
+  // Expose only agents that would actually surface in the chat picker:
+  // not disabled, not hidden, and not subagent-only. Matches the
+  // extension's `session.agents().filter(a => a.mode !== 'subagent' && !a.hidden)`.
+  const visibleCustomAgents = (selectedProfileDetails?.agents ?? []).filter(
+    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
+  );
+  const customModeOptions: ModeOption<AgentMode>[] = visibleCustomAgents.map(a => ({
+    value: a.slug as AgentMode,
+    label: a.name,
+    description: a.config.description ?? '',
+  }));
+
+  // When a custom agent pins a `model`, the override wins over the user's
+  // model combobox selection. The agent's `variant` is only meaningful when
+  // it also pins a model (variants are model-specific, validated at write
+  // time in AgentConfigSchema), so it travels with the locked model.
+  const selectedCustomAgent = visibleCustomAgents.find(a => a.slug === mode);
+  const agentModelOverride = selectedCustomAgent?.config.model?.trim() || undefined;
+  const hasAgentModelOverride = !!agentModelOverride;
+  const agentVariantOverride = hasAgentModelOverride
+    ? selectedCustomAgent?.config.variant?.trim() || undefined
+    : undefined;
+  const displayModel = agentModelOverride ?? model;
+  const displayModelOption = modelOptions.find(m => m.id === displayModel);
+  const displayModelLabel = displayModelOption
+    ? formatShortModelDisplayName(displayModelOption.name)
+    : displayModel;
+  const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
+  const displayVariants = hasAgentModelOverride ? [] : availableVariants;
+
   const recentRepos = useMemo<RepositoryOption[]>(() => {
     const recentList = recentRepoData?.repositories;
     if (!recentList?.length || unifiedRepositories.length === 0) return [];
@@ -564,6 +619,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       );
       setPublicRepoUrl('');
       setShowRepositoryRequiredMessage(false);
+      setShowEnvironmentRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
       if (repo.platform) {
         setSelectedPlatform(repo.platform);
@@ -977,43 +1033,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !!selectedModelOption &&
     (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
 
-  const bitbucketRepo = useMemo(() => {
-    if (!organizationId || selectedPlatform !== 'bitbucket') return undefined;
-    const repository = unifiedRepositories.find(
-      repository => repository.fullName === selectedRepo && repository.platform === 'bitbucket'
-    );
-    if (!repository || typeof repository.id !== 'string' || !repository.workspaceUuid) {
-      return undefined;
-    }
-    return {
-      fullName: selectedRepo,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.id,
-    };
-  }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
-
-  const environmentRepository = useMemo<EnvironmentRepository | undefined>(() => {
-    if (hasPublicRepo || !selectedRepo) return undefined;
-    if (selectedPlatform === 'bitbucket') {
-      if (!bitbucketRepo) return undefined;
-      return {
-        platform: 'bitbucket',
-        fullName: bitbucketRepo.fullName,
-        workspaceUuid: bitbucketRepo.workspaceUuid,
-        repositoryUuid: bitbucketRepo.repositoryUuid,
-      };
-    }
-    if (selectedPlatform === 'gitlab') {
-      return { platform: 'gitlab', projectPath: selectedRepo };
-    }
-    return { platform: 'github', fullName: selectedRepo };
-  }, [hasPublicRepo, selectedRepo, selectedPlatform, bitbucketRepo]);
-  const repositoryEnvironment = useRepositoryEnvironment({
-    organizationId,
-    repository: environmentRepository,
-  });
-  const showSnapshotNotice = !!repositoryEnvironment;
-
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1027,6 +1046,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       model: displayModel,
       variant: displayVariant,
       profileId: selectedProfileId ?? undefined,
+      ...(sessionEnvironment.selection.status !== 'unknown'
+        ? { requireEnvironmentChoice: true as const }
+        : {}),
+      ...(requestedEnvironment ? { requestedEnvironment } : {}),
       autoCommit: true,
       autoInitiate: true,
       attachments: buildCloudAgentAttachments(attachmentMessageUuid, attachmentUpload.attachments),
@@ -1047,11 +1070,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     displayModel,
     displayVariant,
     selectedProfileId,
+    sessionEnvironment.selection.status,
+    requestedEnvironment,
     attachmentMessageUuid,
     attachmentUpload.attachments,
   ]);
   const isFormValid =
     prompt.trim().length > 0 &&
+    sessionEnvironment.selection.status !== 'loading' &&
     !isPromptTooLong &&
     !publicRepoUrlError &&
     model.length > 0 &&
@@ -1077,6 +1103,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     }
     if (!selectedRepo && !hasPublicRepo) {
       setShowRepositoryRequiredMessage(true);
+      guard.end();
+      return;
+    }
+    if (environmentBlocksStart(sessionEnvironment.selection)) {
+      setShowEnvironmentRequiredMessage(true);
       guard.end();
       return;
     }
@@ -1167,6 +1198,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
+    sessionEnvironment.selection,
     trimmedPublicRepoUrl,
   ]);
 
@@ -1516,6 +1548,16 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 Select a repository
               </p>
             )}
+            {environmentChoiceRequired && (
+              <p
+                id="new-session-environment-required"
+                className="text-destructive flex min-w-0 items-center gap-1 text-xs"
+                role="alert"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
+                Select an environment to start the session.
+              </p>
+            )}
             <UIButton
               type="button"
               variant="primary"
@@ -1524,7 +1566,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               aria-describedby={
-                showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
+                environmentChoiceRequired
+                  ? 'new-session-environment-required'
+                  : showRepositoryRequiredMessage
+                    ? 'new-session-repository-required'
+                    : undefined
               }
               aria-label="Start session"
             >
@@ -1756,7 +1802,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               organizationId={organizationId}
               repository={environmentRepository}
               repositoryLabel={selectedRepo}
+              environments={sessionEnvironment.matches}
               environment={repositoryEnvironment}
+              onChooseEnvironment={environmentId => {
+                setShowEnvironmentRequiredMessage(false);
+                sessionEnvironment.chooseEnvironment(environmentId);
+              }}
               selectedProfileId={selectedProfileId}
             />
           </div>
@@ -1766,6 +1817,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               <EnvironmentProfileSetupNotice
                 organizationId={organizationId}
                 repository={environmentRepository}
+                environment={repositoryEnvironment}
                 selectedProfileId={selectedProfileId}
               />
             )}
@@ -1775,6 +1827,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
               platform={profileBindingPlatform}
+              environment={repositoryEnvironment}
             />
           </div>
         </div>
@@ -1809,7 +1862,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             ))}
           </div>
         )}
-        {showSnapshotNotice && <EnvironmentSnapshotNotice />}
 
         {githubIdentityHint && (
           <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />

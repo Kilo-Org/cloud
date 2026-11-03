@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useCallback, useState, useMemo } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -33,7 +35,7 @@ export function CreditCategoriesTable() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-credit-categories'],
     queryFn: async () => {
-      const response = await fetch('/admin/api/credit-categories');
+      const response = await adminFetch('/admin/api/credit-categories');
 
       if (!response.ok) {
         throw new Error('Failed to fetch credit categories');

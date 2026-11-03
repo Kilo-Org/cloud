@@ -1,5 +1,6 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
@@ -232,11 +233,66 @@ async function setup(
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await evictAllDurableObjects();
   await reset();
 });
 
 describe('idle session disk checkpoint', () => {
+  it.each([
+    {
+      options: { enabled: false },
+      event: 'session_snapshot_eligibility',
+      reason: 'not_allowlisted',
+      capable: true,
+    },
+    {
+      options: { capability: false },
+      event: 'session_snapshot_schedule',
+      reason: 'not_capable',
+      capable: false,
+    },
+    {
+      options: {},
+      event: 'session_snapshot_schedule',
+      reason: 'scheduled',
+      capable: true,
+    },
+  ])('reports the actual $reason gate and negotiated capability', async scenario => {
+    const test = await setup(scenario.options);
+    const fields = vi.spyOn(logger, 'withFields');
+    const wrapper = await test.start();
+    await test.idle(wrapper, 0);
+    await runInDurableObject(test.sandbox, async instance => {
+      await instance['armAlarm'](await instance.getAllocationState());
+    });
+    expect(fields.mock.calls.map(call => call[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_capability',
+          sandboxId: test.registration.sandboxId,
+          advertised: scenario.capable,
+          accepted: scenario.capable,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: scenario.event,
+          sandboxId: test.registration.sandboxId,
+          reason: scenario.reason,
+        }),
+      ])
+    );
+    const scheduleLogs = () =>
+      fields.mock.calls.filter(([entry]) => entry.diagnosticEvent === 'session_snapshot_schedule')
+        .length;
+    const count = scheduleLogs();
+    await runInDurableObject(test.sandbox, async instance => {
+      await instance['armAlarm'](await instance.getAllocationState());
+      await instance['armAlarm'](await instance.getAllocationState());
+    });
+    expect(scheduleLogs()).toBe(count);
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
   it.each(['cloud-agent-web', 'desktop', 'agent-manager'])(
     'captures %s after the two-minute idle delay, once per idle period',
     async origin => {
@@ -464,6 +520,7 @@ describe('idle session disk checkpoint', () => {
 
   it('restores the same cold session and passes only confirmed provenance', async () => {
     const test = await setup();
+    const fields = vi.spyOn(logger, 'withFields');
     await test.checkpoint();
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
@@ -477,6 +534,42 @@ describe('idle session disk checkpoint', () => {
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toBeUndefined();
+    expect(fields.mock.calls.map(call => call[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_launch',
+          reason: 'tracking_initialized',
+          sessionId: test.sessionId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_capture',
+          phase: 'stored',
+          sessionId: test.sessionId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_lookup',
+          reason: 'selected',
+          sessionId: test.sessionId,
+          sourceAllocationId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_launch',
+          reason: 'selected',
+          sessionId: test.sessionId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_restore',
+          reason: 'confirmed',
+          sessionId: test.sessionId,
+          sourceAllocationId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'session_snapshot_descriptor_removed',
+          reason: 'prompt',
+          sessionId: test.sessionId,
+        }),
+      ])
+    );
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
@@ -500,6 +593,7 @@ describe('idle session disk checkpoint', () => {
   it('retains a checkpoint through preparation heartbeats and retries it after allocation loss', async () => {
     const test = await setup();
     await test.checkpoint();
+    const fields = vi.spyOn(logger, 'withFields');
     const checkpoint = await test.snapshot();
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
@@ -517,6 +611,14 @@ describe('idle session disk checkpoint', () => {
       )
     );
     expect(await test.snapshot()).toEqual(checkpoint);
+    expect(
+      fields.mock.calls.filter(([entry]) => entry.diagnosticEvent === 'session_snapshot_lookup')
+    ).toHaveLength(1);
+    expect(
+      fields.mock.calls.filter(
+        ([entry]) => entry.diagnosticEvent === 'session_snapshot_descriptor_removed'
+      )
+    ).toHaveLength(0);
 
     await runInDurableObject(test.sandbox, instance =>
       instance['applyEvent']({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })

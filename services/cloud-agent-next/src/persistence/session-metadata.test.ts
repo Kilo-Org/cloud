@@ -1545,3 +1545,27 @@ describe('session metadata boundary', () => {
     ).toThrow('Invalid current session metadata');
   });
 });
+
+describe('continuation agent variant', () => {
+  const base = {
+    metadataSchemaVersion: 2 as const,
+    identity: { sessionId: 'agent_variant', userId: 'user_variant' },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+  };
+
+  it('keeps an empty variant distinct from an absent variant', () => {
+    expect(parseSessionMetadata({ ...base, agent: { variant: '' } }).agent?.variant).toBe('');
+    expect(parseSessionMetadata({ ...base, agent: {} }).agent?.variant).toBeUndefined();
+  });
+
+  it('accepts a long provider variant such as budget-32768', () => {
+    expect(
+      parseSessionMetadata({ ...base, agent: { variant: 'budget-32768' } }).agent?.variant
+    ).toBe('budget-32768');
+  });
+
+  it('rejects a variant longer than 50 characters', () => {
+    expect(() => parseSessionMetadata({ ...base, agent: { variant: 'x'.repeat(51) } })).toThrow();
+  });
+});

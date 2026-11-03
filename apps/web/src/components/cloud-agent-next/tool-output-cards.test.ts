@@ -21,12 +21,16 @@ jest.mock('react-markdown', () =>
 jest.mock('remark-gfm', () =>
   process.getBuiltinModule('module').createRequire(__filename)('remark-gfm')
 );
+jest.mock('./CloudAgentProvider', () => ({ useOptionalManager: () => null }));
+jest.mock('./use-preview', () => ({ usePreviewLinks: () => null }));
 
 import { BashToolCard } from './BashToolCard';
 import { BackgroundProcessToolCard } from './BackgroundProcessToolCard';
 import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { GenericToolCard } from './GenericToolCard';
 import { ToolCodeBlock } from './ToolOutput';
+import { ApplyPatchToolCard } from './ApplyPatchToolCard';
+import { ToolPartRenderer } from './part-content';
 
 Object.assign(globalThis, { React });
 
@@ -520,6 +524,55 @@ describe('ScheduledTaskToolCard', () => {
 });
 
 describe('GenericToolCard', () => {
+  it.each(['filePath', 'file_path', 'filepath', 'path', 'workdir', 'directory', 'cwd', 'root'])(
+    'keeps %s visible ahead of description/query for generic and MCP tools',
+    key => {
+      for (const tool of ['lookup', 'mcp']) {
+        const args = {
+          description: 'Inspect matching records',
+          query: 'SELECT content',
+          [key]: '/cloud-agent/sessions/ses_test/src/config.ts',
+        };
+        const input =
+          tool === 'mcp'
+            ? { server_name: 'filesystem', tool_name: 'inspect', arguments: args }
+            : args;
+        const html = renderToStaticMarkup(
+          React.createElement(GenericToolCard, {
+            toolPart: completedTool(tool, input, ''),
+          })
+        );
+
+        expect(html).toContain('src/config.ts · Inspect matching records');
+        expect(html).not.toContain('/cloud-agent/');
+        expect(html).not.toContain('ses_test');
+        expect(html).not.toContain('SELECT content');
+      }
+    }
+  );
+
+  it('ignores blank and non-string paths instead of manufacturing file context', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(GenericToolCard, {
+        toolPart: completedTool(
+          'lookup',
+          {
+            filePath: {},
+            file_path: '',
+            filepath: false,
+            path: '  ',
+            description: 'Inspect records',
+          },
+          ''
+        ),
+      })
+    );
+
+    expect(html).toContain('Inspect records');
+    expect(html).not.toContain('[object Object]');
+    expect(html).not.toContain('filepath=');
+  });
+
   it.each([['unrecognized_tool', 'unrecognized_tool']])(
     'preserves the friendly display name for %s',
     (tool, title) => {
@@ -718,5 +771,129 @@ describe('GenericToolCard', () => {
     expect(html).toContain('Still completed');
     expect(html).not.toContain('Copy arguments');
     expect(html).not.toContain('Waiting');
+  });
+});
+
+describe('failed tool file context', () => {
+  it.each([
+    ['read', { filePath: '/cloud-agent/sessions/ses_test/src/read.ts' }, 'src/read.ts'],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'src/write.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test/src', pattern: '*.ts' }, 'src'],
+    ['grep', { path: '/cloud-agent/sessions/ses_test', pattern: 'needle' }, '.'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/docs' }, 'docs'],
+    ['bash', { workdir: '/cloud-agent/sessions/ses_test/scripts' }, 'scripts'],
+    ['bash', { cwd: '/cloud-agent/sessions/ses_test/scripts' }, 'scripts'],
+    ['custom', { file_path: '/cloud-agent/sessions/ses_test/src/custom.ts' }, 'src/custom.ts'],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/custom.ts' }, 'src/custom.ts'],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { query: 'content', filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'src/mcp.ts',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { cwd: '/cloud-agent/sessions/ses_test/src' },
+      },
+      'src',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'retains the normalized input path for failed %s',
+    (tool, input, path) => {
+      const part = completedTool(tool, input, '');
+      part.state = {
+        status: 'error',
+        input,
+        error: 'Permission denied',
+        time: { start: 1, end: 2 },
+      };
+      const html = renderToStaticMarkup(React.createElement(ToolPartRenderer, { part }));
+
+      expect(html).toContain(`Failed: <span class="font-mono">${tool}</span>`);
+      expect(html).toContain(`>${path}</code>`);
+      expect(html).toContain('Permission denied');
+      expect(html).not.toContain('/cloud-agent/');
+      expect(html).not.toContain('ses_test');
+    }
+  );
+});
+
+describe('apply patch file labels', () => {
+  const patchText = [
+    '*** Begin Patch',
+    '*** Update File: /cloud-agent/sessions/ses_test/src/old.ts',
+    '*** Move to: /cloud-agent/sessions/ses_test/src/new.ts',
+    '@@',
+    '-before',
+    '+after',
+    '+*** Add File: not-a-header.ts',
+    '*** Delete File: /cloud-agent/sessions/ses_test/src/deleted.ts',
+    '*** Add File: /cloud-agent/sessions/ses_test/src/added.ts',
+    '+new',
+    '*** End Patch',
+  ].join('\n');
+
+  it.each(['pending', 'running', 'completed', 'error'] as const)(
+    'identifies input filenames without claiming applied changes for %s',
+    status => {
+      const input = { patchText };
+      const part = completedTool('apply_patch', input, '');
+      if (status === 'pending') part.state = { status, input, raw: '' };
+      if (status === 'running') part.state = { status, input, time: { start: 1 } };
+      if (status === 'error')
+        part.state = { status, input, error: 'Patch rejected', time: { start: 1, end: 2 } };
+      const card = React.createElement(ToolPartRenderer, { part });
+      const collapsed = renderToStaticMarkup(card);
+      const html = expanded(card);
+
+      for (const path of ['src/old.ts', 'src/new.ts', 'src/deleted.ts', 'src/added.ts']) {
+        expect(collapsed).toContain(path);
+      }
+      expect(collapsed).not.toContain('not-a-header.ts');
+      expect(collapsed).not.toContain('ses_test');
+      if (status !== 'error') expect(html).toContain('Patch input (not an applied diff)');
+      expect(html).not.toContain('Unified patch');
+      expect(html).not.toContain('additions');
+      expect(html).not.toContain('>Added<');
+      if (status === 'error') {
+        expect(collapsed).toContain('Patch rejected');
+        expect(collapsed).toContain('Failed:');
+      }
+    }
+  );
+
+  it('keeps metadata authoritative and identifies multiple files in the collapsed header', () => {
+    const part = completedTool('apply_patch', { patchText }, '', {
+      files: [{ relativePath: 'src/actual.ts' }, { relativePath: 'src/other.ts' }],
+    });
+    const html = renderToStaticMarkup(React.createElement(ApplyPatchToolCard, { toolPart: part }));
+
+    expect(html).toContain('2 files');
+    expect(html).toContain('src/actual.ts, src/other.ts');
+    expect(html).not.toContain('src/old.ts');
+  });
+
+  it('labels a single pending file without expanding patch input', () => {
+    const part = completedTool('apply_patch', {}, '');
+    part.state = {
+      status: 'pending',
+      input: {
+        patchText:
+          '*** Begin Patch\r\n*** Add File: /cloud-agent/sessions/ses_test/src/new.ts\r\n+new\r\n*** End Patch',
+      },
+      raw: '',
+    };
+    const html = renderToStaticMarkup(React.createElement(ApplyPatchToolCard, { toolPart: part }));
+
+    expect(html).toContain('src/new.ts');
+    expect(html).not.toContain('ses_test');
+    expect(html).not.toContain('*** Begin Patch');
   });
 });

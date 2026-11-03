@@ -15,7 +15,6 @@ const mockRefetch = jest.fn<() => Promise<unknown>>(async () => ({}));
 const mockBrowserSupportsWebAuthn = jest.fn<() => boolean>(() => true);
 const mockStartRegistration = jest.fn<() => Promise<unknown>>(async () => ({}));
 const mockFetch = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-
 const mockQueryResult: {
   data: { passkeys: unknown[] } | undefined;
   isLoading: boolean;
@@ -55,6 +54,10 @@ jest.mock('@/lib/trpc/utils', () => ({
 jest.mock('@simplewebauthn/browser', () => ({
   browserSupportsWebAuthn: () => mockBrowserSupportsWebAuthn(),
   startRegistration: () => mockStartRegistration(),
+}));
+
+jest.mock('next/navigation', () => ({
+  usePathname: () => '/connected-accounts',
 }));
 
 jest.mock('@tanstack/react-query', () => {
@@ -186,12 +189,16 @@ function installDom(): { container: HTMLElement; cleanup: () => void } {
   };
 }
 
-function mountCard(): { container: HTMLElement; root: Root; cleanup: () => void } {
+function mountCard(props: { showAdminStepUpNote?: boolean } = {}): {
+  container: HTMLElement;
+  root: Root;
+  cleanup: () => void;
+} {
   const dom = installDom();
   let root!: Root;
   act(() => {
     root = createRoot(dom.container);
-    root.render(createElement(PasskeysCard));
+    root.render(createElement(PasskeysCard, props));
   });
   return {
     container: dom.container,
@@ -399,6 +406,23 @@ describe('PasskeysCard', () => {
       'Passkey creation was cancelled. No passkey was added.'
     );
     expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it('asks an admin to sign in again when enrollment needs reauthentication', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'REAUTH_REQUIRED' }),
+    });
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await flush();
+
+    expect(mounted.container.textContent).toContain('Sign in again before adding a passkey');
+    expect(hasButton(mounted.container, 'Sign out and sign in again')).toBe(true);
     expect(mockRefetch).not.toHaveBeenCalled();
   });
 

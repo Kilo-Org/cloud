@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -56,7 +58,7 @@ export function AccountDeduplicationTable() {
         minAccounts: String(minAccounts),
         hideAllBlocked: String(hideAllBlocked),
       });
-      const res = await fetch(`/admin/api/account-deduplication?${params}`);
+      const res = await adminFetch(`/admin/api/account-deduplication?${params}`);
       if (!res.ok) {
         throw new Error(`Failed to load duplicate accounts (${res.status})`);
       }

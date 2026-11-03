@@ -15,14 +15,8 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 describe('custom LLM catalog', () => {
-  useKiloExclusiveModel();
-
   beforeAll(async () => {
     await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
     await insertCustomLlmForTest('acme/private-model');
@@ -46,20 +40,8 @@ describe('custom LLM catalog', () => {
     await expect(isCustomLlm('kilo-internal/unknown')).resolves.toBe(false);
   });
 
-  test('ignores a custom LLM whose id is still a Kilo-exclusive model', async () => {
-    const exclusiveId = kiloExclusiveModelFixture.public_id;
-    await insertCustomLlmForTest(exclusiveId, publicCustomLlmDefinition(['acme']));
-    try {
-      await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();
-      await expect(getPublicCustomLlmInferenceProviders(exclusiveId)).resolves.toBeNull();
-      expect((await requireCustomLlmsById()).has(exclusiveId)).toBe(false);
-    } finally {
-      await deleteCustomLlmForTest(exclusiveId);
-    }
-  });
-
   test.each(['stealth/glyph-cluster', 'reflection/beam-free'])(
-    'serves a custom LLM with the id of the removed Kilo-exclusive model %s',
+    'serves a custom LLM with id %s as free',
     async id => {
       await insertCustomLlmForTest(id, publicCustomLlmDefinition(['acme']));
       try {

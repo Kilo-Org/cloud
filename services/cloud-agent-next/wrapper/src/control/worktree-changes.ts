@@ -665,7 +665,7 @@ function encodedBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value));
 }
 
-function omittedRecord(
+export function omittedRecord(
   revision: number,
   file: Pick<WorktreeChangesFile, 'path' | 'scope'>,
   reason: FileOmissionReason

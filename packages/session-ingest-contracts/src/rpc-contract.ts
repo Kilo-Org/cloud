@@ -729,7 +729,10 @@ export const MAX_SESSION_DIFF_READ_BYTES = 8 * 1024 * 1024;
 
 export const sessionDiffReadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('value'), files: z.array(sessionDiffFileSchema) }),
-  z.object({ kind: z.literal('too_large'), maximumBytes: z.number() }),
+  z.object({
+    kind: z.literal('too_large'),
+    maximumBytes: z.number().int().positive(),
+  }),
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
@@ -991,16 +994,18 @@ export const kiloSdkMessageHistoryPageSchema = z.object({
 });
 export type KiloSdkMessageHistoryPage = z.infer<typeof kiloSdkMessageHistoryPageSchema>;
 
+const KILO_SDK_HISTORY_FAILURE_PHASES = ['message_scan', 'page_parts'] as const;
+
 export const kiloSdkHistoryTooLargeSchema = z.object({
   kind: z.literal('too_large'),
   maximumBytes: z.number().int().positive(),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryTooLarge = z.infer<typeof kiloSdkHistoryTooLargeSchema>;
 
 export const kiloSdkHistoryRetryableFailureSchema = z.object({
   kind: z.literal('retryable_failure'),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryRetryableFailure = z.infer<typeof kiloSdkHistoryRetryableFailureSchema>;
 
@@ -1339,6 +1344,17 @@ export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
+  setGeneratedTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   deleteHostedWorkspaceSession: (
     params: DeleteHostedWorkspaceSessionParams

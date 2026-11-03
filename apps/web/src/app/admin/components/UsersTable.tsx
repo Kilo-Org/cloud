@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -58,9 +60,12 @@ export function UsersTable() {
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: ['admin-users', queryStringState] as const,
     queryFn: async ({ queryKey: [, params], signal }) => {
-      const response = await fetch(`/admin/api/users?${toSortedSearchParams(params).toString()}`, {
-        signal,
-      });
+      const response = await adminFetch(
+        `/admin/api/users?${toSortedSearchParams(params).toString()}`,
+        {
+          signal,
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch users');

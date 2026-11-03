@@ -36,7 +36,24 @@ export type PlatformAdminPermissions = {
   canExportApiRequestLogs: boolean;
 };
 
-export type AdminStepUpState = { status: 'absent' };
+export type AdminStepUpState =
+  /** Measurement did not run (for example, step-up mode is off). */
+  | { status: 'absent' }
+  /** The session predates the per-session claim and cannot be bound to a proof. */
+  | { status: 'session_unbound' }
+  /** The actor has no passkey enrolled, so no step-up proof can be minted. */
+  | { status: 'not_enrolled' }
+  /** The actor is enrolled but has no live proof for this session and action. */
+  | { status: 'required' }
+  | { status: 'expired'; verifiedAt: string }
+  /** The newest proof for this session and action was explicitly revoked. */
+  | { status: 'revoked'; verifiedAt: string }
+  | {
+      status: 'fresh';
+      method: 'webauthn_uv';
+      verifiedAt: string;
+      expiresAt: string;
+    };
 
 export type SupportGrantSlot = {
   grantId: string;
@@ -127,11 +144,47 @@ export function createAdminAssurance(params: {
   userId: string;
   permissions: PlatformAdminPermissions;
   supportGrant?: SupportGrantSlot | null;
+  stepUp?: AdminStepUpState;
 }): AdminAssurance {
   return {
     userId: params.userId,
     permissions: params.permissions,
-    stepUp: ADMIN_STEP_UP_ABSENT,
+    stepUp: params.stepUp ?? ADMIN_STEP_UP_ABSENT,
     supportGrant: params.supportGrant ?? null,
   };
+}
+
+export type StepUpErrorCode =
+  | 'MFA_REQUIRED'
+  | 'MFA_EXPIRED'
+  | 'NOT_ENROLLED'
+  | 'SESSION_UNBOUND'
+  | 'BEARER_NOT_ALLOWED'
+  | 'REAUTH_REQUIRED'
+  | 'STEP_UP_UNAVAILABLE';
+
+/**
+ * Cause attached to a FORBIDDEN tRPC error when enforcement refuses a request
+ * for missing or stale step-up. The error formatter exposes only these fields
+ * as `data.stepUp`, never the underlying session or proof.
+ */
+export class StepUpRequiredError extends Error {
+  readonly code: StepUpErrorCode;
+  readonly actionClass: PrivilegedActionClass;
+  readonly purpose: 'session' | 'operation';
+  readonly maxAgeSeconds: number;
+
+  constructor(params: {
+    code: StepUpErrorCode;
+    actionClass: PrivilegedActionClass;
+    purpose: 'session' | 'operation';
+    maxAgeSeconds: number;
+  }) {
+    super(params.code);
+    this.name = 'StepUpRequiredError';
+    this.code = params.code;
+    this.actionClass = params.actionClass;
+    this.purpose = params.purpose;
+    this.maxAgeSeconds = params.maxAgeSeconds;
+  }
 }

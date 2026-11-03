@@ -212,6 +212,9 @@ function createInternalApiContext(options: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
       CREDENTIAL_CONTAINMENT_ENABLED: options.credentialContainmentEnabled,
+      CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS:
+        options.credentialContainmentEnabled === 'false' ? '*' : undefined,
     },
   } as TRPCContext;
 }

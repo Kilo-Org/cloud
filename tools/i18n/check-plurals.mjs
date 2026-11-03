@@ -713,8 +713,8 @@ function run() {
 
   console.log(
     sourceOnly
-      ? 'check-plurals: en declares a plural family for every counted message'
-      : 'check-plurals: every counted message and every locale declares its plural categories'
+      ? 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT'
+      : 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT, and every required plural family declares its locale categories'
   );
 }
 

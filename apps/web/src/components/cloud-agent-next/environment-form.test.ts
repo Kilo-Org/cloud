@@ -40,6 +40,7 @@ describe('single environment script', () => {
 
 describe('hasEnvironmentFormChanges', () => {
   const saved = {
+    name: 'Saved environment',
     script: toEnvironmentScript(['export A=1', 'echo "$A"']),
     variablesText: 'TOKEN=<unchanged>\nPLAIN="saved"',
     sandboxAllocation: 'cloudflare-single',
@@ -50,6 +51,7 @@ describe('hasEnvironmentFormChanges', () => {
   });
 
   test.each([
+    { name: 'Renamed environment' },
     { script: 'pnpm install' },
     { variablesText: 'TOKEN="replacement"' },
     { variablesText: 'PLAIN="saved"' },
@@ -64,6 +66,13 @@ describe('hasEnvironmentFormChanges', () => {
     const draft = { ...saved, script: 'changed' };
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(true);
     draft.script = saved.script;
+    expect(hasEnvironmentFormChanges(saved, draft)).toBe(false);
+  });
+
+  test('allows a build after reverting a name-only edit', () => {
+    const draft = { ...saved, name: 'Renamed environment' };
+    expect(hasEnvironmentFormChanges(saved, draft)).toBe(true);
+    draft.name = saved.name;
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(false);
   });
 });

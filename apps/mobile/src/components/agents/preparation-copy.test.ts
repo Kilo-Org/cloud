@@ -123,6 +123,10 @@ describe('preparationErrorText', () => {
     expect(preparationErrorText('sandbox_lost', t)).toBe('The sandbox was lost');
   });
 
+  it('names a repository access failure of a multi-repository environment, not its raw code', () => {
+    expect(preparationErrorText('repository_access_failed', t)).toBe('Workspace setup failed');
+  });
+
   it('names the wrapper sentences a step failure carries', () => {
     expect(preparationErrorText('Setup command 2 failed', t)).toBe('Setup command 2 failed');
     expect(preparationErrorText('Setup command 1 timed out', t)).toBe('Setup command 1 timed out');

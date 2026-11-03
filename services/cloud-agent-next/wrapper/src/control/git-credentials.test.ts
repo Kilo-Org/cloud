@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,8 +9,14 @@ import {
   gitUrlCarriesCredential,
   normalizeOriginCredential,
   clearGitCredentialRecord,
+  additionalHostCredentials,
   writeGitCredentialRecord,
+  writeGitCredentialRecords,
+  writeGitCredentialRecordSet,
 } from './git-credentials.js';
+
+/** The image's read-only credential helper, which answers Git for a V2 build. */
+const helper = path.join(import.meta.dir, '../../../scripts/kilo-git-credential');
 
 let home: string;
 
@@ -143,6 +150,194 @@ describe('credential record', () => {
     await fs.mkdir(recordPath, { recursive: true });
     await fs.writeFile(path.join(recordPath, 'blocker'), 'x');
     expect(await clearGitCredentialRecord(home)).toBe(false);
+  });
+});
+
+describe('host credential records', () => {
+  const read = () => fs.readFile(gitCredentialRecordPath(home), 'utf8');
+  const exists = () =>
+    fs.access(gitCredentialRecordPath(home)).then(
+      () => true,
+      () => false
+    );
+
+  it('writes the one record of a single host exactly as a V1 route did', async () => {
+    await writeGitCredentialRecord({
+      home,
+      url: 'https://github.com/acme/repo.git',
+      token: 'alias-github',
+      platform: 'github',
+    });
+    expect(await read()).toBe(
+      'protocol=https\nhost=github.com\nusername=x-access-token\npassword=alias-github\n'
+    );
+    expect((await fs.stat(gitCredentialRecordPath(home))).mode & 0o777).toBe(0o600);
+  });
+
+  it('writes one record for each host and never one for each repository', async () => {
+    await writeGitCredentialRecords({
+      home,
+      credentials: [
+        { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+        ...additionalHostCredentials([
+          {
+            url: 'https://gitlab.com/group/sub/project.git',
+            token: 'alias-gitlab',
+            platform: 'gitlab',
+          },
+          {
+            url: 'https://bitbucket.org/team/repo.git',
+            token: 'alias-bitbucket',
+            platform: 'bitbucket',
+          },
+        ]),
+      ],
+    });
+    expect(await read()).toBe(
+      'protocol=https\nhost=github.com\nusername=x-access-token\npassword=alias-github\n' +
+        '\n' +
+        'protocol=https\nhost=gitlab.com\nusername=oauth2\npassword=alias-gitlab\n' +
+        '\n' +
+        'protocol=https\nhost=bitbucket.org\nusername=x-token-auth\npassword=alias-bitbucket\n'
+    );
+    expect(await read()).not.toContain('path=');
+  });
+
+  it('removes a stale record when no host has a token', async () => {
+    await writeGitCredentialRecord({
+      home,
+      url: 'https://github.com/acme/repo.git',
+      token: 'alias-github',
+      platform: 'github',
+    });
+    await writeGitCredentialRecords({
+      home,
+      credentials: [
+        { url: 'https://github.com/acme/repo.git', token: undefined, platform: 'github' },
+      ],
+    });
+    expect(await exists()).toBe(false);
+  });
+
+  it('keeps the record when a remote is not HTTPS, as a V1 route did', async () => {
+    await writeGitCredentialRecord({
+      home,
+      url: 'https://github.com/acme/repo.git',
+      token: 'alias-github',
+      platform: 'github',
+    });
+    await writeGitCredentialRecord({
+      home,
+      url: 'ssh://git@github.com/acme/repo.git',
+      token: 'alias-ssh',
+      platform: 'github',
+    });
+    expect(await read()).toContain('alias-github');
+  });
+
+  it('skips the host whose URL carries no HTTPS record and writes the others', async () => {
+    await writeGitCredentialRecords({
+      home,
+      credentials: [
+        { url: 'ssh://git@git.example.com/acme/repo.git', token: 'alias-ssh', platform: 'gitlab' },
+        { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      ],
+    });
+    const record = await read();
+    expect(record).toContain('host=github.com');
+    expect(record).not.toContain('alias-ssh');
+  });
+});
+
+describe('credential set record', () => {
+  it('writes one path-qualified record per member', async () => {
+    await writeGitCredentialRecordSet({
+      home,
+      entries: [
+        {
+          url: 'https://github.com/acme/one.git',
+          token: 'gh-one',
+          platform: 'github',
+        },
+        {
+          url: 'https://github.com/acme/two.git',
+          token: 'gh-two',
+          platform: 'github',
+        },
+      ],
+    });
+
+    const recordPath = gitCredentialRecordPath(home);
+    expect(await fs.readFile(recordPath, 'utf8')).toBe(
+      'protocol=https\nhost=github.com\npath=acme/one\nusername=x-access-token\npassword=gh-one\n' +
+        '\n' +
+        'protocol=https\nhost=github.com\npath=acme/two\nusername=x-access-token\npassword=gh-two\n'
+    );
+    expect((await fs.stat(recordPath)).mode & 0o777).toBe(0o600);
+  });
+
+  it('qualifies a record by the clone URL path, case included, so the helper answers Git', async () => {
+    await writeGitCredentialRecordSet({
+      home,
+      entries: [
+        {
+          url: 'https://gitlab.example.com/sub/MyGroup/Repo.git',
+          token: 'gl-mixed',
+          platform: 'gitlab',
+        },
+      ],
+    });
+    const query = (path: string) =>
+      execFileSync('sh', [helper, 'get'], {
+        input: `protocol=https\nhost=gitlab.example.com\npath=${path}\n\n`,
+        env: { PATH: process.env.PATH, SESSION_HOME: home },
+        encoding: 'utf8',
+      });
+
+    expect(await fs.readFile(gitCredentialRecordPath(home), 'utf8')).toContain(
+      'path=sub/MyGroup/Repo\n'
+    );
+    expect(query('sub/MyGroup/Repo.git')).toContain('password=gl-mixed');
+    expect(query('sub/mygroup/repo.git')).not.toContain('password=');
+  });
+
+  it('clears the whole set when the last member is removed', async () => {
+    await writeGitCredentialRecordSet({
+      home,
+      entries: [
+        {
+          url: 'https://github.com/acme/one.git',
+          token: 'gh-one',
+          platform: 'github',
+        },
+      ],
+    });
+    await writeGitCredentialRecordSet({ home, entries: [] });
+    expect(
+      await fs.access(gitCredentialRecordPath(home)).then(
+        () => 'present',
+        () => 'missing'
+      )
+    ).toBe('missing');
+  });
+
+  it('refuses a member with no repository path', async () => {
+    let threw = false;
+    try {
+      await writeGitCredentialRecordSet({
+        home,
+        entries: [
+          {
+            url: 'https://github.com/',
+            token: 'gh-one',
+            platform: 'github',
+          },
+        ],
+      });
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(true);
   });
 });
 

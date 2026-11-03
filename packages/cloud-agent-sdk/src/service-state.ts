@@ -737,8 +737,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const parsedCommit = sessionCommitDataSchema.safeParse(event);
     const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
     if (parsedCommit.success) {
-      if (seenCommits.has(parsedCommit.data.commitHash)) return;
-      seenCommits.add(parsedCommit.data.commitHash);
+      const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
+      if (seenCommits.has(identity)) return;
+      seenCommits.add(identity);
       commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
     }
     if (event.success || commitHash) {

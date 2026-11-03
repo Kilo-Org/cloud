@@ -15,6 +15,7 @@ import {
   enkryptCreditsToMicrodollars,
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
   recordEnkryptUsage,
+  recordEnkryptUsageLocally,
   type EnkryptUsageRecord,
 } from './usage';
 
@@ -276,5 +277,28 @@ describe('recordEnkryptUsage', () => {
         .from(organization_user_usage)
         .where(eq(organization_user_usage.organization_id, organization.id))
     ).toEqual([]);
+  });
+
+  it('records and debits a redelivered usage id only once', async () => {
+    const { user, organization } = await organizationWithMember();
+    const usageWrite = {
+      ...usageRecord(organization.id, user.id),
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    };
+
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('recorded');
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('duplicate');
+
+    expect(
+      await db
+        .select()
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, organization.id))
+    ).toHaveLength(1);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+    });
   });
 });

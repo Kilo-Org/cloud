@@ -13,6 +13,8 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { NextResponse } from 'next/server';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -193,6 +195,48 @@ describe('POST /api/edit/completions', () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes an authentication failure without a rejected credential through', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (not a member of the organization)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      credentialsRejected: false,
+    });
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported edit models with the dedicated error type', async () => {

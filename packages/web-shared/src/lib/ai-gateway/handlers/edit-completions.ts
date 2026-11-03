@@ -15,6 +15,7 @@ import {
   extractEditPromptInfo,
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
+  invalidTokenResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
   extractHeaderAndLimitLength,
@@ -88,13 +89,14 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId,
   } = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
   });
   authSpan.end();
-  if (authFailedResponse) return authFailedResponse;
+  if (authFailedResponse) return credentialsRejected ? invalidTokenResponse() : authFailedResponse;
 
   const user = maybeUser;
   const requestBodyText = await requestBodyTextPromise;

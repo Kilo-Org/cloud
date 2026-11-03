@@ -11,6 +11,7 @@ import {
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('next/server', () => {
   return {
@@ -338,6 +339,28 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
 
     expect(response.status).toBe(401);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('Invalid API token', { status: 401 }) as never,
+      credentialsRejected: true,
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 

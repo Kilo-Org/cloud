@@ -18,7 +18,8 @@ import {
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
-import { after } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -460,6 +461,44 @@ describe('POST /api/fim/completions', () => {
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes an authentication failure without a rejected credential through', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (not a member of the organization)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      credentialsRejected: false,
+    });
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response).toBe(authFailedResponse);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   describe('bouncer wiring', () => {

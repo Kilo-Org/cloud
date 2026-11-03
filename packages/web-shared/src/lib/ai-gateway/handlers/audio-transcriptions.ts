@@ -17,6 +17,7 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   creditsBlockedResponse,
@@ -193,6 +194,7 @@ export async function handleAudioTranscriptionsRequest(
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -206,6 +208,7 @@ export async function handleAudioTranscriptionsRequest(
   const botId: string | undefined = authBotId;
   const tokenSource: string | undefined = authTokenSource;
 
+  if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
   if (authFailedResponse || !maybeUser) {
     return NextResponse.json(
       {

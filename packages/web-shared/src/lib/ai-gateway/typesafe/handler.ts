@@ -16,6 +16,7 @@ import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
+  invalidTokenResponse,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -108,11 +109,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
 
-  const { user, authFailedResponse, organizationId, botId, tokenSource } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
-  if (authFailedResponse) return authFailedResponse;
+  const { user, authFailedResponse, credentialsRejected, organizationId, botId, tokenSource } =
+    await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+  if (authFailedResponse) return credentialsRejected ? invalidTokenResponse() : authFailedResponse;
 
   let body: unknown;
   try {

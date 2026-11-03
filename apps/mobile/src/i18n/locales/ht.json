@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
     "thresholdTitle": "Depasman papòt",
-    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "thresholdSubtitle": "Depans aktyèl la pou sektè sa a nan fenèt ou chwazi a depase limit ou",
     "anomalyTitle": "Ogmantasyon chak èdtan",
-    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "anomalySubtitle": "Vitès chak èdtan sektè sa a byen pi wo pase bazliy p95 pa li menm",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Fenèt",
     "window24h": "24 èdtan",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon",
     "multiplierMaxError": "Antre yon miltiplikatè {{max}} oswa mwens",
-    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens."
+    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens"
   },
   "profiles": {
     "title": "Pwofil yo",

@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
     "thresholdTitle": "Tejkalimi i pragut",
-    "thresholdSubtitle": "Shpenzimet rrjedhëse tejkalojnë kufirin tënd",
+    "thresholdSubtitle": "Shpenzimet rrjedhëse të këtij fushëveprimi gjatë dritares së zgjedhur tejkalojnë kufirin tënd",
     "anomalyTitle": "Rritje për orë",
-    "anomalySubtitle": "Një orë është shumë mbi ritmin e zakonshëm të këtij fushëveprimi",
+    "anomalySubtitle": "Ritmi për orë i këtij fushëveprimi është shumë mbi vijën e vet bazë p95",
     "limitLabel": "Kufi (USD)",
     "windowLabel": "Dritare",
     "window24h": "24 orë",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
     "pushOffByCategory": "Fikur në Njoftimet",
     "multiplierMaxError": "Vendos një shumëzues {{max}} ose më të vogël",
-    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak."
+    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak"
   },
   "profiles": {
     "title": "Profilet",

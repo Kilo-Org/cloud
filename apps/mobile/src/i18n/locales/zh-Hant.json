@@ -3815,7 +3815,7 @@
     "permissionDenied": "你沒有管理支出提醒的權限。",
     "pushOffByCategory": "已在通知中關閉",
     "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
-    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。"
+    "thresholdMaxError": "請輸入不超過 {{max}} 的金額"
   },
   "profiles": {
     "title": "設定檔",

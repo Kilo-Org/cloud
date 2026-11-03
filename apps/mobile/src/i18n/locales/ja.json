@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
     "thresholdTitle": "しきい値の超過",
-    "thresholdSubtitle": "累計支出が上限を超えています",
+    "thresholdSubtitle": "このスコープの選択した期間の累計支出が上限を超えています",
     "anomalyTitle": "毎時の急増",
-    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "anomalySubtitle": "このスコープの1時間あたりのレートが、自身のp95ベースラインを大きく上回っています",
     "limitLabel": "上限 (USD)",
     "windowLabel": "期間",
     "window24h": "24時間",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "支出アラートを管理する権限がありません。",
     "pushOffByCategory": "通知でオフ",
     "multiplierMaxError": "{{max}}以下の倍率を入力してください",
-    "thresholdMaxError": "{{max}}以下の金額を入力してください。"
+    "thresholdMaxError": "{{max}}以下の金額を入力してください"
   },
   "profiles": {
     "title": "プロフィール",

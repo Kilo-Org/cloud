@@ -3908,9 +3908,9 @@
   "spendAlerts": {
     "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
     "thresholdTitle": "Prekročenie prahu",
-    "thresholdSubtitle": "Priebežné výdavky prekračujú tvoj limit",
+    "thresholdSubtitle": "Priebežné výdavky tohto rozsahu za zvolené okno prekračujú tvoj limit",
     "anomalyTitle": "Hodinová špička",
-    "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
+    "anomalySubtitle": "Hodinová sadzba tohto rozsahu je výrazne nad jeho vlastným p95 základom",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Okno",
     "window24h": "24 hodín",
@@ -3927,7 +3927,7 @@
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
     "pushOffByCategory": "Vypnuté v Upozorneniach",
     "multiplierMaxError": "Zadaj násobiteľ {{max}} alebo menší",
-    "thresholdMaxError": "Zadaj sumu {{max}} alebo menšiu."
+    "thresholdMaxError": "Zadaj sumu {{max}} alebo menšiu"
   },
   "profiles": {
     "title": "Profily",

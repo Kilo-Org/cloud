@@ -3858,9 +3858,9 @@
   "spendAlerts": {
     "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
     "thresholdTitle": "Franchissement du seuil",
-    "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
+    "thresholdSubtitle": "Les dépenses cumulées de ce périmètre sur la fenêtre choisie dépassent votre limite",
     "anomalyTitle": "Pic horaire",
-    "anomalySubtitle": "Une heure est bien au-dessus du rythme habituel de ce périmètre",
+    "anomalySubtitle": "Le rythme horaire de ce périmètre est bien au-dessus de sa propre référence p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Fenêtre",
     "window24h": "24 heures",
@@ -3877,7 +3877,7 @@
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
     "pushOffByCategory": "Désactivé dans les notifications",
     "multiplierMaxError": "Saisissez un multiplicateur de {{max}} ou moins",
-    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins."
+    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins"
   },
   "profiles": {
     "title": "Profils",

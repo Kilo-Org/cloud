@@ -3802,9 +3802,9 @@
   "spendAlerts": {
     "subtitle": "Thumela isexwayiso nge-imeyili noma nge-push kwabathintwayo bokukhokha lapho ukusetshenziswa kwemali kwalesi sikhathi kweqa umkhawulo noma kukhuphuka ngaphezu kwezinga elivamile lehora.",
     "thresholdTitle": "Ukweqa umkhawulo",
-    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kweqa umkhawulo wakho",
+    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kulesi sikhathi ngesikhathi osikhethile kuweqa umkhawulo wakho",
     "anomalyTitle": "Ukukhuphuka ngehora",
-    "anomalySubtitle": "Ihora elilodwa liphakeme kakhulu kunezinga elivamile lalesi sikhathi",
+    "anomalySubtitle": "Isilinganiso sehora lalesi sikhathi siphezulu kakhulu kunesisekelo saso se p95",
     "limitLabel": "Umkhawulo (USD)",
     "windowLabel": "Isikhathi",
     "window24h": "Amahora angu-24",
@@ -3821,7 +3821,7 @@
     "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
     "pushOffByCategory": "Kucishiwe kuzaziso",
     "multiplierMaxError": "Faka isiphindaphindi esingu-{{max}} noma ngaphansi",
-    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}."
+    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}"
   },
   "profiles": {
     "title": "Amaphrofayili",

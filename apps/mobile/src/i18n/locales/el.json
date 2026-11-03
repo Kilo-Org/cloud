@@ -3815,7 +3815,7 @@
     "permissionDenied": "Δεν έχεις δικαίωμα να διαχειρίζεσαι τις ειδοποιήσεις δαπανών.",
     "pushOffByCategory": "Ανενεργό στις Ειδοποιήσεις",
     "multiplierMaxError": "Εισήγαγε πολλαπλασιαστή {{max}} ή μικρότερο",
-    "thresholdMaxError": "Συμπλήρωσε ένα ποσό {{max}} ή μικρότερο."
+    "thresholdMaxError": "Συμπλήρωσε ένα ποσό {{max}} ή μικρότερο"
   },
   "profiles": {
     "title": "Προφίλ",

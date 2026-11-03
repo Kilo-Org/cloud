@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Kirim peringatan lewat email atau push ke kontak penagihan saat pengeluaran cakupan ini melewati batas atau melonjak di atas laju per jam biasanya.",
     "thresholdTitle": "Melewati ambang batas",
-    "thresholdSubtitle": "Pengeluaran berjalan melewati batas kamu",
+    "thresholdSubtitle": "Pengeluaran berjalan cakupan ini selama jendela yang dipilih melewati batas kamu",
     "anomalyTitle": "Lonjakan per jam",
-    "anomalySubtitle": "Satu jam jauh di atas laju biasanya cakupan ini",
+    "anomalySubtitle": "Laju per jam cakupan ini jauh di atas garis dasar p95-nya sendiri",
     "limitLabel": "Batas (USD)",
     "windowLabel": "Jendela",
     "window24h": "24 jam",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
     "pushOffByCategory": "Nonaktif di Notifikasi",
     "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
-    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang."
+    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang"
   },
   "profiles": {
     "title": "Profil",

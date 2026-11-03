@@ -3852,9 +3852,9 @@
   "spendAlerts": {
     "subtitle": "Invia un avviso via email o push ai contatti di fatturazione quando la spesa di questo ambito supera un limite o schizza sopra il suo ritmo orario abituale.",
     "thresholdTitle": "Superamento della soglia",
-    "thresholdSubtitle": "La spesa progressiva supera il tuo limite",
+    "thresholdSubtitle": "La spesa progressiva di questo ambito nella finestra scelta supera il tuo limite",
     "anomalyTitle": "Picco orario",
-    "anomalySubtitle": "Un'ora è molto sopra il ritmo abituale di questo ambito",
+    "anomalySubtitle": "Il ritmo orario di questo ambito è molto sopra la sua baseline p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Finestra",
     "window24h": "24 ore",
@@ -3871,7 +3871,7 @@
     "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
     "pushOffByCategory": "Disattivato in Notifiche",
     "multiplierMaxError": "Inserisci un moltiplicatore di {{max}} o meno",
-    "thresholdMaxError": "Inserisci un importo di {{max}} o meno."
+    "thresholdMaxError": "Inserisci un importo di {{max}} o meno"
   },
   "profiles": {
     "title": "Profili",

@@ -3796,11 +3796,11 @@
   "spendAlerts": {
     "subtitle": "کله چې د دې ساحې لګښت له یو حد څخه تېر شي یا له خپل عادي ساعتي کچه پورته ووځي، د بلونو اړیکو ته د برېښنالیک یا push له لارې خبرتیا ولېږه.",
     "thresholdTitle": "د حد تېرېدل",
-    "thresholdSubtitle": "روان لګښت ستاسو حد تېروي",
+    "thresholdSubtitle": "د دې ساحې روان لګښت په ټاکل شوې موده کې ستاسو حد تېروي",
     "anomalyTitle": "ساعتي زیاتوالی",
-    "anomalySubtitle": "یوه ساعته د دې ساحې له عادي کچې ډېره لوړه ده",
+    "anomalySubtitle": "د دې ساحې ساعتي کچه له خپل p95 بنسټ څخه ډېره لوړه ده",
     "limitLabel": "حد (USD)",
-    "windowLabel": "کړکۍ",
+    "windowLabel": "موده",
     "window24h": "24 ساعته",
     "window7d": "7 ورځې",
     "window30d": "30 ورځې",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
     "pushOffByCategory": "په خبرتیاوو کې بند",
     "multiplierMaxError": "د {{max}} یا کم ضریب ولیکه",
-    "thresholdMaxError": "د {{max}} یا کمه اندازه ولیکئ."
+    "thresholdMaxError": "د {{max}} یا کمه اندازه ولیکه"
   },
   "profiles": {
     "title": "پروفایلونه",

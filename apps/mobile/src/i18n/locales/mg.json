@@ -3802,9 +3802,9 @@
   "spendAlerts": {
     "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
     "thresholdTitle": "Fihoaram-bidy",
-    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
+    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy amin'ity faritra ity mandritra ny fe-potoana voafidy",
     "anomalyTitle": "Fitsambikinana isan'ora",
-    "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
+    "anomalySubtitle": "Ny taha isan'oran'ity faritra ity dia ambony lavitra noho ny fototra p95 azy manokana",
     "limitLabel": "Fetra (USD)",
     "windowLabel": "Fe-potoana",
     "window24h": "Adiny 24",
@@ -3821,7 +3821,7 @@
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana",
     "multiplierMaxError": "Ampidiro mpamaro tsy mihoatra ny {{max}}",
-    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}."
+    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}"
   },
   "profiles": {
     "title": "mombamomba",

@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Bu əhatənin xərci həddi aşdıqda və ya adi saatlıq sürətindən yuxarı sıçradıqda ödəniş əlaqələrinə e-poçt və ya push ilə bildiriş göndər.",
     "thresholdTitle": "Həddin aşılması",
-    "thresholdSubtitle": "Yığılan xərc limitini aşır",
+    "thresholdSubtitle": "Bu əhatənin seçdiyiniz pəncərədəki yığılan xərci limitinizi aşır",
     "anomalyTitle": "Saatlıq sıçrayış",
-    "anomalySubtitle": "Bir saat bu əhatənin adi sürətindən xeyli yuxarıdır",
+    "anomalySubtitle": "Bu əhatənin saatlıq sürəti öz p95 baza göstəricisindən xeyli yuxarıdır",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Pəncərə",
     "window24h": "24 saat",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
     "pushOffByCategory": "Bildirişlərdə söndürülüb",
     "multiplierMaxError": "{{max}} və ya daha az əmsal daxil et",
-    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et."
+    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et"
   },
   "profiles": {
     "title": "Profillər",

@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Stuur een e-mail- of pushmelding naar de factuurcontacten wanneer de besteding van dit bereik een limiet overschrijdt of boven het gebruikelijke uurtarief uitstijgt.",
     "thresholdTitle": "Drempeloverschrijding",
-    "thresholdSubtitle": "Lopende besteding overschrijdt je limiet",
+    "thresholdSubtitle": "De lopende besteding van dit bereik overschrijdt je limiet in het gekozen venster",
     "anomalyTitle": "Uurlijkse piek",
-    "anomalySubtitle": "Een uur ligt ver boven het gebruikelijke tarief van dit bereik",
+    "anomalySubtitle": "Het uurlijkse tarief van dit bereik ligt ver boven de eigen p95-basislijn",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
     "window24h": "24 uur",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Je hebt geen toestemming om bestedingswaarschuwingen te beheren.",
     "pushOffByCategory": "Uit in Meldingen",
     "multiplierMaxError": "Voer een vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in."
+    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in"
   },
   "profiles": {
     "title": "Profielen",

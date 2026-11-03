@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
     "thresholdTitle": "Oorskryding van drempel",
-    "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
+    "thresholdSubtitle": "Hierdie omvang se lopende besteding oor die gekose venster oorskry jou limiet",
     "anomalyTitle": "Uurlikse piek",
-    "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
+    "anomalySubtitle": "Hierdie omvang se uurlikse tempo is ver bo sy eie p95-basislyn",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
     "window24h": "24 uur",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
     "pushOffByCategory": "Af in Kennisgewings",
     "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in."
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in"
   },
   "profiles": {
     "title": "Profiele",

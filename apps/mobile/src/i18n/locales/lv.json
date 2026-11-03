@@ -3852,9 +3852,9 @@
   "spendAlerts": {
     "subtitle": "Sūti brīdinājumu pa e-pastu vai push ziņojumu norēķinu kontaktpersonām, kad šīs jomas izdevumi pārsniedz limitu vai pārlec virs ierastā stundas tempa.",
     "thresholdTitle": "Sliekšņa pārsniegums",
-    "thresholdSubtitle": "Tekošie izdevumi pārsniedz tavu limitu",
+    "thresholdSubtitle": "Šīs jomas tekošie izdevumi izvēlētajā logā pārsniedz tavu limitu",
     "anomalyTitle": "Stundas lēciens",
-    "anomalySubtitle": "Viena stunda ir krietni virs šīs jomas ierastā tempa",
+    "anomalySubtitle": "Šīs jomas stundas temps ir krietni virs tās pašas p95 pamatlīnijas",
     "limitLabel": "Limits (USD)",
     "windowLabel": "Logs",
     "window24h": "24 stundas",
@@ -3871,7 +3871,7 @@
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
     "pushOffByCategory": "Izslēgts paziņojumos",
     "multiplierMaxError": "Ievadi reizinātāju, kas ir {{max}} vai mazāks",
-    "thresholdMaxError": "Ievadi summu, kas ir {{max}} vai mazāka."
+    "thresholdMaxError": "Ievadi summu, kas ir {{max}} vai mazāka"
   },
   "profiles": {
     "title": "Profili",

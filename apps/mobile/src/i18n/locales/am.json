@@ -3802,9 +3802,9 @@
   "spendAlerts": {
     "subtitle": "የዚህ አካባቢ ወጪ ገደብ ሲያልፍ ወይም ከተለመደው የሰዓት መጠኑ በላይ ሲጨምር ለሂሳብ ተጠሪዎች በኢሜይል ወይም በግፋ ማስጠንቀቂያ ላክ።",
     "thresholdTitle": "የገደብ መሻገር",
-    "thresholdSubtitle": "ተንቀሳቃሽ ወጪ ገደብህን ያልፋል",
+    "thresholdSubtitle": "የዚህ አካባቢ ተንቀሳቃሽ ወጪ በተመረጠው የጊዜ መስኮት ውስጥ ገደብህን ያልፋል",
     "anomalyTitle": "የሰዓት ጭማሪ",
-    "anomalySubtitle": "አንድ ሰዓት ከዚህ አካባቢ የተለመደው መጠን በጣም ከፍ ይላል",
+    "anomalySubtitle": "የዚህ አካባቢ የሰዓት ምጣኔ ከራሱ የ p95 መሠረታዊ መጠን በጣም ከፍ ይላል",
     "limitLabel": "ገደብ (USD)",
     "windowLabel": "የጊዜ መስኮት",
     "window24h": "24 ሰዓታት",

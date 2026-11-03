@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
     "thresholdTitle": "Daangaa darbuu",
-    "thresholdSubtitle": "Baasiin yeroo ammaa daangaa kee darbaa jira",
+    "thresholdSubtitle": "Baasiin yeroo ammaa naannoo kanaa yeroon filatani keessa daangaa kee darbaa jira",
     "anomalyTitle": "Olka'iinsa sa'aatii",
-    "anomalySubtitle": "Sa'aanni tokko sadarkaa baramaa naannoo kanaa caalaa baay'ee ol jira",
+    "anomalySubtitle": "Sadarkaan sa'aatii naannoo kanaa bu'uuraa p95 ofi isaa caalaa baay'ee ol jira",
     "limitLabel": "Daangaa (USD)",
     "windowLabel": "Yeroo",
     "window24h": "Sa'aatii 24",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
     "pushOffByCategory": "Beeksisota keessatti cufaa",
     "multiplierMaxError": "Baay'isaa {{max}} ykn isaa gadii galchi",
-    "thresholdMaxError": "Hamma {{max}} ykn isaa gadii galchi."
+    "thresholdMaxError": "Hamma {{max}} ykn isaa gadii galchi"
   },
   "profiles": {
     "title": "Profaayilii",

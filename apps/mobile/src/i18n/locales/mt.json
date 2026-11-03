@@ -3964,9 +3964,9 @@
   "spendAlerts": {
     "subtitle": "Ibgħat twissija bil-posta elettronika jew push lill-kuntatti tal-ħlasijiet meta l-infiq ta' dan il-kamp jinqabeż limitu jew jogħla 'l fuq mir-rata tas-siegħa tas-soltu.",
     "thresholdTitle": "Qbiż tal-limitu",
-    "thresholdSubtitle": "L-infiq attwali jaqbeż il-limitu tiegħek",
+    "thresholdSubtitle": "L-infiq attwali ta' dan il-kamp matul it-tieqa magħżula jaqbeż il-limitu tiegħek",
     "anomalyTitle": "Żieda fis-siegħa",
-    "anomalySubtitle": "Siegħa hija 'l fuq ħafna mir-rata tas-soltu ta' dan il-kamp",
+    "anomalySubtitle": "Ir-rata ta' kull siegħa ta' dan il-kamp hija 'l fuq ħafna mill-bażelina p95 tiegħu stess",
     "limitLabel": "Limitu (USD)",
     "windowLabel": "Tieqa",
     "window24h": "24 siegħa",
@@ -3983,7 +3983,7 @@
     "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
     "pushOffByCategory": "Mitfi fin-Notifiki",
     "multiplierMaxError": "Daħħal multiplikatur ta' {{max}} jew inqas",
-    "thresholdMaxError": "Daħħal ammont ta' {{max}} jew inqas."
+    "thresholdMaxError": "Daħħal ammont ta' {{max}} jew inqas"
   },
   "profiles": {
     "title": "Profili",

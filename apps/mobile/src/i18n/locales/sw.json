@@ -3796,9 +3796,9 @@
   "spendAlerts": {
     "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
     "thresholdTitle": "Kuvuka kizingiti",
-    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "thresholdSubtitle": "Matumizi yanayoendelea ya wigo huu kwenye kipindi ulichochagua yanapita kikomo chako",
     "anomalyTitle": "Kuongezeka kwa saa",
-    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "anomalySubtitle": "Kiwango cha matumizi kwa saa cha wigo huu kiko juu sana kuliko msingi wake wa p95",
     "limitLabel": "Kikomo (USD)",
     "windowLabel": "Kipindi",
     "window24h": "Saa 24",
@@ -3815,7 +3815,7 @@
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa",
     "multiplierMaxError": "Weka kizidishi cha {{max}} au chini",
-    "thresholdMaxError": "Weka kiasi cha {{max}} au chini."
+    "thresholdMaxError": "Weka kiasi cha {{max}} au chini"
   },
   "profiles": {
     "title": "Wasifu",

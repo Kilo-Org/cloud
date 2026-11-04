@@ -279,7 +279,10 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
       verify(request.cookies.get('turnstile_jwt')?.value)
     );
     const ip = trustedClientIP(request);
-    if (!session.success || !turnstile.success || !ip || turnstile.data.ip !== ip) return result;
+    // Turnstile uses its issuance header; only the Watchwood request uses the trusted IP.
+    const turnstileIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    if (!session.success || !turnstile.success || !ip || turnstile.data.ip !== turnstileIp)
+      return result;
     safetyIdentifier = session.data.safetyIdentifier;
     turnstileGuid = turnstile.data.guid;
     const declaredLength = request.headers.get('content-length');

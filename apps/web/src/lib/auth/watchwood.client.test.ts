@@ -104,6 +104,29 @@ describe('Watchwood browser signup', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it('collects and submits evidence without Promise.withResolvers support', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Promise, 'withResolvers');
+    Reflect.set(Promise, 'withResolvers', undefined);
+    try {
+      const prepared = prepare().then(
+        () => true,
+        () => false
+      );
+      await jest.advanceTimersByTimeAsync(0);
+      installSdk();
+      script().dispatchEvent(new window.Event('load'));
+      expect(await prepared).toBe(true);
+
+      await submit();
+
+      expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      if (descriptor) Object.defineProperty(Promise, 'withResolvers', descriptor);
+      else Reflect.deleteProperty(Promise, 'withResolvers');
+    }
+  });
+
   it('skips SDK loading when the server context request fails', async () => {
     fetchMock.mockResolvedValue(Response.json({ enabled: true }, { status: 503 }));
 

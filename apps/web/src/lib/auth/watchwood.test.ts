@@ -241,9 +241,10 @@ describe('Watchwood signup assessment', () => {
     }
   );
 
-  it('uses only the Vercel-provided address in deployed requests', async () => {
+  it('uses the trusted Vercel address when Turnstile forwarding metadata differs', async () => {
     process.env.VERCEL = '1';
     const identity = await session();
+    mockCookieValues.set('turnstile_jwt', signed({ guid, ip: '192.0.2.11' }));
     await assessWatchwoodSignup(
       request(
         { token: browserToken, safety_identifier: identity },

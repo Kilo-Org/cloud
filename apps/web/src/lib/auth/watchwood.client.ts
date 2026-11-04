@@ -2,6 +2,8 @@
 
 import { z } from 'zod';
 
+// Supported browsers lack Promise.withResolvers, so this module uses Promise constructors.
+
 const sdkUrl = 'https://cdn.platform.openai.com/deployments/watchwood/watchwood.js';
 const scriptId = 'watchwood-sdk';
 const timeoutMs = 2_000;
@@ -37,30 +39,30 @@ async function loadSdk(signal: AbortSignal) {
   const sdk = readSdk();
   if (sdk) return sdk;
 
-  const { promise, resolve, reject } = Promise.withResolvers<void>();
   const script = document.createElement('script');
   script.id = scriptId;
   script.src = sdkUrl;
   script.async = true;
-  const cleanup = () => {
-    script.removeEventListener('load', onLoad);
-    script.removeEventListener('error', onError);
-    signal.removeEventListener('abort', onError);
-  };
-  const onLoad = () => {
-    cleanup();
-    resolve();
-  };
-  const onError = () => {
-    cleanup();
-    script.remove();
-    reject(new Error('Watchwood unavailable'));
-  };
-  script.addEventListener('load', onLoad, { once: true });
-  script.addEventListener('error', onError, { once: true });
-  signal.addEventListener('abort', onError, { once: true });
-  document.head.appendChild(script);
-  await promise;
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      script.removeEventListener('load', onLoad);
+      script.removeEventListener('error', onError);
+      signal.removeEventListener('abort', onError);
+    };
+    const onLoad = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      script.remove();
+      reject(new Error('Watchwood unavailable'));
+    };
+    script.addEventListener('load', onLoad, { once: true });
+    script.addEventListener('error', onError, { once: true });
+    signal.addEventListener('abort', onError, { once: true });
+    document.head.appendChild(script);
+  });
 
   signal.throwIfAborted();
   const loadedSdk = readSdk();
@@ -115,8 +117,9 @@ async function runWatchwoodSignup(submit: boolean): Promise<void> {
   const controller = new AbortController();
   activeOperation = controller;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const { promise: aborted, resolve } = Promise.withResolvers<void>();
-  controller.signal.addEventListener('abort', () => resolve(), { once: true });
+  const aborted = new Promise<void>(resolve => {
+    controller.signal.addEventListener('abort', () => resolve(), { once: true });
+  });
   try {
     await Promise.race([performWatchwoodSignup(controller.signal, submit), aborted]);
   } catch {

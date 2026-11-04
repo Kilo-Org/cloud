@@ -76,6 +76,97 @@ GitLab and Bitbucket parity checks remain synthetic. Maximum ingress sizes and
 long-duration forwarding remain unverified. Native HTTP/high-port startup guards
 remain required; host Docker routing is not a containment substitute.
 
+## Cloud fixture provider (K1 contract)
+
+`fixture-provider.ts` implements the Cloud side of K1's versioned fixture
+provider (`Kilo-Org/kilocode` `packages/kilo-e2e/schema/*.v1.json`) for both the
+local and hosted Cloud lanes. It is local/manual test infrastructure, never a
+production endpoint, and refuses any non-loopback origin or database.
+
+K1 invokes it as a subprocess with a file-path protocol and no credentials on
+argv:
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  prepare --request <provider-request.json> --result <prepare-result.json>
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  cleanup --request <cleanup-request.json> --result <cleanup-result.json>
+```
+
+The request contains `runId`, `lane`, `fakeLlmScope`, `descriptorPath`,
+`projectDir`, and the per-run XDG `state` directories. A run id is 1-55
+characters of letters, digits, underscore, or dash: `scopeForRun` prefixes
+`kilo-e2e-` and the fake LLM caps a scope token at 64 characters. `prepare` writes the
+descriptor atomically with mode 0600, refuses a scope other than
+`kilo-e2e-<runId>`, and returns the K1 `ProviderPrepareResult`. K1's default
+provider timeout is 30 seconds; a Cloud-lane `prepare` creates a hosted
+workspace through the real stack, so a consumer that needs more headroom raises
+`provider.timeoutMs`.
+
+One local command prepares both lanes and prints a machine-readable summary:
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  prepare-lanes --run-id local-$(date +%s) --out dev/logs/fixture \
+  --git-url https://github.com/octocat/Hello-World.git
+```
+
+Descriptor mapping:
+
+- `origins` come only from `pnpm dev:status --json`; the gateway origin includes
+  `/api/v1`, and optional session-ingest/event-service origins are present only
+  when those services are up.
+- `credentials.apiKey` is the local fixture user bearer; the user is reused
+  across runs, while profiles, workspaces, and sessions stay run-scoped. It is
+  never printed.
+- `project.model` is `kilo/fake-deterministic`, `project.seed` is derived from
+  the run id, and `project.gitUrl` is the caller git URL for `lane=cloud` and
+  `file://<projectDir>` for `lane=local`.
+- `resources` is populated only for `lane=cloud` from a run-owned profile and
+  hosted workspace/root session.
+- `cleanup.ids` records the profile, workspace, cloud/native session, and the
+  fake-LLM scope; `cleanup.token` is mirrored into the profile description as
+  the ownership marker.
+
+Observe/gate hooks are scoped to the descriptor's run; a tag must be the scope
+or start with `<scope>-`:
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  observe --descriptor <descriptor.json> --tag kilo-e2e-<runId>-stream
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  gate --descriptor <descriptor.json> --tag kilo-e2e-<runId>-stream --wait-ms 120000
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  release --descriptor <descriptor.json> --tag kilo-e2e-<runId>-stream
+pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
+  directives --descriptor <descriptor.json> --token <scenario token>
+```
+
+`directives` prints the run-scoped `open` (`idle`), `stream` (`echo:<token>`),
+and human-required permission (`file:write`) directive texts. Drivers prepend
+nothing further; the scope marker is what makes the fake's counters and gates
+run-local.
+
+`cleanup` (with `--descriptor`) is safe to run twice: an absent descriptor is a
+clean no-op, already-removed resources are reported as removed, a workspace is
+deleted only when its persisted owner, profile, and root session match, and a
+foreign or uninspectable resource becomes a leftover with a failed result
+instead of being deleted. Run it with `--remove-descriptor` to mirror the K1
+coordinator after a clean result.
+
+Scope checks:
+
+```bash
+pnpm --filter cloud-agent-next run typecheck:fixture
+pnpm --filter cloud-agent-next exec vitest run test/unit/e2e/fixture-contract.test.ts test/unit/e2e/fixture-provider.test.ts
+pnpm --filter cloud-agent-next lint
+pnpm --filter cloud-agent-next check:duplication
+```
+
+Stack-down, a `POSTGRES_URL` that is not the discovered local postgres, or a
+non-loopback origin each fail before any resource is created (or deleted) with
+the concrete cause; there is no skip or production fallback.
+
 ## Running
 
 ### Native supervision acceptance fixtures

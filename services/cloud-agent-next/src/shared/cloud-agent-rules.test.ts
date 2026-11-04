@@ -7,8 +7,9 @@ describe('buildCloudAgentRules', () => {
 
     expect(rules).toContain('## Git Branches');
     expect(rules).toContain(
-      'Commit and push to the branch this session started on. Do not create or switch branches, or move the work to a differently named branch, unless the user explicitly asks for it.'
+      'Stay on the branch this session started on. Do not create or switch branches, or move the work to a differently named branch, unless the user explicitly asks for it.'
     );
+    expect(rules).toContain('This rule does not ask you to commit or push.');
     expect(rules).toContain('# Cloud Agent Environment');
     expect(rules).toContain('## Command Execution');
   });

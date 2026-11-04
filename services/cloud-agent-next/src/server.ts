@@ -88,10 +88,8 @@ import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
-import { verifiedVercelSandboxIdentityContract } from './scm-broker/vercel-identity.js';
 
 const app = new Hono<HonoContext>();
-if (verifiedVercelSandboxIdentityContract) registerVercelScmBrokerRoute(app);
 
 const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
 const SnapshotBuildStartInputSchema = z
@@ -291,6 +289,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   if (!route) return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
+
+registerVercelScmBrokerRoute(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({

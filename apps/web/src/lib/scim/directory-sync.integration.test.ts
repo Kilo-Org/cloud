@@ -392,6 +392,64 @@ describe('directory membership', () => {
       addDirectoryMembership({ directoryGroupId, externalId: `directory_user_absent_${suffix}` })
     ).rejects.toThrow(DirectorySyncConflictError);
   });
+
+  test('a replayed removal reports no change', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    const first = await removeDirectoryMembership({ directoryGroupId, externalId });
+    const replay = await removeDirectoryMembership({ directoryGroupId, externalId });
+
+    expect(first.removed).toBe(true);
+    expect(replay.removed).toBe(false);
+  });
+
+  test('removal converges for an unbound directory group', async () => {
+    await seedUser();
+
+    // Nothing to revoke is the state the event asks for, so this must not
+    // conflict: provisioning the group would be creating rows for a departing
+    // user, and a 409 would hold the Worker's cursor for an add that may never
+    // arrive.
+    const result = await removeDirectoryMembership({
+      directoryGroupId: `directory_group_absent_${suffix}`,
+      externalId,
+    });
+
+    expect(result).toEqual({
+      organizationId: null,
+      parentOrganizationId: null,
+      kiloUserId: null,
+      removed: false,
+    });
+  });
+
+  test('removal converges for an unknown directory user, and provisions nobody', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const absentExternalId = `directory_user_absent_${suffix}`;
+
+    const result = await removeDirectoryMembership({
+      directoryGroupId,
+      externalId: absentExternalId,
+    });
+
+    expect(result).toEqual({
+      organizationId: childId,
+      parentOrganizationId: parentId,
+      kiloUserId: null,
+      removed: false,
+    });
+
+    // A user leaving the directory must never be created by their own removal.
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, absentExternalId));
+    expect(users).toEqual([]);
+  });
 });
 
 describe('deleteDirectorySubOrganization', () => {

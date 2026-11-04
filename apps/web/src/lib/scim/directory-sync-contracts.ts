@@ -91,6 +91,31 @@ export type DirectoryMembershipResult = {
   clearedRemovalTombstone: boolean;
 };
 
+/**
+ * Removal is reported separately from an add, because it converges rather than
+ * requiring its subjects to exist.
+ *
+ * A `dsync.group.user_removed` for a group or user Kilo never provisioned has
+ * nothing to revoke, so it reports `removed: false` with null subjects instead
+ * of conflicting. Provisioning them to satisfy the removal would create a Kilo
+ * account for a user who is leaving the directory, which is plainly wrong, and
+ * a 409 would hold the cursor waiting for an add that may never come.
+ *
+ * The tradeoff is deliberate: with no membership row there is no tombstone, so
+ * a `user_removed` that overtakes its `user_added` lets the late add win. Add
+ * before remove is the normal order and WorkOS consumes serially, so this is a
+ * rare reordering, and it is preferred over provisioning departing users.
+ */
+export type DirectoryMembershipRemovalResult = {
+  /** Null when no live sub-organization is bound to the directory group. */
+  organizationId: string | null;
+  parentOrganizationId: string | null;
+  /** Null when no user is bound to the directory user. */
+  kiloUserId: string | null;
+  /** False when there was nothing to remove, which is the converged case. */
+  removed: boolean;
+};
+
 /** Soft delete: `deleted_at` is stamped, nothing is removed. */
 export type DirectorySyncDeleteResult = {
   id: string;

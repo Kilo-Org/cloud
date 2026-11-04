@@ -17,6 +17,7 @@ import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 
 import type {
   DirectoryMembership,
+  DirectoryMembershipRemovalResult,
   DirectoryMembershipResult,
   DirectoryOrganizationUpsert,
   DirectorySubOrganizationUpsert,
@@ -338,13 +339,20 @@ export async function addDirectoryMembership(
  * same parent, so leaving one group must not revoke access to the directory's
  * organization.
  *
+ * Converges rather than conflicting. An unknown group or user means there is no
+ * membership to revoke, which is the state the event asks for, so it reports
+ * `removed: false` instead of throwing. The alternative would be provisioning
+ * the group and user first — which creates a Kilo account for a user who is
+ * leaving the directory — or holding the Worker's cursor on a 409 waiting for
+ * an add that may never arrive.
+ *
  * `removeUserFromOrganization` hard-deletes the membership and writes the
  * tombstone, which is the repo's removal protocol, and also cascades away the
  * user's model-access group assignments in that organization.
  */
 export async function removeDirectoryMembership(
   input: DirectoryMembership
-): Promise<DirectoryMembershipResult> {
+): Promise<DirectoryMembershipRemovalResult> {
   const groupRows = await db
     .select({ id: organizations.id, parent: organizations.parent_organization_id })
     .from(organizations)
@@ -353,9 +361,12 @@ export async function removeDirectoryMembership(
 
   const group = groupRows.at(0);
   if (!group) {
-    throw new DirectorySyncConflictError(
-      `No live sub-organization is bound to directory group ${input.directoryGroupId}`
-    );
+    return {
+      organizationId: null,
+      parentOrganizationId: null,
+      kiloUserId: null,
+      removed: false,
+    };
   }
 
   const userRows = await db
@@ -366,7 +377,12 @@ export async function removeDirectoryMembership(
 
   const user = userRows.at(0);
   if (!user) {
-    throw new DirectorySyncConflictError(`No user is bound to directory user ${input.externalId}`);
+    return {
+      organizationId: group.id,
+      parentOrganizationId: group.parent,
+      kiloUserId: null,
+      removed: false,
+    };
   }
 
   // `removedBy` is left undefined: the actor is the identity provider, and the
@@ -374,14 +390,15 @@ export async function removeDirectoryMembership(
   // back to the removed user's own id for the group-policy revision bump, and
   // the tombstone records `removed_by` as null — which is what "not removed by
   // a Kilo user" should look like.
-  await removeUserFromOrganization(group.id, user.id);
+  const { rowCount } = await removeUserFromOrganization(group.id, user.id);
 
   return {
     organizationId: group.id,
     parentOrganizationId: group.parent,
     kiloUserId: user.id,
-    created: false,
-    clearedRemovalTombstone: false,
+    // A replayed removal finds no membership and reports no change, which is
+    // what makes the route idempotent.
+    removed: (rowCount ?? 0) > 0,
   };
 }
 

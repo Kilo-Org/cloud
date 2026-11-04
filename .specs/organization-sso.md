@@ -79,6 +79,7 @@ Active.
 9. Directory provisioning of a Directory user MAY bypass signup admission, which exists to rate-limit self-service signup abuse and cannot apply to a machine-initiated request that has no end user or client IP. Every other account-creation protection — email deduplication, the deletion fence, and billing-customer provisioning with its compensating delete — MUST still apply, and each bypass MUST be audited.
 10. Directory sync MUST NOT delete a Kilo user account. A Directory user leaving a directory MUST remove memberships only; account deletion is a separate, explicitly requested operation.
 11. A directory disconnect MUST soft-delete the affected Directory group organizations and MUST release their directory bindings, so a later reconnect binds cleanly rather than colliding.
+12. Directory sync MUST NOT create a Kilo user or organization in order to apply a removal. A removal whose Directory group organization or Directory user does not exist has no membership to revoke, which is the state the event asserts, so it MUST converge and report that nothing was removed rather than count as a missing dependency under rule 7. Provisioning a departing user's account, or holding the cursor for an addition that may never arrive, are both worse than the single consequence this accepts: with no membership there is no Removal tombstone, so a removal that overtakes its own addition lets the late addition win. Addition before removal is the normal order and the event stream is consumed serially, so that reordering is rare.
 
 ### Isolation
 

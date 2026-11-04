@@ -41,8 +41,7 @@ jest.mock('@/lib/scim/directory-sync', () => {
       organizationId: 'org-2',
       parentOrganizationId: 'org-1',
       kiloUserId: 'user-1',
-      created: false,
-      clearedRemovalTombstone: false,
+      removed: true,
     })),
   };
 });
@@ -184,6 +183,28 @@ describe('success', () => {
 
     expect(response.status).toBe(200);
     expect(directorySync.removeDirectoryMembership).toHaveBeenCalledWith(membershipBody);
+  });
+
+  test('DELETE memberships converges with nothing to remove', async () => {
+    // An unknown group or user is the removal's converged state, not a
+    // conflict, so the Worker advances its cursor rather than retrying for an
+    // add that may never arrive.
+    jest.mocked(directorySync.removeDirectoryMembership).mockResolvedValueOnce({
+      organizationId: null,
+      parentOrganizationId: null,
+      kiloUserId: null,
+      removed: false,
+    });
+
+    const response = await deleteMembership(request(membershipBody));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      organizationId: null,
+      parentOrganizationId: null,
+      kiloUserId: null,
+      removed: false,
+    });
   });
 });
 

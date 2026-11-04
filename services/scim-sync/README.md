@@ -91,16 +91,43 @@ unknown field is a 400 rather than a silently dropped one — a new field must
 land in `directory-sync-contracts.ts` as optional before the Worker starts
 sending it.
 
-Three response classes, and they decide cursor movement:
+### Arrival order
+
+`dsync.group.user_added` carries the whole user and the whole group
+(`data: { directoryId, user: DirectoryUser, group: DirectoryGroup }`), which is
+every field the group and user upserts require. So the dispatcher upserts both
+from the payload before posting the membership — three idempotent calls, and the
+event no longer depends on its `dsync.group.created` and `dsync.user.created`
+having been seen first. The two upserts are no-ops in the normal case.
+
+The directory is deliberately **not** provisioned this way. Nothing in a
+`dsync.group.*` payload distinguishes a directory Kilo never activated from one
+an administrator disconnected, so backfilling it resurrects the organization and
+its groups after a `dsync.deleted`. An unknown directory stays a 409; recovering
+a lost cursor is an operator action, using `range_start`.
+
+`dsync.group.user_removed` takes no prerequisite calls. An unknown group or user
+means there is no membership to revoke, which is what the event asserts, so the
+route answers 200 with `removed: false`. Provisioning them would create an
+account for a user who is leaving the directory. The accepted cost is that a
+removal arriving before its own addition leaves no tombstone to fence the late
+addition with — see `.specs/organization-sso.md`, Directory Sync rule 12.
+
+### Response classes
+
+Three classes, and they decide cursor movement:
 
 | Status | Meaning | Cursor |
 |---|---|---|
-| 2xx | Applied, or already applied | Advance |
-| 409 | A dependency is missing — an event ahead of the directory, user, or group it needs, or a group under a group | Hold and retry; the body names the dependency |
+| 2xx | Applied, already applied, or nothing to do | Advance |
+| 409 | A dependency is missing — an unactivated directory, or a group whose directory resolves to a sub-organization | Hold and retry; the body names the dependency |
 | 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
 
-409 is how out-of-order delivery recovers, which is why it must not be treated
-as a permanent failure.
+A 409 is not always recoverable by waiting. `Could not provision directory user:
+EMAIL-ALREADY-USED` means a personal account already owns that address, and a
+group under a sub-organization is structural — no arrival order fixes either.
+Separating those from the retryable cases is open, and is why the loop needs a
+bound rather than indefinite retry.
 
 ## Logging
 

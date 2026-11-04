@@ -42,6 +42,13 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
  * parent, so leaving one group must not revoke access to the directory's
  * organization.
  *
+ * Converges instead of conflicting: a group or user Kilo never provisioned has
+ * no membership to revoke, so this answers 200 with `removed: false` rather
+ * than 409. Provisioning them first would create an account for a user who is
+ * leaving the directory, and a 409 would hold the caller's cursor waiting for
+ * an add that may never arrive. So `dsync.group.user_removed` needs no
+ * prerequisite calls, unlike `dsync.group.user_added`.
+ *
  * The body is read rather than taken from the path because a membership is
  * identified by a pair. `DELETE` with a body is unusual, but the alternative is
  * encoding two WorkOS identifiers into a path segment.

@@ -48,6 +48,12 @@ export const DirectorySubOrganizationUpsertSchema = z.strictObject({
 export type DirectorySubOrganizationUpsert = z.infer<typeof DirectorySubOrganizationUpsertSchema>;
 
 export const DirectoryUserUpsertSchema = z.strictObject({
+  /**
+   * `data.directory_id` — resolves the organization whose Effective SSO policy
+   * domain decides whether a pre-existing account holding this address may be
+   * taken over. Required: without it the domain gate cannot run.
+   */
+  directoryId: workOSId,
   /** `data.email`. Required: a user row cannot exist without one. */
   email: z.string().email().max(320),
   firstName: z.string().max(255).nullish(),

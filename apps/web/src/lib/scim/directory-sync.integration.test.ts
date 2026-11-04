@@ -4,10 +4,13 @@ import {
   organization_membership_removals,
   organization_memberships,
   organizations,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+
+import { createOrUpdateUser } from '@/lib/user';
 
 // Stripe is not reachable in tests (`.env.test` sets a deliberately invalid
 // key), so the two entry points that provision a customer are stubbed. Both are
@@ -101,6 +104,7 @@ async function seedSubOrganization(): Promise<string> {
 
 async function seedUser(): Promise<string> {
   const result = await upsertDirectoryUser(externalId, {
+    directoryId,
     email,
     firstName: 'Bob',
     lastName: 'Bobert',
@@ -256,6 +260,7 @@ describe('upsertDirectoryUser', () => {
   test('is idempotent: a replayed event returns the same user', async () => {
     const first = await seedUser();
     const second = await upsertDirectoryUser(externalId, {
+      directoryId,
       email,
       firstName: 'Bob',
       lastName: 'Bobert',
@@ -266,27 +271,150 @@ describe('upsertDirectoryUser', () => {
     expect(second.created).toBe(false);
   });
 
-  test('adopts an existing account that matches on email', async () => {
-    const existing = await upsertDirectoryUser(`directory_user_other_${suffix}`, {
-      email,
-      firstName: 'Bob',
-      lastName: 'Bobert',
-      idpId: `idp_other_${suffix}`,
-    });
-    createdUserIds.push(existing.id);
+  test('takes over an existing account when the organization captured its domain', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
 
-    const linked = await upsertDirectoryUser(externalId, {
-      email,
-      firstName: 'Bob',
-      lastName: 'Bobert',
+    // A personal account on the captured domain, holding a non-SSO login and a
+    // live browser session.
+    const capturedEmail = `holder-${suffix}@${domain}`;
+    const priorHolder = await createOrUpdateUser(
+      {
+        google_user_email: capturedEmail,
+        google_user_name: 'Prior Holder',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google',
+        provider_account_id: `google_${suffix}`,
+      },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { skipSignupAdmission: true }
+    );
+    if (!priorHolder.success) throw new Error(`setup failed: ${priorHolder.error}`);
+    createdUserIds.push(priorHolder.user.id);
+
+    const taken = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: capturedEmail,
+      firstName: 'Prior',
+      lastName: 'Holder',
       idpId: `idp_${suffix}`,
     });
 
-    expect(linked.id).toBe(existing.id);
-    expect(linked.created).toBe(false);
+    // The same account, not a second one: the address is unique per account.
+    expect(taken.id).toBe(priorHolder.user.id);
 
-    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, linked.id));
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, taken.id));
     expect(row.external_id).toBe(externalId);
+    // The prior holder keeps no live browser session (Authentication rule 7).
+    expect(row.web_session_pepper).not.toBe(priorHolder.user.web_session_pepper);
+
+    // ...and no non-SSO login survives, so they cannot sign back in past SSO.
+    const providers = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, taken.id));
+    expect(providers.map(provider => provider.provider)).toEqual(['workos']);
+  });
+
+  test('refuses to take over an account whose domain the organization never captured', async () => {
+    const organizationId = await seedOrganization();
+    await db
+      .update(organizations)
+      .set({ sso_domain: `captured-${suffix}.test` })
+      .where(eq(organizations.id, organizationId));
+
+    const foreignEmail = `holder-${suffix}@unrelated-${suffix}.test`;
+    const priorHolder = await createOrUpdateUser(
+      {
+        google_user_email: foreignEmail,
+        google_user_name: 'Unrelated Person',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google',
+        provider_account_id: `google_${suffix}`,
+      },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { skipSignupAdmission: true }
+    );
+    if (!priorHolder.success) throw new Error(`setup failed: ${priorHolder.error}`);
+    createdUserIds.push(priorHolder.user.id);
+
+    await expect(
+      upsertDirectoryUser(externalId, {
+        directoryId,
+        email: foreignEmail,
+        firstName: 'Unrelated',
+        lastName: 'Person',
+        idpId: `idp_${suffix}`,
+      })
+    ).rejects.toThrow(DirectorySyncConflictError);
+
+    // The account is untouched: still its own login, still bound to nobody.
+    const [row] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, priorHolder.user.id));
+    expect(row.external_id).toBeNull();
+    expect(row.web_session_pepper).toBe(priorHolder.user.web_session_pepper);
+
+    const providers = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, priorHolder.user.id));
+    expect(providers.map(provider => provider.provider)).toEqual(['google']);
+  });
+
+  test('refuses a takeover when the organization has captured no domain at all', async () => {
+    await seedOrganization();
+
+    const unclaimedEmail = `holder-${suffix}@nopolicy-${suffix}.test`;
+    const priorHolder = await createOrUpdateUser(
+      {
+        google_user_email: unclaimedEmail,
+        google_user_name: 'No Policy',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google',
+        provider_account_id: `google_${suffix}`,
+      },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { skipSignupAdmission: true }
+    );
+    if (!priorHolder.success) throw new Error(`setup failed: ${priorHolder.error}`);
+    createdUserIds.push(priorHolder.user.id);
+
+    await expect(
+      upsertDirectoryUser(externalId, {
+        directoryId,
+        email: unclaimedEmail,
+        firstName: 'No',
+        lastName: 'Policy',
+        idpId: `idp_${suffix}`,
+      })
+    ).rejects.toThrow(DirectorySyncConflictError);
   });
 });
 

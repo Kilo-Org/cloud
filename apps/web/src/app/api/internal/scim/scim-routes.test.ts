@@ -64,7 +64,13 @@ const subOrganizationBody = {
   directoryIdpId: 'idp_group_123',
   name: 'engineering',
 };
-const userBody = { email: 'person@acme.test', firstName: 'A', lastName: 'B', idpId: 'idp_1' };
+const userBody = {
+  directoryId: 'directory_123',
+  email: 'person@acme.test',
+  firstName: 'A',
+  lastName: 'B',
+  idpId: 'idp_1',
+};
 const membershipBody = { directoryGroupId: 'directory_group_123', externalId: 'directory_user_1' };
 
 const organizationParams = { params: Promise.resolve({ directoryId: 'directory_123' }) };

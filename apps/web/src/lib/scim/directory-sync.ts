@@ -4,6 +4,8 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import {
   addUserToOrganization,
   createOrganization,
@@ -196,11 +198,26 @@ export async function upsertDirectorySubOrganization(
 /**
  * Bind a WorkOS directory user to a Kilo user.
  *
- * Matches `external_id` first, then the normalized email so a directory user
- * who already signed in is adopted rather than duplicated. Creation goes
- * through `createOrUpdateUser`, which owns the Stripe customer, the
- * normalized-email dedup check, the soft-delete fence, and the compensating
- * Stripe delete when any of those reject.
+ * A pre-existing account holding the directory user's address is taken over,
+ * but only when the address's domain equals the Effective SSO policy domain of
+ * the directory's organization. Domain capture is what establishes the
+ * enterprise's claim to the address, and the identity provider has asserted
+ * that this person holds it, so the account is converted to the SSO authority's
+ * WorkOS identity rather than refused or duplicated. A non-matching domain is
+ * refused: an unverified domain is not the enterprise's to claim. Every SCIM
+ * account is expected to be domain-captured, so a refusal means the directory
+ * is pushing an address its organization never proved it owns.
+ *
+ * Both paths go through `createOrUpdateUser` with `provider: 'workos'` and
+ * `autoLinkToExistingUser`, which owns the whole settlement: for an existing
+ * address it replaces the account's auth providers with the `workos` row and
+ * rotates `web_session_pepper` in one transaction, so the prior holder keeps
+ * neither a non-SSO login nor a live browser session (Authentication rules 1,
+ * 2, and 7); for a new address it owns the Stripe customer, the
+ * normalized-email dedup, the soft-delete fence, and the compensating Stripe
+ * delete when any of those reject.
+ *
+ * See `.specs/organization-sso.md`, Directory Sync rule 13.
  */
 export async function upsertDirectoryUser(
   externalId: string,
@@ -217,19 +234,16 @@ export async function upsertDirectoryUser(
     return { id: bound.id, created: false };
   }
 
-  const displayName = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
-
   // `findUserByNormalizedEmail` also matches legacy rows whose
   // `normalized_email` is null by comparing `google_user_email`, which a plain
-  // equality check on the normalized column would miss.
+  // equality check on the normalized column would miss. Taking one over is
+  // gated on the domain; `createOrUpdateUser` performs the conversion.
   const existing = await findUserByNormalizedEmail(input.email);
   if (existing) {
-    await db
-      .update(kilocode_users)
-      .set({ external_id: externalId })
-      .where(eq(kilocode_users.id, existing.id));
-    return { id: existing.id, created: false };
+    await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
   }
+
+  const displayName = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
 
   const result = await createOrUpdateUser(
     {
@@ -243,6 +257,8 @@ export async function upsertDirectoryUser(
       provider_account_id: input.idpId,
     },
     undefined,
+    // The directory asserted this identity, which is the proof that authorizes
+    // linking the address to its WorkOS account.
     true,
     undefined,
     undefined,
@@ -256,20 +272,6 @@ export async function upsertDirectoryUser(
   );
 
   if (!result.success) {
-    // `EMAIL-ALREADY-USED` is the one failure here that no arrival order and no
-    // retry can clear: a pre-existing Kilo account holds that address, and
-    // `findUserByNormalizedEmail` above already adopted every account this code
-    // is willing to claim.
-    //
-    // It should not stay a refusal. Where the address's domain equals the
-    // Effective SSO policy domain of the directory's organization, the
-    // enterprise's claim to it is already established by domain capture and the
-    // identity provider has asserted that this person holds it, so the existing
-    // account must be convertible to the SSO authority's WorkOS identity and
-    // bound to this Directory user instead — see `.specs/organization-sso.md`,
-    // Directory Sync rule 13. That conversion is not implemented here yet: it
-    // needs the SSO policy lookup, session invalidation under Authentication
-    // rule 7, and an audit record. A non-matching domain stays refused.
     throw new DirectorySyncConflictError(`Could not provision directory user: ${result.error}`);
   }
 
@@ -279,6 +281,58 @@ export async function upsertDirectoryUser(
     .where(eq(kilocode_users.id, result.user.id));
 
   return { id: result.user.id, created: result.isNew };
+}
+
+/**
+ * Refuses unless the directory's organization has captured the address's
+ * domain, which is the only thing that authorizes taking over an account
+ * someone else already holds.
+ *
+ * The policy is read from the directory's organization rather than the
+ * address: resolving an authority from the domain alone would let any
+ * organization that captured a domain take over addresses belonging to a
+ * different organization's directory. A misconfigured policy — ambiguous
+ * domain, or a child carrying its own — fails closed, under Policy Resolution
+ * rule 7.
+ */
+async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string): Promise<void> {
+  const refuse = (reason: string): never => {
+    // The skipped takeover is the auditable event: it names a directory pushing
+    // an address its organization never proved it owns.
+    console.warn('[scim] Refused a directory account takeover', {
+      directoryId,
+      emailDomain: getLowerDomainFromEmail(email),
+      reason,
+    });
+    throw new DirectorySyncConflictError(
+      `An existing Kilo account holds ${email}, and directory ${directoryId} has not captured its domain: ${reason}`
+    );
+  };
+
+  const ownerRows = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(directoryOwner(directoryId))
+    .limit(1);
+
+  const owner = ownerRows.at(0);
+  if (!owner) {
+    return refuse(`no live organization is bound to directory ${directoryId}`);
+  }
+
+  const policy = await resolveEffectiveOrganizationSsoPolicy(owner.id);
+  if (policy.status !== 'required') {
+    return refuse(
+      policy.status === 'misconfigured'
+        ? `the organization's SSO policy is misconfigured (${policy.reason})`
+        : 'the organization has no SSO domain, so it has captured nothing'
+    );
+  }
+
+  const emailDomain = getLowerDomainFromEmail(email);
+  if (emailDomain !== policy.domain) {
+    return refuse(`the organization's captured domain is ${policy.domain}`);
+  }
 }
 
 /**

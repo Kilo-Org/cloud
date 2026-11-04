@@ -100,6 +100,11 @@ from the payload before posting the membership — three idempotent calls, and t
 event no longer depends on its `dsync.group.created` and `dsync.user.created`
 having been seen first. The two upserts are no-ops in the normal case.
 
+The user upsert's `directoryId` comes from `data.directoryId` on a membership
+event and from `data.directoryId` on the `DirectoryUser` itself for
+`dsync.user.created` and `dsync.user.updated`. It is required, because the
+domain gate on account takeover resolves the organization from it.
+
 The directory is deliberately **not** provisioned this way. Nothing in a
 `dsync.group.*` payload distinguishes a directory Kilo never activated from one
 an administrator disconnected, so backfilling it resurrects the organization and
@@ -124,17 +129,24 @@ Three classes, and they decide cursor movement:
 | 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
 
 A 409 is not always recoverable by waiting. A group under a sub-organization is
-structural, and `Could not provision directory user: EMAIL-ALREADY-USED` means a
-pre-existing Kilo account already holds that address — no arrival order fixes
-either.
+structural, and a refused account takeover is a claim the directory cannot
+substantiate — no arrival order fixes either.
 
-The email collision has an intended resolution rather than a retry: where the
-address's domain equals the organization's Effective SSO policy domain, domain
-capture already establishes the enterprise's claim to it, so the existing
-account is converted to the SSO authority's WorkOS identity and bound to the
-Directory user. See `.specs/organization-sso.md`, Directory Sync rule 13. That
-conversion is not implemented yet, so the collision is still a 409 today. A
-non-matching domain stays refused.
+`PUT .../users/{external_id}` carries `directoryId` so it can resolve that
+claim. A pre-existing Kilo account holding the address is taken over only when
+the address's domain equals the Effective SSO policy domain of the directory's
+organization: domain capture is what establishes the enterprise's claim to it.
+The account is then converted to the SSO authority's WorkOS identity, its other
+authentication providers are dropped and its browser sessions are invalidated,
+so the prior holder keeps neither a login that bypasses SSO nor a live session.
+
+Any other address is refused, including when the organization has captured no
+domain or its policy is misconfigured. Every SCIM account is expected to be
+domain-captured, so a refusal is a real misconfiguration rather than a race, and
+retrying will not clear it. The app logs it as
+`[scim] Refused a directory account takeover` with the directory and the email
+domain — never the address. See `.specs/organization-sso.md`, Directory Sync
+rule 13.
 
 Separating genuinely terminal failures from the retryable ones is still open,
 and is why the loop needs a retry bound rather than indefinite retry.

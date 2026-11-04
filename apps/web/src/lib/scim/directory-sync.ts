@@ -3,9 +3,13 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
-import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import {
+  resolveEffectiveOrganizationSsoPolicy,
+  resolveSsoAuthorityForDomain,
+} from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import {
   addUserToOrganization,
   createOrganization,
@@ -68,6 +72,10 @@ export class DirectorySyncConflictError extends Error {}
  * creates one. Creating with no `userId` means no owner membership is written:
  * a directory has no Kilo actor to credit, and members arrive through
  * `dsync.group.user_added`.
+ *
+ * The event's captured domains are applied on every path, so an organization
+ * that gains a domain later picks it up on the next `dsync.activated` rather
+ * than only at creation.
  */
 export async function upsertDirectoryOrganization(
   directoryId: string,
@@ -81,6 +89,7 @@ export async function upsertDirectoryOrganization(
 
   const bound = alreadyBound.at(0);
   if (bound) {
+    await captureDirectoryDomain(bound.id, input.capturedDomains);
     return { id: bound.id, created: false };
   }
 
@@ -96,6 +105,7 @@ export async function upsertDirectoryOrganization(
       .update(organizations)
       .set({ directory_id: directoryId })
       .where(eq(organizations.id, existing.id));
+    await captureDirectoryDomain(existing.id, input.capturedDomains);
     return { id: existing.id, created: false };
   }
 
@@ -114,8 +124,79 @@ export async function upsertDirectoryOrganization(
     .update(organizations)
     .set({ directory_id: directoryId })
     .where(eq(organizations.id, created.id));
+  await captureDirectoryDomain(created.id, input.capturedDomains);
 
   return { id: created.id, created: true };
+}
+
+/**
+ * Records a WorkOS-captured domain as the organization's `sso_domain`.
+ *
+ * The domain is trusted: our administrators gate directory intake, so a domain
+ * on the event has already passed a human. What is not trusted is that it is
+ * free — Policy Resolution rule 6 forbids two authorities claiming one domain,
+ * and `resolveSsoAuthorityForDomain` fails closed on an ambiguous one, which
+ * would break authentication for both organizations. So this takes the first
+ * domain no other live organization holds, under the same advisory lock
+ * `updateSsoDomain` uses, and leaves `sso_domain` alone when every candidate is
+ * taken.
+ *
+ * An absent or empty list says nothing about domains rather than clearing one:
+ * `dsync.deleted` omits `domains` entirely, and releasing an SSO domain is a
+ * deliberate administrative action (`clearSsoDomain`), not a sync side effect.
+ *
+ * A set is written only when it changes the row, so a replayed event is a
+ * no-op and does not re-audit.
+ */
+async function captureDirectoryDomain(
+  organizationId: string,
+  capturedDomains: readonly string[] | undefined
+): Promise<void> {
+  if (!capturedDomains || capturedDomains.length === 0) return;
+
+  await db.transaction(async tx => {
+    const [organization] = await tx
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('update');
+    if (!organization) return;
+
+    for (const candidate of capturedDomains) {
+      const domain = candidate.trim().toLowerCase();
+      if (domain === '') continue;
+      if (organization.ssoDomain?.toLowerCase() === domain) return;
+
+      // Same lock `updateSsoDomain` takes, so a concurrent human capture of the
+      // same domain cannot interleave with this one.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${domain}, 0))`
+      );
+      const authority = await resolveSsoAuthorityForDomain(domain, tx);
+      if (authority.status === 'required' && authority.sourceOrganizationId !== organizationId) {
+        continue;
+      }
+      if (authority.status === 'misconfigured') continue;
+
+      await tx
+        .update(organizations)
+        .set({ sso_domain: domain })
+        .where(eq(organizations.id, organizationId));
+
+      // The same action a human capture writes, with a null actor, which is how
+      // this repo records a system-initiated organization change.
+      await createAuditLog({
+        action: 'organization.sso.set_domain',
+        actor_email: null,
+        actor_id: null,
+        actor_name: null,
+        message: `Set SSO domain to ${domain} from WorkOS directory sync`,
+        organization_id: organizationId,
+        tx,
+      });
+      return;
+    }
+  });
 }
 
 /**

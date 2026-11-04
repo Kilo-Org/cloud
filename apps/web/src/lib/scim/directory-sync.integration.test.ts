@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   kilocode_users,
+  organization_audit_logs,
   organization_membership_removals,
   organization_memberships,
   organizations,
@@ -66,6 +67,9 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (createdOrganizationIds.length > 0) {
+    await db
+      .delete(organization_audit_logs)
+      .where(inArray(organization_audit_logs.organization_id, createdOrganizationIds));
     await db
       .delete(organization_membership_removals)
       .where(inArray(organization_membership_removals.organization_id, createdOrganizationIds));
@@ -151,6 +155,101 @@ describe('upsertDirectoryOrganization', () => {
 
     expect(bound.id).toBe(adopted.id);
     expect(bound.created).toBe(false);
+  });
+
+  test('captures the event domain as the SSO domain, and re-audits nothing on replay', async () => {
+    const domain = `integrator-${suffix}.okta.com`;
+    const upsert = async () =>
+      upsertDirectoryOrganization(directoryId, {
+        workOSOrganizationId,
+        name: `SCIM Org ${suffix}`,
+        capturedDomains: [domain],
+      });
+
+    const organizationId = trackOrganization((await upsert()).id);
+
+    const [row] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    expect(row.sso_domain).toBe(domain);
+
+    // A human capture writes this action; directory sync writes it with a null
+    // actor, which is how a system-initiated organization change is recorded.
+    const audits = await db
+      .select({ action: organization_audit_logs.action, actorId: organization_audit_logs.actor_id })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId));
+    expect(audits).toEqual([{ action: 'organization.sso.set_domain', actorId: null }]);
+
+    // The set is skipped when it would not change the row, so replaying the
+    // event does not append a second audit row.
+    await upsert();
+    const auditsAfterReplay = await db
+      .select({ id: organization_audit_logs.id })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId));
+    expect(auditsAfterReplay).toHaveLength(1);
+  });
+
+  test('leaves the SSO domain alone when another organization already holds it', async () => {
+    const domain = `contested-${suffix}.test`;
+    const incumbent = trackOrganization(
+      (
+        await upsertDirectoryOrganization(`directory_incumbent_${suffix}`, {
+          workOSOrganizationId: `org_incumbent_${suffix}`,
+          name: `Incumbent ${suffix}`,
+          capturedDomains: [domain],
+        })
+      ).id
+    );
+
+    // Two authorities claiming one domain fails closed for both
+    // (Policy Resolution rule 6), so the second claim must not land.
+    const challenger = trackOrganization(
+      (
+        await upsertDirectoryOrganization(directoryId, {
+          workOSOrganizationId,
+          name: `Challenger ${suffix}`,
+          capturedDomains: [domain],
+        })
+      ).id
+    );
+
+    const [incumbentRow] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, incumbent));
+    const [challengerRow] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, challenger));
+
+    expect(incumbentRow.ssoDomain).toBe(domain);
+    expect(challengerRow.ssoDomain).toBeNull();
+  });
+
+  test('an event without domains does not clear a captured domain', async () => {
+    const domain = `kept-${suffix}.test`;
+    const organizationId = trackOrganization(
+      (
+        await upsertDirectoryOrganization(directoryId, {
+          workOSOrganizationId,
+          name: `SCIM Org ${suffix}`,
+          capturedDomains: [domain],
+        })
+      ).id
+    );
+
+    // `dsync.deleted` omits `domains`, and releasing an SSO domain is a
+    // deliberate administrative action rather than a sync side effect.
+    await upsertDirectoryOrganization(directoryId, {
+      workOSOrganizationId,
+      name: `SCIM Org ${suffix}`,
+    });
+
+    const [row] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(row.ssoDomain).toBe(domain);
   });
 });
 

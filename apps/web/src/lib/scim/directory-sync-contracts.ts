@@ -32,6 +32,19 @@ export const DirectoryOrganizationUpsertSchema = z.strictObject({
   workOSOrganizationId: workOSId,
   /** `data.name` — used only when creating. */
   name: z.string().min(1).max(255),
+  /**
+   * `data.domains[].domain` — the domains the organization has captured in
+   * WorkOS, which our administrators gate on intake. The first one that is not
+   * already claimed by another organization becomes the organization's
+   * `sso_domain`, which is what authorizes taking over an existing account on
+   * that domain.
+   *
+   * Optional, and an empty list is normal: a directory can exist before a
+   * domain is attached, and `dsync.deleted` omits `domains` entirely. Absent
+   * means "say nothing about domains", never "clear them" — releasing an SSO
+   * domain stays a deliberate administrative action.
+   */
+  capturedDomains: z.array(z.string().min(1).max(255)).max(50).optional(),
 });
 
 export type DirectoryOrganizationUpsert = z.infer<typeof DirectoryOrganizationUpsertSchema>;

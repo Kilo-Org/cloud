@@ -91,6 +91,38 @@ unknown field is a 400 rather than a silently dropped one — a new field must
 land in `directory-sync-contracts.ts` as optional before the Worker starts
 sending it.
 
+### Domain capture
+
+`dsync.activated` carries `data.domains[]`, and the organization upsert sends
+them as `capturedDomains`. The first one no other live organization holds
+becomes that organization's `sso_domain`, which is what later authorizes taking
+over an existing account on the domain. Directory intake is administratively
+gated, so a domain on the event has already passed a human reviewer — the same
+authority a manual capture in the dashboard carries.
+
+Three guards, all because a domain is an SSO authority rather than a label:
+
+- A domain another live organization holds is skipped, not overwritten. Two
+  authorities claiming one domain fails closed for *both*
+  (`.specs/organization-sso.md`, Policy Resolution rule 6), so stealing it would
+  break authentication for the incumbent.
+- The claim is taken under the same `pg_advisory_xact_lock(hashtextextended('sso-domain:' || $domain, 0))`
+  that the dashboard's capture uses, so a concurrent human capture cannot
+  interleave.
+- An event without `domains` says nothing rather than clearing: `dsync.deleted`
+  omits the field, and releasing an SSO domain stays a deliberate
+  administrative action.
+
+Each capture writes an `organization.sso.set_domain` audit row with a null
+actor, which is how this repo records a system-initiated organization change. A
+replay that would not change the row writes nothing, so re-running an event does
+not append audit noise.
+
+Note that an Okta directory's domain is often the IdP tenant hostname
+(`integrator-6483000.okta.com`) rather than the customer's email domain. That is
+what WorkOS reports and what gets captured; a takeover is then authorized only
+for addresses actually on that domain.
+
 ### Arrival order
 
 `dsync.group.user_added` carries the whole user and the whole group

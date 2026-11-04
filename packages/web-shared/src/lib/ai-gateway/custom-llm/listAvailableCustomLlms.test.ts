@@ -28,10 +28,17 @@ const FREE_PRICING = {
 };
 
 describe('convertCustomLlmToCatalogModel pricing', () => {
-  test('lists a custom LLM without pricing as free', () => {
-    const model = convertCustomLlmToCatalogModel('acme/free-model', customLlmDefinition());
+  test('lists a custom LLM with a free id as free', () => {
+    const model = convertCustomLlmToCatalogModel('acme/model-free', customLlmDefinition());
 
     expect(model.isFree).toBe(true);
+    expect(model.pricing).toEqual(FREE_PRICING);
+  });
+
+  test('lists an unpriced custom LLM without a free id at zero prices but not as free', () => {
+    const model = convertCustomLlmToCatalogModel('acme/unpriced-model', customLlmDefinition());
+
+    expect(model.isFree).toBe(false);
     expect(model.pricing).toEqual(FREE_PRICING);
   });
 
@@ -95,6 +102,38 @@ describe('convertCustomLlmToCatalogModel pricing', () => {
     expect(model.pricing.completion).toBe('0.000003000000');
     expect(model.pricing.input_cache_read).toBeUndefined();
     expect(model.pricing.input_cache_write).toBeUndefined();
+  });
+});
+
+describe('convertCustomLlmToCatalogModel training', () => {
+  const pricing: CustomPricingTiers = [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 1,
+        completion_per_million: 3,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ];
+
+  test('assumes a custom LLM may train on prompts by default', () => {
+    const model = convertCustomLlmToCatalogModel(
+      'acme/priced-model',
+      customLlmDefinition({ pricing })
+    );
+
+    expect(model.mayTrainOnYourPrompts).toBe(true);
+  });
+
+  test('honors may_train_on_prompts: false', () => {
+    const model = convertCustomLlmToCatalogModel(
+      'acme/priced-model',
+      customLlmDefinition({ pricing, may_train_on_prompts: false })
+    );
+
+    expect(model.mayTrainOnYourPrompts).toBe(false);
   });
 });
 

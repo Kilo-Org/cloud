@@ -1,4 +1,7 @@
-import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  createEmptyEnkryptOutputDetectors,
+  createKiloDefaultEnkryptInputDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   applyKiloDefaultPreset,
   createPolicyRule,
@@ -6,6 +9,7 @@ import {
   fromDraft,
   fromDraftDetectors,
   getEnkryptGuardrailsIssues,
+  getEnkryptOutputGuardrailIssues,
   issueAt,
   parseLineList,
   toDraft,
@@ -13,11 +17,16 @@ import {
   type EnkryptGuardrailsDraft,
 } from './enkrypt-guardrails-draft';
 
+function offOutput() {
+  return { enabled: false, detectors: createEmptyEnkryptOutputDetectors() };
+}
+
 function enabledDraft(): EnkryptGuardrailsDraft {
   return toDraft({
     enabled: true,
     scan_tool_results: false,
     detectors: createKiloDefaultEnkryptInputDetectors(),
+    output: offOutput(),
   });
 }
 
@@ -46,12 +55,22 @@ describe('draft conversion', () => {
   });
 
   it('round-trips the whole configuration', () => {
+    const outputDetectors = createEmptyEnkryptOutputDetectors();
+    outputDetectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: ['Acme'] };
+    outputDetectors.topic_detector = { enabled: true, action: 'block', topic: ['weapons'] };
     const config = {
       enabled: true,
       scan_tool_results: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
+      output: { enabled: true, detectors: outputDetectors },
     };
-    expect(fromDraft(toDraft(config))).toEqual(config);
+    const draft = toDraft(config);
+    expect(draft.output.detectors.topic_detector).toEqual({
+      enabled: true,
+      action: 'block',
+      topic: 'weapons',
+    });
+    expect(fromDraft(draft)).toEqual(config);
   });
 });
 
@@ -59,6 +78,7 @@ describe('draftsEqual', () => {
   it('ignores key order and list formatting that would save the same configuration', () => {
     const draft = enabledDraft();
     const reordered: EnkryptGuardrailsDraft = {
+      output: draft.output,
       scan_tool_results: draft.scan_tool_results,
       detectors: Object.fromEntries(
         Object.entries(draft.detectors).reverse()
@@ -158,5 +178,31 @@ describe('getEnkryptGuardrailsIssues', () => {
       'Describe what the rule forbids or requires.'
     );
     expect(issueAt(issues, 'policy_violation.rules.0.id')).toBeUndefined();
+  });
+});
+
+describe('getEnkryptOutputGuardrailIssues', () => {
+  it('reports nothing while response checks are off and no detector is set', () => {
+    expect(getEnkryptOutputGuardrailIssues(enabledDraft().output).size).toBe(0);
+  });
+
+  it('requires a response detector while response checks are on', () => {
+    const { output } = enabledDraft();
+    output.enabled = true;
+    expect(issueAt(getEnkryptOutputGuardrailIssues(output), 'detectors')).toBe(
+      'Turn on at least one response detector.'
+    );
+
+    output.detectors.toxicity = { enabled: true, action: 'log' };
+    expect(getEnkryptOutputGuardrailIssues(output).size).toBe(0);
+  });
+
+  it('is reported under output. in the whole configuration', () => {
+    const draft = enabledDraft();
+    draft.output.detectors.topic_detector = { enabled: true, action: 'block', topic: '' };
+
+    const issues = getEnkryptGuardrailsIssues(draft);
+    expect(issueAt(issues, 'output.topic_detector.topic')).toBe('Add at least one topic.');
+    expect(issueAt(issues, 'topic_detector')).toBeUndefined();
   });
 });

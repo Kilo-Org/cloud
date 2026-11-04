@@ -1,48 +1,60 @@
-import {
-  getAiProviderMetadataBucket,
-  scheduleAiProviderMetadataArchive,
-} from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
-export type VercelProviderMetadataCapture = (metadata: unknown, generationId?: string) => void;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-const LOG_SOURCE = 'vercel-provider-metadata';
+export function createVercelProviderMetadataCollector() {
+  let metadata: Record<string, unknown> | undefined;
+  let terminal = false;
+  const { promise: completed, resolve: complete } = Promise.withResolvers<void>();
 
-export function createVercelProviderMetadataCapture(): VercelProviderMetadataCapture | undefined {
-  const target = getAiProviderMetadataBucket(LOG_SOURCE);
-  if (!target) return undefined;
+  const captureNode = (value: unknown) => {
+    if (!isRecord(value)) return;
+    const candidate = value.provider_metadata ?? value.providerMetadata;
+    if (isRecord(candidate)) metadata = candidate;
+  };
 
-  let capturedMetadata: object | undefined;
-  let capturedGenerationId: string | undefined;
-  let waitingLogged = false;
-  let registrationAttempted = false;
-
-  return (metadata, generationId) => {
-    if (typeof generationId === 'string' && generationId.length > 0) {
-      capturedGenerationId = generationId;
-    }
-    if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
-      capturedMetadata = metadata;
-    }
-    if (registrationAttempted) return;
-    if (!capturedMetadata || !capturedGenerationId) {
-      if (!waitingLogged && (metadata !== undefined || capturedGenerationId)) {
-        console.debug(`[${LOG_SOURCE}] waiting for metadata and generation ID`, {
-          generationId: capturedGenerationId,
-          metadataReceived: Boolean(capturedMetadata),
-          generationIdReceived: Boolean(capturedGenerationId),
-        });
-        waitingLogged = true;
+  return {
+    completed,
+    capture(value: unknown, apiKind?: GatewayChatApiKind) {
+      if (terminal) return;
+      if (value === '[DONE]') {
+        terminal = true;
+        complete();
+        return;
       }
-      return;
-    }
+      if (!isRecord(value)) return;
 
-    registrationAttempted = true;
-    scheduleAiProviderMetadataArchive({
-      target,
-      logSource: LOG_SOURCE,
-      logContext: { generationId: capturedGenerationId },
-      key: `vercel/${capturedGenerationId}.json`,
-      body: () => JSON.stringify(capturedMetadata),
-    });
+      if (apiKind === 'messages' || (apiKind === undefined && value.type === 'message_start')) {
+        if (value.type === 'message_start') captureNode(value.message);
+        captureNode(value);
+      } else if (apiKind === 'responses' || (apiKind === undefined && isRecord(value.response))) {
+        captureNode(value.response);
+        captureNode(value);
+      } else {
+        const choices = Array.isArray(value.choices) ? value.choices : [];
+        for (const choice of choices) {
+          if (isRecord(choice)) captureNode(choice.delta);
+        }
+        captureNode(value);
+        for (const choice of choices) {
+          if (isRecord(choice)) captureNode(choice.message);
+        }
+      }
+
+      terminal =
+        (apiKind === 'chat_completions' && value.error != null) ||
+        (apiKind === 'messages' && (value.type === 'message_stop' || value.type === 'error')) ||
+        (apiKind === 'responses' &&
+          (value.type === 'response.completed' ||
+            value.type === 'response.failed' ||
+            value.type === 'response.incomplete' ||
+            value.type === 'error'));
+      if (terminal) complete();
+    },
+    snapshot(): Record<string, unknown> | undefined {
+      return metadata;
+    },
   };
 }

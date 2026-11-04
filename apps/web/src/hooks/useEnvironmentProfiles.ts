@@ -1,6 +1,6 @@
 'use client';
 
-import { appliesImplicitProfiles, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { appliesRepoBindings, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import {
   useCombinedProfiles,
   useProfile,
@@ -18,7 +18,7 @@ export function useEnvironmentProfiles({
   organizationId?: string;
   repository?: { platform: string; fullName: string };
   selectedProfileId?: string | null;
-  /** The environment being edited or used. A V2 environment skips the binding and the implicit default. */
+  /** The environment being edited or used. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
 }) {
   const personal = useProfiles({ enabled: !organizationId });
@@ -28,9 +28,9 @@ export function useEnvironmentProfiles({
   });
   const bindings = useRepoBindings({ organizationId });
   const summaries = organizationId ? combined.data?.allProfiles : personal.data;
-  const implicitProfiles = appliesImplicitProfiles(environment);
+  const binds = appliesRepoBindings(environment);
   const binding =
-    !implicitProfiles || repository?.platform === 'bitbucket'
+    !binds || repository?.platform === 'bitbucket'
       ? undefined
       : bindings.data?.find(
           candidate =>
@@ -39,11 +39,9 @@ export function useEnvironmentProfiles({
         );
   const layers = resolveProfileLayers({
     repoBindingProfileId: binding?.profileId ?? null,
-    effectiveDefaultProfileId: !implicitProfiles
-      ? null
-      : organizationId
-        ? (combined.data?.effectiveDefaultId ?? null)
-        : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
+    effectiveDefaultProfileId: organizationId
+      ? (combined.data?.effectiveDefaultId ?? null)
+      : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
     explicitOverrideProfileId: selectedProfileId ?? null,
   });
   const ownerFor = (id: string | undefined) =>

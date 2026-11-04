@@ -472,7 +472,7 @@ describe('GET /api/v1/models', () => {
     });
     jest.mocked(getCustomLlmsById).mockResolvedValue(
       new Map([
-        ['acme/public-model', customLlm('acme/public-model', true)],
+        ['acme/public-model-free', customLlm('acme/public-model-free', true)],
         ['acme/private-model', customLlm('acme/private-model', false)],
         ['acme/claude-review', customLlm('acme/claude-review', true)],
         ['some-other-model', customLlm('some-other-model', true)],
@@ -487,8 +487,8 @@ describe('GET /api/v1/models', () => {
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
 
     expect(response.status).toBe(200);
-    expect(responseData.data.find(item => item.id === 'acme/public-model')).toMatchObject({
-      name: 'Custom acme/public-model',
+    expect(responseData.data.find(item => item.id === 'acme/public-model-free')).toMatchObject({
+      name: 'Custom acme/public-model-free',
       description: 'Public custom model',
       isFree: true,
       mayTrainOnYourPrompts: true,

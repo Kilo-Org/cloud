@@ -31,7 +31,7 @@ import type { AgentSandboxProvider } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -173,8 +173,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,

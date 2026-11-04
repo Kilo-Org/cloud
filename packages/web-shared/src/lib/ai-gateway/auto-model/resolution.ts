@@ -42,7 +42,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import { isFreeVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
+import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
@@ -77,8 +77,8 @@ type ResolveAutoModelParams = {
  * configured, the configuration is invalid, or no configured model is eligible.
  *
  * Other free models are only eligible when they appear in the OpenRouter
- * models cache, or when they are free Vercel-only models and Kilo currently
- * routes them to Vercel. Public custom LLMs are eligible when they serve the
+ * models cache, or when Vercel serves them and Kilo currently routes them to
+ * Vercel. Public custom LLMs are eligible when they serve the
  * current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
  */
 async function getEligibleAutoFreeModels(
@@ -94,7 +94,7 @@ async function getEligibleAutoFreeModels(
   ]);
   const isEligible = async (model: string) => {
     const customLlm = customLlmsById.get(model.toLowerCase());
-    if (!(await isAutoFreeEligibleModelId(model, customLlm))) return false;
+    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
     if (customLlm) {
       return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
@@ -102,7 +102,7 @@ async function getEligibleAutoFreeModels(
       openRouterModels.has(model) ||
       (routingConfig.vercelEnabled &&
         !routingConfig.vercelOptOutModels.has(model) &&
-        (await isFreeVercelModel(model)))
+        (await isVercelModel(model)))
     );
   };
   const eligible = await Promise.all(configuredModels.map(({ model }) => isEligible(model)));

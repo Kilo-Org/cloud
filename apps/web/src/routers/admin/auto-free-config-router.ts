@@ -28,7 +28,7 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
     // Read the primary, not the cached catalog, so a custom LLM saved moments ago counts.
     const ineligibleModelIds = input.config
-      ? await getIneligibleAutoFreeModelIds(
+      ? getIneligibleAutoFreeModelIds(
           input.config,
           parseCustomLlmRows(await db.select().from(custom_llm2))
         )

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
@@ -36,7 +37,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isFreeGatewayModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -313,7 +314,8 @@ export async function applyProviderSpecificLogic(
   organizationId: string | null,
   sessionId: string | null,
   taskId: string | null,
-  isNonTrialEnterprise: boolean
+  isNonTrialEnterprise: boolean,
+  dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
@@ -322,7 +324,7 @@ export async function applyProviderSpecificLogic(
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if ((await isFreeGatewayModel(requestedModel)) || (userByok !== null && !usesUserGatewayKey)) {
+  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -415,7 +417,8 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok
+      usesUserGatewayKey ? null : userByok,
+      dataRegion
     );
   }
 

@@ -134,40 +134,48 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
   return text === '' ? undefined : text;
 }
 
-// Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below).
-function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
-  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
-    return colors.foreground;
-  }
-  if (variant === 'link') {
-    return colors.primary;
-  }
-  if (variant === 'accent-soft') {
-    return colors.accentSoftTintForeground;
-  }
-  if (variant === 'destructive') {
-    return colors.destructiveSolidForeground;
-  }
-  if (variant === 'outline-destructive') {
-    return colors.destructive;
-  }
-  // default
-  return colors.primaryForeground;
-}
+type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
+
+/**
+ * Each variant's ink in one place: the class its label paints and the theme
+ * token its busy mark follows. The mark has to read in the label's own colour —
+ * a busy button shows the mark where the label was, and a still capture of the
+ * platform indicator is otherwise a speck on the fill — so the two columns
+ * cannot be kept apart. Recording both here makes a variant added to
+ * `buttonVariants` without an ink pair, or an ink pair naming a token the
+ * palette does not define, a type error instead of a mark in the default
+ * variant's colour.
+ */
+const BUTTON_INK = {
+  default: { label: 'text-primary-foreground', mark: 'primaryForeground' },
+  destructive: {
+    label: 'text-destructive-solid-foreground',
+    mark: 'destructiveSolidForeground',
+  },
+  outline: { label: 'text-foreground', mark: 'foreground' },
+  'outline-destructive': { label: 'text-destructive', mark: 'destructive' },
+  secondary: { label: 'text-secondary-foreground', mark: 'secondaryForeground' },
+  ghost: { label: 'text-foreground', mark: 'foreground' },
+  link: { label: 'text-primary group-active:underline', mark: 'primary' },
+  'accent-soft': {
+    label: 'text-accent-soft-tint-foreground',
+    mark: 'accentSoftTintForeground',
+  },
+} as const satisfies Record<ButtonVariant, { label: string; mark: keyof ThemeColors }>;
+
+/**
+ * The label column of `BUTTON_INK`, keyed by the variant union. The table above
+ * is what makes it complete and what ties each label to its mark; `fromEntries`
+ * only rebuilds the same keys and widens them to `string`, so the record type
+ * restores the union cva reads its `variant` prop from.
+ */
+const buttonLabelClasses = Object.fromEntries(
+  Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
+) as Record<ButtonVariant, string>;
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      destructive: 'text-destructive-solid-foreground',
-      outline: 'text-foreground',
-      'outline-destructive': 'text-destructive',
-      secondary: 'text-secondary-foreground',
-      ghost: 'text-foreground',
-      link: 'text-primary group-active:underline',
-      'accent-soft': 'text-accent-soft-tint-foreground',
-    },
+    variant: buttonLabelClasses,
     size: {
       default: '',
       sm: '',
@@ -242,7 +250,7 @@ function Button({
   // a still can land on a speck of ink where the label used to be. A track at
   // the arc's own radius and stroke, painted in the label's own ink, keeps the
   // mark a ring in every frame without diluting the ink the label used.
-  const busyInk = spinnerColor(variant, colors);
+  const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
   const busyMark = (
     <View
       className="items-center justify-center"

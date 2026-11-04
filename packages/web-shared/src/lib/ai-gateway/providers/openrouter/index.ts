@@ -254,7 +254,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         !isPublicCustomLlmModel && isFreeNemotronModel(model.id)
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
-      const isFree = await isFreeModel(model.id);
+      const isFree = isFreeModel(model.id);
       return {
         ...model,
         inference_provider_ids: inferenceProviderIds,
@@ -318,30 +318,27 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
 }
 
 /**
- * Fetch raw, unfiltered models from OpenRouter API
- * Use this for syncing model stats where you need complete data including :free variants
+ * Reads one OpenRouter catalogue: fetch, sanitize, validate and report.
+ * Callers own the URL, the headers and the cache policy, because the raw list may be cached
+ * while the transcription list must not be.
  */
-export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
-    cache: 'force-cache',
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER.apiKey}`,
-      ...ATTRIBUTION_HEADERS,
-    },
-    next: { revalidate: 60 },
-  });
+async function fetchOpenRouterModels(
+  url: string,
+  init: Parameters<typeof fetch>[1],
+  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+): Promise<OpenRouterModelsResponse> {
+  const response = await fetch(url, init);
 
   if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter models: ${response.status} ${response.statusText}`;
+    const errorMessage = `Failed to fetch OpenRouter ${subject}: ${response.status} ${response.statusText}`;
     captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/models', source: 'openrouter_api' },
+      tags: { endpoint, source: 'openrouter_api' },
       extra: {
         status: response.status,
         statusText: response.statusText,
       },
     });
-    throw new Error('Failed to fetch models from OpenRouter API');
+    throw new Error(`Failed to fetch ${subject} from OpenRouter API`);
   }
 
   const data = removeUpstreamEnkrypt(await response.json());
@@ -349,9 +346,9 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
   if (!parseResult.success) {
-    errorExceptInTest('OpenRouter models response not in expected format:', parseResult.error);
+    errorExceptInTest(`OpenRouter ${subject} response not in expected format:`, parseResult.error);
 
-    captureMessage('openrouter models not in expected format!', {
+    captureMessage(`openrouter ${subject} not in expected format!`, {
       level: 'error',
       extra: {
         data,
@@ -363,6 +360,26 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
   }
 
   return parseResult.data;
+}
+
+/**
+ * Fetch raw, unfiltered models from OpenRouter API
+ * Use this for syncing model stats where you need complete data including :free variants
+ */
+export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+  return fetchOpenRouterModels(
+    `${OPENROUTER.apiUrl}/models`,
+    {
+      cache: 'force-cache',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER.apiKey}`,
+        ...ATTRIBUTION_HEADERS,
+      },
+      next: { revalidate: 60 },
+    },
+    { subject: 'models', endpoint: 'openrouter/models' }
+  );
 }
 
 /**
@@ -392,7 +409,7 @@ export async function getEnhancedOpenRouterModels({
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
   const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();
-  const response = await fetch(
+  return fetchOpenRouterModels(
     localFakeModelsUrl ?? `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
     {
       method: 'GET',
@@ -404,40 +421,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
       // unreachable gateway and the mobile picker would list stale models
       // instead of showing its load-failed retry state.
       cache: 'no-store',
-    }
+    },
+    { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
   );
-
-  if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter transcription models: ${response.status} ${response.statusText}`;
-    captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/transcription-models', source: 'openrouter_api' },
-      extra: {
-        status: response.status,
-        statusText: response.statusText,
-      },
-    });
-    throw new Error('Failed to fetch transcription models from OpenRouter API');
-  }
-
-  const data = removeUpstreamEnkrypt(await response.json());
-
-  const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
-
-  if (!parseResult.success) {
-    errorExceptInTest(
-      'OpenRouter transcription models response not in expected format:',
-      parseResult.error
-    );
-
-    captureMessage('openrouter transcription models not in expected format!', {
-      level: 'error',
-      extra: {
-        data,
-        zodError: parseResult.error.issues,
-      },
-    });
-    return data as OpenRouterModelsResponse;
-  }
-
-  return parseResult.data;
 }

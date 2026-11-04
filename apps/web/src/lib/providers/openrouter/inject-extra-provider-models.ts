@@ -12,7 +12,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
-import { isFreeVercelStoredModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findVercelOnlyModels,
   getVendorNamesByModelPrefix,
@@ -276,7 +276,7 @@ export function injectVercelOnlyModels({
 
   for (const vercelOnlyModel of vercelOnlyModels) {
     const { id, storedModel, catalog } = vercelOnlyModel;
-    const isFree = isFreeVercelStoredModel(storedModel);
+    const isFree = isFreeModel(id);
     const model: OpenRouterModel = {
       slug: id,
       name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),

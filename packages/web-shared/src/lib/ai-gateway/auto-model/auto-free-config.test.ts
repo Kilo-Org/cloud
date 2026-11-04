@@ -13,12 +13,6 @@ import {
   readConfiguredAutoFreeModels,
 } from './auto-free-config';
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models', () => ({
-  isFreeVercelModel: jest.fn(async (model: string) =>
-    ['reflection/beam-free', 'anthropic/claude-beam-free'].includes(model)
-  ),
-}));
-
 beforeEach(async () => {
   await cleanupDbForTest();
 });
@@ -61,15 +55,12 @@ describe('isAutoFreeEligibleModelId', () => {
     ['anthropic/claude-sonnet-4:free', false],
     ['openai/gpt-oss-120b:free', true],
     ['openai/gpt-5:free', false],
-    ['reflection/beam-free', true],
-    ['anthropic/claude-beam-free', false],
-    ['vendor/paid-free', false],
-  ])('%s -> %s', async (model, expected) => {
-    expect(await isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
+  ])('%s -> %s', (model, expected) => {
+    expect(isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
   });
 
-  function customLlm(definition: CustomLlmDefinition): CustomLlm {
-    return { public_id: 'acme/model', definition, encrypted_api_key: null };
+  function customLlm(definition: CustomLlmDefinition, publicId = 'acme/model-free'): CustomLlm {
+    return { public_id: publicId, definition, encrypted_api_key: null };
   }
 
   it.each([
@@ -103,33 +94,25 @@ describe('isAutoFreeEligibleModelId', () => {
       publicCustomLlmDefinition(['acme'], { country_deny_list: [] }),
       true,
     ],
-    [
-      'a public custom LLM with pricing',
-      publicCustomLlmDefinition(['acme'], {
-        pricing: [
-          {
-            start_context_length: 0,
-            pricing: {
-              prompt_per_million: 1,
-              completion_per_million: 2,
-              input_cache_read_per_million: null,
-              input_cache_write_per_million: null,
-            },
-          },
-        ],
-      }),
-      false,
-    ],
-  ])('%s', async (_name, definition, expected) => {
-    expect(await isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
+  ])('%s', (_name, definition, expected) => {
+    expect(isAutoFreeEligibleModelId('acme/model-free', customLlm(definition))).toBe(expected);
+  });
+
+  it('rejects a public custom LLM whose id is not free', () => {
+    expect(
+      isAutoFreeEligibleModelId(
+        'acme/model',
+        customLlm(publicCustomLlmDefinition(['acme']), 'acme/model')
+      )
+    ).toBe(false);
   });
 });
 
 describe('getIneligibleAutoFreeModelIds', () => {
-  it('accepts public custom LLMs and rejects private ones', async () => {
+  it('accepts public custom LLMs and rejects private ones', () => {
     const customLlms: CustomLlm[] = [
       {
-        public_id: 'Acme/Public-Free',
+        public_id: 'Acme/Public-free',
         definition: publicCustomLlmDefinition(['acme']),
         encrypted_api_key: null,
       },
@@ -141,7 +124,7 @@ describe('getIneligibleAutoFreeModelIds', () => {
     ];
 
     expect(
-      await getIneligibleAutoFreeModelIds(
+      getIneligibleAutoFreeModelIds(
         {
           models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
             model,

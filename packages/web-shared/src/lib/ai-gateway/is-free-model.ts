@@ -4,44 +4,32 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import {
-  findCustomLlm,
-  isCustomLlm,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { isFreeVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models';
-
-/** Whether Kilo charges nothing for the model. Custom LLMs are free unless they set pricing. */
-export async function isFreeModel(modelId: string): Promise<boolean> {
-  const customLlm = await findCustomLlm(modelId);
-  if (customLlm?.definition.pricing) return false;
-  return customLlm !== null || (await isFreeGatewayModel(modelId));
-}
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 /**
- * The built-in free model rules plus free Vercel-only models, without custom LLMs. Prefer it over
- * `isFreeModelExcludingCustomLlms` on chat routes, where Vercel-only models are served.
+ * Whether Kilo charges nothing for the model, judged by its id alone. Custom
+ * LLMs follow the same rule; the admin router rejects pricing on a custom LLM
+ * whose id matches it.
  */
-export async function isFreeGatewayModel(modelId: string): Promise<boolean> {
-  return isFreeModelExcludingCustomLlms(modelId) || (await isFreeVercelModel(modelId));
-}
-
-/**
- * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
- * custom LLMs need separate handling, as for `kilo-auto/free` candidates.
- */
-export function isFreeModelExcludingCustomLlms(model: string): boolean {
+export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
-    modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||
-    (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
+    modelId.endsWith(':free') ||
+    modelId.endsWith('-free') ||
+    modelId.startsWith('stealth/')
   );
 }
 
-/** Free models and custom LLMs, priced or not, are assumed to train on prompts. */
+/**
+ * Free models are assumed to train on prompts, and so are custom LLMs unless
+ * their definition sets `may_train_on_prompts: false`.
+ */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (await isCustomLlm(model)) || isFreeModelExcludingCustomLlms(model);
+  const customLlm = await findCustomLlm(model);
+  if (customLlm) return customLlm.definition.may_train_on_prompts !== false;
+  return isFreeModel(model);
 }

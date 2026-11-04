@@ -11,12 +11,14 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as GitHubTokenServiceModule from './github-token-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findManagedInstallationForRepo: vi.fn(),
   findRefreshCandidates: vi.fn(),
   updateAccountLogin: vi.fn(),
   getTokenForRepo: vi.fn(),
+  getRepositoryOnlyToken: vi.fn(),
   refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
@@ -33,9 +35,11 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('./github-token-service.js', () => ({
+vi.mock('./github-token-service.js', async importOriginal => ({
+  ...(await importOriginal<typeof GitHubTokenServiceModule>()),
   GitHubTokenService: class GitHubTokenService {
     getTokenForRepo = serviceMocks.getTokenForRepo;
+    getRepositoryOnlyToken = serviceMocks.getRepositoryOnlyToken;
     refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
@@ -61,6 +65,8 @@ vi.mock('./gitlab-lookup-service.js', () => ({
 }));
 
 import handler, { GitTokenRPCEntrypoint } from './index.js';
+import { GitHubSessionCapabilityCodec } from './github-session-capability.js';
+import { GitHubRepositoryPermissionsUnavailableError } from './github-token-service.js';
 
 function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
@@ -84,6 +90,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       permissions: { contents: 'write', pull_requests: 'write' },
     });
     serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
+    serviceMocks.getRepositoryOnlyToken.mockResolvedValue('repository-only-token');
     serviceMocks.selectUserAuthorization.mockResolvedValue({
       selected: true,
       token: 'user-token',
@@ -108,6 +115,136 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
         email: '240665456+kiloconnect[bot]@users.noreply.github.com',
       },
     });
+  });
+
+  it('pins repository-only installation authority at issuance and every redemption despite available user authorization', async () => {
+    const key = Buffer.alloc(32, 7).toString('base64');
+    const service = new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      {
+        GITHUB_APP_SLUG: 'kiloconnect',
+        GITHUB_APP_BOT_USER_ID: '240665456',
+        SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: key,
+      } as unknown as CloudflareEnv
+    );
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'allocation-1',
+      allowUserAuthorization: true,
+      permissionScope: 'repository',
+    });
+    if (!issued.success) throw new Error('Expected repository capability');
+    expect(new GitHubSessionCapabilityCodec(key).decode(issued.capability)).toMatchObject({
+      version: 2,
+      source: 'installation',
+      permissionScope: 'repository',
+      owner: 'acme',
+      repo: 'repo',
+      outboundContainerId: 'allocation-1',
+    });
+    for (const [requestMethod, requestUrl] of [
+      ['POST', 'https://api.github.com/graphql'],
+      ['PATCH', 'https://api.github.com/repos/acme/repo/issues/1'],
+    ]) {
+      expect(
+        await service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId: 'allocation-1',
+          requestMethod,
+          requestUrl,
+        })
+      ).toMatchObject({
+        success: true,
+        source: 'installation',
+        authorization: 'Bearer repository-only-token',
+      });
+    }
+    for (const requestUrl of [
+      'https://api.github.com/orgs/acme/members/octocat',
+      'https://api.github.com/repos/foreign/private',
+    ]) {
+      expect(
+        await service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId: 'allocation-1',
+          requestMethod: 'GET',
+          requestUrl,
+        })
+      ).toEqual({ success: false, reason: 'repository_mismatch' });
+    }
+    expect(
+      await service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'allocation-1',
+        requestMethod: 'POST',
+        requestUrl:
+          'https://uploads.github.com/user-attachments/assets?name=screenshot.png&repository_id=1145038391',
+      })
+    ).toEqual({ success: false, reason: 'invalid_upstream_request' });
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledWith('123', 'repo', 'standard', {
+      contents: 'write',
+      pull_requests: 'write',
+    });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    expect(
+      await service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'allocation-2',
+        requestMethod: 'GET',
+        requestUrl: 'https://api.github.com/repos/acme/repo',
+      })
+    ).toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves recoverable permission lookup failures through capability issuance and redemption', async () => {
+    const service = new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      {
+        GITHUB_APP_SLUG: 'kiloconnect',
+        GITHUB_APP_BOT_USER_ID: '240665456',
+        SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      } as unknown as CloudflareEnv
+    );
+    const params = {
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'allocation-1',
+      allowUserAuthorization: true,
+      permissionScope: 'repository',
+    } as const;
+    serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
+      new GitHubRepositoryPermissionsUnavailableError()
+    );
+    expect(await service.issueGitHubSessionCapability(params)).toEqual({
+      success: false,
+      reason: 'repository_permissions_unavailable',
+    });
+
+    const issued = await service.issueGitHubSessionCapability(params);
+    if (!issued.success) throw new Error('Expected repository capability');
+    const redemption = {
+      capability: issued.capability,
+      outboundContainerId: 'allocation-1',
+      requestMethod: 'POST',
+      requestUrl: 'https://api.github.com/graphql',
+    };
+    serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
+      new GitHubRepositoryPermissionsUnavailableError()
+    );
+    expect(await service.redeemGitHubSessionCapability(redemption)).toEqual({
+      success: false,
+      reason: 'repository_permissions_unavailable',
+    });
+    expect(await service.redeemGitHubSessionCapability(redemption)).toMatchObject({
+      success: true,
+      authorization: 'Bearer repository-only-token',
+    });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });
 
   it('defaults to installation identity when eligibility is omitted', async () => {

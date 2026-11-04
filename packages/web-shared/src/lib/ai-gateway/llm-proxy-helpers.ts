@@ -12,10 +12,12 @@ import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactio
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -79,7 +81,8 @@ export function invalidPathResponse() {
     {
       error: 'Invalid path',
       error_type: ProxyErrorType.invalid_path,
-      message: 'This endpoint only accepts the path `/chat/completions`.',
+      message:
+        'This endpoint only accepts the paths `/chat/completions`, `/responses` and `/messages`.',
     },
     { status: 400 }
   );
@@ -258,6 +261,23 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
       error: error,
       error_type: ProxyErrorType.provider_not_allowed,
       message: error,
+    },
+    { status: 403 }
+  );
+}
+
+const MANAGED_GATEWAY_NAMES = {
+  openrouter: 'OpenRouter',
+  vercel: 'the Vercel AI Gateway',
+} as const satisfies Record<ManagedGatewayId, string>;
+
+export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
+  const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
     },
     { status: 403 }
   );
@@ -730,16 +750,12 @@ export function accountForMicrodollarUsage(
   return accounting;
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /**
  * Field names, never values, of the request as sent upstream, so rejections
  * such as "unknown field" can be attributed from logs alone.
  */
 function describeRequestFields(request: unknown): Record<string, string> {
-  if (!isObjectRecord(request)) {
+  if (!isRecord(request)) {
     return {};
   }
   const fields: Record<string, string> = {
@@ -747,7 +763,7 @@ function describeRequestFields(request: unknown): Record<string, string> {
   };
   if (Array.isArray(request.messages)) {
     const messageFields = new Set(
-      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+      request.messages.filter(isRecord).flatMap(message => Object.keys(message))
     );
     fields.messageFields = [...messageFields].sort().join(',');
   }
@@ -946,6 +962,15 @@ function reasoningBudgetBucket(value: unknown): string | null {
   if (value <= 16_000) return 'le16k';
   if (value <= 64_000) return 'le64k';
   return 'gt64k';
+}
+
+/**
+ * The Vercel inference region set on the upstream request. Clients cannot send `providerOptions`,
+ * so the value always comes from `applyVercelSettings` and stays within the known regions.
+ */
+export function extractInferenceRegion(body: GatewayRequest['body']): string | null {
+  const inferenceRegion = body.providerOptions?.gateway?.inferenceRegion;
+  return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
 }
 
 function isReasoningObject(value: unknown): value is Record<string, unknown> {

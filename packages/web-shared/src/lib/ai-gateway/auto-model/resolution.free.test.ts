@@ -27,8 +27,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/free-vercel-models', () => ({
-  isFreeVercelModel: jest.fn(async (model: string) => model === 'reflection/beam-free'),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  isVercelModel: jest.fn(async (model: string) => model === 'reflection/beam-free'),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
@@ -57,7 +57,7 @@ describe('getAutoFreeCandidates', () => {
     }
   );
 
-  it('includes free Vercel-only models while Kilo routes them to Vercel', async () => {
+  it('includes free models Vercel serves while Kilo routes them to Vercel', async () => {
     configure(['test/present:free', 'reflection/beam-free']);
     expect(await getAutoFreeCandidates('chat_completions')).toEqual([
       'reflection/beam-free',

@@ -439,8 +439,13 @@ References:
 
 ## Production prerequisites
 
-Provision the Worker, SQLite Durable Object namespace, private R2 bucket, and authentication binding.
-Store shared secrets in the shared engineering vault and Cloudflare Secrets Store.
+Production is provisioned and deploys automatically at `https://session-sync.kiloapps.io`.
+The top level of `wrangler.jsonc` holds the production bindings; `pnpm dev` uses `env.local`.
+Production uses the private R2 bucket `session-sync`, the Hyperdrive configuration
+`session-sync-production`, and the Secrets Store entries `NEXTAUTH_SECRET_PROD` and
+`SESSION_SYNC_SECRET_PROD`. Shared secrets live in the shared engineering vault.
+The Hyperdrive configuration connects as `session_sync_reader`, a read-only role with
+column grants on only the account, device-session, and membership columns that exchange reads.
 Set `ENVIRONMENT=production` explicitly; exchange fails closed if it is absent or
 empty and never accepts a credential from a different environment.
 Do not copy production credentials into local examples or test fixtures.
@@ -455,4 +460,4 @@ cached reads and recommends a cache-disabled binding for authentication and perm
 [Hyperdrive query caching](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/).
 Verify account and organization authorization on an isolated stack before deployment.
 Complete account deletion, backup retention, quota policy, and rollout monitoring before public adoption.
-Automatic deployment excludes this service until its real bindings and secrets are provisioned.
+The CLI has no default destination; users opt in with an explicit `--url`.

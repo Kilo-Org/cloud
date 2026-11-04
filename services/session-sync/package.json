@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env local",
     "staging:config": "node scripts/render-staging-config.mjs \"$SESSION_SYNC_STAGING_RESOURCES\"",
     "staging:dry-run": "pnpm run staging:config && wrangler deploy --config .wrangler/wrangler.staging.json --dry-run --outdir .wrangler/staging-dry-run",
     "test": "vitest run && node --test scripts/render-staging-config.test.mjs",

@@ -26,6 +26,7 @@ export type FakeWrapperHelloInput = {
   redactsNamedSecrets?: boolean;
   installsSkillsSh?: boolean;
   sessionSnapshots?: boolean;
+  startCommands?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -171,6 +172,7 @@ export class FakeWrapper {
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
+      ...(input.startCommands ? { startCommands: true } : {}),
     });
     return this.next();
   }

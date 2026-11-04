@@ -6,9 +6,10 @@ import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
 
 Object.assign(globalThis, { React });
 
-function renderScripts(readOnly: boolean): string {
+function renderScripts(readOnly: boolean, kind: 'setup' | 'start' = 'setup'): string {
   return renderToStaticMarkup(
     React.createElement(EnvironmentScriptsEditor, {
+      kind,
       script: 'pnpm install',
       onChange: jest.fn(),
       readOnly,
@@ -39,8 +40,8 @@ describe('EnvironmentScriptsEditor readOnly', () => {
     expect(tag(markup, 'textarea')).toMatch(/\sreadOnly=""/i);
     expect(tag(markup, 'input')).toMatch(/\sdisabled=""/i);
     expect(markup).not.toContain('Choose file');
-    expect(markup).toContain('Runs before the agent starts.');
-    expect(markup).not.toContain('For longer setup');
+    expect(markup).toContain('Runs when a snapshot is built');
+    expect(markup).not.toContain('For longer scripts');
     expect(markup).toContain('pnpm install');
   });
 
@@ -50,7 +51,15 @@ describe('EnvironmentScriptsEditor readOnly', () => {
     expect(tag(markup, 'textarea')).not.toMatch(/\sreadOnly=/i);
     expect(tag(markup, 'input')).not.toMatch(/\sdisabled=""/i);
     expect(markup).toContain('Choose file');
-    expect(markup).toContain('For longer setup');
+    expect(markup).toContain('For longer scripts');
+  });
+
+  it('labels the start script as running in every session', () => {
+    const markup = renderScripts(false, 'start');
+
+    expect(markup).toContain('Start script');
+    expect(markup).toContain('Runs before the agent starts in every session');
+    expect(markup).not.toContain('Setup script');
   });
 });
 

@@ -482,6 +482,31 @@ describe('mergeProfileConfiguration', () => {
       expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
     });
 
+    test('keeps environment start commands apart from setup and from profile layers', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: { setupCommands: ['install'], startCommands: ['serve'] },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.startCommands).toEqual(['serve']);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.startCommands).toBeUndefined();
+    });
+
     test('an empty environment still replaces profile setup commands, not profile vars', async () => {
       const user = await insertTestUser();
       const owner: ProfileOwner = { type: 'user', id: user.id };

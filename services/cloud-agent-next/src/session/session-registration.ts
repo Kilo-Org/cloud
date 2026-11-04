@@ -1922,6 +1922,7 @@ function profileCreateIntent(
   return {
     ...(profile?.id ? { id: profile.id } : {}),
     setupCommands: resolved.setupCommands,
+    ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
     ...(mcpServers ? { mcpServers } : {}),
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,

@@ -56,8 +56,11 @@ import type { ControlWorkload } from '../control/workload-cgroup.js';
 import { refreshAdoptedRepository } from './workspace-adoption.js';
 import {
   classifyWorkspace,
+  readEnvironmentSetupRecord,
   readWorkspaceStamp,
+  setupCommandsCoveredBySnapshot,
   writeWorkspaceStamp,
+  type EnvironmentSetupRecord,
   type WorkspaceInspection,
   type WorkspaceStamp,
 } from './workspace-stamp.js';
@@ -149,6 +152,7 @@ export type PrepareDeps = {
   hasGit?: (directory: string) => Promise<boolean>;
   readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
   writeStamp?: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
+  readSetupRecord?: (directory: string) => Promise<EnvironmentSetupRecord | null>;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   inheritedEnv?: NodeJS.ProcessEnv;
   homeRoots?: HomeRoots;
@@ -430,6 +434,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
 
   const hasGit = deps.hasGit ?? defaultHasGit;
   const readStamp = deps.readStamp ?? readWorkspaceStamp;
+  const readSetupRecord = deps.readSetupRecord ?? readEnvironmentSetupRecord;
   const writeStamp =
     deps.writeStamp ??
     (async (directory: string, stamp: WorkspaceStamp) =>
@@ -763,9 +768,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * another allocation is a restored environment snapshot to adopt, and anything
    * else is cloned. An adopt failure fails the preparation; it never clears the
    * root to clone over the snapshot. Setup runs once, at the route directory,
-   * after every root is in place. It always runs after a clone or an adopt, with
-   * this session's admitted configuration. Each root is stamped, never the route
-   * directory. A session never captures.
+   * after every root is in place. It runs after a clone or an adopt, with this
+   * session's admitted configuration, except the leading commands a current
+   * environment snapshot already ran. Start commands always follow it, and also
+   * run after a session disk snapshot restore. Each root is stamped, never the
+   * route directory. A session never captures.
    */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -853,6 +860,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           )
         );
       }
+      // The disk keeps every file setup produced, but no process survives it.
+      if ((spec.startCommands?.length ?? 0) > 0) setStep('setup');
+      await runPreparationCommands(
+        spec,
+        spec.startCommands ?? [],
+        env,
+        redact,
+        new AbortController().signal
+      );
       return {
         outcome: 'adopted',
         deferredStamps: [
@@ -892,7 +908,28 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
     const { adopted, cloning } = reconciled;
     setStep('setup');
-    await runSetupCommands(spec, spec.directory, env, redact, new AbortController().signal);
+    const setupCommands = spec.setupCommands ?? [];
+    const coveredSetupCommands =
+      spec.environmentSnapshotCurrent === true &&
+      reconciled.inspections.every(inspection => inspection === 'foreign')
+        ? setupCommandsCoveredBySnapshot(
+            await Promise.all(roots.map(root => readSetupRecord(root.directory))),
+            setupCommands
+          )
+        : 0;
+    log(
+      `control-plane workspace setup session=${spec.sessionId} setupCommands=${setupCommands.length} coveredBySnapshot=${coveredSetupCommands} startCommands=${spec.startCommands?.length ?? 0}`
+    );
+    if (coveredSetupCommands > 0) {
+      emitProgress(spec.sessionId, 'setup', 'Setup already ran in the environment snapshot');
+    }
+    await runPreparationCommands(
+      spec,
+      [...setupCommands.slice(coveredSetupCommands), ...(spec.startCommands ?? [])],
+      env,
+      redact,
+      new AbortController().signal
+    );
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
@@ -919,20 +956,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: null };
   }
 
-  async function runSetupCommands(
+  /** Setup and start commands run as one list, at the route directory. */
+  async function runPreparationCommands(
     spec: ControlPlaneRouteSpec,
-    directory: string,
+    commands: readonly string[],
     env: Record<string, string>,
     redact: (text: string) => string,
     signal: AbortSignal
   ): Promise<void> {
-    const commands = spec.setupCommands ?? [];
     if (commands.length === 0) return;
     emitProgress(spec.sessionId, 'setup');
     // The Session renders the setup events as per-command preparation steps.
     await repository.runSetupCommands({
-      commands,
-      directory,
+      commands: [...commands],
+      directory: spec.directory,
       env,
       redact,
       signal,
@@ -1193,7 +1230,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const needsWorkspace =
         spec.sessionSnapshot !== undefined ||
         Boolean(spec.git) ||
-        (spec.setupCommands?.length ?? 0) > 0;
+        (spec.setupCommands?.length ?? 0) > 0 ||
+        (spec.startCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.

@@ -104,6 +104,8 @@ export type EnvironmentInlineArgs = Pick<
 export type MergeProfileConfigurationResult = {
   envVars?: Record<string, string>;
   setupCommands?: string[];
+  /** The environment's start commands. Only an environment supplies them. */
+  startCommands?: string[];
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
@@ -445,8 +447,10 @@ export async function mergeProfileConfiguration(
   // the (identical) base id as the active profile.
   const resolvedProfileId = top?.profileId ?? base?.profileId ?? null;
 
+  const startCommands = args.environment?.startCommands ?? [];
   return {
     ...mergeLayers(layers),
+    ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
     ...(resolvedProfileId ? { resolvedProfileId } : {}),
   };
 }

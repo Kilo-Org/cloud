@@ -180,6 +180,7 @@ type RouteOverrides = {
   git?: ControlPlaneRouteSpec['git'] | null;
   env?: Record<string, string>;
   setupCommands?: string[];
+  startCommands?: string[];
   userId?: string;
   orgId?: string | null;
   sessionId?: string;
@@ -200,6 +201,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
     ...(git === undefined ? {} : { git }),
     ...(overrides.env === undefined ? {} : { env: overrides.env }),
     ...(overrides.setupCommands === undefined ? {} : { setupCommands: overrides.setupCommands }),
+    ...(overrides.startCommands === undefined ? {} : { startCommands: overrides.startCommands }),
   };
   return {
     spec,
@@ -256,14 +258,19 @@ function putLaunchRecord(stub: DurableObjectStub<SandboxControlV2>, record: unkn
   return runInDurableObject(stub, (_instance, state) => state.storage.put(LAUNCH_KEY, record));
 }
 
-async function connect(sandboxId: string, provider: FakeProvider, launchCount = 1) {
+async function connect(
+  sandboxId: string,
+  provider: FakeProvider,
+  launchCount = 1,
+  capabilities: { startCommands?: boolean } = {}
+) {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(launchCount));
   const launchEnv = provider.launchEnvs[launchCount - 1];
   const credential = launchEnv?.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv?.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-  await wrapper.hello({ wrapperId: 'wr_1', allocationId });
+  await wrapper.hello({ wrapperId: 'wr_1', allocationId, ...capabilities });
   return { wrapper, allocationId };
 }
 
@@ -459,6 +466,7 @@ describe('environment snapshot launch', () => {
       startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
+      environmentSnapshot: { environmentId: REFERENCE.environmentId, revision: 1 },
     });
   });
 
@@ -606,6 +614,69 @@ describe('environment snapshot launch', () => {
           'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started',
       })
     );
+  });
+
+  it('tells a start-command wrapper that a snapshot at the session revision already ran setup', async () => {
+    const lookups = fakeEnvironmentBuild({
+      ...RESOLVED,
+      snapshot: {
+        ...SNAPSHOT,
+        revision: REFERENCE.configurationRevision,
+        capturedAt: 1,
+        buildId: '66666666-6666-4666-8666-666666666666',
+        stale: null,
+      },
+      admission: { status: 'not_needed' },
+    });
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const { stub } = await setup('sbx__env_launch_current', provider, {
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    const { wrapper } = await connect('sbx__env_launch_current', provider, 1, {
+      startCommands: true,
+    });
+    const frame = await prepareFrameOf(wrapper);
+
+    expect(frame.spec).toMatchObject({
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
+      environmentSnapshotCurrent: true,
+    });
+    expect(await readLaunchRecord(stub)).toMatchObject({
+      environmentSnapshot: {
+        environmentId: REFERENCE.environmentId,
+        revision: REFERENCE.configurationRevision,
+      },
+    });
+  });
+
+  it('runs full setup from a snapshot of an older revision', async () => {
+    const lookups = fakeEnvironmentBuild();
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const { stub } = await setup('sbx__env_launch_stale_phases', provider, {
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    const { wrapper } = await connect('sbx__env_launch_stale_phases', provider, 1, {
+      startCommands: true,
+    });
+    const frame = await prepareFrameOf(wrapper);
+
+    expect(frame.spec).toMatchObject({ setupCommands: ['npm install'], startCommands: ['serve'] });
+    expect(frame.spec).not.toHaveProperty('environmentSnapshotCurrent');
+  });
+
+  it('appends start commands to setup for a wrapper that predates them', async () => {
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const { stub } = await setup('sbx__env_launch_old_wrapper_phases', provider);
+    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    const { wrapper } = await connect('sbx__env_launch_old_wrapper_phases', provider);
+    const frame = await prepareFrameOf(wrapper);
+
+    expect(frame.spec.setupCommands).toEqual(['npm install', 'serve']);
+    expect(frame.spec).not.toHaveProperty('startCommands');
+    expect(frame.spec).not.toHaveProperty('environmentSnapshotCurrent');
   });
 
   it('starts from the image without a lookup when the session has no environment', async () => {

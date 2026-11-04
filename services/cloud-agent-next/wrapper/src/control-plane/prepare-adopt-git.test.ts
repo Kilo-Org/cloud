@@ -11,7 +11,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { createPreparationManager, type PrepareDeps } from './prepare.js';
-import { readWorkspaceStamp } from './workspace-stamp.js';
+import { readWorkspaceStamp, writeEnvironmentSetupRecord } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
 import { profileConfigPath } from './runtime-profile.js';
 import { gitCredentialRecordPath } from '../control/git-credentials.js';
@@ -330,6 +330,88 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
+  describe('with start commands', () => {
+    const setupRun = (calls: unknown[][]) => calls.map(call => call[0]);
+
+    async function snapshotBuiltWith(commands: string[]): Promise<void> {
+      await manager('alloc-image').prepared.prepare(spec({ setupCommands: commands }));
+      await writeEnvironmentSetupRecord(directory, commands);
+    }
+
+    it('skips the setup commands a current snapshot already ran, then runs start commands', async () => {
+      await snapshotBuiltWith(['install']);
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install', 'inline extra'],
+          startCommands: ['serve'],
+          environmentSnapshotCurrent: true,
+        })
+      );
+
+      expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['inline extra', 'serve']);
+      expect(restored.frames).toContainEqual(
+        expect.objectContaining({
+          type: 'session.progress',
+          step: 'setup',
+          detail: 'Setup already ran in the environment snapshot',
+        })
+      );
+    });
+
+    it('runs every setup command when the snapshot is not current', async () => {
+      await snapshotBuiltWith(['install']);
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
+      );
+
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['install', 'serve']);
+    });
+
+    it('runs every setup command when the snapshot recorded other commands', async () => {
+      await snapshotBuiltWith(['older install']);
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install'],
+          startCommands: ['serve'],
+          environmentSnapshotCurrent: true,
+        })
+      );
+
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['install', 'serve']);
+    });
+
+    it('runs setup and start commands after a fresh clone', async () => {
+      const fresh = manager('alloc-image');
+      await fresh.prepared.prepare(
+        spec({
+          setupCommands: ['install'],
+          startCommands: ['serve'],
+          environmentSnapshotCurrent: true,
+        })
+      );
+
+      expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
+      expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);
+    });
+
+    it('runs neither for a workspace this allocation already prepared', async () => {
+      await manager('alloc-image').prepared.prepare(spec());
+      const sibling = manager('alloc-image');
+      await sibling.prepared.prepare(
+        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
+      );
+
+      expect(ready(sibling.frames)).toMatchObject({ workspace: 'same' });
+      expect(sibling.runSetup).not.toHaveBeenCalled();
+    });
+  });
+
   it('retains local workspace state', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
@@ -405,6 +487,22 @@ describe('restoring a private session disk snapshot', () => {
     expect(
       restored.gitCalls.some(args => ['clone', 'fetch', 'checkout', 'branch'].includes(args[0]!))
     ).toBe(false);
+  });
+
+  it('runs only the start commands, because no process survives the disk snapshot', async () => {
+    await manager('alloc-source').prepared.prepare(spec());
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(
+      spec({
+        branch: 'main',
+        sessionSnapshot: provenance,
+        setupCommands: ['must not replay'],
+        startCommands: ['serve'],
+      })
+    );
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect((restored.runSetup.mock.calls as unknown[][]).map(call => call[0])).toEqual(['serve']);
   });
 
   it('fails a source allocation mismatch without touching recovered files or starting Kilo', async () => {

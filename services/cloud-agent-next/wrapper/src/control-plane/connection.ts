@@ -28,6 +28,7 @@ const RECONNECT_JITTER_DIVISOR = 4;
  * with the original hello that every supported Worker accepts.
  */
 const FALLBACK_HELLO_CAPABILITIES = [
+  { heartbeatAck: true, sessionSnapshots: true, redactsNamedSecrets: true, installsSkillsSh: true },
   { heartbeatAck: true, redactsNamedSecrets: true, installsSkillsSh: true },
   {},
 ] as const;
@@ -437,6 +438,7 @@ export function createControlPlaneConnection(
           sessionSnapshots: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
+          startCommands: true,
         })
       )
         return;

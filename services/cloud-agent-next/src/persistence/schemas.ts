@@ -282,6 +282,11 @@ const SharedSessionProfileFields = {
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  /**
+   * The environment's start commands. They run after setup in every prepared
+   * workspace, including one whose environment snapshot already ran setup.
+   */
+  startCommands: setupCommandsSchema.optional(),
   kiloCommands: RuntimeKiloCommandsSchema.optional(),
   runtimeInstructions: RuntimeInstructionsSchema.optional(),
 });

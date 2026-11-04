@@ -127,6 +127,7 @@ export function controlPlaneRouteSpecFromAttachPayload(
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
+    ...(payload.startCommands ? { startCommands: payload.startCommands } : {}),
     ...(runtimeIsolation ? { runtimeIsolation } : {}),
     // The Sandbox DO replaces this with its own route attempt id; the field is
     // only a protocol placeholder until an attempt starts.

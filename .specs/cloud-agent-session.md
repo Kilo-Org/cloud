@@ -23,7 +23,8 @@ sandbox size into it; revised 2026-10-22 to simplify environment editing and
 show profile conflicts before saving; revised 2026-10-29 to allow several
 repositories in one environment; revised 2026-10-31 to define worktree-owned
 shared runtime and MCP configuration; revised 2026-11-04 to state that one
-sandbox serves one workspace.
+sandbox serves one workspace; revised 2026-11-04 to add environment start
+commands and skip setup that a current snapshot already ran.
 
 ## Conventions
 
@@ -40,8 +41,8 @@ they appear in all capitals, as shown here.
   workspace only: the sibling chats of that workspace share it, and no other
   workspace uses it.
 - **Repository environment**: an optional saved setup for one or several
-  repositories -- setup commands, plaintext variables, secrets, and a sandbox
-  size -- distinct from the sandbox Environment. A repository MAY belong to
+  repositories -- setup commands, start commands, plaintext variables, secrets,
+  and a sandbox size -- distinct from the sandbox Environment. A repository MAY belong to
   several environments of one owner.
 - **Multi-repository environment** (V2): a repository environment that lists its
   repositories. Multi-repository environments are available to all personal and
@@ -51,6 +52,10 @@ they appear in all capitals, as shown here.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request
   or for a session, that later sessions of that environment start from.
+- **Start commands**: a repository environment's commands that run after setup
+  in every prepared workspace, including one whose snapshot already ran setup.
+  They are not build inputs: a build never runs them, and changing them does not
+  change the configuration revision.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -167,8 +172,11 @@ repository.
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
 5. Setup commands MUST run on the first prepare and again on every rebuild,
-   except when restoring a private session disk snapshot. A failing or timed-out
-   setup command MUST fail preparation and the turn.
+   except when restoring a private session disk snapshot and except the setup
+   commands a current environment snapshot already ran. Start commands MUST run
+   after setup on the first prepare, on every rebuild and after a private
+   session disk snapshot restore. A failing or timed-out setup or start command
+   MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -195,9 +203,14 @@ repository.
    one repository. Otherwise, and when the lookup is unavailable, it MUST start from
    the base image. The lookup MUST NOT delay the start by more than 15 seconds
    and MUST NOT wait for a build.
-3. A session that starts from a snapshot MUST still run setup with the
-   configuration admitted for that session. Cached files MAY retain earlier
-   values, including secrets.
+3. A session that starts from a snapshot whose revision equals the session's
+   configuration revision MUST NOT run the environment setup commands that the
+   snapshot ran. It MUST still run setup commands that the session adds after
+   them, and every start command. A session that starts from an older snapshot
+   revision MUST run setup in full with the configuration admitted for that
+   session. A snapshot that does not record its setup commands MUST be treated
+   as an older revision. Cached files MAY retain earlier values, including
+   secrets.
 4. When a session starts from an older snapshot revision, preparation MUST
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
@@ -679,6 +692,16 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-04 -- Environment start commands
+
+- Environments have a start script that runs before the agent starts in every
+  session, after setup or a current snapshot. It is not part of a build.
+- A session that starts from a snapshot of the current environment revision
+  skips the setup the snapshot already ran. An older snapshot still runs setup
+  in full.
+- Start commands also run after a session disk snapshot restore, because no
+  process survives a snapshot.
 
 ### 2026-11-04 -- One sandbox per workspace
 

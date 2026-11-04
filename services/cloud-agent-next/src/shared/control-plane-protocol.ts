@@ -366,9 +366,23 @@ const routeSpecObjectSchema = z
      */
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
+    /**
+     * Commands run after setup whenever the wrapper prepares a fresh workspace,
+     * including one restored from a snapshot that already ran setup. Only a
+     * wrapper that advertised `startCommands` receives them; for an older one
+     * the Sandbox DO appends them to `setupCommands`.
+     */
+    startCommands: setupCommandsSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
+    /**
+     * Only the Sandbox DO adds this to the frame, like `capture`: the allocation
+     * launched from an environment snapshot built at this route's environment
+     * revision. The wrapper may then skip the leading setup commands that the
+     * snapshot records as already run. It is never stored in a route spec.
+     */
+    environmentSnapshotCurrent: z.literal(true).optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
      * omits it only after negotiating worktree sharing for a new allocation.
@@ -418,6 +432,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     env: true,
     secretEnvKeys: true,
     setupCommands: true,
+    startCommands: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -431,6 +446,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     env: true,
     secretEnvKeys: true,
     setupCommands: true,
+    startCommands: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -458,6 +474,13 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
         code: 'custom',
         path: ['secretEnvKeys'],
         message: 'registration spec must not carry secret env key names',
+      });
+    }
+    if (spec.environmentSnapshotCurrent !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['environmentSnapshotCurrent'],
+        message: 'environment snapshot provenance is frame-only',
       });
     }
   }
@@ -945,6 +968,12 @@ const controlPlaneHelloFrameSchema = z
      * sent to a wrapper that did not advertise it.
      */
     installsSkillsSh: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper runs `startCommands` after setup and
+     * honors `environmentSnapshotCurrent`. A wrapper that did not advertise it
+     * receives the start commands appended to `setupCommands`.
+     */
+    startCommands: z.literal(true).optional(),
   })
   .strict();
 

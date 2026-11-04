@@ -17,7 +17,13 @@ import type {
 } from '../../../src/shared/environment-build-protocol.js';
 import { createRepositoryPreparation } from '../control-plane/repository-preparation.js';
 import { directoryHome } from '../control-plane/workspace-home.js';
-import { readWorkspaceStamp, writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
+import {
+  environmentSetupRecord,
+  readEnvironmentSetupRecord,
+  readWorkspaceStamp,
+  writeEnvironmentSetupRecord,
+  writeWorkspaceStamp,
+} from '../control-plane/workspace-stamp.js';
 import { gitCredentialRecordPath } from '../control/git-credentials.js';
 import { git, runProcess } from '../utils.js';
 import { removeBuildCredentials, stopOtherProcesses } from './cleanup.js';
@@ -189,6 +195,7 @@ function harness(
       },
       cleanup: options.cleanup ?? removeBuildCredentials,
       writeStamp: (dir, stamp) => writeWorkspaceStamp(dir, true, stamp),
+      writeSetupRecord: writeEnvironmentSetupRecord,
       signal,
       inherited: { PATH: process.env.PATH, ENVIRONMENT_BUILD_CREDENTIAL: 'jwt', HOME: '/root' },
       logPath: undefined,
@@ -235,6 +242,12 @@ describe('environment build run', () => {
       allocationId: '33333333-3333-4333-8333-333333333333',
       commit: tip,
     });
+    expect(await readEnvironmentSetupRecord(directory)).toEqual(
+      environmentSetupRecord([
+        'mkdir -p "$XDG_CACHE_HOME/tool" && echo "$PLAIN" > "$XDG_CACHE_HOME/tool/built"',
+        'echo "token is $API_TOKEN"',
+      ])
+    );
     expect(h.steps).toEqual(['clone', 'setup', 'cleanup']);
     expect(h.stopped()).toBe(1);
     expect(h.lines.join('\n')).not.toContain('secret-canary-value');
@@ -282,6 +295,9 @@ describe('environment build run', () => {
         allocationId: '33333333-3333-4333-8333-333333333333',
         commit,
       });
+      expect(await readEnvironmentSetupRecord(child)).toEqual(
+        environmentSetupRecord(['pwd > parent-pwd.txt'])
+      );
     }
     // The cwd of several repositories is not a git root and is never stamped.
     expect(await readWorkspaceStamp(cwd)).toBeNull();

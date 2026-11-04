@@ -555,9 +555,20 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   over the same authenticated routes, clones the default
   branch into `/workspace/app`, runs setup with the directory HOME and `KILO_ENVIRONMENT_BUILD=1`
   (setup commands may use the rest of the build deadline), removes credentials and
-  reflogs, and writes the workspace stamp. The coordinator records the capture as issued before it
+  reflogs, and writes the workspace stamp and, beside it in `.git`, the setup record
+  (`kilo-environment-setup.json`: the count and SHA-256 of the setup commands it ran). Start
+  commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
+- **Setup skip.** The launch record keeps the offered snapshot's environment and revision. When
+  the allocation started from it and a route's environment and revision match, the Sandbox DO adds
+  the frame-only `environmentSnapshotCurrent: true` (`environmentPhaseSpec`). On an adopt where
+  every root is `foreign`, the wrapper then skips the leading setup commands whose count and hash
+  every root's setup record matches, and runs the rest of setup followed by `startCommands`. A
+  missing or different record, an older revision, a clone or a mixed workspace runs setup in full.
+  Only a wrapper whose hello advertised `startCommands` receives `startCommands` and the marker; an
+  older wrapper receives the start commands appended to `setupCommands`, so admission bounds the
+  combined list by the setup-command limit.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
@@ -737,7 +748,7 @@ decides from the filesystem alone, for each root:
 The workspace is `same` (`session.ready` reports `workspace: 'same'`, with no setup) only when every
 root has a stamp from this allocation. Otherwise a `same` root is left as it is, the others are
 cloned, checked out or adopted, and setup runs once, at the route directory, for the whole
-workspace. The stamps are written after setup, one for each root, so a root cloned before a later failure has
+workspace, followed by the start commands. The stamps are written after setup, one for each root, so a root cloned before a later failure has
 none and the retry reuses its clone.
 
 Adopt preserves each prepared root and selects the route's starting ref explicitly:
@@ -747,7 +758,8 @@ Adopt preserves each prepared root and selects the route's starting ref explicit
 3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
 4. Check out the target directly, without an intermediate checkout or deleting other local branches.
    Review refs retain their dedicated fetch and checkout path. Set the git author.
-5. Run the setup commands once for the workspace, then write the stamp of each root.
+5. Run the setup commands once for the workspace, minus the leading commands a current snapshot
+   already ran (see "Setup skip" above), then the start commands, then write the stamp of each root.
 
 Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
 use the bounded git retry policy; missing branches, authentication failures and checkout conflicts

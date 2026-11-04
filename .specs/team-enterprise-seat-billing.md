@@ -150,11 +150,13 @@ grants billing access without consuming a seat.
    Enterprise.
 2. The system MUST default the organization plan to Teams at the
    data layer when no plan is explicitly provided by the creation
-   flow and no parent organization supplies one. (Self-service
-   creation always provides Enterprise; see rule 3. Child
-   organizations take their parent's plan; see rule 10.)
-3. The self-service creation flow MUST create all new organizations
-   on the Enterprise plan with a 14-day free trial.
+   flow and no parent organization supplies one. (The self-service
+   signup flow for top-level organizations always provides
+   Enterprise; see rule 3. Child organizations take their parent's
+   plan; see rule 10.)
+3. The self-service signup flow MUST create new top-level
+   organizations on the Enterprise plan with a 14-day free trial.
+   Child organizations follow rule 10 instead.
 4. The user MUST NOT be offered a choice of plan or billing cycle
    during trial creation; plan tier and billing cycle selection
    occurs only when converting to a paid subscription.
@@ -612,7 +614,8 @@ in the current codebase:
 
 - Added Organization Plans rule 10: new child organizations are
   created with their parent's current plan as a creation-time
-  default. Clarified rule 2 accordingly.
+  default. Clarified rules 2 and 3 accordingly, scoping the
+  Enterprise trial default to top-level self-service signup.
 
 ### 2026-05-28 -- Organization EFW review boundary
 

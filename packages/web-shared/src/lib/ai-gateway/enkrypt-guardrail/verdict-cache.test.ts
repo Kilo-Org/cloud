@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   ENKRYPT_MAX_SCAN_CHARACTERS,
+  guardrailBlockMessage,
   type EnkryptDetectDependencies,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   ENKRYPT_SCAN_OVERLAP_CHARACTERS,
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
   MAX_PROBED_PREFIXES,
-  rememberAllowedRequest,
+  rememberRequestVerdict,
   scanRequestWithVerdictCache,
   verdictCacheKeys,
   type EnkryptGuardrailRequest,
+  type EnkryptVerdictCacheEntry,
   type EnkryptVerdictCacheStore,
 } from './verdict-cache';
 
@@ -49,18 +51,37 @@ function makeRequest(
 }
 
 function memoryStore(entries: string[] = []) {
-  const values = new Map(entries.map(key => [key, '1']));
+  const values = new Map(
+    entries.map(key => [
+      key,
+      { value: 'allow', expiresAt: Date.now() + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000 },
+    ])
+  );
+  const get = (key: string) => {
+    const entry = values.get(key);
+    return entry && entry.expiresAt > Date.now() ? entry.value : null;
+  };
   return {
-    mget: jest.fn(async (keys: string[]) => keys.map(key => values.get(key) ?? null)),
-    set: jest.fn(async (key: string, value: string, _options: { ex: number }) => {
-      values.set(key, value);
-      return 'OK';
-    }),
+    mget: jest.fn(async (keys: string[]): Promise<unknown[]> => keys.map(get)),
+    set: jest.fn(
+      async (
+        key: string,
+        verdict: EnkryptVerdictCacheEntry['verdict'],
+        options: { ex: number; nx?: true }
+      ) => {
+        if (options.nx && get(key) !== null) return null;
+        values.set(key, {
+          value: typeof verdict === 'string' ? verdict : JSON.stringify(verdict),
+          expiresAt: Date.now() + options.ex * 1_000,
+        });
+        return 'OK';
+      }
+    ),
   } satisfies EnkryptVerdictCacheStore;
 }
 
-function enkryptResponse(summary: Record<string, unknown>) {
-  return new Response(JSON.stringify({ summary, result_message: null }), {
+function enkryptResponse(summary: Record<string, unknown>, resultMessage: string | null = null) {
+  return new Response(JSON.stringify({ summary, result_message: resultMessage }), {
     status: 200,
     headers: { 'content-type': 'application/json', 'x-enkrypt-credits-cost': '3' },
   });
@@ -109,7 +130,7 @@ describe('verdictCacheKeys', () => {
     expect(new Set(keys).size).toBe(conversation.length);
     for (const key of keys) {
       expect(key).toMatch(
-        new RegExp(`^enkrypt-guardrail:verdict:v1:${organizationId}:[0-9a-f]{64}$`)
+        new RegExp(`^enkrypt-guardrail:verdict:v2:${organizationId}:[0-9a-f]{64}$`)
       );
     }
   });
@@ -173,7 +194,7 @@ describe('verdictCacheKeys', () => {
 });
 
 describe('scanRequestWithVerdictCache', () => {
-  it('scans the full text on a miss and returns the final key to cache', async () => {
+  it('scans the full text on a miss and returns an allow entry for the final key', async () => {
     const store = memoryStore();
     const dependencies = deps(store);
 
@@ -181,7 +202,7 @@ describe('scanRequestWithVerdictCache', () => {
 
     expect(scannedTexts(dependencies)).toEqual([conversation.join('\n\n')]);
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.allowedKey).toBe(keysFor(conversation).at(-1));
+    expect(result.cacheEntry).toEqual({ key: keysFor(conversation).at(-1), verdict: 'allow' });
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({ verdict_cache: 'miss', cached_segments: 0, total_segments: 5 })
@@ -199,7 +220,7 @@ describe('scanRequestWithVerdictCache', () => {
     expect(scannedTexts(dependencies)).toEqual([
       `${'c'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS)}\n\nd\n\ne`,
     ]);
-    expect(result.allowedKey).toBe(keys[4]);
+    expect(result.cacheEntry).toEqual({ key: keys[4], verdict: 'allow' });
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({
@@ -247,10 +268,190 @@ describe('scanRequestWithVerdictCache', () => {
       report: expect.any(Object),
       verdict: { action: 'allow' },
       usageRecords: [],
-      allowedKey: null,
+      cacheEntry: null,
     });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
+
+  it('returns only blocking detector IDs to cache for a genuine Enkrypt block', async () => {
+    const mixedConfig = {
+      ...config,
+      detectors: { ...config.detectors, pii: { enabled: true, entities: ['secrets'] } },
+    } satisfies EnkryptGuardrailRequest['config'];
+    const dependencies = deps(memoryStore(), () =>
+      enkryptResponse(
+        { injection_attack: 1, keyword_detected: 1, pii: ['sensitive text'] },
+        'Upstream message containing sensitive prompt text'
+      )
+    );
+
+    const result = await scanRequestWithVerdictCache(
+      makeRequest(conversation, { config: mixedConfig }),
+      dependencies
+    );
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message: expect.stringContaining('Upstream message containing sensitive prompt text'),
+    });
+    expect(result.usageRecords.at(-1)?.decision).toBe('blocked');
+    expect(result.cacheEntry).toEqual({
+      key: keysFor(conversation, { config: mixedConfig }).at(-1),
+      verdict: { action: 'block', detectors: ['injection_attack', 'keyword_detector'] },
+    });
+  });
+
+  it.each([
+    ['repeated', conversation],
+    ['appended', [...conversation, 'new question']],
+  ])(
+    'blocks a %s blocked prefix without an Enkrypt call or cache renewal',
+    async (_name, segments) => {
+      const store = memoryStore();
+      const original = await scanRequestWithVerdictCache(
+        makeRequest(conversation),
+        deps(store, () => enkryptResponse({ injection_attack: 1 }, 'Sensitive upstream message'))
+      );
+      if (!original.cacheEntry) throw new Error('expected a cacheable block');
+      await rememberRequestVerdict(original.cacheEntry, store);
+      const dependencies = deps(store);
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(segments, { sessionId: 'ses_retry', clientRequestId: 'retry-request' }),
+        dependencies
+      );
+
+      expect(result).toEqual({
+        verdict: { action: 'block', message: guardrailBlockMessage(['injection_attack'], null) },
+        cacheEntry: null,
+        usageRecords: [],
+        report: {
+          scan: 'blocking',
+          detectors_enabled: ['injection_attack', 'keyword_detector'],
+          detectors_blocking: config.blockingDetectors,
+          verdict_cache: 'hit',
+          total_characters: segments.join('\n\n').length,
+          total_segments: segments.length,
+          cached_characters: conversation.join('\n\n').length,
+          cached_segments: conversation.length,
+          scanned_characters: 0,
+          decision: 'blocked',
+          error: null,
+          detectors_fired: ['injection_attack'],
+          attempts: 0,
+          credits_cost: null,
+          latency_ms: 0,
+        },
+      });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(store.set).toHaveBeenCalledTimes(1);
+      expect(console.debug).toHaveBeenLastCalledWith('[enkrypt-guardrail] decision', {
+        organization_id: organizationId,
+        session_id: 'ses_retry',
+        client_request_id: 'retry-request',
+        api_kind: 'chat_completions',
+        scan_tool_results: true,
+        ...result.report,
+      });
+    }
+  );
+
+  it('does not let the longest allowed prefix hide an earlier blocked prefix', async () => {
+    const keys = keysFor(conversation);
+    const store = memoryStore([keys[0], keys[4]]);
+    await rememberRequestVerdict(
+      { key: keys[2], verdict: { action: 'block', detectors: ['keyword_detector'] } },
+      store
+    );
+    const dependencies = deps(store);
+
+    const result = await scanRequestWithVerdictCache(makeRequest(conversation), dependencies);
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message: guardrailBlockMessage(['keyword_detector'], null),
+    });
+    expect(result.report).toEqual(
+      expect.objectContaining({ verdict_cache: 'hit', decision: 'blocked', cached_segments: 3 })
+    );
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts automatically deserialized block objects as well as serialized entries', async () => {
+    const store = memoryStore();
+    store.mget.mockResolvedValue([{ action: 'block', detectors: ['injection_attack'] }]);
+    const dependencies = deps(store);
+
+    const result = await scanRequestWithVerdictCache(makeRequest(['blocked']), dependencies);
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message: guardrailBlockMessage(['injection_attack'], null),
+    });
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, unknown]>([
+    ['missing entry', null],
+    ['old allow marker', '1'],
+    ['unexpected string', 'allowed'],
+    ['invalid JSON', '{"action":'],
+    ['boolean', true],
+    ['array', ['allow']],
+    ['missing detectors', { action: 'block' }],
+    ['empty detectors', { action: 'block', detectors: [] }],
+    ['unknown detector', { action: 'block', detectors: ['unknown_detector'] }],
+    ['non-blocking detector', { action: 'block', detectors: ['pii'] }],
+    ['wrong action', { action: 'allow', detectors: ['injection_attack'] }],
+    ['extra message', { action: 'block', detectors: ['injection_attack'], message: 'private' }],
+    ['serialized invalid detectors', '{"action":"block","detectors":[123]}'],
+  ])('rescans in full for malformed cache data: %s', async (_name, value) => {
+    const store = memoryStore();
+    store.mget.mockResolvedValue([value]);
+    const dependencies = deps(store);
+
+    const result = await scanRequestWithVerdictCache(makeRequest(['hello']), dependencies);
+
+    expect(scannedTexts(dependencies)).toEqual(['hello']);
+    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(result.report).toEqual(
+      expect.objectContaining({ verdict_cache: 'miss', cached_segments: 0 })
+    );
+  });
+
+  it.each(['allow', 'block'] as const)(
+    'expires a cached %s after six hours without renewing it on hits',
+    async action => {
+      const startedAt = Date.now();
+      const now = jest.spyOn(Date, 'now').mockReturnValue(startedAt);
+      const store = memoryStore();
+      const original = await scanRequestWithVerdictCache(
+        makeRequest(conversation),
+        deps(store, () => enkryptResponse({ injection_attack: action === 'block' ? 1 : 0 }))
+      );
+      if (!original.cacheEntry) throw new Error('expected a cacheable verdict');
+      await rememberRequestVerdict(original.cacheEntry, store);
+      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000 - 1);
+      const hitDependencies = deps(store);
+
+      const hit = await scanRequestWithVerdictCache(makeRequest(conversation), hitDependencies);
+
+      expect(hit.verdict.action).toBe(action);
+      expect(hit.cacheEntry).toBeNull();
+      expect(hitDependencies.fetch).not.toHaveBeenCalled();
+      expect(store.set).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000);
+      const expiredDependencies = deps(store);
+
+      const expired = await scanRequestWithVerdictCache(
+        makeRequest(conversation),
+        expiredDependencies
+      );
+
+      expect(scannedTexts(expiredDependencies)).toEqual([conversation.join('\n\n')]);
+      expect(expired.report?.verdict_cache).toBe('miss');
+    }
+  );
 
   it('rescans everything when an earlier message was edited', async () => {
     const store = memoryStore([keysFor(conversation).at(-1) ?? '']);
@@ -276,23 +477,59 @@ describe('scanRequestWithVerdictCache', () => {
     expect(scannedTexts(dependencies)).toEqual([conversation.join('\n\n')]);
   });
 
+  it.each<[string, Partial<EnkryptGuardrailRequest>]>([
+    ['another organization', { organizationId: '00000000-0000-4000-8000-000000000003' }],
+    ['another user', { kiloUserId: 'oauth/google:456' }],
+    ['a changed blocking set', { config: { ...config, blockingDetectors: ['injection_attack'] } }],
+    [
+      'changed detector settings',
+      {
+        config: {
+          ...config,
+          detectors: {
+            ...config.detectors,
+            keyword_detector: { enabled: true, banned_keywords: ['Project Hydra'] },
+          },
+        },
+      },
+    ],
+    ['changed tool-result scope', { config: { ...config, scanToolResults: false } }],
+    ['rewritten history', { segments: conversation.with(2, 'rewritten message') }],
+  ])('does not reuse a cached block for %s', async (_name, overrides) => {
+    const store = memoryStore();
+    const original = await scanRequestWithVerdictCache(
+      makeRequest(conversation),
+      deps(store, () => enkryptResponse({ injection_attack: 1 }))
+    );
+    if (!original.cacheEntry) throw new Error('expected a cacheable block');
+    await rememberRequestVerdict(original.cacheEntry, store);
+    const dependencies = deps(store);
+    const request = makeRequest(conversation, overrides);
+
+    const result = await scanRequestWithVerdictCache(request, dependencies);
+
+    expect(scannedTexts(dependencies)).toEqual([request.segments.join('\n\n')]);
+    expect(result.verdict).toEqual({ action: 'allow' });
+  });
+
   it.each<[string, () => Response]>([
-    ['blocked', () => enkryptResponse({ injection_attack: 1 })],
     ['failed', () => new Response('unavailable', { status: 500 })],
-  ])('returns no key to cache for a %s request', async (_name, respond) => {
+    ['detector error', () => enkryptResponse({ injection_attack: -1 })],
+    ['invalid response', () => new Response('{}', { status: 200 })],
+  ])('returns no entry to cache for a %s request', async (_name, respond) => {
     const result = await scanRequestWithVerdictCache(
       makeRequest(conversation),
       deps(memoryStore(), respond)
     );
 
     expect(result.verdict.action).not.toBe('allow');
-    expect(result.allowedKey).toBeNull();
+    expect(result.cacheEntry).toBeNull();
   });
 
   it.each<[string, () => Response]>([
     ['fails', () => new Response('unavailable', { status: 500 })],
     ['reports a detector error', () => enkryptResponse({ pii: -1 })],
-  ])('returns no key to cache when a log-only scan %s and allows', async (_name, respond) => {
+  ])('returns no entry to cache when a log-only scan %s and allows', async (_name, respond) => {
     const logOnlyConfig = {
       scanToolResults: true,
       status: 'ready',
@@ -306,10 +543,10 @@ describe('scanRequestWithVerdictCache', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.allowedKey).toBeNull();
+    expect(result.cacheEntry).toBeNull();
   });
 
-  it('returns no key to cache when a log-only scan is too large to send', async () => {
+  it('returns no entry to cache when a log-only scan is too large to send', async () => {
     const result = await scanRequestWithVerdictCache(
       makeRequest(['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)], {
         config: { ...config, blockingDetectors: [] },
@@ -318,7 +555,36 @@ describe('scanRequestWithVerdictCache', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.allowedKey).toBeNull();
+    expect(result.cacheEntry).toBeNull();
+  });
+
+  it.each(['missing API key', 'aborted request'])(
+    'returns no cache entry without a detection for a %s',
+    async failure => {
+      const store = memoryStore();
+      const dependencies = deps(store);
+      if (failure === 'missing API key') dependencies.apiKey = undefined;
+      else dependencies.signal = AbortSignal.abort();
+
+      const result = await scanRequestWithVerdictCache(makeRequest(conversation), dependencies);
+
+      expect(result.verdict.action).toBe('unavailable');
+      expect(result.cacheEntry).toBeNull();
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(store.set).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns no cache entry for an empty request without scanning or looking up', async () => {
+    const store = memoryStore();
+    const dependencies = deps(store);
+
+    const result = await scanRequestWithVerdictCache(makeRequest([]), dependencies);
+
+    expect(result.cacheEntry).toBeNull();
+    expect(result.usageRecords).toEqual([]);
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+    expect(store.mget).not.toHaveBeenCalled();
   });
 
   it('scans the full text when the cache lookup fails', async () => {
@@ -346,7 +612,7 @@ describe('scanRequestWithVerdictCache', () => {
     const result = await scanRequestWithVerdictCache(makeRequest(conversation), dependencies);
 
     expect(scannedTexts(dependencies)).toEqual([conversation.join('\n\n')]);
-    expect(result.allowedKey).toBeNull();
+    expect(result.cacheEntry).toBeNull();
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({ verdict_cache: 'off' })
@@ -362,6 +628,7 @@ describe('scanRequestWithVerdictCache', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
+    expect(result.cacheEntry).toBeNull();
     expect(store.mget).not.toHaveBeenCalled();
   });
 
@@ -385,6 +652,22 @@ describe('scanRequestWithVerdictCache', () => {
       '[enkrypt-guardrail] decision',
       expect.objectContaining({ verdict_cache: 'miss' })
     );
+  });
+
+  it('does not expand the probe window to find an older cached block', async () => {
+    const segments = Array.from({ length: MAX_PROBED_PREFIXES + 20 }, (_, index) => `m${index}`);
+    const store = memoryStore();
+    await rememberRequestVerdict(
+      { key: keysFor(segments)[10], verdict: { action: 'block', detectors: ['injection_attack'] } },
+      store
+    );
+    const dependencies = deps(store);
+
+    const result = await scanRequestWithVerdictCache(makeRequest(segments), dependencies);
+
+    expect(scannedTexts(dependencies)).toEqual([segments.join('\n\n')]);
+    expect(result.report?.verdict_cache).toBe('miss');
+    expect(store.mget).toHaveBeenCalledWith(keysFor(segments).slice(20));
   });
 
   describe('the scan limit', () => {
@@ -421,27 +704,81 @@ describe('scanRequestWithVerdictCache', () => {
           ),
         },
         usageRecords: [],
-        allowedKey: null,
+        cacheEntry: null,
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
   });
 });
 
-describe('rememberAllowedRequest', () => {
-  it('stores a marker without text for the cache lifetime', async () => {
+describe('rememberRequestVerdict', () => {
+  it('stores an explicit allow without text for the cache lifetime only if absent', async () => {
     const store = memoryStore();
 
-    await expect(rememberAllowedRequest('key', store)).resolves.toBe(true);
+    await expect(rememberRequestVerdict({ key: 'key', verdict: 'allow' }, store)).resolves.toBe(
+      true
+    );
 
-    expect(store.set).toHaveBeenCalledWith('key', '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS });
+    expect(store.set).toHaveBeenCalledWith('key', 'allow', {
+      ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+      nx: true,
+    });
+  });
+
+  it('lets a block replace an earlier allow', async () => {
+    const store = memoryStore(['key']);
+    const entry: EnkryptVerdictCacheEntry = {
+      key: 'key',
+      verdict: { action: 'block', detectors: ['injection_attack'] },
+    };
+
+    await expect(rememberRequestVerdict(entry, store)).resolves.toBe(true);
+
+    expect(store.set).toHaveBeenCalledWith('key', entry.verdict, {
+      ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+    });
+    await expect(store.mget(['key'])).resolves.toEqual([JSON.stringify(entry.verdict)]);
+  });
+
+  it('does not let a slower allowing cold scan overwrite a cached block', async () => {
+    const store = memoryStore();
+    const allowingDependencies = deps(store);
+    let releaseAllow = () => {};
+    const allowingResponse = new Promise<Response>(resolve => {
+      releaseAllow = () => resolve(enkryptResponse({ injection_attack: 0 }));
+    });
+    jest.mocked(allowingDependencies.fetch).mockReturnValue(allowingResponse);
+    const allowing = scanRequestWithVerdictCache(makeRequest(conversation), allowingDependencies);
+    const blocked = await scanRequestWithVerdictCache(
+      makeRequest(conversation),
+      deps(store, () => enkryptResponse({ injection_attack: 1 }))
+    );
+    expect(allowingDependencies.fetch).toHaveBeenCalledTimes(1);
+    if (!blocked.cacheEntry) throw new Error('expected a cacheable block');
+    await rememberRequestVerdict(blocked.cacheEntry, store);
+
+    releaseAllow();
+    const allowed = await allowing;
+    if (!allowed.cacheEntry) throw new Error('expected a cacheable allow');
+    await expect(rememberRequestVerdict(allowed.cacheEntry, store)).resolves.toBe(false);
+    const retryDependencies = deps(store);
+    const retry = await scanRequestWithVerdictCache(makeRequest(conversation), retryDependencies);
+
+    expect(retry.verdict.action).toBe('block');
+    expect(retryDependencies.fetch).not.toHaveBeenCalled();
+    expect(store.set).toHaveBeenLastCalledWith(allowed.cacheEntry.key, 'allow', {
+      ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+      nx: true,
+    });
   });
 
   it('logs and swallows a write failure', async () => {
     const store = memoryStore();
     store.set.mockRejectedValue(new Error('unreachable'));
 
-    await expect(rememberAllowedRequest('key', store)).resolves.toBe(false);
+    await expect(rememberRequestVerdict({ key: 'key', verdict: 'allow' }, store)).resolves.toBe(
+      false
+    );
     expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
       '[enkrypt-guardrail] verdict cache write failed',
       { error: 'unreachable' }

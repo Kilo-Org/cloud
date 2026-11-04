@@ -3578,16 +3578,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     current: boolean
   ): void {
     if (!current) return;
-    const outcome: ControlPlaneOutcome = {
-      sessionId: frame.sessionId,
-      status: frame.status,
-      ...(frame.reason === undefined ? {} : { reason: frame.reason }),
-      ...(frame.assistantReason === undefined ? {} : { assistantReason: frame.assistantReason }),
-      ...(frame.providerOwnership === undefined
-        ? {}
-        : { providerOwnership: frame.providerOwnership }),
-      lastMessageId: frame.lastMessageId,
-    };
+    const { type: _type, ...outcome } = frame;
     this.notifications.enqueue(outcome.sessionId, { kind: 'outcome', payload: outcome });
   }
 

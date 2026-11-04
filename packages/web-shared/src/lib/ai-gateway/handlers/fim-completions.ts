@@ -5,7 +5,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -184,7 +184,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     provider: fimProvider,
     requested_model: requestBody.model,
-    is_free: isFreeModelExcludingCustomLlms(requestBody.model),
+    is_free: isFreeModel(requestBody.model),
     custom_llm_pricing: null,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,

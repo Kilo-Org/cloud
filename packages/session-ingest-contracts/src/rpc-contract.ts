@@ -1291,10 +1291,8 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`. `before` is capped at
- * `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized value never reaches
- * the decoder.
+ * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
+ * value never reaches the decoder.
  */
 export const getSessionMessagesSchema = z
   .object({

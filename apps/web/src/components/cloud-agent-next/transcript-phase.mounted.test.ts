@@ -453,6 +453,57 @@ describe('CloudChatPage route-aware transcript phase', () => {
     }
   );
 
+  it('shows the starting environment beside the repository and branch', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: 'kilo/workspace',
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+    mockAtomValues.sessionConfig = { repository: 'Kilo-Org/cloud' };
+    mockUseCloudAgentEnvironment.mockReturnValue({ data: { name: 'Cloud development' } });
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const footer = dom.container.querySelector('[data-composer]')?.nextElementSibling;
+    expect(footer?.textContent).toBe('Kilo-Org/cloud·kilo/workspace·Cloud development');
+    expect(mockUseCloudAgentEnvironment).toHaveBeenLastCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      { organizationId: undefined }
+    );
+  });
+
+  it('keeps the repository and branch when the environment cannot be loaded', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: 'kilo/workspace',
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+    mockAtomValues.sessionConfig = { repository: 'Kilo-Org/cloud' };
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const footer = dom.container.querySelector('[data-composer]')?.nextElementSibling;
+    expect(footer?.textContent).toBe('Kilo-Org/cloud·kilo/workspace');
+  });
+
+  it('does not query a previous chat environment while switching sessions', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_a',
+      organizationId: null,
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    render();
+
+    expect(mockUseCloudAgentEnvironment).toHaveBeenLastCalledWith(null, {
+      organizationId: undefined,
+    });
+  });
+
   it.each([
     { isPreparingAsync: true, cloudStatus: { type: 'ready' } },
     { isPreparingAsync: false, cloudStatus: null },

@@ -44,7 +44,14 @@ export function ComposerContextLine({
   const hasMultipleRepositories = repositories !== undefined && repositories.length > 1;
   const mainRepository = repository || repositories?.[0]?.repoFullName;
   const hasUsage = contextTokens !== undefined && contextWindow !== undefined;
-  if (!reserve && !repository && !branch && !environmentName && !hasUsage && !hasMultipleRepositories)
+  if (
+    !reserve &&
+    !repository &&
+    !branch &&
+    !environmentName &&
+    !hasUsage &&
+    !hasMultipleRepositories
+  )
     return null;
 
   return (

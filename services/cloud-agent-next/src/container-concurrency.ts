@@ -141,10 +141,11 @@ type AccountState = {
   blocked: ContainerConcurrencySubject | null;
 };
 
-function blockedReasonOf(userId: string): SQL<string | null> {
+/** Same rule as runtime authorization: `blocked_at` or `blocked_reason` blocks. */
+function isUserBlocked(userId: string): SQL<boolean | null> {
   return sql<
-    string | null
-  >`(select ${kilocode_users.blocked_reason} from ${kilocode_users} where ${kilocode_users.id} = ${userId})`;
+    boolean | null
+  >`(select ${kilocode_users.blocked_at} is not null or ${kilocode_users.blocked_reason} is not null from ${kilocode_users} where ${kilocode_users.id} = ${userId})`;
 }
 
 /** Whether admission reads `kilocode_users` for a human or a user billing subject. */
@@ -173,16 +174,15 @@ async function readAccountState(
         sql`(select ${account.total_microdollars_acquired} - ${account.microdollars_used} from ${account} where ${account.id} = ${subject.id})`.mapWith(
           Number
         ),
-      actorBlockedReason:
-        actorUserId === null ? sql<string | null>`null` : blockedReasonOf(actorUserId),
-      subjectBlockedReason:
-        subjectUserId === null ? sql<string | null>`null` : blockedReasonOf(subjectUserId),
+      actorBlocked: actorUserId === null ? sql<boolean | null>`null` : isUserBlocked(actorUserId),
+      subjectBlocked:
+        subjectUserId === null ? sql<boolean | null>`null` : isUserBlocked(subjectUserId),
     })
     .from(sql`(select 1) as admission`);
   let blocked: ContainerConcurrencySubject | null = null;
-  if (actorUserId !== null && row?.actorBlockedReason) {
+  if (actorUserId !== null && row?.actorBlocked) {
     blocked = { type: 'user', id: actorUserId };
-  } else if (subjectUserId !== null && row?.subjectBlockedReason) {
+  } else if (subjectUserId !== null && row?.subjectBlocked) {
     blocked = { type: 'user', id: subjectUserId };
   }
   return { balance: row?.balance ?? 0, blocked };

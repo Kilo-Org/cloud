@@ -255,6 +255,17 @@ describe('container capacity against PostgreSQL', () => {
     }
   });
 
+  it.each([
+    { blocked_reason: 'abuse', blocked_at: null },
+    { blocked_reason: null, blocked_at: new Date().toISOString() },
+  ])('treats either block column as blocked: %j', async columns => {
+    await writer.db.update(kilocode_users).set(columns).where(eq(kilocode_users.id, userId));
+    expect((await readContainerCapacity(reader, request())).blocked).toEqual({
+      type: 'user',
+      id: userId,
+    });
+  });
+
   it('reports a blocked user billing subject for a bot start', async () => {
     await writer.db
       .update(kilocode_users)

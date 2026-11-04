@@ -47,8 +47,8 @@ function userCapacity(live: number, limit = USER_CONTAINER_LIMIT): ContainerCapa
 
 type AccountRow = {
   balance: number | null;
-  actorBlockedReason: string | null;
-  subjectBlockedReason: string | null;
+  actorBlocked: boolean | null;
+  subjectBlocked: boolean | null;
 };
 
 /**
@@ -60,8 +60,8 @@ function fakeDatabase(account: Partial<AccountRow> = {}, live = 0) {
   const queries: Array<{ text: string; values: unknown[] }> = [];
   const row: AccountRow = {
     balance: FUNDED_CONTAINER_MINIMUM_MICRODOLLARS,
-    actorBlockedReason: null,
-    subjectBlockedReason: null,
+    actorBlocked: null,
+    subjectBlocked: null,
     ...account,
   };
   const query = vi.fn(async (config: { text: string }, values: unknown[]) => {
@@ -70,11 +70,7 @@ function fakeDatabase(account: Partial<AccountRow> = {}, live = 0) {
     if (config.text.includes('as admission')) {
       return {
         rows: [
-          [
-            row.balance === null ? null : String(row.balance),
-            row.actorBlockedReason,
-            row.subjectBlockedReason,
-          ],
+          [row.balance === null ? null : String(row.balance), row.actorBlocked, row.subjectBlocked],
         ],
       };
     }
@@ -273,7 +269,7 @@ describe('assertContainerCapacity', () => {
 
 describe('account block admission', () => {
   it.each(CHECKPOINTS)('rejects a blocked user at %s', async checkpoint => {
-    const database = fakeDatabase({ actorBlockedReason: 'abuse' });
+    const database = fakeDatabase({ actorBlocked: true });
     const rejection = database.assert(request({ checkpoint }));
     await expect(rejection).rejects.toBeInstanceOf(ContainerAccountBlockedError);
     await expect(rejection).rejects.toMatchObject({
@@ -290,7 +286,7 @@ describe('account block admission', () => {
     expect(database.queries).toHaveLength(2);
     expect(account.text).toBe(
       'select (select "total_microdollars_acquired" - "microdollars_used" from "kilocode_users" where "id" = $1), ' +
-        '(select "blocked_reason" from "kilocode_users" where "id" = $2), null from (select 1) as admission'
+        '(select "blocked_at" is not null or "blocked_reason" is not null from "kilocode_users" where "id" = $2), null from (select 1) as admission'
     );
     expect(account.values).toEqual(['user_1', 'user_1']);
   });
@@ -324,12 +320,12 @@ describe('account block admission', () => {
     'checks the acting user when the subject is an organization at %s',
     async checkpoint => {
       const input = request({ subject: { type: 'org', id: 'org_1' }, checkpoint });
-      const database = fakeDatabase({ actorBlockedReason: 'abuse' });
+      const database = fakeDatabase({ actorBlocked: true });
       await expect(database.assert(input)).rejects.toBeInstanceOf(ContainerAccountBlockedError);
       const [account] = database.accountQueries();
       expect(account.text).toBe(
         'select (select "total_microdollars_acquired" - "microdollars_used" from "organizations" where "id" = $1), ' +
-          '(select "blocked_reason" from "kilocode_users" where "id" = $2), null from (select 1) as admission'
+          '(select "blocked_at" is not null or "blocked_reason" is not null from "kilocode_users" where "id" = $2), null from (select 1) as admission'
       );
       expect(account.values).toEqual(['org_1', 'user_1']);
 
@@ -338,7 +334,7 @@ describe('account block admission', () => {
   );
 
   it('rejects a bot start billed to a blocked user', async () => {
-    const database = fakeDatabase({ subjectBlockedReason: 'abuse' });
+    const database = fakeDatabase({ subjectBlocked: true });
     await expect(
       database.assert(request({ actor: { type: 'bot', id: 'automation' } }))
     ).rejects.toBeInstanceOf(ContainerAccountBlockedError);
@@ -349,7 +345,7 @@ describe('account block admission', () => {
     { instanceId: 'crv-abcdef' },
     { instanceId: `sbx-${'a'.repeat(48)}`, billingOrigin: 'code-review' },
   ])('does not let a Code Reviewer exemption admit a blocked human: %j', async overrides => {
-    const database = fakeDatabase({ actorBlockedReason: 'abuse' });
+    const database = fakeDatabase({ actorBlocked: true });
     await expect(database.assert(request(overrides))).rejects.toBeInstanceOf(
       ContainerAccountBlockedError
     );
@@ -357,12 +353,12 @@ describe('account block admission', () => {
   });
 
   it('reports a block before a reached limit', async () => {
-    const database = fakeDatabase({ actorBlockedReason: 'abuse' }, USER_CONTAINER_LIMIT);
+    const database = fakeDatabase({ actorBlocked: true }, USER_CONTAINER_LIMIT);
     await expect(database.assert(request())).rejects.toBeInstanceOf(ContainerAccountBlockedError);
   });
 
   it('keeps the test-Worker bypass for blocked accounts', async () => {
-    const database = fakeDatabase({ actorBlockedReason: 'abuse' });
+    const database = fakeDatabase({ actorBlocked: true });
     await expect(
       database.assert(request(), { CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true' })
     ).resolves.toBeUndefined();

@@ -29,6 +29,7 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
@@ -194,7 +195,8 @@ export function NewSessionConfigureForm({
   const windowSize = useWindowDimensions();
   const inlineSectionHeadings = resolveNewSessionInlineSections(
     windowSize.width,
-    windowSize.height
+    windowSize.height,
+    useLiveFontScale()
   );
   const runOnNote =
     runOnInlineNote ??

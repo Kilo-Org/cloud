@@ -10,6 +10,7 @@ import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-ag
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { NewSessionSectionField } from '@/components/agents/new-session-section-field';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { resolveNewSessionInlineSections } from '@/components/agents/new-session-section-layout';
 import {
   isStoredRepoSelectionGone,
@@ -156,7 +157,8 @@ export function NewSessionScreenBody() {
   const windowSize = useWindowDimensions();
   const inlineSectionHeadings = resolveNewSessionInlineSections(
     windowSize.width,
-    windowSize.height
+    windowSize.height,
+    useLiveFontScale()
   );
   const searchParams = useLocalSearchParams<{
     organizationId?: string;

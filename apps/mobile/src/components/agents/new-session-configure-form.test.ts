@@ -51,6 +51,13 @@ const platformState = vi.hoisted(() => ({ OS: 'android' }));
 // The composer-reveal hook arms the did-events through Keyboard.addListener;
 // the captured subscribers let the repro fire `keyboardDidShow` directly.
 const windowState = vi.hoisted(() => ({ width: 411, height: 914, scale: 2.625, fontScale: 1 }));
+const liveFontScale = vi.hoisted(() => ({ value: 1 }));
+
+// The form reads the live system scale from the app's provider, which this
+// plain-function suite never mounts; the store drives the compact-row decision.
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
+  useLiveFontScale: () => liveFontScale.value,
+}));
 const keyboardSubscribers = vi.hoisted(() => ({
   show: null as (() => void) | null,
   hide: null as (() => void) | null,
@@ -494,6 +501,27 @@ describe('NewSessionConfigureForm', () => {
       expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(true);
     } finally {
       windowState.height = 914;
+    }
+  });
+
+  it('keeps the stacked heading at a font scale that leaves one word no room', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    windowState.height = 640;
+    liveFontScale.value = 1.8;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm({
+        ...defaultProps(),
+        showRunOnSelector: true,
+      }) as Node;
+
+      // The row's share of a 360 dp cell no longer holds a long localized word
+      // at this scale, so the form keeps its stacked heading and scrolls.
+      expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(false);
+    } finally {
+      windowState.height = 914;
+      liveFontScale.value = 1;
     }
   });
 

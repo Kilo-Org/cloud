@@ -23,25 +23,28 @@
  * are short too and take the row, and only a window taller than the threshold
  * keeps the stacked heading.
  *
- * The width gate is the narrowest common phone (320 dp), the width `narrow-layout`
- * names as the design target. The heading shares its row with the control at
- * most 45% of the width, so on a narrower window — a split-screen pane, a
- * foldable's cover display, a large display-size override — a long localized
- * name no longer fits one word and would break mid-word. Those windows keep the
- * stacked layout and simply scroll the picker into view. An unknown width keeps
- * the stacked form for the same reason: the compact row is the exception, never
- * the default.
+ * The width gate is judged in points of text, not of screen: the heading shares
+ * its row with the control at most 45% of the width, so the room a word has is
+ * `windowWidth / fontScale`. Below the narrowest common phone (320 dp) — and at
+ * any system font scale that shrinks that room below it — a long localized name
+ * no longer fits one word and would break mid-word, the defect `narrow-layout`
+ * documents. Those windows keep the stacked layout and scroll the picker into
+ * view. An unknown width, height or scale keeps the stacked form for the same
+ * reason: the compact row is the exception, never the default.
  */
-export const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
-export const NEW_SESSION_INLINE_SECTION_MIN_WINDOW_WIDTH = 320;
+const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
+const NEW_SESSION_INLINE_SECTION_MIN_TEXT_WIDTH = 320;
 
 export function resolveNewSessionInlineSections(
   windowWidth: number,
-  windowHeight: number
+  windowHeight: number,
+  fontScale: number
 ): boolean {
   return (
     Number.isFinite(windowWidth) &&
-    windowWidth >= NEW_SESSION_INLINE_SECTION_MIN_WINDOW_WIDTH &&
+    Number.isFinite(fontScale) &&
+    fontScale > 0 &&
+    windowWidth / fontScale >= NEW_SESSION_INLINE_SECTION_MIN_TEXT_WIDTH &&
     Number.isFinite(windowHeight) &&
     windowHeight > 0 &&
     windowHeight < NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT

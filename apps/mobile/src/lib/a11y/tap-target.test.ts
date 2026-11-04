@@ -361,14 +361,25 @@ describe('code-reviewer line-action geometry', () => {
     // is held to the audit floor beside it.
     expect(LINE_ACTION_BOX_CLASS).toContain(`min-h-[${MIN_TAP_TARGET_DP}px]`);
     expect(await compiledDp(LINE_ACTION_BOX_CLASS, 'minHeight')).toBe(MIN_TAP_TARGET_DP);
+    // The box floats over the line it ends: its vertical margin cancels the
+    // half that overflows the `text-xs` line, so it neither grows the row nor
+    // reaches into the copy above it. Losing the margin leaves the 28dp
+    // height intact and still collides.
+    const textLineDp = 14;
+    expect(await compiledDp(LINE_ACTION_BOX_CLASS, 'marginBlock')).toBe(
+      -(MIN_TAP_TARGET_DP - textLineDp) / 2
+    );
     // A `min-h-[28px]` box measures 27.8dp on Android: 27.8 + 2 * 9 = 45.8dp
     // holds, while the inline link's 8dp a side would land at 43.8dp.
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
     expect(
       tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // A short label's 36dp width floor at the call site measures 35.81dp on
+    // Android, so the horizontal reach is checked at that width too:
+    // 35.81 + 5 + 5 = 45.81dp holds, while 4dp a side would land at 43.81dp.
+    expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
     // The box floats over one line, so neither axis has a shorter side.
     expect(LINE_ACTION_HIT_SLOP.top).toBe(LINE_ACTION_HIT_SLOP.bottom);
     expect(LINE_ACTION_HIT_SLOP.left).toBe(LINE_ACTION_HIT_SLOP.right);
@@ -415,8 +426,7 @@ describe('composer input row control separation', () => {
     // `ms-1` is 0.25rem at NativeWind's 14pt rem: 3.5dp, narrower than the
     // two facing slops, which is why both controls zero their facing side.
     expect(COMPOSER_VOICE_SEND_GAP_CLASS).toBe('ms-1');
-    const step = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length));
-    const voiceSendGapDp = step * 0.25 * 14;
+    const voiceSendGapDp = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length)) * 0.25 * 14;
     expect(voiceSendGapDp).toBe(3.5);
     expect(voiceSendGapDp).toBeLessThan(VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP);
   });

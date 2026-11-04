@@ -1,10 +1,6 @@
-// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable, View } from 'react-native';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
+import { compileClassName, compiledDimensions } from '@/test/native-dimensions';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,17 +20,21 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The palette the ink table indexes. Every token it names is present, so a
+// variant whose mark token was added to the table without a mock entry fails
+// here as an undefined colour rather than passing silently.
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#123456',
     primary: '#345678',
     primaryForeground: '#abcdef',
+    secondaryForeground: '#123456',
+    destructive: '#654321',
+    destructiveSolidForeground: '#fedcba',
+    accentSoftTintForeground: '#1a1a10',
   }),
 }));
 
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function render(element: ReactElement) {
@@ -58,31 +58,16 @@ const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
 const BusyMark = 'ActivityIndicator' as ElementType;
 const busyMarks = (node: TestRenderer.ReactTestInstance) => node.findAllByType(BusyMark);
 
+/** The compiled box of the classes the button row carries. */
+function nativeDimensions(button: TestRenderer.ReactTestInstance) {
+  return compiledDimensions(button.props.className as string);
+}
+
 function renderButton({
   children = createElement(Text, null, 'Retry'),
   ...props
 }: ButtonProps = {}) {
   return render(createElement(Button, { accessibilityLabel: 'Retry', ...props }, children));
-}
-
-/** The native style a className compiles to, through the app's theme and installed compilers. */
-async function compiledStyles(className: string) {
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${className}; }`,
-    { from: import.meta.filename }
-  );
-  // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
-}
-
-function nativeDimensions(button: TestRenderer.ReactTestInstance) {
-  return compiledStyles(
-    (button.props.className as string)
-      .split(' ')
-      .filter(className => /^(?:min-h|h|w)-/.test(className))
-      .join(' ')
-  );
 }
 
 beforeEach(() => {
@@ -230,7 +215,7 @@ describe('Button native target contract', () => {
     expect(spinner?.props.size).toBe('small');
     const overlay = button.find(n => n.props.className === BUTTON_BUSY_OVERLAY_CLASS);
     expect(overlay.findAllByType(BusyMark)).toHaveLength(1);
-    const overlayStyles = await compiledStyles(BUTTON_BUSY_OVERLAY_CLASS);
+    const overlayStyles = await compileClassName(BUTTON_BUSY_OVERLAY_CLASS);
     expect(overlayStyles).toContainEqual(expect.objectContaining({ position: 'absolute' }));
 
     // The wrapper and the label are the same elements once loading ends; only

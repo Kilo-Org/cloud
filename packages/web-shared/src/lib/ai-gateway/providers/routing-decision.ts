@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { EnkryptGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   UserByokProviderIdSchema,
   type UserByokProviderId,
@@ -196,6 +197,8 @@ export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.ext
       metadata: z.record(z.string(), z.unknown()),
     })
     .optional(),
+  /** The organization's Enkrypt input guardrail, when it applied to the request. */
+  enkrypt: EnkryptGuardrailReportSchema.optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;

@@ -99,18 +99,12 @@ export type OpenAiChatGptAccessTokenOutcome =
   | { kind: 'terminal' }
   | { kind: 'failed' };
 
-type RefreshDecision =
-  | { kind: 'access_token'; accessToken: string }
-  | { kind: 'no_connection' }
-  | { kind: 'terminal' }
-  | { kind: 'failed' };
-
 /**
  * One locked refresh attempt. `retry` is a retryable failure that the caller
  * backs off from after the lock is released. `retryAfterMs` carries the
  * server's own `Retry-After` delay when the response provided one.
  */
-type RefreshAttempt = RefreshDecision | { kind: 'retry'; retryAfterMs?: number };
+type RefreshAttempt = OpenAiChatGptAccessTokenOutcome | { kind: 'retry'; retryAfterMs?: number };
 
 /**
  * Single-flight per owner within one process: concurrent callers share the same

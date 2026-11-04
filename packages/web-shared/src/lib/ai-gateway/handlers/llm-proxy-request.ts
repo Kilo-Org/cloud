@@ -62,7 +62,18 @@ const messagesRequestSchema = z.looseObject({
     z.looseObject({ role: z.string(), content: z.union([z.string(), contentPartsSchema]) })
   ),
   system: z.union([z.string(), contentPartsSchema]).nullish(),
-  tools: z.array(z.looseObject({ name: z.string() })).nullish(),
+  tools: z
+    .array(
+      z
+        .looseObject({ type: z.string().nullish(), name: z.string().optional() })
+        .refine(
+          tool =>
+            (!!tool.type && tool.type !== 'function' && tool.type !== 'custom') ||
+            tool.name !== undefined,
+          { path: ['name'] }
+        )
+    )
+    .nullish(),
 });
 
 const responsesRequestSchema = z.looseObject({

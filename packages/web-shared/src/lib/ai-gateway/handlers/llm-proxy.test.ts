@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
@@ -1033,6 +1034,15 @@ describe('POST /api/v1/chat/completions request handling', () => {
       field: 'messages[0].content',
     },
     { path: '/messages', fields: { tools: [{ input_schema: {} }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: 'custom' }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: 'function' }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: null }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: '' }] }, field: 'tools[0].name' },
+    {
+      path: '/messages',
+      fields: { tools: [{ type: 'custom', name: 1 }] },
+      field: 'tools[0].name',
+    },
     { path: '/chat/completions', fields: { messages: [null] }, field: 'messages[0]' },
     {
       path: '/chat/completions',
@@ -1106,6 +1116,34 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({ tools: [tool] });
+  });
+
+  it.each([
+    { type: 'openrouter:web_search' },
+    { type: 'vercel:perplexity_search' },
+    { type: 'mcp_toolset', mcp_server_name: 'docs' } satisfies Anthropic.Beta.BetaMCPToolset,
+    { type: 'vendor:server_tool', vendor_options: { entries: [null, 1] } },
+    {
+      type: 'custom',
+      name: 'read',
+      input_schema: { type: 'object' },
+    } satisfies Anthropic.Tool,
+    {
+      type: null,
+      name: 'read',
+      input_schema: { type: 'object' },
+    } satisfies Anthropic.Tool,
+  ])('accepts and preserves Messages tools: %j', async tool => {
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        { ...makeBody('anthropic/claude-sonnet-4.5'), max_tokens: 100, tools: [tool] },
+        undefined,
+        '/messages'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.tools).toEqual([tool]);
   });
 
   it('accepts a null Messages system prompt', async () => {

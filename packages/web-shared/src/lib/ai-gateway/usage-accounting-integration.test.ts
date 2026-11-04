@@ -509,21 +509,43 @@ describe('production FRA queued accounting', () => {
     expect(writer).not.toHaveBeenCalled();
   });
 
-  test.each(['publisher_not_configured', 'registration_failed'])(
-    'FRA retains pre-I/O direct fallback for %s',
-    async reason => {
+  test.each([
+    { reason: 'publisher_not_configured', reportsPublisherConfig: true },
+    { reason: 'registration_failed', reportsPublisherConfig: false },
+  ])(
+    'FRA selected $reason fails without falling back to direct accounting',
+    async ({ reason, reportsPublisherConfig }) => {
       configureFra();
+      advancePublisherReportClock();
       jest.mocked(publisher.enqueueUsage).mockResolvedValue({ kind: 'unavailable', reason });
       const lifecycle = requestLifetime();
       const result = await lifecycle.run(() =>
-        logMicrodollarUsage({ ...stats }, { ...personalContext })
+        logMicrodollarUsage({ ...stats }, { ...personalContext, usageId: 'synthetic-fra-failure' })
       );
       lifecycle.close();
       await lifecycle.drain();
-      expect(result?.status).toBe('recorded');
+      expect(result).toBeNull();
       expect(fetch).not.toHaveBeenCalled();
-      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(db.transaction).not.toHaveBeenCalled();
       expect(writer).not.toHaveBeenCalled();
+      expect(sentry.captureMessage).toHaveBeenCalledTimes(reportsPublisherConfig ? 1 : 0);
+      expect(warn).toHaveBeenCalledWith(
+        reportsPublisherConfig
+          ? 'usage accounting queue publisher not configured'
+          : 'usage accounting queue unavailable without a request lifetime',
+        reportsPublisherConfig
+          ? {
+              usageId: 'synthetic-fra-failure',
+              execution_region: 'fra1',
+            }
+          : {
+              usageId: 'synthetic-fra-failure',
+              execution_region: 'fra1',
+              reason: 'registration_failed',
+            }
+      );
+      expect(error).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
     }
   );
 
@@ -701,18 +723,26 @@ describe('production SFO queued accounting', () => {
   );
 
   test.each(['no_scope', 'no_wait_until'])(
-    '%s falls back to direct accounting instead of dropping selected usage',
+    '%s fails selected accounting without a request lifetime and does not write directly',
     async missing => {
       configureQueueEnvironment();
-      const work = () => logMicrodollarUsage({ ...stats }, { ...personalContext });
+      const work = () =>
+        logMicrodollarUsage({ ...stats }, { ...personalContext, usageId: 'synthetic-sfo-failure' });
       const record = await (missing === 'no_scope' ? work() : requestLifetime(false).run(work));
-      expect(record?.status).toBe('recorded');
+      expect(record).toBeNull();
       expect(publisher.enqueueUsage).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
-      expect(writer).toHaveBeenCalledTimes(1);
-      expect(writer.mock.calls[0][0].core.id).toBe(record?.usageId);
+      expect(writer).not.toHaveBeenCalled();
       expect(db.transaction).not.toHaveBeenCalled();
       expect(error).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'usage accounting queue unavailable without a request lifetime',
+        {
+          usageId: 'synthetic-sfo-failure',
+          execution_region: 'sfo1',
+          reason: 'registration_failed',
+        }
+      );
     }
   );
 
@@ -753,39 +783,47 @@ describe('production SFO queued accounting', () => {
     }
   });
 
-  test('selected missing_config writes the row directly instead of dropping it', async () => {
+  test('selected missing_config fails without a direct write', async () => {
     configureQueueEnvironment();
     config.USAGE_INGEST_URL = '';
     advancePublisherReportClock();
     const lifetime = requestLifetime();
     const result = await lifetime.run(() =>
-      logMicrodollarUsage({ ...stats }, { ...personalContext })
+      logMicrodollarUsage({ ...stats }, { ...personalContext, usageId: 'synthetic-missing-config' })
     );
     lifetime.close();
     await lifetime.drain();
-    expect(result?.status).toBe('recorded');
+    expect(result).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
-    expect(writer).toHaveBeenCalledTimes(1);
+    expect(writer).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('usage accounting queue publisher not configured', {
+      execution_region: 'sfo1',
+      usageId: 'synthetic-missing-config',
+    });
     expect(lifetime.errors).toEqual([]);
   });
 
-  test('selected malformed URL writes the row directly instead of dropping it', async () => {
+  test('selected malformed URL fails without a direct write', async () => {
     configureQueueEnvironment();
     config.USAGE_INGEST_URL = 'usage.example.test/missing-scheme';
     advancePublisherReportClock();
     const lifetime = requestLifetime();
     const result = await lifetime.run(() =>
-      logMicrodollarUsage({ ...stats }, { ...personalContext })
+      logMicrodollarUsage({ ...stats }, { ...personalContext, usageId: 'synthetic-malformed-url' })
     );
     lifetime.close();
     await lifetime.drain();
-    expect(result?.status).toBe('recorded');
+    expect(result).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
-    expect(writer).toHaveBeenCalledTimes(1);
+    expect(writer).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('usage accounting queue publisher not configured', {
+      execution_region: 'sfo1',
+      usageId: 'synthetic-malformed-url',
+    });
     expect(lifetime.errors).toEqual([]);
   });
 
@@ -816,7 +854,7 @@ describe('production SFO queued accounting', () => {
     expect(lifetime.errors).toEqual([]);
   });
 
-  test('writes every unconfigured-publisher row but reports at most once per interval', async () => {
+  test('logs every unconfigured-publisher failure, throttles Sentry, and never writes directly', async () => {
     configureQueueEnvironment();
     config.USAGE_INGEST_PUBLISH_SECRET = '';
     const record = async () => {
@@ -831,28 +869,27 @@ describe('production SFO queued accounting', () => {
     advancePublisherReportClock();
     const first = await record();
     const second = await record();
-    expect([first?.status, second?.status]).toEqual(['recorded', 'recorded']);
+    expect([first, second]).toEqual([null, null]);
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
     advancePublisherReportClock();
     const third = await record();
-    expect(third?.status).toBe('recorded');
+    expect(third).toBeNull();
     expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
-    const directFallbacks = warn.mock.calls.filter(
+    const configFailures = warn.mock.calls.filter(
       ([message]) => message === 'usage accounting queue publisher not configured'
     );
-    expect(directFallbacks).toEqual(
+    expect(configFailures).toEqual(
       Array.from({ length: 3 }, () => [
         'usage accounting queue publisher not configured',
         {
           execution_region: process.env.VERCEL_REGION,
           usageId: expect.any(String),
-          fallback: 'direct',
         },
       ])
     );
     expect(error).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(writer).toHaveBeenCalledTimes(3);
+    expect(writer).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
@@ -1537,65 +1574,32 @@ describe('queued usage accounting', () => {
         expect(publisher.enqueueUsage).toHaveBeenCalledWith(payload, {
           retryTransientFailures: true,
         });
-        if (failure.startsWith('missing')) {
-          // Nothing was published, so the row is written directly instead of dropped.
-          expect(record).toEqual({
-            status: 'recorded',
-            usageId: payload.core.id,
-            createdAt: payload.core.created_at,
-          });
-          if (region === 'sfo1') {
-            const handoff = writer.mock.calls[0][0] as UsageRecordRequest;
-            expect(writer).toHaveBeenCalledTimes(1);
-            expect(handoff.core.id).toBe(payload.core.id);
-            expect(handoff.metadata.id).toBe(payload.core.id);
-            expect(db.transaction).not.toHaveBeenCalled();
-          } else {
-            expect(writer).not.toHaveBeenCalled();
-            expect(db.transaction).toHaveBeenCalledTimes(1);
-          }
+        const preIoFailure = failure.startsWith('missing');
+        expect(record).toBeNull();
+        expect(writer).not.toHaveBeenCalled();
+        expect(db.transaction).not.toHaveBeenCalled();
+        expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+        expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
+        expect(completionLogs).toEqual([]);
+        expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
+        if (preIoFailure) {
+          // The selected transport never attempted I/O and does not write directly.
           expect(error).not.toHaveBeenCalled();
           expect(warn).toHaveBeenCalledWith('usage accounting queue publisher not configured', {
             execution_region: process.env.VERCEL_REGION,
             usageId: payload.core.id,
-            fallback: 'direct',
           });
           expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
-          // Frankfurt writes locally and emits the shared completion record. An SFO write
-          // happens inside the Frankfurt endpoint, so only its response comes back.
-          if (region === 'sfo1') expect(completionLogs).toEqual([]);
-          else
-            expect(completionLogs.map(value => JSON.parse(value))).toEqual([
-              expect.objectContaining({
-                outcome: 'recorded',
-                usage_id: payload.core.id,
-                execution_region: 'fra1',
-              }),
-            ]);
-          // The attached event rides the direct write, so the gateway never reports it.
-          expect(report).not.toHaveBeenCalled();
         } else {
           // The queue may hold the event, so no direct write and no second Bouncer report.
-          expect(record).toBeNull();
-          expect(writer).not.toHaveBeenCalled();
-          expect(db.transaction).not.toHaveBeenCalled();
           expect(error).toHaveBeenCalledTimes(1);
           expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
             execution_region: process.env.VERCEL_REGION,
             usageId: payload.core.id,
             reason: failure === 'transport_failure' ? 'request_failed' : failure,
           });
-          expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
           expect(sentry.captureMessage).not.toHaveBeenCalled();
-          expect(completionLogs).toEqual([]);
         }
-        expect(outbox.enqueueBouncerUsageEvent).toHaveBeenCalledTimes(
-          failure.startsWith('missing') && reportsUsage && region === 'fra1' ? 1 : 0
-        );
-        // A direct write is this outbox row's first delivery; the handoff delivers it in Frankfurt.
-        expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(
-          region === 'fra1' && failure.startsWith('missing') && reportsUsage ? 1 : 0
-        );
         const logs = JSON.stringify([...error.mock.calls, ...warn.mock.calls, ...info.mock.calls]);
         for (const sensitive of [
           'sensitive-secret-prompt',
@@ -1615,42 +1619,26 @@ describe('queued usage accounting', () => {
         ['no_scope', 'no_wait_until'].map(missing => ({ region, missing }))
       )
     )(
-      '$region / $missing falls back to direct accounting instead of dropping usage',
+      '$region / $missing fails selected usage without a direct write',
       async ({ region, missing }) => {
         config.USAGE_QUEUE_ONLY_ENABLED = true;
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
         const lifecycle = requestLifetime(false);
-        const work = () => run({ ...stats }, { ...watchedContext });
+        const work = () =>
+          run({ ...stats }, { ...watchedContext, usageId: 'synthetic-lifetime-failure' });
         const record = await (missing === 'no_scope' ? work() : lifecycle.run(work));
         lifecycle.close();
         await lifecycle.drain();
-        expect(record).toMatchObject({ status: 'recorded', usageId: expect.any(String) });
+        expect(record).toBeNull();
         expect(publisher.enqueueUsage).not.toHaveBeenCalled();
         expect(fetch).not.toHaveBeenCalled();
         expect(sent).toEqual([]);
-        const attachedEvent = reportsUsage
-          ? expect.objectContaining({ request_id: 'synthetic-request' })
-          : null;
-        if (region === 'sfo1') {
-          expect(writer).toHaveBeenCalledTimes(1);
-          expect(writer).toHaveBeenCalledWith(
-            expect.objectContaining({
-              core: expect.objectContaining({ id: record?.usageId }),
-              metadata: expect.objectContaining({ id: record?.usageId }),
-              bouncer_usage_event: attachedEvent,
-            })
-          );
-          expect(db.transaction).not.toHaveBeenCalled();
-          expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
-          expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
-        } else {
-          expect(writer).not.toHaveBeenCalled();
-          expect(db.transaction).toHaveBeenCalledTimes(1);
-          expect(outbox.enqueueBouncerUsageEvent).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
-          expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
-        }
-        expect(report).not.toHaveBeenCalled();
+        expect(writer).not.toHaveBeenCalled();
+        expect(db.transaction).not.toHaveBeenCalled();
+        expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+        expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
+        expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
         expect(sentry.captureMessage).not.toHaveBeenCalled();
         expect(error).not.toHaveBeenCalled();
         expect(warn.mock.calls).toEqual([
@@ -1658,9 +1646,8 @@ describe('queued usage accounting', () => {
             'usage accounting queue unavailable without a request lifetime',
             {
               execution_region: process.env.VERCEL_REGION,
-              usageId: record?.usageId,
+              usageId: 'synthetic-lifetime-failure',
               reason: 'registration_failed',
-              fallback: 'direct',
             },
           ],
         ]);
@@ -2012,7 +1999,7 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
   });
 
   test.each(['not_configured', 'ambiguous_200', 'http_503', 'unexpected_rejection', 'no_scope'])(
-    'ordinary report remains single when queued accounting writes directly: %s',
+    'ordinary report remains single when queued accounting fails: %s',
     async failure => {
       if (failure === 'http_503') jest.spyOn(Math, 'random').mockReturnValue(0);
       configureQueueEnvironment();
@@ -2031,24 +2018,15 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
       const lifecycle = requestLifetime();
       const work = () =>
         logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext });
-      const failuresThatFallBack = failure === 'not_configured' || failure === 'no_scope';
       const result = await (failure === 'no_scope' ? work() : lifecycle.run(work));
       lifecycle.close();
       await lifecycle.drain();
-      // A direct write cannot have published the event, so the gateway still reports it once
-      // and the Bouncer event rides the write instead of a second best-effort send.
-      expect(result).toEqual(
-        failuresThatFallBack ? expect.objectContaining({ status: 'recorded' }) : null
-      );
+      expect(result).toBeNull();
       expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
       expect(client.usageEventWireBody).not.toHaveBeenCalled();
-      expect(writer).toHaveBeenCalledTimes(
-        failuresThatFallBack && process.env.VERCEL_REGION === 'sfo1' ? 1 : 0
-      );
-      expect(db.transaction).toHaveBeenCalledTimes(
-        failuresThatFallBack && process.env.VERCEL_REGION === 'fra1' ? 1 : 0
-      );
-      // An ordinary event carries no durable Bouncer payload, so the direct write enqueues none.
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      // An ordinary event carries no durable Bouncer payload, so no outbox row is enqueued.
       expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledTimes(
         failure === 'http_503'

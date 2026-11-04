@@ -68,7 +68,7 @@ export async function enqueueUsage(
   }
 
   // A URL that is not an absolute http(s) endpoint is configuration, not transport: no
-  // request is attempted, so the caller must fall back exactly like a missing publisher.
+  // request is attempted, so it reports the same outcome as a missing publisher.
   const parsedUrl = parsePublisherUrl(USAGE_INGEST_URL);
   if (!parsedUrl) return reportUnavailable(payload.core.id, 'publisher_not_configured');
   const url = parsedUrl.toString();

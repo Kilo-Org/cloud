@@ -400,25 +400,25 @@ async function logMicrodollarUsageWithTransport(
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
     if (outcome.reason === 'publisher_not_configured') {
-      // Nothing was attempted, so a direct write cannot duplicate the event.
+      // The publisher rejected its configuration before any I/O. The selected transport
+      // never switches to a direct write, so this event remains unrecorded.
       reportPublisherNotConfigured(core.id);
       console.warn('usage accounting queue publisher not configured', {
         usageId: core.id,
         execution_region: getUsagePublisherExecutionRegion(),
-        fallback: 'direct',
       });
-      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+      return null;
     }
     if (outcome.reason === 'registration_failed') {
       // No request scope or `waitUntil`, so `after()` could not track the publication.
-      // Nothing was published, so the direct write cannot duplicate it.
+      // The selected transport never switches to a direct write, so this event remains
+      // unrecorded.
       console.warn('usage accounting queue unavailable without a request lifetime', {
         usageId: core.id,
         execution_region: getUsagePublisherExecutionRegion(),
         reason: outcome.reason,
-        fallback: 'direct',
       });
-      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+      return null;
     }
     console.error('usage accounting publication failed', {
       usageId: core.id,
@@ -1616,7 +1616,7 @@ export async function processTokenData(
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
  * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
- * retains the existing best-effort fallback. Every other request also keeps the
+ * retains the existing best-effort Bouncer report. Every other request also keeps the
  * independent best-effort send, which never rejects.
  * Ordinary queued reporting starts alongside publication and both are awaited by the caller's
  * existing lifetime. Its queue payload has no Bouncer event, so the writer cannot send it again.

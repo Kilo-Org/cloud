@@ -2,6 +2,7 @@ const mockIsFreeModel = jest.fn();
 const mockGetModelUserByokProviders = jest.fn();
 const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
+const mockGetEnabledByokProviders = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: (...args: unknown[]) => mockIsFreeModel(...args),
@@ -12,7 +13,32 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getUserByokProviderIds: (...args: unknown[]) => mockGetUserByokProviderIds(...args),
   getOrganizationByokProviderIds: (...args: unknown[]) =>
     mockGetOrganizationByokProviderIds(...args),
+  getEnabledByokProviders: (...args: unknown[]) => mockGetEnabledByokProviders(...args),
 }));
+
+const mockGetDirectByokModel = jest.fn();
+const mockSupportsCatalogMode = jest.fn();
+const mockGetDirectByokCatalogModelIds = jest.fn();
+const mockGetAllowedDirectByokCatalogModelIds = jest.fn();
+const mockIsCustomLlm = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  isCustomLlm: (...args: unknown[]) => mockIsCustomLlm(...args),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  getDirectByokModel: (...args: unknown[]) => mockGetDirectByokModel(...args),
+  supportsCatalogMode: (...args: unknown[]) => mockSupportsCatalogMode(...args),
+  getDirectByokCatalogModelIds: (...args: unknown[]) => mockGetDirectByokCatalogModelIds(...args),
+}));
+
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
+  () => ({
+    getAllowedDirectByokCatalogModelIds: (...args: unknown[]) =>
+      mockGetAllowedDirectByokCatalogModelIds(...args),
+  })
+);
 
 const mockCanRouteToVercel = jest.fn();
 const mockResolveOrganizationMemberModelDecision = jest.fn();
@@ -52,6 +78,12 @@ beforeEach(() => {
   mockGetModelUserByokProviders.mockResolvedValue([]);
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
+  mockGetEnabledByokProviders.mockResolvedValue([]);
+  mockGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+  mockSupportsCatalogMode.mockReturnValue(false);
+  mockGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
+  mockGetAllowedDirectByokCatalogModelIds.mockResolvedValue(new Set());
+  mockIsCustomLlm.mockResolvedValue(false);
   mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
   mockGetOpenAiChatGptStoredConnection.mockResolvedValue(null);
 });
@@ -170,6 +202,122 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     expect(await eligibility(true)).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: false });
+  });
+
+  describe('direct BYOK key', () => {
+    const DIRECT_MODEL = 'opencode-go/deepseek-v4.1-flash';
+    const CATALOG_MODEL = 'deepseek/deepseek-v4.1-flash';
+    const provider = { id: 'opencode-go' };
+    const model = { id: 'deepseek-v4.1-flash' };
+
+    function eligibility(modelId: string, organizationId?: string) {
+      return computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId,
+        ...(organizationId ? { organizationId } : {}),
+      });
+    }
+
+    beforeEach(() => {
+      mockGetUserByokProviderIds.mockResolvedValue(['opencode-go']);
+      mockSupportsCatalogMode.mockImplementation(providerId => providerId === 'opencode-go');
+    });
+
+    it('counts an enabled key for its bespoke model', async () => {
+      mockGetDirectByokModel.mockResolvedValue({ provider, model });
+      mockGetEnabledByokProviders.mockResolvedValue([
+        { providerId: 'opencode-go', serveCatalogModels: false },
+      ]);
+
+      expect(await eligibility(DIRECT_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+    });
+
+    it('does not count a bespoke model when its key is in catalog mode', async () => {
+      mockGetDirectByokModel.mockResolvedValue({ provider, model });
+      mockSupportsCatalogMode.mockReturnValue(true);
+      mockGetEnabledByokProviders.mockResolvedValue([
+        { providerId: 'opencode-go', serveCatalogModels: true },
+      ]);
+
+      expect(await eligibility(DIRECT_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('does not count a bespoke model without an enabled key', async () => {
+      mockGetUserByokProviderIds.mockResolvedValue(['openrouter']);
+      mockGetDirectByokModel.mockResolvedValue({ provider, model });
+
+      expect(await eligibility(DIRECT_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('counts a catalog model served by a catalog-mode key', async () => {
+      mockGetDirectByokCatalogModelIds.mockResolvedValue(new Set([CATALOG_MODEL]));
+
+      expect(await eligibility(CATALOG_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(mockGetDirectByokCatalogModelIds).toHaveBeenCalledWith({
+        type: 'user',
+        id: fakeUser.id,
+      });
+    });
+
+    it('does not count a catalog model no key serves', async () => {
+      expect(await eligibility(CATALOG_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('does not count a bespoke model a custom LLM owns', async () => {
+      mockGetDirectByokModel.mockResolvedValue({ provider, model });
+      mockGetEnabledByokProviders.mockResolvedValue([
+        { providerId: 'opencode-go', serveCatalogModels: false },
+      ]);
+      mockIsCustomLlm.mockResolvedValue(true);
+
+      expect(await eligibility(DIRECT_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('does not count a catalog model a custom LLM owns', async () => {
+      mockGetDirectByokCatalogModelIds.mockResolvedValue(new Set([CATALOG_MODEL]));
+      mockIsCustomLlm.mockResolvedValue(true);
+
+      expect(await eligibility(CATALOG_MODEL)).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('applies the organization provider allow-list to catalog models', async () => {
+      const policy = { policyRevision: 7 };
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['opencode-go']);
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: true },
+        policy,
+      });
+      mockGetAllowedDirectByokCatalogModelIds.mockResolvedValue(new Set([CATALOG_MODEL]));
+
+      expect(await eligibility(CATALOG_MODEL, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(mockGetAllowedDirectByokCatalogModelIds).toHaveBeenCalledWith('org-1', policy);
+      expect(mockGetDirectByokCatalogModelIds).not.toHaveBeenCalled();
+    });
   });
 
   describe('organization Vercel AI Gateway key', () => {

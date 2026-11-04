@@ -12,6 +12,7 @@ import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
 import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/network-errors';
 import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
+import { requestUrlString } from '@/lib/telemetry/request-target';
 import {
   type ActiveTokenSnapshot,
   getActiveToken,
@@ -50,16 +51,6 @@ const E2E_LATENCY_RULES: readonly (readonly [procedure: string, delayMs: number]
   ['cliSessionsV2.get', E2E_LATENCY_SESSION_MS],
   ['cliSessionsV2.getSessionMessagesPage', E2E_LATENCY_MESSAGES_MS],
 ];
-
-function requestUrlString(url: RequestInfo | URL): string {
-  if (url instanceof URL) {
-    return url.href;
-  }
-  if (url instanceof Request) {
-    return url.url;
-  }
-  return url;
-}
 
 function e2eLatencyForUrl(url: string): number {
   let delayMs = 0;

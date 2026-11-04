@@ -129,7 +129,15 @@ describe('additionalEnvironmentMembers', () => {
   it('lists no repositories for a single-repository environment', () => {
     expect(additionalEnvironmentMembers(v1, widgets)).toEqual([]);
     expect(
-      additionalEnvironmentMembers(v1, { platform: 'github', fullName: 'acme/widgets' })
+      additionalEnvironmentMembers(
+        summary({
+          id: 'gitlab-single',
+          platform: 'gitlab',
+          repoFullName: 'group/project',
+          gitlabCloneUrl: 'https://gitlab.com/group/project.git',
+        }),
+        { platform: 'gitlab', projectPath: 'group/project' }
+      )
     ).toEqual([]);
   });
 

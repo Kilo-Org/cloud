@@ -169,6 +169,10 @@ Leases include inline values and all reserved or stored blobs. A session grows i
 32 MiB steps, capped at its combined inline/blob bound, only when its usage needs more space.
 An alarm shrinks a lease when usage drops at least two steps below it. Deletion releases
 the session admission and its whole lease. Tenant calls never run inside SQLite transactions.
+Admission mutations are serialized without blocking session reads during tenant RPCs.
+Tenant outages return retryable `tenant_unavailable` (503), `Retry-After: 60`, and
+an epoch-ms `error.retryAt`; alarm-driven releases and shrinks retry without resetting the session.
+Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.
 
@@ -186,6 +190,9 @@ Wrangler rate-limit bindings are tunable per deployment and apply per Cloudflare
 Each binding uses a distinct namespace, including staging and tests.
 Denial returns retryable `rate_limited` (429), `Retry-After: 60`, and an epoch-ms
 `error.retryAt`. Clients honor both header and JSON deadlines before adding jitter.
+
+Failed R2 cleanup persists a one-minute retry floor. Later writes cannot pull that alarm
+forward. A retry that encounters an expired, in-flight cleanup claim waits five seconds.
 
 
 A tombstone survives entity cleanup.

@@ -67,7 +67,10 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
         .one();
       const sessions = usage.sessions + (prior ? 0 : 1);
       const total = usage.bytes + bytes - (prior?.bytes ?? 0);
-      if (sessions > limits.sessions || total > limits.bytes) {
+      if (
+        (!prior && sessions > limits.sessions) ||
+        (bytes > (prior?.bytes ?? 0) && total > limits.bytes)
+      ) {
         return fail('tenant_budget_exceeded', 'The tenant storage budget is exhausted', limits);
       }
       sql.exec(

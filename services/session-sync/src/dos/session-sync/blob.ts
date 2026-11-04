@@ -1,6 +1,6 @@
 import { and, asc, count, eq, inArray, lte, ne } from 'drizzle-orm';
 
-import { blobs, entities } from '../../db/sqlite-schema';
+import { blobs } from '../../db/sqlite-schema';
 import { LIMITS, type BlobAck, type BlobRef, type Principal } from '../../protocol';
 import { live, load, raise, update, visible, writable, type Db, type Meta } from './session';
 
@@ -55,7 +55,10 @@ export function begin(
       'Another upload or cleanup owns this hash; retry after its deadline',
       {
         // Cleanup can claim the row only after its deadline plus the margin.
-        retryAt: Math.max(now, row.deadline) + SWEEP_MARGIN_MS,
+        retryAt:
+          row.state === 'cleaning' && row.deadline <= now
+            ? now + 5000
+            : Math.max(now, row.deadline) + SWEEP_MARGIN_MS,
       }
     );
   }
@@ -129,14 +132,8 @@ export function commit(
       hash: ref.hash,
     });
   }
-  const referenced = db
-    .select({ id: entities.id })
-    .from(entities)
-    .where(eq(entities.blob_hash, ref.hash))
-    .limit(1)
-    .get();
   db.update(blobs)
-    .set({ state: referenced ? 'ready' : 'unreferenced', deadline: now + LIMITS.unreferencedMs })
+    .set({ state: 'unreferenced', deadline: now + LIMITS.unreferencedMs })
     .where(and(eq(blobs.hash, ref.hash), eq(blobs.attempt, attempt)))
     .run();
   return { version: 1, hash: ref.hash, bytes: ref.bytes, created: true };

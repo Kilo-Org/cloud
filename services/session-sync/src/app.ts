@@ -32,7 +32,9 @@ function json(body: unknown, status: number): Response {
 }
 
 function failure(error: SyncError): Response {
-  return json(errorBody(error), ERROR_STATUS[error.code]);
+  const response = json(errorBody(error), ERROR_STATUS[error.code]);
+  if (error.code === 'tenant_unavailable') response.headers.set('Retry-After', '60');
+  return response;
 }
 
 function respond<T>(result: Result<T>): Response {

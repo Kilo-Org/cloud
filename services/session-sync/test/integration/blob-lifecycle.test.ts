@@ -7,6 +7,7 @@ import { blobs } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import * as batchOps from '../../src/dos/session-sync/batch';
 import * as blobOps from '../../src/dos/session-sync/blob';
+import type { Env } from '../../src/env';
 import * as sessionOps from '../../src/dos/session-sync/session';
 import { LIMITS, pageSchema, sessionStateSchema, type Principal } from '../../src/protocol';
 import { batch, client, newSessionID, personal, sha256, testEnv } from '../helpers';
@@ -428,5 +429,92 @@ it('bounds retained blob bytes during ten minutes of one-second supersessions', 
     expect(peak).toBeLessThanOrEqual(62 * bytes);
     expect(sessionOps.load(db)!.blob_bytes).toBeLessThanOrEqual(61 * bytes);
     expect(peak).toBeLessThan(LIMITS.sessionBlobBytes);
+  });
+});
+
+it('rejects a reference while a claimed blob is awaiting physical deletion', async () => {
+  const { principal, api, sessionID, sourceID, stub } = await fixture();
+  const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('claim race'));
+  await store(upload);
+  expect((await stub.commitBlob(upload.input)).ok).toBe(true);
+  await expire(stub);
+  const claimed = await runInDurableObject(stub, (_instance, state) => {
+    const db = drizzle(state.storage);
+    return state.storage.transactionSync(() => blobOps.claim(db, sessionOps.load(db)!, Date.now()));
+  });
+  expect(claimed).toHaveLength(1);
+  const response = await api.apply(
+    sessionID,
+    batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'm', blob: upload.input.blob }])
+  );
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({
+    error: { code: 'blob_missing', details: { hash: upload.input.blob.hash } },
+  });
+  const begun = await stub.beginBlob({ principal, sessionID, blob: upload.input.blob });
+  expect(begun).toMatchObject({ ok: false, error: { code: 'upload_in_progress' } });
+  if (begun.ok) throw new Error('A claimed hash must not be admitted');
+  const retryAt = Number(begun.error.details?.retryAt);
+  expect(retryAt).toBeGreaterThan(Date.now());
+  expect(retryAt).toBeLessThanOrEqual(Date.now() + 5000);
+  await testEnv.SESSION_SYNC_R2.delete(claimed.map(row => row.key));
+  await runInDurableObject(stub, (_instance, state) => {
+    state.storage.transactionSync(() =>
+      blobOps.finish(drizzle(state.storage), claimed, Date.now())
+    );
+  });
+  expect(await (await api.state(sessionID)).json()).toMatchObject({
+    position: 0,
+    usage: { blobBytes: 0 },
+  });
+});
+
+it('retains R2 cleanup backoff across mutations and early alarm invocations', async () => {
+  const { principal, api, sessionID, sourceID, stub } = await fixture();
+  const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('R2 outage'));
+  await store(upload);
+  expect((await stub.commitBlob(upload.input)).ok).toBe(true);
+  await expire(stub);
+  await runInDurableObject(stub, instance => {
+    // Fault injection is confined to this object's environment.
+    const exposed = instance as unknown as { env: Env; deleteAttempts: number };
+    exposed.deleteAttempts = 0;
+    exposed.env = {
+      ...exposed.env,
+      SESSION_SYNC_R2: {
+        delete: async () => {
+          exposed.deleteAttempts++;
+          throw new Error('Synthetic R2 outage');
+        },
+      } as unknown as R2Bucket,
+    };
+  });
+  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  const retryAt = await runInDurableObject(stub, (_instance, state) =>
+    state.storage.get<number>('purgeRetryAt')
+  );
+  expect(retryAt).toBeGreaterThan(Date.now());
+  expect(
+    (
+      await api.apply(
+        sessionID,
+        batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'm', value: 'still writable' }])
+      )
+    ).status
+  ).toBe(200);
+  expect(
+    (
+      await stub.beginBlob({
+        principal,
+        sessionID,
+        blob: { hash: await sha256(new TextEncoder().encode('next')), bytes: 4 },
+      })
+    ).ok
+  ).toBe(true);
+  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  await runInDurableObject(stub, async (instance, state) => {
+    expect('deleteAttempts' in instance && instance.deleteAttempts).toBe(1);
+    expect(await state.storage.getAlarm()).toBeGreaterThanOrEqual(retryAt!);
+    expect(await state.storage.get('purgeRetryAt')).toBe(retryAt);
   });
 });

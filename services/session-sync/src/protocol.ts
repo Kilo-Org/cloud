@@ -336,6 +336,7 @@ export const ERROR_STATUS = {
   storage_budget_exceeded: 413,
   tenant_budget_exceeded: 413,
   rate_limited: 429,
+  tenant_unavailable: 503,
   internal_error: 500,
 } as const;
 export type ErrorCode = keyof typeof ERROR_STATUS;

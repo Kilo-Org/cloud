@@ -150,8 +150,9 @@ grants billing access without consuming a seat.
    Enterprise.
 2. The system MUST default the organization plan to Teams at the
    data layer when no plan is explicitly provided by the creation
-   flow. (Self-service creation always provides Enterprise; see
-   rule 3.)
+   flow and no parent organization supplies one. (Self-service
+   creation always provides Enterprise; see rule 3. Child
+   organizations take their parent's plan; see rule 10.)
 3. The self-service creation flow MUST create all new organizations
    on the Enterprise plan with a 14-day free trial.
 4. The user MUST NOT be offered a choice of plan or billing cycle
@@ -173,6 +174,12 @@ grants billing access without consuming a seat.
 9. If the organization later transitions back to Enterprise, the
    system MUST reactivate the previously stored Enterprise-only
    settings without requiring reconfiguration.
+10. When a new child organization is created, the system MUST create
+    it with its parent organization's current plan. This is a
+    one-time default at creation: later changes to the parent's plan
+    MUST NOT propagate to existing child organizations, attaching an
+    existing organization to a parent MUST NOT change its plan, and
+    the child's plan remains independently editable.
 
 ### Seat Pricing
 
@@ -600,6 +607,12 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-11-04 -- Child organization plan inheritance
+
+- Added Organization Plans rule 10: new child organizations are
+  created with their parent's current plan as a creation-time
+  default. Clarified rule 2 accordingly.
 
 ### 2026-05-28 -- Organization EFW review boundary
 

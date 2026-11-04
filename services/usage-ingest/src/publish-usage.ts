@@ -29,6 +29,7 @@ async function readUsageBody(request: Request) {
     return { error: errorResponse('Invalid JSON', 400) };
   }
 
+  // Track the current stage so the catch can classify failures without logging error text.
   let category = 'body_read_failure';
   try {
     const result = await readBoundedStream(

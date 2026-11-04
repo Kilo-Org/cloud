@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from 'drizzle-orm';
+import { waitUntil } from '@vercel/functions';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -54,6 +55,8 @@ export const OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS = 10_000;
 
 export const OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS = 5_000;
 export const OPENAI_CHATGPT_REFRESH_TIMEOUT_MS = 8_000;
+export const OPENAI_CHATGPT_REFRESH_PERSISTENCE_GRACE_MS = 1_000;
+export const OPENAI_CHATGPT_REFRESH_MAX_LOCK_BACKOFF_MS = 2_000;
 
 /** Shown when the connection can no longer be refreshed and must be reconnected. */
 export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
@@ -85,8 +88,8 @@ const REFRESH_REQUEST_TIMEOUT_ERROR_CODE = 'request_timeout';
  * distinct from `failed`: a terminal outcome means OpenAI has already rejected
  * the stored credential for good (the connection is disabled and cleared), so
  * the caller must not keep serving the request through another billing path.
- * `failed` is a transient refresh failure that leaves the stored credential in
- * place.
+ * `failed` is a transient refresh failure that does not disable or clear the
+ * connection.
  */
 export type OpenAiChatGptAccessTokenOutcome =
   | { kind: 'access_token'; accessToken: string }
@@ -143,8 +146,8 @@ async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise
 
 async function setRemainingStatementTimeout(
   tx: OpenAiChatGptDatabase,
-  signal: AbortSignal,
-  deadlineAt: number
+  deadlineAt: number,
+  signal: AbortSignal
 ): Promise<void> {
   signal.throwIfAborted();
   const remainingMs = deadlineAt - Date.now();
@@ -153,6 +156,17 @@ async function setRemainingStatementTimeout(
   }
   await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${remainingMs}'`));
   signal.throwIfAborted();
+}
+
+async function setPersistenceStatementTimeout(
+  tx: OpenAiChatGptDatabase,
+  deadlineAt: number
+): Promise<void> {
+  const remainingMs = Math.max(
+    OPENAI_CHATGPT_REFRESH_PERSISTENCE_GRACE_MS,
+    deadlineAt - Date.now()
+  );
+  await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${remainingMs}'`));
 }
 
 function refreshRequestHeaders(): string {
@@ -301,7 +315,8 @@ async function attemptRefresh(
   owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
   deadlineSignal: AbortSignal,
-  deadlineAt: number
+  deadlineAt: number,
+  onSuccessAccepted: () => void
 ): Promise<RefreshAttempt> {
   const refreshToken = connection.refresh_token;
   if (!refreshToken) {
@@ -355,7 +370,11 @@ async function attemptRefresh(
         error_at: undefined,
       };
 
-      await setRemainingStatementTimeout(tx, deadlineSignal, deadlineAt);
+      // OpenAI may have invalidated the old refresh token already. An accepted
+      // pair gets bounded persistence grace without extending caller latency.
+      const persistenceDeadlineAt = deadlineAt + OPENAI_CHATGPT_REFRESH_PERSISTENCE_GRACE_MS;
+      onSuccessAccepted();
+      await setPersistenceStatementTimeout(tx, persistenceDeadlineAt);
       await tx
         .update(openai_chatgpt_connections)
         .set({
@@ -363,6 +382,7 @@ async function attemptRefresh(
           is_enabled: true,
         })
         .where(openAiChatGptOwnerWhere(owner));
+      await setPersistenceStatementTimeout(tx, persistenceDeadlineAt);
 
       return { kind: 'access_token', accessToken };
     }
@@ -397,7 +417,8 @@ async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
   signal: AbortSignal,
-  deadlineAt: number
+  deadlineAt: number,
+  onSuccessAccepted: () => void
 ): Promise<RefreshAttempt> {
   const row = await readOpenAiChatGptConnectionRow(tx, owner, {
     forUpdate: true,
@@ -414,10 +435,18 @@ async function resolveInsideLock(
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  const attempt = await attemptRefresh(tx, owner, connection, signal, deadlineAt);
+  const attempt = await attemptRefresh(
+    tx,
+    owner,
+    connection,
+    signal,
+    deadlineAt,
+    onSuccessAccepted
+  );
+  if (attempt.kind === 'access_token') return attempt;
   signal.throwIfAborted();
   if (attempt.kind === 'terminal') {
-    await setRemainingStatementTimeout(tx, signal, deadlineAt);
+    await setRemainingStatementTimeout(tx, deadlineAt, signal);
     await markOpenAiChatGptConnectionErrored(
       tx,
       owner,
@@ -478,16 +507,20 @@ async function resolveBeforeDeadline(
   }
 
   let attempt = 0;
+  let busyAttempt = 0;
   while (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {
     signal.throwIfAborted();
     // Rotating a token requires primary serialization; busy rows never wait
     // on that connection, and every retry releases it before backing off.
-    const decision = await db.transaction(async tx => {
-      await setRemainingStatementTimeout(tx, signal, deadlineAt);
-      const decision = await resolveInsideLock(tx, owner, signal, deadlineAt);
-      signal.throwIfAborted();
+    const transaction: Promise<RefreshAttempt> = db.transaction(async tx => {
+      await setRemainingStatementTimeout(tx, deadlineAt, signal);
+      const decision = await resolveInsideLock(tx, owner, signal, deadlineAt, () => {
+        waitUntil(transaction.catch(() => logRefreshFailure(owner, 'persistence_failed')));
+      });
+      if (decision.kind !== 'access_token') signal.throwIfAborted();
       return decision;
     });
+    const decision = await transaction;
 
     if (decision.kind !== 'retry' && decision.kind !== 'busy') return decision;
     if (decision.kind === 'retry') attempt++;
@@ -495,7 +528,7 @@ async function resolveBeforeDeadline(
 
     const delay =
       decision.kind === 'busy'
-        ? OPENAI_CHATGPT_REFRESH_INITIAL_BACKOFF_MS
+        ? Math.min(backoffDelayMs(++busyAttempt), OPENAI_CHATGPT_REFRESH_MAX_LOCK_BACKOFF_MS)
         : retryDelayMs(attempt, decision.retryAfterMs);
     await sleep(Math.min(delay, Math.max(0, deadlineAt - Date.now())));
     signal.throwIfAborted();

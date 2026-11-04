@@ -405,7 +405,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
-    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 
@@ -484,7 +484,7 @@ describe('local e2e worker config', () => {
           (entry: { class_name: string }) => entry.class_name === 'SandboxContainers'
         ).images.app.dockerfile
       ).toBe('../Dockerfile.containers');
-      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
       expect(environment.vars.CODE_REVIEW_CONTAINERS_ORG_IDS).toBe('*');
     }
   });

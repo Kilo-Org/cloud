@@ -406,7 +406,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(handle).toEqual(expect.any(String));
       if (!handle) throw new Error('missing runtime proxy handle');
       expect(JSON.stringify(frame).includes(token)).toBe(false);
-      expect(broker.kiloIssued()).toBe(0);
       expect(frame.spec.runtimeIsolation).toBeUndefined();
       expect(
         await sandboxStub.resolveCredential({
@@ -418,7 +417,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).toBeNull();
       await runInDurableObject(sessionStub, async instance => {
         expect(await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
-          mode: contained ? 'contained' : 'direct',
+          mode: 'contained',
         });
       });
       wrapper.send({ type: 'session.ready', sessionId });
@@ -542,7 +541,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
       await forward(nextHandle);
       expect(destinations).toHaveLength(6);
-      expect(broker.kiloIssued()).toBe(0);
       const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
         new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {

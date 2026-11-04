@@ -84,21 +84,6 @@ export function sandboxAllocationUnavailableReason(
   }
 }
 
-/**
- * Repository-compatibility gate for an allocation. Contained Vercel resolves
- * Git credentials only for GitHub, so a saved Vercel choice is ineligible for a
- * GitLab/Bitbucket/Git repository and must fall through to the next candidate.
- */
-export function sandboxAllocationRepositoryUnavailableReason(
-  allocation: SandboxAllocation,
-  repositoryType: SessionRepositoryType
-): string | undefined {
-  if (getSandboxAllocationProvider(allocation) === 'vercel' && repositoryType !== 'github') {
-    return 'Vercel sandboxes support GitHub repositories only';
-  }
-  return undefined;
-}
-
 export function getSandboxSelectionCapabilities(
   env: Env,
   owner: SelectionOwner,
@@ -121,7 +106,6 @@ export function getSandboxSelectionCapabilities(
     };
   }
 
-  const repositoryType = options?.repositoryType;
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
@@ -133,13 +117,9 @@ export function getSandboxSelectionCapabilities(
       capability,
       options?.vercelUnavailableReason
     );
-    const repositoryUnavailableReason = repositoryType
-      ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
-      : undefined;
     return {
       allocation: getSandboxAllocationRequest(allocation),
       ...(unavailableReason ? { unavailableReason } : {}),
-      ...(repositoryUnavailableReason ? { repositoryUnavailableReason } : {}),
     };
   });
   return {

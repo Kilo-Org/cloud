@@ -94,7 +94,6 @@ import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cloudflareSandboxSmallNativeReplacement,
   recordedSandboxAllocationMatchesRequest,
-  credentialContainmentEnabled,
   resolveNewSessionSandboxAllocation,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -621,21 +620,19 @@ function ownershipRequestForCreate(
 
 function computeCredentialContainment(
   sessionId: string,
-  input: SessionRegistrationInput,
-  env: Env
+  input: SessionRegistrationInput
 ): CredentialContainment {
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     sessionId,
     input.repository,
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+    true
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
-    github: containmentEnabled && input.repository.type === 'github',
-    gitlab: containmentEnabled && input.repository.type === 'gitlab',
-    bitbucket: containmentEnabled && input.repository.type === 'bitbucket',
-    kilocode: containmentEnabled,
+    github: input.repository.type === 'github',
+    gitlab: input.repository.type === 'gitlab',
+    bitbucket: input.repository.type === 'bitbucket',
+    kilocode: true,
   };
 }
 
@@ -897,7 +894,7 @@ function sandboxSmallReplacementForSession(
     userId: ctx.userId,
     sessionId,
     requestedAllocation: requestedSandboxAllocation(input),
-    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
+    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
@@ -932,9 +929,7 @@ async function allocateNewSession(
     userId: ctx.userId,
     sessionId: cloudAgentSessionId,
     requestedAllocation,
-    contained: hasCredentialContainment(
-      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
-    ),
+    contained: hasCredentialContainment(computeCredentialContainment(cloudAgentSessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
@@ -942,7 +937,7 @@ async function allocateNewSession(
     assertEnvironmentSupportsSandbox({
       environment: input.environment,
       allocation: sandboxAllocation,
-      contained: credentialContainmentEnabled(ctx.env),
+      contained: true,
     });
   } catch (error) {
     // A saved allocation resolved after admission can still fail here; the ledger
@@ -998,7 +993,7 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'report', error);
   }
 
-  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
+  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input);
   let sandboxId: SandboxId;
   let sandboxKind: SandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
@@ -1325,7 +1320,7 @@ function rebuildRecordedSessionAllocation(
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     sandboxProviderBinding: normalizedBinding,
     initialTurn,
-    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
+    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input),
     rollbackCliSession: async () => {
       try {
         await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
@@ -2197,7 +2192,7 @@ export async function createSessionWithLedger(
   assertEnvironmentSupportsSandbox({
     environment: input.environment,
     allocation: requestedSandboxAllocation(input),
-    contained: credentialContainmentEnabled(ctx.env),
+    contained: true,
   });
   const initialWorktreeEnabled = isEligibleFirstWorktreeSession(input, ctx);
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);

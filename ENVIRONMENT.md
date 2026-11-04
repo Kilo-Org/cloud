@@ -514,7 +514,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Cloud Agent Services
 
-- `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `true`. Existing sessions retain their persisted containment flags. Retired non-contained sessions must use a new session. [SERVER]
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]

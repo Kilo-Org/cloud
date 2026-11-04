@@ -24,6 +24,7 @@
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",
     "./egress-audit": "./src/egress-audit.ts",
+    "./scm-capability-contract": "./src/scm-capability-contract.ts",
     "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",

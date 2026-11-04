@@ -48,6 +48,12 @@ upgrade retains the old ready snapshot. New allocations use the replacement afte
 already-running allocations are not restarted. This does not waive the fixed-Node-path requirement
 above when deliberately enabling downloaded startup on an older base.
 
+The lifecycle is implemented by the
+[settings router](../../../apps/web/src/routers/organizations/organization-vercel-compute-router.ts),
+[runtime resolver](../src/byoc/vercel-credential-resolver.ts) and
+[upgrade status projection](../../../apps/web/src/lib/cloud-agent-next/vercel-compute-status.ts).
+Check these consumers when deciding whether a future base change requires a coordinated cutover.
+
 The standalone operator harness is a separate provider qualification path:
 `pnpm --filter cloud-agent-next snapshot:vercel build --output <accepted-config.json>`, then
 `pnpm --filter cloud-agent-next snapshot:vercel acceptance --snapshot-id <snapshot-id> --build-id <build-id>`.

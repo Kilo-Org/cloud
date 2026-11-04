@@ -195,12 +195,17 @@ const ProviderRoutingDecisionSchema = z.object({
 
 export type ProviderRoutingDecision = z.infer<typeof ProviderRoutingDecisionSchema>;
 
-/** A `kilo/<usage id>.json` object in the AI provider metadata bucket. */
+/** A `<usage_id>.json` object in the AI provider metadata bucket. */
 export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.extend({
   schema_version: z.literal(1),
   /** The `microdollar_usage` and `microdollar_usage_metadata` id of the request. */
   usage_id: z.uuid(),
   created_at: z.iso.datetime(),
+  vercel: z
+    .object({
+      metadata: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;

@@ -2889,8 +2889,13 @@ export const CustomLlmDefinitionSchema = z
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
-    /** What Kilo bills users, in the custom pricing tier format. Without it the model is free. */
+    /** What Kilo bills users, in the custom pricing tier format. Must be unset when the
+     * public id matches the free model id rules, and should be set otherwise. */
     pricing: CustomPricingTiersSchema.optional(),
+    /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
+     * or when unset, the model is assumed to train on prompts. Set it to false only for
+     * an upstream with zero data retention. */
+    may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
@@ -2899,6 +2904,13 @@ export const CustomLlmDefinitionSchema = z
         code: 'custom',
         path: ['api_kinds'],
         message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
+    if (definition.may_train_on_prompts !== undefined && !definition.pricing) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['may_train_on_prompts'],
+        message: 'may_train_on_prompts must not be set without pricing',
       });
     }
     if (!definition.public) return;
@@ -3206,6 +3218,8 @@ export type StripeSubscriptionStatus =
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
+  // The billed or acting user is blocked (abuse, ToS, deletion), not short on credit.
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',
@@ -3283,6 +3297,7 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
  */
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',

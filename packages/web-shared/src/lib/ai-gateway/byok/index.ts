@@ -32,7 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
@@ -67,7 +67,7 @@ async function deriveModelInferenceUserByokProviders(
  * callers that may see custom LLM ids exclude them separately.
  */
 export function isGatewayUserByokEligibleModel(modelId: string): boolean {
-  return !isFreeModelExcludingCustomLlms(modelId);
+  return !isFreeModel(modelId);
 }
 
 export async function getModelGatewayUserByokProviders(

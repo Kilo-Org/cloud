@@ -70,7 +70,7 @@ describe('getProvider custom LLM credentials', () => {
     expect(result).toMatchObject({
       kind: 'provider',
       bypassAccessCheck: true,
-      isFree: true,
+      isFree: false,
       provider: {
         type: 'custom',
         apiUrl: 'https://llm.example.com/v1/chat/completions',
@@ -91,7 +91,7 @@ describe('getProvider custom LLM credentials', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
-      isFree: true,
+      isFree: false,
       provider: {
         apiUrl: 'https://secure-proxy.example.com/api/proxy',
         apiKey: 'upstream-key',

@@ -50,8 +50,8 @@ describe('resolveNewSessionInlineSections', () => {
 
   it('judges the heading share by the font scale, so large text keeps the stacked form', () => {
     // The same 360 dp cell at the system's own large-text steps: the share
-    // shrinks with the scale, so the row stops holding a word past 1.125 and
-    // the stacked form returns.
+    // shrinks with the scale, so the row stops holding a word just above 1.03
+    // and the stacked form returns.
     expect(resolveNewSessionInlineSections(360, 640, 1)).toBe(true);
     // (360 - 28) * 0.45 is 149.4 dp, so the last scale that still holds a
     // 144 dp word is ~1.037; Android's first step above 1.0 (1.15) stacks.

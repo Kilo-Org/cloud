@@ -83,12 +83,14 @@ describe('adminGatewayConfigRouter', () => {
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId.toUpperCase()],
       gateway_settings: [organizationId],
+      request_logs: [organizationId.toUpperCase()],
     });
     await caller.admin.gatewayConfig.set(input);
 
     await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual({
       experimental_byok: [organizationId],
       gateway_settings: [organizationId],
+      request_logs: [organizationId],
     });
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
       vercel_routing_enabled: false,
@@ -103,6 +105,7 @@ describe('adminGatewayConfigRouter', () => {
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [],
       gateway_settings: ['00000000-0000-4000-8000-000000000001'],
+      request_logs: [],
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
@@ -119,6 +122,7 @@ describe('adminGatewayConfigRouter', () => {
       caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: ['not-an-id'],
         gateway_settings: [],
+        request_logs: [],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);

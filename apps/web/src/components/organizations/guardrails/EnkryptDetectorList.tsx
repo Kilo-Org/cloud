@@ -33,7 +33,7 @@ export type UpdateEnkryptDetector = <K extends EnkryptDetectorId>(
 
 type ReviseDetectorId = (typeof ENKRYPT_REVISE_DETECTOR_IDS)[number];
 
-const DETECTOR_DETAILS: Record<EnkryptDetectorId, { label: string; description: string }> = {
+export const DETECTOR_DETAILS: Record<EnkryptDetectorId, { label: string; description: string }> = {
   injection_attack: {
     label: 'Prompt injection',
     description: 'Detects attempts to override instructions or jailbreak the model.',
@@ -72,12 +72,13 @@ const DETECTOR_DETAILS: Record<EnkryptDetectorId, { label: string; description: 
   },
 };
 
-const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> = {
-  pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
-  secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
-  ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
-  url: { label: 'URLs', description: 'Web addresses.' },
-};
+export const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> =
+  {
+    pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
+    secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
+    ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
+    url: { label: 'URLs', description: 'Web addresses.' },
+  };
 
 const POLICY_FORMAT_OPTIONS = [
   {

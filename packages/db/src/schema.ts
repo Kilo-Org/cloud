@@ -10696,10 +10696,8 @@ export const enkrypt_usage = pgTable(
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
     // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
-    // Null on rows recorded before the output guardrail existed, which are all input guardrail
-    // calls. No foreign key: adding one validates every partition of this table while blocking
-    // writes.
-    guardrail_id: integer(),
+    // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
+    guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

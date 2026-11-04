@@ -1,5 +1,5 @@
 {
-  "id": "9f518e57-99bb-40b9-a1d8-531e0e07ab88",
+  "id": "26a582ed-0052-4c76-adb9-20586b77ed1b",
   "prevId": "e4a7e0b8-2d06-4284-8940-b948cf966b3d",
   "version": "7",
   "dialect": "postgresql",
@@ -12781,6 +12781,19 @@
           ],
           "columnsTo": [
             "decision_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "enkrypt_usage_guardrail_id_enkrypt_usage_guardrail_guardrail_id_fk": {
+          "name": "enkrypt_usage_guardrail_id_enkrypt_usage_guardrail_guardrail_id_fk",
+          "tableFrom": "enkrypt_usage",
+          "tableTo": "enkrypt_usage_guardrail",
+          "columnsFrom": [
+            "guardrail_id"
+          ],
+          "columnsTo": [
+            "guardrail_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"

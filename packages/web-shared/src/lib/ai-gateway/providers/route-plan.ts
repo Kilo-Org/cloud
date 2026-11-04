@@ -1,8 +1,5 @@
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import {
-  canRouteToVercel,
-  shouldRouteToVercel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   GatewayUserByokProviderIdSchema,
   getVercelProviderIdForUserByok,
@@ -11,7 +8,6 @@ import {
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import {
   getModelGatewayUserByokProviders,
@@ -111,8 +107,6 @@ export type RoutePlanInputs = {
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>;
   /** `getRequestIgnoredVercelProviderIds` of the request. */
   requestIgnoredProviders: ReadonlySet<string>;
-  kiloIgnoredProviders: string[];
-  boundedSpending: boolean;
   /** Receives the providers whose keys the organization policy excludes before they are ranked. */
   onExcludedByPolicy?: (providerIds: string[]) => void;
 };
@@ -317,20 +311,4 @@ export async function planRoutes(inputs: RoutePlanInputs): Promise<RoutePlanStep
 
   steps.push({ route: 'kilo' });
   return steps;
-}
-
-/** The gateway Kilo's paid route uses. */
-export async function resolveKiloGateway(
-  inputs: Pick<
-    RoutePlanInputs,
-    'requestedModel' | 'getRoutingProviderConfig' | 'kiloIgnoredProviders' | 'boundedSpending'
-  >
-): Promise<'vercel' | 'openrouter'> {
-  const routesToVercel = await shouldRouteToVercel(
-    inputs.requestedModel,
-    async () =>
-      withIgnoredProviders(await inputs.getRoutingProviderConfig(), inputs.kiloIgnoredProviders),
-    inputs.boundedSpending
-  );
-  return routesToVercel ? 'vercel' : 'openrouter';
 }

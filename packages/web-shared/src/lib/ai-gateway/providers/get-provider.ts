@@ -30,13 +30,14 @@ import {
   getAllowedGatewayRoutedByokProviders,
   isKeyPlanStep,
   planRoutes,
-  resolveKiloGateway,
   type GatewayByokPlanStep,
   type KeyPlanStep,
   type RoutePlanInputs,
   type RoutePlanStep,
   type VercelByokPlanStep,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
+import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -442,8 +443,6 @@ async function selectProvider(
     getAllowedProviders: input.getAllowedProviders,
     getRoutingProviderConfig: input.getRoutingProviderConfig,
     requestIgnoredProviders: getRequestIgnoredVercelProviderIds(request.body.provider),
-    kiloIgnoredProviders: input.kiloIgnoredProviders ?? [],
-    boundedSpending: input.boundedSpending ?? false,
     onExcludedByPolicy: excluded =>
       decision.step({ step: 'organization-policy', excluded_provider_ids: excluded }),
   } satisfies RoutePlanInputs;
@@ -557,17 +556,23 @@ async function selectProvider(
       }
       case 'kilo': {
         recordNoKeyServed();
-        const gateway = await resolveKiloGateway(planInputs);
+        const { kiloIgnoredProviders = [], boundedSpending = false } = input;
+        const routesToVercel = await shouldRouteToVercel(
+          requestedModel,
+          async () =>
+            withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders),
+          boundedSpending
+        );
         decision.step({
           step: 'kilo',
           outcome: 'selected',
-          gateway,
-          bounded_spending: planInputs.boundedSpending,
-          kilo_ignored_providers: planInputs.kiloIgnoredProviders,
+          gateway: routesToVercel ? 'vercel' : 'openrouter',
+          bounded_spending: boundedSpending,
+          kilo_ignored_providers: kiloIgnoredProviders,
         });
         return {
           kind: 'provider',
-          provider: gateway === 'vercel' ? VERCEL_AI_GATEWAY : OPENROUTER,
+          provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
           userByok: null,
           isFree: isFreeModel(requestedModel),
           bypassAccessCheck: false,
@@ -642,7 +647,7 @@ function markUnreachedSteps(steps: ByokRoutePreviewStep[]): ByokRoutePreviewStep
 
 async function previewStep(
   step: RoutePlanStep,
-  inputs: RoutePlanInputs
+  requestedModel: string
 ): Promise<ByokRoutePreviewStep[]> {
   switch (step.route) {
     case 'direct-byok':
@@ -688,7 +693,16 @@ async function previewStep(
         },
       ];
     case 'kilo':
-      return [{ route: 'kilo', outcome: 'used', gateway: await resolveKiloGateway(inputs) }];
+      return [
+        {
+          route: 'kilo',
+          outcome: 'used',
+          // The preview explains the unrestricted route, so no request can carry a spend ceiling here.
+          gateway: (await shouldRouteToVercel(requestedModel, async () => undefined, false))
+            ? 'vercel'
+            : 'openrouter',
+        },
+      ];
   }
 }
 
@@ -725,11 +739,9 @@ export async function previewByokRouting({
     getAllowedProviders: async () => undefined,
     getRoutingProviderConfig: async () => undefined,
     requestIgnoredProviders: new Set<string>(),
-    kiloIgnoredProviders: [],
-    boundedSpending: false,
   } satisfies RoutePlanInputs;
   const steps = await Promise.all(
-    (await planRoutes(inputs)).map(step => previewStep(step, inputs))
+    (await planRoutes(inputs)).map(step => previewStep(step, requestedModel))
   );
   return { kind: 'routes', steps: markUnreachedSteps(steps.flat()) };
 }

@@ -2,6 +2,7 @@
 
 import { useState, type KeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import {
@@ -24,6 +26,7 @@ import {
   formatMicrodollarsAsUsd,
   formatRequestTime,
 } from './format';
+import { EnkryptUsageTab } from './EnkryptUsageTab';
 import { RequestLogDetailsSheet, userLabel, type RequestLogRow } from './RequestLogDetailsSheet';
 
 const COLUMNS = [
@@ -120,15 +123,14 @@ function LoadingRows() {
   ));
 }
 
-export function RequestLogsPage({ organizationId }: { organizationId: string }) {
+function RequestsTab({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const [selectedRow, setSelectedRow] = useState<RequestLogRow | null>(null);
   const logsQuery = useQuery(trpc.organizations.requestLogs.list.queryOptions({ organizationId }));
   const rows = logsQuery.data ?? [];
 
   return (
-    <div className="flex w-full flex-col gap-y-6 p-4 md:p-6">
-      <OrganizationPageHeader organizationId={organizationId} title="Request Logs" />
+    <div className="flex flex-col gap-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
           The organization&apos;s latest 100 gateway requests from the past 24 hours. Select a
@@ -201,6 +203,47 @@ export function RequestLogsPage({ organizationId }: { organizationId: string }) 
           if (!open) setSelectedRow(null);
         }}
       />
+    </div>
+  );
+}
+
+const TABS = ['requests', 'enkrypt'] as const;
+type Tab = (typeof TABS)[number];
+
+function isTab(value: string | null): value is Tab {
+  return TABS.some(tab => tab === value);
+}
+
+export function RequestLogsPage({ organizationId }: { organizationId: string }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tabParam = searchParams.get('tab');
+  const activeTab: Tab = isTab(tabParam) ? tabParam : 'requests';
+
+  const onTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'requests') params.delete('tab');
+    else params.set('tab', value);
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-y-6 p-4 md:p-6">
+      <OrganizationPageHeader organizationId={organizationId} title="Request Logs" />
+      <Tabs value={activeTab} onValueChange={onTabChange} className="flex flex-col gap-4">
+        <TabsList className="self-start">
+          <TabsTrigger value="requests">Requests</TabsTrigger>
+          <TabsTrigger value="enkrypt">Enkrypt</TabsTrigger>
+        </TabsList>
+        <TabsContent value="requests">
+          <RequestsTab organizationId={organizationId} />
+        </TabsContent>
+        <TabsContent value="enkrypt">
+          <EnkryptUsageTab organizationId={organizationId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

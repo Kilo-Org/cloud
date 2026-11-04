@@ -1,6 +1,8 @@
 import {
   api_kind,
   editor_name,
+  enkrypt_usage,
+  enkrypt_usage_decision,
   feature,
   finish_reason,
   inference_region,
@@ -48,6 +50,13 @@ async function assertRequestLogsEnabled(organizationId: string): Promise<void> {
 function withinRequestLogWindow() {
   return gte(
     microdollar_usage.created_at,
+    sql`NOW() - make_interval(hours => ${REQUEST_LOGS_MAX_AGE_HOURS})`
+  );
+}
+
+function withinEnkryptUsageWindow() {
+  return gte(
+    enkrypt_usage.created_at,
     sql`NOW() - make_interval(hours => ${REQUEST_LOGS_MAX_AGE_HOURS})`
   );
 }
@@ -143,6 +152,80 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       latency_ms: row.latency,
       generation_time_ms: row.generation_time,
     }));
+  }),
+
+  listEnkryptUsage: organizationBillingProcedure.query(async ({ input }) => {
+    await assertRequestLogsEnabled(input.organizationId);
+    const where = and(
+      eq(enkrypt_usage.organization_id, input.organizationId),
+      withinEnkryptUsageWindow()
+    );
+    const [rows, [summary]] = await timedUsageQuery(
+      {
+        db: readDb,
+        route: 'organizations.requestLogs.listEnkryptUsage',
+        queryLabel: 'org_latest_enkrypt_usage',
+        scope: 'org',
+        period: `${REQUEST_LOGS_MAX_AGE_HOURS}h`,
+      },
+      tx =>
+        Promise.all([
+          tx
+            .select({
+              id: enkrypt_usage.id,
+              created_at: enkrypt_usage.created_at,
+              kilo_user_id: enkrypt_usage.kilo_user_id,
+              user_name: kilocode_users.google_user_name,
+              user_email: kilocode_users.google_user_email,
+              session_id: enkrypt_usage.session_id,
+              api_kind: api_kind.api_kind,
+              decision: enkrypt_usage_decision.decision,
+              charged_microdollars: enkrypt_usage.charged_microdollars,
+              added_latency_ms: enkrypt_usage.added_latency_ms,
+            })
+            .from(enkrypt_usage)
+            .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+            .innerJoin(
+              enkrypt_usage_decision,
+              eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+            )
+            .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
+            .where(where)
+            .orderBy(desc(enkrypt_usage.created_at))
+            .limit(REQUEST_LOGS_LIMIT),
+          tx
+            .select({
+              total_calls: sql<number>`count(*)::int`,
+              allowed: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'allowed')::int`,
+              blocked: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'blocked')::int`,
+              errors: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'error')::int`,
+              total_charged_microdollars: sql<number>`coalesce(sum(${enkrypt_usage.charged_microdollars}), 0)::float8`,
+              avg_added_latency_ms: sql<
+                number | null
+              >`avg(${enkrypt_usage.added_latency_ms})::float8`,
+            })
+            .from(enkrypt_usage)
+            .innerJoin(
+              enkrypt_usage_decision,
+              eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+            )
+            .where(where),
+        ])
+    );
+
+    return {
+      rows: rows.map(row => ({
+        id: row.id,
+        created_at: toIsoTimestamp(row.created_at),
+        user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
+        session_id: row.session_id,
+        api_kind: row.api_kind,
+        decision: row.decision,
+        charged_microdollars: row.charged_microdollars,
+        added_latency_ms: row.added_latency_ms,
+      })),
+      summary,
+    };
   }),
 
   getDetails: organizationBillingProcedure

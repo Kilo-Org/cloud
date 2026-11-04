@@ -1,4 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
+import { provisionEnkryptUsagePartitions } from '@/lib/usage-partitions';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -8,6 +9,8 @@ import {
   type User,
   ai_gateway_config,
   api_kind,
+  enkrypt_usage,
+  enkrypt_usage_decision,
   feature,
   finish_reason,
   microdollar_usage,
@@ -20,6 +23,9 @@ import { REQUEST_LOGS_LIMIT } from './organization-request-logs-router';
 
 type UsageInsert = typeof microdollar_usage.$inferInsert;
 type MetadataInsert = typeof microdollar_usage_metadata.$inferInsert;
+type EnkryptUsageInsert = typeof enkrypt_usage.$inferInsert;
+type ApiKind = (typeof api_kind.$inferInsert)['api_kind'];
+type EnkryptDecision = (typeof enkrypt_usage_decision.$inferInsert)['decision'];
 
 let owner: User;
 let admin: User;
@@ -60,7 +66,7 @@ async function finishReasonId(name: string): Promise<number> {
   return row.id;
 }
 
-async function apiKindId(name: 'chat_completions'): Promise<number> {
+async function apiKindId(name: ApiKind): Promise<number> {
   await db
     .insert(api_kind)
     .values({ api_kind: name })
@@ -96,6 +102,54 @@ function usageRow(overrides: Partial<UsageInsert> & { organization_id: string })
 
 function metadataRow(id: string, overrides: Partial<MetadataInsert> = {}): MetadataInsert {
   return { id, message_id: `msg-${id}`, ...overrides };
+}
+
+async function enkryptDecisionId(decision: EnkryptDecision): Promise<number> {
+  await db
+    .insert(enkrypt_usage_decision)
+    .values({ decision })
+    .onConflictDoNothing({ target: enkrypt_usage_decision.decision });
+  const [row] = await db
+    .select({ id: enkrypt_usage_decision.decision_id })
+    .from(enkrypt_usage_decision)
+    .where(eq(enkrypt_usage_decision.decision, decision));
+  return row.id;
+}
+
+type EnkryptLookups = {
+  apiKind: Record<'chat_completions' | 'messages' | 'responses', number>;
+  decision: Record<'allowed' | 'blocked' | 'error', number>;
+};
+
+async function enkryptLookups(): Promise<EnkryptLookups> {
+  return {
+    apiKind: {
+      chat_completions: await apiKindId('chat_completions'),
+      messages: await apiKindId('messages'),
+      responses: await apiKindId('responses'),
+    },
+    decision: {
+      allowed: await enkryptDecisionId('allowed'),
+      blocked: await enkryptDecisionId('blocked'),
+      error: await enkryptDecisionId('error'),
+    },
+  };
+}
+
+function enkryptRow(
+  lookups: EnkryptLookups,
+  overrides: Partial<EnkryptUsageInsert> & { organization_id: string }
+): EnkryptUsageInsert & { id: string; created_at: string } {
+  return {
+    id: randomUUID(),
+    kilo_user_id: owner.id,
+    api_kind_id: lookups.apiKind.chat_completions,
+    decision_id: lookups.decision.allowed,
+    enkrypt_credits_cost: 1,
+    charged_microdollars: 100,
+    created_at: hoursAgo(1),
+    ...overrides,
+  };
 }
 
 describe('organizations.requestLogs trpc router', () => {
@@ -137,6 +191,9 @@ describe('organizations.requestLogs trpc router', () => {
         .where(inArray(microdollar_usage_metadata.id, usageIds));
       await db.delete(microdollar_usage).where(inArray(microdollar_usage.id, usageIds));
     }
+    await db
+      .delete(enkrypt_usage)
+      .where(inArray(enkrypt_usage.organization_id, [organization.id, otherOrganization.id]));
     await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
   });
 
@@ -383,6 +440,184 @@ describe('organizations.requestLogs trpc router', () => {
       expect(result.map(row => row.id)).toEqual(
         rows.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
       );
+    });
+  });
+
+  describe('listEnkryptUsage', () => {
+    it('rejects the request when the feature is not enabled for the organization', async () => {
+      await enableRequestLogs([otherOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.requestLogs.listEnkryptUsage({ organizationId: organization.id })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects a plain member with UNAUTHORIZED', async () => {
+      await enableRequestLogs([organization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.requestLogs.listEnkryptUsage({ organizationId: organization.id })
+      ).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have the required organizational role to access this feature',
+      });
+    });
+
+    it('returns an empty list and a zero summary without usage', async () => {
+      await enableRequestLogs([organization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.requestLogs.listEnkryptUsage({ organizationId: organization.id })
+      ).resolves.toEqual({
+        rows: [],
+        summary: {
+          total_calls: 0,
+          allowed: 0,
+          blocked: 0,
+          errors: 0,
+          total_charged_microdollars: 0,
+          avg_added_latency_ms: null,
+        },
+      });
+    });
+
+    it("returns the organization's guardrail calls from the last 24 hours, newest first, with a summary", async () => {
+      await enableRequestLogs([organization.id, otherOrganization.id]);
+      const lookups = await enkryptLookups();
+      const tooOldAt = hoursAgo(25);
+      const partitions = await provisionEnkryptUsagePartitions(db, new Date(tooOldAt));
+      expect(partitions.errors).toEqual([]);
+
+      const errored = enkryptRow(lookups, {
+        organization_id: organization.id,
+        api_kind_id: lookups.apiKind.responses,
+        decision_id: lookups.decision.error,
+        enkrypt_credits_cost: null,
+        charged_microdollars: 0,
+        added_latency_ms: null,
+        created_at: hoursAgo(0.5),
+      });
+      const blocked = enkryptRow(lookups, {
+        organization_id: organization.id,
+        kilo_user_id: member.id,
+        session_id: 'ses_enkrypt_blocked',
+        api_kind_id: lookups.apiKind.messages,
+        decision_id: lookups.decision.blocked,
+        enkrypt_credits_cost: 2,
+        charged_microdollars: 200,
+        added_latency_ms: 60,
+        created_at: hoursAgo(1),
+      });
+      const allowed = enkryptRow(lookups, {
+        organization_id: organization.id,
+        api_kind_id: lookups.apiKind.chat_completions,
+        decision_id: lookups.decision.allowed,
+        enkrypt_credits_cost: 1.5,
+        charged_microdollars: 150,
+        added_latency_ms: 40,
+        created_at: hoursAgo(23),
+      });
+      const tooOld = enkryptRow(lookups, {
+        organization_id: organization.id,
+        decision_id: lookups.decision.blocked,
+        charged_microdollars: 9_000,
+        added_latency_ms: 9_000,
+        created_at: tooOldAt,
+      });
+      const otherOrgRow = enkryptRow(lookups, {
+        organization_id: otherOrganization.id,
+        decision_id: lookups.decision.blocked,
+        charged_microdollars: 7_000,
+        added_latency_ms: 7_000,
+        created_at: hoursAgo(1),
+      });
+      await db.insert(enkrypt_usage).values([allowed, tooOld, errored, otherOrgRow, blocked]);
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.listEnkryptUsage({
+        organizationId: organization.id,
+      });
+
+      expect(result.rows).toEqual([
+        {
+          id: errored.id,
+          created_at: errored.created_at,
+          user: { id: owner.id, name: owner.google_user_name, email: owner.google_user_email },
+          session_id: null,
+          api_kind: 'responses',
+          decision: 'error',
+          charged_microdollars: 0,
+          added_latency_ms: null,
+        },
+        {
+          id: blocked.id,
+          created_at: blocked.created_at,
+          user: { id: member.id, name: member.google_user_name, email: member.google_user_email },
+          session_id: 'ses_enkrypt_blocked',
+          api_kind: 'messages',
+          decision: 'blocked',
+          charged_microdollars: 200,
+          added_latency_ms: 60,
+        },
+        {
+          id: allowed.id,
+          created_at: allowed.created_at,
+          user: { id: owner.id, name: owner.google_user_name, email: owner.google_user_email },
+          session_id: null,
+          api_kind: 'chat_completions',
+          decision: 'allowed',
+          charged_microdollars: 150,
+          added_latency_ms: 40,
+        },
+      ]);
+      for (const row of result.rows) {
+        expect(row).not.toHaveProperty('enkrypt_credits_cost');
+      }
+      expect(result.summary).toEqual({
+        total_calls: 3,
+        allowed: 1,
+        blocked: 1,
+        errors: 1,
+        total_charged_microdollars: 350,
+        avg_added_latency_ms: 50,
+      });
+      expect(result.summary).not.toHaveProperty('total_credits');
+    });
+
+    it(`returns at most ${REQUEST_LOGS_LIMIT} calls while the summary counts every call in the window`, async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const rows = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
+        enkryptRow(lookups, {
+          organization_id: organization.id,
+          decision_id:
+            index === REQUEST_LOGS_LIMIT ? lookups.decision.blocked : lookups.decision.allowed,
+          charged_microdollars: 10,
+          added_latency_ms: index === REQUEST_LOGS_LIMIT ? 1_010 : 0,
+          created_at: new Date(Date.now() - (index + 1) * 60_000).toISOString(),
+        })
+      );
+      await db.insert(enkrypt_usage).values(rows);
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.listEnkryptUsage({
+        organizationId: organization.id,
+      });
+
+      expect(result.rows.map(row => row.id)).toEqual(
+        rows.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
+      );
+      expect(result.summary).toEqual({
+        total_calls: REQUEST_LOGS_LIMIT + 1,
+        allowed: REQUEST_LOGS_LIMIT,
+        blocked: 1,
+        errors: 0,
+        total_charged_microdollars: (REQUEST_LOGS_LIMIT + 1) * 10,
+        avg_added_latency_ms: 1_010 / (REQUEST_LOGS_LIMIT + 1),
+      });
     });
   });
 

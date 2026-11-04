@@ -485,6 +485,7 @@ describe('builder setup environment', () => {
       },
       vars: {
         FOO: 'bar',
+        KILO_ENVIRONMENT_BUILD: '0',
         XDG_CACHE_HOME: '/elsewhere',
         GIT_CONFIG_COUNT: '1',
         GIT_CONFIG_KEY_0: 'credential.helper',
@@ -506,6 +507,7 @@ describe('builder setup environment', () => {
       XDG_STATE_HOME: '/home/abc/.local/state',
       ...SYSTEM_GIT_CONFIG_ENV,
       GIT_TERMINAL_PROMPT: '0',
+      KILO_ENVIRONMENT_BUILD: '1',
     });
   });
 

@@ -110,7 +110,7 @@ const WORKTREE_ID = 'worktree_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_WORKTREE_ID = 'worktree_dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const OPERATION_KEY = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const LEDGER_ROW_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
-const SHARED_SANDBOX_ID = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const SOURCE_SANDBOX_ID = 'ses-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const INTERNAL_SECRET = 'test-internal-secret';
 const CURRENT_AUTH_TOKEN = 'current-customer-token';
 const BYOC_PROVIDER_BINDING = {
@@ -170,9 +170,8 @@ function sourceMetadata(options?: {
     profile: { envVars: { PROFILE_SETTING: 'preserved' }, setupCommands: ['pnpm install'] },
     finalization: { autoCommit: true, condenseOnComplete: true },
     workspace: {
-      sandboxId: SHARED_SANDBOX_ID,
-      sandboxProvider: 'cloudflare',
-      sandboxRoute: { kind: 'shared', routeKey: SHARED_SANDBOX_ID },
+      sandboxId: SOURCE_SANDBOX_ID,
+      sandboxProvider: 'cloudflare-containers',
       worktreeId: WORKTREE_ID,
       workspacePath: getWorktreeWorkspacePath(organizationId, userId, WORKTREE_ID),
       branchName: 'feature/shared',
@@ -606,6 +605,13 @@ describe('createWorktreeChat request validation and authorization', () => {
       }),
     ],
     [
+      'retired runtime provider',
+      (metadata: SessionMetadata) => ({
+        ...metadata,
+        workspace: { ...metadata.workspace, sandboxProvider: 'cloudflare' as const },
+      }),
+    ],
+    [
       'repository mismatch',
       (metadata: SessionMetadata) => ({
         ...metadata,
@@ -873,8 +879,7 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      context.env.PER_SESSION_SANDBOX_ORG_IDS =
-        sandboxAllocation === 'cloudflare-shared' ? '*' : '';
+      context.env.PER_SESSION_SANDBOX_ORG_IDS = '';
       Object.assign(context.env, {
         VERCEL_SANDBOX_ORG_IDS: sandboxAllocation.startsWith('vercel-') ? '' : '*',
       });
@@ -908,7 +913,7 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     { resources: { vcpus: 4, memory: 8192 } },
   ])('rejects direct sibling allocation overrides before side effects: %j', async override => {
     const { caller, input, destinationStub } = fixture({
-      metadata: sourceMetadataWithPreset('cloudflare-single'),
+      metadata: sourceMetadataWithPreset('cloudflare-containers-standard-3'),
       organizationId: ORGANIZATION_ID,
     });
     await expect(caller.createWorktreeChat({ ...input, ...override })).rejects.toMatchObject({
@@ -1231,7 +1236,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       cloudAgentWorktreeId: WORKTREE_ID,
       cloudAgentWorktreeLocation: {
         sandboxId: metadata.workspace?.sandboxId,
-        provider: 'cloudflare',
+        provider: 'cloudflare-containers',
       },
       organizationId: undefined,
       createdOnPlatform: 'cloud-agent-web',
@@ -1734,7 +1739,7 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
         ...metadata.workspace,
         sandboxId: `sbx-${'c'.repeat(48)}`,
         sandboxRoute: undefined,
-        sandboxKind: 'shared',
+        sandboxKind: 'isolated',
       },
     };
   }
@@ -1748,11 +1753,11 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
     expect(registration?.metadata.workspace).toMatchObject({
       sandboxId: metadata.workspace?.sandboxId,
-      sandboxKind: 'shared',
+      sandboxKind: 'isolated',
     });
     expect(registration?.sandboxSelection).toMatchObject({
-      sandboxKind: 'shared',
-      billing: { sandboxKind: 'shared' },
+      sandboxKind: 'isolated',
+      billing: { sandboxKind: 'isolated' },
     });
   });
 
@@ -1762,7 +1767,7 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     const destination = destinationMetadata(metadata);
     destination.workspace = {
       ...destination.workspace,
-      sandboxKind: 'isolated',
+      sandboxKind: 'code-review',
     };
     destinationStub.getMetadata.mockResolvedValueOnce(destination);
     admitOperationMock.mockResolvedValueOnce({

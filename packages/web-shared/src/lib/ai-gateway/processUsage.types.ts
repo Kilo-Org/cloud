@@ -147,8 +147,6 @@ export type MicrodollarUsageContext = {
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
-  botId?: string;
-  tokenSource?: string;
   /** Which product feature generated this API call. NULL if header not sent. */
   feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */
@@ -159,6 +157,8 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Bounded labels for the reasoning configuration requested by the client. */
   reasoning_setting: string | null;
+  /** The Vercel AI Gateway inference region the request was pinned to, or null for global routing. */
+  inference_region: string | null;
   /**
    * Time until the upstream response headers arrived, in milliseconds. Stored as
    * `latency` only when the usage stats do not carry a measured latency.
@@ -296,6 +296,7 @@ export type UsageMetaData = {
   mode: string | null;
   auto_model: string | null;
   reasoning_setting: string | null;
+  inference_region: string | null;
   market_cost: number | null;
   non_inference_cost: number | null;
   is_free: boolean | null;

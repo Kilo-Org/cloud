@@ -37,7 +37,7 @@ import {
   briefingChargeAccountingSchema,
 } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   accountBalanceMicrodollars,
   findOrganizationMemberBalanceRow,

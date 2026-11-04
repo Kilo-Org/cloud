@@ -4,6 +4,10 @@ import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
+import type {
+  EnkryptGuardrailReport,
+  EnkryptOutputGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
@@ -36,6 +40,7 @@ const decision: ProviderRoutingDecision = {
       outcome: 'selected',
       gateway: 'vercel',
       bounded_spending: false,
+      organization_disabled_vercel_ai_gateway: false,
       kilo_ignored_providers: [],
     },
   ],
@@ -171,6 +176,155 @@ test('combines full metadata fidelity and routing fields in exactly one PutObjec
     vercel: { metadata },
   });
   expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${USAGE_ID}.json`]);
+});
+
+test('adds the Enkrypt guardrail report read at upload time', async () => {
+  const enkrypt: EnkryptGuardrailReport = {
+    settings: {
+      status: 'ready',
+      scan_tool_results: true,
+      detectors: [{ detector: 'injection_attack', action: 'block' }],
+    },
+    verdict: 'block',
+    unavailable_reason: null,
+    added_latency_ms: 412,
+    scans: [
+      {
+        scan: 'blocking',
+        detectors_enabled: ['injection_attack'],
+        detectors_blocking: ['injection_attack'],
+        verdict_cache: 'hit',
+        total_characters: 9_000,
+        total_segments: 12,
+        cached_characters: 8_000,
+        cached_segments: 10,
+        scanned_characters: 3_000,
+        decision: 'blocked',
+        error: null,
+        detectors_fired: ['injection_attack'],
+        attempts: 1,
+        credits_cost: 3,
+        latency_ms: 400,
+        verdict_cache_write: 'skipped',
+      },
+    ],
+  };
+  const report = jest.fn(async () => enkrypt);
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(report);
+  capture?.captureRoutingDecision(decision);
+  expect(report).not.toHaveBeenCalled();
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    enkrypt,
+  });
+});
+
+test('adds the Enkrypt output guardrail report read at upload time', async () => {
+  const enkryptOutput: EnkryptOutputGuardrailReport = {
+    settings: {
+      status: 'ready',
+      scan_tool_results: false,
+      detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
+    },
+    held_back: true,
+    held_bytes: 4_096,
+    held_ms: 8_200,
+    upstream_read_failed: false,
+    output_characters: 1_200,
+    not_scanned_reason: null,
+    verdict: 'block',
+    unavailable_reason: null,
+    added_latency_ms: 310,
+    scans: [
+      {
+        scan: 'blocking',
+        detectors_enabled: ['pii'],
+        detectors_blocking: ['pii'],
+        verdict_cache: 'off',
+        total_characters: 1_200,
+        total_segments: 1,
+        cached_characters: 0,
+        cached_segments: 0,
+        scanned_characters: 1_200,
+        decision: 'blocked',
+        error: null,
+        detectors_fired: ['pii'],
+        attempts: 1,
+        credits_cost: 2,
+        latency_ms: 300,
+      },
+    ],
+  };
+  const report = jest.fn(async () => enkryptOutput);
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptOutputReport(report);
+  capture?.captureRoutingDecision(decision);
+  expect(report).not.toHaveBeenCalled();
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    enkrypt_output: enkryptOutput,
+  });
+});
+
+test('archives the input report when the Enkrypt output report fails', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => null);
+  capture?.captureEnkryptOutputReport(async () => {
+    throw new TypeError('boom');
+  });
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('enkrypt_output');
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] Enkrypt output report failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'TypeError' }
+  );
+});
+
+test('still archives the routing decision when the Enkrypt report fails', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => {
+    throw new RangeError('Maximum call stack size exceeded');
+  });
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+  });
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] Enkrypt report failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'RangeError' }
+  );
+});
+
+test('omits the Enkrypt entry when no guardrail applied', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => null);
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('enkrypt');
 });
 
 test('does not register an archive from metadata or parser settlement without routing', async () => {

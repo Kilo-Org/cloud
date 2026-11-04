@@ -16,7 +16,6 @@ const { DurableObjectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
-vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import {
   CONTROL_SUPERVISOR_PATH,
@@ -36,7 +35,7 @@ import {
 } from '../shared/preview-headers.js';
 import type { Env } from '../types.js';
 import type { ContainersOutboundProps } from './containers-outbound.js';
-import { encodeCloudflareProviderRef } from '../sandbox-control/cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from '../sandbox-control/provider-ref.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.

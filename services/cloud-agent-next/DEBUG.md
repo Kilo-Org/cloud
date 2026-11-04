@@ -62,7 +62,7 @@ List local sandbox containers and their proxy siblings:
 docker ps --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}'
 ```
 
-Cloudflare sandbox containers usually include `Sandbox` in the synthesized name or use a `cloudflare/sandbox` image. There may be a sibling `-proxy` container. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
+Cloudflare container sandboxes usually include `SandboxContainers` in the synthesized name and run an image built from `Dockerfile.containers`. Docker container names are synthesized, so when several sandboxes are running, confirm the primary container by finding the control wrapper process (`kilocode-control-plane-wrapper.js`) or the `workspace_*` session's route in the Worker log.
 
 To inspect one candidate:
 

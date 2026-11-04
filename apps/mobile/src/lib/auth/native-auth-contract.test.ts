@@ -99,7 +99,7 @@ describe('parseTokenPair', () => {
     expect(parseTokenPair(null)).toBeNull();
   });
 
-  it('returns null when refreshToken is present but expiresIn is missing', () => {
+  it('drops refreshToken when expiresIn is missing and returns the token-only pair', () => {
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref' })).toEqual({ token: 'abc' });
   });
 

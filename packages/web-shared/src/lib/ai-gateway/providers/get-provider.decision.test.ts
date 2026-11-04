@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import {
-  getProvider,
-  type GetProviderInput,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
@@ -20,6 +18,7 @@ import neuralwattDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/
 import {
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
+  getStoredByokKeys,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -39,6 +38,7 @@ import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -56,11 +56,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
     getDirectByokCatalogModelId: jest.fn(),
   };
 });
-jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
-  ...jest.requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok'),
-  getModelInferenceUserByokProviders: jest.fn(),
-  getModelGatewayUserByokProviders: jest.fn(),
-}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
+  const actual = jest.requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok');
+  return {
+    ...actual,
+    getModelInferenceUserByokProviders: jest.fn(),
+    getModelGatewayUserByokProviders: jest.fn(),
+    getStoredByokKeys: jest.fn(actual.getStoredByokKeys),
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok/encryption', () => {
   const actual = jest.requireActual<typeof encryptionModule>(
     '@kilocode/web-shared/lib/ai-gateway/byok/encryption'
@@ -72,6 +76,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
     '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
   ),
   checkOpenAiChatGptByok: jest.fn(),
+  getOpenAiChatGptCandidateModel: jest.fn(async (apiKind: GatewayChatApiKind) =>
+    apiKind === 'responses' ? 'gpt-test' : null
+  ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
@@ -115,26 +122,34 @@ function request(apiKind: GatewayChatApiKind, ignore?: string[]): GatewayRequest
   }
 }
 
-type KeyFixture = { providerId: UserByokProviderId; catalogMode?: boolean; priority?: number };
+type KeyFixture = {
+  providerId: UserByokProviderId;
+  catalogMode?: boolean;
+  priority?: number;
+  isEnabled?: boolean;
+};
 
 async function insertKeys(user: User, keys: KeyFixture[], organizationId?: string): Promise<void> {
   if (keys.length === 0) return;
   await db.insert(byok_api_keys).values(
-    keys.map(({ providerId, catalogMode = false, priority }) => ({
+    keys.map(({ providerId, catalogMode = false, priority, isEnabled = true }) => ({
       ...(organizationId ? { organization_id: organizationId } : { kilo_user_id: user.id }),
       provider_id: providerId,
       encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
       created_by: user.id,
+      is_enabled: isEnabled,
       settings: { serve_catalog_models: catalogMode, priority },
     }))
   );
 }
 
 async function routeAndRecord(
-  input: Omit<GetProviderInput, 'onDecision'>
+  input: Omit<Parameters<typeof getProviderInput>[0], 'onDecision'>
 ): Promise<ProviderRoutingDecision> {
   const decisions: ProviderRoutingDecision[] = [];
-  await getProvider({ ...input, onDecision: decision => decisions.push(decision) });
+  await getProvider(
+    getProviderInput({ ...input, onDecision: decision => decisions.push(decision) })
+  );
   expect(decisions).toHaveLength(1);
   const [decision] = decisions;
   const serialized = JSON.stringify(decision);
@@ -185,7 +200,7 @@ beforeEach(() => {
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
   jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'anthropic']);
   jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
-  jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(null);
+  jest.mocked(checkOpenAiChatGptByok).mockReset().mockResolvedValue(null);
   jest.mocked(canRouteToVercel).mockResolvedValue(true);
   jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
   jest.mocked(decryptApiKey).mockClear();
@@ -220,12 +235,14 @@ describe('getProvider routing decision', () => {
         jest.mocked(getDirectByokModel).mockResolvedValueOnce({ provider, model });
       }
 
-      const result = await getProvider({
-        requestedModel,
-        request: { kind: 'chat_completions', body: { model: requestedModel, messages: [] } },
-        user,
-        organizationId: undefined,
-      });
+      const result = await getProvider(
+        getProviderInput({
+          requestedModel,
+          request: { kind: 'chat_completions', body: { model: requestedModel, messages: [] } },
+          user,
+          organizationId: undefined,
+        })
+      );
 
       expect(result).toMatchObject({
         kind: 'provider',
@@ -259,7 +276,6 @@ describe('getProvider routing decision', () => {
       steps: [
         NO_CUSTOM_LLM,
         NO_DIRECT_BYOK_MODEL,
-        { step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' },
         { step: 'byok-key', outcome: 'selected', route: 'direct-byok', provider_id: 'zai-coding' },
       ],
       byok_candidates: [
@@ -292,7 +308,6 @@ describe('getProvider routing decision', () => {
     expect(decision.steps).toEqual([
       NO_CUSTOM_LLM,
       NO_DIRECT_BYOK_MODEL,
-      CHATGPT_UNAVAILABLE,
       { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'moonshotai' },
     ]);
     expect(decision.byok_candidates).toEqual([
@@ -417,7 +432,7 @@ describe('getProvider routing decision', () => {
       api_kind: 'responses',
       owner_type: 'user',
       steps: [NO_CUSTOM_LLM, NO_DIRECT_BYOK_MODEL, { step: 'chatgpt', outcome: 'selected' }],
-      byok_candidates: [],
+      byok_candidates: [candidate('vercel-byok', 'moonshotai', 0, 'unreached')],
       result: {
         kind: 'provider',
         route: 'chatgpt',
@@ -475,13 +490,13 @@ describe('getProvider routing decision', () => {
       steps: [
         NO_CUSTOM_LLM,
         NO_DIRECT_BYOK_MODEL,
-        CHATGPT_UNAVAILABLE,
         { step: 'byok-key', outcome: 'skipped', reason: 'no-candidates' },
         {
           step: 'kilo',
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: true,
+          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: ['deepinfra'],
         },
       ],
@@ -495,7 +510,10 @@ describe('getProvider routing decision', () => {
         is_free: false,
       },
     });
-    expect(shouldRouteToVercel).toHaveBeenCalledWith(MODEL, expect.any(Function), true);
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: MODEL, boundedSpending: true }),
+      expect.any(Function)
+    );
   });
 
   test('records provider keys the organization policy excludes', async () => {
@@ -632,7 +650,7 @@ describe('getProvider routing decision', () => {
         provider_id: 'zai-coding',
         reason: 'no-key',
       },
-      CHATGPT_UNAVAILABLE,
+      { step: 'byok-key', outcome: 'skipped', reason: 'no-candidates' },
     ]);
     expect(decision.result).toMatchObject({ route: 'kilo', payer: 'kilo' });
   });
@@ -661,10 +679,7 @@ describe('getProvider routing decision', () => {
       organizationId: undefined,
     });
 
-    expect(decision.steps.slice(2)).toEqual([
-      { step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' },
-      { step: 'chatgpt', outcome: 'selected' },
-    ]);
+    expect(decision.steps.slice(2)).toEqual([{ step: 'chatgpt', outcome: 'selected' }]);
     expect(decision.byok_candidates).toEqual([
       candidate('gateway-byok', 'openrouter', 0, 'unreached', { priority: 0 }),
       candidate('direct-byok', 'zai-coding', 1, 'unreached', { priority: 1 }),
@@ -704,20 +719,200 @@ describe('getProvider routing decision', () => {
     const user = await insertTestUser();
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await getProvider({
-      requestedModel: MODEL,
-      request: request('chat_completions'),
-      user,
-      organizationId: undefined,
-      onDecision: () => {
-        throw new TypeError('archive failed');
-      },
-    });
+    const result = await getProvider(
+      getProviderInput({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+        onDecision: () => {
+          throw new TypeError('archive failed');
+        },
+      })
+    );
 
     expect(result).toMatchObject({ kind: 'provider', userByok: null });
     expect(error).toHaveBeenCalledWith('[getProvider] failed to report the routing decision', {
       errorType: 'TypeError',
     });
+  });
+});
+
+describe('getProvider route order with a ChatGPT connection', () => {
+  const chatGptProvider = {
+    kind: 'provider',
+    provider: { ...OPENROUTER, type: 'openai-chatgpt' },
+    userByok: null,
+    bypassAccessCheck: false,
+    skipBalanceCheck: true,
+  } as const;
+
+  function deleteKeysAfterTheyAreRead(user: User) {
+    const actual = jest.requireActual<typeof byokModule>(
+      '@kilocode/web-shared/lib/ai-gateway/byok'
+    );
+    jest.mocked(getStoredByokKeys).mockImplementationOnce(async (fromDb, owner) => {
+      const stored = await actual.getStoredByokKeys(fromDb, owner);
+      await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, user.id));
+      return stored;
+    });
+  }
+
+  test('serves a ranked catalog key whose row is deleted before decryption, never Kilo', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'zai-coding', catalogMode: true }]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(chatGptProvider);
+    deleteKeysAfterTheyAreRead(user);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(decision.result).toMatchObject({ route: 'direct-byok', payer: 'owner-byok-key' });
+    expect(decision.steps.slice(2)).toEqual([
+      { step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' },
+      { step: 'byok-key', outcome: 'selected', route: 'direct-byok', provider_id: 'zai-coding' },
+    ]);
+    expect(decision.byok_candidates).toEqual([
+      candidate('direct-byok', 'zai-coding', 0, 'selected'),
+    ]);
+    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { chatGpt: 'connected', route: 'chatgpt' },
+    { chatGpt: 'unavailable', route: 'direct-byok' },
+  ] as const)(
+    'checks a $chatGpt ChatGPT connection ahead of a catalog key when an ignored provider key ranks first',
+    async ({ chatGpt, route }) => {
+      const user = await insertTestUser();
+      await insertKeys(user, [
+        { providerId: 'anthropic', priority: 0 },
+        { providerId: 'zai-coding', catalogMode: true, priority: 1 },
+      ]);
+      jest
+        .mocked(findDirectByokCatalogModels)
+        .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+      jest
+        .mocked(checkOpenAiChatGptByok)
+        .mockResolvedValue(chatGpt === 'connected' ? chatGptProvider : null);
+
+      const decision = await routeAndRecord({
+        requestedModel: MODEL,
+        request: request('responses', ['anthropic']),
+        user,
+        organizationId: undefined,
+      });
+
+      expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
+      expect(decision.result).toMatchObject({ route });
+      expect(decision.byok_candidates).toEqual(
+        chatGpt === 'connected'
+          ? [
+              candidate('vercel-byok', 'anthropic', 0, 'unreached', { priority: 0 }),
+              candidate('direct-byok', 'zai-coding', 1, 'unreached', { priority: 1 }),
+            ]
+          : [
+              candidate('vercel-byok', 'anthropic', 0, 'skipped', {
+                priority: 0,
+                reason: 'ignored-by-request',
+              }),
+              candidate('direct-byok', 'zai-coding', 1, 'selected', { priority: 1 }),
+            ]
+      );
+    }
+  );
+
+  test('keeps the ChatGPT connection below a serving catalog key when a gateway key ranked first cannot serve', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'openrouter', priority: 0 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 1 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(chatGptProvider);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+    expect(decision.byok_candidates).toEqual([
+      candidate('gateway-byok', 'openrouter', 0, 'skipped', {
+        priority: 0,
+        reason: 'model-unavailable',
+      }),
+      candidate('direct-byok', 'zai-coding', 1, 'selected', { priority: 1 }),
+    ]);
+  });
+
+  test('checks the ChatGPT connection once, even when the keys ranked below it are deleted', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'anthropic', priority: 0 },
+      { providerId: 'moonshotai', priority: 1 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 2 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    deleteKeysAfterTheyAreRead(user);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
+    expect(decision.steps.slice(2)).toEqual([
+      CHATGPT_UNAVAILABLE,
+      { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'anthropic' },
+    ]);
+  });
+
+  test('records a disabled key and a key outside catalog mode as skipped', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'synthetic', priority: 0 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 1, isEnabled: false },
+      { providerId: 'moonshotai', priority: 2 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([
+        catalogModel('synthetic', ['chat_completions']),
+        catalogModel('zai-coding', ['chat_completions']),
+      ]);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(decision.byok_candidates).toEqual([
+      candidate('direct-byok', 'synthetic', 0, 'skipped', {
+        priority: 0,
+        reason: 'not-catalog-mode',
+      }),
+      candidate('direct-byok', 'zai-coding', 1, 'skipped', { priority: 1, reason: 'disabled' }),
+      candidate('vercel-byok', 'moonshotai', 2, 'selected', { priority: 2 }),
+    ]);
   });
 });
 

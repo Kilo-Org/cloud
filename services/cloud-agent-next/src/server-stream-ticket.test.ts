@@ -31,11 +31,6 @@ vi.mock('./logger.js', () => {
   };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
-
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     constructor(_state: unknown, _env: unknown) {}

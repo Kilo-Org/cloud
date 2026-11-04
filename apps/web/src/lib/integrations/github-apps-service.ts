@@ -21,7 +21,7 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
-import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**

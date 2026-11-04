@@ -115,6 +115,7 @@ import {
 } from './schema-types';
 import type {
   EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
   WatchPrPolicy,
   WatchPrStatus,
   EnkryptFailureCategory,
@@ -10687,6 +10688,15 @@ export const enkrypt_usage_decision = pgTable(
   table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
 );
 
+export const enkrypt_usage_guardrail = pgTable(
+  'enkrypt_usage_guardrail',
+  {
+    guardrail_id: serial().notNull().primaryKey(),
+    guardrail: text().notNull().$type<EnkryptGuardrailDirection>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_guardrail').on(table.guardrail)]
+);
+
 // Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
 export const enkrypt_usage = pgTable(
   'enkrypt_usage',
@@ -10705,11 +10715,14 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the final call of the request's blocking scan, or of its log-only scan when no blocking call
-    // was recorded, so it is counted once per request; null on other calls or when the request
-    // returned before awaiting the verdict.
+    // How long the request waited for the guardrail verdict: before its upstream call for the input
+    // guardrail, and between the end of the upstream response and its release for the output
+    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
+    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
+    // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
+    // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
+    guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

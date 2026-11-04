@@ -59,11 +59,6 @@ vi.mock('./logger.js', () => {
   };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
-
 vi.mock('./agent-sandbox/factory.js', () => ({
   createAgentSandbox: vi.fn(() => ({
     getRunningTerminalClient: getRunningTerminalClientMock,

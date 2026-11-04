@@ -10,7 +10,7 @@ import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -20,9 +20,11 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   getOrganizationProviderPrivacy,
+  INVALID_TOKEN_CODE,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
@@ -78,14 +80,20 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
+  ...jest.requireActual<typeof LlmProxyHelpers>(
+    '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+  ),
   creditsBlockedResponse: jest.fn(),
   extractFraudAndProjectHeaders: jest.fn(),
   extractHeaderAndLimitLength: jest.fn(),
@@ -443,8 +451,6 @@ describe('handleSystemOneRequest', () => {
         mode: 'code',
         user_byok: false,
         isStreaming: false,
-        botId: 'bot-123',
-        tokenSource: 'api-key',
         ttfb_ms: expect.any(Number),
       })
     );
@@ -580,6 +586,25 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    jest.mocked(getUserFromAuth).mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rate limits before authentication or upstream work', async () => {

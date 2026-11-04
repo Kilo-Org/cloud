@@ -46,14 +46,16 @@ async function mount(
     visible: boolean;
     currentIndex: number;
     title: string;
+    options: string[];
   }> = {}
 ) {
+  const options = props.options ?? AXE;
   const ui = await renderWithProviders(
     createElement(ContextPickerSheet, {
       visible: props.visible ?? true,
       title: props.title ?? 'Select account',
-      options: AXE,
-      cancelButtonIndex: 2,
+      options,
+      cancelButtonIndex: options.length - 1,
       currentIndex: props.currentIndex ?? 1,
       onSelect: index => {
         onSelect(index);
@@ -237,6 +239,29 @@ describe('ContextPickerSheet', () => {
     expect(scroll.findAll(node => node === cancel)).toHaveLength(0);
     // Every account row is inside the list; the heading sits above it.
     expect(scroll.findAll(accountRow)).toHaveLength(AXE.length - 1);
+  });
+
+  it('keeps every membership selectable when the current account is at the end', async () => {
+    const options = [
+      'Personal',
+      'شركة الخليج للبرمجيات',
+      'منظمة أفق المفتوحة',
+      'مبادرة النور',
+      ...Array.from({ length: 8 }, (_, index) => `Workspace ${index + 1}`),
+      'Cancel',
+    ];
+    const renderer = await mount({ options, currentIndex: options.length - 2 });
+    const accounts = renderer.root.findAll(accountRow);
+
+    expect(accounts.map(row => row.props.accessibilityLabel)).toEqual(options.slice(0, -1));
+    expect(accounts.filter(row => selectedState(row) === true)).toHaveLength(1);
+    await act(() => {
+      for (const row of accounts) {
+        (row.props.onPress as () => void)();
+      }
+      (renderer.root.findByProps({ accessibilityLabel: 'Cancel' }).props.onPress as () => void)();
+    });
+    expect(onSelect.mock.calls).toEqual(options.map((_, index) => [index]));
   });
 
   it('bounds the list to half the window and lets the sheet size to its content', async () => {

@@ -47,6 +47,8 @@ type ContextPickerSheetProps = {
  * list — outside the sheet. A content-sized sheet keeps the heading, the rows
  * and Cancel in the frame at any membership count, and the list scrolls once it
  * reaches `LIST_MAX_WINDOW_FRACTION` of the window.
+ * A clipped, ruled viewport sits 10 dp below the heading so a partially scrolled
+ * account row cannot read as part of the title.
  */
 export function ContextPickerSheet({
   visible,
@@ -116,62 +118,64 @@ function ContextPickerSheetBody({
         >
           {title}
         </Text>
-        <ScrollView
-          ref={listRef}
-          nestedScrollEnabled
-          style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}
-          showsVerticalScrollIndicator={false}
-        >
-          {options.map((label, index) => {
-            if (index === cancelButtonIndex) {
-              return null;
-            }
-            return (
-              <Pressable
-                key={index}
-                className={cn(
-                  ROW_TARGET_CLASS,
-                  'flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
-                  index !== lastRowIndex && 'border-b-[0.5px] border-hair-soft'
-                )}
-                onPress={() => {
-                  onSelect(index);
-                }}
-                onLayout={
-                  index === currentIndex
-                    ? event => {
-                        if (revealed.current) {
-                          return;
+        <View className="mt-[10px] overflow-hidden border-t border-border">
+          <ScrollView
+            ref={listRef}
+            nestedScrollEnabled
+            style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}
+            showsVerticalScrollIndicator={false}
+          >
+            {options.map((label, index) => {
+              if (index === cancelButtonIndex) {
+                return null;
+              }
+              return (
+                <Pressable
+                  key={index}
+                  className={cn(
+                    ROW_TARGET_CLASS,
+                    'flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
+                    index !== lastRowIndex && 'border-b-[0.5px] border-hair-soft'
+                  )}
+                  onPress={() => {
+                    onSelect(index);
+                  }}
+                  onLayout={
+                    index === currentIndex
+                      ? event => {
+                          if (revealed.current) {
+                            return;
+                          }
+                          revealed.current = true;
+                          listRef.current?.scrollTo({
+                            y: event.nativeEvent.layout.y,
+                            animated: false,
+                          });
                         }
-                        revealed.current = true;
-                        listRef.current?.scrollTo({
-                          y: event.nativeEvent.layout.y,
-                          animated: false,
-                        });
-                      }
-                    : undefined
-                }
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ selected: index === currentIndex }}
-              >
-                {/* Every account row holds the same blank gutter so the
+                      : undefined
+                  }
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: index === currentIndex }}
+                >
+                  {/* Every account row holds the same blank gutter so the
                       labels line up; only the current account paints a check
                       in it. The gutter is the check's own 16 dp — the app's rem
                       is 14, so `w-4` would clip the icon. */}
-                <View className="w-[16px] items-center">
-                  {index === currentIndex && <Check size={16} color={colors.primary} />}
-                </View>
-                {/* The tail, not the leading words, tells sibling memberships
+                  <View className="w-[16px] items-center">
+                    {index === currentIndex && <Check size={16} color={colors.primary} />}
+                  </View>
+                  {/* The tail, not the leading words, tells sibling memberships
                     apart, so a label cut at the row's width keeps its own name. */}
-                <Text className="min-w-0 flex-1 text-sm" numberOfLines={1} ellipsizeMode="middle">
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <Text className="min-w-0 flex-1 text-sm" numberOfLines={1} ellipsizeMode="middle">
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
         {/* The dismiss row is an action, not the next account: a full rule
             closes the scrolling list where the rows stop, and the row's own
             section padding keeps it off that rule. Without the rule a row the

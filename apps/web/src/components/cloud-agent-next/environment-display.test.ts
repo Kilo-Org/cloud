@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import type { EnvironmentSummary } from '@kilocode/cloud-agent-profile';
-import { findRepositoryEnvironments } from './environment-display';
+import { findRepositoryEnvironments, additionalEnvironmentMembers } from './environment-display';
 
 /** A V1 summary: one repository in the identity scalars. */
 type V1Summary = Extract<EnvironmentSummary, { platform: string }>;
@@ -99,5 +99,55 @@ describe('findRepositoryEnvironments with multi-repository environments', () => 
     expect(
       findRepositoryEnvironments([v1, v2], { platform: 'github', fullName: 'Acme/API' })
     ).toEqual([v2]);
+  });
+});
+
+describe('additionalEnvironmentMembers', () => {
+  const v1 = summary({ id: 'v1' });
+  const v2: EnvironmentSummary = {
+    id: 'v2',
+    name: 'Group',
+    repositories: [
+      { platform: 'github', repoFullName: 'acme/api' },
+      { platform: 'github', repoFullName: 'acme/widgets' },
+      {
+        platform: 'gitlab',
+        repoFullName: 'group/project',
+        gitlabCloneUrl: 'https://gitlab.com/group/project.git',
+      },
+    ],
+    createdAt: '2026-10-21T00:00:00.000Z',
+    updatedAt: '2026-10-21T00:00:00.000Z',
+    plainVarCount: 0,
+    secretCount: 0,
+    commandCount: 0,
+    sandboxAllocation: null,
+    configurationRevision: 1,
+  };
+  const widgets = { platform: 'github', fullName: 'acme/widgets' } as const;
+
+  it('lists no repositories for a single-repository environment', () => {
+    expect(additionalEnvironmentMembers(v1, widgets)).toEqual([]);
+    expect(
+      additionalEnvironmentMembers(v1, { platform: 'github', fullName: 'acme/widgets' })
+    ).toEqual([]);
+  });
+
+  it('lists only the repositories beyond the selected one', () => {
+    expect(additionalEnvironmentMembers(v2, widgets).map(member => member.repoFullName)).toEqual([
+      'acme/api',
+      'group/project',
+    ]);
+    expect(
+      additionalEnvironmentMembers(v2, { platform: 'github', fullName: 'Acme/API' }).map(
+        member => member.repoFullName
+      )
+    ).toEqual(['acme/widgets', 'group/project']);
+  });
+
+  it('lists every repository when the selected one is absent', () => {
+    expect(
+      additionalEnvironmentMembers(v2, { platform: 'github', fullName: 'acme/other' })
+    ).toHaveLength(3);
   });
 });

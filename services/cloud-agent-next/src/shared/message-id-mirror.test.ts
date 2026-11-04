@@ -4,6 +4,7 @@ import {
   MESSAGE_ID_FORMAT_DESCRIPTION as CANONICAL_MESSAGE_ID_FORMAT_DESCRIPTION,
   MESSAGE_ID_LENGTH as CANONICAL_MESSAGE_ID_LENGTH,
   MESSAGE_ID_PATTERN as CANONICAL_MESSAGE_ID_PATTERN,
+  MESSAGE_ID_RANDOM_LENGTH,
 } from '@kilocode/session-ingest-contracts/message-id';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -51,6 +52,18 @@ describe('message-id mirror', () => {
       expect(createMessageId(now)).toBe(buildMessageId(now, bytes));
     } finally {
       getRandomValues.mockRestore();
+    }
+  });
+
+  it('builds canonical ids only from the canonical random length', () => {
+    const canonical = new Uint8Array(MESSAGE_ID_RANDOM_LENGTH);
+    canonical.fill(0xff);
+
+    expect(canonicalIsCanonicalMessageId(buildMessageId(1_700_000_000_000, canonical))).toBe(true);
+    for (const length of [0, MESSAGE_ID_RANDOM_LENGTH - 1, MESSAGE_ID_RANDOM_LENGTH + 1]) {
+      expect(() => buildMessageId(1_700_000_000_000, new Uint8Array(length))).toThrow(
+        /random bytes/
+      );
     }
   });
 });

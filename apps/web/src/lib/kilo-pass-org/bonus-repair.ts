@@ -32,6 +32,10 @@ export async function repairExpiredOrganizationPassBonuses(
   let recordedMisses = 0;
 
   for (const snapshot of snapshots) {
+    // The missed-bonus decision is a closed-window decision: sum the spend that
+    // occurred inside the issuance window, the same interval the write path
+    // enforces, so spend recorded after window_end never reaches the threshold
+    // comparison or the stored total.
     const [total] = await tx
       .select({
         spent: sql<number>`coalesce(sum(${kilo_pass_org_qualifying_spend_events.spent_microdollars}), 0)`,
@@ -43,7 +47,8 @@ export async function repairExpiredOrganizationPassBonuses(
           gte(
             kilo_pass_org_qualifying_spend_events.occurred_at,
             snapshot.qualifying_spend_starts_at
-          )
+          ),
+          lt(kilo_pass_org_qualifying_spend_events.occurred_at, snapshot.window_end)
         )
       );
     const spent = Number(total?.spent ?? 0);

@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileAgents: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
@@ -309,6 +310,27 @@ describe('ProfileAgentsScreen save ownership', () => {
 
     expect(second.props.slugConflictFromServer).toBe(false);
     expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
+    unmount();
+  });
+});
+
+describe('ProfileAgentsScreen agent row layout', () => {
+  it('keeps the mode label off the name row', async () => {
+    h.query.data = [agent('Alpha', 'subagent')];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+
+    const texts = renderer.root.findAll(node => String(node.type) === 'Text');
+    const nameText = texts.find(node => node.props.children === 'Alpha');
+    const label = texts.find(node => String(node.props.className ?? '').includes('uppercase'));
+
+    // A label beside the name takes the width a short name needs, so the row
+    // ellipsizes "Alpha" on a compact card. The label belongs to the column,
+    // where it sits at the same gap as the model and the description.
+    expect(label?.parent).not.toBe(nameText?.parent);
+    expect(label?.parent).toBe(nameText?.parent?.parent);
+
     unmount();
   });
 });

@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
+  DEVCONTAINER_RETIRED_MESSAGE,
   getEffectiveCredentialContainment,
-  hasCredentialContainment,
   getSandboxProvider,
+  hasCredentialContainment,
   parseSessionMetadata,
   requiresContainmentSandbox,
+  retiredRuntimeMessage,
   serializeSessionMetadata,
   updateProviderRuntime,
 } from './session-metadata.js';
@@ -31,37 +34,50 @@ const profile = {
 
 describe('session metadata boundary', () => {
   it.each(
-    [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
-      egressAllowlist,
-    }))
-  )('preserves canonical egress policy through serialization: %j', ({ egressAllowlist }) => {
-    const metadata = parseSessionMetadata({
-      metadataSchemaVersion: 2,
-      identity: { sessionId: 'workspace_test', userId: 'user' },
-      auth: {},
-      workspace: {
-        sandboxId: 'ses-0123456789abcdef',
-        sandboxProvider: 'cloudflare-containers',
-        egressMode: 'allowlist',
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      ...[undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
+        egressMode: 'allowlist' as const,
         egressAllowlist,
-      },
-      lifecycle: { version: 1, timestamp: 1 },
-    });
-    const expected =
-      egressAllowlist === undefined
-        ? undefined
-        : egressAllowlist.length === 0
-          ? []
-          : ['example.com', 'z.example.com'];
-    expect(metadata.workspace?.egressAllowlist).toEqual(expected);
-    expect(metadata.workspace?.egressMode).toBe('allowlist');
-    expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
-      'allowlist'
-    );
-    expect(
-      parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
-    ).toEqual(expected);
-  });
+      })),
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )(
+    'preserves canonical egress policy through serialization: %j',
+    ({ egressMode, egressAllowlist, egressAudit }) => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+          egressAllowlist,
+          egressAudit,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      const expected =
+        egressAllowlist === undefined
+          ? undefined
+          : egressAllowlist.length === 0
+            ? []
+            : ['example.com', 'z.example.com'];
+      expect(metadata.workspace?.egressAllowlist).toEqual(expected);
+      expect(metadata.workspace?.egressMode).toBe(egressMode);
+      expect(metadata.workspace?.egressAudit).toBe(egressAudit);
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAudit).toBe(
+        egressAudit
+      );
+      expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
+        egressMode
+      );
+      expect(
+        parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
+      ).toEqual(expected);
+    }
+  );
 
   it.each([
     {
@@ -85,7 +101,12 @@ describe('session metadata boundary', () => {
   ])(
     'rejects unsupported egress placement %j',
     ({ sessionId, provider, sandboxId, ...workspace }) => {
-      for (const egressAllowlist of [undefined, []]) {
+      for (const policy of [
+        { egressMode: 'allowlist', egressAllowlist: undefined },
+        { egressMode: 'allowlist', egressAllowlist: [] },
+        { egressAudit: true },
+        { egressMode: 'unrestricted', egressAudit: true },
+      ]) {
         expect(
           CurrentSessionMetadataSchema.safeParse({
             metadataSchemaVersion: 2,
@@ -95,8 +116,7 @@ describe('session metadata boundary', () => {
               ...workspace,
               sandboxId,
               sandboxProvider: provider,
-              egressMode: 'allowlist',
-              egressAllowlist,
+              ...policy,
             },
             lifecycle: { version: 1, timestamp: 1 },
           }).success
@@ -116,11 +136,13 @@ describe('session metadata boundary', () => {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider,
           egressMode: 'unrestricted',
+          egressAudit: false,
         },
         lifecycle: { version: 1, timestamp: 1 },
       });
       expect(metadata.workspace?.egressMode).toBe('unrestricted');
       expect(metadata.workspace?.egressAllowlist).toBeUndefined();
+      expect(metadata.workspace?.egressAudit).toBe(false);
       expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace).toEqual(
         metadata.workspace
       );
@@ -149,6 +171,7 @@ describe('session metadata boundary', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
     { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
   ])('rejects invalid persisted egress policy %j', policy => {
     expect(
       CurrentSessionMetadataSchema.safeParse({
@@ -826,6 +849,53 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
+  });
+
+  it('reports devcontainer retirement before a retired provider and ignores a missing workspace', () => {
+    const devcontainer = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_devcontainer', userId: 'user_retired' },
+      auth: {},
+      workspace: {
+        sandboxId: 'dind-abcdef',
+        sandboxProvider: 'cloudflare',
+        devcontainerRequested: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(devcontainer)).toBe(DEVCONTAINER_RETIRED_MESSAGE);
+
+    const retiredProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_provider', userId: 'user_retired' },
+      auth: {},
+      workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(retiredProvider)).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+
+    const activeProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user_active',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'cloudflare-containers',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(activeProvider)).toBeNull();
+
+    const noWorkspace = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_no_workspace', userId: 'user_no_workspace' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(noWorkspace)).toBeNull();
   });
 
   it.each(['agent_isolated_standard', 'workspace_isolated_standard'])(
@@ -1523,5 +1593,29 @@ describe('session metadata boundary', () => {
         userId: 'user_123',
       })
     ).toThrow('Invalid current session metadata');
+  });
+});
+
+describe('continuation agent variant', () => {
+  const base = {
+    metadataSchemaVersion: 2 as const,
+    identity: { sessionId: 'agent_variant', userId: 'user_variant' },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+  };
+
+  it('keeps an empty variant distinct from an absent variant', () => {
+    expect(parseSessionMetadata({ ...base, agent: { variant: '' } }).agent?.variant).toBe('');
+    expect(parseSessionMetadata({ ...base, agent: {} }).agent?.variant).toBeUndefined();
+  });
+
+  it('accepts a long provider variant such as budget-32768', () => {
+    expect(
+      parseSessionMetadata({ ...base, agent: { variant: 'budget-32768' } }).agent?.variant
+    ).toBe('budget-32768');
+  });
+
+  it('rejects a variant longer than 50 characters', () => {
+    expect(() => parseSessionMetadata({ ...base, agent: { variant: 'x'.repeat(51) } })).toThrow();
   });
 });

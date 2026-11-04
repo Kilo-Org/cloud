@@ -1,7 +1,15 @@
 // admin-router.ts
-import { sessionViewerProcedure, superadminProcedure } from '@/lib/trpc/admin-procedures';
+import {
+  apiRequestLogExporterProcedure,
+  sessionViewerProcedure,
+  superadminProcedure,
+} from '@/lib/trpc/admin-procedures';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
+import {
+  userCanExportApiRequestLogs,
+  userCanViewSessions,
+  userIsSuperadmin,
+} from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -64,9 +72,10 @@ import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-pro
 import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
-import { adminEnkryptGuardrailChargesRouter } from '@/routers/admin/enkrypt-guardrail-charges-router';
+import { adminEnkryptUsageRouter } from '@/routers/admin/enkrypt-usage-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
+import { adminServiceFeeRollbackRouter } from '@/routers/admin/service-fee-rollback-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
@@ -365,6 +374,7 @@ const SetAdminPermissionsSchema = z.object({
       isSuperadmin: z.boolean().optional(),
       canViewSessions: z.boolean().optional(),
       canManageCredits: z.boolean().optional(),
+      canExportApiRequestLogs: z.boolean().optional(),
     })
     .refine(
       permissions => Object.values(permissions).some(value => value !== undefined),
@@ -387,6 +397,7 @@ const platformAdminUserColumns = {
   is_super_admin: kilocode_users.is_super_admin,
   can_view_sessions: kilocode_users.can_view_sessions,
   can_manage_credits: kilocode_users.can_manage_credits,
+  can_export_api_request_logs: kilocode_users.can_export_api_request_logs,
   is_admin: kilocode_users.is_admin,
 };
 
@@ -405,6 +416,7 @@ function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): Platform
     is_super_admin: user.is_super_admin,
     can_view_sessions: user.can_view_sessions,
     can_manage_credits: user.can_manage_credits,
+    can_export_api_request_logs: user.can_export_api_request_logs,
     is_admin: user.is_admin,
   };
 }
@@ -521,6 +533,7 @@ function adminRoleSnapshot(user: User) {
     isSuperadmin: user.is_super_admin,
     canViewSessions: user.can_view_sessions,
     canManageCredits: user.can_manage_credits,
+    canExportApiRequestLogs: user.can_export_api_request_logs,
   };
 }
 
@@ -556,6 +569,7 @@ export const adminRouter = createTRPCRouter({
       isSuperadmin: userIsSuperadmin(currentUser),
       canViewSessions: userCanViewSessions(currentUser),
       canManageCredits: userCanManageCredits(currentUser),
+      canExportApiRequestLogs: userCanExportApiRequestLogs(currentUser),
     };
   }),
   impactReferrals: adminImpactReferralsRouter,
@@ -1994,6 +2008,7 @@ export const adminRouter = createTRPCRouter({
                       is_super_admin: false,
                       can_view_sessions: false,
                       can_manage_credits: false,
+                      can_export_api_request_logs: false,
                       web_session_pepper: crypto.randomUUID(),
                       api_token_pepper: crypto.randomUUID(),
                     }
@@ -2104,6 +2119,10 @@ export const adminRouter = createTRPCRouter({
               input.permissions.canManageCredits !== target.can_manage_credits && {
                 can_manage_credits: input.permissions.canManageCredits,
               }),
+            ...(input.permissions.canExportApiRequestLogs !== undefined &&
+              input.permissions.canExportApiRequestLogs !== target.can_export_api_request_logs && {
+                can_export_api_request_logs: input.permissions.canExportApiRequestLogs,
+              }),
           };
 
           if (Object.keys(changes).length === 0) {
@@ -2147,6 +2166,10 @@ export const adminRouter = createTRPCRouter({
               (changes.can_manage_credits
                 ? 'Granted credit manager access.'
                 : 'Revoked credit manager access.'),
+            changes.can_export_api_request_logs !== undefined &&
+              (changes.can_export_api_request_logs
+                ? 'Granted API request log export access.'
+                : 'Revoked API request log export access.'),
           ].filter((note): note is string => typeof note === 'string');
 
           await tx.insert(user_admin_notes).values(
@@ -2457,7 +2480,7 @@ export const adminRouter = createTRPCRouter({
   }),
 
   apiRequestLog: createTRPCRouter({
-    getSummary: adminProcedure.query(async () => {
+    getSummary: apiRequestLogExporterProcedure.query(async () => {
       const [summary] = await db
         .select({
           recordCount: count(),
@@ -2758,9 +2781,10 @@ export const adminRouter = createTRPCRouter({
   customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
-  enkryptGuardrailCharges: adminEnkryptGuardrailChargesRouter,
+  enkryptUsage: adminEnkryptUsageRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  serviceFeeRollback: adminServiceFeeRollbackRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
   actionAuditLogs: adminActionAuditLogsRouter,

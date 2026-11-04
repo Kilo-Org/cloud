@@ -51,7 +51,7 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → sync success body (no operation_name → no polling)
     //                   The SDK treats `status: 'Success'` as
     //                   `created: true` (forkResult.created).
-    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows
+    //   2. GET upstream rigs read (findRegisteredRig) — empty rows
     //   3. GET listPulls (open) — empty so we fall through to write+create
     //   4. POST /write registration on wl/register/alice
     //   5. POST /pulls → returns pull_id
@@ -86,7 +86,7 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → DoltHub returns a 2xx body with an "already
     //      exists" message, which `forkDatabase` resolves as
     //      `created: false` (see dolthub/database.ts).
-    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows so
+    //   2. GET upstream rigs read (findRegisteredRig) — empty rows so
     //      we keep going down the PR-detection path.
     //   3. GET listPulls → returns the prior PR with matching title
     //                      "Register rig: alice"; we return it instead
@@ -109,6 +109,8 @@ describe('joinViaSdk', () => {
           ],
         },
       },
+      // read the token's own account → the org the caller claims.
+      { status: 200, body: { status: 'Success', username: 'alice' } },
     ]);
 
     const result = await joinViaSdk(baseCtx, fetch);
@@ -124,5 +126,119 @@ describe('joinViaSdk', () => {
       c => c.method === 'POST' && c.url.endsWith('/hop/wl/pulls')
     );
     expect(createPullCalls).toHaveLength(0);
+  });
+
+  it('accepts a re-join with a handle the caller already registered without any write', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'alice', dolthub_org: 'alice' }],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'alice' } },
+    ]);
+
+    const result = await joinViaSdk(baseCtx, fetch);
+
+    expect(result.rigHandle).toBe('alice');
+    expect(result.registrationPullId).toBeNull();
+    expect(result.registrationPullUrl).toBeNull();
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('refuses a handle registered by another org and reports a precondition failure', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'bob', dolthub_org: 'bob' }],
+        },
+      },
+    ]);
+
+    const ctx = { ...baseCtx, rigHandle: 'bob' };
+    await expect(joinViaSdk(ctx, fetch)).rejects.toMatchObject({
+      name: 'WantedBoardOpError',
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+  });
+
+  it('re-joins a connection made under an org whose proof the credential already holds', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'acme-tools', dolthub_org: 'acme' }],
+        },
+      },
+    ]);
+
+    const ctx = {
+      ...baseCtx,
+      forkOrg: 'acme',
+      rigHandle: 'acme-tools',
+      ownerEmail: 'bob@example.com',
+      orgProven: true,
+    };
+    const result = await joinViaSdk(ctx, fetch);
+
+    expect(result.alreadyJoined).toBe(true);
+    expect(result.registrationPullId).toBeNull();
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/pulls'))).toBe(false);
+    expect(calls.some(c => c.url.includes('/user'))).toBe(false);
+  });
+
+  it('refuses an org-based re-join until a verified flow records the org', async () => {
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { message: 'database already exists' } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [{ handle: 'acme-tools', dolthub_org: 'acme' }],
+        },
+      },
+      { status: 200, body: { status: 'Success', username: 'bob' } },
+    ]);
+
+    const ctx = { ...baseCtx, forkOrg: 'acme', rigHandle: 'acme-tools' };
+    await expect(joinViaSdk(ctx, fetch)).rejects.toMatchObject({
+      name: 'WantedBoardOpError',
+      code: 'PRECONDITION_FAILED',
+    });
+    expect(calls.some(c => c.url.includes('/write/'))).toBe(false);
+  });
+
+  it('reports an unrecognised fork response as an upstream failure', async () => {
+    // The join hands the caller a rig identity when the fork is
+    // confirmed under its org, so a body that confirms nothing — an
+    // error envelope, an unknown status, a malformed error — must end
+    // the join before it returns a handle to persist.
+    for (const body of [
+      { status: 'Error', message: 'user has no access to this owner' },
+      { status: 'Unexpected' },
+      { status: 'Error', error: { message: 'denied' } },
+      { status: 'Pending', owner_name: 'alice', database_name: 'wl' },
+      { status: 'Unexpected', owner_name: 'alice', database_name: 'wl' },
+    ]) {
+      const { fetch, calls } = makeFetch([{ status: 200, body }]);
+
+      await expect(joinViaSdk(baseCtx, fetch)).rejects.toMatchObject({
+        name: 'WantedBoardOpError',
+        code: 'UPSTREAM_ERROR',
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toContain('/fork');
+    }
   });
 });

@@ -99,7 +99,7 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
@@ -158,7 +158,7 @@ async function registerSession(input: {
   await installPeer(stub, peer);
   await stub.registerSessionFromMetadata({
     metadata: metadata(input),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return stub;
 }
@@ -175,6 +175,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     expect(procedures).not.toHaveProperty('resumeHostedSession');
     expect(procedures.interruptSession._def.type).toBe('mutation');
     expect(procedures.send._def.type).toBe('mutation');
+    expect(procedures.listChildSessions._def.type).toBe('query');
   });
 
   it('interrupts a turn without releasing its route and accepts the next message', async () => {
@@ -195,7 +196,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: nativeSessionId, sandboxId }),
       message: promptPayload(initialMessageId),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await expect(stub.getSession()).resolves.toMatchObject({
       messages: [{ messageId: initialMessageId, state: 'accepted' }],
@@ -353,7 +354,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       cloudAgentSessionId: sessionId,
       kiloUserId: USER_ID,
       organizationId: ORG_ID,
-      location: { sandboxId, provider: 'cloudflare' },
+      location: { sandboxId, provider: 'cloudflare-containers' },
     });
 
     await expect(sessions.getByName(newSessionId()).getMetadata()).resolves.toBeNull();
@@ -369,7 +370,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(first),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // The route is preparing, so the admitted message stays queued.
@@ -448,7 +449,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         sandboxId: await generateSandboxId('*', ORG_ID, USER_ID, revokedSession),
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(registration).toEqual({ success: true });
     await expect(revokedStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
@@ -476,7 +477,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
       runtimeAuthorizationSeal: activeSeal,
     });
     expect(admission.success).toBe(true);
@@ -515,7 +516,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloSessionId: kiloSessionId(),
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -544,7 +545,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     await expect(stub.getSession()).resolves.toMatchObject({ type: 'found' });
@@ -585,7 +586,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         organizationId: ORG_ID,
       })
     ).resolves.toEqual({
-      location: { sandboxId, provider: 'cloudflare' },
+      location: { sandboxId, provider: 'cloudflare-containers' },
       children: [],
       directory: '/workspace/app',
     });
@@ -733,7 +734,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(accepted),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     // A second message whose delivery is not ready stays queued beside it.
     peer.deliverResult = 'not_ready';
@@ -775,7 +776,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await installPeer(stub, peer);
     await stub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // A permanent release failure aborts before the wipe, so deletion retries.
@@ -796,7 +797,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await installPeer(stub, new FakeSandboxPeer());
     await stub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const racing = messageId();

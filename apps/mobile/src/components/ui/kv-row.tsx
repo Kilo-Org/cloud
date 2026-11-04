@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type KvTone = 'good' | 'warn' | 'danger' | 'muted';
@@ -20,13 +21,13 @@ type KvRowProps = {
    */
   dotTone?: KvTone;
   /**
-   * Draw the value in the interface's text face with tabular figures instead of
-   * the mono face. Use it for a column of counts: the mono face's slashed zero
-   * reads as code beside the proportional digits of the label on the same row,
-   * and a count column compares left to right. Identifier values (versions,
-   * paths, commit ids) keep the default mono face.
+   * The face the value paints in. The default `mono` suits a code identifier —
+   * a package name, a version range, an advisory id, a path, a branch. A
+   * plain-language value or a timestamp is `text`, because the code face reads
+   * as code beside the sans label. `numeric` is `text` with tabular figures,
+   * for a column of counts: a count column compares left to right.
    */
-  valueNumeric?: boolean;
+  valueFace?: 'mono' | 'text' | 'numeric';
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
   className?: string;
@@ -34,6 +35,13 @@ type KvRowProps = {
   selectable?: boolean;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
+  /**
+   * Render the value as a left-to-right run whatever the interface direction is.
+   * A version, a version range and a CVE or GHSA id are written left to right,
+   * so the bidi algorithm otherwise reverses a range in a right-to-left locale:
+   * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
+   */
+  valueDirection?: 'ltr';
 };
 
 const VALUE_TONE = {
@@ -51,24 +59,25 @@ const DOT_TONE = {
   muted: 'bg-muted-foreground',
 } satisfies Record<KvTone, string>;
 
-/** Label-left / mono-value-right row with hair-soft bottom divider. */
+/** Label-left / value-right row with hair-soft bottom divider. */
 export function KvRow({
   icon: Icon,
   label,
   value,
   valueTone = 'default',
   dotTone,
-  valueNumeric,
+  valueFace = 'mono',
   last,
   className,
   selectable,
   valueClassName,
+  valueDirection,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   // Android's `selectable` routes the value through ReactTextView, which
   // re-applies selection when the view attaches and drops the `maxLines`
   // clamp. A selectable value then wraps past the row's one-line height and
-  // paints a clipped second line (SPOT-DEFECT: the finding-details Repository
+  // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
@@ -88,13 +97,14 @@ export function KvRow({
         </Text>
       </View>
       <Text
-        variant={valueNumeric ? 'default' : 'mono'}
+        variant={valueFace === 'mono' ? 'mono' : 'default'}
         selectable={selectable}
         numberOfLines={valueLineLimit}
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}
+        style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
         className={cn(
           'min-w-0 shrink text-right text-[13px]',
-          valueNumeric && 'tabular-nums',
+          valueFace === 'numeric' && 'tabular-nums',
           VALUE_TONE[valueTone],
           valueClassName
         )}

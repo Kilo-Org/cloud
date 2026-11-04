@@ -4,3 +4,4 @@ export * from './dashboard';
 export * from './commands';
 export * from './settings';
 export * from './sync-preconditions';
+export * from './config-conflict';

@@ -197,6 +197,20 @@ describe('verified scoped web authentication', () => {
     expect(auth.cloudAgentAuthority).toEqual(scope);
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+  it('allows models.list discovery on scoped HTTP paths for personal and signed-org authority', async () => {
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+    const orgScope = { ...scope, organizationId };
+    mockHeaders.mockResolvedValue(
+      bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }))
+    );
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+  });
   it.each([
     undefined,
     '/api/gastown/token',
@@ -204,6 +218,8 @@ describe('verified scoped web authentication', () => {
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
+    '/api/trpc/models.preferred',
+    '/api/trpc/models.list,user.getMe',
   ])('denies direct REST and unrelated procedure paths %s', async requestPathname => {
     const headers = bearer();
     headers.set('x-pathname', '/api/user');

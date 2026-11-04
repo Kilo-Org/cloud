@@ -9,6 +9,7 @@
       "lowBalance": "Jūsų balansui reikia dėmesio",
       "spendAlert": "Jūsų išlaidoms reikia dėmesio",
       "securityFinding": "Saugumo radiniui reikia dėmesio",
+      "securityUpdate": "Saugumo patikra turi atnaujinimą",
       "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Saugumo radiniui reikia dėmesio"
+      "body": "Saugumo patikra turi atnaujinimą"
     }
   },
   "instanceLifecycle": {

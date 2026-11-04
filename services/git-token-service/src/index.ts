@@ -407,7 +407,7 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
   }
 }
 
-type GitHubCapabilityCredential = 'pinned' | 'none';
+type GitHubCapabilityCredential = 'pinned' | 'user' | 'none';
 
 type GitHubCapabilityUpstream =
   | {
@@ -591,7 +591,7 @@ function validateGitHubCapabilityUpstream(
       const repositoryId = parseGitHubRepositoryId(url);
       return repositoryId === null
         ? { failure: 'invalid_upstream_request' }
-        : { failure: null, credential: 'pinned', repositoryId };
+        : { failure: null, credential: 'user', repositoryId };
     }
     if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
     return GITHUB_UPLOAD_METHODS.includes(method)
@@ -1213,7 +1213,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     let auth: GetCloudAgentAuthForRepoResult | null;
     if (claims.source === 'user') {
-      auth = await this.redeemPinnedUserAuthorization(authParams);
+      try {
+        auth = await this.redeemPinnedUserAuthorization(authParams, upstream.credential === 'user');
+      } catch (error) {
+        if (upstream.credential === 'user') return { success: false, reason: 'source_unavailable' };
+        throw error;
+      }
     } else {
       try {
         auth = await this.getCloudAgentAuthForRepo(authParams);
@@ -1230,20 +1235,37 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     if (!this.matchesSessionIdentity(claims.identity, auth)) {
       return { success: false, reason: 'identity_mismatch' };
     }
+
+    let token = auth.githubToken;
+    let source = auth.source;
+    // GitHub user attachments reject installation tokens, even with repository write access.
+    if (upstream.credential === 'user' && source !== 'user') {
+      try {
+        const selection = await this.githubUserAuthorizationService.selectUserAuthorization({
+          ...authParams,
+          strictRepositoryLookup: true,
+        });
+        if (!selection.selected) return { success: false, reason: 'source_unavailable' };
+        token = selection.token;
+        source = 'user';
+      } catch {
+        return { success: false, reason: 'source_unavailable' };
+      }
+    }
     if (upstream.repositoryId !== undefined) {
       const repositoryFailure = await this.verifyGitHubRepositoryId(
         claims.owner,
         claims.repo,
         upstream.repositoryId,
-        auth.githubToken
+        token
       );
       if (repositoryFailure !== null) return { success: false, reason: repositoryFailure };
     }
     return {
       success: true,
-      authorization: this.formatUpstreamAuthorization(params.requestUrl, auth.githubToken),
+      authorization: this.formatUpstreamAuthorization(params.requestUrl, token),
       installationId: auth.installationId,
-      source: auth.source,
+      source,
       appType: auth.appType,
     };
   }
@@ -1316,7 +1338,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   }
 
   private async redeemPinnedUserAuthorization(
-    params: GetCloudAgentAuthForRepoParams
+    params: GetCloudAgentAuthForRepoParams,
+    strictRepositoryLookup = false
   ): Promise<GetCloudAgentAuthForRepoResult | null> {
     const installation = await this.findManagedInstallationWithLoginRepair(params);
     if (!installation.success && installation.reason === 'integration_mismatch') {
@@ -1329,7 +1352,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     ) {
       return null;
     }
-    const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
+    const selection = await this.githubUserAuthorizationService.selectUserAuthorization({
+      ...params,
+      ...(strictRepositoryLookup ? { strictRepositoryLookup: true } : {}),
+    });
     if (!selection.selected) return null;
     return {
       success: true,

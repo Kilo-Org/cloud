@@ -1,12 +1,17 @@
 // The PR inbox's empty slot: the body drawn when the merged list has no rows.
 //
-// It owns two contracts the list depends on. Every state renders under its own
+// It owns one contract the list depends on: every state renders under its own
 // element identity, because two states that draw the same element type at the
 // same position otherwise reconcile into ONE host view and Android keeps the
 // previous state's accessibility props on it (the reconnect card was announced
-// as "Loading inbox"). And the slot keeps the height its loading placeholder
-// measured, so a settled body that is shorter than the skeletons does not pull
-// the RECENT section below it up after the screen has settled.
+// as "Loading inbox").
+//
+// The slot no longer reserves the skeleton height for its settled body. It was
+// there to stop the RECENT section below it from moving when the skeletons
+// became something shorter, and that space is what kept the RECENT state under
+// the tab bar on a compact phone. The list now leaves RECENT out while this
+// body loads, so nothing sits below the skeletons to be pushed: the settled
+// body lays itself out and RECENT appears under it where it stays.
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -20,7 +25,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
-import { useEmptySlotHeight } from '@/lib/pr-review/use-empty-slot-height';
 
 const SKELETON_ROW_COUNT = 5;
 
@@ -38,17 +42,13 @@ type InboxEmptyProps = {
 
 export function InboxEmpty(props: Readonly<InboxEmptyProps>) {
   const { t } = useTranslation();
-  const slot = useEmptySlotHeight(props.view.kind === 'loading');
-  // The loading announcement lives on this keyed slot. A keyed slot is one host
-  // view per state, so the announcement cannot survive into a settled body, and
-  // it survives the wrapper that reserves the height — a label one level below
-  // the slot never reaches Android's accessibility tree.
+  // The loading announcement lives on this keyed node. A keyed node is one host
+  // view per state, so the announcement cannot survive into a settled body; a
+  // label one level below it never reaches Android's accessibility tree.
   return (
     <View
       key={props.view.kind}
       accessibilityLabel={props.view.kind === 'loading' ? t('prReview.inbox.loading') : undefined}
-      onLayout={slot.handleLayout}
-      style={slot.style}
     >
       <InboxBody {...props} />
     </View>
@@ -79,12 +79,20 @@ function InboxBody({
   }
 
   if (view.kind === 'empty') {
+    // Both empty states of this screen are section bodies of one scroll: this
+    // one always has the RECENT section below it, so it never owns a clear
+    // region of its own. The full-size `top` form put a 56 dp bubble over a
+    // 64 dp pin, which held the title 133 dp under the INBOX eyebrow and pushed
+    // the RECENT state under the tab bar on a compact phone. Compact drops both;
+    // `pt-4` is the separation the dropped pin used to give the eyebrow.
     return (
       <EmptyState
         icon={GitPullRequest}
         title={t('prReview.inbox.noReviewRequests')}
         description={t('prReview.inbox.noReviewRequestsDescription')}
         placement="top"
+        compact
+        className="pt-4"
       />
     );
   }

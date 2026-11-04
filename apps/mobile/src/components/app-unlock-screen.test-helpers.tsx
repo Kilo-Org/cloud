@@ -295,6 +295,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useSheetHeaderTopClearance: () => 0,
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',
     sheetAllowedDetents: [0.5, 1],
@@ -462,9 +463,23 @@ export function expectFeedback(root: ReactTestInstance, message: string, copies:
   );
 }
 
+/**
+ * The scene navigation the layouts' `screenLayout` receives. The unlock
+ * surfaces under test read focus and state events; a layout that repairs the
+ * Stack it belongs to (the Security Agent group's dashboard) reads a Stack
+ * that already has its parent, so its repair no-ops here.
+ */
+const SCENE_NAVIGATION = {
+  isFocused: () => true,
+  addListener: () => () => undefined,
+  getState: () => ({ index: 0, routes: [{ key: 'index', name: 'index' }] }),
+  reset: () => undefined,
+};
+
 export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
-  const props = { children };
-  return layout(props as Parameters<typeof appUnlockScreenLayout>[0]);
+  const props = { children, navigation: SCENE_NAVIGATION };
+  // The harness supplies the props these layouts read, not the whole scene.
+  return layout(props as unknown as Parameters<typeof appUnlockScreenLayout>[0]);
 }
 
 export function nestedUnlockScenes(children: ReactElement) {

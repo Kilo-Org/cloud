@@ -7,8 +7,10 @@
 // busy with every option disabled while it runs, and leaves the explanation up
 // until the new outcome replaces it. Retry success pops the screen; a
 // selection while an error shows clears the error.
-// Save-completion contract: the pop runs only while this screen is still the
-// focused route, so a Back pressed during the save pops exactly once.
+// Save-completion contract: the screen dismisses itself at most once. A Back
+// press during the save is this screen's leave, so the completion does not pop
+// again, and a Back that lands while that dismissal animates is this screen's
+// Back too — the pair never closes the screen beneath.
 
 /* eslint-disable promise-function-async -- gate fakes must stay pending until the test releases them */
 
@@ -17,6 +19,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { OptionList } from './option-list';
 
@@ -26,10 +29,14 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
-  useNavigation: () => ({ isFocused: () => focus.focused }),
+  useNavigation: () => ({
+    isFocused: () => focus.focused,
+    addListener: () => () => undefined,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -167,6 +174,7 @@ async function press(pressable: () => void): Promise<void> {
 }
 
 beforeEach(() => {
+  resetLeaveSettle();
   routerBack.mockReset();
   focus.focused = true;
 });

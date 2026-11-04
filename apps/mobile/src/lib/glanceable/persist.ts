@@ -1,4 +1,5 @@
 import {
+  buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
   glanceableAgentsSnapshotSchema,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -9,6 +10,7 @@ import {
   _setHomeWidgetStoreForTests,
   restoreHomeWidgetData,
 } from './home-widget-data';
+import { readSignedInScope, type SignedInScope } from './scope';
 
 import { type GlanceableSink } from './sink-registry';
 
@@ -85,8 +87,39 @@ let restoresInFlight = 0;
 // to land resumes it instead of dropping the work.
 let settleWaiters: (() => void)[] = [];
 
+// What the restore learned about the record it put in memory. `none` means it
+// restored no record, so only frames written in this process are in memory;
+// `unknown` means the identity read did not complete, which is not a mismatch.
+// Decided from the same reads that fill the state, so a caller asks
+// synchronously instead of re-reading the keychain on every surface write.
+type RestoredScope = 'none' | 'match' | 'mismatch' | 'unknown';
+let restoredScope: RestoredScope = 'none';
+
+// True once this process wrote the in-memory snapshot itself. A frame it wrote
+// is already fenced by the context that produced it; only a restored record
+// needs `restoredScope` resolved before a surface may draw it.
+let snapshotWrittenInProcess = false;
+
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
+}
+
+/**
+ * The snapshot a surface may draw: the frame this process wrote, or a restored
+ * record only when it belongs to the signed-in scope. Sinks and republish paths
+ * read this instead of {@link getLastGlanceableSnapshot}, whose value also feeds
+ * the revision floor and the ownership questions a null must not answer.
+ */
+export function getGlanceableSnapshotForSignedInScope(): GlanceableAgentsSnapshot | null {
+  if (lastSnapshot === null) {
+    return null;
+  }
+  if (snapshotWrittenInProcess) {
+    return lastSnapshot;
+  }
+  // A record the signed-in scope matched, or one whose scope could not be
+  // checked at all, is drawable; only a confirmed different scope is not.
+  return restoredScope === 'match' || restoredScope === 'unknown' ? lastSnapshot : null;
 }
 
 /**
@@ -158,9 +191,25 @@ async function mirrorSnapshotAfter(previous: Promise<void> | null, raw: string):
 /** In-memory write plus a fire-and-forget SecureStore mirror. */
 function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   persistEpoch += 1;
+  snapshotWrittenInProcess = true;
   lastSnapshot = snapshot;
   localScopeKey = snapshot.scopeKey;
   mirrorWrite = mirrorSnapshotAfter(mirrorWrite, JSON.stringify(snapshot));
+}
+
+/** How a record's scope key relates to the signed-in scope the restore read. */
+function scopeRelation(recordScopeKey: string, signedInScope: SignedInScope): RestoredScope {
+  if (signedInScope.status === 'unavailable') {
+    return 'unknown';
+  }
+  return signedInScope.status === 'known' && scopeKeyOf(signedInScope) === recordScopeKey
+    ? 'match'
+    : 'mismatch';
+}
+
+/** The opaque key of a known signed-in scope; the one form the fence compares. */
+function scopeKeyOf(scope: Extract<SignedInScope, { status: 'known' }>): string {
+  return buildOpaqueScopeKey({ userId: scope.userId, organizationId: scope.organizationId });
 }
 
 /** Parse a stored record with the shared schema; a malformed record is absent. */
@@ -172,6 +221,16 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The scope key of the signed-in account, or `null` when it is not known: no
+ * signed-in account or a read that did not complete. Callers that must not act
+ * on an unconfirmed scope treat `null` as a refusal.
+ */
+export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
+  const signedInScope = await readSignedInScope(getSecureStore());
+  return signedInScope.status === 'known' ? scopeKeyOf(signedInScope) : null;
 }
 
 /**
@@ -195,21 +254,31 @@ export async function restorePersistedGlanceable(): Promise<void> {
       return;
     }
     const stored = rawSnapshot === null ? null : parseStoredSnapshot(rawSnapshot);
-    // A remount keeps the module alive, so a logout or privacy blank written
-    // before restore owns the state and must not be clobbered by a stale disk
-    // record from the prior session.
+    const authenticatedScope = await readSignedInScope(getSecureStore());
+    // A live write that landed during the identity read owns the state, the
+    // same as one that landed during the record read: skip the fill rather than
+    // clobber it with what was read before it.
+    if (persistEpoch !== startEpoch) {
+      return;
+    }
+    const authenticatedScopeKey =
+      authenticatedScope.status === 'known' ? scopeKeyOf(authenticatedScope) : null;
     if (stored === null) {
       // No usable record: a scope key the previous release wrote on its own
       // still names the scope, the same way it did before this record existed.
       const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
       localScopeKey ??= legacyScopeKey;
+      restoredScope = 'none';
     } else {
       lastSnapshot ??= stored;
       // The record carries its own scope key, so the restored snapshot and the
       // restored scope always come from the same publish.
       localScopeKey ??= stored.scopeKey;
+      // The record's own scope key says which context wrote it, not which one
+      // holds the device now, so a surface may draw it only on a match.
+      restoredScope = scopeRelation(stored.scopeKey, authenticatedScope);
     }
-    await restoreHomeWidgetData(localScopeKey);
+    await restoreHomeWidgetData(authenticatedScopeKey);
   } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
     // A read failure is different: the record may be there and own a card, so
@@ -258,6 +327,10 @@ export function _setLastGlanceableSnapshotForTests(
 ): void {
   persistEpoch += 1;
   lastSnapshot = snapshot;
+  // Callers seed a completed restore, so the record is the state this process
+  // acts on rather than a record still to be verified.
+  snapshotWrittenInProcess = snapshot !== null;
+  restoredScope = 'none';
   localScopeKey = snapshot?.scopeKey ?? null;
   // Seeding the mirror models a completed restore: callers act on this state as
   // the read's result, the same way `restorePersistedGlanceable` would.
@@ -277,6 +350,8 @@ export function _resetGlanceablePersistForTests(): void {
   persistEpoch = 0;
   mirrorWrite = null;
   lastSnapshot = null;
+  restoredScope = 'none';
+  snapshotWrittenInProcess = false;
   localScopeKey = null;
   restoreUnavailable = false;
   restoresInFlight = 0;

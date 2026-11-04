@@ -56,6 +56,7 @@ import {
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -87,8 +88,22 @@ import {
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import {
+  getPrObservationSummary,
+  prObservationSummarySchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -124,6 +139,9 @@ function isSessionNotFoundError(err: unknown): boolean {
 }
 
 const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
   'path',
   'file',
   'activeFile',
@@ -131,6 +149,9 @@ const privateTranscriptPathFields = new Set([
   'absolutePath',
   'filePath',
   'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
@@ -152,13 +173,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
 
   for (const [key, current] of Object.entries(value)) {
     if (typeof current === 'string') {
-      if (
-        key === 'directory' ||
-        key === 'cwd' ||
-        key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
-      ) {
-        Reflect.set(value, key, directory);
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
         Reflect.set(value, key, '');
       }
@@ -169,7 +185,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
         if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
-          current[index] = directory;
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
         }
@@ -219,6 +235,7 @@ export const associatedPrSchema = z.object({
   state: z.string(),
   title: z.string().nullable(),
   headSha: z.string().nullable(),
+  observations: prObservationSummarySchema.nullable(),
   lastSyncedAt: z.string(),
   reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
   // True when the server has flagged this PR for an async review-decision
@@ -237,6 +254,7 @@ type AssociatedPrRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -360,6 +378,7 @@ function formatCacheRow(
     state: cache.pr_state,
     title: cache.pr_title,
     headSha: cache.pr_head_sha,
+    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
     lastSyncedAt: cache.pr_last_synced_at,
     reviewDecision,
     reviewDecisionPending: cache.review_decision_pending === true,
@@ -404,6 +423,7 @@ function pendingPartialFromSession(
     state: 'unknown',
     title: null,
     headSha: null,
+    observations: null,
     lastSyncedAt: session.updated_at
       ? new Date(session.updated_at).toISOString()
       : new Date().toISOString(),
@@ -577,6 +597,7 @@ const commonSessionFieldsWithPr = {
   pr_state: github_branch_pull_requests.pr_state,
   pr_title: github_branch_pull_requests.pr_title,
   pr_head_sha: github_branch_pull_requests.pr_head_sha,
+  pr_observations: github_branch_pull_requests.pr_observations,
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -642,6 +663,7 @@ export function projectAssociatedPr<
     pr_state,
     pr_title,
     pr_head_sha,
+    pr_observations,
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
@@ -680,6 +702,7 @@ export function projectAssociatedPr<
         pr_state,
         pr_title,
         pr_head_sha,
+        pr_observations,
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
@@ -989,6 +1012,27 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {
@@ -1774,6 +1818,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1879,6 +1924,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_state: row.pr_state,
             pr_title: row.pr_title,
             pr_head_sha: row.pr_head_sha,
+            pr_observations: row.pr_observations,
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
@@ -1924,6 +1970,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1967,6 +2014,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: row.pr_state,
         pr_title: row.pr_title,
         pr_head_sha: row.pr_head_sha,
+        pr_observations: row.pr_observations,
         pr_last_synced_at: row.pr_last_synced_at,
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
@@ -2216,6 +2264,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,

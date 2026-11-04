@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   DiscordGuildAlreadyConnectedError,
   exchangeDiscordCode,
@@ -53,7 +53,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord OAuth error', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { error, state },
+        extra: { error, ...safeCallbackContext(searchParams) },
       });
 
       return NextResponse.redirect(
@@ -74,7 +74,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback missing code', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
 
       return NextResponse.redirect(
@@ -91,7 +91,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -224,10 +224,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
         endpoint: 'discord/callback',
         source: 'discord_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

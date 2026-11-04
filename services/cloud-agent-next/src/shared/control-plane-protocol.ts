@@ -107,10 +107,12 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
   'credential_upgrade_required',
+  'repository_access_failed',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'invalid_configuration',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
@@ -288,7 +290,26 @@ export const controlPlaneRouteKiloSchema = z
 export const CONTROL_PLANE_WORKSPACE_OUTCOMES = ['cloned', 'same', 'adopted'] as const;
 export type ControlPlaneWorkspaceOutcome = (typeof CONTROL_PLANE_WORKSPACE_OUTCOMES)[number];
 
-export const controlPlaneRouteSpecSchema = z
+/** One repository checkout of a V2 session workspace. */
+export const controlPlaneWorkspaceRootSchema = z
+  .object({
+    /** The git root: `/workspace/<leaf>`. */
+    directory: z.string().min(1).max(1024),
+    repoFullName: z.string().min(1).max(500),
+    git: z
+      .object({
+        url: z.string().min(1).max(2048),
+        platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+      })
+      .strict(),
+    branch: z.string().min(1).max(256),
+    /** The branch is the session's generated one: create it when the remote has none. */
+    branchMode: z.literal('working').optional(),
+  })
+  .strict();
+export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;
+
+const routeSpecObjectSchema = z
   .object({
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
@@ -315,7 +336,25 @@ export const controlPlaneRouteSpecSchema = z
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
+    sessionSnapshot: z
+      .object({ sourceAllocationId: z.string().min(1).max(256) })
+      .strict()
+      .optional(),
+    /**
+     * Server-only continuation marker. When set, the wrapper does not restore
+     * ingest transcript files over the workspace: the pushed branch already
+     * carries the source state. It is projected from session metadata.
+     */
+    continuation: z.literal(true).optional(),
     git: controlPlaneRouteGitSchema.optional(),
+    /**
+     * The git roots of a V2 environment session: each repository checkout
+     * and the branch it runs on. `directory` is the cwd. Only a V2 route carries
+     * this; a route without it has one root at `directory` and clones `git`, as
+     * every route did before V2. It holds no credential: each root's alias comes
+     * from the grant by host.
+     */
+    roots: z.array(controlPlaneWorkspaceRootSchema).min(1).max(100).optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
@@ -351,8 +390,28 @@ export const controlPlaneRouteSpecSchema = z
   })
   .strict();
 
+// The wrapper empties and clones into a root, so a root must lie inside the cwd.
+function checkRootsInsideDirectory(
+  spec: { directory: string; roots?: readonly { directory: string }[] },
+  context: z.RefinementCtx
+): void {
+  const outside = spec.roots?.findIndex(
+    root => root.directory !== spec.directory && !root.directory.startsWith(`${spec.directory}/`)
+  );
+  if (outside !== undefined && outside >= 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['roots', outside, 'directory'],
+      message: 'workspace root must be the route directory or inside it',
+    });
+  }
+}
+
+export const controlPlaneRouteSpecSchema =
+  routeSpecObjectSchema.superRefine(checkRootsInsideDirectory);
+
 /** Fields that one shared runtime applies once, from its first live attachment. */
-export const workspaceConfigSchema = controlPlaneRouteSpecSchema
+export const workspaceConfigSchema = routeSpecObjectSchema
   .pick({
     mcp: true,
     env: true,
@@ -365,7 +424,7 @@ export const workspaceConfigSchema = controlPlaneRouteSpecSchema
   .strict();
 export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
 
-export const attachmentSpecSchema = controlPlaneRouteSpecSchema
+export const attachmentSpecSchema = routeSpecObjectSchema
   .omit({
     mcp: true,
     env: true,
@@ -375,7 +434,8 @@ export const attachmentSpecSchema = controlPlaneRouteSpecSchema
     runtimeAgents: true,
     kiloCommands: true,
   })
-  .strict();
+  .strict()
+  .superRefine(checkRootsInsideDirectory);
 export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
 
 /**
@@ -385,6 +445,13 @@ export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
  */
 export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
   (spec, context) => {
+    if (spec.sessionSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sessionSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (spec.secretEnvKeys !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -489,6 +556,13 @@ export const controlPlanePrepareInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.spec.sessionSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'sessionSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (value.spec.git?.token !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -752,6 +826,20 @@ export const controlPlaneStatusResultSchema = z
   })
   .strict();
 
+/**
+ * The Git credential of one host that a V2 environment adds to the launch
+ * repository's host. The wrapper writes one record for each host: the alias is
+ * the same for every repository of a host, and the proxy tells repositories
+ * apart by the request path.
+ */
+export const controlPlaneGitHostCredentialSchema = z
+  .object({
+    url: z.string().min(1).max(2048),
+    token: z.string().min(1).max(4096),
+    platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+  })
+  .strict();
+
 export const controlPlaneSessionCredentialsPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -762,6 +850,11 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * The credential of each host a V2 environment uses besides the launch
+     * repository's host, which `git` serves.
+     */
+    gitCredentials: z.array(controlPlaneGitHostCredentialSchema).min(1).optional(),
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
     cloudAgentMcp: z
       .object({
@@ -798,6 +891,7 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    sessionSnapshots: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper redacts a value by each named secret key
      * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.

@@ -20,6 +20,8 @@ export const Limits = {
   MAX_RUNTIME_INSTRUCTION_CONTENT: 100_000,
   SESSION_TTL_DAYS: 90,
   SESSION_TTL_MS: 90 * 24 * 60 * 60 * 1000, // 90 days in milliseconds
+  /** Maximum source sessions in one local-worktree-to-cloud continuation. */
+  MAX_CONTINUE_SESSIONS: 10,
 } as const;
 
 // === ExecutionParams (for session-service) ===

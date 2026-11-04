@@ -472,3 +472,25 @@ test('runMatrix restores device and language when a capture fails', async () => 
   assert.deepEqual(state.languageCalls, ['ar/ar', 'system/en']);
   assert.equal(calls.at(-1), 'restore');
 });
+
+test('a capture returns the device to touch mode before it opens each link', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const taps: string[] = [];
+  const device = fakeDevice(calls, state);
+  const ctx = context(
+    { ...device, tap: (x, y) => taps.push(`${Math.round(x)},${Math.round(y)}`) },
+    fakeProbe(state)
+  );
+  await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'a', link: 'kiloapp://a' },
+    { id: 'b', link: 'kiloapp://b' },
+  ]);
+  // One tap per target, before its link: a device left in key mode paints the
+  // keyboard focus highlight over the first control of the screen it opens.
+  assert.deepEqual(taps, ['2,32', '2,32']);
+  assert.deepEqual(
+    calls.filter(call => call.startsWith('open:')),
+    ['open:kiloapp://a', 'open:kiloapp://b']
+  );
+});

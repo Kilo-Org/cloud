@@ -18,6 +18,12 @@
   --popover-foreground: #14130f;
   --secondary: #f0eee6;
   --secondary-foreground: #14130f;
+  /* Fill of a filled neutral (secondary) action. Light keeps the surface a
+   * filled control has always painted; the dark block needs its own step
+   * because `--secondary` there is the card surface, so a filled action and
+   * the outlined control beside it would paint the same colour (see the dark
+   * block). */
+  --secondary-fill: #f0eee6;
   --muted: #f0eee6;
   --muted-foreground: #6f6a61;
   --accent: #4f5a10;
@@ -43,6 +49,15 @@
   --ring: #4f5a10;
   --radius: 0.625rem;
 
+  /* Selected-state fill of an in-page tab pill, and its label. The fill is the
+   * accent at the luminance its own label carries: the light primary's olive,
+   * because the dark accent (#ffdd00) as a full pill glares on the dark page
+   * and pulls focus from the panel the tab selects. The dark theme keeps the
+   * hue and lifts its value so the fill still stands off the near-black page
+   * (see the dark block). */
+  --selection: #4f5a10;
+  --selection-foreground: #ffffff;
+
   /* Focus-only tokens */
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
@@ -58,6 +73,13 @@
   --ring-track: rgba(20, 15, 10, 0.05);
   --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
+  /* Low-emphasis accent control. `--accent-soft` is the full-strength accent
+   * surface that user bubbles and selected pills fill with; a soft accent
+   * *button* must recede behind a filled primary instead of repeating it, so it
+   * paints the accent at 16% over whatever surface holds it and takes the
+   * accent itself as ink. */
+  --accent-soft-tint: #4f5a1029;
+  --accent-soft-tint-foreground: #4f5a10;
   --good: #24784a;
   --good-foreground: #ffffff;
   --good-tile-bg: #24784a1a;
@@ -138,6 +160,14 @@
     --popover-foreground: #f2f0eb;
     --secondary: #1f1f24;
     --secondary-foreground: #f2f0eb;
+    /* Dark counterpart of a filled neutral action's fill. `--secondary` is also
+     * the elevated card surface an outlined control paints (`outline`'s
+     * dark:bg-secondary), so a filled action in that colour is
+     * indistinguishable from the outlined control beside it in the confirm
+     * sheet and the permission card. This step is distinct from both: 1.85:1
+     * off `--card`, 1.70:1 off `--secondary`, with `--secondary-foreground`
+     * 8.5:1 on it. */
+    --secondary-fill: #44444a;
     --muted: #1f1f24;
     --muted-foreground: #8a8680;
     --accent: #ffdd00;
@@ -160,6 +190,16 @@
     --ring: #ffdd00;
     --radius: 0.625rem;
 
+    /* The dark page lifts the same olive hue: the dark accent (#ffdd00) as a
+     * full pill glares and pulls focus from the panel the tab selects, but the
+     * light olive (#4f5a10) itself stands only 2.6:1 off `--background` and
+     * 2.2:1 off `--secondary`, under the 3:1 WCAG asks of a selected-state
+     * fill. This value keeps the light olive's hue (h~69) at 3.6:1 off the
+     * page and 3.1:1 off `--secondary` while `--selection-foreground` stays
+     * 4.7:1 on it. */
+    --selection: #647214;
+    --selection-foreground: #f2f0eb;
+
     /* Focus-only tokens */
     --ink2: #c4c1b8;
     --muted-soft: #56544f;
@@ -174,6 +214,12 @@
     --ring-track: rgba(255, 255, 255, 0.2);
     --accent-soft: #ffdd00;
     --accent-soft-foreground: #1a1a10;
+    /* Dark counterpart of the soft accent control. The dark theme's primary
+     * already fills with #ffdd00, so a solid accent-soft button would be
+     * indistinguishable from it; the 16% tint keeps the accent's hue while the
+     * control stays clearly secondary, and the accent inks the label. */
+    --accent-soft-tint: #ffdd0029;
+    --accent-soft-tint-foreground: #ffdd00;
     --good: #5fcb8e;
     --good-foreground: #0e0e10;
     --good-tile-bg: #5fcb8e1a;
@@ -244,6 +290,7 @@
   --color-primary-disabled: var(--primary-disabled);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-fill: var(--secondary-fill);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -255,6 +302,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
 
   /* Focus-only */
   --color-ink2: var(--ink2);
@@ -264,6 +313,8 @@
   --color-ring-track: var(--ring-track);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-accent-soft-tint: var(--accent-soft-tint);
+  --color-accent-soft-tint-foreground: var(--accent-soft-tint-foreground);
   --color-good: var(--good);
   --color-good-foreground: var(--good-foreground);
   --color-good-tile-bg: var(--good-tile-bg);

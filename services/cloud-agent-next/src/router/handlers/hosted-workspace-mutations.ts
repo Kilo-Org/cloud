@@ -119,7 +119,7 @@ export const DeleteHostedWorkspaceSessionOutput = z
 type HostedWorkspaceCreate = z.infer<typeof CreateHostedWorkspaceInput>;
 type HostedWorkspaceCreateResult = z.infer<typeof CreateHostedWorkspaceOutput>;
 
-function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeId {
+export function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeId {
   const parsed = cloudAgentWorktreeIdSchema.safeParse(
     `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
   );
@@ -155,7 +155,7 @@ export function hostedWorkspaceCreateRequest(input: HostedWorkspaceCreate): Sess
   };
 }
 
-async function verifyWorkspaceIdentity(
+export async function verifyWorkspaceIdentity(
   db: WorkerDb,
   userId: string,
   kiloSessionId: string,

@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
-import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type {
+  EnkryptGuardrailVerdict,
+  EnkryptUnavailableReason,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
-const GUARDRAIL_UNAVAILABLE_MESSAGE =
-  "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Please retry.";
+const UNAVAILABLE_MESSAGES: Record<EnkryptUnavailableReason, string> = {
+  transient:
+    "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Please retry.",
+  timeout:
+    "Your organization's Enkrypt AI guardrail did not finish checking this request in time, so it was not sent. Longer conversations take longer to check: compact or prune earlier conversation history, or start a new session, then retry.",
+  failed:
+    "Your organization's Enkrypt AI guardrail could not check this request, so it was not sent. Try again later.",
+};
 
 /**
  * Error bodies in each API's native shape, so the OpenAI, OpenRouter, and Anthropic SDKs used by
@@ -35,7 +44,8 @@ function apiErrorBody(
 
 /**
  * Maps a guardrail verdict to the gateway's rejection, or null to send the request upstream. A
- * block is final, so clients are told not to retry; an unavailable guardrail is transient.
+ * block is final, so clients are told not to retry, and an unavailable guardrail is retried
+ * automatically only after a transient failure.
  */
 export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
@@ -61,13 +71,17 @@ export function enkryptGuardrailRejectionResponse(
     apiErrorBody(
       kind,
       {
-        message: GUARDRAIL_UNAVAILABLE_MESSAGE,
+        message: UNAVAILABLE_MESSAGES[verdict.reason],
         openAiType: 'server_error',
         openAiCode: ProxyErrorType.guardrail_unavailable,
         anthropicType: 'api_error',
       },
       ProxyErrorType.guardrail_unavailable
     ),
-    { status: 503, headers: { 'retry-after': '1' } }
+    {
+      status: 503,
+      headers:
+        verdict.reason === 'transient' ? { 'retry-after': '1' } : { 'x-should-retry': 'false' },
+    }
   );
 }

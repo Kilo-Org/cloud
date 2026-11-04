@@ -375,7 +375,7 @@ describe('applyProviderSpecificLogic reasoning placeholders', () => {
     request.body.model = model;
     await applyProviderSpecificLogic(
       {
-        id: 'openrouter',
+        type: 'openrouter',
         apiUrl: 'https://example.com/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,
@@ -394,7 +394,8 @@ describe('applyProviderSpecificLogic reasoning placeholders', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return chatAssistant(request);
   }

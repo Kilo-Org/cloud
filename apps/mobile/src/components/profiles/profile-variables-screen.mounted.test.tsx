@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, delete flows, and the inline refusals for the variables screen */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   confirmRequest,
@@ -20,6 +20,7 @@ import {
   toggleSecret,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
 import { SECRET_MASK } from '@/components/profiles/profile-variables-model';
+import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
@@ -47,6 +48,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileVars: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
@@ -170,6 +172,102 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names the profile variable limit and refuses a new key at it without a request', async () => {
+    h.query.data = testVars(
+      Array.from({ length: MAX_PROFILE_VARS }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      }))
+    );
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(true);
+
+    pressButton(renderer.root, 'Add variable');
+    changeText(renderer.root, 'Key', 'NEW_VAR');
+    changeText(renderer.root, 'Value', 'v');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(h.error).toHaveBeenCalledWith(limitCopy);
+
+    unmount();
+  });
+
+  const atVariableLimit = (): TestVars =>
+    testVars([
+      { key: 'API_KEY', value: 'old', isSecret: false },
+      ...Array.from({ length: MAX_PROFILE_VARS - 1 }, (_, index) => ({
+        key: `VAR_${String(index)}`,
+        value: 'v',
+        isSecret: false,
+      })),
+    ]);
+
+  it('still fills a stored variable at the limit', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', 'new');
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      key: 'API_KEY',
+      value: 'new',
+    });
+    expect(h.error).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('states the limit only for a reader who can add variables', async () => {
+    h.query.data = atVariableLimit();
+    h.query.isPending = false;
+    h.canManage = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS });
+    expect(
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .includes(limitCopy)
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('reaches a screen reader as the mark-secret switch alone, without a duplicate label stop', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+
+    const label = i18n.t('profiles.secrets.markSecret');
+    const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({
+      accessible: false,
+      importantForAccessibility: 'no',
+    });
+    expect(findAll(renderer.root, 'Switch').map(node => node.props.accessibilityLabel)).toEqual([
+      label,
+    ]);
+
+    unmount();
+  });
+
   it('names the key it will store when a typed key would be normalized', async () => {
     h.query.data = testVars();
     h.query.isPending = false;
@@ -240,11 +338,11 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    changeText(renderer.root, 'Key', 'a'.repeat(257));
+    changeText(renderer.root, 'Key', 'a'.repeat(129));
     pressButton(renderer.root, 'Save');
 
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
-    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 256 characters or fewer');
+    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 128 characters or fewer');
 
     unmount();
   });
@@ -389,6 +487,14 @@ describe('ProfileVariablesScreen', () => {
 
     pressPressable(renderer.root, 'Reveal value');
     expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(false);
+    // The revealed value's control names what it does now: it hides it again.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Reveal value'
+      )
+    ).toBe(false);
+    pressPressable(renderer.root, 'Hide value');
+    expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(true);
 
     unmount();
   });

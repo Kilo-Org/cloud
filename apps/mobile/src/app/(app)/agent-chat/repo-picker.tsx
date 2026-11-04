@@ -2,7 +2,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
@@ -21,6 +23,7 @@ type PickerListItem =
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -93,6 +96,7 @@ export default function RepoPickerScreen() {
   const handleSelect = useCallback(
     (repo: string) => {
       selectionHaptic();
+      dismissSearchPickerKeyboard();
       bridgeRef.current?.onSelect(repo);
       repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
       bridgeRef.current = undefined;
@@ -116,6 +120,7 @@ export default function RepoPickerScreen() {
     <PickerSheet
       title={t('agentChat.repoPicker.title')}
       onDone={closePicker}
+      scrollable={false}
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
           <Search size={18} color={colors.mutedForeground} />
@@ -175,11 +180,17 @@ export default function RepoPickerScreen() {
           }
         />
       ) : (
-        // Mapped rows inside the shell ScrollView instead of a FlatList: the
-        // FlatList stretches into the space the formSheet offers and its rows
-        // painted over the pinned search header while scrolling. The shell
-        // scroll view starts below the header, so a row can never overlap it.
-        <View>
+        // Mapped rows inside the list's own scroll view rather than a virtualized
+        // list: the shell keeps its header and the pinned search field above the
+        // scroller, so a row can never paint over them. The list owns the sheet's
+        // scroll so its search field and rows share one tap contract — the first
+        // tap on a row arrives even while the search keyboard is up.
+        <ScrollView
+          className="flex-1"
+          nestedScrollEnabled
+          {...SEARCHABLE_PICKER_LIST_PROPS}
+          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+        >
           {listItems.map(item => {
             if (item.kind === 'header') {
               return (
@@ -238,7 +249,7 @@ export default function RepoPickerScreen() {
             );
           })}
           {renderBitbucketNote()}
-        </View>
+        </ScrollView>
       )}
     </PickerSheet>
   );

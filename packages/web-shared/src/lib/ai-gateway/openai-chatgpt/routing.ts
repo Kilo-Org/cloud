@@ -1,5 +1,4 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -129,7 +128,7 @@ export type OpenAiChatGptRoutingResult =
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim().toLowerCase();
-  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !findKiloExclusiveModel(model);
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model);
 }
 
 /**
@@ -290,7 +289,7 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    id: 'openai-chatgpt',
+    type: 'openai-chatgpt',
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

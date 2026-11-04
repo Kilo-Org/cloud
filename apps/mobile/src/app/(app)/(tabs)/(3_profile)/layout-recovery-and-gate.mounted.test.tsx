@@ -29,21 +29,23 @@ vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
  * on a throw, and the gate keeps applying to the scenes the navigator mounts.
  */
 const scene = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
+  const listeners = new Map<string, Set<(event?: unknown) => void>>();
   let focused = true;
   return {
     setFocused(next: boolean) {
       focused = next;
-      for (const listener of listeners) {
+      for (const listener of listeners.get(next ? 'focus' : 'blur') ?? []) {
         listener();
       }
     },
     navigation: {
       isFocused: () => focused,
-      addListener: (_event: string, listener: () => void) => {
-        listeners.add(listener);
+      addListener: (event: string, listener: (event?: unknown) => void) => {
+        const set = listeners.get(event) ?? new Set<(event?: unknown) => void>();
+        set.add(listener);
+        listeners.set(event, set);
         return () => {
-          listeners.delete(listener);
+          set.delete(listener);
         };
       },
     },

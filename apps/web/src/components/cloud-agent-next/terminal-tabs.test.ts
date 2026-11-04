@@ -12,7 +12,7 @@ import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { WorktreeChangesView } from './WorktreeChanges';
-import type { ConversationMessages } from './ConversationMessages';
+import type { ConversationMessages } from './assistant-ui/test-renderers';
 import type { StoredMessage, StoredSession } from './types';
 import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
 import type { useWorktreeReview } from './useWorktreeReview';
@@ -91,6 +91,9 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('./useSavedWorktreeChanges', () => ({
+  useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
+}));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
@@ -225,20 +228,37 @@ jest.mock('./WorktreeFilePane', () => ({
       'data-file-scope': scope,
     }),
 }));
-jest.mock('./ChatInput', () => ({
-  ChatInput: (props: Record<string, unknown>) => {
+jest.mock('./assistant-ui/CloudComposer', () => ({
+  CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
     return createElement('input', { 'data-composer': true });
   },
 }));
-jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: (props: ComponentProps<typeof ConversationMessages>) => {
-    mockConversation = props;
-    return createElement('section', { 'data-conversation': true });
+jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
+  CloudChatRuntimeProvider: ({
+    projection,
+    children,
+  }: {
+    projection: {
+      messages: StoredMessage[];
+      commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
+    };
+    children: ReactNode;
+  }) => {
+    mockConversation = {
+      ...projection,
+      staticMessages: projection.messages,
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+    };
+    return children;
   },
 }));
+jest.mock('./assistant-ui/CloudThread', () => ({
+  CloudThread: () => createElement('section', { 'data-conversation': true }),
+}));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
-jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
 jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
 jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
@@ -462,6 +482,24 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     const { currentUserId = 'owner', ...rest } = props;
     act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
   }
+
+  it('keeps the composer and its owner mounted through read-only conversation switches', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    mockSessionId = 'ses_history';
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.closest('[hidden]')).not.toBeNull();
+    mockSessionId = 'ses_writable_b';
+    mockAtomValues.isReadOnly = false;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    mockSessionId = 'ses_recent';
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+  });
 
   function openTerminal() {
     act(() => mockTabs.onCreateTerminal());

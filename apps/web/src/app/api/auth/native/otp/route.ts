@@ -6,6 +6,7 @@ import {
   deleteSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
@@ -83,10 +84,13 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
     );
   }
 
-  const { code, challengeId } = await createSignInCode(email);
-  const result = await sendSignInCodeEmail(email, code);
+  // The code is bound to the address it is delivered to, so both use the same
+  // trimmed, lowercased string; a plus suffix or Gmail dots stay part of it.
+  const codeEmail = getDeliveredEmailAddress(email);
+  const { code, challengeId } = await createSignInCode(codeEmail);
+  const result = await sendSignInCodeEmail(codeEmail, code);
   if (!result.sent) {
-    await deleteSignInCode(email, code);
+    await deleteSignInCode(codeEmail, code);
     const neverbounceRejected = result.reason === 'neverbounce_rejected';
     await enforceResponseFloor(startTime);
     return NextResponse.json(

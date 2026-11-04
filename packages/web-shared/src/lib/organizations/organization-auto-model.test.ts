@@ -7,7 +7,11 @@ import {
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import {
+  getAllowedDirectByokCatalogModelIds,
+  modelsServedByOrganizationInferenceProviderUserByok,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -35,6 +39,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({ getByokCredential
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
   () => ({
+    getAllowedDirectByokCatalogModelIds: jest.fn(async () => new Set()),
     modelsServedByOrganizationInferenceProviderUserByok: jest.fn(async () => []),
   })
 );
@@ -247,5 +252,39 @@ describe('validateOrganizationAutoTarget with organization inference provider ke
       )
     ).resolves.toEqual(notAllowed);
     expect(mockedServedModels).not.toHaveBeenCalled();
+  });
+
+  describe('with a catalog-mode direct BYOK key serving the model through Z.AI', () => {
+    beforeEach(() => {
+      jest
+        .mocked(getAllowedDirectByokCatalogModelIds)
+        .mockImplementation(
+          async (_organizationId, policy) =>
+            new Set(
+              (await isModelAllowedForProviderKey(policy, 'moonshotai/kimi-k2.6', 'z-ai'))
+                ? ['moonshotai/kimi-k2.6']
+                : []
+            )
+        );
+    });
+
+    test('accepts the model when the provider allow-list names the key provider', async () => {
+      await expect(
+        validateOrganizationAutoTarget(
+          organization({ provider_allow_list: ['anthropic', 'z-ai'] }),
+          'moonshotai/kimi-k2.6'
+        )
+      ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+      expect(getAllowedDirectByokCatalogModelIds).toHaveBeenCalledWith('org-1', expect.anything());
+    });
+
+    test('rejects the model when the provider allow-list does not name the key provider', async () => {
+      await expect(
+        validateOrganizationAutoTarget(
+          organization({ provider_allow_list: ['anthropic'] }),
+          'moonshotai/kimi-k2.6'
+        )
+      ).resolves.toEqual(notAllowed);
+    });
   });
 });

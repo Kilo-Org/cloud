@@ -43,7 +43,7 @@ describe('PrMergeSheet provider behavior', () => {
     await edit(renderer, 'Commit message', '  GitLab message  ');
     await press(renderer, 'Merge');
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
-    expect(hosts(renderer, 'ConfirmDialog')[0]?.props.title).toBe('Merge merge request?');
+    expect(hosts(renderer, 'ConfirmDialog')[0]?.props.title).toBe('Merge?');
     await press(renderer, 'Confirm Merge');
 
     expect(state.merge.mutateAsync).toHaveBeenCalledExactlyOnceWith({

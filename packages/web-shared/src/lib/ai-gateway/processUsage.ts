@@ -48,7 +48,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { Provider, ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -117,6 +117,7 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
 
@@ -165,6 +166,7 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
+    id: usageContext.usageId ?? randomUUID(),
     kilo_user_id: usageContext.kiloUserId,
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,
@@ -186,6 +188,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     reasoning_setting: usageContext.reasoning_setting,
+    inference_region: usageContext.inference_region,
     ttfb_ms: usageContext.ttfb_ms,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -226,11 +229,17 @@ export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
 ): Promise<CoreUsageWithMetaData> {
-  const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
-    usageContextInfo;
+  const {
+    id,
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    ...metadataFromContext
+  } = usageContextInfo;
 
   const core: MicrodollarUsage = {
     id,
@@ -844,8 +853,8 @@ function scheduleKiloPassBonusIfNeeded(
  * make callers treat billed usage as unrecorded and skip dependent writes.
  *
  * The row's presence under this user is the proof, not the PostgreSQL error code:
- * `id` is generated per delivery by `toInsertableDbUsageRecord`, and the row can
- * only be visible if a delivery of this exact record committed its whole
+ * `id` is generated once per usage record, and the row can only be visible if a
+ * delivery of this exact record committed its whole
  * transaction. A deadlock victim that is retried into the collision therefore
  * recovers the same way a plain primary-key violation does.
  *
@@ -1015,6 +1024,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
           , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
+          , ${createUpsertCTE(sql`inference_region`, metadataFields.inference_region)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -1056,7 +1066,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               feature_id,
               mode_id,
               auto_model_id,
-              reasoning_setting_id
+              reasoning_setting_id,
+              inference_region_id
             )
             SELECT
               ${metadataFields.id},
@@ -1098,7 +1109,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte),
-              (SELECT reasoning_setting_id FROM reasoning_setting_cte)
+              (SELECT reasoning_setting_id FROM reasoning_setting_cte),
+              (SELECT inference_region_id FROM inference_region_cte)
           )
           , balance_update AS (
             UPDATE kilocode_users
@@ -1168,6 +1180,12 @@ export function countAndStoreUsage(
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
   const { requestStartedAt } = usageContext;
+  const metadataCapture =
+    usageContext.provider === 'vercel' ? usageContext.providerMetadataCapture : undefined;
+  const contentType = clonedReponse.headers.get('content-type');
+  const isStreaming = contentType?.includes('application/json')
+    ? false
+    : contentType?.includes('text/event-stream') || usageContext.isStreaming;
 
   const parseResponseText = async (
     body: ReadableStream<Uint8Array>,
@@ -1187,7 +1205,7 @@ export function countAndStoreUsage(
 
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseResponsesMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1195,18 +1213,20 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseResponsesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1214,19 +1234,21 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseMicrodollarUsageFromString(
               content,
               usageContext.kiloUserId,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
     if (usageContext.api_kind === 'messages') {
-      usageStatsPromise = usageContext.isStreaming
+      usageStatsPromise = isStreaming
         ? parseMessagesMicrodollarUsageFromStream(
             clonedReponse.body,
             usageContext.kiloUserId,
@@ -1234,18 +1256,21 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status,
             usesUserCredentials,
-            requestStartedAt
+            requestStartedAt,
+            metadataCapture
           )
         : parseResponseText(clonedReponse.body, content =>
             parseMessagesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
-              usageContext.provider
+              usageContext.provider,
+              metadataCapture
             )
           );
     }
   }
 
+  metadataCapture?.waitFor(usageStatsPromise);
   return usageStatsPromise.then(usageStats =>
     processTokenData(usageStats, usageContext, servingProvider)
   );
@@ -1254,7 +1279,7 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId,
+  provider: ProviderType,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
@@ -1284,10 +1309,11 @@ export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1323,6 +1349,7 @@ export async function parseMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
@@ -1334,6 +1361,10 @@ export async function parseMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if ('error' in json) {
       const error = json.error as OpenRouterError;
@@ -1359,8 +1390,6 @@ export async function parseMicrodollarUsageFromStream(
     model = json.model ?? model;
     messageId = json.id ?? messageId;
     usage = json.usage ?? usage;
-    const choice = json.choices?.[0];
-    const chunkProviderMetadata = choice?.delta?.provider_metadata;
     if (chunkProviderMetadata) {
       vercelProviderMetadata = chunkProviderMetadata;
     }
@@ -1415,13 +1444,17 @@ export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
         MaybeHasOpenRouterUsage &
         MaybeHasVercelProviderMetaData)
     | null;
+  const choice = responseJson?.choices?.[0];
+  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   if (
     providerReportsIsByok(provider) &&
@@ -1433,9 +1466,7 @@ export function parseMicrodollarUsageFromString(
       extra: { responseJson },
     });
   }
-  const choice = responseJson?.choices?.[0];
   const finish_reason = choice?.finish_reason ?? null;
-  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
@@ -1482,6 +1513,8 @@ export async function processTokenData(
     });
     return null;
   }
+
+  usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
 
   const timer = createTimer();
   const generationProvider = getGenerationLookupProvider(usageStats, usageContext, servingProvider);
@@ -1564,7 +1597,8 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
+    usageContext.provider === 'custom' ||
+    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -1669,7 +1703,7 @@ function getGenerationLookupProvider(
         ? VERCEL_AI_GATEWAY
         : undefined;
   const provider =
-    gatewayProvider && servingProvider?.id === gatewayProvider.id
+    gatewayProvider && servingProvider?.type === gatewayProvider.type
       ? servingProvider
       : gatewayProvider;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
@@ -1699,7 +1733,7 @@ export const mapToUsageStats = (
   { data }: OpenRouterGeneration,
   responseContent: string,
   kiloUserId: string,
-  provider: ProviderId
+  provider: ProviderType
 ): MicrodollarUsageStats => {
   let llmCostUsd;
   let nonInferenceCost_mUsd: number | undefined;

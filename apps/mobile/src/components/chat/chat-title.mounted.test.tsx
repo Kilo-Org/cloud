@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ChatTitle } from './chat-title';
+import { HEADER_TITLE_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { CHAT_TITLE_MAX_LENGTH } from '@/lib/chat/store';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
@@ -40,6 +41,23 @@ describe('the chat title', () => {
     expect(view.renderer.root.findAll(node => (node.type as string) === 'BetaPill')).toHaveLength(
       1
     );
+  });
+
+  it('carries the header title touch target on the pressable itself', async () => {
+    // A control-size audit reads the pressable's own view rect, and `hitSlop`
+    // does not move it: the floor has to be the class.
+    view = await renderWithProviders(
+      createElement(ChatTitle, {
+        title: 'Chat',
+        initialValue: 'Chat',
+        canRename: true,
+        onRename: vi.fn(),
+      })
+    );
+
+    const title = view.renderer.root.find(node => (node.type as string) === 'Pressable');
+    expect(title.props.className).toContain(HEADER_TITLE_TARGET_CLASS);
+    expect(title.props.hitSlop).toBeUndefined();
   });
 
   it('opens the current name, saves it, and closes the dialog', async () => {

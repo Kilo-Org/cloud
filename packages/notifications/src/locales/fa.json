@@ -9,6 +9,7 @@
       "lowBalance": "موجودی شما نیاز به توجه دارد",
       "spendAlert": "هزینه شما نیاز به توجه دارد",
       "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
+      "securityUpdate": "یک بررسی امنیتی به‌روزرسانی دارد",
       "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "یک یافته امنیتی نیاز به توجه دارد"
+      "body": "یک بررسی امنیتی به‌روزرسانی دارد"
     }
   },
   "instanceLifecycle": {

@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,7 +14,8 @@ import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListCon
 import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
-import { EnkryptGuardrailChargesContent } from '@/app/admin/gateway/EnkryptGuardrailChargesContent';
+import { EnkryptUsageContent } from '@/app/admin/gateway/EnkryptUsageContent';
+import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -26,6 +28,7 @@ const VALID_TABS: readonly string[] = [
   'unavailable-models',
   'provider-order',
   'custom-pricing',
+  'organization-features',
   'api-request-log',
   'enkrypt-charges',
 ];
@@ -38,6 +41,7 @@ type Tab =
   | 'unavailable-models'
   | 'provider-order'
   | 'custom-pricing'
+  | 'organization-features'
   | 'api-request-log'
   | 'enkrypt-charges';
 const isValidTab = (value: string | null): value is Tab =>
@@ -104,11 +108,14 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
               Custom Pricing
             </TabsTrigger>
+            <TabsTrigger value="organization-features" className={tabTriggerClass}>
+              Organization Features
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
             <TabsTrigger value="enkrypt-charges" className={tabTriggerClass}>
-              Enkrypt Charges
+              Enkrypt Usage
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -149,8 +156,10 @@ export default function AdminGatewayPage() {
                   Model IDs the gateway hides from the catalog and rejects for direct requests,
                   stored in the <code>unavailable_models</code> column of{' '}
                   <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
-                  listed here.
+                  Auto Small&apos;s free fallback, <code>{AUTO_SMALL_TARGET_MODELS.free}</code>, is
+                  internal-only: it is always hidden and rejected for direct requests, independently
+                  of this list. Kilo serves it through <code>{AUTO_SMALL_TARGET_MODELS.paid}</code>{' '}
+                  for users without balance.
                 </>
               }
             />
@@ -160,6 +169,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="custom-pricing" className="mt-4">
             <CustomPricingContent />
+          </TabsContent>
+          <TabsContent value="organization-features" className="mt-4">
+            <OrganizationFeaturesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"
@@ -171,7 +183,7 @@ export default function AdminGatewayPage() {
             </div>
           </TabsContent>
           <TabsContent value="enkrypt-charges" className="mt-4">
-            <EnkryptGuardrailChargesContent />
+            <EnkryptUsageContent />
           </TabsContent>
         </Tabs>
       </div>

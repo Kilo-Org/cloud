@@ -1,16 +1,22 @@
+/* eslint-disable max-lines -- one cohesive mirror suite: read fencing, write ordering, and the scope gate the mirror feeds */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+
+import { getLastHomeWidgetData } from './home-widget-data';
 import {
   _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
   _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   isGlanceableRestoreSettled,
@@ -23,6 +29,8 @@ import {
 const NOW = 1_750_000_000_000;
 const SNAPSHOT_KEY = 'glanceable-snapshot';
 const SCOPE_KEY = 'glanceable-scope-key';
+const HOME_WIDGET_DATA_KEY = 'home-widget-data';
+const details = EMPTY_HOME_WIDGET_DETAILS;
 
 const store = new Map<string, string>();
 
@@ -324,6 +332,70 @@ describe('restorePersistedGlanceable', () => {
 
     expect(restarted.getLastGlanceableSnapshot()).toBeNull();
     expect(restarted.getLocalScopeKey()).toBe('legacy-scope');
+  });
+
+  it('restores the Home-widget record on the signed-in scope', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+
+    // The record is adopted only when its scope is the signed-in one.
+    expect(getLastHomeWidgetData()).toMatchObject({ snapshot: { scopeKey: stored.scopeKey } });
+  });
+
+  it('leaves a Home-widget record of another scope unadopted', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+
+    await restorePersistedGlanceable();
+
+    // The glanceable record still restores: its revision and scope feed the
+    // fences the signed-in context verifies before it writes anything.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLastHomeWidgetData()).toBeNull();
+  });
+
+  it('draws a record on the signed-in scope and only on the signed-in scope', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    await restorePersistedGlanceable();
+    expect(getGlanceableSnapshotForSignedInScope()).toEqual(stored);
+
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+    await restorePersistedGlanceable();
+    // The revision still seeds the next publisher, but no surface draws it.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getGlanceableSnapshotForSignedInScope()).toBeNull();
+  });
+
+  it('leaves the Home-widget record unadopted when the identity is unreadable', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    secureStoreMock.getItemAsync.mockImplementation(key =>
+      key === ACTIVE_USER_ID_KEY
+        ? Promise.reject(new Error('keychain locked'))
+        : Promise.resolve(store.get(key) ?? null)
+    );
+
+    await restorePersistedGlanceable();
+
+    // An unreadable identity is "unknown", never a match; the mirror itself
+    // still read, so it is not reported as unavailable.
+    expect(getLastHomeWidgetData()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
   });
 });
 

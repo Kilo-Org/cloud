@@ -44,6 +44,35 @@ describe('projectSettledMessageFailure', () => {
     }
   );
 
+  it('does not attribute a missing-agent configuration failure to a managed provider', () => {
+    const classified = classifyAssistantFailure({
+      name: 'UnknownError',
+      data: {
+        message: 'Agent not found: "foreman". Available agents: code, plan',
+      },
+    });
+
+    const report = buildControlPlaneMessageReport({
+      cloudAgentSessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+      message: message({
+        state: 'failed',
+        acceptedAt: 1,
+        reason: classified.safeMessage,
+      }),
+      facts: {
+        assistantReason: classified.reason,
+        providerOwnership: classified.providerOwnership,
+      },
+    });
+
+    expect(report?.run).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'user',
+      failureReason: 'assistant_invalid_request',
+    });
+  });
+
   it('projects a workspace clone timeout subtype onto the callback failure', () => {
     const failure = projectSettledMessageFailure(
       message({ state: 'failed', reason: 'workspace_setup_failed' }),

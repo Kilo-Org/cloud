@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one contrast guard per shipped surface shares this file's colour-math helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ROW_PALETTE } from '@/lib/agent-color';
@@ -122,6 +123,27 @@ describe('muted-foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('auto-merge banner copy contrast (WCAG AA text)', () => {
+  // The banner's description paints `text-ink2` on `bg-accent-soft-tint`, the
+  // accent at 16% over the page. The muted foreground reads as a quiet second
+  // line here but measures under 4.5:1 on this surface, so the pair is guarded
+  // on the composite the text actually renders on.
+  const themes = [
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const;
+
+  it('every theme: ink2 on the accent tint clears 4.5:1', () => {
+    for (const [themeName, colors] of themes) {
+      const tint = compositeHex(colors.accentSoftTint, colors.background);
+      expect(
+        contrastRatio(colors.ink2, tint),
+        `ink2 vs accent tint (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
+  });
+});
+
 describe('status token contrast on light surfaces (WCAG AA text)', () => {
   // Status tokens are read as text on the app background (screens) and on
   // `secondary` (status chips/cards). `global.css` keeps `--good` /
@@ -226,6 +248,40 @@ describe('disabled primary fill contrast (WCAG AA text)', () => {
   });
 });
 
+describe('selected tab pill contrast (WCAG AA text)', () => {
+  // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
+  // the light theme's olive at the value the dark page needs: the dark accent
+  // (#ffdd00) as a full pill glares on the dark page, and the unlifted light
+  // value recedes into it, so dark mode lifts the same hue and must not fall
+  // back to the accent.
+  it('light theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.selectionForeground, lightColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: selectionForeground vs selection >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.selectionForeground, darkColors.selection);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the selected fill is not the dark accent', () => {
+    expect(darkColors.selection).not.toBe(darkColors.primary);
+  });
+
+  // The fill is the selected state's own indicator, so WCAG 1.4.11 asks for 3:1
+  // against the page it sits on and against `secondary`, the unselected fill of
+  // the pill and the row surface under the tab. A value that clears the label
+  // but recedes into the dark page leaves the selection unreadable.
+  it('dark theme: the selected fill stands >= 3:1 off the page and off secondary', () => {
+    expect(contrastRatio(darkColors.selection, darkColors.background)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+    expect(contrastRatio(darkColors.selection, darkColors.secondary)).toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+});
+
 describe('warn foreground token contrast (WCAG AA text)', () => {
   it('light theme: warnForeground vs warn >= 4.5:1', () => {
     // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
@@ -304,5 +360,103 @@ describe('idle composer control and ring track contrast (non-text)', () => {
     expect(trackRatio).toBeLessThan(
       contrastRatio(darkColors.mutedForeground, darkColors.secondary)
     );
+  });
+});
+
+describe('disabled switch pair contrast (non-text)', () => {
+  // The shared switch paints this pair for a disabled control on Android, in
+  // place of the brand on-track: `primary-disabled` under a grip that sits
+  // below it in strength for the on position, `muted-soft` with the mid neutral
+  // grip for the off one. iOS keeps the brand pair and fades it itself. The
+  // switch sits on a `secondary` row, so its tracks are measured over that. The
+  // floors are perception floors: the pair has to read as a control and the two
+  // positions have to stay apart. Light has no third neutral for the off track
+  // — `control-idle` equals `secondary` there — so the disabled off track is
+  // the same neutral as the enabled off track, and only its grip dims.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  // [theme, palette, the grip the switch paints on the on track]. The on grip
+  // is the one colour a disabled pair cannot share with its enabled one: the
+  // scheme's on ink is what marks a control that still works.
+  const themes = [
+    ['light', lightColors, lightColors.primaryForeground],
+    ['dark', darkColors, darkColors.mutedSoft],
+  ] as const;
+
+  it('every theme: the disabled off track reads on the row surface', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedSoft, colors.secondary),
+        `muted-soft vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled on track stays apart from the disabled off track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
+        `primary-disabled vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled off grip reads on its own track', () => {
+    for (const [themeName, colors] of themes) {
+      expect(
+        contrastRatio(colors.mutedForeground, colors.mutedSoft),
+        `muted-foreground vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  it('every theme: the disabled on grip reads on its own track', () => {
+    for (const [themeName, colors, onGrip] of themes) {
+      expect(
+        contrastRatio(onGrip, colors.primaryDisabled),
+        `on grip vs primary-disabled (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  // Regression: the disabled on grip once fell back to `primaryForeground` in
+  // both schemes, which dark defines as the near-black card colour. Android's
+  // thumb is wider than the track, so its outer arc lands on the row itself —
+  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
+  // remained of the pill read as a blank grey bar. The dark grip is the mid
+  // neutral instead: darker than its fill, and still a visible step off the
+  // near-black row its arc sits on.
+  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
+    expect(
+      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
+      'muted-soft vs secondary (dark)'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+  });
+});
+
+// The `secondary` button variant paints `--secondary-fill`. It used to paint
+// `--secondary`, which is also the dark card an `outline` control paints, so in
+// the dark scheme a filled action and the outlined control beside it (the
+// discard-draft sheet's Save as to-do and Keep editing) rendered one colour.
+describe('filled neutral action contrast (non-text)', () => {
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+
+  it('dark theme: the filled action reads on the card and apart from the outlined fill', () => {
+    for (const surface of [darkColors.card, darkColors.secondary]) {
+      expect(contrastRatio(darkColors.secondaryFill, surface)).toBeGreaterThanOrEqual(
+        MIN_VISIBLE_SURFACE_RATIO
+      );
+    }
+  });
+
+  it('light theme: the filled action keeps the surface it has always painted', () => {
+    expect(lightColors.secondaryFill).toBe(lightColors.secondary);
+  });
+
+  it('every theme: the filled action label clears 4.5:1 on its own fill', () => {
+    for (const colors of [lightColors, darkColors]) {
+      expect(
+        contrastRatio(colors.secondaryForeground, colors.secondaryFill)
+      ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
   });
 });

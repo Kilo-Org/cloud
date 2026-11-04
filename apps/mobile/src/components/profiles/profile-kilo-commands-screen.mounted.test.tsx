@@ -37,6 +37,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileKiloCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));

@@ -9,6 +9,7 @@
       "lowBalance": "Teastaíonn aird ar do chothromas",
       "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
+      "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
       "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Teastaíonn aird ar thátal slándála"
+      "body": "Tá nuashonrú ar sheiceáil slándála"
     }
   },
   "instanceLifecycle": {

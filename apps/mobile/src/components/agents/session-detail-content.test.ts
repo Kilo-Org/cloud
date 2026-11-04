@@ -55,7 +55,7 @@ import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-na
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
-import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
+import { formatSessionCostBadge } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -1104,6 +1104,14 @@ function footerRowItems(view: { renderer: ReactTestRenderer }) {
   return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
 }
 
+/**
+ * The band a reserved header holds its text area's height with: a zero-width
+ * twin of the eyebrow and the title's line cap.
+ */
+function findReservedBand(header: ReactTestInstance) {
+  return header.findByProps({ className: 'w-0 overflow-hidden' });
+}
+
 function pressHeaderBack(renderer: ReactTestRenderer) {
   const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
     onPress: () => void;
@@ -1129,9 +1137,9 @@ describe('SessionDetailContent display scope', () => {
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -1529,7 +1537,7 @@ describe('session detail header right cluster', () => {
     }
     priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
     expect(expected).not.toBeNull();
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
     const cost = metrics.find(
@@ -1909,7 +1917,7 @@ describe('session detail assistant response retry', () => {
       promptRow('msg-prompt', prompt),
       failedResponse('msg-response', 'msg-prompt', {
         name: 'APIError',
-        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       }),
     ];
     const view = await mountDetails(messages);
@@ -1954,7 +1962,7 @@ describe('session detail assistant response retry', () => {
       promptRow('msg-prompt', prompt),
       failedResponse('msg-response', 'msg-prompt', {
         name: 'APIError',
-        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       }),
     ];
     const view = await mountDetails(messages);
@@ -2606,9 +2614,9 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
-    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-21'
-    );
+    // The header holds the session title's three lines in the band beside the
+    // heading, so a title that arrives late or wraps cannot move the body.
+    expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
@@ -4305,7 +4313,7 @@ describe('session detail duplicate failure state', () => {
     message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
     (message.info as { error?: { name: string; data: unknown } }).error = {
       name: 'APIError',
-      data: { message: 'raw provider text' },
+      data: { message: 'raw provider text', isRetryable: true },
     };
     return {
       info: message.info,

@@ -1,8 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import type { EnvironmentSummary } from '@kilocode/cloud-agent-profile';
-import { findRepositoryEnvironment } from './environment-display';
+import { findRepositoryEnvironments } from './environment-display';
 
-function summary(partial: Partial<EnvironmentSummary>): EnvironmentSummary {
+/** A V1 summary: one repository in the identity scalars. */
+type V1Summary = Extract<EnvironmentSummary, { platform: string }>;
+
+function summary(partial: Partial<V1Summary>): EnvironmentSummary {
   return {
     id: 'environment',
     name: 'Environment',
@@ -22,7 +25,7 @@ function summary(partial: Partial<EnvironmentSummary>): EnvironmentSummary {
   };
 }
 
-describe('findRepositoryEnvironment', () => {
+describe('findRepositoryEnvironments', () => {
   const github = summary({ id: 'github' });
   const gitlab = summary({
     id: 'gitlab',
@@ -41,32 +44,60 @@ describe('findRepositoryEnvironment', () => {
 
   it('matches GitHub and GitLab paths without case and never across platforms', () => {
     expect(
-      findRepositoryEnvironment(environments, { platform: 'github', fullName: 'Acme/Widgets' })
-    ).toBe(github);
+      findRepositoryEnvironments(environments, { platform: 'github', fullName: 'Acme/Widgets' })
+    ).toEqual([github]);
     expect(
-      findRepositoryEnvironment(environments, { platform: 'gitlab', projectPath: 'Group/Project' })
-    ).toBe(gitlab);
+      findRepositoryEnvironments(environments, { platform: 'gitlab', projectPath: 'Group/Project' })
+    ).toEqual([gitlab]);
     expect(
-      findRepositoryEnvironment(environments, { platform: 'gitlab', projectPath: 'acme/widgets' })
-    ).toBeUndefined();
+      findRepositoryEnvironments(environments, { platform: 'gitlab', projectPath: 'acme/widgets' })
+    ).toEqual([]);
   });
 
   it('matches Bitbucket by the UUID pair after a rename', () => {
     expect(
-      findRepositoryEnvironment(environments, {
+      findRepositoryEnvironments(environments, {
         platform: 'bitbucket',
         fullName: 'team/new-name',
         workspaceUuid: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',
         repositoryUuid: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
       })
-    ).toBe(bitbucket);
+    ).toEqual([bitbucket]);
     expect(
-      findRepositoryEnvironment(environments, {
+      findRepositoryEnvironments(environments, {
         platform: 'bitbucket',
         fullName: 'team/old-name',
         workspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         repositoryUuid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       })
-    ).toBeUndefined();
+    ).toEqual([]);
+  });
+});
+
+describe('findRepositoryEnvironments with multi-repository environments', () => {
+  const v1 = summary({ id: 'v1' });
+  const v2: EnvironmentSummary = {
+    id: 'v2',
+    name: 'Group',
+    repositories: [
+      { platform: 'github', repoFullName: 'acme/api' },
+      { platform: 'github', repoFullName: 'acme/widgets' },
+    ],
+    createdAt: '2026-10-21T00:00:00.000Z',
+    updatedAt: '2026-10-21T00:00:00.000Z',
+    plainVarCount: 0,
+    secretCount: 0,
+    commandCount: 0,
+    sandboxAllocation: null,
+    configurationRevision: 1,
+  };
+
+  it('returns every environment that contains the repository, V1 and V2', () => {
+    expect(
+      findRepositoryEnvironments([v1, v2], { platform: 'github', fullName: 'acme/widgets' })
+    ).toEqual([v1, v2]);
+    expect(
+      findRepositoryEnvironments([v1, v2], { platform: 'github', fullName: 'Acme/API' })
+    ).toEqual([v2]);
   });
 });

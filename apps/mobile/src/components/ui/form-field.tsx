@@ -3,6 +3,7 @@ import { type LayoutChangeEvent, type TextInput, type TextInputProps, View } fro
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -88,14 +89,7 @@ function FormField({
 
   return (
     <View className="gap-1.5" onLayout={containerOnLayout}>
-      {labelAccessory === undefined ? (
-        <Text className="text-sm font-medium text-foreground">{label}</Text>
-      ) : (
-        <View className="flex-row items-center gap-2">
-          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{label}</Text>
-          {labelAccessory}
-        </View>
-      )}
+      <FormFieldLabel label={label} labelAccessory={labelAccessory} />
       <Input
         ref={instance => {
           nativeInput.current = instance;

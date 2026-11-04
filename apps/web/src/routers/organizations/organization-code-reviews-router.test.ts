@@ -950,7 +950,6 @@ describe('organization review agent router: getGitHubStatus connection rule', ()
         accountLogin: 'octo-org',
         repositorySelection: 'all',
         installedAt: '2026-01-01 00:00:00+00',
-        isValid: true,
       },
     });
   });

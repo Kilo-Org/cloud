@@ -2072,8 +2072,15 @@ Add a row when you turn one off, and give the reason.
 | `typescript/require-await` | The same false positive as `require-await`, on the TypeScript side. |
 | `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
-| `unicorn/require-module-specifiers` | Off for the config files, which use bare re-exports. |
 | `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
+| `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
+
+The block under `no-underscore-dangle` in `.oxlintrc.json` — `node/no-sync`,
+`one-var`, the `typescript/*`, `unicorn/*` and `vitest/*` rules that follow it —
+is one deviation, not one row per rule. The comment above the block states the
+reason: the oxlint 1.88 upgrade reports about 3,000 findings on its own, and
+each rule is adopted separately, with its findings fixed in a change that can
+review them.
 
 The `**/*.test.ts` override also covers `**/*-fixture.ts`, and
 `pnpm check:boundaries` exempts both. A fixture is test code: it may reach for a
@@ -2084,8 +2091,8 @@ declarations this compiler rejects, and the package cannot fix them. It is the
 one relaxed compiler flag, and it is the reason principle 12 cannot be enforced
 by the type system alone.
 
-`new-cap` stays on with `Tag`, `GenericTag`, `TaggedError` and `TaggedClass`
-as exceptions, because each is a call, not a constructor.
+`new-cap` stays on with `Service`, `TaggedError` and `TaggedClass` as
+exceptions, because each is a call, not a constructor.
 
 `isolatedDeclarations` is off. It cannot infer a typia validator's type.
 

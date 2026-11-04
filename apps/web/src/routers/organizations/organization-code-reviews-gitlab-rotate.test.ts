@@ -179,7 +179,6 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
       // the stored integration row regardless of their concrete values).
       expect(status.integration).toEqual(
         expect.objectContaining({
-          isValid: true,
           instanceUrl: 'https://gitlab.example.com',
         })
       );
@@ -296,7 +295,7 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
 
       expect(status.connected).toBe(true);
       expect(status.integration).toEqual(
-        expect.objectContaining({ isValid: true, instanceUrl: 'https://gitlab.example.com' })
+        expect.objectContaining({ instanceUrl: 'https://gitlab.example.com' })
       );
       expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
     });

@@ -50,18 +50,36 @@ describe('findingDetailBackTarget', () => {
 
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
-  // forced back control by reading the source and asserting every `ScreenHeader`
-  // usage passes `showBackButton`. This fails if the control is removed from any
-  // of the four states (loaded, notFound, error, loading).
+  // forced back control by reading the source. The loaded state renders its own
+  // `ScreenHeader`; the loading state renders the one that reserves the eyebrow
+  // line, and the failure and not-found states share the one that does not, so
+  // neither of those can gain a blank line above its title. This fails if a
+  // state stops rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
   const source = readFileSync(screenPath, 'utf8');
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
+  const loadingHeaderCount = (source.match(/\{loadingHeader\}/g) ?? []).length;
+  const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
+  const loadingHeaderSource = /const loadingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
+  const pendingHeaderSource = /const pendingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
 
-  it('renders a ScreenHeader in all four states', () => {
-    expect(screenHeaderCount).toBe(4);
+  it('renders the loading, failure and not-found states through a header', () => {
+    expect(screenHeaderCount).toBe(3);
+    expect(loadingHeaderCount).toBe(1);
+    expect(pendingHeaderCount).toBe(2);
+  });
+
+  it('reserves the eyebrow line only while the load can still gain a repository', () => {
+    // The payload draws the finding's repository on the eyebrow line above the
+    // title, which pushes the title down half a line when it lands. Reserving
+    // the line while the load is pending keeps the title still. A finding that
+    // does not exist and a failed load never gain a repository, so a reserved
+    // line there would leave the title above a gap no label ever fills.
+    expect(loadingHeaderSource).toMatch(/\breserveEyebrow\b/);
+    expect(pendingHeaderSource).not.toMatch(/\breserveEyebrow\b/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

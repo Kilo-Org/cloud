@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
-import { chunkArray } from './chunkArray';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 
 type DbExecutor = {
   execute: (query: ReturnType<typeof sql>) => Promise<{ rowCount: number | null }>;

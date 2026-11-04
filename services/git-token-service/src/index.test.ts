@@ -1404,7 +1404,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       permissions: { contents: 'write', pull_requests: 'write' },
     });
     serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
-    serviceMocks.selectUserAuthorization.mockResolvedValue({
+    serviceMocks.selectUserAuthorization.mockReset().mockResolvedValue({
       selected: true,
       token: 'user-token',
       gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
@@ -1854,13 +1854,14 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         appType: 'standard',
       });
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
     }
   );
 
   const userAttachmentUrl =
     'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391';
 
-  it('redeems an installation-pinned user-attachment upload after confirming repository metadata', async () => {
+  it('uses stored user OAuth for an installation-pinned attachment and its repository lookup', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(Response.json({ id: 1145038391, full_name: 'Acme/Repo' }));
@@ -1883,12 +1884,18 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       })
     ).resolves.toEqual({
       success: true,
-      authorization: 'Bearer installation-token',
+      authorization: 'Bearer user-token',
       installationId: '123',
-      source: 'installation',
+      source: 'user',
       appType: 'standard',
     });
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledExactlyOnceWith({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+      accessPurpose: 'workflow',
+      strictRepositoryLookup: true,
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.github.com/repos/acme/repo',
       expect.objectContaining({
@@ -1896,12 +1903,77 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         redirect: 'manual',
         signal: expect.any(AbortSignal),
         headers: expect.objectContaining({
-          Authorization: 'Bearer installation-token',
+          Authorization: 'Bearer user-token',
           'User-Agent': 'Kilo-Git-Token-Service',
         }),
       })
     );
   });
+
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'insufficient_user_access',
+    'refresh_failed',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ])(
+    'never falls back to installation credentials for an attachment when user auth is %s',
+    async reason => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(Response.json({ id: 1145038391, full_name: 'acme/repo' }));
+      vi.stubGlobal('fetch', fetchMock);
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.selectUserAuthorization.mockResolvedValueOnce({ selected: false, reason });
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([false, true])(
+    'sanitizes attachment user-authorization lookup errors without installation fallback (user pin=%s)',
+    async allowUserAuthorization => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.selectUserAuthorization.mockRejectedValueOnce(
+        new Error('private lookup detail')
+      );
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('redeems a selected-user user-attachment upload with the identity-checked user token', async () => {
     const fetchMock = vi

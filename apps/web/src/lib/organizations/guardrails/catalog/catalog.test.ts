@@ -120,6 +120,8 @@ describe('adaptMcpRegistryList', () => {
             },
             { registryType: 'oci', identifier: 'ghcr.io/example/server:1.2.0' },
             { registryType: 'npm', identifier: 'http-pkg', transport: { type: 'streamable-http' } },
+            { registryType: 'npm', identifier: 'untagged-pkg', version: '2nightly' },
+            { registryType: 'npm', identifier: 'built-pkg', version: '1.2.3+build.5' },
           ],
         },
         _meta: { 'io.modelcontextprotocol.registry/official': { status: 'active' } },
@@ -148,7 +150,7 @@ describe('adaptMcpRegistryList', () => {
   });
 
   it('maps remotes and npm/pypi packages, and flags the rest', () => {
-    const [remote, npm, pypi, oci, httpPackage] = page.items[0].variants;
+    const [remote, npm, pypi, oci, httpPackage, tagLike, built] = page.items[0].variants;
     expect(remote).toMatchObject({
       eligible: true,
       identityKey: 'remote:https://sh.example.com/mcp',
@@ -161,6 +163,8 @@ describe('adaptMcpRegistryList', () => {
     expect(pypi).toMatchObject({ eligible: true, identityKey: 'pypi:example-server' });
     expect(oci).toMatchObject({ eligible: false });
     expect(httpPackage).toMatchObject({ eligible: false });
+    expect(tagLike).toMatchObject({ eligible: true, versionHint: null });
+    expect(built).toMatchObject({ eligible: true, versionHint: '1.2.3' });
     expect(page.items[0].name).toBe('Example');
     expect(page.items[0].homepageUrl).toBe('https://github.com/example/server');
   });

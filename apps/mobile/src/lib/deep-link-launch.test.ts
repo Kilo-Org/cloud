@@ -43,6 +43,7 @@ import {
   setCurrentDeepLinkUserId,
   setPendingDeepLink,
   subscribeToPendingDeepLink,
+  wasLaunchAppRouteCaptured,
 } from './deep-link-launch';
 /* eslint-enable import/first */
 
@@ -767,6 +768,22 @@ describe('deep-link-launch', () => {
       );
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_0123456789abcdefghijklmnop');
+    });
+
+    it("captures a launch that opened one of the app's own routes", () => {
+      _setGetLinkingURLForTests(() => 'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices');
+      captureLaunchDeepLink();
+      // Assert immediately - no await. The point of the test is synchronicity.
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/invoices');
+      // The relaunch repair must leave this launch to the pending consumer.
+      expect(wasLaunchAppRouteCaptured()).toBe(true);
+    });
+
+    it('does not mark a universal-link launch as an app-route launch', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+      expect(wasLaunchAppRouteCaptured()).toBe(false);
     });
 
     it('is a no-op when the latch is already set (slot not overwritten)', () => {

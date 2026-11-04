@@ -65,6 +65,55 @@ function credentialInput(protocol: string, host: string): string {
   return `protocol=${protocol}\nhost=${host}\n\n`;
 }
 
+function credentialInputWithPath(protocol: string, host: string, credentialPath: string): string {
+  return `protocol=${protocol}\nhost=${host}\npath=${credentialPath}\n\n`;
+}
+
+function writeCredentialRecords(
+  home: string,
+  records: ReadonlyArray<Record<string, string>>
+): string {
+  const credentialFile = path.join(
+    home,
+    '.local',
+    'share',
+    'kilo',
+    'cloud-agent',
+    'git-credentials'
+  );
+  fs.mkdirSync(path.dirname(credentialFile), { recursive: true });
+  fs.writeFileSync(
+    credentialFile,
+    `${records
+      .map(record =>
+        Object.entries(record)
+          .map(([key, value]) => `${key}=${value}`)
+          .join('\n')
+      )
+      .join('\n\n')}\n`
+  );
+  return credentialFile;
+}
+
+function twoMemberGitHubSet(): Array<Record<string, string>> {
+  return [
+    {
+      protocol: 'https',
+      host: 'github.com',
+      path: 'org/one',
+      username: 'x-access-token',
+      password: 'kgh2.one',
+    },
+    {
+      protocol: 'https',
+      host: 'github.com',
+      path: 'org/two',
+      username: 'x-access-token',
+      password: 'kgh2.two',
+    },
+  ];
+}
+
 function runHelper(
   action: string | undefined,
   input: string,
@@ -554,5 +603,148 @@ describe('kilo-git-credential', () => {
     expect(result.stdout).toBe('');
     expect(fs.existsSync(path.join(result.home, '.git-credentials'))).toBe(false);
     expect(fs.readdirSync(result.home)).toEqual([]);
+  });
+
+  it('selects one repository from a path-qualified set', () => {
+    const home = createHelperHome();
+    writeCredentialRecords(home, twoMemberGitHubSet());
+
+    const second = runHelper(
+      'get',
+      credentialInputWithPath('https', 'github.com', 'org/two'),
+      {},
+      { home }
+    );
+    expect(second.status).toBe(0);
+    const parsed = parseCredential(second.stdout);
+    expect(parsed.username).toBe('x-access-token');
+    expectPassword(parsed.password, 'kgh2.two');
+
+    const first = runHelper(
+      'get',
+      credentialInputWithPath('https', 'github.com', 'org/one'),
+      {},
+      { home }
+    );
+    expect(first.status).toBe(0);
+    expectPassword(parseCredential(first.stdout).password, 'kgh2.one');
+  });
+
+  it('matches a .git request path against the record path', () => {
+    const home = createHelperHome();
+    writeCredentialRecords(home, twoMemberGitHubSet());
+
+    const result = runHelper(
+      'get',
+      credentialInputWithPath('https', 'github.com', 'org/one.git'),
+      {},
+      { home }
+    );
+    expect(result.status).toBe(0);
+    expectPassword(parseCredential(result.stdout).password, 'kgh2.one');
+  });
+
+  it('returns nothing for an ambiguous pathless query against a path-qualified set', () => {
+    const home = createHelperHome();
+    writeCredentialRecords(home, twoMemberGitHubSet());
+
+    const result = runHelper(
+      'get',
+      credentialInput('https', 'github.com'),
+      { GH_TOKEN: 'kgh2.environment' },
+      { home }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
+  });
+
+  it('returns nothing for an unknown path against a path-qualified set', () => {
+    const home = createHelperHome();
+    writeCredentialRecords(home, twoMemberGitHubSet());
+
+    const result = runHelper(
+      'get',
+      credentialInputWithPath('https', 'github.com', 'org/three'),
+      { GH_TOKEN: 'kgh2.environment' },
+      { home }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
+  });
+
+  it('still falls back to an environment token when no record matches the host', () => {
+    const home = createHelperHome();
+    writeCredentialRecords(home, twoMemberGitHubSet());
+
+    const result = runHelper(
+      'get',
+      credentialInputWithPath('https', 'gitlab.com', 'group/project'),
+      { GITLAB_TOKEN: 'kgl2.environment' },
+      { home }
+    );
+    expect(result.status).toBe(0);
+    expectPassword(parseCredential(result.stdout).password, 'kgl2.environment');
+  });
+  describe('one record for each host', () => {
+    const hostRecords = (): Array<Record<string, string>> => [
+      {
+        protocol: 'https',
+        host: 'github.com',
+        username: 'x-access-token',
+        password: 'kcp1.github-alias',
+      },
+      { protocol: 'https', host: 'gitlab.com', username: 'oauth2', password: 'kcp1.gitlab-alias' },
+    ];
+
+    it('answers each host with its own alias, whatever the repository', () => {
+      const home = createHelperHome();
+      writeCredentialRecords(home, hostRecords());
+
+      const github = runHelper('get', credentialInput('https', 'github.com'), {}, { home });
+      expect(github.status).toBe(0);
+      expect(parseCredential(github.stdout).username).toBe('x-access-token');
+      expectPassword(parseCredential(github.stdout).password, 'kcp1.github-alias');
+
+      const gitlab = runHelper('get', credentialInput('https', 'gitlab.com'), {}, { home });
+      expect(gitlab.status).toBe(0);
+      expect(parseCredential(gitlab.stdout).username).toBe('oauth2');
+      expectPassword(parseCredential(gitlab.stdout).password, 'kcp1.gitlab-alias');
+    });
+
+    it('fails closed when two records name one host', () => {
+      const home = createHelperHome();
+      writeCredentialRecords(home, [
+        ...hostRecords(),
+        {
+          protocol: 'https',
+          host: 'github.com',
+          username: 'x-access-token',
+          password: 'kcp1.second-alias',
+        },
+      ]);
+
+      const result = runHelper(
+        'get',
+        credentialInput('https', 'github.com'),
+        { GH_TOKEN: 'kgh2.environment' },
+        { home }
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('');
+    });
+
+    it('falls back to an environment token for a host with no record', () => {
+      const home = createHelperHome();
+      writeCredentialRecords(home, hostRecords());
+
+      const result = runHelper(
+        'get',
+        credentialInput('https', 'bitbucket.org'),
+        { BITBUCKET_TOKEN: 'kbb1.environment' },
+        { home }
+      );
+      expect(result.status).toBe(0);
+      expectPassword(parseCredential(result.stdout).password, 'kbb1.environment');
+    });
   });
 });

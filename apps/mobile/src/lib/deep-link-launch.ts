@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the launch capture, the pending slot and its durable mirror share one module so their precedence rules cannot drift */
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
@@ -8,7 +9,7 @@ import {
 } from '@kilocode/app-shared/universal-links';
 
 import { currentRouteHref } from './current-route-href';
-import { opensDestination } from './deep-link-destination';
+import { opensDestination, shellRouteHref } from './deep-link-destination';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
@@ -57,6 +58,10 @@ let pendingSource: DeepLinkSource | null = null;
 // The href the cold-start capture stashed; 'none' once handled without one;
 // null until the capture has run.
 let launchCapturedHref: string | null = null;
+
+// The launch opened one of the app's own routes (`kiloapp:///(app)/…`): the
+// request this process started for, which the relaunch repair leaves alone.
+let launchCapturedAppRoute = false;
 
 // True while the pending slot holds a universal link the cold-launch capture
 // derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
@@ -529,6 +534,17 @@ export function captureLaunchDeepLink(): void {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
       sessionBound: isSystemSearchFamilyLink(url),
     });
+    return;
+  }
+  // A launch that names one of the app's own routes is captured for the same
+  // reason, and latched so the relaunch repair leaves it to the consumer.
+  const appRoute = shellRouteHref(url);
+  if (appRoute !== null) {
+    launchCapturedHref = appRoute;
+    launchCapturedAppRoute = true;
+    setPendingDeepLink(appRoute, 'universal-link', {
+      fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+    });
   }
 }
 
@@ -541,6 +557,12 @@ export function wasLaunchLinkHandled(): string | null {
   return launchCapturedHref === 'none' ? null : launchCapturedHref;
 }
 
+/** Whether the launch opened one of the app's own routes, which the relaunch
+ *  repair must leave to the pending consumer. */
+export function wasLaunchAppRouteCaptured(): boolean {
+  return launchCapturedAppRoute;
+}
+
 /** Test-only: reset module-private latch, pending slot, and listeners between cases. */
 export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
@@ -550,6 +572,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
   launchCapturedHref = null;
+  launchCapturedAppRoute = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
   currentDeepLinkUserId = null;

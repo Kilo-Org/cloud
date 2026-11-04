@@ -109,7 +109,6 @@ const publisher = jest.requireMock<typeof UsagePublisher>(
   '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
 );
 const config = jest.requireMock<{
-  USAGE_SHADOW_PUBLISH_ENABLED: boolean;
   USAGE_QUEUE_ONLY_ENABLED: boolean;
   USAGE_INGEST_URL: string;
   USAGE_INGEST_PUBLISH_SECRET: string;
@@ -171,6 +170,7 @@ const context: MicrodollarUsageContext = {
   machine_id: null,
   user_byok: false,
   is_free: false,
+  custom_llm_pricing: null,
   has_tools: false,
   feature: null,
   session_id: null,
@@ -178,6 +178,7 @@ const context: MicrodollarUsageContext = {
   auto_model: null,
   ttfb_ms: null,
   reasoning_setting: 'medium',
+  inference_region: 'eu',
 };
 let warn: jest.SpyInstance<ReturnType<typeof console.warn>, Parameters<typeof console.warn>>;
 let error: jest.SpyInstance<ReturnType<typeof console.error>, Parameters<typeof console.error>>;
@@ -227,7 +228,6 @@ beforeEach(() => {
         '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
       ).enqueueUsage
     );
-  config.USAGE_SHADOW_PUBLISH_ENABLED = false;
   config.USAGE_QUEUE_ONLY_ENABLED = false;
   queueConfig.USAGE_VERCEL_QUEUE_ENABLED = false;
   jest.mocked(enqueueVercelUsage).mockReset();
@@ -254,7 +254,6 @@ describe('Vercel queued accounting lifetime', () => {
     async ({ region, mode, accepted }) => {
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       queueConfig.USAGE_VERCEL_QUEUE_ENABLED = true;
-      config.USAGE_SHADOW_PUBLISH_ENABLED = true;
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const publication = Promise.withResolvers<Awaited<ReturnType<typeof enqueueVercelUsage>>>();

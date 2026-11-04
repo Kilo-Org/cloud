@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -10,8 +10,11 @@ import type {
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import { createPreparationManager } from './prepare.js';
+import { createPreparationManager, type PrepareDeps } from './prepare.js';
 import { readWorkspaceStamp } from './workspace-stamp.js';
+import { directoryHome } from './workspace-home.js';
+import { profileConfigPath } from './runtime-profile.js';
+import { gitCredentialRecordPath } from '../control/git-credentials.js';
 
 // These tests run real git against a local origin. A mocked git proves the command
 // sequence; only a real repository proves an adopted snapshot ends on the same
@@ -80,15 +83,32 @@ function spec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRoute
   };
 }
 
-function manager(allocationId: string) {
+function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
+  const runtimeEnvs: Record<string, string>[] = [];
+  const restore = mock<NonNullable<PrepareDeps['restore']>>(async () => ({
+    ok: true,
+    downloaded: true,
+    imported: true,
+    diffs: { applied: 0, skipped: 0, total: 0 },
+  }));
+  const runSetup = mock(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
+  const recoverWorktree = mock(async () => ({
+    applied: 0,
+    skipped: 0,
+    total: 0,
+    skippedDiffs: [],
+  }));
   const prepared = createPreparationManager({
     timers: CONTROL_PLANE_TIMERS,
     allocationId,
     emit: frame => frames.push(frame),
     runtimes: {
-      ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
+      ensure: async input => {
+        runtimeEnvs.push(input.env);
+        return { serverUrl: 'http://127.0.0.1:1' } as unknown as WrapperKiloClient;
+      },
       installCredentials: async () => undefined,
       isUnavailable: () => false,
       getLiveClient: () => undefined,
@@ -104,9 +124,13 @@ function manager(allocationId: string) {
     },
     seedRegistration: async () => undefined,
     sessionExists: async () => true,
+    restore,
+    runSetup,
+    recoverWorktree,
     sleep: async () => undefined,
+    ...overrides,
   });
-  return { prepared, frames, gitCalls };
+  return { prepared, frames, gitCalls, restore, runtimeEnvs, runSetup, recoverWorktree };
 }
 
 function ready(frames: ControlPlaneWrapperFrame[]) {
@@ -134,9 +158,17 @@ describe('adopting an environment snapshot against a real repository', () => {
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
     expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     expect(git(directory, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('session/scope-2');
+    expect(
+      git(directory, 'for-each-ref', '--format=%(upstream)', 'refs/heads/session/scope-2')
+    ).toBe('');
     expect(git(directory, 'rev-parse', 'HEAD')).toBe(tip);
-    expect(git(directory, 'branch', '--format=%(refname:short)')).toBe('session/scope-2');
-    expect(await readWorkspaceStamp(directory, true)).toEqual({
+    expect(git(directory, 'branch', '--format=%(refname:short)').split('\n')).toEqual([
+      'main',
+      'session/scope-1',
+      'session/scope-2',
+    ]);
+    expect(restored.gitCalls.filter(args => args[0] === 'checkout')).toHaveLength(1);
+    expect(await readWorkspaceStamp(directory)).toEqual({
       allocationId: 'alloc-restored',
       commit: tip,
     });
@@ -192,11 +224,78 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
-  it('falls back to a fresh clone when the snapshot cannot be reconciled', async () => {
+  it('checks out the target without first touching a conflicting default branch', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    git(author, 'checkout', '-q', '-b', 'feature');
+    const featureTip = commitFile('feature.txt', 'feature', 'feature commit');
+    git(author, 'push', '-q', 'origin', 'feature');
+    git(author, 'checkout', '-q', 'main');
+    commitFile('README', 'new default', 'advance default');
+    git(author, 'push', '-q', 'origin', 'main');
+    await fs.writeFile(path.join(directory, 'README'), 'edited by setup');
+    await fs.mkdir(path.join(directory, 'node_modules'));
+    await fs.writeFile(path.join(directory, 'node_modules', 'dep.js'), 'prepared dependency');
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'feature' }));
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(featureTip);
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('edited by setup');
+    expect(await fs.readFile(path.join(directory, 'node_modules', 'dep.js'), 'utf8')).toBe(
+      'prepared dependency'
+    );
+    expect(restored.gitCalls.filter(args => args[0] === 'checkout')).toHaveLength(1);
+    expect(restored.gitCalls.some(args => args[0] === 'clone' || args[0] === 'branch')).toBe(false);
+    expect(restored.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-head')).toBe(
+      false
+    );
+  });
+
+  it('creates an unpushed working branch from the current default, not a stale local branch', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const tip = commitFile('README', 'two', 'advance default');
+    git(author, 'push', '-q', 'origin', 'main');
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'session/scope-1', branchMode: 'working' }));
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(tip);
+    expect(git(directory, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('session/scope-1');
+    expect(
+      git(directory, 'for-each-ref', '--format=%(upstream)', 'refs/heads/session/scope-1')
+    ).toBe('');
+    expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+  });
+
+  it('reports a missing requested branch without deleting the snapshot', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const stamp = await readWorkspaceStamp(directory);
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ branch: 'missing' }));
+
+    expect(restored.frames.findLast(frame => frame.type === 'session.failed')).toMatchObject({
+      step: 'restore',
+      subtype: 'git_branch_missing',
+    });
+    expect(restored.gitCalls.some(args => args[0] === 'clone' || args[0] === 'checkout')).toBe(
+      false
+    );
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('one');
+  });
+
+  it('preserves setup changes and dependencies when checkout conflicts with upstream', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
     const localEdit = path.join(directory, 'README');
     await fs.writeFile(localEdit, 'edited by setup');
+    await fs.mkdir(path.join(directory, 'node_modules'));
+    const dependency = path.join(directory, 'node_modules', 'dep.js');
+    await fs.writeFile(dependency, 'prepared dependency');
+    const stamp = await readWorkspaceStamp(directory);
 
     commitFile('README', 'two', 'second');
     git(author, 'push', '-q', 'origin', 'main');
@@ -204,12 +303,14 @@ describe('adopting an environment snapshot against a real repository', () => {
     const restored = manager('alloc-restored');
     await restored.prepared.prepare(spec({ sessionId: 'ses_b' }));
 
-    expect(ready(restored.frames)).toMatchObject({ workspace: 'cloned' });
-    expect(restored.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(await fs.readFile(localEdit, 'utf8')).toBe('two');
-    expect(await readWorkspaceStamp(directory, true)).toMatchObject({
-      allocationId: 'alloc-restored',
+    expect(restored.frames.findLast(frame => frame.type === 'session.failed')).toMatchObject({
+      step: 'checkout',
+      subtype: 'git_checkout_conflict',
     });
+    expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(await fs.readFile(localEdit, 'utf8')).toBe('edited by setup');
+    expect(await fs.readFile(dependency, 'utf8')).toBe('prepared dependency');
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
   });
 
   it('rewrites a credential-bearing origin to the canonical URL before Kilo starts', async () => {
@@ -240,5 +341,132 @@ describe('adopting an environment snapshot against a real repository', () => {
     expect(ready(second.frames)).toMatchObject({ workspace: 'same' });
     expect(git(directory, 'rev-parse', 'HEAD')).toBe(commit);
     expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local changes');
+  });
+});
+
+describe('restoring a private session disk snapshot', () => {
+  const provenance = { sourceAllocationId: 'alloc-source' };
+
+  it('preserves local git, files, home and history while refreshing credentials and config', async () => {
+    await manager('alloc-source').prepared.prepare(spec());
+    git(directory, 'checkout', '-q', '-b', 'local-work');
+    await fs.writeFile(path.join(directory, '.gitignore'), 'node_modules/\n');
+    await fs.writeFile(path.join(directory, 'local-commit.txt'), 'unpushed commit\n');
+    git(directory, 'add', '.gitignore', 'local-commit.txt');
+    git(directory, 'commit', '-q', '-m', 'local only');
+    git(directory, 'branch', 'another-local-branch');
+    await fs.writeFile(path.join(directory, 'README'), 'staged\n');
+    git(directory, 'add', 'README');
+    await fs.writeFile(path.join(directory, 'README'), 'unstaged\n');
+    await fs.writeFile(path.join(directory, 'untracked.txt'), 'untracked\n');
+    await fs.mkdir(path.join(directory, 'node_modules'));
+    await fs.writeFile(path.join(directory, 'node_modules', 'cached'), 'ignored dependency\n');
+    const home = directoryHome(directory, path.join(root, 'homes'));
+    await fs.writeFile(path.join(home, 'user-state'), 'home state\n');
+    await fs.mkdir(path.dirname(profileConfigPath(home)), { recursive: true });
+    await fs.writeFile(profileConfigPath(home), '{"agent":{"stale":{}}}');
+    git(directory, 'remote', 'set-url', 'origin', 'https://old:secret@github.com/acme/repo.git');
+    const status = git(directory, 'status', '--porcelain=v1', '--untracked-files=all');
+    const refs = git(directory, 'show-ref', '--heads');
+    const head = git(directory, 'rev-parse', 'HEAD');
+    const restored = manager('alloc-restored');
+    const restoredSpec = spec({
+      branch: 'main',
+      sessionSnapshot: provenance,
+      setupCommands: ['must not replay'],
+      worktreeRecovery: { files: [{ path: 'README', status: 'modified', patch: 'older patch' }] },
+      git: { url: 'https://github.com/acme/repo.git', token: 'current-git-token' },
+      env: { CURRENT_CONFIG: 'refreshed' },
+    });
+
+    await restored.prepared.prepare(restoredSpec);
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(directory, 'status', '--porcelain=v1', '--untracked-files=all')).toBe(status);
+    expect(git(directory, 'show-ref', '--heads')).toBe(refs);
+    expect(git(directory, 'branch', '--show-current')).toBe('local-work');
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
+    expect(git(directory, 'show', ':README')).toBe('staged');
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('unstaged\n');
+    expect(await fs.readFile(path.join(directory, 'untracked.txt'), 'utf8')).toBe('untracked\n');
+    expect(await fs.readFile(path.join(directory, 'node_modules', 'cached'), 'utf8')).toBe(
+      'ignored dependency\n'
+    );
+    expect(await fs.readFile(path.join(home, 'user-state'), 'utf8')).toBe('home state\n');
+    expect(await fs.stat(profileConfigPath(home)).catch(() => null)).toBeNull();
+    expect(git(directory, 'remote', 'get-url', 'origin')).toBe('https://github.com/acme/repo.git');
+    expect(restored.runtimeEnvs[0]?.CURRENT_CONFIG).toBe('refreshed');
+    expect(await fs.readFile(gitCredentialRecordPath(home), 'utf8')).toContain(
+      'password=current-git-token\n'
+    );
+    expect(restored.restore).not.toHaveBeenCalled();
+    expect(restored.runSetup).not.toHaveBeenCalled();
+    expect(restored.recoverWorktree).not.toHaveBeenCalled();
+    expect(
+      restored.gitCalls.some(args => ['clone', 'fetch', 'checkout', 'branch'].includes(args[0]!))
+    ).toBe(false);
+  });
+
+  it('fails a source allocation mismatch without touching recovered files or starting Kilo', async () => {
+    await manager('alloc-source').prepared.prepare(spec());
+    await fs.writeFile(path.join(directory, 'recovered.txt'), 'keep me');
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ sessionSnapshot: { sourceAllocationId: 'other' } }));
+    expect(restored.frames.at(-1)).toMatchObject({
+      type: 'session.failed',
+      reason: 'workspace_setup_failed',
+      step: 'restore',
+    });
+    expect(restored.gitCalls).toEqual([]);
+    expect(restored.runtimeEnvs).toEqual([]);
+    expect(restored.runSetup).not.toHaveBeenCalled();
+    expect(await fs.readFile(path.join(directory, 'recovered.txt'), 'utf8')).toBe('keep me');
+  });
+
+  it('defers stamping until session resolution succeeds and falls back to history-only ingest', async () => {
+    await manager('alloc-source').prepared.prepare(spec());
+    const failed = manager('alloc-restored', {
+      sessionExists: async () => false,
+      restore: async () => ({ ok: false, error: 'unavailable', code: 503, step: 'download' }),
+    });
+    await failed.prepared.prepare(spec({ sessionSnapshot: provenance }));
+    expect(failed.frames.at(-1)).toMatchObject({ type: 'session.failed', step: 'kilo_session' });
+    expect(await readWorkspaceStamp(directory)).toMatchObject({
+      allocationId: 'alloc-source',
+    });
+    const restarted = manager('alloc-restored', { sessionExists: async () => false });
+    await restarted.prepared.prepare(spec({ sessionSnapshot: provenance }));
+    expect(ready(restarted.frames)).toBeDefined();
+    expect(restarted.restore.mock.calls[0]?.[3]?.restoreFiles).toBe(false);
+  });
+
+  it.each([false, true])('restores a bare session with git init=%s', async initializeGit => {
+    const bareSpec = spec({ git: undefined });
+    await manager('alloc-source').prepared.prepare(bareSpec);
+    if (initializeGit) git(directory, 'init', '-q', '-b', 'local-work');
+    await fs.writeFile(path.join(directory, 'local.txt'), 'local commit\n');
+    if (initializeGit) {
+      git(directory, 'add', 'local.txt');
+      git(directory, 'commit', '-q', '-m', 'local only');
+    }
+    const head = initializeGit ? git(directory, 'rev-parse', 'HEAD') : '';
+    const restored = manager('alloc-restored');
+
+    await restored.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local commit\n');
+    expect(await readWorkspaceStamp(directory)).toMatchObject({
+      allocationId: 'alloc-restored',
+      commit: head,
+      workspacePrepared: false,
+    });
+    const restarted = manager('alloc-restored');
+    await restarted.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
+    expect(ready(restarted.frames)).toMatchObject({ workspace: 'same' });
+    if (initializeGit) expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
+    const normal = manager('alloc-restored');
+    await normal.prepared.prepare({ ...bareSpec, setupCommands: ['normal setup'] });
+    expect(normal.runSetup).toHaveBeenCalledTimes(1);
   });
 });

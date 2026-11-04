@@ -60,7 +60,7 @@ function purlType(purl) {
 // A purl without a version cannot be matched against an advisory range.
 function hasVersion(purl) {
   const path = purl.split(/[?#]/)[0];
-  return path.lastIndexOf('@') > path.indexOf('/');
+  return path.lastIndexOf('@') > path.lastIndexOf('/') && !path.endsWith('@');
 }
 
 function* walkComponents(components) {

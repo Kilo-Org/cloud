@@ -32,6 +32,8 @@ const bom = {
     { type: 'library', name: 'apt', purl: 'pkg:deb/debian/apt@3.0.3?arch=amd64&distro=debian-13' },
     { type: 'application', name: 'node', purl: 'pkg:generic/node@24.11.0' },
     { type: 'library', name: 'unversioned', purl: 'pkg:npm/unversioned' },
+    { type: 'library', name: '@scope/unversioned', purl: 'pkg:npm/@scope/unversioned' },
+    { type: 'library', name: 'empty-version', purl: 'pkg:npm/empty-version@' },
     { type: 'file', name: '/etc/passwd' },
   ],
 };

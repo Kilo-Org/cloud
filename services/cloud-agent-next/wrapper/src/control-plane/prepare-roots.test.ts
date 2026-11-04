@@ -650,6 +650,10 @@ describe('preparing a route with one git root', () => {
     expect(harness.clones()).toEqual([{ url: API_URL, directory: API }]);
     expect(harness.setups).toEqual([{ command: 'npm install', directory: API }]);
     expect([...harness.stamps.keys()]).toEqual([API]);
+    // The route names one repository, so its name adds nothing to the phase
+    // progress: the step's own message names the work.
+    expect(progressDetails(harness.frames, 'clone')).toEqual([null]);
+    expect(progressDetails(harness.frames, 'checkout')).toEqual([null]);
   });
 });
 

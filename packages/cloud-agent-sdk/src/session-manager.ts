@@ -29,6 +29,7 @@ import {
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
+import { upsertByRequestId } from './pending-requests';
 import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
@@ -921,17 +922,6 @@ function pendingDeliveryStatesEqual(
   return true;
 }
 
-function upsertPendingRequest<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 /** True when two request lists name the same requests in the same order. */
 function sameRequestIds(
   a: readonly { requestId: string }[],
@@ -949,6 +939,25 @@ function removePendingRequest<T extends { requestId: string }>(
   return list.some(entry => entry.requestId === requestId)
     ? list.filter(entry => entry.requestId !== requestId)
     : list;
+}
+
+/**
+ * Composer readiness from the session's cloud status. No reported status yet,
+ * a settled agent, or a failed cloud status all count as ready; an active
+ * cloud-agent session stays ready while the infrastructure prepares or
+ * finalizes, because the CLI queues those sends.
+ */
+function isCloudReady(
+  cloudStatus: CloudStatus | null,
+  sessionType: ActiveSessionType | null
+): boolean {
+  return (
+    cloudStatus === null ||
+    cloudStatus.type === 'ready' ||
+    cloudStatus.type === 'error' ||
+    (sessionType === 'cloud-agent' &&
+      (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'))
+  );
 }
 
 /**
@@ -1908,13 +1917,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function updateCapabilityAtoms(session: CloudAgentSession): void {
-    const cloudStatus = store.get(cloudStatusAtom);
-    const cloudReady =
-      cloudStatus === null ||
-      cloudStatus.type === 'ready' ||
-      cloudStatus.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const liveCanSend = activeSessionType !== 'read-only' && session.canSend && cloudReady;
     if (postInterruptUnlock) {
       if (liveCanSend) {
@@ -2109,10 +2112,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
       store.set(setupLogAtom, session.state.getSetupLog());
-      transcriptRows.applyLive(
-        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : [],
-        session.state.getCommits()
-      );
+      transcriptRows.applyLive(session.state.getPreparationAttempts(), session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -2941,7 +2941,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onQuestionAsked: (requestId, questions) => {
         if (!questions) return;
-        const next = upsertPendingRequest(store.get(pendingQuestionsAtom), {
+        const next = upsertByRequestId(store.get(pendingQuestionsAtom), {
           requestId,
           questions,
         });
@@ -2955,7 +2955,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onPermissionAsked: (requestId, permission, patterns, metadata, always) => {
         if (!permission) return;
-        const next = upsertPendingRequest(store.get(pendingPermissionsAtom), {
+        const next = upsertByRequestId(store.get(pendingPermissionsAtom), {
           requestId,
           permission,
           patterns: patterns ?? [],
@@ -3565,13 +3565,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * the CLI is still winding down are queued CLI-side.
    */
   function restoreAfterInterrupt(session: CloudAgentSession): void {
-    const cs = store.get(cloudStatusAtom);
-    const cloudReady =
-      cs === null ||
-      cs.type === 'ready' ||
-      cs.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cs.type === 'preparing' || cs.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const readOnly = activeSessionType === 'read-only';
     postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);

@@ -33,7 +33,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/transcriptions/transcription-request';
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayUsageContextBase,
   organizationProviderPreferences,

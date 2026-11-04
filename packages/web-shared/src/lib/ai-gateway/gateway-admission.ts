@@ -15,7 +15,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';

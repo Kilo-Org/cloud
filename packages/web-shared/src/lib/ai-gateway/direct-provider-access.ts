@@ -8,7 +8,7 @@ import {
   readGatewayBalance,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 export type DirectProviderAccessResult =
   | { rejection: NextResponse; access?: never }

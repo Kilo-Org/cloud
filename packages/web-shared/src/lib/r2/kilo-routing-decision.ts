@@ -1,3 +1,4 @@
+import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type {
   KiloRoutingDecisionRecord,
   ProviderRoutingDecision,
@@ -7,12 +8,15 @@ import {
   scheduleAiProviderMetadataArchive,
 } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
 import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const LOG_SOURCE = 'kilo-routing-decision';
 
 export type AiProviderMetadataCapture = {
   captureRoutingDecision: (decision: ProviderRoutingDecision) => void;
   captureVercelMetadata: (value: unknown) => void;
+  /** Called at upload time, after the response. */
+  captureEnkryptReport: (report: () => Promise<EnkryptGuardrailReport | null>) => void;
   waitFor: (promise: Promise<unknown>) => void;
 };
 
@@ -25,6 +29,7 @@ export function createAiProviderMetadataCapture(
   const vercel = createVercelProviderMetadataCollector();
   let record: KiloRoutingDecisionRecord | undefined;
   let parsing: Promise<void> | undefined;
+  let enkryptReport: (() => Promise<EnkryptGuardrailReport | null>) | undefined;
 
   return {
     captureRoutingDecision(decision) {
@@ -43,12 +48,26 @@ export function createAiProviderMetadataCapture(
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();
-          return JSON.stringify({ ...record, ...(metadata ? { vercel: { metadata } } : {}) });
+          const enkrypt = await enkryptReport?.().catch((error: unknown) => {
+            errorExceptInTest(`[${LOG_SOURCE}] Enkrypt report failed; archived without it`, {
+              usageId,
+              errorType: error instanceof Error ? error.name : 'unknown',
+            });
+            return null;
+          });
+          return JSON.stringify({
+            ...record,
+            ...(metadata ? { vercel: { metadata } } : {}),
+            ...(enkrypt ? { enkrypt } : {}),
+          });
         },
       });
     },
     captureVercelMetadata(value) {
       vercel.capture(value, record?.api_kind);
+    },
+    captureEnkryptReport(report) {
+      enkryptReport = report;
     },
     waitFor(promise) {
       parsing = promise.then(

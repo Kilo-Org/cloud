@@ -1,21 +1,84 @@
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import { z } from 'zod';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
   NotYetCostedUsageStats,
   VercelProviderAttempt,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
+export const vercelProviderMetadataSchema = z.looseObject({
+  gateway: z
+    .looseObject({
+      cost: z.string().optional(),
+      marketCost: z.string().optional(),
+      routing: z
+        .looseObject({
+          canonicalSlug: z.string().optional(),
+          finalProvider: z.string().optional(),
+          modelAttempts: z
+            .array(
+              z.looseObject({
+                canonicalSlug: z.string().optional(),
+                success: z.boolean().optional(),
+                providerAttempts: z
+                  .array(
+                    z.looseObject({
+                      provider: z.string().optional(),
+                      credentialType: z.string().optional(),
+                      success: z.boolean().optional(),
+                      providerRequestId: z.string().optional(),
+                      providerResponseId: z.string().optional(),
+                    })
+                  )
+                  .optional(),
+              })
+            )
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export const usageCostSchema = z.object({
+  cost: z.number().nullish(),
+  is_byok: z.boolean().nullish(),
+  cost_details: z.object({ upstream_inference_cost: z.number().nullish() }).nullish(),
+});
+
+export const upstreamStreamErrorSchema = z.object({
+  message: z.string().nullish(),
+  code: z.union([z.number(), z.string()]).nullish(),
+  type: z.string().nullish(),
+  error_type: z.string().nullish(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const openRouterUsageSchema = usageCostSchema.extend({
+  prompt_tokens: z.number().nullish(),
+  completion_tokens: z.number().nullish(),
+  prompt_tokens_details: z
+    .object({
+      cached_tokens: z.number().nullish(),
+      cache_write_tokens: z.number().nullish(),
+      cache_creation_input_tokens: z.number().nullish(),
+    })
+    .nullish(),
+});
+
 type OpenRouterCostFields = {
-  cost?: number;
+  cost?: number | null;
   is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost?: number | null };
+  cost_details?: { upstream_inference_cost?: number | null } | null;
 };
 
 function byokFee_USD(provider: ProviderType, upstreamInferenceCost_USD: number) {
@@ -317,6 +380,55 @@ export function reportUpstreamStreamError(params: {
 
 export type ResponseTiming = Pick<NotYetCostedUsageStats, 'latency' | 'generation_time'>;
 
+export async function parseUsageWithRecovery(
+  response: Response,
+  context: MicrodollarUsageContext,
+  parse: () => MicrodollarUsageStats | null | Promise<MicrodollarUsageStats | null>
+): Promise<MicrodollarUsageStats> {
+  try {
+    const stats = await parse();
+    if (!stats) throw new Error('Missing usage response body');
+    stats.messageId ??= response.headers.get('x-generation-id');
+    return stats;
+  } catch {
+    const messageId = response.headers.get('x-generation-id');
+    captureException(new Error('Unable to read or parse upstream usage response'), {
+      tags: { source: 'usage_response_parsing', api_kind: context.api_kind },
+      extra: {
+        usageId: context.usageId,
+        kiloUserId: context.kiloUserId,
+        organizationId: context.organizationId,
+        provider: context.provider,
+        messageId,
+      },
+    });
+    const contentType = response.headers.get('content-type');
+    return {
+      messageId,
+      model: null,
+      responseContent: '',
+      hasError: true,
+      inference_provider: null,
+      upstream_id: null,
+      finish_reason: null,
+      latency: null,
+      moderation_latency: null,
+      generation_time: null,
+      streamed: contentType?.includes('application/json')
+        ? false
+        : contentType?.includes('text/event-stream') || context.isStreaming,
+      cancelled: null,
+      status_code: response.status,
+      cost_mUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      is_byok: null,
+    };
+  }
+}
+
 /**
  * Records when the first and final chunks of an upstream response arrive. The
  * gateway measures this itself, rather than trusting upstream-reported timings,
@@ -356,7 +468,7 @@ const isWhitespace = (text: string) => text.trim() === '';
 
 /**
  * Drains an SSE response body, calling `onEvent` for each parsed event. Handles
- * stream processing failures gracefully and always releases the reader lock and
+ * stream processing failures gracefully and always cleans up the reader and
  * ends `streamProcessingSpan`.
  *
  * Each SSE event is a chunk for the response timing, so keep-alive comments such
@@ -364,29 +476,39 @@ const isWhitespace = (text: string) => text.trim() === '';
  * body without any event, such as a JSON error, is timed by its non-whitespace
  * chunks instead.
  *
- * `wasAborted` is `true` if the stream was aborted before completion.
+ * Malformed events are skipped so later events can still supply usage.
  */
 export async function drainSseStream(
   stream: ReadableStream<Uint8Array>,
   onEvent: (event: EventSourceMessage) => void,
   streamProcessingSpan: Span,
-  requestStartedAt: number | undefined
-): Promise<{ wasAborted: boolean; timing: ResponseTiming }> {
+  requestStartedAt: number | undefined,
+  getIds?: () => Record<string, string | null | undefined>
+): Promise<{ wasAborted: boolean; malformedEventCount: number; timing: ResponseTiming }> {
   const eventTimer = createChunkTimer();
   const chunkTimer = createChunkTimer();
+  let malformedEventCount = 0;
   const sseStreamParser = createParser({
     onEvent(event) {
       eventTimer.markChunk();
-      onEvent(event);
+      try {
+        onEvent(event);
+      } catch {
+        malformedEventCount++;
+      }
     },
   });
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let wasAborted = false;
+  let reachedEof = false;
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        reachedEof = true;
+        break;
+      }
       const text = decoder.decode(value, { stream: true });
       if (!isWhitespace(text)) chunkTimer.markChunk();
       sseStreamParser.feed(text);
@@ -394,12 +516,27 @@ export async function drainSseStream(
   } catch (error) {
     errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
     wasAborted = true;
+    captureException(new Error('Unable to read upstream usage stream'), {
+      tags: { source: 'usage_stream_parsing' },
+      extra: getIds?.(),
+    });
   } finally {
+    if (!reachedEof) {
+      // A tee's cancellation waits for its sibling; accounting must not wait for it.
+      void reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
     streamProcessingSpan.end();
   }
+  if (malformedEventCount > 0) {
+    captureMessage('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: { ...getIds?.(), malformedEventCount },
+    });
+  }
   const timer = eventTimer.receivedChunk() ? eventTimer : chunkTimer;
-  return { wasAborted, timing: timer.timing(requestStartedAt) };
+  return { wasAborted, malformedEventCount, timing: timer.timing(requestStartedAt) };
 }
 
 /**

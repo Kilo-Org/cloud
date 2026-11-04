@@ -255,10 +255,7 @@ export async function getConflictingSlackInstallation(
     .select()
     .from(platform_integrations)
     .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        legacySlackWorkspaceCondition(teamId)
-      )
+      and(eq(platform_integrations.platform, PLATFORM.SLACK), legacySlackWorkspaceCondition(teamId))
     )
     .limit(1);
 

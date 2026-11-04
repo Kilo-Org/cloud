@@ -2,7 +2,7 @@ import 'server-only';
 import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
+import { reportFirewallRateLimitIssue } from '@kilocode/web-shared/lib/firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limits for the native sign-in exchange. The rules live in

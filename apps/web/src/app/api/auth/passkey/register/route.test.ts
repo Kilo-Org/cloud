@@ -20,7 +20,7 @@ import {
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
-import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
@@ -104,12 +104,17 @@ describe('POST /api/auth/passkey/register', () => {
   });
 
   it.each([
-    ['not-found', 'is not configured'],
-    ['blocked', 'could not be evaluated'],
+    ['not-found', { rateLimited: false, error: 'not-found' }, 'is not configured'],
+    ['blocked', { rateLimited: false, error: 'blocked' }, 'could not be evaluated'],
+    [
+      'blocked despite the rate-limit flag',
+      { rateLimited: true, error: 'blocked' },
+      'could not be evaluated',
+    ],
   ] as const)(
     'refuses minting when the registration limiter reports %s',
-    async (error, message) => {
-      mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+    async (_condition, result, message) => {
+      mockCheckRateLimit.mockResolvedValue(result);
 
       const response = await POST(createRequest({ action: 'options' }));
 
@@ -122,6 +127,16 @@ describe('POST /api/auth/passkey/register', () => {
       );
     }
   );
+
+  it('refuses minting when the registration limiter throws', async () => {
+    mockCheckRateLimit.mockRejectedValue(new Error('firewall unavailable'));
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+  });
 
   it('reports a not-found registration rule only once per interval', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });

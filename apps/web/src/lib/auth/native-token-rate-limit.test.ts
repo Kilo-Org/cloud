@@ -11,7 +11,7 @@ import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
 } from './native-token-rate-limit';
-import { __test__ as rateLimitTest } from './firewall-rate-limit';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);

@@ -18,7 +18,7 @@ import {
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
-import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 
 const mockCreateAuthenticationOptions = jest.mocked(createAuthenticationOptions);
 const mockVerifyAuthentication = jest.mocked(verifyAuthentication);
@@ -81,20 +81,38 @@ describe('POST /api/auth/passkey/authenticate', () => {
   });
 
   it.each([
-    ['not-found', 'is not configured'],
-    ['blocked', 'could not be evaluated'],
-  ] as const)('refuses minting when the options limiter reports %s', async (error, message) => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+    ['not-found', { rateLimited: false, error: 'not-found' }, 'is not configured'],
+    ['blocked', { rateLimited: false, error: 'blocked' }, 'could not be evaluated'],
+    [
+      'blocked despite the rate-limit flag',
+      { rateLimited: true, error: 'blocked' },
+      'could not be evaluated',
+    ],
+  ] as const)(
+    'refuses minting when the options limiter reports %s',
+    async (_condition, result, message) => {
+      mockCheckRateLimit.mockResolvedValue(result);
+
+      const response = await POST(createRequest({ action: 'options' }));
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+      expect(mockCreateAuthenticationOptions).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        `Firewall rate limit 'passkey-authentication-options' ${message}`,
+        { level: 'error', tags: { source: 'passkey_authenticate_options' } }
+      );
+    }
+  );
+
+  it('refuses minting when the options limiter throws', async () => {
+    mockCheckRateLimit.mockRejectedValue(new Error('firewall unavailable'));
 
     const response = await POST(createRequest({ action: 'options' }));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
     expect(mockCreateAuthenticationOptions).not.toHaveBeenCalled();
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      `Firewall rate limit 'passkey-authentication-options' ${message}`,
-      { level: 'error', tags: { source: 'passkey_authenticate_options' } }
-    );
   });
 
   it('rate limits the unauthenticated verify action', async () => {
@@ -113,21 +131,31 @@ describe('POST /api/auth/passkey/authenticate', () => {
     expect(mockVerifyAuthentication).not.toHaveBeenCalled();
   });
 
-  it('refuses verification when the verify limiter reports not-found', async () => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+  it.each([
+    ['not-found', { rateLimited: false, error: 'not-found' }, 'is not configured'],
+    [
+      'blocked despite the rate-limit flag',
+      { rateLimited: true, error: 'blocked' },
+      'could not be evaluated',
+    ],
+  ] as const)(
+    'refuses verification when the verify limiter reports %s',
+    async (_condition, result, message) => {
+      mockCheckRateLimit.mockResolvedValue(result);
 
-    const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: assertion })
-    );
+      const response = await POST(
+        createRequest({ action: 'verify', challengeId, response: assertion })
+      );
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
-    expect(mockVerifyAuthentication).not.toHaveBeenCalled();
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      "Firewall rate limit 'passkey-authentication-verify' is not configured",
-      { level: 'error', tags: { source: 'passkey_authenticate_verify' } }
-    );
-  });
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+      expect(mockVerifyAuthentication).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        `Firewall rate limit 'passkey-authentication-verify' ${message}`,
+        { level: 'error', tags: { source: 'passkey_authenticate_verify' } }
+      );
+    }
+  );
 
   it('reports a not-found options rule only once per interval', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });

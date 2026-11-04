@@ -7,7 +7,7 @@ import {
   verifyAuthentication,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 
 /**
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
+  // Authentication must refuse when either action's limiter is unavailable.
   try {
     if (parsed.data.action === 'options') {
       const limit = await checkFirewallRateLimit(OPTIONS_RATE_LIMIT_ID, {

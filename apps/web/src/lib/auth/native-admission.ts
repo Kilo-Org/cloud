@@ -14,7 +14,7 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
-import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
+import { reportFirewallRateLimitIssue } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────

@@ -39,7 +39,7 @@ import {
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
 import { checkRateLimit } from '@vercel/firewall';
-import { __test__ as rateLimitTest } from './firewall-rate-limit';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { db } from '@kilocode/web-shared/lib/drizzle';

@@ -7,7 +7,7 @@ import {
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       if (limit === 'limited') {
         return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
       }
+      // Passkey registration must refuse when its limiter is unavailable.
       if (limit === 'unavailable') {
         return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
       }

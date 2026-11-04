@@ -293,7 +293,7 @@ export async function resolveRuntimeProxyCredential(input: {
   const token = exp > now + 5 * 60_000 ? input.token : await input.renew();
   return {
     token,
-    transportProofRequired: parsedGrant.data.mode === 'contained',
+    transportProofRequired: true,
   };
 }
 

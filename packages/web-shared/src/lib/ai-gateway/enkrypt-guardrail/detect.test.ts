@@ -3,6 +3,8 @@ import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
+  guardrailBlockMessage,
+  responseBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -780,5 +782,19 @@ describe('scanRequest', () => {
         expect.objectContaining({ scan: 'log_only', decision: 'client_aborted' })
       );
     });
+  });
+});
+
+describe('responseBlockMessage', () => {
+  it('rewords the default block reason for a response', () => {
+    expect(responseBlockMessage(guardrailBlockMessage(['pii'], 'redacted text'))).toBe(
+      "Your organization's Enkrypt AI guardrail blocked the model's response (detected: pii). The response was flagged by your organization policy. Rephrase the request and retry."
+    );
+  });
+
+  it("keeps Enkrypt's block message", () => {
+    expect(responseBlockMessage(guardrailBlockMessage(['toxicity'], 'Toxic content.'))).toBe(
+      "Your organization's Enkrypt AI guardrail blocked the model's response (detected: toxicity). Toxic content."
+    );
   });
 });

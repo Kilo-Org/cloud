@@ -119,6 +119,7 @@ function isNotFound(error: unknown): boolean {
 
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
+  env?: { WORKER_URL?: string };
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
@@ -197,7 +198,8 @@ export function createVercelProviderAdapter(deps: {
       // reader failure prevents the create entirely.
       const networkPolicy = buildControlNetworkPolicy(
         await deps.readContainedGrants(),
-        await deps.readAcceptedRuntimeProxyHandles?.()
+        await deps.readAcceptedRuntimeProxyHandles?.(),
+        deps.env
       );
       const created = await restClient
         .createSandbox({
@@ -355,7 +357,8 @@ export function createVercelProviderAdapter(deps: {
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
       const networkPolicy = buildControlNetworkPolicy(
         grants,
-        await deps.readAcceptedRuntimeProxyHandles?.()
+        await deps.readAcceptedRuntimeProxyHandles?.(),
+        deps.env
       );
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,

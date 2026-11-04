@@ -65,7 +65,7 @@ function gitlabEntry(origin: string, projectPath: string, credential: string) {
         projectPath,
         integrationId: 'integration-1',
         authType: 'pat' as const,
-        identity: { accountId: null, accountLogin: null },
+        identity: { accountId: '1', accountLogin: 'gitlab-user' },
         glabIsOAuth2: false,
       },
     },
@@ -673,7 +673,7 @@ describe('a persisted V2 grant', () => {
         purpose: 'github' as const,
         alias: GITHUB_ALIAS,
         gitUrl: 'https://github.com/acme/widgets.git',
-        nativeToken: 'ghs_native',
+        capability: capability('kgh2.vercel'),
       }),
     ],
   ])('is invalid on a %s grant that holds additional repositories', (name, mode, launchScm) => {

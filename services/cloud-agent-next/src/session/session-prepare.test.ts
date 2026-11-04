@@ -103,6 +103,11 @@ vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
   sealRuntimeAuthorization: vi.fn(),
 }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
+// These cases cover allocation and ledger behavior, not the unverified Vercel SCM gate.
+vi.mock('../scm-broker/vercel-identity.js', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  verifiedVercelSandboxIdentityContract: { issuerForTeam: () => null, sandboxIdForRef: () => null },
+}));
 
 function modernContext(
   ctx: SessionRegistrationContext,
@@ -1497,7 +1502,7 @@ describe('explicit sandbox session creation', () => {
       expect(metadata.workspace).toMatchObject({
         worktreeId: WORKTREE_ID,
         sandboxAllocation,
-        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
       });
       expect(metadata.finalization?.autoCommit).toBe(true);
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
@@ -2128,18 +2133,15 @@ describe('explicit sandbox session creation', () => {
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     });
 
-    it('fails a ledger create whose credentials would be direct, before admission', async () => {
+    it('starts a V2 environment when the obsolete containment flag is off', async () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
 
-      await expect(runCreate(ctx, environmentRequest(v2Environment))).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('contained credentials'),
+      await expect(runCreate(ctx, environmentRequest(v2Environment))).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
       });
-      expect(admitOperationMock).not.toHaveBeenCalled();
-      expectNoAllocation(doStub);
     });
 
     it.each([
@@ -2777,10 +2779,7 @@ describe('createSessionWithLedger admission ladder', () => {
             expect.objectContaining({
               identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
               workspace: expect.objectContaining({
-                credentialContainment:
-                  flag === 'false'
-                    ? { github: false, gitlab: false, bitbucket: false, kilocode: false }
-                    : expected,
+                credentialContainment: expected,
               }),
             })
           );
@@ -2789,7 +2788,7 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it('persists disabled workspace containment independently of later flag changes', async () => {
+  it('persists mandatory containment independently of obsolete flag changes', async () => {
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
@@ -2809,16 +2808,16 @@ describe('createSessionWithLedger admission ladder', () => {
         workspace: expect.objectContaining({
           credentialContainment: {
             github: false,
-            gitlab: false,
+            gitlab: true,
             bitbucket: false,
-            kilocode: false,
+            kilocode: true,
           },
         }),
       })
     );
   });
 
-  it('disables toggle containment for an agent ID when CREDENTIAL_CONTAINMENT_ENABLED=false', async () => {
+  it('ignores the obsolete containment opt-out', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
@@ -2835,9 +2834,9 @@ describe('createSessionWithLedger admission ladder', () => {
         workspace: expect.objectContaining({
           credentialContainment: {
             github: false,
-            gitlab: false,
+            gitlab: true,
             bitbucket: false,
-            kilocode: false,
+            kilocode: true,
           },
         }),
       })

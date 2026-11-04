@@ -131,9 +131,16 @@ export type VercelSandboxInjectionRule = {
 };
 
 export type VercelSandboxNetworkPolicy = {
-  mode: 'custom';
-  allowedDomains: string[];
-  injectionRules: VercelSandboxInjectionRule[];
+  allow: Record<
+    string,
+    Array<
+      | {
+          match: VercelSandboxInjectionRule['match'];
+          transform: Array<{ headers: Record<string, string> }>;
+        }
+      | { forwardURL: string }
+    >
+  >;
 };
 
 export type VercelSandboxRestClientConfig = {

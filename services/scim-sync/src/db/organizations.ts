@@ -14,8 +14,9 @@ import type { WorkerDb } from './pg';
  *
  * The binding columns live on every `organizations` row, parent or child, which
  * is what makes a sub-organization the thing a directory group resolves to.
- * Kilo's `organization_groups` table is unrelated: it holds capability policy
- * sets and is not populated by directory sync.
+ * Kilo's `organization_groups` table is unrelated: a group there is a
+ * `model_access` allow-list deciding which models a member may call, not a
+ * tenant, and nothing populates it from directory sync.
  */
 
 export type OrganizationRow = typeof organizations.$inferSelect;

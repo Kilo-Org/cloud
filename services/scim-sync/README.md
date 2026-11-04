@@ -135,12 +135,29 @@ Four schema facts the query modules encode, each easy to get wrong:
 - **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
   validate, parse, or cast one as a UUID.
 
-Kilo's `organization_groups` table is unrelated and is not read: it holds
-capability policy sets (`read`, `edit`, `browser`, `command`, `mcp`), and
-nothing populates it from directory sync. Worth knowing anyway, because
-deleting a membership cascades a user's assignments in that table away through a
-composite foreign key — so a membership write has authorization consequences no
-directory event names.
+Kilo's `organization_groups` table is unrelated to WorkOS directory groups and
+is not read here. A group is a named bundle of policies scoped to one
+organization, and the only policy type is `model_access` — modes `all`, `none`,
+or `selected` with model and provider allow-lists
+(`packages/db/src/schema-types.ts:1457-1466`). It decides which models a member
+may call: the policies a member's groups carry are unioned over the org-wide
+default and enforced in the AI gateway, which denies the request
+(`packages/web-shared/src/lib/ai-gateway/handlers/llm-proxy.ts:1065-1070`).
+Groups are enterprise-only, administered by an owner or admin, and nothing
+populates them from directory sync.
+
+So groups and sub-organizations are orthogonal rather than alternatives: a
+sub-organization is a tenant boundary with its own members, credits, and seats,
+while a group is a model allow-list inside one organization. A directory group
+maps to a sub-organization, not to a row in `organization_groups`.
+
+**A write path has to account for one cascade.**
+`organization_group_memberships` holds a composite foreign key into
+`organization_memberships` with `ON DELETE CASCADE`, so deleting a membership
+also destroys that user's group assignments in that organization — their
+model-access grants. Re-adding the membership later does not restore them. A
+`dsync.group.user_removed` followed by a re-add therefore loses configuration
+that no directory event describes and that WorkOS cannot replay.
 
 Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
 strict ISO validators such as `z.string().datetime()` reject. Normalize before

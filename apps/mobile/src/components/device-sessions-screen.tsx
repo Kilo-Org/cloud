@@ -68,14 +68,15 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
       {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
           14 dp inside the card's 10.5 dp padding, while the leading tile sat
           on that padding and the card read lopsided. At 28 dp the glyph's
-          outer edge is 6 dp inside the card's 14 dp padding, and 8 dp of hit
-          slop keeps the 44 dp touch target. */}
+          outer edge is 6 dp inside the card's 14 dp padding, and 9 dp of hit
+          slop per side reaches 46 dp, so pixel rounding cannot drop the target
+          under 44 dp. */}
       <Pressable
         onPress={() => {
           onPress(session);
         }}
         disabled={disabled}
-        hitSlop={8}
+        hitSlop={9}
         accessibilityRole="button"
         accessibilityLabel={
           session.isCurrent

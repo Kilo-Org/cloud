@@ -141,13 +141,13 @@ describe('account surface states', () => {
     const signOut = renderer.root.findAll(node => String(node.type) === 'Pressable');
     expect(signOut).toHaveLength(1);
     // The control box hugs its 16 pt glyph so its outer edge lines up with the
-    // card padding instead of sitting 14 dp inside it; 28 dp plus 8 dp of hit
-    // slop on each side keeps the app's 44 dp minimum. The loading skeleton
-    // reserves this same box (asserted below), so the control does not jump the
-    // list when rows arrive.
+    // card padding instead of sitting 14 dp inside it; 28 dp plus 9 dp of hit
+    // slop per side reaches 46 dp, clear of the app's 44 dp minimum even after
+    // pixel rounding. The loading skeleton reserves this same box (asserted
+    // below), so the control does not jump the list when rows arrive.
     expect(signOut[0]?.props.className).toContain('min-h-[28px]');
     expect(signOut[0]?.props.className).toContain('min-w-[28px]');
-    expect(signOut[0]?.props.hitSlop).toBe(8);
+    expect(signOut[0]?.props.hitSlop).toBe(9);
     unmount();
   });
 

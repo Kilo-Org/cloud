@@ -25,6 +25,19 @@ function parseAbsoluteHttpUrl(value: string | undefined): URL | null {
   }
 }
 
+/**
+ * The single enablement guard and URL normalization for every local fake LLM
+ * endpoint: development only, never on Vercel, and only for a parseable
+ * http/https `FAKE_LLM_URL`, with one trailing slash removed so callers append
+ * their own path.
+ */
+function getLocalFakeBaseUrl(): string | null {
+  if (process.env.NODE_ENV !== 'development') return null;
+  if (process.env.VERCEL) return null;
+  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
+  return url ? url.href.replace(/\/$/, '') : null;
+}
+
 export function isLocalFakeDeterministicModel(id: string | undefined | null): boolean {
   if (!id) return false;
   return (
@@ -38,9 +51,7 @@ export function isLocalFakeTranscriptionModel(id: string | undefined | null): bo
 }
 
 export function isLocalFakeLlmEnabled(): boolean {
-  if (process.env.NODE_ENV !== 'development') return false;
-  if (process.env.VERCEL) return false;
-  return parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL) !== null;
+  return getLocalFakeBaseUrl() !== null;
 }
 
 export function getLocalFakeDeterministicCatalogEntry(): OpenRouterModel | null {
@@ -85,9 +96,8 @@ export function appendLocalFakeDeterministicCatalogModels(
 }
 
 export function getLocalFakeLlmProvider(): Provider | null {
-  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
-  if (!isLocalFakeLlmEnabled() || !url) return null;
-  const baseUrl = url.href.replace(/\/$/, '');
+  const baseUrl = getLocalFakeBaseUrl();
+  if (!baseUrl) return null;
   return buildDirectProvider(
     'custom',
     ['chat_completions'],
@@ -104,18 +114,18 @@ export function getLocalFakeLlmProvider(): Provider | null {
  * fake LLM, for e2e runs without a real OpenRouter key.
  */
 export function getLocalFakeTranscriptionProvider(): Provider | null {
-  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
-  if (!isLocalFakeLlmEnabled() || !url) return null;
+  const baseUrl = getLocalFakeBaseUrl();
+  if (!baseUrl) return null;
   return {
     ...OPENROUTER,
-    apiUrl: `${url.href.replace(/\/$/, '')}/api/openrouter`,
+    apiUrl: `${baseUrl}/api/openrouter`,
     apiKey: LOCAL_FAKE_LLM_API_KEY,
   };
 }
 
 /** Full transcription-models catalog URL on the local fake LLM, or null. */
 export function getLocalFakeTranscriptionModelsUrl(): string | null {
-  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
-  if (!isLocalFakeLlmEnabled() || !url) return null;
-  return `${url.href.replace(/\/$/, '')}/api/openrouter/models?output_modalities=transcription`;
+  const baseUrl = getLocalFakeBaseUrl();
+  if (!baseUrl) return null;
+  return `${baseUrl}/api/openrouter/models?output_modalities=transcription`;
 }

@@ -8,6 +8,7 @@ import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
+  type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
@@ -195,6 +196,17 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
 }
 
 /**
+ * Whether a stored row may serve traffic. The payload's `status` mirrors a save
+ * or a terminal failure, but a person can also disable the row through the
+ * ordinary BYOK toggle, which leaves the payload saying `connected`. Both the
+ * enable flag and a connected status must hold for the route to be eligible and
+ * for the models list to carry the BYOK tag.
+ */
+function isUsableStoredConnection(stored: OpenAiChatGptStoredConnection | null): boolean {
+  return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
  * The upstream model one specific owner's connection would serve the request
  * with, or null when that connection is not eligible.
  */
@@ -217,12 +229,7 @@ async function eligibleUpstreamModelForOwner(
   }
 
   const stored = await getOpenAiChatGptStoredConnection(owner);
-  // The payload's `status` mirrors a save or a terminal failure, but a person
-  // can also disable the row through the ordinary BYOK toggle, which leaves the
-  // payload saying `connected`. Both must hold for the route to be eligible.
-  return stored?.isEnabled === true && stored.connection.status === 'connected'
-    ? upstreamModel
-    : null;
+  return isUsableStoredConnection(stored) ? upstreamModel : null;
 }
 
 /**
@@ -236,7 +243,7 @@ export async function getOpenAiChatGptByokModelIds(
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
   const stored = await getOpenAiChatGptStoredConnection(owner);
-  if (stored?.isEnabled !== true || stored.connection.status !== 'connected') return null;
+  if (!isUsableStoredConnection(stored)) return null;
 
   const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
   if (apiKey.trim().length === 0) return null;

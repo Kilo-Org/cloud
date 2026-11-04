@@ -1,5 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 import { custom_llm2 } from '@kilocode/db/schema';
+import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { captureException } from '@sentry/nextjs';
 import {
   findCustomLlm,
   getPublicCustomLlmInferenceProviders,
@@ -14,6 +16,10 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+const mockedCaptureException = jest.mocked(captureException);
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
@@ -80,5 +86,36 @@ describe('custom LLM catalog', () => {
     );
     await expect(getPublicCustomLlmInferenceProviders('acme/private-model')).resolves.toBeNull();
     await expect(getPublicCustomLlmInferenceProviders('openai/gpt-4o')).resolves.toBeNull();
+  });
+
+  test('reports a malformed row as an error and keeps serving the valid rows', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedCaptureException.mockClear();
+    await insertCustomLlmForTest('acme/malformed-model', {
+      internal_id: 'upstream-model',
+    } as unknown as CustomLlmDefinition);
+    try {
+      await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
+      await expect(findCustomLlm('acme/malformed-model')).resolves.toBeNull();
+      expect(errorLog).toHaveBeenCalledWith(
+        'Failed to parse custom llm definition',
+        'acme/malformed-model',
+        expect.anything()
+      );
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledWith(expect.anything(), {
+        tags: { source: 'custom_llm_catalog' },
+        extra: { public_id: 'acme/malformed-model' },
+      });
+
+      // The catalog refreshes every minute, so the same row parses again and logs
+      // again; Sentry receives it once for the row until the report window passes.
+      resetCustomLlmCacheForTest();
+      await expect(findCustomLlm('acme/malformed-model')).resolves.toBeNull();
+      expect(errorLog).toHaveBeenCalledTimes(2);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    } finally {
+      await deleteCustomLlmForTest('acme/malformed-model');
+    }
   });
 });

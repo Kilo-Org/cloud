@@ -119,19 +119,25 @@ export async function getOpenAiChatGptConnection(
   return row ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
 }
 
+/** The stored payload together with the row's own enabled flag. */
+export type OpenAiChatGptStoredConnection = {
+  connection: OpenAiChatGptConnection;
+  isEnabled: boolean;
+};
+
 /**
- * The stored payload together with the row's own enabled flag. Routing must use
- * this: a person can disable the row through the ordinary BYOK toggle, and the
- * payload keeps saying `connected` because the toggle does not rewrite it. The
- * status router deliberately keeps using `getOpenAiChatGptConnection`, so a
- * terminal refresh failure still surfaces its reconnect message.
+ * Routing must use this: a person can disable the row through the ordinary BYOK
+ * toggle, and the payload keeps saying `connected` because the toggle does not
+ * rewrite it. The status router deliberately keeps using
+ * `getOpenAiChatGptConnection`, so a terminal refresh failure still surfaces its
+ * reconnect message.
  *
  * Reads the replica: it runs before inference on gateway requests, which also
  * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
-): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
+): Promise<OpenAiChatGptStoredConnection | null> {
   const row = await readOpenAiChatGptConnectionRow(readDb, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);

@@ -146,12 +146,14 @@ The initial storage policy is explicit:
 | Retained batch receipts | 256 |
 
 Verified uploads without a current entity reference enter `unreferenced` for 15 minutes.
-Replacing or removing the last reference starts the same grace window after the whole batch.
-References within grace return the blob to `ready`; duplicate uploads refresh the grace deadline.
+Replacing or removing the last reference sets its cleanup deadline to the batch commit time.
+It becomes reclaimable after the one-minute sweep margin, rather than retaining every superseded version.
+References before cleanup return the blob to `ready`; duplicate uploads refresh the deadline by 15 minutes.
 Reads accept both verified states. Alarms reclaim expired unreferenced blobs like expired uploads:
 claim first, delete the private R2 object, then release its reserved bytes.
 The cleanup clock-skew margin is one minute. A missing reclaimed hash returns `blob_missing`
 with `error.details.hash`, so producers discard their acknowledgement hint and upload again.
+Readers that receive `blob_not_found` for a superseded hash re-read current session state.
 An old receipt leaving the bounded tail never makes its packet eligible to apply again.
 
 Entity pages seek on the composite `(kind, id)` key. They select identities and sizes first,
@@ -190,6 +192,17 @@ A tombstone survives entity cleanup.
 A deleted ID cannot be registered again.
 An operational restore must reapply deletion fences before exposing restored data.
 Document backup-retention behavior before production rollout.
+
+### Request metrics
+
+`SESSION_SYNC_METRICS` writes one Analytics Engine datapoint per completed or canceled
+response to `session_sync_metrics` (`session_sync_staging_metrics` in staging).
+The index is the normalized method/route; blobs are route, HTTP status, error code,
+and tenant type. Doubles are total ms, DO RPC ms, R2 ms, exchange SQL ms, consumed
+request bytes, and streamed response bytes, in that order.
+DO RPC duration includes its internal R2 work; these latency fields are not additive.
+Stream counting does not buffer blobs or page bodies. Metrics omit user IDs, session IDs,
+hashes, credentials, and content. Tests can omit the Analytics Engine binding.
 
 ## Portable checkpoints
 

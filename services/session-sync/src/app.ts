@@ -22,6 +22,7 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
+import { requestMetrics, timed } from './metrics';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -43,18 +44,30 @@ function invalid(error: z.ZodError): SyncError {
 }
 
 /** Calls the session object of the authenticated tenant with retries for transient failures. */
-function call<T>(
+async function call<T>(
   c: C,
   sessionID: string,
   operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<T>,
   name: string
 ): Promise<T> {
   const tenant = c.get('principal').tenant;
-  return withDORetry(
-    () => getSessionSyncDOStub(c.env, { tenant, sessionID }),
-    operation,
-    `SessionSyncDO.${name}`
-  );
+  return timed(c.req.raw, 'doMs', async () => {
+    const result = await withDORetry(
+      () => getSessionSyncDOStub(c.env, { tenant, sessionID }),
+      operation,
+      `SessionSyncDO.${name}`
+    );
+    const metrics = requestMetrics(c.req.raw);
+    if (
+      metrics &&
+      result &&
+      typeof result === 'object' &&
+      'r2Ms' in result &&
+      typeof result.r2Ms === 'number'
+    )
+      metrics.r2Ms += result.r2Ms;
+    return result;
+  });
 }
 
 function declaredLength(request: Request): number | undefined {
@@ -118,6 +131,8 @@ app.use('/v1/sessions/*', async (c, next) => {
   const principal = await authorize(c.req.raw, c.env);
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
+  const metrics = requestMetrics(c.req.raw);
+  if (metrics) metrics.tenant = principal.tenant.type;
   const denied = await rateLimit(c.env.USER_REQUEST_LIMITER, principal.userID);
   if (denied) return denied;
   if (c.req.method === 'PUT' && /^\/v1\/sessions\/[^/]+\/blobs\/[^/]+$/.test(c.req.path)) {
@@ -229,11 +244,14 @@ app.put('/v1/sessions/:id/blobs/:hash', async c => {
     if (!consumed.ok) return failure(consumed.error);
     return json({ version: 1, hash: hash.data, bytes, created: false }, 200);
   }
+  const upload = begun.value;
   const attemptInput = { ...input, attempt: begun.value.attempt };
 
   let uploaded: Result<null>;
   try {
-    uploaded = await uploadBlob(c.env.SESSION_SYNC_R2, begun.value, body, hash.data, bytes);
+    uploaded = await timed(c.req.raw, 'r2Ms', () =>
+      uploadBlob(c.env.SESSION_SYNC_R2, upload, body, hash.data, bytes)
+    );
   } catch (error) {
     await call(c, input.sessionID, async s => await s.abortBlob(attemptInput), 'abortBlob');
     throw error;
@@ -266,7 +284,7 @@ app.get('/v1/sessions/:id/blobs/:hash', async c => {
     'locateBlob'
   );
   if (!located.ok) return failure(located.error);
-  const object = await c.env.SESSION_SYNC_R2.get(located.value.key);
+  const object = await timed(c.req.raw, 'r2Ms', () => c.env.SESSION_SYNC_R2.get(located.value.key));
   if (!object) {
     return failure({ code: 'blob_not_found', message: 'The blob is not stored for this session' });
   }

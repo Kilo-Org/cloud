@@ -351,7 +351,9 @@ export const errorBodySchema = z.strictObject({
   error: z.looseObject({ code: z.string(), message: z.string() }),
 });
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: SyncError };
+export type Result<T> = ({ ok: true; value: T } | { ok: false; error: SyncError }) & {
+  r2Ms?: number;
+};
 
 export function fail(
   code: ErrorCode,

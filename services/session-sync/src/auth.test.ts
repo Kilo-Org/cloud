@@ -356,3 +356,19 @@ describe('exchange', () => {
     expect(await errorCode(response)).toEqual({ status: 503, code: 'auth_unavailable' });
   });
 });
+
+it('limits a verified exchange account before SQL and supplies retry instructions', async () => {
+  const limit = vi.fn(async () => ({ success: false }));
+  const response = await exchange(
+    exchangeRequest(await legacyApiToken()),
+    env({
+      EXCHANGE_ACCOUNT_LIMITER: { limit },
+    })
+  );
+  expect(response.status).toBe(429);
+  expect(limit).toHaveBeenCalledWith({ key: USER });
+  expect(response.headers.get('Retry-After')).toBe('60');
+  expect(await response.json()).toMatchObject({
+    error: { code: 'rate_limited', retryAt: expect.any(Number) },
+  });
+});

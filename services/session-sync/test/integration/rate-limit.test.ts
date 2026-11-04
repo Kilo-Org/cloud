@@ -9,20 +9,44 @@ it('limits exchange by IP before credential verification with a retry deadline',
   let response: Response | undefined;
   for (let index = 0; index <= 120; index++) {
     response = await SELF.fetch('https://session-sync.test/v1/auth/exchange', {
-      method: 'POST', headers: { 'CF-Connecting-IP': ip },
+      method: 'POST',
+      headers: { 'CF-Connecting-IP': ip },
     });
     if (response.status === 429) break;
     expect(response.status).toBe(401);
   }
   expect(response!.status).toBe(429);
   expect(response!.headers.get('Retry-After')).toBe('60');
-  expect(await response!.json()).toMatchObject({ error: { code: 'rate_limited', retryAt: expect.any(Number) } });
+  expect(await response!.json()).toMatchObject({
+    error: { code: 'rate_limited', retryAt: expect.any(Number) },
+  });
 });
 
 it('limits authenticated data requests before dispatching to the session object', async () => {
-  const response = await app.request('https://session-sync.test/v1/sessions/ses_limited', {
-    headers: { authorization: `Bearer ${await grant(personal('limited-user'))}` },
-  }, { ...testEnv, USER_REQUEST_LIMITER: { limit: async () => ({ success: false }) } });
+  const response = await app.request(
+    'https://session-sync.test/v1/sessions/ses_limited',
+    {
+      headers: { authorization: `Bearer ${await grant(personal('limited-user'))}` },
+    },
+    { ...testEnv, USER_REQUEST_LIMITER: { limit: async () => ({ success: false }) } }
+  );
+  expect(response.status).toBe(429);
+  expect(response.headers.get('Retry-After')).toBe('60');
+});
+
+it('limits blob PUTs separately from ordinary authenticated requests', async () => {
+  const response = await app.request(
+    `https://session-sync.test/v1/sessions/ses_limited/blobs/${'a'.repeat(64)}`,
+    {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${await grant(personal('limited-blob-user'))}` },
+    },
+    {
+      ...testEnv,
+      USER_REQUEST_LIMITER: { limit: async () => ({ success: true }) },
+      USER_BLOB_LIMITER: { limit: async () => ({ success: false }) },
+    }
+  );
   expect(response.status).toBe(429);
   expect(response.headers.get('Retry-After')).toBe('60');
 });

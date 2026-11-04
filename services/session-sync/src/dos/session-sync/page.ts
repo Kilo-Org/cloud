@@ -55,9 +55,7 @@ export function read(
     .select({ kind: entities.kind, id: entities.id, inline_bytes: entities.inline_bytes })
     .from(entities)
     .where(
-      after
-        ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})`
-        : undefined
+      after ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})` : undefined
     )
     .orderBy(asc(entities.kind), asc(entities.id))
     .limit(input.limit + 1)
@@ -77,7 +75,9 @@ export function read(
         .from(entities)
         .where(
           and(
-            after ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})` : undefined,
+            after
+              ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})`
+              : undefined,
             sql`(${entities.kind}, ${entities.id}) <= (${end.kind}, ${end.id})`
           )
         )

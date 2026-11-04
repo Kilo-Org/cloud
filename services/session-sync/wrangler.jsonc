@@ -29,10 +29,26 @@
     "ORGANIZATION_TENANT_BYTES": "2199023255552",
   },
   "ratelimits": [
-    { "name": "EXCHANGE_IP_LIMITER", "namespace_id": "1020", "simple": { "limit": 120, "period": 60 } },
-    { "name": "EXCHANGE_ACCOUNT_LIMITER", "namespace_id": "1021", "simple": { "limit": 60, "period": 60 } },
-    { "name": "USER_REQUEST_LIMITER", "namespace_id": "1022", "simple": { "limit": 1200, "period": 60 } },
-    { "name": "USER_BLOB_LIMITER", "namespace_id": "1023", "simple": { "limit": 300, "period": 60 } },
+    {
+      "name": "EXCHANGE_IP_LIMITER",
+      "namespace_id": "1020",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "EXCHANGE_ACCOUNT_LIMITER",
+      "namespace_id": "1021",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "USER_REQUEST_LIMITER",
+      "namespace_id": "1022",
+      "simple": { "limit": 1200, "period": 60 },
+    },
+    {
+      "name": "USER_BLOB_LIMITER",
+      "namespace_id": "1023",
+      "simple": { "limit": 300, "period": 60 },
+    },
   ],
   "analytics_engine_datasets": [
     { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },

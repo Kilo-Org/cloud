@@ -18,10 +18,26 @@
     "SESSION_SYNC_SECRET": "session-sync-test-secret-0123456789abcdef",
   },
   "ratelimits": [
-    { "name": "EXCHANGE_IP_LIMITER", "namespace_id": "1024", "simple": { "limit": 120, "period": 60 } },
-    { "name": "EXCHANGE_ACCOUNT_LIMITER", "namespace_id": "1025", "simple": { "limit": 60, "period": 60 } },
-    { "name": "USER_REQUEST_LIMITER", "namespace_id": "1026", "simple": { "limit": 1200, "period": 60 } },
-    { "name": "USER_BLOB_LIMITER", "namespace_id": "1027", "simple": { "limit": 300, "period": 60 } },
+    {
+      "name": "EXCHANGE_IP_LIMITER",
+      "namespace_id": "1024",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "EXCHANGE_ACCOUNT_LIMITER",
+      "namespace_id": "1025",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "USER_REQUEST_LIMITER",
+      "namespace_id": "1026",
+      "simple": { "limit": 1200, "period": 60 },
+    },
+    {
+      "name": "USER_BLOB_LIMITER",
+      "namespace_id": "1027",
+      "simple": { "limit": 300, "period": 60 },
+    },
   ],
   // The isolated exchange smoke database. Data-route tests never connect to it.
   "hyperdrive": [

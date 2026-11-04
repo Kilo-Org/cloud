@@ -45,7 +45,9 @@ it('seeks across kinds and byte-truncated pages without skipping or repeating ro
         expected.push(`${kind}/${key}`);
         return { op: 'put' as const, kind, id: key, value };
       });
-      expect((await api.apply(id, batch(source, position, position + 1, changes))).status).toBe(200);
+      expect((await api.apply(id, batch(source, position, position + 1, changes))).status).toBe(
+        200
+      );
       position++;
     }
   }
@@ -58,7 +60,9 @@ it('seeks across kinds and byte-truncated pages without skipping or repeating ro
     if (cursor) query.cursor = cursor;
     if (revision) query.revision = revision;
     const page = pageSchema.parse(await (await api.entities(id, query)).json());
-    expect(page.entities.length).toBeLessThanOrEqual(Math.floor(LIMITS.pageBytes / (value.length + 2)));
+    expect(page.entities.length).toBeLessThanOrEqual(
+      Math.floor(LIMITS.pageBytes / (value.length + 2))
+    );
     seen.push(...page.entities.map(entity => `${entity.kind}/${entity.id}`));
     cursor = page.next ?? undefined;
     revision = String(page.revision);

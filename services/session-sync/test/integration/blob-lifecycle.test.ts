@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { blobs } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
+import * as batchOps from '../../src/dos/session-sync/batch';
 import * as blobOps from '../../src/dos/session-sync/blob';
 import * as sessionOps from '../../src/dos/session-sync/session';
 import { LIMITS, pageSchema, sessionStateSchema, type Principal } from '../../src/protocol';
@@ -282,51 +283,150 @@ describe('unreferenced blob grace period', () => {
     await store(upload);
     expect((await stub.commitBlob(upload.input)).ok).toBe(true);
     const ref = upload.input.blob;
-    expect((await api.apply(sessionID, batch(sourceID, 0, 1, [
-      { op: 'put', kind: 'message', id: 'm', blob: ref },
-    ]))).status).toBe(200);
-    expect((await api.apply(sessionID, batch(sourceID, 1, 2, [
-      { op: 'put', kind: 'message', id: 'm', value: 'replacement' },
-    ]))).status).toBe(200);
+    expect(
+      (
+        await api.apply(
+          sessionID,
+          batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'm', blob: ref }])
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await api.apply(
+          sessionID,
+          batch(sourceID, 1, 2, [{ op: 'put', kind: 'message', id: 'm', value: 'replacement' }])
+        )
+      ).status
+    ).toBe(200);
     await runInDurableObject(stub, (_instance, state) => {
       const row = drizzle(state.storage).select().from(blobs).get();
       expect(row).toMatchObject({ state: 'unreferenced' });
-      expect(row!.deadline).toBeGreaterThan(Date.now() + LIMITS.unreferencedMs - 10_000);
+      expect(row!.deadline).toBeLessThanOrEqual(Date.now());
+      expect(row!.deadline).toBeGreaterThan(Date.now() - 10_000);
     });
     expect((await api.getBlob(sessionID, ref.hash)).status).toBe(200);
     await expire(stub);
     await runDurableObjectAlarm(stub);
     expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).toBeNull();
-    const response = await api.apply(sessionID, batch(sourceID, 2, 3, [
-      { op: 'put', kind: 'message', id: 'm', blob: ref },
-    ]));
+    const response = await api.apply(
+      sessionID,
+      batch(sourceID, 2, 3, [{ op: 'put', kind: 'message', id: 'm', blob: ref }])
+    );
     expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: { code: 'blob_missing', details: { hash: ref.hash } } });
+    expect(await response.json()).toMatchObject({
+      error: { code: 'blob_missing', details: { hash: ref.hash } },
+    });
     expect(await (await api.state(sessionID)).json()).toMatchObject({ usage: { blobBytes: 0 } });
   });
 
   it('keeps a blob re-referenced within grace, including a same-batch transfer', async () => {
     const { principal, api, sessionID, sourceID, stub } = await fixture();
-    const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('reused content'));
+    const upload = await begin(
+      stub,
+      principal,
+      sessionID,
+      new TextEncoder().encode('reused content')
+    );
     await store(upload);
     expect((await stub.commitBlob(upload.input)).ok).toBe(true);
     const ref = upload.input.blob;
-    expect((await api.apply(sessionID, batch(sourceID, 0, 1, [
-      { op: 'put', kind: 'message', id: 'm', blob: ref },
-    ]))).status).toBe(200);
-    expect((await api.apply(sessionID, batch(sourceID, 1, 2, [
-      { op: 'remove', kind: 'message', id: 'm', cause: 'revert' },
-    ]))).status).toBe(200);
-    expect((await api.apply(sessionID, batch(sourceID, 2, 3, [
-      { op: 'put', kind: 'message', id: 'new', blob: ref },
-      { op: 'put', kind: 'message', id: 'other', blob: ref },
-      { op: 'remove', kind: 'message', id: 'new', cause: 'revert' },
-    ]))).status).toBe(200);
+    expect(
+      (
+        await api.apply(
+          sessionID,
+          batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'm', blob: ref }])
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await api.apply(
+          sessionID,
+          batch(sourceID, 1, 2, [{ op: 'remove', kind: 'message', id: 'm', cause: 'revert' }])
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await api.apply(
+          sessionID,
+          batch(sourceID, 2, 3, [
+            { op: 'put', kind: 'message', id: 'new', blob: ref },
+            { op: 'put', kind: 'message', id: 'other', blob: ref },
+            { op: 'remove', kind: 'message', id: 'new', cause: 'revert' },
+          ])
+        )
+      ).status
+    ).toBe(200);
     await expire(stub);
     await runDurableObjectAlarm(stub);
     expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).not.toBeNull();
     await runInDurableObject(stub, (_instance, state) => {
       expect(drizzle(state.storage).select().from(blobs).get()).toMatchObject({ state: 'ready' });
     });
+  });
+});
+
+it('retains fresh uploads for grace and refreshes unreferenced upload hints', async () => {
+  const { principal, sessionID, stub } = await fixture();
+  const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('new content'));
+  await store(upload);
+  expect((await stub.commitBlob(upload.input)).ok).toBe(true);
+  await runInDurableObject(stub, (_instance, state) => {
+    const db = drizzle(state.storage);
+    const row = db.select().from(blobs).get()!;
+    expect(row.state).toBe('unreferenced');
+    expect(row.deadline).toBeGreaterThan(Date.now() + LIMITS.unreferencedMs - 10_000);
+    db.update(blobs)
+      .set({ deadline: Date.now() + 1000 })
+      .where(eq(blobs.hash, row.hash))
+      .run();
+  });
+  expect(await stub.beginBlob({ principal, sessionID, blob: upload.input.blob })).toMatchObject({
+    ok: true,
+    value: { status: 'ready' },
+  });
+  await runInDurableObject(stub, (_instance, state) => {
+    expect(drizzle(state.storage).select().from(blobs).get()!.deadline).toBeGreaterThan(
+      Date.now() + LIMITS.unreferencedMs - 10_000
+    );
+  });
+});
+
+it('bounds retained blob bytes during ten minutes of one-second supersessions', async () => {
+  const { principal, sessionID, sourceID, stub } = await fixture();
+  await runInDurableObject(stub, (_instance, state) => {
+    const db = drizzle(state.storage);
+    const bytes = 200 * 1024;
+    const start = Date.now();
+    let peak = 0;
+    // Exercise real SQLite transitions with a logical clock. The lifecycle tests
+    // above cover R2 deletion; these metadata-only fixtures have no physical objects.
+    for (let index = 0; index < 600; index++) {
+      const now = start + index * 1000;
+      state.storage.transactionSync(() => {
+        const ref = { hash: index.toString(16).padStart(64, '0'), bytes };
+        const begun = blobOps.begin(db, principal, sessionID, ref, now);
+        if (begun.status !== 'upload') throw new Error('Expected new upload');
+        blobOps.commit(db, principal, sessionID, ref, begun.attempt, now);
+        batchOps.apply(
+          db,
+          principal,
+          sessionID,
+          batch(sourceID, index, index + 1, [
+            { op: 'put', kind: 'message', id: 'current', blob: ref },
+          ]),
+          ref.hash,
+          now
+        );
+        peak = Math.max(peak, sessionOps.load(db)!.blob_bytes);
+        const claimed = blobOps.claim(db, sessionOps.load(db)!, now);
+        blobOps.finish(db, claimed, now);
+      });
+    }
+    expect(peak).toBeLessThanOrEqual(62 * bytes);
+    expect(sessionOps.load(db)!.blob_bytes).toBeLessThanOrEqual(61 * bytes);
+    expect(peak).toBeLessThan(LIMITS.sessionBlobBytes);
   });
 });

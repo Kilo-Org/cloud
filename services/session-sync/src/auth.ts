@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
 import { rateLimit } from './rate-limit';
+import { requestMetrics, timed } from './metrics';
 
 export type { Principal };
 
@@ -255,7 +256,10 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (request.method !== 'POST') {
     return failure(405, 'method_not_allowed', 'Use POST for credential exchange');
   }
-  const ipDenied = await rateLimit(env.EXCHANGE_IP_LIMITER, request.headers.get('CF-Connecting-IP') ?? 'local');
+  const ipDenied = await rateLimit(
+    env.EXCHANGE_IP_LIMITER,
+    request.headers.get('CF-Connecting-IP') ?? 'local'
+  );
   if (ipDenied) return ipDenied;
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token) return failure(401, 'unauthenticated', 'A Kilo bearer credential is required');
@@ -278,11 +282,11 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
           : { type: 'organization', id: body.organizationID },
     });
     if (!issued.success) return unsupportedCredential('Unsupported account identifier');
+    const metrics = requestMetrics(request);
+    if (metrics) metrics.tenant = issued.data.tenant.type;
 
-    const denied = await checkAccount(
-      getWorkerDb(env.HYPERDRIVE.connectionString),
-      credential,
-      body.organizationID
+    const denied = await timed(request, 'sqlMs', () =>
+      checkAccount(getWorkerDb(env.HYPERDRIVE.connectionString), credential, body.organizationID)
     );
     if (denied) return denied;
 

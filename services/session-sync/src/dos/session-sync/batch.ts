@@ -114,7 +114,7 @@ export function apply(
     db.update(blobs)
       .set({
         state: referenced ? 'ready' : 'unreferenced',
-        deadline: now + LIMITS.unreferencedMs,
+        deadline: now,
       })
       .where(eq(blobs.hash, hash))
       .run();

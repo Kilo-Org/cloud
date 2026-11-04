@@ -82,7 +82,8 @@ try {
     preview_urls: false,
     vars: { ...source.vars, ENVIRONMENT: 'staging' },
     ratelimits: source.ratelimits.map((binding, index) => ({
-      ...binding, namespace_id: String(1028 + index),
+      ...binding,
+      namespace_id: String(1028 + index),
     })),
     analytics_engine_datasets: [
       { binding: 'SESSION_SYNC_METRICS', dataset: 'session_sync_staging_metrics' },

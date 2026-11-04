@@ -81,6 +81,11 @@ at the outcome log, including writer wait in processing mode; it is omitted for
 invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
 
+Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
+`usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
+`usage_ingest_processing`) are always emitted; see
+[queue delivery diagnostics](diagnostics.md).
+
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
 of handling that message, independently of writer duration. Selected existing processing
 outcomes also include `handler_entry_queue_age_ms`, the non-negative wall-clock
@@ -388,7 +393,7 @@ attributing any hosted latency effect.
 The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
-both diagnostics and parallelism variables, and the writer target. Keep one
+the parallelism variable, and the writer target. Keep one
 consumer per environment at cap 200 / parallelism 2, with production batch 6 and
 staging batch 2 (at most 400 writer calls each); do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
@@ -397,8 +402,8 @@ checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
-timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
-writer route, retry delay/budget and per-message dispositions.
+timeout 0 and cap 200 for the same single queue. Preserve the current writer
+route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 

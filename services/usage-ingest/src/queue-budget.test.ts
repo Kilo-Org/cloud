@@ -13,7 +13,7 @@ it('bounds production EU processing to 400 direct Frankfurt writer calls', () =>
   ]);
   expect(production.vars.USAGE_WRITER_URL).toBe('https://app.kilo.ai/api/internal/usage/record');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
+  expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([
     {
@@ -42,7 +42,7 @@ it('keeps staging on one EU queue with at most 400 concurrent writer calls', () 
     { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
   ]);
   expect(staging.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(staging.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
+  expect(staging.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(staging.queues.consumers).toHaveLength(1);
   expect(staging.queues.consumers[0].queue).toBe('usage-ingest-processing-staging-eu');
   let writerBudget = 0;

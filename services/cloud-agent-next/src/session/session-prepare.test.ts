@@ -1501,10 +1501,7 @@ describe('explicit sandbox session creation', () => {
       });
       expect(metadata.workspace).toMatchObject({
         worktreeId: WORKTREE_ID,
-        sandboxAllocation:
-          sandboxAllocation === 'cloudflare-single'
-            ? 'cloudflare-containers-standard-3'
-            : sandboxAllocation,
+        sandboxAllocation,
         credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
       });
       expect(metadata.finalization?.autoCommit).toBe(true);
@@ -1514,10 +1511,7 @@ describe('explicit sandbox session creation', () => {
         expect.objectContaining({
           [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
           [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-          sandboxAllocation:
-            sandboxAllocation === 'cloudflare-single'
-              ? 'cloudflare-containers-standard-3'
-              : sandboxAllocation,
+          sandboxAllocation,
         })
       );
       expect(createCliSessionMock.mock.calls[0]?.[0]).toMatchObject({

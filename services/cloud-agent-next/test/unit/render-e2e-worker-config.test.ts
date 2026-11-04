@@ -39,6 +39,8 @@ const OMITTED_MIGRATION_CLASSES = [
   'SandboxSmall',
   'SandboxDIND',
   'SandboxCodeReview',
+  'SandboxContainment',
+  'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
   'SandboxContainers',
 ];
@@ -482,7 +484,7 @@ describe('local e2e worker config', () => {
           (entry: { class_name: string }) => entry.class_name === 'SandboxContainers'
         ).images.app.dockerfile
       ).toBe('../Dockerfile.containers');
-      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
       expect(environment.vars.CODE_REVIEW_CONTAINERS_ORG_IDS).toBe('*');
     }
   });

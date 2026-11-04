@@ -4046,7 +4046,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
     const view = await stub.prepare({
       ...environmentInput([WIDGETS, GADGETS]),
       sandboxSelection: {
-        provider: 'cloudflare' as const,
+        provider: 'cloudflare-containers' as const,
         containment: { kilocode: false, github: false },
       },
     });

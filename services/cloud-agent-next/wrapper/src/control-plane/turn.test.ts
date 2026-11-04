@@ -556,6 +556,109 @@ describe('turn manager submission', () => {
     expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
   });
 
+  describe('empty assistant reply', () => {
+    const zeroTokens = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } };
+
+    function assistantInfo(id: string, overrides: Record<string, unknown> = {}) {
+      return {
+        id,
+        sessionID: KILO_SESSION,
+        role: 'assistant',
+        time: { created: 1, completed: 2 },
+        finish: 'other',
+        cost: 0,
+        tokens: zeroTokens,
+        ...overrides,
+      };
+    }
+
+    function part(messageID: string, type: string) {
+      return kiloEvent('message.part.updated', {
+        part: { id: `${messageID}-${type}`, sessionID: KILO_SESSION, messageID, type },
+      });
+    }
+
+    async function closeAfter(events: KiloFeedEvent[], autoCommit = false) {
+      const commits: string[] = [];
+      const h = createHarness({
+        runAutoCommit: (async () => {
+          commits.push('commit');
+          return { success: true };
+        }) as never,
+      });
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit } }));
+      await settle();
+      for (const event of events) h.manager.observeKiloEvent(event);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      return { outcomes: outcomeFrames(h.frames), commits };
+    }
+
+    it('fails missing_assistant_reply after finalization when the last step is empty', async () => {
+      const { outcomes, commits } = await closeAfter(
+        [
+          kiloEvent('message.updated', {
+            info: assistantInfo('a1', {
+              finish: 'tool-calls',
+              tokens: { ...zeroTokens, input: 10 },
+            }),
+          }),
+          part('a1', 'tool'),
+          kiloEvent('message.updated', { info: assistantInfo('a2', { time: { created: 3 } }) }),
+          part('a2', 'step-start'),
+          part('a2', 'reasoning'),
+          part('a2', 'step-finish'),
+          kiloEvent('message.updated', { info: assistantInfo('a2') }),
+        ],
+        true
+      );
+      expect(commits).toEqual(['commit']);
+      expect(outcomes).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: SESSION_ID,
+          status: 'failed',
+          reason: 'missing_assistant_reply',
+          lastMessageId: 'm1',
+        },
+      ]);
+    });
+
+    it('completes when the last step called a tool', async () => {
+      const { outcomes } = await closeAfter([
+        kiloEvent('message.updated', { info: assistantInfo('a1') }),
+        part('a1', 'tool'),
+        kiloEvent('message.updated', { info: assistantInfo('a1') }),
+      ]);
+      expect(outcomes).toMatchObject([{ status: 'completed' }]);
+    });
+
+    it.each([
+      ['input', { ...zeroTokens, input: 1 }],
+      ['output', { ...zeroTokens, output: 1 }],
+      ['reasoning', { ...zeroTokens, reasoning: 1 }],
+      ['cache read', { ...zeroTokens, cache: { read: 1, write: 0 } }],
+    ])('completes when the last step has nonzero %s usage', async (_name, tokens) => {
+      const { outcomes } = await closeAfter([
+        kiloEvent('message.updated', { info: assistantInfo('a1', { tokens }) }),
+      ]);
+      expect(outcomes).toMatchObject([{ status: 'completed' }]);
+    });
+
+    it.each([
+      ['an unfinished step', { finish: null }],
+      ['a stop finish', { finish: 'stop' }],
+      ['a step without a completed time', { time: { created: 1 } }],
+      ['a step without token usage', { tokens: undefined }],
+    ])('completes for %s', async (_name, overrides) => {
+      const { outcomes } = await closeAfter([
+        kiloEvent('message.updated', { info: assistantInfo('a1', overrides) }),
+      ]);
+      expect(outcomes).toMatchObject([{ status: 'completed' }]);
+    });
+  });
+
   it('routes /compact without auto and fails when summarize returns false', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

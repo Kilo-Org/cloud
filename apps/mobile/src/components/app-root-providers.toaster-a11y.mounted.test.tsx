@@ -132,14 +132,13 @@ it('clears the floating tab bar while a tab screen is on top', async () => {
 });
 
 /**
- * The bar's own layout hides it on two in-tab routes (`shouldHideTabBar`);
- * there the toast must fall back to the resting offset instead of floating
- * over a bar that is not there.
+ * A Chat conversation hides the in-tab bar (`shouldHideTabBar`), so its toast
+ * uses the resting offset rather than clearing the hidden bar.
  */
 it('keeps the resting offset when the route hides the tab bar', async () => {
   platform.OS = 'android';
-  route.segments = ['(app)', 'security-agent', 'personal', 'filter'];
-  route.pathname = '/security-agent/personal/filter';
+  route.segments = ['(app)', '(tabs)', '(4_chat)', '[id]'];
+  route.pathname = '/chat-1';
   // The off-screen bar must not move this toast even when a height was published.
   publishRenderedTabBarHeight(120);
   await mount();

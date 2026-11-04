@@ -22,18 +22,19 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { requestMetrics, timed } from './metrics';
+import { jsonResponse, requestMetrics, textResponse, timed } from './metrics';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
 
 function json(body: unknown, status: number): Response {
-  return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+  return jsonResponse(body, { status, headers: { 'cache-control': 'no-store' } });
 }
 
 function failure(error: SyncError): Response {
   const response = json(errorBody(error), ERROR_STATUS[error.code]);
   if (error.code === 'tenant_unavailable') response.headers.set('Retry-After', '60');
+  if (error.code === 'rate_limited') response.headers.set('Retry-After', '60');
   return response;
 }
 
@@ -135,8 +136,11 @@ app.use('/v1/sessions/*', async (c, next) => {
   c.set('principal', principal);
   const metrics = requestMetrics(c.req.raw);
   if (metrics) metrics.tenant = principal.tenant.type;
-  const denied = await rateLimit(c.env.USER_REQUEST_LIMITER, principal.userID);
-  if (denied) return denied;
+  // Reads and batches buy request credits in their session object.
+  if (c.req.method === 'PUT' || c.req.method === 'DELETE') {
+    const denied = await rateLimit(c.env.USER_REQUEST_LIMITER, principal.userID);
+    if (denied) return denied;
+  }
   if (c.req.method === 'PUT' && /^\/v1\/sessions\/[^/]+\/blobs\/[^/]+$/.test(c.req.path)) {
     const blobDenied = await rateLimit(c.env.USER_BLOB_LIMITER, principal.userID);
     if (blobDenied) return blobDenied;
@@ -212,7 +216,7 @@ app.get('/v1/sessions/:id/entities', async c => {
     'readEntities'
   );
   if (!result.ok) return failure(result.error);
-  return new Response(result.value, {
+  return textResponse(result.value, {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 });

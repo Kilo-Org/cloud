@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import migrations from '../../drizzle/migrations';
 import type { Env } from '../env';
+import { DataRateLimit } from '../data-rate-limit';
 import { toHex } from '../hex';
 import {
   LIMITS,
@@ -85,6 +86,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   private purgeRetryAt = 0;
   private leaseReconcilePending = false;
   private pendingRegistration: { tenant: Tenant; sessionID: string } | undefined;
+  private dataRateLimit = new DataRateLimit();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -290,6 +292,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
+    const admitted = await this.dataRateLimit.admit(
+      this.env.USER_DATA_BLOCK_LIMITER,
+      principal.userID
+    );
+    if (!admitted.ok) return admitted;
     return this.tx(() => session.toState(this.db, session.visible(this.db, principal, sessionID)));
   }
 
@@ -298,6 +305,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(batchInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, body } = parsed.value;
+    const admitted = await this.dataRateLimit.admit(
+      this.env.USER_DATA_BLOCK_LIMITER,
+      principal.userID
+    );
+    if (!admitted.ok) return admitted;
     const batch = parseBatch(body);
     if (!batch.ok) return batch;
     // Hash before the transaction: every check and write below runs synchronously.
@@ -313,6 +325,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(pageInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, ...query } = parsed.value;
+    const admitted = await this.dataRateLimit.admit(
+      this.env.USER_DATA_BLOCK_LIMITER,
+      principal.userID
+    );
+    if (!admitted.ok) return admitted;
     return this.tx(() => JSON.stringify(page.read(this.db, principal, sessionID, query)));
   }
 
@@ -404,6 +421,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(locateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, hash } = parsed.value;
+    const admitted = await this.dataRateLimit.admit(
+      this.env.USER_DATA_BLOCK_LIMITER,
+      principal.userID
+    );
+    if (!admitted.ok) return admitted;
     return this.tx(() => blob.locate(this.db, principal, sessionID, hash));
   }
 

@@ -41,9 +41,10 @@ try {
   requireValue(
     verification?.hyperdriveDedicatedNonproduction === true &&
       verification?.databaseSyntheticOnly === true &&
+      verification?.hyperdriveCachingDisabled === true &&
       verification?.r2DedicatedAndPrivate === true &&
       verification?.independentSigningSecrets === true,
-    'Verify the actual Hyperdrive origin, synthetic-only database, private dedicated R2 bucket, and independent staging signing secrets before rendering (see README.md)'
+    'Verify the actual Hyperdrive origin with caching disabled, synthetic-only database, private dedicated R2 bucket, and independent staging signing secrets before rendering (see README.md)'
   );
   requireValue(
     typeof verification.evidence === 'string' && verification.evidence.trim().length > 0,

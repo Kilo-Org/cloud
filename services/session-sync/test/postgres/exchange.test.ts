@@ -184,6 +184,7 @@ describe('credential exchange against the account database', () => {
   it('rejects a credential whose pepper was rotated', async () => {
     const user = await account();
     const token = await legacy(user);
+    expect((await exchange(request(token), env)).status).toBe(200);
     await client.db
       .update(kilocode_users)
       .set({ api_token_pepper: randomUUID() })
@@ -194,18 +195,29 @@ describe('credential exchange against the account database', () => {
     });
   });
 
-  it('rejects a blocked account', async () => {
-    const user = await account({ blocked_reason: 'synthetic block' });
-    expect(await code(await exchange(request(await legacy(user)), env))).toEqual({
+  it('rejects an account blocked after a successful exchange', async () => {
+    const user = await account();
+    const token = await legacy(user);
+    expect((await exchange(request(token), env)).status).toBe(200);
+    await client.db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'synthetic block' })
+      .where(eq(kilocode_users.id, user.id));
+    expect(await code(await exchange(request(token), env))).toEqual({
       status: 403,
       code: 'account_blocked',
     });
   });
 
-  it('rejects an organization the account does not belong to', async () => {
+  it('rejects organization membership removed after a successful exchange', async () => {
     const user = await account();
-    const org = await organization();
-    expect(await code(await exchange(request(await legacy(user), org), env))).toEqual({
+    const org = await organization(user.id);
+    const token = await legacy(user);
+    expect((await exchange(request(token, org), env)).status).toBe(200);
+    await client.db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, user.id));
+    expect(await code(await exchange(request(token, org), env))).toEqual({
       status: 403,
       code: 'organization_access_denied',
     });

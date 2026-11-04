@@ -2,6 +2,7 @@ import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { expect, it, vi } from 'vitest';
 
 import worker from '../../src/index';
+import { instrument, jsonResponse } from '../../src/metrics';
 import { grant, newSessionID, personal, sha256, testEnv } from '../helpers';
 
 it('records one bounded datapoint with actual streamed bytes and no identifiers', async () => {
@@ -95,4 +96,67 @@ it('streams multi-MiB blob PUT and GET unchanged with metrics enabled', async ()
   expect(writeDataPoint).toHaveBeenCalledTimes(3);
   expect(writeDataPoint.mock.calls[1]![0].doubles[4]).toBe(bytes.byteLength);
   expect(writeDataPoint.mock.calls[2]![0].doubles[5]).toBe(bytes.byteLength);
+});
+
+it('avoids wrapping declared bodies while preserving byte counts and error codes', async () => {
+  const writeDataPoint = vi.fn();
+  const ctx = createExecutionContext();
+  const text = 'héllo';
+  const bytes = new TextEncoder().encode(text).byteLength;
+  const request = new Request('https://session-sync.test/v1/sessions/ses_metrics/batches', {
+    method: 'POST',
+    body: text,
+    headers: { 'content-length': String(bytes) },
+  });
+  const original = jsonResponse(
+    { error: { code: 'position_conflict', message: text } },
+    { status: 409 }
+  );
+  const response = await instrument(
+    request,
+    { ...testEnv, SESSION_SYNC_METRICS: { writeDataPoint } },
+    ctx,
+    async counted => {
+      expect(counted).toBe(request);
+      expect(await counted.text()).toBe(text);
+      return original;
+    }
+  );
+  expect(response).toBe(original);
+  const body = await response.text();
+  await waitOnExecutionContext(ctx);
+  expect(writeDataPoint).toHaveBeenCalledTimes(1);
+  expect(writeDataPoint.mock.calls[0]![0]).toMatchObject({
+    blobs: ['POST /v1/sessions/:id/batches', '409', 'position_conflict', 'unknown'],
+    doubles: [expect.any(Number), 0, 0, 0, bytes, new TextEncoder().encode(body).byteLength],
+  });
+});
+
+it('counts unknown-length request and response streams without buffering them', async () => {
+  const writeDataPoint = vi.fn();
+  const ctx = createExecutionContext();
+  const request = new Request('https://session-sync.test/v1/sessions/ses_metrics/batches', {
+    method: 'POST',
+    body: new Uint8Array(123),
+  });
+  const response = await instrument(
+    request,
+    { ...testEnv, SESSION_SYNC_METRICS: { writeDataPoint } },
+    ctx,
+    async counted => {
+      expect((await counted.arrayBuffer()).byteLength).toBe(123);
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(17));
+            controller.enqueue(new Uint8Array(29));
+            controller.close();
+          },
+        })
+      );
+    }
+  );
+  expect((await response.arrayBuffer()).byteLength).toBe(46);
+  await waitOnExecutionContext(ctx);
+  expect(writeDataPoint.mock.calls[0]![0].doubles.slice(4)).toEqual([123, 46]);
 });

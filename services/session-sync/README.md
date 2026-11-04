@@ -50,16 +50,16 @@ All JSON requests use protocol version `1`.
 Errors have an explicit machine-readable code and an appropriate HTTP status.
 An unavailable authentication dependency produces a retryable service error, not an invalid-credential response.
 
-| Operation | Route | Meaning |
-|---|---|---|
-| Exchange credential | `POST /v1/auth/exchange` | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant. |
-| Inspect session | `GET /v1/sessions/:id` | Read producer binding, committed source position, revision, and deletion state. |
-| Register session | `PUT /v1/sessions/:id` | Bind a session to its source without replacing an existing owner. |
-| Apply batch | `POST /v1/sessions/:id/batches` | Atomically apply an incremental batch and return its durable receipt. |
-| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities. |
-| Upload blob | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes. |
-| Read blob | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization. |
-| Remove cloud session | `DELETE /v1/sessions/:id` | Tombstone the cloud copy and prevent its automatic recreation. |
+| Operation            | Route                              | Meaning                                                                         |
+| -------------------- | ---------------------------------- | ------------------------------------------------------------------------------- |
+| Exchange credential  | `POST /v1/auth/exchange`           | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant.    |
+| Inspect session      | `GET /v1/sessions/:id`             | Read producer binding, committed source position, revision, and deletion state. |
+| Register session     | `PUT /v1/sessions/:id`             | Bind a session to its source without replacing an existing owner.               |
+| Apply batch          | `POST /v1/sessions/:id/batches`    | Atomically apply an incremental batch and return its durable receipt.           |
+| Read entities        | `GET /v1/sessions/:id/entities`    | Read bounded pages of the current portable entities.                            |
+| Upload blob          | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes.                       |
+| Read blob            | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization.                              |
+| Remove cloud session | `DELETE /v1/sessions/:id`          | Tombstone the cloud copy and prevent its automatic recreation.                  |
 
 A cloud tombstone is the service part of delete-everywhere.
 Device propagation belongs to the remote-control delivery, not the initial ingestion client.
@@ -133,17 +133,17 @@ It does not depend on the application-shared package.
 
 The initial storage policy is explicit:
 
-| Resource | Bound |
-|---|---|
-| Batch body | 512 KiB |
-| Changes per batch | 64 |
-| Inline entity body | 64 KiB |
-| Blob body | 8 MiB |
+| Resource                                   | Bound   |
+| ------------------------------------------ | ------- |
+| Batch body                                 | 512 KiB |
+| Changes per batch                          | 64      |
+| Inline entity body                         | 64 KiB  |
+| Blob body                                  | 8 MiB   |
 | Stored and reserved blob bytes per session | 256 MiB |
-| Blob entries per session | 10,000 |
-| Inline entity bytes per session | 64 MiB |
-| Current entities per session | 100,000 |
-| Retained batch receipts | 256 |
+| Blob entries per session                   | 10,000  |
+| Inline entity bytes per session            | 64 MiB  |
+| Current entities per session               | 100,000 |
+| Retained batch receipts                    | 256     |
 
 Verified uploads without a current entity reference enter `unreferenced` for 15 minutes.
 Replacing or removing the last reference sets its cleanup deadline to the batch commit time.
@@ -188,20 +188,33 @@ Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 
 Wrangler rate-limit bindings are tunable per deployment and apply per Cloudflare location:
 
-| Binding | Key | Default per 60 seconds |
-|---|---|---|
-| `EXCHANGE_IP_LIMITER` | Client IP, before credential verification | 120 |
-| `EXCHANGE_ACCOUNT_LIMITER` | Verified account, before account SQL | 60 |
-| `USER_REQUEST_LIMITER` | Authenticated user, all data routes | 1,200 |
-| `USER_BLOB_LIMITER` | Authenticated user, blob PUT | 300 |
+| Binding                    | Key                                                      | Default per 60 seconds |
+| -------------------------- | -------------------------------------------------------- | ---------------------- |
+| `EXCHANGE_IP_LIMITER`      | Client IP, before credential verification                | 120                    |
+| `EXCHANGE_ACCOUNT_LIMITER` | Verified account, before account SQL                     | 60                     |
+| `USER_REQUEST_LIMITER`     | Authenticated user, registration, deletion, and blob PUT | 1,200                  |
+| `USER_BLOB_LIMITER`        | Authenticated user, blob PUT                             | 300                    |
+| `USER_DATA_BLOCK_LIMITER`  | Authenticated user, prepaid read/batch blocks            | 120 blocks             |
 
 Each binding uses a distinct namespace, including staging and tests.
 Denial returns retryable `rate_limited` (429), `Retry-After: 60`, and an epoch-ms
 `error.retryAt`. Clients honor both header and JSON deadlines before adding jitter.
 
+State, entity, and blob reads and batch POSTs use an in-memory session-object token
+bucket: 1,200 requests initially, refilling at 20 per second. Each user also buys
+ten request credits at a time through `USER_DATA_BLOCK_LIMITER`, before admission,
+keyed by user ID across sessions and organizations. Credits expire at the next
+aligned minute boundary. A purchase crossing that boundary is discarded and charged
+again. Unused credits and object eviction can only reduce aggregate admission:
+each admitted request consumes a prepaid credit, including each session's first
+request. The per-user ceiling remains at most ten times successful block charges
+within a limiter period/location; it is not a globally coordinated quota.
+Set the block limit to one tenth of the desired read/batch request ceiling.
+The session token bucket resets on object eviction; prepaid credits are never
+persisted or carried to a new instance. Purchases are serialized within an instance.
+
 Failed R2 cleanup persists a one-minute retry floor. Later writes cannot pull that alarm
 forward. A retry that encounters an expired, in-flight cleanup claim waits five seconds.
-
 
 A tombstone survives entity cleanup.
 A deleted ID cannot be registered again.
@@ -210,14 +223,22 @@ Document backup-retention behavior before production rollout.
 
 ### Request metrics
 
-`SESSION_SYNC_METRICS` writes one Analytics Engine datapoint per completed or canceled
-response to `session_sync_metrics` (`session_sync_staging_metrics` in staging).
+`SESSION_SYNC_METRICS` writes one Analytics Engine datapoint per response to
+`session_sync_metrics` (`session_sync_staging_metrics` in staging).
 The index is the normalized method/route; blobs are route, HTTP status, error code,
-and tenant type. Doubles are total ms, DO RPC ms, R2 ms, exchange SQL ms, consumed
-request bytes, and streamed response bytes, in that order.
+and tenant type. Doubles are total ms, DO RPC ms, R2 ms, exchange SQL ms, request
+bytes, and response bytes, in that order. Valid Content-Length values supply byte
+counts without wrapping streams. JSON responses declare their exact UTF-8 length.
+Known-length responses emit when ready; their total ms excludes later body delivery.
+Unknown-length streams count consumed bytes and emit on completion or cancellation.
 DO RPC duration includes its internal R2 work; these latency fields are not additive.
-Stream counting does not buffer blobs or page bodies. Metrics omit user IDs, session IDs,
-hashes, credentials, and content. Tests can omit the Analytics Engine binding.
+Metrics do not buffer blobs or page bodies or record user IDs, session IDs, hashes,
+credentials, or content. Tests can omit the Analytics Engine binding.
+
+Run `node scripts/profile-metrics.mjs` in the Worker pool to compare the same
+synthetic batch/state/error/blob mix with metrics off and each component disabled.
+The harness generates variants from the real implementation and removes them after
+the run. Its no-op Analytics Engine sink measures call overhead, not remote ingestion.
 
 ## Portable checkpoints
 
@@ -312,6 +333,9 @@ Before rendering, an operator must obtain and review all of the following:
 2. A dedicated Hyperdrive in the verified account pointing to that database.
    Record its real ID and reviewed origin metadata; do not reuse an existing
    production/replica Hyperdrive or local connection string.
+   Its query cache must be disabled (`wrangler hyperdrive update <id> --caching-disabled`).
+   Review `caching.disabled: true` in the actual Hyperdrive configuration metadata.
+   Set `verification.hyperdriveCachingDisabled` only after recording this evidence.
 3. A dedicated bucket named `session-sync-staging`, in the same verified account.
    Verify that its public development URL is disabled, it has no public custom
    domains, and it is not exposed by another Worker or public gateway. Only this
@@ -341,6 +365,7 @@ false assertions are intentionally **rejected**, not deployable placeholders:
   "verification": {
     "hyperdriveDedicatedNonproduction": false,
     "databaseSyntheticOnly": false,
+    "hyperdriveCachingDisabled": false,
     "r2DedicatedAndPrivate": false,
     "independentSigningSecrets": false,
     "evidence": ""
@@ -402,13 +427,20 @@ References:
 [Secrets Store bindings](https://developers.cloudflare.com/secrets-store/integrations/workers/),
 [Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/deploy/).
 
-
 ## Production prerequisites
 
 Provision the Worker, SQLite Durable Object namespace, private R2 bucket, and authentication binding.
 Store shared secrets in the shared engineering vault and Cloudflare Secrets Store.
 Do not copy production credentials into local examples or test fixtures.
 Configure a deployment-specific secret for sync grants.
+The `HYPERDRIVE` binding must point to a configuration with `caching.disabled: true`,
+in production as well as staging. Account, device-session, and membership reads all
+use `getWorkerDb(env.HYPERDRIVE.connectionString)`; the database client does not
+disable Hyperdrive caching itself. The staging renderer requires an explicit
+cache-disabled attestation, not just a resource name. Local PostgreSQL tests cannot
+prove remote cache settings. Cloudflare documents that writes do not invalidate
+cached reads and recommends a cache-disabled binding for authentication and permissions:
+[Hyperdrive query caching](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/).
 Verify account and organization authorization on an isolated stack before deployment.
 Complete account deletion, backup retention, quota policy, and rollout monitoring before public adoption.
 Automatic deployment excludes this service until its real bindings and secrets are provisioned.

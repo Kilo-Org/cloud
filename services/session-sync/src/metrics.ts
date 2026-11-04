@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import type { Env } from './env';
 
 export type Metrics = {
@@ -8,6 +10,26 @@ export type Metrics = {
   requestBytes: number;
 };
 const requests = new WeakMap<Request, Metrics>();
+
+/** Known byte lengths avoid counting streams for in-memory JSON responses. */
+export function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  const text = JSON.stringify(body);
+  return textResponse(text, init);
+}
+
+export function textResponse(text: string, init?: ResponseInit): Response {
+  const headers = new Headers(init?.headers);
+  headers.set('content-type', 'application/json');
+  headers.set('content-length', String(Buffer.byteLength(text)));
+  return new Response(text, { ...init, headers });
+}
+
+function declaredBytes(headers: Headers): number | undefined {
+  const value = headers.get('content-length');
+  if (value === null || !/^\d+$/.test(value)) return undefined;
+  const bytes = Number(value);
+  return Number.isSafeInteger(bytes) ? bytes : undefined;
+}
 
 export function requestMetrics(request: Request): Metrics | undefined {
   return requests.get(request);
@@ -36,7 +58,7 @@ function route(request: Request): string {
     : 'not_found';
 }
 
-/** Counts streams without buffering bodies or recording account/session identifiers. */
+/** Uses declared lengths when present; unknown-length bodies stay streaming. */
 export async function instrument(
   request: Request,
   env: Env,
@@ -45,19 +67,27 @@ export async function instrument(
 ): Promise<Response> {
   if (!env.SESSION_SYNC_METRICS) return fetch(request);
   const started = performance.now();
-  const metrics: Metrics = { tenant: 'unknown', doMs: 0, r2Ms: 0, sqlMs: 0, requestBytes: 0 };
-  const counted = request.body
-    ? new Request(request, {
-        body: request.body.pipeThrough(
-          new TransformStream<Uint8Array, Uint8Array>({
-            transform(chunk, controller) {
-              metrics.requestBytes += chunk.byteLength;
-              controller.enqueue(chunk);
-            },
-          })
-        ),
-      })
-    : request;
+  const requestBytes = declaredBytes(request.headers);
+  const metrics: Metrics = {
+    tenant: 'unknown',
+    doMs: 0,
+    r2Ms: 0,
+    sqlMs: 0,
+    requestBytes: requestBytes ?? 0,
+  };
+  const counted =
+    request.body && requestBytes === undefined
+      ? new Request(request, {
+          body: request.body.pipeThrough(
+            new TransformStream<Uint8Array, Uint8Array>({
+              transform(chunk, controller) {
+                metrics.requestBytes += chunk.byteLength;
+                controller.enqueue(chunk);
+              },
+            })
+          ),
+        })
+      : request;
   requests.set(counted, metrics);
   const response = await fetch(counted);
   let errorCode = '';
@@ -72,11 +102,13 @@ export async function instrument(
         errorCode = error.code;
     }
   }
-  let responseBytes = 0;
+  const declaredResponseBytes = declaredBytes(response.headers);
+  let responseBytes = declaredResponseBytes ?? 0;
+  const normalizedRoute = route(counted);
   const emit = () =>
     env.SESSION_SYNC_METRICS?.writeDataPoint({
-      indexes: [route(counted)],
-      blobs: [route(counted), String(response.status), errorCode, metrics.tenant],
+      indexes: [normalizedRoute],
+      blobs: [normalizedRoute, String(response.status), errorCode, metrics.tenant],
       doubles: [
         performance.now() - started,
         metrics.doMs,
@@ -86,7 +118,7 @@ export async function instrument(
         responseBytes,
       ],
     });
-  if (!response.body) {
+  if (!response.body || declaredResponseBytes !== undefined) {
     emit();
     return response;
   }

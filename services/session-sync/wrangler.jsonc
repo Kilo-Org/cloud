@@ -49,6 +49,11 @@
       "namespace_id": "1023",
       "simple": { "limit": 300, "period": 60 },
     },
+    {
+      "name": "USER_DATA_BLOCK_LIMITER",
+      "namespace_id": "1033",
+      "simple": { "limit": 120, "period": 60 },
+    },
   ],
   "analytics_engine_datasets": [
     { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },

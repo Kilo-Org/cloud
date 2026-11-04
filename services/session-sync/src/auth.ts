@@ -14,7 +14,7 @@ import { z } from 'zod';
 
 import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
 import { rateLimit } from './rate-limit';
-import { requestMetrics, timed } from './metrics';
+import { jsonResponse, requestMetrics, timed } from './metrics';
 
 export type { Principal };
 
@@ -103,7 +103,7 @@ async function resolveSecret(binding: SecretBinding, minBytes: number): Promise<
 }
 
 function failure(status: number, code: string, message: string): Response {
-  return Response.json(
+  return jsonResponse(
     { error: { code, message } },
     { status, headers: { 'Cache-Control': 'no-store' } }
   );
@@ -302,7 +302,7 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
       .setExpirationTime(exp)
       .sign(new TextEncoder().encode(grantSecret));
 
-    return Response.json(
+    return jsonResponse(
       {
         version: 1,
         token: grant,

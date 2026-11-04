@@ -153,7 +153,11 @@ export function NewSessionScreenBody() {
   // repository picker above the pinned footer at once, and the picker is the
   // field Start needs. Reading the window (not the measured form frame) keeps
   // the choice stable from the first render.
-  const inlineSectionHeadings = resolveNewSessionInlineSections(useWindowDimensions().height);
+  const windowSize = useWindowDimensions();
+  const inlineSectionHeadings = resolveNewSessionInlineSections(
+    windowSize.width,
+    windowSize.height
+  );
   const searchParams = useLocalSearchParams<{
     organizationId?: string;
     shareId?: string;

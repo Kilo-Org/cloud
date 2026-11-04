@@ -22,8 +22,10 @@ type NewSessionSectionFieldProps = {
  * sections that sit above the repository picker merge theirs into the row on a
  * short window so the picker itself stays above the pinned Start footer.
  *
- * The label never shrinks: a squeezed label wraps into a column of single
- * letters beside the control instead of naming it.
+ * The label never takes the row: it is capped at 45% of it, so a long localized
+ * name or a large font scale wraps the heading instead of squeezing the control
+ * it names, and the 240 dp width gate keeps the row off windows where even a
+ * capped heading would leave no word of room.
  */
 export function NewSessionSectionField({
   label,
@@ -40,7 +42,10 @@ export function NewSessionSectionField({
   }
   return (
     <View className="mt-5 flex-row items-center gap-2">
-      <Text className="shrink-0 text-sm font-medium text-muted-foreground">{label}</Text>
+      {/* The heading may not take the row: a long localized label (or a large
+          font scale) would leave the control it names no room for a word. Above
+          240 dp the form only takes this row, so the cap is the label's share. */}
+      <Text className="max-w-[45%] text-sm font-medium text-muted-foreground">{label}</Text>
       <View className="flex-1">{children}</View>
     </View>
   );

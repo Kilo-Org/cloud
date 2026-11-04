@@ -191,7 +191,11 @@ export function NewSessionConfigureForm({
   // the Account section above it, so the repository picker below them stays
   // above the pinned footer. The window is read here rather than a measured
   // frame so the form cannot reflow after the first layout.
-  const inlineSectionHeadings = resolveNewSessionInlineSections(useWindowDimensions().height);
+  const windowSize = useWindowDimensions();
+  const inlineSectionHeadings = resolveNewSessionInlineSections(
+    windowSize.width,
+    windowSize.height
+  );
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);

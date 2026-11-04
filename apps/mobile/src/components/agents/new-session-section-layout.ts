@@ -1,3 +1,5 @@
+import { NARROW_LAYOUT_WIDTH } from '@/lib/narrow-layout';
+
 /**
  * How the New Session form lays out the sections above the repository picker on
  * a short window.
@@ -15,20 +17,29 @@
  * layout, and a form whose sections moved after a measured frame settled would
  * shift every row below the card a second time.
  *
- * The threshold is the last window that still needs the compact row: the
+ * The height threshold is the last window that still needs the compact row: the
  * composer's floor (88), the card's top gap and chrome (14 + 125) and the rows
  * under it (262) need a 489 dp form frame, and the screen chrome around that
- * frame measures ~218 dp at this size. A taller window keeps the stacked
- * heading it has always had, and a tablet or a landscape window is far above
- * the threshold.
+ * frame measures ~218 dp at this size. It is a height rule, not a portrait
+ * rule: a landscape phone (~360-411 dp tall) and a 1024x600 landscape tablet
+ * are short too and take the row, and only a window taller than the threshold
+ * keeps the stacked heading.
  *
- * An unmeasured window keeps the stacked form: treating an unknown height as
- * short would change the layout on a platform that reports none.
+ * The width gate is the one `narrow-layout` already draws for every side-by-side
+ * row: below 240 dp the fixed heading leaves the control no room for a word, so
+ * those windows keep the stacked layout and simply scroll the picker into view.
+ * An unknown width keeps the stacked form for the same reason — the compact row
+ * is the exception, never the default.
  */
 export const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
 
-export function resolveNewSessionInlineSections(windowHeight: number): boolean {
+export function resolveNewSessionInlineSections(
+  windowWidth: number,
+  windowHeight: number
+): boolean {
   return (
+    Number.isFinite(windowWidth) &&
+    windowWidth >= NARROW_LAYOUT_WIDTH &&
     Number.isFinite(windowHeight) &&
     windowHeight > 0 &&
     windowHeight < NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT

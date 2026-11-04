@@ -687,6 +687,8 @@ const controlPlanePromptAgentSchema = z
 const controlPlanePromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
+    /** Server-owned context injected as a synthetic prompt part. */
+    context: z.string().max(2000).optional(),
     attachments: z
       .array(
         z

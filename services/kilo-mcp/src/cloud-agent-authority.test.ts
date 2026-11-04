@@ -138,7 +138,7 @@ describe('Cloud Agent MCP authority', () => {
 
   it.each([
     { githubRepo: 'Other-Owner/Another_Repo', model: 'other-provider/another-model' },
-    { callbackTarget: { url: 'session:parent' } },
+    { callbackTarget: { url: 'workspace:new-chat' } },
     {
       variant: 'high',
       upstreamBranch: 'feature/child-task',
@@ -285,11 +285,11 @@ describe('Cloud Agent MCP authority', () => {
     },
     {
       path: 'cloudAgentNext.prepareSession',
-      input: { ...launch, callbackTarget: { url: 'session:other' } },
+      input: { ...launch, callbackTarget: { url: 'workspace:not-a-session' } },
     },
     {
       path: 'cloudAgentNext.prepareSession',
-      input: { ...launch, callbackTarget: { url: 'session:parent', extra: true } },
+      input: { ...launch, callbackTarget: { url: 'workspace:new-chat', extra: true } },
     },
     {
       path: 'organizations.cloudAgentNext.prepareSession',
@@ -638,7 +638,7 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.instructions).toContain('only when the user explicitly asks');
       expect(body.result.instructions).toContain('own sandbox and worktree');
       expect(body.result.instructions).toContain('fan out independent tasks');
-      expect(body.result.instructions).toContain('callbackTarget: { url: "session:parent" }');
+      expect(body.result.instructions).toContain('callbackTarget: { url: "workspace:new-chat" }');
       expect(body.result.instructions).toContain('Do not poll or wait in a tool for a callback');
       expect(body.result.instructions).toContain('Prefer callbacks over polling');
       expect(body.result.instructions).toContain('keep any status check bounded');

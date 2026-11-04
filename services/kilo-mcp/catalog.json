@@ -6919,18 +6919,37 @@
             "cloneFromKiloSessionId": {},
             "cloneUpToMessageId": {},
             "callbackTarget": {
-              "type": "object",
-              "properties": {
-                "url": {
-                  "type": "string",
-                  "const": "session:parent"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "workspace:new-chat"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                 }
-              },
-              "required": [
-                "url"
               ],
-              "additionalProperties": false,
-              "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+              "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
             },
             "githubRepo": {
               "type": "string",
@@ -7554,18 +7573,37 @@
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
             "callbackTarget": {
-              "type": "object",
-              "properties": {
-                "url": {
-                  "type": "string",
-                  "const": "session:parent"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "workspace:new-chat"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                 }
-              },
-              "required": [
-                "url"
               ],
-              "additionalProperties": false,
-              "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+              "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
             },
             "githubRepo": {
               "type": "string",
@@ -18280,18 +18318,37 @@
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
                 "callbackTarget": {
-                  "type": "object",
-                  "properties": {
-                    "url": {
-                      "type": "string",
-                      "const": "session:parent"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "workspace:new-chat"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                     }
-                  },
-                  "required": [
-                    "url"
                   ],
-                  "additionalProperties": false,
-                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                  "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
                 },
                 "githubRepo": {
                   "type": "string",
@@ -18921,18 +18978,37 @@
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "callbackTarget": {
-                  "type": "object",
-                  "properties": {
-                    "url": {
-                      "type": "string",
-                      "const": "session:parent"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "workspace:new-chat"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                     }
-                  },
-                  "required": [
-                    "url"
                   ],
-                  "additionalProperties": false,
-                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                  "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
                 },
                 "githubRepo": {
                   "type": "string",

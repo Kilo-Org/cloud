@@ -11,7 +11,7 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -35,11 +35,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   >),
   isFreeModel: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
-    decision: { allowed: true },
-  }),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
+      decision: { allowed: true },
+    }),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn().mockResolvedValue(null),

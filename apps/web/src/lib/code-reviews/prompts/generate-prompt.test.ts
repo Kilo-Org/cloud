@@ -523,7 +523,7 @@ describe('generateReviewPrompt (incremental review)', () => {
       previousHeadSha: 'abc123prev',
     });
 
-    // The inline comments table should still be present (section 10 in generate-prompt.ts)
+    // The inline comments table should still be present
     expect(prompt).toContain('Existing Inline Comments');
     expect(prompt).toContain('src/foo.ts');
   });

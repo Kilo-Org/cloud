@@ -108,7 +108,6 @@ export function getPlatformConfig(platform: CodeReviewPlatform): PlatformConfig 
     case PLATFORM.BITBUCKET:
       return bitbucketConfig;
     default: {
-      // Exhaustive check
       const _exhaustive: never = platform;
       throw new Error(`Unknown platform: ${_exhaustive}`);
     }

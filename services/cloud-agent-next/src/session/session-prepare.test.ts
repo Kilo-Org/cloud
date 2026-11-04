@@ -610,7 +610,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it('rejects an inherited allowlist when no saved allocation selects containers', async () => {
+  it('rejects an inherited allowlist when no saved allocation selects a supported runtime', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
@@ -621,16 +621,14 @@ describe('explicit sandbox session creation', () => {
       runtime: { egressMode: 'allowlist', egressAllowlist: [] },
     });
 
+    // Legacy Cloudflare sandboxes are retired, so the placement decision is
+    // refused before an egress policy could ride on a non-containers sandbox.
     await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
     });
     expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
     expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBeUndefined();
-    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
-      provider: 'cloudflare',
-      sandboxKind: 'isolated',
-    });
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });

@@ -220,6 +220,30 @@ describe('Text eyebrow letterspacing', () => {
   });
 });
 
+// A heading reaches an assistive reader as a heading with its own level, and
+// the two come from one entry per heading: neither can be announced without the
+// other, and a non-heading variant announces neither.
+describe('Text heading accessibility', () => {
+  it.each([
+    ['h1', '1'],
+    ['h2', '2'],
+    ['h3', '3'],
+    ['h4', '4'],
+  ] as const)('announces %s as a heading with level %s', (variant, level) => {
+    const node = hostText(mountTextTree(createElement(Text, { variant }, 'Section')));
+
+    expect(node.props.role).toBe('heading');
+    expect(node.props['aria-level']).toBe(level);
+  });
+
+  it('leaves a non-heading variant without a heading role or level', () => {
+    const node = hostText(mountTextTree(createElement(Text, { variant: 'muted' }, 'Note')));
+
+    expect(node.props.role).toBeUndefined();
+    expect(node.props['aria-level']).toBeUndefined();
+  });
+});
+
 describe('Text mono variant in either interface', () => {
   // The mono variant carries a font that ships no RTL-script glyphs, so
   // RTL-script copy loses the family in either direction while a Latin run such

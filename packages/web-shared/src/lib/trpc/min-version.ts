@@ -11,11 +11,11 @@ import {
   isAppVersion,
   isKnownPlatform,
   isMobileClient as isMobileClientValue,
+  type AppHeaderList,
 } from '@kilocode/web-shared/lib/app-headers';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { isVersionBelow } from '@kilocode/app-shared/app-version';
 
-export type MinimumVersionHeaders = { get(name: string): string | null };
 export type MinimumVersions = { ios: string; android: string };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -56,7 +56,7 @@ let readGeneration = 0;
 /** Reads still running, including abandoned ones that hold a pool connection. */
 let liveReads = 0;
 
-export function isMobileClient(headersList?: MinimumVersionHeaders | null): boolean {
+export function isMobileClient(headersList?: AppHeaderList | null): boolean {
   return isMobileClientValue(headersList?.get(APP_CLIENT_HEADER));
 }
 
@@ -67,7 +67,7 @@ export function isMobileClient(headersList?: MinimumVersionHeaders | null): bool
  * return `{ pass: false }`.
  */
 export function enforceMinimumVersion(
-  headersList: MinimumVersionHeaders | null | undefined,
+  headersList: AppHeaderList | null | undefined,
   minimums: MinimumVersions
 ): { pass: boolean } {
   if (!headersList) {

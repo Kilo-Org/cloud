@@ -8,6 +8,12 @@
  * the gate in front of the tRPC procedures can import it.
  */
 
+/**
+ * Anything that reads a request header by name: `Headers`, a Next request's
+ * header list, or a fake in a test.
+ */
+export type AppHeaderList = { get(name: string): string | null };
+
 export const APP_CLIENT_HEADER = 'x-kilo-client';
 export const APP_PLATFORM_HEADER = 'x-kilo-app-platform';
 export const APP_VERSION_HEADER = 'x-kilo-app-version';

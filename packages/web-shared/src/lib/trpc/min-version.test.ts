@@ -9,20 +9,20 @@ const limitMock = jest.fn<() => Promise<unknown>>();
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb }));
 jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 
+import type { AppHeaderList } from '@kilocode/web-shared/lib/app-headers';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { FAILURE_BACKOFF_MS } from '../cached-fetch';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   isMobileClient,
-  type MinimumVersionHeaders,
   type MinimumVersions,
 } from './min-version';
 
 // getMinimumVersions holds a module-level cache, so re-import for a fresh cache.
 let getMinimumVersions: () => Promise<MinimumVersions | null>;
 
-function headers(entries: Record<string, string>): MinimumVersionHeaders {
+function headers(entries: Record<string, string>): AppHeaderList {
   return { get: (name: string) => entries[name] ?? null };
 }
 

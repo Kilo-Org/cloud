@@ -20,10 +20,8 @@ import {
   MOBILE_CLIENT,
   isAppVersion,
   isMobileClient,
+  type AppHeaderList,
 } from '@kilocode/web-shared/lib/app-headers';
-
-/** Same shape the min-version helper reads (`lib/trpc/min-version.ts`). */
-export type TimingHeaders = { get(name: string): string | null };
 
 export type ClientDimensions = {
   client: string | null;
@@ -60,7 +58,7 @@ function readAllowlisted(
 }
 
 /** Header names the app already sends on every request. */
-export function readClientDimensions(headersList?: TimingHeaders | null): ClientDimensions {
+export function readClientDimensions(headersList?: AppHeaderList | null): ClientDimensions {
   const version = headersList?.get(APP_VERSION_HEADER) ?? null;
   const requestId = headersList?.get('x-kilo-request-id') ?? null;
   return {

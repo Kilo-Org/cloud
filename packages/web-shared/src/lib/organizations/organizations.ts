@@ -89,6 +89,7 @@ export async function getUserOrganizationsWithSeats(
     .select({
       organizationId: organizations.id,
       organizationName: organizations.name,
+      parentOrganizationId: organizations.parent_organization_id,
       role: organization_memberships.role,
       totalMicrodollarsAcquired: organizations.total_microdollars_acquired,
       microdollarsUsed: organizations.microdollars_used,
@@ -129,6 +130,7 @@ export async function getUserOrganizationsWithSeats(
   return results.map(result => ({
     organizationName: result.organizationName,
     organizationId: result.organizationId,
+    parentOrganizationId: result.parentOrganizationId,
     role: result.role,
     memberCount: result.total_member_count,
     balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,

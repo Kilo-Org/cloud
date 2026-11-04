@@ -132,6 +132,13 @@ describe('trpcProceduresFromUrl', () => {
   it('returns an empty list for the bare trpc path', () => {
     expect(trpcProceduresFromUrl('https://api.kilo.ai/api/trpc/')).toEqual([]);
   });
+
+  it('drops a fragment suffix, as the error reporter does', () => {
+    expect(trpcProceduresFromUrl('https://api.kilo.ai/api/trpc/a.b,c.d#section')).toEqual([
+      'a.b',
+      'c.d',
+    ]);
+  });
 });
 
 describe('createLatencyBuffer', () => {

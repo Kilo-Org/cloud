@@ -49,7 +49,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   /** The snapshot returned by `getStatusSnapshot` (B10 badge tests). */
   statusSnapshot: SandboxStatusSnapshot = {
     status: 'sleeping',
-    provider: 'Cloudflare',
+    provider: 'Cloudflare Containers',
     observedAt: 1,
     detailCode: 'sandbox_stopped',
     inactivityTimeoutMs: 600_000,
@@ -128,9 +128,9 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   previewTargetResult: PreviewTargetResult = {
     status: 'ok',
     coordinates: {
-      provider: 'cloudflare',
-      allocationName: 'sbx',
-      containment: false,
+      provider: 'cloudflare-containers',
+      logicalSandboxId: 'sbx',
+      allocationRef: 'sbx',
     },
   };
   readonly previewTargetCalls: string[] = [];

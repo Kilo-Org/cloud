@@ -26,6 +26,7 @@ import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;
@@ -42,6 +43,7 @@ type SendUpstreamAttemptInput = {
   signal?: AbortSignal;
   vercelRequestId?: string | null;
   costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
+  dataRegion: OrganizationDataRegion | null;
 };
 
 type SendUpstreamAttemptResult =
@@ -70,6 +72,7 @@ export async function sendUpstreamAttempt({
   signal,
   vercelRequestId,
   costLimit,
+  dataRegion,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -83,7 +86,8 @@ export async function sendUpstreamAttempt({
     organizationId,
     sessionId,
     taskId,
-    isNonTrialEnterprise
+    isNonTrialEnterprise,
+    dataRegion
   );
   if (costLimit) {
     const decision = await enforceRequestCostLimit(

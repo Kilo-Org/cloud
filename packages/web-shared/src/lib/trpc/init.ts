@@ -151,19 +151,6 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-/**
- * Marker class used to attach an upstream API error code to a TRPCError so the
- * error-formatter can surface it to the client in `err.data.upstreamCode`.
- *
- * Usage:
- *   throw new TRPCError({
- *     code: 'CONFLICT',
- *     message: 'Config was modified',
- *     cause: new UpstreamApiError('etag_mismatch'),
- *   });
- *
- * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
- */
 const t = initTRPC.context<TRPCContext>().create({
   errorFormatter: trpcErrorFormatter,
 });

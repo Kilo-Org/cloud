@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, type TextInput, View } from 'react-native';
+import { Platform, type TextInput, type TextInputProps, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { DialogCard } from '@/components/ui/dialog';
@@ -49,7 +49,25 @@ export function RenameModal<TSaveResult>({
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const nameRef = useRef(initialValue);
+  // The field keeps what the user typed. Its seed is the value the dialog
+  // opened with, captured once, so a caller that writes the typed name into its
+  // cache on save and restores the old one when the save is refused never
+  // re-seeds it.
+  //
+  // Android commits this dialog while the save is pending and after it fails
+  // (the field's editable/locked state and the inline error), and its text input
+  // applies the text of the committed props on every one of those commits. An
+  // uncontrolled field's only text source is the props, so the typed name is
+  // replaced by the seed unless the seed is the typed text: Android passes the
+  // field's own text as its `value`.
+  //
+  // iOS applies that text only when the text state itself updates, so the
+  // uncontrolled field keeps the typed name and the seed stays its
+  // `defaultValue`; this app never controls text with `value` plus state on iOS
+  // (apps/mobile/CLAUDE.md).
+  const [openingValue] = useState(initialValue);
+  const [text, setText] = useState(openingValue);
+  const textRef = useRef(openingValue);
   const inputRef = useRef<TextInput>(null);
   const [canSave, setCanSave] = useState(false);
   const [pending, setPending] = useState(false);
@@ -77,7 +95,7 @@ export function RenameModal<TSaveResult>({
   };
 
   const handleSave = async () => {
-    const trimmed = nameRef.current.trim();
+    const trimmed = textRef.current.trim();
     setPending(true);
     setSaveInFlight(true);
     setErrorText(null);
@@ -116,6 +134,9 @@ export function RenameModal<TSaveResult>({
     }
   };
 
+  const textProps: Pick<TextInputProps, 'value' | 'defaultValue'> =
+    Platform.OS === 'android' ? { value: text } : { defaultValue: openingValue };
+
   return (
     <DialogCard onClose={handleClose} placement="top">
       <Text className="text-base font-semibold">{title}</Text>
@@ -135,13 +156,16 @@ export function RenameModal<TSaveResult>({
         )}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        defaultValue={initialValue}
+        {...textProps}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : undefined}
         onChangeText={val => {
-          nameRef.current = val;
+          textRef.current = val;
+          if (Platform.OS === 'android') {
+            setText(val);
+          }
           const trimmed = val.trim();
-          setCanSave(trimmed.length > 0 && trimmed !== initialValue);
+          setCanSave(trimmed.length > 0 && trimmed !== openingValue);
         }}
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}

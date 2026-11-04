@@ -15,7 +15,7 @@ import {
   decodeCloudflareProviderRef,
   encodeCloudflareProviderRef,
   type CloudflareProviderRef,
-} from './cloudflare-provider.js';
+} from './provider-ref.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';

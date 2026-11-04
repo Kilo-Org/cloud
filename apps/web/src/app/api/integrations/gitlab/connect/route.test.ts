@@ -303,19 +303,29 @@ describe('GET /api/integrations/gitlab/connect', () => {
   });
 
   test('accepts field values that reach the configured bounds', async () => {
+    const instanceOrigin = 'https://gitlab.example.com/';
+    const instanceUrl = `${instanceOrigin}${'a'.repeat(2048 - instanceOrigin.length)}`;
+    const returnTo = `/${'b'.repeat(2047)}`;
+
     const response = await callGitLabConnectPost(
       makeJsonRequest('/api/integrations/gitlab/connect', {
-        instanceUrl: `https://gitlab.example.com/${'a'.repeat(1024)}`,
+        instanceUrl,
         clientId: 'c'.repeat(512),
         clientSecret: 's'.repeat(512),
-        returnTo: `/${'b'.repeat(1000)}`,
+        returnTo,
       })
     );
 
+    expect(instanceUrl).toHaveLength(2048);
+    expect(returnTo).toHaveLength(2048);
     expect(response.status).toBe(200);
     expect(mockedStoreGitLabOAuthCredentials).toHaveBeenCalledWith({
       clientId: 'c'.repeat(512),
       clientSecret: 's'.repeat(512),
     });
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({ instanceUrl: instanceUrl.replace(/\/$/, ''), returnTo }),
+      USER_ID
+    );
   });
 });

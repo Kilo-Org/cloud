@@ -145,6 +145,10 @@ jest.mock('@/hooks/useCelebrationSound', () => ({
   useCelebrationSound: () => ({ play: jest.fn(), soundEnabled: false, setSoundEnabled: jest.fn() }),
 }));
 jest.mock('@/hooks/useCliSessionPresence', () => ({ useCliSessionPresence: jest.fn() }));
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupEnabled: () => ({ data: { enabled: false, canStart: false } }),
+  useEnvironmentSetupRunBySession: () => ({ data: null }),
+}));
 jest.mock('./hooks/useSessionModels', () => ({
   useSessionModels: () => ({
     modelOptions: [],

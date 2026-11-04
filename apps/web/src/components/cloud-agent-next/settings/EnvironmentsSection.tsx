@@ -24,8 +24,14 @@ import {
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
+import {
+  useEnvironmentSetupEnabled,
+  useEnvironmentSetupRunsForEnvironment,
+} from '@/hooks/useEnvironmentSetupRuns';
 import { EnvironmentDialog } from '../EnvironmentDialog';
+import { EnvironmentSetupAgentDialog } from '../EnvironmentSetupAgentDialog';
 import { snapshotBadge } from '../environment-build-display';
+import { hasOpenSetupRun } from './environment-setup-status';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
@@ -37,8 +43,11 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [setupDialogOpen, setSetupDialogOpen] = useState(false);
   const [dialogEnvironmentId, setDialogEnvironmentId] = useState<string | null>(null);
   const [dialogRepository, setDialogRepository] = useState<EnvironmentRepository | undefined>();
+  const { data: setupEnabled } = useEnvironmentSetupEnabled({ organizationId });
+  const canStartSetup = setupEnabled?.canStart === true;
 
   const repoChoices = useEnvironmentRepositoryChoices(organizationId);
 
@@ -69,54 +78,66 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
             several do, you choose one.
           </p>
         </div>
-        {canManage && (
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="shrink-0">
-                <Plus className="mr-1.5 h-4 w-4" />
-                Add environment
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[320px] p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Search repositories..." />
-                <CommandEmpty>No repositories match your search</CommandEmpty>
-                <CommandList className="max-h-64 overflow-auto">
-                  {(['github', 'gitlab', 'bitbucket'] as const).map(platform => {
-                    const choices = repoChoices.filter(choice => choice.platform === platform);
-                    if (choices.length === 0) return null;
-                    return (
-                      <CommandGroup
-                        key={platform}
-                        heading={
-                          platform === 'github'
-                            ? 'GitHub'
-                            : platform === 'gitlab'
-                              ? 'GitLab'
-                              : 'Bitbucket'
-                        }
-                      >
-                        {choices.map(choice => (
-                          <CommandItem
-                            key={`${platform}:${choice.label}`}
-                            value={`${platform}:${choice.label}`}
-                            onSelect={() => openCreate(choice)}
-                            className="flex items-center gap-2"
-                          >
-                            <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-                            <span className="flex-1 truncate" title={choice.label}>
-                              {choice.label}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    );
-                  })}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {canManage && (
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="shrink-0">
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Add environment
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="end">
+                <Command>
+                  <CommandInput placeholder="Search repositories..." />
+                  <CommandEmpty>No repositories match your search</CommandEmpty>
+                  <CommandList className="max-h-64 overflow-auto">
+                    {(['github', 'gitlab', 'bitbucket'] as const).map(platform => {
+                      const choices = repoChoices.filter(choice => choice.platform === platform);
+                      if (choices.length === 0) return null;
+                      return (
+                        <CommandGroup
+                          key={platform}
+                          heading={
+                            platform === 'github'
+                              ? 'GitHub'
+                              : platform === 'gitlab'
+                                ? 'GitLab'
+                                : 'Bitbucket'
+                          }
+                        >
+                          {choices.map(choice => (
+                            <CommandItem
+                              key={`${platform}:${choice.label}`}
+                              value={`${platform}:${choice.label}`}
+                              onSelect={() => openCreate(choice)}
+                              className="flex items-center gap-2"
+                            >
+                              <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                              <span className="flex-1 truncate" title={choice.label}>
+                                {choice.label}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      );
+                    })}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+          {canStartSetup && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="pointer-coarse:min-h-11"
+              onClick={() => setSetupDialogOpen(true)}
+            >
+              Set up with agent
+            </Button>
+          )}
+        </div>
       </div>
 
       {query.isLoading ? (
@@ -145,6 +166,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
               environment={environment}
               organizationId={organizationId}
               canManage={canManage}
+              setupEnabled={setupEnabled?.enabled === true}
               onEdit={() => openEdit(environment.id)}
             />
           ))}
@@ -162,6 +184,12 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         onSaved={() => setDialogOpen(false)}
         onDeleted={() => setDialogOpen(false)}
       />
+      <EnvironmentSetupAgentDialog
+        open={setupDialogOpen}
+        onOpenChange={setSetupDialogOpen}
+        organizationId={organizationId}
+        initialRepositories={[]}
+      />
     </section>
   );
 }
@@ -170,14 +198,21 @@ function EnvironmentRow({
   environment,
   organizationId,
   canManage,
+  setupEnabled,
   onEdit,
 }: {
   environment: EnvironmentSummary;
   organizationId?: string;
   canManage: boolean;
+  setupEnabled: boolean;
   onEdit: () => void;
 }) {
   const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, { organizationId });
+  const { data: setupRuns } = useEnvironmentSetupRunsForEnvironment(environment.id, {
+    organizationId,
+    enabled: setupEnabled,
+  });
+  const setupInProgress = hasOpenSetupRun(setupRuns);
   const badge = snapshotBadge(buildStatus, Date.now());
   const members = environmentMembers(environment);
   const primary = members[0];
@@ -205,6 +240,11 @@ function EnvironmentRow({
           {badge && (
             <Badge variant="outline" className="shrink-0 text-[10px]">
               {badge}
+            </Badge>
+          )}
+          {setupInProgress && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Setup in progress
             </Badge>
           )}
         </span>

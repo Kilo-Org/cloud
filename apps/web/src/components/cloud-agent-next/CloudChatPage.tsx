@@ -120,6 +120,13 @@ import type { KnownModel } from './known-models';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
+import {
+  useEnvironmentSetupEnabled,
+  useEnvironmentSetupRunBySession,
+} from '@/hooks/useEnvironmentSetupRuns';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { EnvironmentSetupRunCard } from './EnvironmentSetupRunCard';
+import { EnvironmentSetupRequestNotice } from './EnvironmentSetupRequestNotice';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { cn } from '@/lib/utils';
@@ -259,6 +266,13 @@ export default function CloudChatPage({
   const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const sessionId = useAtomValue(manager.atoms.sessionId);
+  const setupEnabled = useEnvironmentSetupEnabled({ organizationId });
+  const setupRun =
+    useEnvironmentSetupRunBySession(sessionId, {
+      organizationId,
+      enabled: setupEnabled.data?.enabled === true,
+    }).data ?? null;
+  const canManageSetupRun = organizationId === undefined || canManageOrganization(organizationRole);
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
@@ -1570,6 +1584,16 @@ export default function CloudChatPage({
                     )}
                   </div>
 
+                  {setupRun !== null && (
+                    <div className="shrink-0 border-b px-[max(1rem,calc(50%_-_27rem))] py-2">
+                      <EnvironmentSetupRunCard
+                        run={setupRun}
+                        organizationId={organizationId}
+                        canManage={canManageSetupRun}
+                      />
+                    </div>
+                  )}
+
                   <div
                     ref={setChildSessionDrawerContainer}
                     className="relative flex min-h-0 flex-1 flex-col"
@@ -1711,6 +1735,16 @@ export default function CloudChatPage({
                               <SessionContinuationPanel sessionId={sessionIdFromParams} />
                             ) : null)}
                           <div hidden={isReadOnly}>
+                            {setupRun !== null && transcriptPhase !== 'opening' && (
+                              <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                <EnvironmentSetupRequestNotice
+                                  run={setupRun}
+                                  organizationId={organizationId}
+                                  organizationName={organizationName}
+                                  canManage={canManageSetupRun}
+                                />
+                              </div>
+                            )}
                             {unreadablePermissions.length > 0 && transcriptPhase !== 'opening' && (
                               <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
                                 <PermissionUnreadableNotice />

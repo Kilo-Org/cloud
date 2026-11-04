@@ -63,6 +63,7 @@ import {
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_environment_setup_runs,
   security_findings,
   security_finding_notifications,
   security_remediation_attempts,
@@ -1051,6 +1052,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   the person's own openai_chatgpt_connections rows, agent_configs, webhook_events,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
+ *   cloud_agent_environment_setup_runs (user-owned runs are deleted; runs the
+ *   deleted user created for an organization are retained with `requirements`
+ *   cleared and `created_by_user_id` kept),
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
  *   security_remediation_attempts actor references,
@@ -1368,6 +1372,13 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_sandbox_allocation_settings)
     .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, userId));
+  await tx
+    .delete(cloud_agent_environment_setup_runs)
+    .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, userId));
+  await tx
+    .update(cloud_agent_environment_setup_runs)
+    .set({ requirements: '' })
+    .where(eq(cloud_agent_environment_setup_runs.created_by_user_id, userId));
   await tx
     .delete(cloud_agent_environments)
     .where(eq(cloud_agent_environments.owned_by_user_id, userId));

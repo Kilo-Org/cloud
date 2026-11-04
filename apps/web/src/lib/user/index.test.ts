@@ -89,6 +89,7 @@ import {
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_environment_setup_runs,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -335,6 +336,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environment_setup_runs);
     await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
@@ -5764,6 +5766,61 @@ describe('User', () => {
         .from(cloud_agent_environments)
         .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
       expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
+    it('deletes user-owned setup runs and clears requirements on organization runs the user created', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: `Setup runs org ${randomUUID()}` })
+        .returning({ id: organizations.id });
+
+      const runValues = {
+        requirements: 'Set up the local dev stack.',
+        model: 'anthropic/claude-sonnet-4',
+        launch_repo_full_name: 'acme/widgets',
+      };
+      await db.insert(cloud_agent_environment_setup_runs).values([
+        {
+          ...runValues,
+          owned_by_user_id: user.id,
+          created_by_user_id: user.id,
+        },
+        {
+          ...runValues,
+          requirements: 'Organization setup requirements.',
+          owned_by_organization_id: organization.id,
+          created_by_user_id: user.id,
+        },
+        {
+          ...runValues,
+          requirements: 'Other user requirements.',
+          owned_by_user_id: otherUser.id,
+          created_by_user_id: otherUser.id,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const deletedUserRuns = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, user.id));
+      expect(deletedUserRuns).toHaveLength(0);
+
+      const [organizationRun] = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_organization_id, organization.id));
+      expect(organizationRun.requirements).toBe('');
+      expect(organizationRun.created_by_user_id).toBe(user.id);
+
+      const [otherUserRun] = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, otherUser.id));
+      expect(otherUserRun.requirements).toBe('Other user requirements.');
     });
 
     it('should nullify user_feedback FK', async () => {

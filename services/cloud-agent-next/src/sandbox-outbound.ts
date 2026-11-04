@@ -1040,63 +1040,23 @@ const managedScmOutboundHandlers = {
   [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
 };
 
-export class Sandbox extends MeteredSandbox {
+export class SandboxContainment extends MeteredSandbox {
   protected get sandboxClassName(): SandboxClassName {
-    return 'Sandbox';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxSmall extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmall';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxDIND extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxDIND';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxCodeReview extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReview';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxContainment extends Sandbox {
-  protected override get sandboxClassName(): SandboxClassName {
     return 'SandboxContainment';
   }
+  enableInternet = true;
   interceptHttps = true;
 }
-// Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
-// setter and registers into @cloudflare/containers' internal outboundHandlersRegistry. A static
-// class field here would shadow the inherited accessor and silently no-op the registration.
+// Assignment invokes the inherited setter that registers the outbound handlers.
 SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
 
-export class SandboxSmallContainment extends SandboxSmall {
-  protected override get sandboxClassName(): SandboxClassName {
+export class SandboxSmallContainment extends MeteredSandbox {
+  protected get sandboxClassName(): SandboxClassName {
     return 'SandboxSmallContainment';
   }
+  enableInternet = true;
   interceptHttps = true;
 }
 SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxCodeReviewContainment extends SandboxCodeReview {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReviewContainment';
-  }
-  interceptHttps = true;
-}
-SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export { ContainerProxy };

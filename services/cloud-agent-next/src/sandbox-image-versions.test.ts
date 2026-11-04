@@ -29,11 +29,9 @@ describe('sandbox image version parity', () => {
     const sandboxVersion = packageJson.dependencies['@cloudflare/sandbox'];
     const dockerfile = readServiceFile('../Dockerfile');
     const devDockerfile = readServiceFile('../Dockerfile.dev');
-    const dindDockerfile = readServiceFile('../Dockerfile.dind');
 
     expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
     expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
-    expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
   });
 
   it('keeps the Kilo SDK pins, CLI runtime pins, and slash-command source aligned', () => {
@@ -45,7 +43,6 @@ describe('sandbox image version parity', () => {
     };
     const dockerfile = readServiceFile('../Dockerfile');
     const devDockerfile = readServiceFile('../Dockerfile.dev');
-    const dindDockerfile = readServiceFile('../Dockerfile.dind');
     const containersDockerfile = readServiceFile('../Dockerfile.containers');
     const wranglerConfig = readServiceFile('../wrangler.jsonc');
     const imageVar = `"KILOCODE_CLI_VERSION": "${KILO_CLI_VERSION}"`;
@@ -56,15 +53,14 @@ describe('sandbox image version parity', () => {
     expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(containersDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(wranglerConfig.split(imageVar)).toHaveLength(17);
+    expect(wranglerConfig.split(imageVar)).toHaveLength(7);
     expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });
 
 describe('runtime distribution packaging', () => {
-  const dockerfiles = ['Dockerfile', 'Dockerfile.dev', 'Dockerfile.containers', 'Dockerfile.dind'];
+  const dockerfiles = ['Dockerfile', 'Dockerfile.dev', 'Dockerfile.containers'];
 
   it('pins the shared toolchain versions', () => {
     expect(RUNTIME_DISTRIBUTION.bun).toBe('1.4.4');
@@ -166,17 +162,6 @@ describe('runtime distribution packaging', () => {
       expect(dockerfile).toContain(`COPY ${GIT_CREDENTIAL_HELPER.packagePath} ${realPath}`);
       expect(dockerfile).toContain(`ln -sf ${realPath} ${GIT_CREDENTIAL_HELPER.linkPath}`);
     }
-  });
-
-  it('links the shared install inventory through the builder in DinD', () => {
-    const dind = readServiceFile('../Dockerfile.dind');
-    expect(dind).toContain(
-      'bun run build.ts --install-dir /opt/kilo-cloud --link-dir /usr/local/bin'
-    );
-    for (const bundle of WRAPPER_BUNDLES) {
-      expect(dind).not.toContain(`ln -sf /opt/kilo-cloud/${bundle.installName}`);
-    }
-    expect(dind).not.toContain('ln -sf /opt/kilo-cloud/kilocode-control-plane-supervisor.sh');
   });
 
   it('ships a self-contained control-plane smoke harness', () => {

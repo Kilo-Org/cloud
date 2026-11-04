@@ -352,6 +352,7 @@ function createdMetadata(doStub: ReturnType<typeof makeDoStub>): SessionMetadata
 
 function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
   return {
+    CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
@@ -1470,11 +1471,12 @@ describe('explicit sandbox session creation', () => {
       allocation => !allocation.startsWith('vercel-')
     )
   )(
-    'creates the first worktree chat with %s and upstream finalization/containment semantics',
+    'creates supported worktree allocations and rejects retired %s without containment',
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
       const request = requestForPreset(sandboxAllocation);
       request.options = {
         ...request.options,
@@ -1482,6 +1484,13 @@ describe('explicit sandbox session creation', () => {
         clientProvenance: 'browser',
       };
       request.finalization = { autoCommit: true };
+      if (sandboxAllocation === 'cloudflare-single' || sandboxAllocation === 'cloudflare-shared') {
+        await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+        expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+        return;
+      }
       await runCreate(ctx, request);
       const command = createdMetadata(doStub);
       const metadata = parseSessionMetadata({
@@ -2699,6 +2708,7 @@ describe('createSessionWithLedger admission ladder', () => {
           const doStub = makeDoStub();
           const ctx = makeContext(doStub);
           if (flag !== undefined) ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = flag;
+          if (flag === 'false') ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
           await runCreate(ctx, makeRequest({ repository }));
 
@@ -2723,6 +2733,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
     await runCreate(
       ctx,
@@ -2750,6 +2761,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
     await runCreate(
       ctx,

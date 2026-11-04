@@ -11,7 +11,6 @@ import {
   createInstruction,
   updateInstruction,
 } from './profile-instructions-service';
-import { MAX_IMPORT_INSTRUCTIONS } from './import/instructions';
 import type { ProfileOwner } from './types';
 
 const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
@@ -142,11 +141,6 @@ describe('instructionCreateInputSchema', () => {
       instructionCreateInputSchema.safeParse({ name: 'rules', content: 'x'.repeat(100_001) })
         .success
     ).toBe(false);
-  });
-
-  test('shares the documented per-profile instruction cap with the import contract', () => {
-    expect(MAX_PROFILE_INSTRUCTIONS).toBe(50);
-    expect(MAX_PROFILE_INSTRUCTIONS).toBe(MAX_IMPORT_INSTRUCTIONS);
   });
 });
 

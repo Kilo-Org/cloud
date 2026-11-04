@@ -9,6 +9,7 @@ This spec defines the security and membership rules for organization SSO, includ
 Active.
 
 - Added 2026-06-23 for parent organization SSO enforcement.
+- Amended 2026-11-04 for WorkOS Directory Sync (SCIM) provisioning.
 
 ## Definitions
 
@@ -20,6 +21,10 @@ Active.
 - **External user**: A human user whose normalized primary email domain does not equal the Effective SSO policy domain.
 - **Bot user**: A system or service account with `is_bot = true`.
 - **Removal tombstone**: A durable `organization_membership_removals` record showing that a user was explicitly removed from an organization.
+- **Directory-managed organization**: An organization bound to a WorkOS directory through `organizations.directory_id`.
+- **Directory group organization**: An SSO child organization bound to a WorkOS directory group through `organizations.directory_group_id`.
+- **Directory user**: A human user bound to a WorkOS directory user through `kilocode_users.external_id`.
+- **Directory sync**: The `scim-sync` Worker's replay of the WorkOS Events API into Kilo state. It is a distinct mechanism from Ordinary SSO JIT provisioning, which happens during an interactive sign-in.
 
 ## Rules
 
@@ -57,9 +62,23 @@ Active.
 1. Successful SSO authentication MUST NOT automatically grant membership in every SSO child organization.
 2. Parent membership MUST NOT grant child membership, and child membership MUST NOT grant parent or sibling membership.
 3. Ordinary SSO JIT provisioning MAY add a user only to the SSO authority organization.
-4. Ordinary SSO JIT provisioning MUST NOT restore a membership when a Removal tombstone exists.
+4. Ordinary SSO JIT provisioning MUST NOT restore a membership when a Removal tombstone exists. Directory sync is the sole exception, under Directory Sync rule 5.
 5. A platform administrator MAY restore or add a Same-domain user only through an explicit audited action after verifying a matching WorkOS identity.
 6. Bot users are exempt from human SSO requirements and MUST be admitted only through explicit bot/service-account paths.
+
+### Directory Sync
+
+1. Directory sync MUST apply only to a Directory-managed organization, and MUST resolve that organization from the event's directory rather than from the authenticated caller.
+2. A Directory group organization MUST be a direct child of the Directory-managed organization that owns its directory. A group whose directory resolves to an organization that is itself parented MUST be rejected, because SSO inheritance is not transitive.
+3. Directory sync MUST add a Directory user to both the Directory group organization and that organization's direct parent. Group membership is the identity provider's statement that the user belongs to the enterprise, which the parent represents.
+4. Removing a Directory user from a directory group MUST remove only the Directory group organization membership. A user may belong to sibling groups under the same parent, so leaving one group MUST NOT revoke the parent membership.
+5. Directory sync MUST clear a Removal tombstone when the identity provider asserts the membership. For a Directory-managed organization the identity provider is authoritative, so a Kilo-side removal MUST NOT outlive the directory's view. This is a deliberate exception to Membership Admission rule 4, which continues to bind Ordinary SSO JIT provisioning: a tombstone still blocks an interactive sign-in from silently restoring a membership.
+6. Directory sync MUST be idempotent per event. Every write MUST be keyed on a WorkOS identifier so that a replayed event is a no-op, because the Worker commits its cursor per event and a crash mid-page replays the last one.
+7. Directory sync MUST NOT advance its cursor past an event it could not apply. An event whose dependency is missing MUST be retried rather than dropped.
+8. Directory sync MUST authenticate to the application with the shared internal API secret, and its endpoints MUST NOT be reachable without it.
+9. Directory provisioning of a Directory user MAY bypass signup admission, which exists to rate-limit self-service signup abuse and cannot apply to a machine-initiated request that has no end user or client IP. Every other account-creation protection — email deduplication, the deletion fence, and billing-customer provisioning with its compensating delete — MUST still apply, and each bypass MUST be audited.
+10. Directory sync MUST NOT delete a Kilo user account. A Directory user leaving a directory MUST remove memberships only; account deletion is a separate, explicitly requested operation.
+11. A directory disconnect MUST soft-delete the affected Directory group organizations and MUST release their directory bindings, so a later reconnect binds cleanly rather than colliding.
 
 ### Isolation
 

@@ -381,8 +381,10 @@ admission responses within the same slot and deadline.
 - `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `expire-credits` - Vercel cron path (`/api/cron/expire-credits`) that expires due personal and organization credit grants every 5 minutes; reuses `CRON_SECRET` for auth. It never triggers auto-top-up. [SERVER]
 - `PAID_CREDIT_EXPIRATION_EFFECTIVE_AT` - ISO-8601 instant when new paid credits start receiving a one-calendar-year expiry. Unset or invalid keeps every new purchase non-expiring. Terms are captured at checkout or term start, so pending purchases and annual terms paid earlier keep legacy terms. Apple in-app purchases never expire. Create the `_1year_v2` Google Play credit products before setting it. [SERVER]
-- `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
+- `WORKOS_API_KEY` - WorkOS API key for enterprise SSO, and for the `scim-sync` Worker's Events API polling, where it comes from the Cloudflare Secrets Store rather than a dotenv file. One key per name, not per environment: the Events API is scoped to whichever WorkOS environment issued the key. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
+
+The WorkOS Directory Sync (SCIM) write path is `apps/web/src/app/api/internal/scim/`, authenticated with `INTERNAL_API_SECRET` in the `x-internal-api-key` header and documented in `services/scim-sync/README.md`. It needs no variable of its own: the endpoints are idempotent upserts keyed on WorkOS identifiers, and `preferredRegion = 'fra1'` puts them beside the PostgreSQL primary they write.
 
 ### AI Providers
 

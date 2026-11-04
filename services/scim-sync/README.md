@@ -3,9 +3,12 @@
 Polls the [WorkOS Events API](https://workos.com/docs/events/data-syncing/events-api)
 for Directory Sync (SCIM) events and logs each one.
 
-**Observe-only.** Nothing is written to Postgres, and no users, organizations,
-or memberships are mutated. The cursor is configuration, not state: see
-"Cursor" below.
+**Observe-only, for now.** This Worker still only logs: nothing here writes to
+Postgres, and no users, organizations, or memberships are mutated. The cursor is
+configuration, not state — see "Cursor" below.
+
+The write path it will call already exists, in the Kilo app rather than here:
+see "Mutation endpoints".
 
 ## How it runs
 
@@ -39,6 +42,12 @@ tick, so the same events are logged repeatedly until the value is changed and
 the Worker redeployed. Each poll logs `lastEventId`, and `/status` reports it, so
 the value can be copied forward by hand.
 
+Moving it into Durable Object storage is what the dispatch loop needs: the spec
+requires that the cursor never advance past an event that could not be applied
+(`.specs/organization-sso.md`, Directory Sync rule 7), and a configured value
+cannot express that. The mutation endpoints already answer 409 for exactly that
+case.
+
 ## HTTP surface
 
 | Route | Purpose |
@@ -52,6 +61,46 @@ callable in production; read the poll output from Workers Logs, or stream it
 with `wrangler tail` — unlike the previous iteration, there is now traffic to
 see, because the cron trigger and the alarm both invoke the Worker. Add
 authentication before exposing either route.
+
+## Mutation endpoints
+
+Directory state is written by calling the Kilo app, not by writing Postgres from
+here. The endpoints live in `apps/web/src/app/api/internal/scim/`, over
+`apps/web/src/lib/scim/directory-sync.ts`, and each one is an idempotent upsert
+keyed on a WorkOS identifier, so replaying an event is a no-op.
+
+| Event | Call |
+|---|---|
+| `dsync.activated` | `PUT /api/internal/scim/organizations/{directory_id}` |
+| `dsync.deleted` | `DELETE /api/internal/scim/organizations/{directory_id}` |
+| `dsync.group.created`, `dsync.group.updated` | `PUT /api/internal/scim/sub-organizations/{directory_group_id}` |
+| `dsync.group.deleted` | `DELETE /api/internal/scim/sub-organizations/{directory_group_id}` |
+| `dsync.user.created`, `dsync.user.updated` | `PUT /api/internal/scim/users/{external_id}` |
+| `dsync.group.user_added` | `PUT /api/internal/scim/memberships` |
+| `dsync.group.user_removed`, `dsync.user.deleted` | `DELETE /api/internal/scim/memberships` |
+
+`dsync.user.deleted` removes memberships and never deletes the account: there is
+no user DELETE, because `softDeleteUser` anonymizes the account and refuses
+outright when a live subscription exists. The membership routes take the
+`{directoryGroupId, externalId}` pair in the body, including `DELETE`, because a
+membership is identified by two WorkOS identifiers.
+
+Calling them requires `INTERNAL_API_SECRET` in the `x-internal-api-key` header,
+which this Worker does not yet hold. Request bodies are `z.strictObject`, so an
+unknown field is a 400 rather than a silently dropped one — a new field must
+land in `directory-sync-contracts.ts` as optional before the Worker starts
+sending it.
+
+Three response classes, and they decide cursor movement:
+
+| Status | Meaning | Cursor |
+|---|---|---|
+| 2xx | Applied, or already applied | Advance |
+| 409 | A dependency is missing — an event ahead of the directory, user, or group it needs, or a group under a group | Hold and retry; the body names the dependency |
+| 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
+
+409 is how out-of-order delivery recovers, which is why it must not be treated
+as a permanent failure.
 
 ## Logging
 
@@ -92,8 +141,13 @@ instance and Hyperdrive config as every other service in this repo. Workers
 cannot hold long-lived connections, so Hyperdrive owns the regional pool and
 `getPgDb` opens a `max: 1` pool per call against the string it hands out.
 
-**Read-only for now.** The query modules under `src/db/` only select; nothing
-writes. The poll loop does not use them yet, so `/status` is their only caller.
+**Read-only, and meant to stay that way.** The query modules under `src/db/`
+only select; nothing here writes. The poll loop does not use them yet, so
+`/status` is their only caller. Mutations go through the app's endpoints, which
+own the advisory locks, the depth check, the soft-delete side effects, Stripe
+customer creation, and the removal tombstone — reimplementing any of that
+against raw tables from a Worker would be a second, divergent copy of the
+rules.
 
 The WorkOS directory hierarchy maps onto the organization hierarchy:
 
@@ -120,12 +174,18 @@ cached client outlives the request or Durable Object context that created it,
 and its I/O then fails in whatever context picks it up next. Calling per use is
 also why the probe recovers on its own after a database restart.
 
-Four schema facts the query modules encode, each easy to get wrong:
+Five schema facts the query modules encode, each easy to get wrong:
 
 - **`organizations.deleted_at IS NULL` on every org query.** The unique indexes
   on `directory_group_id` and `external_org_id` are *partial*, scoped to live
   rows, so a soft-deleted organization can hold the same binding as a live one.
   Omit the filter and those lookups stop being deterministic.
+- **`directory_id` alone does not identify the organization.** A
+  sub-organization inherits its parent's `directory_id`, so once one group
+  exists a directory matches several live rows. The organization is the row with
+  `parent_organization_id IS NULL`; a `LIMIT 1` without that filter resolves to
+  whichever row the planner returns, and an update that rewrites the parent's
+  tuple is enough to move a group ahead of it.
 - **`organization_memberships` has no foreign keys** on either column, so a row
   does not prove the organization or user exists, and neither side is cleaned
   up when the other goes away.

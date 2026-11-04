@@ -2,7 +2,6 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
 import {
-  parseUsageQueueFraExposure,
   parseUsageQueueSfoExposure,
   parseUsageQueueSfoUserIds,
 } from './ai-gateway/usage-queue-config';
@@ -87,7 +86,6 @@ export const USAGE_QUEUE_FRA_CONFIG = {
     getEnvVariable('VERCEL_ENV') === 'production' &&
     getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
     getEnvVariable('VERCEL_REGION') === 'fra1',
-  exposure: parseUsageQueueFraExposure(getEnvVariable('USAGE_QUEUE_FRA_EXPOSURE')),
 };
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in

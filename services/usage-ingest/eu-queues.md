@@ -19,11 +19,16 @@ assume a separate manual deployment will provide a later approval gate.
 
 ## Production merge gate
 
-Deploy and verify the default-off SFO selector and removal of background shadow
-publication first. Keep `USAGE_QUEUE_SFO_EXPOSURE=0` until processing is verified. Before merging this queue change, obtain explicit production
-cutover authorization, pause all production queue publishers, and reconcile/drain
-source/DLQ, pending retries, in-flight work and accepted usage IDs. Verify those
-conditions before merge while normal production deployments remain active.
+Deploy and verify the SFO selector and removal of background shadow publication
+first. Keep `USAGE_QUEUE_SFO_EXPOSURE=0` until processing is verified. Production
+FRA selection follows the deployed gateway source and has no runtime switch: an
+eligible production `fra1` deployment queues every payer with an identity, so
+`USAGE_QUEUE_SFO_EXPOSURE=0` does not keep FRA off, and only withholding or
+reverting that gateway source does. Before merging this queue change, obtain
+explicit production cutover authorization, pause all production queue publishers,
+and reconcile/drain source/DLQ, pending retries, in-flight work and accepted usage
+IDs. Verify those conditions before merge while normal production deployments
+remain active.
 
 If these prerequisites cannot be completed before merge, production deployments
 must be **explicitly held before merge** and kept held until the same authorization,

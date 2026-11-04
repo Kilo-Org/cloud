@@ -25,6 +25,7 @@ const tokenSchema = z.object({
 });
 
 let activeOperation: AbortController | undefined;
+let disabledDocument: Document | undefined;
 
 function readSdk() {
   const sdk: unknown = Reflect.get(window, 'watchwood');
@@ -77,7 +78,9 @@ async function performWatchwoodSignup(signal: AbortSignal, submit: boolean): Pro
   const body: unknown = await response.json();
   signal.throwIfAborted();
   const context = contextSchema.safeParse(body);
-  if (!context.success || !context.data.enabled) return;
+  if (!context.success) return;
+  disabledDocument = context.data.enabled ? undefined : document;
+  if (!context.data.enabled) return;
 
   const { org_id, safety_identifier } = context.data;
   const sdk = await loadSdk(signal);
@@ -126,9 +129,11 @@ async function runWatchwoodSignup(submit: boolean): Promise<void> {
 }
 
 export async function prepareWatchwoodSignup(): Promise<void> {
+  disabledDocument = undefined;
   await runWatchwoodSignup(false);
 }
 
 export async function submitWatchwoodSignup(): Promise<void> {
+  if (typeof document !== 'undefined' && disabledDocument === document) return;
   await runWatchwoodSignup(true);
 }

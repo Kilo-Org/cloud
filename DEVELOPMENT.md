@@ -272,6 +272,8 @@ Tokens remain transient; signed, HttpOnly cookies carry the signup identity and 
 The optional SDK device cookie stays disabled.
 
 The browser allows at most two seconds for shadow submission.
+After the mount request reports collection disabled, submission skips Watchwood without another request.
+An unresolved configuration request retains the bounded fail-open path.
 The server allows one second for body reads, Redis budgets, and the upstream check.
 It retries an upstream server error once and does not retry client errors.
 Upstream redirects count as errors and are never followed.

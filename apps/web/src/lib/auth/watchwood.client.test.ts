@@ -88,6 +88,22 @@ describe('Watchwood browser signup', () => {
     expect(fetchMock.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
   });
 
+  it('continues immediately without another request after the server disables collection', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ enabled: false }));
+    await prepare();
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    let completed = false;
+    void submit().then(() => {
+      completed = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(completed).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it('skips SDK loading when the server context request fails', async () => {
     fetchMock.mockResolvedValue(Response.json({ enabled: true }, { status: 503 }));
 

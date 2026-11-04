@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,13 +22,6 @@ type PrHoverCardContentProps = {
   gitBranch: string | null;
 };
 
-/**
- * Hide the Refresh button while the cache row is at most this old. Mirrors
- * `REFRESH_THROTTLE_MS` in `apps/web/src/routers/cli-sessions-v2-router.ts`;
- * the server short-circuits below the same threshold.
- */
-const REFRESH_THROTTLE_MS = 60_000;
-
 const REVIEW_DECISION_LABELS: Record<ReviewDecision, string> = {
   approved: 'Approved',
   changes_requested: 'Changes requested',
@@ -48,41 +40,50 @@ function formatRelativeSync(lastSyncedAt: string): string {
   return formatDistanceToNow(parsed, { addSuffix: true });
 }
 
-function isWithinRefreshThrottle(lastSyncedAt: string): boolean {
-  const parsed = Date.parse(lastSyncedAt);
-  if (!Number.isFinite(parsed)) return false;
-  return Date.now() - parsed < REFRESH_THROTTLE_MS;
-}
+const MERGE_STATE_LABELS: Record<string, string> = {
+  clean: 'Clean',
+  blocked: 'Blocked',
+  behind: 'Behind base branch',
+  unstable: 'Checks failing',
+  dirty: 'Conflicts',
+  draft: 'Draft',
+  unknown: 'Unknown',
+  has_hooks: 'Pre-receive hooks',
+};
+
+const UNAVAILABLE_LABELS = {
+  checks: 'check runs',
+  statuses: 'commit statuses',
+  reviews: 'reviews and threads',
+};
 
 export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardContentProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const state = normalizePrBadgeState(pr.state);
-  // A verified link whose per-PR cache row has not synced yet renders with
-  // state `unknown` and no title. The Refresh action must stay reachable for
-  // it, or a missed webhook leaves the session's own PR stuck without live
-  // state. (An unverified link never reaches this component: the server shows
-  // no PR for it.)
-  const awaitingSync = pr.state === 'unknown';
-  const headShaShort = pr.headSha?.slice(0, 7) ?? null;
-  const truncatedTitle = truncatePrTitle(pr.title, 80);
-
-  const { mutate: refresh, isPending } = useMutation({
+  const statusQuery = useQuery({
+    ...trpc.cliSessionsV2.getAssociatedPullRequestStatus.queryOptions({ sessionId, prUrl: pr.url }),
+    enabled: pr.platform === 'github',
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => failureCount < 1 && error.data?.code === 'BAD_GATEWAY',
+  });
+  const refreshMutation = useMutation({
     ...trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions(),
     onSuccess: () => {
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
     },
-    onError: error => {
-      toast.error(error?.message ?? 'Failed to refresh pull request status');
-    },
+    onError: error => toast.error(error.message),
+    onSettled: () => void statusQuery.refetch(),
   });
-
-  const handleRefresh = useCallback(() => {
-    if (isPending) return;
-    refresh({ sessionId });
-  }, [isPending, refresh, sessionId]);
+  const status = pr.platform === 'github' ? statusQuery.data : undefined;
+  const state = normalizePrBadgeState(status?.state ?? pr.state);
+  const headShaShort = (status?.headSha ?? pr.headSha)?.slice(0, 7) ?? null;
+  const truncatedTitle = truncatePrTitle(status?.title ?? pr.title, 80);
+  const reviewDecision = status ? status.reviewDecision : pr.reviewDecision;
+  const isFetching =
+    pr.platform === 'github' && (statusQuery.isFetching || refreshMutation.isPending);
 
   return (
     <div className="flex flex-col gap-3 text-sm">
@@ -91,9 +92,9 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <span className="text-muted-foreground text-xs leading-5">PR #{pr.number}</span>
       </div>
 
-      {awaitingSync && (
-        <p className="text-muted-foreground text-xs leading-snug">
-          Pull request status has not synced yet. Refresh to fetch the latest status from GitHub.
+      {isFetching && (
+        <p className="text-muted-foreground text-xs leading-snug" role="status">
+          Fetching pull request status from GitHub...
         </p>
       )}
 
@@ -101,45 +102,111 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <p className="text-foreground line-clamp-2 text-sm leading-snug">{truncatedTitle}</p>
       )}
 
-      <div className="border-border/60 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 border-t pt-3 text-xs">
+      <div className="border-border/60 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 border-t pt-3 text-xs">
         {pr.platform === 'github' && (
           <>
             <span
               className="text-muted-foreground"
-              title="Checks received via webhooks for the current commit. Earlier checks may be missing; requiredness is unknown."
+              title={
+                status
+                  ? 'Latest check runs and commit statuses for this commit. Required checks are not evaluated.'
+                  : 'Checks received via webhooks for the cached commit. Earlier checks may be missing.'
+              }
             >
-              Checks (observed)
+              {status ? 'Checks' : 'Checks (observed)'}
             </span>
             <span className="tabular-nums">
-              {pr.observations?.checks
-                ? `${pr.observations.checks.total} total / ${pr.observations.checks.failed} failed`
-                : 'Unknown'}
+              {status ? (
+                status.checks ? (
+                  <>
+                    <span>
+                      {status.checks.total}
+                      {status.checks.truncated ? '+' : ''} total
+                    </span>
+                    <span className="block">
+                      {status.checks.passed} passed / {status.checks.failed} failed /{' '}
+                      {status.checks.pending} pending
+                    </span>
+                    {status.checks.skipped > 0 && (
+                      <span className="block">{status.checks.skipped} skipped</span>
+                    )}
+                    {status.checks.unknown > 0 && (
+                      <span className="block">{status.checks.unknown} unknown</span>
+                    )}
+                  </>
+                ) : (
+                  'Unavailable'
+                )
+              ) : pr.observations?.checks ? (
+                `${pr.observations.checks.total} total / ${pr.observations.checks.failed} failed`
+              ) : (
+                'Unknown'
+              )}
             </span>
             <span
               className="text-muted-foreground"
-              title="Unresolved review threads observed via webhooks, not individual replies. Earlier threads may be missing."
+              title={
+                status
+                  ? 'Unresolved review threads read from GitHub, not individual replies.'
+                  : 'Unresolved review threads observed via webhooks. Earlier threads may be missing.'
+              }
             >
               Unresolved threads
             </span>
             <span className="tabular-nums">
-              {pr.observations?.unresolvedThreads == null
-                ? 'Unknown'
-                : pr.observations.unresolvedThreads}
+              {status
+                ? status.unresolvedThreads === null
+                  ? 'Unavailable'
+                  : `${status.unresolvedThreads}${status.threadsTruncated ? '+' : ''}`
+                : (pr.observations?.unresolvedThreads ?? 'Unknown')}
             </span>
+            <span
+              className="text-muted-foreground"
+              title="Whether GitHub can merge this head into the base without conflicts. No conflicts does not mean ready to merge."
+            >
+              Merge conflicts
+            </span>
+            <span className={status?.mergeable === false ? 'text-destructive' : undefined}>
+              {status?.mergeable === true
+                ? 'No conflicts'
+                : status?.mergeable === false
+                  ? 'Conflicts detected'
+                  : 'Unknown'}
+            </span>
+            {status?.mergeableState && (
+              <>
+                <span className="text-muted-foreground">Merge status</span>
+                <span>{MERGE_STATE_LABELS[status.mergeableState] ?? status.mergeableState}</span>
+              </>
+            )}
           </>
         )}
-        {pr.reviewDecision && (
+        {(pr.platform === 'github' || reviewDecision) && (
           <>
             <span className="text-muted-foreground">Review</span>
-            <span className={REVIEW_DECISION_CLASSES[pr.reviewDecision]}>
-              {REVIEW_DECISION_LABELS[pr.reviewDecision]}
+            <span className={reviewDecision ? REVIEW_DECISION_CLASSES[reviewDecision] : undefined}>
+              {reviewDecision
+                ? REVIEW_DECISION_LABELS[reviewDecision]
+                : status
+                  ? status.unavailable.includes('reviews')
+                    ? 'Unavailable'
+                    : 'No decision'
+                  : 'Unknown'}
             </span>
           </>
         )}
-        {gitBranch && (
+        {(status?.headRef ?? gitBranch) && (
           <>
             <span className="text-muted-foreground">Branch</span>
-            <span className="truncate font-mono">{gitBranch}</span>
+            <span className="truncate font-mono">{status?.headRef ?? gitBranch}</span>
+          </>
+        )}
+        {status && (
+          <>
+            <span className="text-muted-foreground">Base</span>
+            <span className="truncate font-mono" title={status.baseSha}>
+              {status.baseRef}
+            </span>
           </>
         )}
         {headShaShort && (
@@ -149,25 +216,46 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
           </>
         )}
         <span className="text-muted-foreground">Synced</span>
-        <span>{formatRelativeSync(pr.lastSyncedAt)}</span>
+        <span>{formatRelativeSync(status?.fetchedAt ?? pr.lastSyncedAt)}</span>
       </div>
 
-      {pr.platform === 'github' && pr.observations?.truncated && (
+      {pr.platform === 'github' && statusQuery.isError && (
+        <p className="text-destructive text-xs" role="alert">
+          {statusQuery.error.message}
+          {status && ' Showing the last fetched status.'}
+        </p>
+      )}
+
+      {status && status.unavailable.length > 0 && (
+        <p className="text-muted-foreground text-xs">
+          Unavailable from GitHub:{' '}
+          {status.unavailable.map(part => UNAVAILABLE_LABELS[part]).join(', ')}. Check the GitHub
+          connection permissions and refresh to try again.
+        </p>
+      )}
+
+      {status && (status.checks?.truncated || status.threadsTruncated) && (
+        <p className="text-muted-foreground text-xs">
+          Partial counts; some checks or threads could not be read.
+        </p>
+      )}
+
+      {pr.platform === 'github' && !status && pr.observations?.truncated && (
         <p className="text-muted-foreground text-xs">
           Partial observations; some evidence is missing.
         </p>
       )}
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
-        {(awaitingSync || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (
+        {pr.platform === 'github' && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleRefresh}
-            disabled={isPending}
+            onClick={() => refreshMutation.mutate({ sessionId })}
+            disabled={isFetching}
             aria-label="Refresh pull request status"
           >
-            <RefreshCw className={isPending ? 'animate-spin' : undefined} />
+            <RefreshCw className={isFetching ? 'animate-spin' : undefined} />
             Refresh
           </Button>
         )}

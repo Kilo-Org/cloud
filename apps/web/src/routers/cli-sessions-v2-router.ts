@@ -74,8 +74,14 @@ import {
   fetchPullRequestByNumber,
   fetchPullRequestReviewDecision,
   GitHubRateLimitError,
+  isGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
+import {
+  getGitHubIntegrationById,
+  getIntegrationForOwner,
+} from '@/lib/integrations/db/platform-integrations';
+import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import {
@@ -92,6 +98,10 @@ import {
   getPrObservationSummary,
   prObservationSummarySchema,
 } from '@/lib/integrations/platforms/github/pr-observations';
+import {
+  fetchPullRequestStatus,
+  prStatusSchema,
+} from '@/lib/integrations/platforms/github/pr-status';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
 import {
@@ -2038,6 +2048,108 @@ export const cliSessionsV2Router = createTRPCRouter({
           }
         ),
       };
+    }),
+
+  getAssociatedPullRequestStatus: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1), prUrl: z.string().url() }))
+    .output(prStatusSchema)
+    .query(async ({ ctx, input }) => {
+      const session = await getSessionWithAccessCheck(input.sessionId, ctx);
+      const parsed = session.pr_url ? parseGitHubPrUrl(session.pr_url) : null;
+      if (
+        session.platform !== 'github' ||
+        session.pr_link_verified_at === null ||
+        !session.pr_url ||
+        !parsed ||
+        !samePullRequest(input.prUrl, session.pr_url) ||
+        !pullRequestUrlMatchesRepo(session.pr_url, session.git_url) ||
+        (session.pr_number !== null && session.pr_number !== parsed.number)
+      ) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'The session no longer has this verified GitHub pull request',
+        });
+      }
+
+      const owner = session.organization_id
+        ? ({ type: 'org', id: session.organization_id } as const)
+        : ({ type: 'user', id: ctx.user.id } as const);
+      const repository = await resolveGitHubRepositoryForOwner(
+        owner,
+        `${parsed.owner}/${parsed.repo}`,
+        'agent'
+      );
+      const integration = repository
+        ? await getGitHubIntegrationById(owner, repository.githubIntegrationId)
+        : await getIntegrationForOwner(owner, PLATFORM.GITHUB);
+      if (!integration?.platform_installation_id) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'No authorized GitHub connection is available for this repository',
+        });
+      }
+
+      let status;
+      try {
+        status = await fetchPullRequestStatus({
+          installationId: integration.platform_installation_id,
+          integrationId: integration.id,
+          appType: integration.github_app_type ?? 'standard',
+          ...parsed,
+        });
+      } catch (error) {
+        if (isGitHubRateLimitError(error)) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'GitHub rate limit reached. Try again later.',
+          });
+        }
+        if (
+          error instanceof GitHubRuntimeAuthorizationError ||
+          (typeof error === 'object' &&
+            error !== null &&
+            'status' in error &&
+            (error.status === 403 || error.status === 404))
+        ) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'The GitHub connection can no longer read this pull request',
+          });
+        }
+        captureException(error, {
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'getAssociatedPullRequestStatus' },
+          extra: { sessionId: input.sessionId },
+        });
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: 'Could not read pull request status from GitHub. Refresh to try again.',
+        });
+      }
+
+      // A previously verified PR can advance beyond the session's original commit.
+      const verification = verifySessionPullRequestLink({
+        sessionRepo: { gitUrl: session.git_url, gitBranch: session.git_branch },
+        link: {
+          prUrl: session.pr_url,
+          prNumber: session.pr_number,
+          headRef: session.pr_head_ref,
+          headSha: null,
+        },
+        pullRequest: {
+          number: status.number,
+          baseRepoFullName: status.baseRepoFullName,
+          headRepoFullName: status.headRepoFullName,
+          headRef: status.headRef,
+          headSha: status.headSha,
+        },
+      });
+      if (!verification.verified) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'GitHub no longer identifies this pull request as belonging to the session',
+        });
+      }
+      return status;
     }),
 
   /**

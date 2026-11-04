@@ -375,7 +375,7 @@ function EnvironmentForm({
                   detail={
                     hasStartScript
                       ? 'Configure your start script'
-                      : 'Start services in every session'
+                      : 'Start services when a workspace starts'
                   }
                   onClick={() => changePage('start')}
                 />

@@ -333,25 +333,15 @@ describe('adopting an environment snapshot against a real repository', () => {
   describe('with start commands', () => {
     const setupRun = (calls: unknown[][]) => calls.map(call => call[0]);
 
-    async function snapshotBuiltWith(commands: string[]): Promise<void> {
-      await manager('alloc-image').prepared.prepare(spec({ setupCommands: commands }));
-    }
-
-    it('skips the environment setup commands after a snapshot adopt, then runs the session setup and start commands', async () => {
-      await snapshotBuiltWith(['install']);
+    it('runs only the start commands in a workspace restored from the environment snapshot', async () => {
+      await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
       const restored = manager('alloc-restored');
       await restored.prepared.prepare(
-        spec({
-          sessionId: 'ses_b',
-          setupCommands: ['install', 'inline extra'],
-          environmentSetupCommandCount: 1,
-          startCommands: ['serve'],
-          startedFromEnvironmentSnapshot: true,
-        })
+        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
       );
 
       expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
-      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['inline extra', 'serve']);
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
       expect(restored.frames).toContainEqual(
         expect.objectContaining({
           type: 'session.progress',
@@ -361,47 +351,9 @@ describe('adopting an environment snapshot against a real repository', () => {
       );
     });
 
-    it('skips the environment setup commands even when the snapshot ran other ones', async () => {
-      await snapshotBuiltWith(['older install']);
-      const restored = manager('alloc-restored');
-      await restored.prepared.prepare(
-        spec({
-          sessionId: 'ses_b',
-          setupCommands: ['install'],
-          environmentSetupCommandCount: 1,
-          startCommands: ['serve'],
-          startedFromEnvironmentSnapshot: true,
-        })
-      );
-
-      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
-    });
-
-    it('runs every setup command when the allocation did not start from the environment snapshot', async () => {
-      await snapshotBuiltWith(['install']);
-      const restored = manager('alloc-restored');
-      await restored.prepared.prepare(
-        spec({
-          sessionId: 'ses_b',
-          setupCommands: ['install'],
-          environmentSetupCommandCount: 1,
-          startCommands: ['serve'],
-        })
-      );
-
-      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['install', 'serve']);
-    });
-
     it('runs setup and start commands after a fresh clone', async () => {
       const fresh = manager('alloc-image');
-      await fresh.prepared.prepare(
-        spec({
-          setupCommands: ['install'],
-          environmentSetupCommandCount: 1,
-          startCommands: ['serve'],
-          startedFromEnvironmentSnapshot: true,
-        })
-      );
+      await fresh.prepared.prepare(spec({ setupCommands: ['install'], startCommands: ['serve'] }));
 
       expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
       expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);

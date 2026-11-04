@@ -762,13 +762,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * root has a stamp from this allocation needs nothing, a root with one from
    * another allocation is a restored environment snapshot to adopt, and anything
    * else is cloned. An adopt failure fails the preparation; it never clears the
-   * root to clone over the snapshot. Setup runs once, at the route directory,
-   * after every root is in place. It runs after a clone or an adopt, with this
-   * session's admitted configuration, except the environment's own setup
-   * commands when every root was adopted from the environment snapshot that
-   * already ran them. Start commands always follow it, and also
-   * run after a session disk snapshot restore. Each root is stamped, never the
-   * route directory. A session never captures.
+   * root to clone over the snapshot. Setup and start commands run once, at the
+   * route directory, after every root is in place. A workspace restored entirely
+   * from the environment snapshot skips setup, because the build ran it; it and
+   * a session disk snapshot restore run only the start commands. Each root is
+   * stamped, never the route directory. A session never captures.
    */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -904,23 +902,19 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
     const { adopted, cloning } = reconciled;
     setStep('setup');
-    const setupCommands = spec.setupCommands ?? [];
-    // Every root adopted from the environment snapshot, which already ran the
-    // environment's setup. A clone or a mixed workspace runs it in full.
-    const coveredSetupCommands =
-      spec.startedFromEnvironmentSnapshot === true &&
-      reconciled.inspections.every(inspection => inspection === 'foreign')
-        ? Math.min(spec.environmentSetupCommandCount ?? 0, setupCommands.length)
-        : 0;
-    log(
-      `control-plane workspace setup session=${spec.sessionId} setupCommands=${setupCommands.length} coveredBySnapshot=${coveredSetupCommands} startCommands=${spec.startCommands?.length ?? 0}`
+    const fromEnvironmentSnapshot = reconciled.inspections.every(
+      inspection => inspection === 'foreign'
     );
-    if (coveredSetupCommands > 0) {
+    const setupCommands = fromEnvironmentSnapshot ? [] : (spec.setupCommands ?? []);
+    log(
+      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} setupCommands=${setupCommands.length} startCommands=${spec.startCommands?.length ?? 0}`
+    );
+    if (fromEnvironmentSnapshot && (spec.setupCommands?.length ?? 0) > 0) {
       emitProgress(spec.sessionId, 'setup', 'Setup already ran in the environment snapshot');
     }
     await runPreparationCommands(
       spec,
-      [...setupCommands.slice(coveredSetupCommands), ...(spec.startCommands ?? [])],
+      [...setupCommands, ...(spec.startCommands ?? [])],
       env,
       redact,
       new AbortController().signal

@@ -1,4 +1,4 @@
-import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
+import { setupCommandsSchema } from './setup-script.js';
 import { z } from 'zod';
 
 export {
@@ -206,7 +206,6 @@ export const sessionAttachPayloadSchema = z
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
     startCommands: setupCommandsSchema.optional(),
-    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z
       .object({

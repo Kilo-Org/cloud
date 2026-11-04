@@ -12,12 +12,12 @@ const SCRIPT_COPY = {
   setup: {
     label: 'Setup script',
     placeholder: '#!/bin/bash\npnpm install',
-    help: 'Installs tools and dependencies. Runs when a snapshot is built, and before the agent starts when no up-to-date snapshot is available.',
+    help: 'Installs tools and dependencies. Runs when a snapshot is built, and when a workspace starts without a snapshot. Rebuild the snapshot after changing it.',
   },
   start: {
     label: 'Start script',
     placeholder: '#!/bin/bash\ndocker compose up -d',
-    help: 'Runs before the agent starts in every session, including one that starts from a snapshot. Start services or refresh dependencies here.',
+    help: 'Runs each time a workspace starts, including from a snapshot. Chats that join a running workspace do not run it again. Start services here.',
   },
 } as const;
 

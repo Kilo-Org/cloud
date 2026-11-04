@@ -1,4 +1,4 @@
-import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
+import { setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -367,28 +367,16 @@ const routeSpecObjectSchema = z
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
     /**
-     * Commands run after setup whenever the wrapper prepares a fresh workspace,
-     * including one restored from a snapshot that already ran setup. Only a
-     * wrapper that advertised `startCommands` receives them; for an older one
-     * the Sandbox DO appends them to `setupCommands`.
+     * The environment's workspace start commands. The wrapper runs them each
+     * time it starts a workspace: after setup, or alone when the workspace comes
+     * from an environment or session snapshot. Only a wrapper that advertised
+     * `startCommands` receives them; for an older one the Sandbox DO appends
+     * them to `setupCommands`.
      */
     startCommands: setupCommandsSchema.optional(),
-    /**
-     * How many leading `setupCommands` are the repository environment's own.
-     * An adopted environment snapshot already ran them; the rest are the
-     * session's own setup commands.
-     */
-    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
-    /**
-     * Only the Sandbox DO adds this to the frame, like `capture`: the allocation
-     * launched from a snapshot of this route's environment, at any revision. A
-     * wrapper that adopts that snapshot skips the environment's setup commands.
-     * It is never stored in a route spec.
-     */
-    startedFromEnvironmentSnapshot: z.literal(true).optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
      * omits it only after negotiating worktree sharing for a new allocation.
@@ -439,7 +427,6 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
-    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -454,7 +441,6 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
-    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -482,13 +468,6 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
         code: 'custom',
         path: ['secretEnvKeys'],
         message: 'registration spec must not carry secret env key names',
-      });
-    }
-    if (spec.startedFromEnvironmentSnapshot !== undefined) {
-      context.addIssue({
-        code: 'custom',
-        path: ['startedFromEnvironmentSnapshot'],
-        message: 'environment snapshot provenance is frame-only',
       });
     }
   }
@@ -977,9 +956,10 @@ const controlPlaneHelloFrameSchema = z
      */
     installsSkillsSh: z.literal(true).optional(),
     /**
-     * Optional capability: the wrapper runs `startCommands` after setup and
-     * honors `startedFromEnvironmentSnapshot` and `environmentSetupCommandCount`. A wrapper that did not advertise it
-     * receives the start commands appended to `setupCommands`.
+     * Optional capability: the wrapper runs `startCommands` when it starts a
+     * workspace, and skips setup for a workspace restored from an environment
+     * snapshot. A wrapper that did not advertise it receives the start commands
+     * appended to `setupCommands`.
      */
     startCommands: z.literal(true).optional(),
   })

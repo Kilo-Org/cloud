@@ -294,11 +294,9 @@ import {
   confirmRepositoryLaunch,
   readRepositoryLaunch,
   recordRepositoryLaunch,
-  type EnvironmentSnapshotLaunch,
-  type RepositoryLaunchRecord,
   type RepositoryPreparationFailure,
 } from './repository-launch.js';
-import { environmentPhaseSpec } from './environment-phases.js';
+import { startCommandsForWrapper } from './start-commands.js';
 import {
   environmentLaunchCandidate,
   environmentStartDetail,
@@ -2652,9 +2650,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.env ? { env: spec.env } : {}),
       ...(spec.setupCommands ? { setupCommands: spec.setupCommands } : {}),
       ...(spec.startCommands ? { startCommands: spec.startCommands } : {}),
-      ...(spec.environmentSetupCommandCount === undefined
-        ? {}
-        : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
       ...(spec.runtimeIsolation ? { runtimeIsolation: spec.runtimeIsolation } : {}),
       ...(spec.git ? { git: spec.git } : {}),
     };
@@ -2792,7 +2787,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       env?: Record<string, string> | undefined;
       setupCommands?: string[] | undefined;
       startCommands?: string[] | undefined;
-      environmentSetupCommandCount?: number | undefined;
       git?: SessionAttachPayload['git'];
       kilo: NonNullable<SessionAttachPayload['kilo']>;
       githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
@@ -2820,9 +2814,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
       ...(payload.startCommands === undefined ? {} : { startCommands: payload.startCommands }),
-      ...(payload.environmentSetupCommandCount === undefined
-        ? {}
-        : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
       // The roots hold no credential; the wrapper takes each root's alias by host.
       ...(spec.roots === undefined ? {} : { roots: spec.roots }),
@@ -3665,22 +3656,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
-  private materializePrepareFrame(
-    route: RouteRecord,
-    socket: WebSocket,
-    launch: RepositoryLaunchRecord | undefined
-  ): MaterializedPrepareFrame {
-    const allocationId = this.readAttachment(socket)?.allocationId ?? null;
-    const wireSpec = environmentPhaseSpec({
-      spec: runtimeSpecForContract(
+  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
+    const wireSpec = startCommandsForWrapper(
+      runtimeSpecForContract(
         route.spec,
-        readRuntimeContract(this.ctx.storage.kv, allocationId)
+        readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
       ),
-      environment: route.environment,
-      launch,
-      allocationId,
-      runsStartCommands: this.wrapperRunsStartCommands(socket),
-    });
+      this.wrapperRunsStartCommands(socket)
+    );
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
@@ -3989,10 +3972,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
     }
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
-    const launch = await readRepositoryLaunch(this.ctx.storage);
     let frame: MaterializedPrepareFrame;
     try {
-      frame = this.materializePrepareFrame(latest, socket, launch);
+      frame = this.materializePrepareFrame(latest, socket);
     } catch (error) {
       this.logPrepareFrameMaterializationFailure(latest, error);
       await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
@@ -4488,13 +4470,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
-        await beginRepositoryLaunch(
-          this.ctx.storage,
-          allocationId,
-          launch.skipped,
-          selection.mode,
-          launch.environmentSnapshot
-        );
+        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
@@ -4755,11 +4731,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     state: AllocationState,
     allocationId: string,
     launchDeadlineAt: number
-  ): Promise<{
-    options: ProviderLaunchOptions;
-    skipped: boolean;
-    environmentSnapshot?: EnvironmentSnapshotLaunch;
-  }> {
+  ): Promise<{ options: ProviderLaunchOptions; skipped: boolean }> {
     const routes = await listRoutes(this.db);
     const selected = environmentLaunchCandidate(routes);
     const log = (fields: Record<string, string | number | boolean | undefined>) =>
@@ -4808,17 +4780,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       step: 'environment_snapshot',
       detail: environmentStartDetail(candidate.reference, lookup),
     });
-    if (snapshot === undefined || lookup.kind !== 'resolved' || !lookup.resolution.snapshot) {
-      return { options: {}, skipped: false };
-    }
-    return {
-      options: { snapshot },
-      skipped: false,
-      environmentSnapshot: {
-        environmentId: candidate.reference.environmentId,
-        revision: lookup.resolution.snapshot.revision,
-      },
-    };
+    return { options: snapshot === undefined ? {} : { snapshot }, skipped: false };
   }
 
   /**
@@ -4853,9 +4815,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(existing.preparationFailures === undefined
           ? {}
           : { preparationFailures: existing.preparationFailures }),
-        ...(existing.environmentSnapshot === undefined || startSource === 'image'
-          ? {}
-          : { environmentSnapshot: existing.environmentSnapshot }),
       });
       logControlDiagnostic('snapshot_start', {
         sandboxId: this.sandboxId,

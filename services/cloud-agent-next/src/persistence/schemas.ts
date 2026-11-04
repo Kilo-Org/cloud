@@ -1,5 +1,4 @@
 import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
-import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -288,11 +287,6 @@ export const SessionProfileBundleSchema = z.object({
    * workspace, including one whose environment snapshot already ran setup.
    */
   startCommands: setupCommandsSchema.optional(),
-  /**
-   * How many leading `setupCommands` are the environment's own. A session that
-   * adopts an environment snapshot skips them, because the snapshot ran them.
-   */
-  environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
   kiloCommands: RuntimeKiloCommandsSchema.optional(),
   runtimeInstructions: RuntimeInstructionsSchema.optional(),
 });

@@ -279,9 +279,6 @@ function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
     ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
     ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
-    ...(spec.environmentSetupCommandCount === undefined
-      ? {}
-      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     attemptId: spec.attemptId,
   };
 }

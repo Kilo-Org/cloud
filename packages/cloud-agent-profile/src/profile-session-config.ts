@@ -106,11 +106,6 @@ export type MergeProfileConfigurationResult = {
   setupCommands?: string[];
   /** The environment's start commands. Only an environment supplies them. */
   startCommands?: string[];
-  /**
-   * How many leading `setupCommands` are the environment's own. An environment
-   * snapshot already ran them; the rest are the session's.
-   */
-  environmentSetupCommandCount?: number;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
@@ -453,12 +448,9 @@ export async function mergeProfileConfiguration(
   const resolvedProfileId = top?.profileId ?? base?.profileId ?? null;
 
   const startCommands = args.environment?.startCommands ?? [];
-  // The environment layer is first, so its commands lead the merged list.
-  const environmentSetupCommandCount = environmentLayer?.commands.length ?? 0;
   return {
     ...mergeLayers(layers),
     ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
-    ...(environmentSetupCommandCount > 0 ? { environmentSetupCommandCount } : {}),
     ...(resolvedProfileId ? { resolvedProfileId } : {}),
   };
 }

@@ -10,12 +10,6 @@ export type RepositoryPreparationFailure = {
   subtype?: ControlPlaneWorkspaceFailureSubtype;
 };
 
-/** The environment snapshot a launch offered to the provider. */
-export type EnvironmentSnapshotLaunch = {
-  environmentId: string;
-  revision: number;
-};
-
 export type RepositoryLaunchRecord = {
   allocationId: string;
   /** Legacy records used the preinstalled runtime. */
@@ -25,8 +19,6 @@ export type RepositoryLaunchRecord = {
   skipRepository?: true;
   confirmed: boolean;
   preparationFailures?: RepositoryPreparationFailure[];
-  /** Absent when the launch offered no environment snapshot. */
-  environmentSnapshot?: EnvironmentSnapshotLaunch;
 };
 
 export async function readRepositoryLaunch(
@@ -47,15 +39,13 @@ export async function beginRepositoryLaunch(
   storage: Pick<DurableObjectStorage, 'put'>,
   allocationId: string,
   skipRepository: boolean,
-  startupMode: StartupMode = 'preinstalled',
-  environmentSnapshot?: EnvironmentSnapshotLaunch
+  startupMode: StartupMode = 'preinstalled'
 ): Promise<void> {
   await recordRepositoryLaunch(storage, {
     allocationId,
     startupMode,
     ...(skipRepository ? { skipRepository: true } : {}),
     confirmed: false,
-    ...(environmentSnapshot ? { environmentSnapshot } : {}),
   });
 }
 

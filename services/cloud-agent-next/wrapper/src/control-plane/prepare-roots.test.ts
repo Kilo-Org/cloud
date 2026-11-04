@@ -424,7 +424,8 @@ describe('preparing a route with several git roots', () => {
     }
     expect(harness.clones()).toEqual([]);
     expect([...harness.repos]).toEqual([API, WEB]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    // The environment build already ran setup in the snapshot.
+    expect(harness.setups).toEqual([]);
     expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
   });
 

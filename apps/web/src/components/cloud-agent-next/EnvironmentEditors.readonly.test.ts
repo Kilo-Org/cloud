@@ -54,11 +54,11 @@ describe('EnvironmentScriptsEditor readOnly', () => {
     expect(markup).toContain('For longer scripts');
   });
 
-  it('labels the start script as running in every session', () => {
+  it('labels the start script as running when a workspace starts', () => {
     const markup = renderScripts(false, 'start');
 
     expect(markup).toContain('Start script');
-    expect(markup).toContain('Runs before the agent starts in every session');
+    expect(markup).toContain('Runs each time a workspace starts');
     expect(markup).not.toContain('Setup script');
   });
 });

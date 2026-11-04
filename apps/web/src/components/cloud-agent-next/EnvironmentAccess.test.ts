@@ -407,7 +407,7 @@ describe('environment access for members and managers', () => {
       clickButton(content!, 'Start script');
       content = dialogContent(mounted.container);
       expect(content?.querySelector('textarea')?.hasAttribute('readOnly')).toBe(true);
-      expect(content?.textContent).toContain('Runs before the agent starts in every session');
+      expect(content?.textContent).toContain('Runs each time a workspace starts');
 
       click(content?.querySelector('[aria-label="Back to environment"]'));
       clickButton(content!, 'Environment variables');

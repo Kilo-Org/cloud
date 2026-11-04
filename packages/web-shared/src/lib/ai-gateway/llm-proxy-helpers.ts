@@ -12,6 +12,7 @@ import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactio
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
@@ -719,16 +720,12 @@ export function accountForMicrodollarUsage(
   return accounting;
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /**
  * Field names, never values, of the request as sent upstream, so rejections
  * such as "unknown field" can be attributed from logs alone.
  */
 function describeRequestFields(request: unknown): Record<string, string> {
-  if (!isObjectRecord(request)) {
+  if (!isRecord(request)) {
     return {};
   }
   const fields: Record<string, string> = {
@@ -736,7 +733,7 @@ function describeRequestFields(request: unknown): Record<string, string> {
   };
   if (Array.isArray(request.messages)) {
     const messageFields = new Set(
-      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+      request.messages.filter(isRecord).flatMap(message => Object.keys(message))
     );
     fields.messageFields = [...messageFields].sort().join(',');
   }

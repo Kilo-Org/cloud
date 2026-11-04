@@ -393,6 +393,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: 'Invalid request field "input_audio".',
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
   });
@@ -409,9 +414,96 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     const response = await handleAudioTranscriptionsRequest(request as never);
 
     expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'Malformed JSON',
+      error_type: 'invalid_request',
+      message: expect.any(String),
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
   });
+
+  it.each([{ body: null }, { body: [] }, { body: 'text' }])(
+    'rejects a non-object JSON body: $body',
+    async ({ body }) => {
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(makeRequest(body) as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Invalid request body.',
+      });
+      expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { fields: { model: ' ' }, path: 'model' },
+    { fields: { input_audio: { data: 1, format: 'wav' } }, path: 'input_audio.data' },
+    { fields: { input_audio: { data: 'UklGRiQA', format: [] } }, path: 'input_audio.format' },
+    { fields: { language: [] }, path: 'language' },
+    { fields: { temperature: '0' }, path: 'temperature' },
+    { fields: { provider: [] }, path: 'provider' },
+    { fields: { provider: { only: 'openai' } }, path: 'provider.only' },
+    { fields: { provider: { order: [1] } }, path: 'provider.order[0]' },
+    { fields: { provider: { data_collection: 'invalid' } }, path: 'provider.data_collection' },
+  ])('rejects malformed JSON $path before auth or balance work', async ({ fields, path }) => {
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+        ...fields,
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: `Invalid request field "${path}".`,
+    });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { provider: null },
+    { provider: { only: null, ignore: null, order: null, sort: null, upstream_option: true } },
+  ])(
+    'preserves nullish options and additional upstream fields: $provider',
+    async ({ provider }) => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          language: null,
+          temperature: null,
+          provider,
+          user: null,
+          safety_identifier: null,
+          response_format: 'verbose_json',
+        }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(JSON.parse(mockedFetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+        language: null,
+        temperature: null,
+        provider,
+        response_format: 'verbose_json',
+      });
+    }
+  );
 
   it('requires authentication for transcription requests', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
@@ -646,6 +738,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: 'Invalid request field "model".',
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
@@ -658,6 +755,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: 'Invalid request field "file".',
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
@@ -678,6 +780,11 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     const response = await handleAudioTranscriptionsRequest(request as never);
 
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: 'Invalid multipart request body.',
+    });
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
   });

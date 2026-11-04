@@ -271,6 +271,95 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it.each([{ body: null }, { body: [] }, { body: 'text' }, { body: 1 }])(
+    'rejects a non-object body: $body',
+    async ({ body }) => {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        new NextRequest(makeRequest(), { body: JSON.stringify(body) })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Invalid request body.',
+      });
+      expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+      expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { fields: { model: undefined }, path: 'model' },
+    { fields: { model: 1 }, path: 'model' },
+    { fields: { model: ' ' }, path: 'model' },
+    { fields: { input: undefined }, path: 'input' },
+    { fields: { input: null }, path: 'input' },
+    { fields: { provider: [] }, path: 'provider' },
+    { fields: { provider: { only: 'openai' } }, path: 'provider.only' },
+    { fields: { provider: { ignore: [1] } }, path: 'provider.ignore[0]' },
+    { fields: { provider: { order: {} } }, path: 'provider.order' },
+    { fields: { provider: { sort: [] } }, path: 'provider.sort' },
+    { fields: { provider: { zdr: 'true' } }, path: 'provider.zdr' },
+  ])('rejects malformed $path before auth or provider selection', async ({ fields, path }) => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest(fields));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: `Invalid request field "${path}".`,
+    });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetEmbeddingProvider).not.toHaveBeenCalled();
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { input: 'hello' },
+    { input: ['hello', 'world'] },
+    { input: [1, 2, 3] },
+    {
+      input: [
+        [1, 2],
+        [3, 4],
+      ],
+    },
+    { input: { upstream_specific: ['hello'] } },
+  ])('preserves supported and upstream-specific input: $input', async ({ input }) => {
+    const provider = { only: null, ignore: null, order: null, sort: null, custom: { fast: true } };
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ input, provider, upstream_options: { mode: 'fast' } })
+    );
+
+    expect(response.status).toBe(200);
+    expect(getUpstreamBody()).toMatchObject({
+      input,
+      provider,
+      upstream_options: { mode: 'fast' },
+    });
+  });
+
+  it('leaves unknown but well-formed model rejection to the upstream', async () => {
+    mockedFetch.mockResolvedValue(Response.json({ error: 'model not found' }, { status: 404 }));
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest({ model: 'unknown/embedding' }));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'model not found' });
+    expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(
+      'unknown/embedding',
+      user,
+      undefined,
+      undefined
+    );
+  });
+
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
     'rejects malformed provider privacy before proxying: %j',
     async provider => {

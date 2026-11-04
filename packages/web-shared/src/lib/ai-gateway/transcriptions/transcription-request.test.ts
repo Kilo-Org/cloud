@@ -29,6 +29,26 @@ describe('TranscriptionRequestSchema', () => {
       })
     ).toThrow();
   });
+
+  it('preserves nullish optional fields and unknown upstream parameters', () => {
+    const body = {
+      model: 'openai/gpt-4o-mini-transcribe',
+      input_audio: { data: 'UklGRiQA', format: 'wav' },
+      language: null,
+      temperature: null,
+      provider: { only: null, order: null, custom: true },
+      user: null,
+      safety_identifier: null,
+      response_format: 'verbose_json',
+    };
+
+    expect(TranscriptionRequestSchema.parse(body)).toEqual(body);
+    expect(extractTranscriptionPromptInfo(TranscriptionRequestSchema.parse(body))).toEqual({
+      system_prompt_prefix: '',
+      system_prompt_length: 0,
+      user_prompt_prefix: 'audio/wav',
+    });
+  });
 });
 
 describe('extractTranscriptionPromptInfo', () => {

@@ -452,8 +452,7 @@ Provision and verify the Worker-side publisher secret before selecting staging
 or FRA/SFO cohorts; a missing Worker secret returns 503.
 The HTTP address alone selects no traffic: production selection still requires
 both production environment labels, a trusted function region and its applicable
-FRA or SFO cohort controls above. The retired `USAGE_QUEUE_ONLY_ENABLED` value
-no longer affects selection after deployment of this source.
+FRA or SFO cohort controls above.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.

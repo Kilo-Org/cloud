@@ -9,18 +9,17 @@ may reduce peak pressure while taking longer to finish the same work.
 
 ## Select each path
 
-The original staging direct-versus-queue recipe used the now-retired
-`USAGE_QUEUE_ONLY_ENABLED` launch gate. After deploying its retirement, false or
-unset values no longer select direct accounting. This recipe cannot produce a
-staging direct baseline with that gate; do not label such a run as direct.
+Staging selects queued accounting under the environment guards below and has no
+direct-accounting selector. This recipe does not provide a direct baseline;
+establish a separately agreed test setup before comparing direct and queued runs.
 
 For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
 than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
 exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
 Production retains separate FRA/SFO exposure and SFO allowlist controls and
 [rollout gates](eu-queues.md#production-merge-gate); no production change is
-part of this recipe. A direct-baseline method requires a separately agreed test
-setup. Keep the Worker processing mode, writer endpoint and queue policy fixed.
+part of this recipe. Keep the Worker processing mode, writer endpoint and queue
+policy fixed.
 
 Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before

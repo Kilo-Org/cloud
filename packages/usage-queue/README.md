@@ -83,14 +83,13 @@ prerequisites have not been inspected or activated on the hosted project here.
 Before the first deployment of this change, verify the staging selector is not
 already `vercel`: that value activates Vercel publication immediately under the
 staging guard. An absent selector selects Cloudflare; verify that publisher and
-writer too before deploying the launch-gate retirement.
+writer too before deployment.
 
 Before load, complete the private-ingress gate and one ordinary small gateway
 smoke request, checking persistence and actual ACK/drain. Then use the bounded
 10/25/50/100rps stages below. To stop new Vercel publication, remove/change the
 transport selector and redeploy; keep old staging deployments consuming until
-accepted work drains. The restored staging path is Cloudflare; the retired
-launch gate no longer selects direct accounting.
+accepted work drains. The restored staging path is Cloudflare.
 
 ## Readiness boundaries
 
@@ -220,9 +219,8 @@ never pasted into commands, PRs, logs or manifests.
 Exact `vercel` alone selects Vercel plus queue-only accounting under the staging
 guard. To turn Vercel off, remove/change the selector and redeploy.
 Absent, misspelled or case-mismatched transport values select Cloudflare for
-staging accounting. The retired launch gate has no effect. Production
-excludes Vercel even if the selector is accidentally copied. Effective queue-only
-mode selects one transport, so no dual publication. Missing writer config fails consumption and retries; it does not
+staging accounting. Production excludes Vercel even if the selector is accidentally
+copied. Effective queue-only mode selects one transport, so no dual publication. Missing writer config fails consumption and retries; it does not
 redirect an accepted event to Cloudflare or the gateway billing writer.
 
 ## Negative-ingress gate before the first hosted smoke
@@ -405,8 +403,7 @@ Receiving/deleting/republishing with queue tools is a separately authorized muta
 For **new events only**, set `USAGE_QUEUE_TRANSPORT=cloudflare` (or remove it)
 and redeploy staging to select the existing CF processing path. Staging remains
 queue-selected when `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` is not
-`production`: the retired `USAGE_QUEUE_ONLY_ENABLED` gate no longer provides a
-direct-accounting switch, including when false or unset. Verify the chosen
+`production`. There is no staging direct-accounting selector. Verify the chosen
 destination and writer before switching; never dual-publish a billed event.
 The removed shadow-publishing flag has no effect.
 

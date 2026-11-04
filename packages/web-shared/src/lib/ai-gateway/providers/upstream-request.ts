@@ -1,6 +1,6 @@
-import { debugSaveProxyResponseStream } from '../../debugUtils';
-import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { isNativeError } from 'node:util/types';
+import { z } from 'zod';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
   GatewayResponsesRequest,
@@ -42,7 +42,7 @@ type UpstreamFetchFailureFamily =
  * The gateway route's `maxDuration` of 800s covers the whole invocation,
  * including the `after()` work that starts once the stream ends. That work runs
  * in sequence in `countAndStoreUsage`: the generation lookup (`fetchGeneration`,
- * about 75s of backoff), then the usage-record call (`ATTEMPT_TIMEOUT_MS`, 90s),
+ * at most 75s including retries and body), then the usage-record call (`ATTEMPT_TIMEOUT_MS`, 90s),
  * then its local fallback write. By design that can need ~165s plus the
  * fallback, nearly all of the 200s this cap leaves. Production logs agree on the
  * typical case (after() done within 80s of a stream that ran this full cap), but
@@ -82,8 +82,42 @@ export class UpstreamTimeoutError extends Error {
   }
 }
 
-// fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
-const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
+const GENERATION_LOOKUP_BUDGET_MS = 75_000;
+const GENERATION_ATTEMPT_TIMEOUT_MS = 10_000;
+const GenerationSchema = z.object({
+  data: z.object({
+    id: z.string().min(1),
+    is_byok: z.boolean().nullish(),
+    total_cost: z.number().finite(),
+    upstream_inference_cost: z.number().finite().nullish(),
+    created_at: z.string(),
+    model: z.string().min(1),
+    // Vercel omits OpenRouter's origin metadata.
+    origin: z.string().default(''),
+    usage: z.number().finite(),
+    upstream_id: z.string().nullish(),
+    cache_discount: z.number().finite().nullish(),
+    app_id: z.number().finite().nullish(),
+    streamed: z.boolean().nullish(),
+    cancelled: z.boolean().nullish(),
+    provider_name: z.string().nullish(),
+    latency: z.number().finite().nullish(),
+    moderation_latency: z.number().finite().nullish(),
+    generation_time: z.number().finite().nullish(),
+    finish_reason: z.string().nullish(),
+    native_finish_reason: z.string().nullish(),
+    tokens_prompt: z.number().finite().nullish(),
+    tokens_completion: z.number().finite().nullish(),
+    native_tokens_prompt: z.number().finite().nullish(),
+    native_tokens_completion: z.number().finite().nullish(),
+    native_tokens_reasoning: z.number().finite().nullish(),
+    native_tokens_cached: z.number().finite().nullish(),
+    native_tokens_cache_creation: z.number().finite().nullish(),
+    num_media_prompt: z.number().finite().nullish(),
+    num_media_completion: z.number().finite().nullish(),
+    num_search_results: z.number().finite().nullish(),
+  }),
+}) satisfies z.ZodType<OpenRouterGeneration>;
 const CHAT_API_PATHS = {
   chat_completions: '/chat/completions',
   responses: '/responses',
@@ -481,52 +515,63 @@ export async function upstreamRequest({
   }
 }
 
-export async function fetchGeneration(messageId: string, provider: Provider) {
-  // We have to delay, openrouter doesn't have the cost immediately
+export async function fetchGeneration(
+  messageId: string,
+  provider: Provider
+): Promise<OpenRouterGeneration | undefined> {
+  const startedAt = performance.now();
+  // Generation costs are ingested asynchronously by the provider.
   await new Promise(res => setTimeout(res, 200));
-  //ref: https://openrouter.ai/docs/api-reference/get-a-generation
-  let response: Response;
-  try {
-    response = await fetchWithBackoff(
-      `${provider.apiUrl}/generation?id=${messageId}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${provider.apiKey}`,
-          ...ATTRIBUTION_HEADERS,
-        },
-      },
-      {
-        baseDelayMs: 5_000,
-        maxDelayMs: GENERATION_FETCH_MAX_DELAY_MS,
-        retryResponse: r => r.status >= 400,
+  let nextDelayMs = 5_000 * (1 + (Math.random() - 0.5) / 10);
+  let reason = 'budget_exhausted';
+  let status: number | undefined;
+
+  while (true) {
+    const remainingMs = Math.floor(GENERATION_LOOKUP_BUDGET_MS - (performance.now() - startedAt));
+    if (remainingMs <= 0) break;
+    const signal = AbortSignal.timeout(Math.min(GENERATION_ATTEMPT_TIMEOUT_MS, remainingMs));
+    try {
+      reason = 'request_failed';
+      status = undefined;
+      const response = await fetch(
+        `${provider.apiUrl}/generation?id=${encodeURIComponent(messageId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${provider.apiKey}`,
+            ...ATTRIBUTION_HEADERS,
+          },
+          signal,
+        }
+      );
+      status = response.status;
+      if (response.ok) {
+        reason = 'body_read_failed';
+        const payload: unknown = await response.json();
+        const generation = GenerationSchema.safeParse(payload);
+        if (generation.success) return generation.data;
+        reason = 'invalid_payload';
+        break;
       }
-    );
-  } catch (error) {
-    captureException(error, {
-      level: 'info',
-      tags: { source: `${provider.type}_generation_fetch` },
-      extra: { messageId },
-    });
-    return;
+      reason = 'http_error';
+      await response.body?.cancel();
+    } catch (error) {
+      if (isNativeError(error) && error.name === 'SyntaxError') {
+        reason = 'invalid_json';
+        break;
+      }
+      if (signal.aborted) reason = 'request_timeout';
+    }
+
+    if (performance.now() - startedAt + nextDelayMs >= GENERATION_LOOKUP_BUDGET_MS) break;
+    await new Promise(res => setTimeout(res, nextDelayMs));
+    nextDelayMs *= 1.5;
   }
 
-  if (!response.ok) {
-    const responseText = await response.text();
-    captureMessage(`Timed out fetching openrouter generation`, {
-      level: 'info',
-      tags: { source: `${provider.type}_generation_fetch` },
-      extra: {
-        messageId,
-        status: response.status,
-        statusText: response.statusText,
-        responseText,
-      },
-    });
-    return;
-  }
-
-  debugSaveProxyResponseStream(response, `-${messageId}.log.generation.json`);
-
-  return (await response.json()) as OpenRouterGeneration;
+  captureMessage('Generation lookup failed', {
+    level: 'info',
+    tags: { source: `${provider.type}_generation_fetch` },
+    extra: { messageId, reason, status },
+  });
+  return undefined;
 }

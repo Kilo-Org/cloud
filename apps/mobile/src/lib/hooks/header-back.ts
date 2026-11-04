@@ -1,3 +1,5 @@
+import { insideBurstWindow } from './burst-window';
+
 /**
  * Burst window for one header Back press.
  *
@@ -17,19 +19,6 @@ export type HeaderBackGuardState = {
   lastBackAt: number;
 };
 
-/**
- * Whether `now` is inside the window opened at `lastBackAt`.
- *
- * A wall clock can step backwards (NTP correction, a manual change), which
- * makes the delta negative and would keep every press out for as long as the
- * step lasts. A negative delta is read as "the clock moved, not a repeat" and
- * opens a fresh window instead.
- */
-function insideWindow(lastBackAt: number, now: number): boolean {
-  const elapsed = now - lastBackAt;
-  return elapsed >= 0 && elapsed < HEADER_BACK_GUARD_MS;
-}
-
 /** What a header Back press should run. */
 type HeaderBackDecision = 'handler' | 'history' | 'fallback' | 'none';
 
@@ -39,7 +28,7 @@ type HeaderBackDecision = 'handler' | 'history' | 'fallback' | 'none';
  * returning, so a re-entrant call cannot claim the same window twice.
  */
 export function claimHeaderBack(state: HeaderBackGuardState, now: number): boolean {
-  if (insideWindow(state.lastBackAt, now)) {
+  if (insideBurstWindow(state.lastBackAt, now, HEADER_BACK_GUARD_MS)) {
     return false;
   }
   state.lastBackAt = now;

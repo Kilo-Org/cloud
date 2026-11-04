@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { enkrypt_usage, organizations } from '@kilocode/db/schema';
+import { enkrypt_usage, enkrypt_usage_guardrail, organizations } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
@@ -57,7 +57,15 @@ function post(
 }
 
 async function ledgerRows(organizationId: string) {
-  return db.select().from(enkrypt_usage).where(eq(enkrypt_usage.organization_id, organizationId));
+  const rows = await db
+    .select({ row: enkrypt_usage, guardrail: enkrypt_usage_guardrail.guardrail })
+    .from(enkrypt_usage)
+    .leftJoin(
+      enkrypt_usage_guardrail,
+      eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+    )
+    .where(eq(enkrypt_usage.organization_id, organizationId));
+  return rows.map(({ row, guardrail }) => ({ ...row, guardrail }));
 }
 
 async function microdollarsUsed(organizationId: string) {

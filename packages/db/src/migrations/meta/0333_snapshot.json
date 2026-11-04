@@ -1,5 +1,5 @@
 {
-  "id": "ab9bdf96-7cbf-4541-a391-96b6483838eb",
+  "id": "9f518e57-99bb-40b9-a1d8-531e0e07ab88",
   "prevId": "e4a7e0b8-2d06-4284-8940-b948cf966b3d",
   "version": "7",
   "dialect": "postgresql",
@@ -12700,12 +12700,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "guardrail": {
-          "name": "guardrail",
-          "type": "text",
+        "guardrail_id": {
+          "name": "guardrail_id",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'input'"
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -12824,6 +12823,47 @@
           "columns": [
             {
               "expression": "decision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.enkrypt_usage_guardrail": {
+      "name": "enkrypt_usage_guardrail",
+      "schema": "",
+      "columns": {
+        "guardrail_id": {
+          "name": "guardrail_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "guardrail": {
+          "name": "guardrail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_enkrypt_usage_guardrail": {
+          "name": "UQ_enkrypt_usage_guardrail",
+          "columns": [
+            {
+              "expression": "guardrail",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

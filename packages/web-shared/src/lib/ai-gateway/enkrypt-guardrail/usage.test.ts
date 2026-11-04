@@ -5,6 +5,7 @@ import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
@@ -83,10 +84,14 @@ describe('recordEnkryptUsage', () => {
         enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
         charged_microdollars: enkrypt_usage.charged_microdollars,
         added_latency_ms: enkrypt_usage.added_latency_ms,
-        guardrail: enkrypt_usage.guardrail,
+        guardrail: enkrypt_usage_guardrail.guardrail,
       })
       .from(enkrypt_usage)
       .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
       .innerJoin(
         enkrypt_usage_decision,
         eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
@@ -120,8 +125,12 @@ describe('recordEnkryptUsage', () => {
     await recordEnkryptUsage(usageRecord(organization.id, user.id, { guardrail: 'output' }));
 
     const rows = await db
-      .select({ guardrail: enkrypt_usage.guardrail })
+      .select({ guardrail: enkrypt_usage_guardrail.guardrail })
       .from(enkrypt_usage)
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
       .where(eq(enkrypt_usage.organization_id, organization.id));
     expect(rows).toEqual([{ guardrail: 'output' }]);
     expect(await organizationBalance(organization.id)).toEqual({

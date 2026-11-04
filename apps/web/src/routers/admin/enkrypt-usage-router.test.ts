@@ -2,7 +2,12 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { provisionEnkryptUsagePartitions } from '@/lib/usage-partitions';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { api_kind, enkrypt_usage, enkrypt_usage_decision } from '@kilocode/db/schema';
+import {
+  api_kind,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
+} from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
@@ -40,6 +45,14 @@ describe('admin enkrypt usage router', () => {
       .onConflictDoUpdate({
         target: enkrypt_usage_decision.decision,
         set: { decision: enkrypt_usage_decision.decision },
+      })
+      .returning();
+    const [outputGuardrail] = await db
+      .insert(enkrypt_usage_guardrail)
+      .values({ guardrail: 'output' })
+      .onConflictDoUpdate({
+        target: enkrypt_usage_guardrail.guardrail,
+        set: { guardrail: enkrypt_usage_guardrail.guardrail },
       })
       .returning();
     const apiKindId = (value: string) => {
@@ -82,7 +95,7 @@ describe('admin enkrypt usage router', () => {
         enkrypt_credits_cost: 1,
         charged_microdollars: 100,
         added_latency_ms: 900,
-        guardrail: 'output',
+        guardrail_id: outputGuardrail.guardrail_id,
         created_at: outputAt,
       },
       {

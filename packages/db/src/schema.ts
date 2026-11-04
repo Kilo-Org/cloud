@@ -10663,6 +10663,15 @@ export const enkrypt_usage_decision = pgTable(
   table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
 );
 
+export const enkrypt_usage_guardrail = pgTable(
+  'enkrypt_usage_guardrail',
+  {
+    guardrail_id: serial().notNull().primaryKey(),
+    guardrail: text().notNull().$type<EnkryptGuardrailDirection>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_guardrail').on(table.guardrail)]
+);
+
 // Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
 export const enkrypt_usage = pgTable(
   'enkrypt_usage',
@@ -10687,7 +10696,10 @@ export const enkrypt_usage = pgTable(
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
     // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
-    guardrail: text().notNull().default('input').$type<EnkryptGuardrailDirection>(),
+    // Null on rows recorded before the output guardrail existed, which are all input guardrail
+    // calls. No foreign key: adding one validates every partition of this table while blocking
+    // writes.
+    guardrail_id: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

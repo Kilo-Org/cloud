@@ -828,7 +828,10 @@ export function NotificationsScreen() {
                   key={meta.key}
                   className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
                 >
-                  <Skeleton className="h-[18px] w-[18px] rounded" />
+                  {/* The leading cell reserves the loaded CategoryRow's 30 dp
+                      tile frame, so the rows do not move when the preferences
+                      arrive. */}
+                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
                   <View className="flex-1">
                     <Skeleton className="h-5 w-24" />
                     <Skeleton className="mt-0.5 h-4 w-40" />

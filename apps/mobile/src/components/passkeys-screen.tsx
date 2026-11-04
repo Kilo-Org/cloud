@@ -315,7 +315,8 @@ export function PasskeysScreen() {
       <View className="gap-3">
         {SKELETON_ROWS.map(index => (
           <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            <Skeleton className="h-[18px] w-[18px] rounded" />
+            {/* Reserves the loaded row's 30 dp IconTile frame. */}
+            <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
             <View className="flex-1 gap-1.5">
               <Skeleton className="h-5 w-28" />
               <Skeleton className="h-4 w-40" />

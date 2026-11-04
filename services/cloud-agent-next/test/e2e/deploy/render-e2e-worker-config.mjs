@@ -31,12 +31,26 @@ const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
 const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
-const E2E_CONTAINER_CLASSES = new Set(['Sandbox']);
-// The suite cold-boots a container per scenario and they linger until the
-// 15-minute idle stop, so a whole run keeps far more than 20 alive at once. The
-// old value of 20 pinned the class at the limit and left later cold boots
-// stuck in `preparing`; match the production `Sandbox` class instead.
-const E2E_MAX_INSTANCES = 40;
+// Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
+// same `SandboxContainers` class as production.
+const E2E_CONTAINER_CLASSES = new Set(['SandboxContainers']);
+// Preserve the deployed E2E Worker's old migration history. These namespaces
+// were omitted before v15 and must be created under a new E2E tag.
+const HISTORICALLY_OMITTED_CLASSES = new Set([
+  'SandboxSmall',
+  'SandboxDIND',
+  'SandboxCodeReview',
+  'SandboxContainment',
+  'SandboxSmallContainment',
+  'SandboxCodeReviewContainment',
+  'SandboxContainers',
+]);
+const E2E_RUNTIME_MIGRATION = {
+  tag: 'v15-e2e',
+  // This applied migration must stay fixed when the current container set changes.
+  // The retired containment classes stay exported as tombstones, so it remains valid.
+  new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
+};
 
 const E2E_CALLBACK_CLASS = 'E2eCallbackSink';
 const E2E_CALLBACK_BINDING = 'E2E_CALLBACK_SINK';
@@ -108,15 +122,7 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
 
   config.containers = (config.containers ?? [])
     .filter(entry => E2E_CONTAINER_CLASSES.has(entry.class_name))
-    .map(entry => ({
-      ...entry,
-      image:
-        typeof entry.image === 'string' && entry.image.startsWith('./')
-          ? `../${entry.image.slice(2)}`
-          : entry.image,
-      max_instances: E2E_MAX_INSTANCES,
-      ssh: { ...(entry.ssh ?? {}), enabled: true },
-    }));
+    .map(entry => rebaseContainers([entry])[0]);
 
   config.durable_objects = {
     ...config.durable_objects,
@@ -125,17 +131,32 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     ),
   };
 
+  const runtimeAnchorIndex = (config.migrations ?? []).findIndex(entry => entry.tag === 'v15');
+  if (runtimeAnchorIndex === -1) {
+    throw new Error(
+      "cannot insert the e2e runtime migration: production anchor tag 'v15' is missing"
+    );
+  }
   const survivingMigrations = (config.migrations ?? [])
-    .map(entry => {
+    .map((entry, index) => {
+      const omittedMigrationClasses = new Set([
+        ...removedContainerClasses,
+        ...(index <= runtimeAnchorIndex ? HISTORICALLY_OMITTED_CLASSES : []),
+      ]);
       const migration = { ...entry };
       if (entry.new_sqlite_classes) {
         migration.new_sqlite_classes = entry.new_sqlite_classes.filter(
-          className => !removedContainerClasses.has(className)
+          className => !omittedMigrationClasses.has(className)
         );
       }
       if (entry.new_classes) {
         migration.new_classes = entry.new_classes.filter(
-          className => !removedContainerClasses.has(className)
+          className => !omittedMigrationClasses.has(className)
+        );
+      }
+      if (entry.deleted_classes) {
+        migration.deleted_classes = entry.deleted_classes.filter(
+          className => !omittedMigrationClasses.has(className)
         );
       }
       return migration;
@@ -148,6 +169,13 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
         0
     );
   config.migrations = insertCallbackMigration(survivingMigrations);
+  const anchorIndex = config.migrations.findIndex(entry => entry.tag === 'v15');
+  if (anchorIndex === -1) {
+    throw new Error(
+      "cannot insert the e2e runtime migration: production anchor tag 'v15' is empty"
+    );
+  }
+  config.migrations.splice(anchorIndex + 1, 0, structuredClone(E2E_RUNTIME_MIGRATION));
 
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
@@ -169,7 +197,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
-    CREDENTIAL_CONTAINMENT_ENABLED: 'false',
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];
@@ -181,15 +208,11 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     });
   }
 
-  // The e2e Worker keeps no `SandboxContainers` class, so it has no repository
-  // snapshots and must not provision a namespace for them.
-  config.kv_namespaces = (config.kv_namespaces ?? [])
-    .filter(kvNamespace => kvNamespace.binding !== 'REPO_SNAPSHOTS')
-    .map(kvNamespace =>
-      kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-        ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-        : kvNamespace
-    );
+  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
+    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
+      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
+      : kvNamespace
+  );
 
   config.queues = {
     ...config.queues,
@@ -225,7 +248,20 @@ function rebaseImage(image) {
 }
 
 function rebaseContainers(containers) {
-  return (containers ?? []).map(entry => ({ ...entry, image: rebaseImage(entry.image) }));
+  return (containers ?? []).map(entry => ({
+    ...entry,
+    ...(typeof entry.image === 'string' ? { image: rebaseImage(entry.image) } : {}),
+    ...(entry.images
+      ? {
+          images: Object.fromEntries(
+            Object.entries(entry.images).map(([name, image]) => [
+              name,
+              { ...image, dockerfile: rebaseImage(image.dockerfile) },
+            ])
+          ),
+        }
+      : {}),
+  }));
 }
 
 /**

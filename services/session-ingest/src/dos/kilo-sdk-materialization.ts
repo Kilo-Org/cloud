@@ -12,7 +12,6 @@ import {
   partIdSchema,
   sessionDiffFileSchema,
   type KiloSdkMessagesCursor,
-  type KiloSdkMessagesLegacyCursor,
   type SessionDiffFile,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -84,7 +83,7 @@ type ItemDataRef = Pick<typeof ingestItems.$inferSelect, 'item_data' | 'item_dat
 
 type MaterializedKiloSdkMessage = {
   info: Record<string, unknown>;
-  identity: KiloSdkMessagesLegacyCursor;
+  identity: KiloSdkMessagesCursor;
 };
 
 type PersistedKiloSdkMessageStorageIdentity = {
@@ -548,7 +547,7 @@ function directPartIdCondition(range: PartItemIdentityRange) {
 
 function countKiloSdkMessagePartRows(
   db: DrizzleSqliteDODatabase,
-  identity: KiloSdkMessagesLegacyCursor,
+  identity: KiloSdkMessagesCursor,
   afterRowId = 0
 ): KiloSdkMessagePartRowCount {
   return countKiloSdkMessagePartRowsByMessageId(db, identity.id, afterRowId);
@@ -570,7 +569,7 @@ async function hydrateKiloSdkMessageParts(
   db: DrizzleSqliteDODatabase,
   r2: R2Bucket,
   budget: KiloSdkHistoryReadBudget,
-  identity: KiloSdkMessagesLegacyCursor,
+  identity: KiloSdkMessagesCursor,
   oversizedItemPolicy: KiloSdkOversizedItemPolicy
 ): Promise<
   | {
@@ -885,7 +884,7 @@ function parseItemObject(value: string): Record<string, unknown> | null {
   }
 }
 
-function readMessageIdentity(message: Record<string, unknown>): KiloSdkMessagesLegacyCursor | null {
+function readMessageIdentity(message: Record<string, unknown>): KiloSdkMessagesCursor | null {
   const parsed = z
     .object({
       id: messageIdSchema,

@@ -1,16 +1,13 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native style regression tests. */
-// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { type TextStyle } from 'react-native';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
-import { act, TestRenderer } from '@/test/renderer';
+import { type ReactTestInstance } from '@/test/renderer';
+import { compileClassName } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Eyebrow } from './eyebrow';
 import { Text } from './text';
+import { hostText, mountTextTree, unmountTextTree } from './text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({
@@ -19,31 +16,13 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
-
-let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-
-/** The one live renderer's root: any previous tree is unmounted before it is replaced. */
-function renderRoot(element: ReactElement): TestRenderer.ReactTestInstance {
-  act(() => {
-    renderer?.unmount();
-    renderer = TestRenderer.create(element);
-  });
-  if (!renderer) {
-    throw new Error('Missing Text renderer');
-  }
-  return renderer.root;
-}
-
+/** The suite's own mount: the shared tree, wrapped in the tracked class it asserts on. */
 function mount(children: string, style?: TextStyle, className = 'tracking-wide') {
-  const root = renderRoot(createElement(Text, { className, style }, children));
-  return root.find(node => Object.is(node.type, 'Text'));
+  return hostText(mountTextTree(createElement(Text, { className, style }, children)));
 }
 
 /** The component's own inline styles, flattened the way React Native merges them. */
-function ownStyles(node: TestRenderer.ReactTestInstance): TextStyle[] {
+function ownStyles(node: ReactTestInstance): TextStyle[] {
   const { style } = node.props;
   const entries = Array.isArray(style) ? (style as unknown[]).flat(Infinity) : [style];
   return entries.filter((entry): entry is TextStyle => typeof entry === 'object' && entry !== null);
@@ -56,13 +35,7 @@ function resolvedLetterSpacing(styles: TextStyle[]): TextStyle['letterSpacing'] 
 
 /** What the app's own Tailwind + react-native-css compile a tracking class to. */
 async function compiledLetterSpacing(className: string): Promise<number> {
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${className}; }`,
-    { from: import.meta.filename }
-  );
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  const declarations =
-    rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+  const declarations = await compileClassName(className);
   const value = declarations
     .map(declaration => declaration as { letterSpacing?: unknown })
     .findLast(declaration => typeof declaration.letterSpacing === 'number')?.letterSpacing;
@@ -72,15 +45,9 @@ async function compiledLetterSpacing(className: string): Promise<number> {
   return value;
 }
 
-// Both assertions are kept: `hostText` reaches the host node to read its inline
-// style, `hostClasses` reads the resolved class list.
-function hostText(root: TestRenderer.ReactTestInstance) {
-  return root.find(node => Object.is(node.type, 'Text'));
-}
-
-function hostClasses(root: TestRenderer.ReactTestInstance): string[] {
-  const node = root.find(candidate => Object.is(candidate.type, 'Text'));
-  return String(node.props.className).split(' ');
+/** The resolved class list of the host `Text`. */
+function hostClasses(root: ReactTestInstance): string[] {
+  return String(hostText(root).props.className).split(' ');
 }
 
 beforeEach(() => {
@@ -89,8 +56,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  act(() => renderer?.unmount());
-  renderer = undefined;
+  unmountTextTree();
 });
 
 // The reset belongs to the script, not the interface: a joined script takes it
@@ -141,7 +107,7 @@ describe('Text mounted letter spacing', () => {
   it.each([false, true])('resets the tracking for Arabic children (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const text = hostText(
-      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+      mountTextTree(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
     );
 
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
@@ -149,7 +115,7 @@ describe('Text mounted letter spacing', () => {
 
   it('leaves Latin children untouched and keeps LTR style undefined', () => {
     const text = hostText(
-      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+      mountTextTree(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toBeUndefined();
@@ -157,7 +123,7 @@ describe('Text mounted letter spacing', () => {
 
   it('resets the eyebrow variant tracking for Arabic children in RTL', () => {
     i18nManager.isRTL = true;
-    const text = hostText(renderRoot(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
+    const text = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, 'عرض الكل')));
 
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
@@ -165,7 +131,7 @@ describe('Text mounted letter spacing', () => {
   it('resets the tab label tracking for Arabic children in RTL', () => {
     i18nManager.isRTL = true;
     const text = hostText(
-      renderRoot(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
+      mountTextTree(createElement(Text, { className: 'tracking-[0.2px]' }, 'الرئيسية'))
     );
 
     expect(text.props.className as string).toContain('tracking-[0.2px]');
@@ -177,7 +143,7 @@ describe('Text mounted letter spacing', () => {
   it('keeps the RTL paragraph direction and no reset for Latin children', () => {
     i18nManager.isRTL = true;
     const text = hostText(
-      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
+      mountTextTree(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
@@ -193,7 +159,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      renderRoot(createElement(Text, { variant: 'eyebrow' }, 'Live now'))
+      mountTextTree(createElement(Text, { variant: 'eyebrow' }, 'Live now'))
     );
     expect(classes).toEqual(
       expect.arrayContaining([
@@ -209,7 +175,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('drops the mono family from Arabic copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const node = hostText(
-      renderRoot(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
+      mountTextTree(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
     const classes = String(node.props.className).split(' ');
 
@@ -230,7 +196,7 @@ describe('Text eyebrow letterspacing', () => {
 
   it('leaves a non-eyebrow variant untouched in either direction', () => {
     i18nManager.isRTL = true;
-    const classes = hostClasses(renderRoot(createElement(Text, null, 'Live now')));
+    const classes = hostClasses(mountTextTree(createElement(Text, null, 'Live now')));
     expect(classes).not.toContain('uppercase');
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
   });
@@ -238,7 +204,7 @@ describe('Text eyebrow letterspacing', () => {
   it.each([false, true])('applies the same rule to the Eyebrow component (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      renderRoot(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
+      mountTextTree(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
     expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
     if (isRTL) {
@@ -254,6 +220,30 @@ describe('Text eyebrow letterspacing', () => {
   });
 });
 
+// A heading reaches an assistive reader as a heading with its own level, and
+// the two come from one entry per heading: neither can be announced without the
+// other, and a non-heading variant announces neither.
+describe('Text heading accessibility', () => {
+  it.each([
+    ['h1', '1'],
+    ['h2', '2'],
+    ['h3', '3'],
+    ['h4', '4'],
+  ] as const)('announces %s as a heading with level %s', (variant, level) => {
+    const node = hostText(mountTextTree(createElement(Text, { variant }, 'Section')));
+
+    expect(node.props.role).toBe('heading');
+    expect(node.props['aria-level']).toBe(level);
+  });
+
+  it('leaves a non-heading variant without a heading role or level', () => {
+    const node = hostText(mountTextTree(createElement(Text, { variant: 'muted' }, 'Note')));
+
+    expect(node.props.role).toBeUndefined();
+    expect(node.props['aria-level']).toBeUndefined();
+  });
+});
+
 describe('Text mono variant in either interface', () => {
   // The mono variant carries a font that ships no RTL-script glyphs, so
   // RTL-script copy loses the family in either direction while a Latin run such
@@ -261,7 +251,7 @@ describe('Text mono variant in either interface', () => {
   it.each([false, true])('drops the mono family for an Arabic mono variant (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(
-      renderRoot(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
+      mountTextTree(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
     );
 
     expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
@@ -270,7 +260,7 @@ describe('Text mono variant in either interface', () => {
   it('keeps the mono family for a session id in RTL', () => {
     i18nManager.isRTL = true;
     const classes = hostClasses(
-      renderRoot(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b'))
+      mountTextTree(createElement(Text, { variant: 'mono' }, 'ses_9f2c1a7b'))
     );
 
     expect(classes).toContain('font-mono-medium');

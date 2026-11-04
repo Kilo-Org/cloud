@@ -84,12 +84,13 @@ const publicCatalog = { data: [{ id: 'public/model' }] };
 // Load the real Worker implementations at runtime without adding Worker ambient
 // types and their transitive service graph to the web TypeScript project.
 type ValidationEnv = { KILOCODE_BACKEND_BASE_URL: string; NEXTAUTH_SECRET: string };
+const ISOLATED_SANDBOX_ID = `ses-${'a'.repeat(48)}`;
 type TestSessionMetadata = {
   metadataSchemaVersion: 2;
   identity: { sessionId: string; userId: string };
   auth: { kilocodeToken: string };
   agent: { model: string };
-  workspace: Record<string, never>;
+  workspace: { sandboxId: string; sandboxProvider: 'cloudflare-containers' };
   lifecycle: { version: number; timestamp: number };
 };
 const { assertKiloModelAvailable } = jest.requireActual<{
@@ -260,7 +261,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         identity: { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', userId: user.id },
         auth: { kilocodeToken: (await sign(new Date(now - 7200000))).token },
         agent: { model: privateModel },
-        workspace: {},
+        workspace: { sandboxId: ISOLATED_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
         lifecycle: { version: 1, timestamp: now },
       };
       const record: RuntimeAuthorization = {

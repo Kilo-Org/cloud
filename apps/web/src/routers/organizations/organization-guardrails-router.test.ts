@@ -12,7 +12,10 @@ import {
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  createEmptyEnkryptOutputDetectors,
+  createKiloDefaultEnkryptInputDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq } from 'drizzle-orm';
 
@@ -33,7 +36,19 @@ function savedConfig() {
     policy_text: 'Never share customer records.',
     rules: [],
   };
-  return { enabled: true, scan_tool_results: false, detectors };
+  return {
+    enabled: true,
+    scan_tool_results: false,
+    detectors,
+    output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+  };
+}
+
+function savedOutputConfig() {
+  const detectors = createEmptyEnkryptOutputDetectors();
+  detectors.pii = { enabled: true, action: 'block', entities: ['secrets'] };
+  detectors.topic_detector = { enabled: true, action: 'log', topic: ['weapons'] };
+  return { enabled: true, detectors };
 }
 
 describe('organization guardrails router', () => {
@@ -58,7 +73,7 @@ describe('organization guardrails router', () => {
     await addUserToOrganization(organization.id, member.id, 'member');
   });
 
-  it('returns Kilo Default, off, for an organization that never saved guardrails', async () => {
+  it('returns Kilo Default, off, and no response detector for an organization that never saved guardrails', async () => {
     const caller = await createCallerForUser(owner.id);
 
     await expect(
@@ -67,7 +82,9 @@ describe('organization guardrails router', () => {
       enabled: false,
       scan_tool_results: false,
       detectors: createKiloDefaultEnkryptInputDetectors(),
+      output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
       invalid_saved_detectors: false,
+      invalid_saved_output_detectors: false,
     });
   });
 
@@ -80,15 +97,81 @@ describe('organization guardrails router', () => {
       ...config,
     });
 
-    expect(saved).toEqual({ ...config, invalid_saved_detectors: false });
+    expect(saved).toEqual({
+      ...config,
+      invalid_saved_detectors: false,
+      invalid_saved_output_detectors: false,
+    });
     await expect(
       caller.organizations.guardrails.get({ organizationId: organization.id })
     ).resolves.toEqual(saved);
 
+    const { output, ...inputGuardrail } = config;
     const updated = await getOrganizationById(organization.id);
     expect(updated?.settings).toEqual(
-      expect.objectContaining({ data_collection: 'deny', enkrypt: { input_guardrail: config } })
+      expect.objectContaining({
+        data_collection: 'deny',
+        enkrypt: { input_guardrail: inputGuardrail, output_guardrail: output },
+      })
     );
+  });
+
+  it('saves the response guardrail separately from the input guardrail', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const config = { ...savedConfig(), enabled: false, output: savedOutputConfig() };
+
+    const saved = await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...config,
+    });
+
+    expect(saved.output).toEqual(savedOutputConfig());
+    expect(saved.enabled).toBe(false);
+    const updated = await getOrganizationById(organization.id);
+    expect(updated?.settings.enkrypt?.output_guardrail).toEqual(savedOutputConfig());
+    expect(updated?.settings.enkrypt?.input_guardrail).toMatchObject({ enabled: false });
+
+    const [auditLog] = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id))
+      .orderBy(desc(organization_audit_logs.created_at))
+      .limit(1);
+    expect(auditLog.message).toContain(
+      'response checks: enabled; response detectors: pii (block, secrets), topic_detector (log, 1 topics)'
+    );
+    expect(auditLog.message).not.toContain('weapons');
+  });
+
+  it('keeps the saved response guardrail when a save omits it', async () => {
+    const caller = await createCallerForUser(owner.id);
+    await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...savedConfig(),
+      output: savedOutputConfig(),
+    });
+    const { output: _output, ...inputOnly } = savedConfig();
+
+    const saved = await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...inputOnly,
+    });
+
+    expect(saved.output).toEqual(savedOutputConfig());
+    const updated = await getOrganizationById(organization.id);
+    expect(updated?.settings.enkrypt?.output_guardrail).toEqual(savedOutputConfig());
+  });
+
+  it('rejects enabling the response guardrail with no detector', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const config = {
+      ...savedConfig(),
+      output: { enabled: true, detectors: createEmptyEnkryptOutputDetectors() },
+    };
+
+    await expect(
+      caller.organizations.guardrails.update({ organizationId: organization.id, ...config })
+    ).rejects.toThrow('Turn on at least one response detector.');
   });
 
   it('returns trimmed policy text so the saved form matches what was stored', async () => {
@@ -124,7 +207,7 @@ describe('organization guardrails router', () => {
         .limit(1);
       expect(auditLog.action).toBe('organization.settings.change');
       expect(auditLog.message).toBe(
-        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), keyword_detector (block, 2 keywords), policy_violation (policy text)`
+        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), keyword_detector (block, 2 keywords), policy_violation (policy text); response checks: disabled; response detectors: none`
       );
       expect(auditLog.message).not.toContain('Phoenix');
       expect(auditLog.message).not.toContain('customer records');
@@ -244,7 +327,9 @@ describe('organization guardrails router', () => {
       enabled: true,
       scan_tool_results: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
+      output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
       invalid_saved_detectors: true,
+      invalid_saved_output_detectors: false,
     });
     await expect(
       mutateOrganizationSettings(invalidOrganization.id, current => ({
@@ -252,5 +337,27 @@ describe('organization guardrails router', () => {
         data_collection: 'deny',
       }))
     ).resolves.toMatchObject({ data_collection: 'deny' });
+  });
+
+  it('reports invalid saved response detectors', async () => {
+    const invalidOrganization = await createTestOrganization(
+      'Invalid Response Guardrails Org',
+      owner.id,
+      0,
+      {
+        kilo_encrypt: true,
+        enkrypt: { output_guardrail: { enabled: true, detectors: { pii: true } } },
+      },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.guardrails.get({ organizationId: invalidOrganization.id })
+    ).resolves.toMatchObject({
+      output: { enabled: true, detectors: createEmptyEnkryptOutputDetectors() },
+      invalid_saved_detectors: false,
+      invalid_saved_output_detectors: true,
+    });
   });
 });

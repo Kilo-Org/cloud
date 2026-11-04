@@ -116,7 +116,7 @@ export function EnkryptUsageContent() {
         <p className="text-destructive type-body">Unable to load usage records: {error.message}</p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <Stat label="Calls" value={summary ? summary.total_calls.toLocaleString() : '—'} />
         <Stat
           label="Allowed / blocked / error"
@@ -135,10 +135,18 @@ export function EnkryptUsageContent() {
           value={summary ? formatMicrodollars(summary.total_charged_microdollars, 4) : '—'}
         />
         <Stat
-          label="Avg added latency"
+          label="Avg added latency (input)"
           value={
             summary?.avg_added_latency_ms != null
               ? `${Math.round(summary.avg_added_latency_ms)} ms`
+              : '—'
+          }
+        />
+        <Stat
+          label="Avg added latency (output)"
+          value={
+            summary?.avg_output_added_latency_ms != null
+              ? `${Math.round(summary.avg_output_added_latency_ms)} ms`
               : '—'
           }
         />
@@ -160,6 +168,7 @@ export function EnkryptUsageContent() {
                 <TableHead>Organization</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>API</TableHead>
+                <TableHead>Guardrail</TableHead>
                 <TableHead>Decision</TableHead>
                 <TableHead className="text-right">Credits</TableHead>
                 <TableHead className="text-right">Charged</TableHead>
@@ -170,14 +179,14 @@ export function EnkryptUsageContent() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-muted-foreground">
+                  <TableCell colSpan={10} className="text-muted-foreground">
                     Loading usage records…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && data?.rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-muted-foreground">
+                  <TableCell colSpan={10} className="text-muted-foreground">
                     No usage records yet.
                   </TableCell>
                 </TableRow>
@@ -211,6 +220,7 @@ export function EnkryptUsageContent() {
                     </Link>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{row.api_kind}</TableCell>
+                  <TableCell className="font-mono text-xs">{row.guardrail}</TableCell>
                   <TableCell>
                     <DecisionBadge decision={row.decision} />
                   </TableCell>

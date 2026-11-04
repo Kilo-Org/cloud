@@ -34,7 +34,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -215,8 +215,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,
@@ -374,10 +373,8 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   });
 
   it.each([
-    ['cloudflare', true],
     ['cloudflare-containers', true],
     ['vercel', true],
-    ['cloudflare', false],
     ['cloudflare-containers', false],
   ] as const)(
     '%s contained=%s forwards renewed authorization after JWT expiry and allocation replacement',
@@ -409,7 +406,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(handle).toEqual(expect.any(String));
       if (!handle) throw new Error('missing runtime proxy handle');
       expect(JSON.stringify(frame).includes(token)).toBe(false);
-      expect(broker.kiloIssued()).toBe(0);
       expect(frame.spec.runtimeIsolation).toBeUndefined();
       expect(
         await sandboxStub.resolveCredential({
@@ -421,7 +417,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).toBeNull();
       await runInDurableObject(sessionStub, async instance => {
         expect(await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
-          mode: contained ? 'contained' : 'direct',
+          mode: 'contained',
         });
       });
       wrapper.send({ type: 'session.ready', sessionId });
@@ -545,7 +541,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
       await forward(nextHandle);
       expect(destinations).toHaveLength(6);
-      expect(broker.kiloIssued()).toBe(0);
       const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
         new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {

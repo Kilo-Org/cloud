@@ -7,8 +7,8 @@ always processes queued events through the existing Frankfurt writer. Only a
 matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
-The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
-for staging or for the production regional cohorts controlled independently by
+The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
+and `VERCEL_ENV` not `production`) or for production regional cohorts controlled by
 `USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
 The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
 exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
@@ -80,6 +80,11 @@ is attempted. `event_age_ms` is the non-negative age of validated `core.created_
 at the outcome log, including writer wait in processing mode; it is omitted for
 invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
+
+Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
+`usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
+`usage_ingest_processing`) are always emitted; see
+[queue delivery diagnostics](diagnostics.md).
 
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
 of handling that message, independently of writer duration. Selected existing processing
@@ -173,8 +178,8 @@ Redirects are terminal 3xx failures; their targets are never followed.
 ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
 `usageId` and categorical `reason`; accounting returns null and emits no gateway
 persistence completion. This is not durable recovery: unaccepted events may be
-lost, and ambiguous failures may still be recorded later by the consumer. With
-queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
+lost, and ambiguous failures may still be recorded later by the consumer. For
+unselected events, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -388,7 +393,7 @@ attributing any hosted latency effect.
 The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
-both diagnostics and parallelism variables, and the writer target. Keep one
+the parallelism variable, and the writer target. Keep one
 consumer per environment at cap 200 / parallelism 2, with production batch 6 and
 staging batch 2 (at most 400 writer calls each); do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
@@ -397,8 +402,8 @@ checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
-timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
-writer route, retry delay/budget and per-message dispositions.
+timeout 0 and cap 200 for the same single queue. Preserve the current writer
+route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
@@ -443,10 +448,11 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before enabling the launch
-or FRA/SFO cohort controls; a missing Worker secret returns 503.
+Provision and verify the Worker-side publisher secret before selecting staging
+or FRA/SFO cohorts; a missing Worker secret returns 503.
 The HTTP address alone selects no traffic: production selection still requires
-`USAGE_QUEUE_ONLY_ENABLED` and the applicable FRA or SFO cohort controls above.
+both production environment labels, a trusted function region and its applicable
+FRA or SFO cohort controls above.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
@@ -513,3 +519,29 @@ writer credentials and stable identity, ACK after writer completion, duplicate
 ACK, and retry on transport/response failures. No hosted latency or placement
 improvement is claimed. EU routing rollback remains a separate operation in the
 [EU setup](eu-queues.md).
+
+### Authenticated HTTP 400 diagnostics
+
+`usage_ingest_rejected` emits one best-effort warning for each authenticated
+HTTP 400: `missing_body`, `body_read_failure`, `invalid_utf8`, `malformed_json`,
+or `schema_failure`. Statuses, response bodies, validation and queue behavior
+are unchanged. Failed authentication never reads the body or emits this event.
+
+Schema diagnostics contain at most eight issues and an omitted count. Each issue
+has an allowlisted code, a schema-owned path (at most four segments; unknown
+segments stop at `[redacted]`), and allowlisted expected/received type labels.
+Labels are at most 17 characters and path segments at most 26 characters.
+`unknown` covers unsupported expected types, including enum contents; values,
+validator messages, unrecognized-key lists and exception text are never logged.
+Received types use bounded own data-property traversal of parsed JSON only.
+A usage ID is included only after independent validation by the contract's UUID
+schema; body/JSON failures have no usage ID. Log sink/formatting failure is isolated.
+
+In Cloudflare Workers Logs, open the warning's invocation (or join using the
+platform request ID). Read the executing revision from the same invocation's
+`$workers.scriptVersion.id` metadata. This is the deployed Worker version,
+not a Git source SHA; no version binding or configuration change is required.
+The log's own fields intentionally contain no raw request/headers or request ID.
+After a separately authorized rollout, an operator still needs to capture an
+actual rejection and its invocation/version to establish a production cause.
+This diagnostic does not recover missing usage or explain HTTP 409 responses.

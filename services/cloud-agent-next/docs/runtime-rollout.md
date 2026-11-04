@@ -8,20 +8,63 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
-| preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
-| downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
+| preinstalled | all-in-one | `Dockerfile.containers` and pinned build variables |
+| downloaded | all-in-one | `Dockerfile.containers`, exact-SHA runtime descriptor |
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+Downloaded startup supports native Cloudflare Containers and BYOC Vercel. Preinstalled is the native default.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
-path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
+path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
+(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
+next to `RUNTIME_DISTRIBUTION`. The operator build installs the whole set; the Durable Object build
+installs `bun` and the Kilo CLI. Both install from those pins, check the downloaded bytes before
+unpacking or installing, and re-check the tools they installed by exact version and digest before the
+snapshot is created or accepted.
+Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
+
+### BYOC snapshot upgrade timing
+
+The pinned-toolchain installation change keeps the tool versions and base ABI unchanged; it has no
+premerge production prerequisite. Deploy the Worker code first; each enrolled BYOC owner can then
+choose **Upgrade runtime** in Vercel Compute settings
+to build the new snapshot in that owner's Vercel team/project. The authenticated procedures are
+`organizations.vercelCompute.upgradeRuntime` (organization admin, with `organizationId`) and
+`vercelCompute.upgradeRuntime` (the signed-in personal owner). They use the owner's existing encrypted
+Vercel credential and invoke the deployed `VercelSnapshotBuild`; no new global token or snapshot
+environment variable is needed.
+
+A stored runtime digest differing from the deployed identity sets `upgradeAvailable` in the settings
+status. It does not invalidate a ready connection or reject new sessions: provider selection checks
+setup readiness, and the BYOC runtime resolver uses the stored snapshot ID. During an upgrade, the
+old ready snapshot remains selected until the validated replacement is projected as ready. A failed
+upgrade retains the old ready snapshot. New allocations use the replacement after activation;
+already-running allocations are not restarted. This does not waive the fixed-Node-path requirement
+above when deliberately enabling downloaded startup on an older base.
+
+The lifecycle is implemented by the
+[settings router](../../../apps/web/src/routers/organizations/organization-vercel-compute-router.ts),
+[runtime resolver](../src/byoc/vercel-credential-resolver.ts) and
+[upgrade status projection](../../../apps/web/src/lib/cloud-agent-next/vercel-compute-status.ts).
+Check these consumers when deciding whether a future base change requires a coordinated cutover.
+
+The standalone operator harness is a separate provider qualification path:
+`pnpm --filter cloud-agent-next snapshot:vercel build --output <accepted-config.json>`, then
+`pnpm --filter cloud-agent-next snapshot:vercel acceptance --snapshot-id <snapshot-id> --build-id <build-id>`.
+It requires `VERCEL_TOKEN`, `VERCEL_TEAM_ID` and `VERCEL_PROJECT_ID` (environment or service `.dev.vars`;
+team/project may instead be explicit arguments). These commands call the real Vercel API and create
+billable builder/child sandboxes and a retained snapshot. Accepted config JSON is output, not an
+activation of a BYOC connection; it does not update the owner's stored snapshot or digest.
+Do not use the harness as a substitute for an owner's in-app upgrade. Before any authorized live
+qualification, verify the token's actual account, team/project and billing scope; a local command or
+test label alone does not establish isolation. A local provider stand-in proves execution of the
+builder and child scripts, not acceptance by Vercel or activation for a real owner.
 
 A downloaded target can optionally scope its startup to an `interactiveOrgIds` list, rendered as
 `RUNTIME_INTERACTIVE_ORG_IDS`. No current target sets this restriction, so new native and BYOC Vercel
@@ -59,6 +102,10 @@ deployment waits for that handoff. Use a dedicated test organization for real-pr
 the current catalog does not limit downloaded startup to that organization. Record the Worker name,
 exact source SHA, bucket and instance type for each qualification deployment. Broad enrollment does
 not itself establish that the provider checks below passed.
+
+Before deploying a release that removes SDK sandbox bindings, drain every session
+still running on a retired sandbox class. The new Worker cannot stop, inspect or
+reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
    Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that

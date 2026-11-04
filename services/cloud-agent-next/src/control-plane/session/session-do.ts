@@ -43,8 +43,7 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
-  hasRetiredDevcontainerRuntime,
-  DEVCONTAINER_RETIRED_MESSAGE,
+  retiredRuntimeMessage,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -854,7 +853,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -916,7 +915,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -1116,11 +1115,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    const containment = this.registration?.sandboxSelection?.containment;
-    const contained =
-      containment === undefined
-        ? this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
-        : containment.kilocode || containment.github;
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
@@ -1128,7 +1122,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       authorization: authorization.success ? authorization.data : null,
       fence,
       token,
-      mode: contained ? 'contained' : 'direct',
+      mode: 'contained',
     });
   }
 
@@ -2723,7 +2717,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
-    if (await this.failRetiredQueuedMessages()) return;
+    if (await this.failRetiredPendingMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -2815,19 +2809,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.persistQueuedContainer(container);
   }
 
-  private async failRetiredQueuedMessages(): Promise<boolean> {
-    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+  private async failRetiredPendingMessages(): Promise<boolean> {
+    if (this.metadata === null) return false;
+    const reason = retiredRuntimeMessage(this.metadata);
+    if (reason === null) return false;
     await this.settleMessages(
-      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      openMessages(this.messages).map(message => message.messageId),
       'failed',
-      DEVCONTAINER_RETIRED_MESSAGE
+      reason
     );
     this.finishWorktreePreparation();
     return true;
   }
 
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
-    if (await this.failRetiredQueuedMessages()) return null;
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;
@@ -2861,6 +2857,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     pass: TransportPass,
     ownerHint?: ControlPlaneRouteUpdate
   ): Promise<void> {
+    if (await this.failRetiredPendingMessages()) return;
     if (!this.messages.some(message => message.state === 'queued')) return;
     let view = await this.readSandboxView(pass);
     if (view === null) return;
@@ -2916,6 +2913,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async readSandboxView(pass: TransportPass): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     if (peer === null) {
       await this.scheduleTransportRecovery(pass);

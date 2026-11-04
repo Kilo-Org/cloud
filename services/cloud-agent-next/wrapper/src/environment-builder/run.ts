@@ -45,6 +45,8 @@ import type { BuildReporter } from './reporter.js';
  * the build credential and runtime-owned names, then the environment's
  * variables and secrets, then the fixed home and the XDG directories under it,
  * as a session's setup sees them, so caches land in the same paths.
+ * `KILO_ENVIRONMENT_BUILD=1` tells setup it runs in the builder; the reserved
+ * `KILO` prefix keeps environment variables from setting it.
  */
 export function builderSetupEnvironment(input: {
   inherited: NodeJS.ProcessEnv;
@@ -81,6 +83,7 @@ export function builderSetupEnvironment(input: {
     ...SYSTEM_GIT_CONFIG_ENV,
     ...(input.isV2 ? MULTI_MEMBER_GIT_CREDENTIAL_ENV : {}),
     GIT_TERMINAL_PROMPT: '0',
+    KILO_ENVIRONMENT_BUILD: '1',
   };
 }
 

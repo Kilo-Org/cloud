@@ -6,7 +6,6 @@ import type { SandboxId, TRPCContext } from '../../types.js';
 
 const { queryAccess } = vi.hoisted(() => ({ queryAccess: vi.fn() }));
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn(() => ({})) }));
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
   queryAccessibleCloudAgentSession: queryAccess,

@@ -983,10 +983,6 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next check:duplication
 
-      - name: Run cloud-agent-next SDK provenance tests
-        if: matrix.part == 'other'
-        run: pnpm --filter cloud-agent-next test:sdk-provenance
-
       - name: Run the wrapper process tests
         if: matrix.part == 'wrapper-process'
         working-directory: services/cloud-agent-next/wrapper

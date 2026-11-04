@@ -108,13 +108,16 @@ jest.mock(
     getOrganizationGroupPolicyContext: mockGetContext,
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  ).allowsInferenceProviderUserByok,
-  evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
-  getEffectiveModelDecision: mockDecision,
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ).allowsInferenceProviderUserByok,
+    evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
+    getEffectiveModelDecision: mockDecision,
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
   listAvailableCustomLlms: mockCustom,
 }));

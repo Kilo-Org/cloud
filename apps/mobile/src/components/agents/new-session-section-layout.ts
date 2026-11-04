@@ -1,5 +1,3 @@
-import { NARROW_LAYOUT_WIDTH } from '@/lib/narrow-layout';
-
 /**
  * How the New Session form lays out the sections above the repository picker on
  * a short window.
@@ -25,13 +23,17 @@ import { NARROW_LAYOUT_WIDTH } from '@/lib/narrow-layout';
  * are short too and take the row, and only a window taller than the threshold
  * keeps the stacked heading.
  *
- * The width gate is the one `narrow-layout` already draws for every side-by-side
- * row: below 240 dp the fixed heading leaves the control no room for a word, so
- * those windows keep the stacked layout and simply scroll the picker into view.
- * An unknown width keeps the stacked form for the same reason — the compact row
- * is the exception, never the default.
+ * The width gate is the narrowest common phone (320 dp), the width `narrow-layout`
+ * names as the design target. The heading shares its row with the control at
+ * most 45% of the width, so on a narrower window — a split-screen pane, a
+ * foldable's cover display, a large display-size override — a long localized
+ * name no longer fits one word and would break mid-word. Those windows keep the
+ * stacked layout and simply scroll the picker into view. An unknown width keeps
+ * the stacked form for the same reason: the compact row is the exception, never
+ * the default.
  */
 export const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
+export const NEW_SESSION_INLINE_SECTION_MIN_WINDOW_WIDTH = 320;
 
 export function resolveNewSessionInlineSections(
   windowWidth: number,
@@ -39,7 +41,7 @@ export function resolveNewSessionInlineSections(
 ): boolean {
   return (
     Number.isFinite(windowWidth) &&
-    windowWidth >= NARROW_LAYOUT_WIDTH &&
+    windowWidth >= NEW_SESSION_INLINE_SECTION_MIN_WINDOW_WIDTH &&
     Number.isFinite(windowHeight) &&
     windowHeight > 0 &&
     windowHeight < NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT

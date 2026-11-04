@@ -35,10 +35,14 @@ describe('resolveNewSessionInlineSections', () => {
     expect(resolveNewSessionInlineSections(1024, 600)).toBe(true);
   });
 
-  it('keeps the stacked heading where a fixed heading would starve the control', () => {
-    // `narrow-layout`'s threshold: below 240 dp the heading beside a `flex-1`
-    // control leaves it no room for a word, so those windows scroll instead.
-    expect(resolveNewSessionInlineSections(239, 640)).toBe(false);
+  it('keeps the stacked heading where a shortened heading would break a word', () => {
+    // The narrowest common phone is the smallest row that still holds one word
+    // of a long localized heading in its 45% share; below it, and on the
+    // split-screen and cover-display windows the repo names, the form scrolls
+    // the picker into view instead.
+    expect(resolveNewSessionInlineSections(320, 640)).toBe(true);
+    expect(resolveNewSessionInlineSections(319, 640)).toBe(false);
+    expect(resolveNewSessionInlineSections(240, 640)).toBe(false);
     expect(resolveNewSessionInlineSections(160, 640)).toBe(false);
   });
 

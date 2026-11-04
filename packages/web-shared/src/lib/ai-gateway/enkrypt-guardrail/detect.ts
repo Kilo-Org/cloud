@@ -14,6 +14,7 @@ import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-ga
 import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 type ReadyEnkryptInputGuardrailConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
 
@@ -104,6 +105,10 @@ export type EnkryptDetectDependencies = {
   fetch: typeof fetch;
   timeoutMs: number;
   signal: AbortSignal;
+  requestLog?: {
+    guardrail: EnkryptRequestLog['guardrail'];
+    capture: (entry: Promise<EnkryptRequestLog>) => void;
+  };
 };
 
 type DetectError =
@@ -183,8 +188,17 @@ function abortError(signal: AbortSignal, deps: EnkryptDetectDependencies): Detec
 async function detectOnce(
   body: string,
   signal: AbortSignal,
-  deps: EnkryptDetectDependencies & { apiKey: string }
+  deps: EnkryptDetectDependencies & { apiKey: string },
+  requestLog: EnkryptRequestLog | undefined
 ): Promise<DetectAttempt> {
+  const finish = (attempt: DetectAttempt): DetectAttempt => {
+    if (requestLog) {
+      requestLog.error = attempt.kind === 'failed' ? attempt.error : null;
+      deps.requestLog?.capture(capturedBody.then(() => requestLog));
+    }
+    return attempt;
+  };
+  let capturedBody = Promise.resolve();
   let response: Response;
   try {
     response = await deps.fetch(ENKRYPT_DETECT_URL, {
@@ -195,52 +209,66 @@ async function detectOnce(
     });
   } catch {
     const aborted = abortError(signal, deps);
-    return aborted
-      ? { kind: 'failed', error: aborted, retryable: false, creditsCost: null }
-      : { kind: 'failed', error: 'network', retryable: true, creditsCost: null };
+    return finish(
+      aborted
+        ? { kind: 'failed', error: aborted, retryable: false, creditsCost: null }
+        : { kind: 'failed', error: 'network', retryable: true, creditsCost: null }
+    );
   }
+  if (requestLog) requestLog.status_code = response.status;
   const creditsCost = parseCreditsCost(response);
   if (!response.ok) {
-    await response.body?.cancel().catch(() => {});
-    return {
+    if (requestLog) {
+      capturedBody = response.text().then(
+        text => {
+          requestLog.response = text;
+        },
+        () => {}
+      );
+    } else {
+      await response.body?.cancel().catch(() => {});
+    }
+    return finish({
       kind: 'failed',
       error: `http_${response.status}`,
       // An immediate retry of a 429 would hit the same limiter within the deadline.
       retryable: response.status >= 500,
       creditsCost,
-    };
+    });
   }
   let json: unknown;
   try {
-    json = await response.json();
+    const text = await response.text();
+    if (requestLog) requestLog.response = text;
+    json = JSON.parse(text);
   } catch {
-    return {
+    return finish({
       kind: 'failed',
       error: abortError(signal, deps) ?? 'invalid_response',
       retryable: false,
       creditsCost,
-    };
+    });
   }
   const parsed = detectResponseSchema.safeParse(json);
   if (!parsed.success) {
-    return { kind: 'failed', error: 'invalid_response', retryable: false, creditsCost };
+    return finish({ kind: 'failed', error: 'invalid_response', retryable: false, creditsCost });
   }
   const erroredDetectors = matchingDetectors(parsed.data.summary, hasErrored);
   if (erroredDetectors.length > 0) {
-    return {
+    return finish({
       kind: 'failed',
       error: `detector_error:${erroredDetectors.join(',')}`,
       // The known cause is deterministic, so an immediate retry would fail again and be charged again.
       retryable: false,
       creditsCost,
-    };
+    });
   }
-  return {
+  return finish({
     kind: 'detected',
     firedDetectors: matchingDetectors(parsed.data.summary, hasFired),
     resultMessage: parsed.data.result_message ?? null,
     creditsCost,
-  };
+  });
 }
 
 function sanitizeBlockMessage(message: string | null): string | null {
@@ -352,17 +380,28 @@ export async function scanRequest(
     return failedVerdict([], scope, { error: 'missing_api_key', latencyMs: 0 });
   }
 
-  const body = JSON.stringify({
+  const request = {
     text,
     detectors: config.detectors,
     user_metadata: { organization_id: scan.organizationId },
-  });
+  };
+  const body = JSON.stringify(request);
   const signal = AbortSignal.any([deps.signal, AbortSignal.timeout(deps.timeoutMs)]);
   const startedAt = performance.now();
   const attempts: DetectAttempt[] = [];
   let attempt: DetectAttempt;
   do {
-    attempt = await detectOnce(body, signal, { ...deps, apiKey });
+    const requestLog: EnkryptRequestLog | undefined = deps.requestLog
+      ? {
+          guardrail: deps.requestLog.guardrail,
+          scan: kind,
+          request,
+          response: null,
+          status_code: null,
+          error: null,
+        }
+      : undefined;
+    attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
     attempts.push(attempt);
   } while (
     attempt.kind === 'failed' &&

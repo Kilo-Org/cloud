@@ -26,6 +26,7 @@ import {
   type EnkryptOutputScan,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
 import type { EnkryptOutputGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 type RespondInput = {
   upstream: Extract<Awaited<ReturnType<typeof sendUpstreamAttempt>>, { type: 'success' }>;
@@ -153,6 +154,17 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     return errorResponse;
   }
 
+  let outputRequestLogs: (() => Promise<EnkryptRequestLog[]>) | undefined;
+  const logging: RequestLoggingParams = {
+    ...input.logging,
+    enkrypt: async () => {
+      const [inputLogs, outputLogs] = await Promise.all([
+        input.logging.enkrypt?.(),
+        outputRequestLogs?.(),
+      ]);
+      return [...(inputLogs ?? []), ...(outputLogs ?? [])];
+    },
+  };
   return await guardEnkryptOutput({
     response,
     scan: input.enkryptOutputScan,
@@ -168,17 +180,20 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
         isFree: usageContext.is_free,
         userByok: usageContext.user_byok,
         customLlmPricing: usageContext.custom_llm_pricing,
-        logging: input.logging,
+        logging,
         responseTransforms: provider.responseTransforms,
       }),
     captureReport: input.captureEnkryptOutputReport,
+    captureRequestLogs: logs => {
+      outputRequestLogs = logs;
+    },
     onReject: async (rejection, verdict) => {
       if (input.signal.aborted) return;
       await logUnrewrittenResponse({
         response: rejection.clone(),
         model,
         providerId: provider.type,
-        logging: input.logging,
+        logging,
         error: { guardrail_rejection: verdict.action, guardrail: 'output' },
       });
     },

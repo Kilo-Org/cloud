@@ -448,6 +448,7 @@ export async function handleLlmProxyRequest(
     session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
+    enkrypt: enkryptGuardrail.requestLogs,
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(

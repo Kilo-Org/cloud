@@ -10,10 +10,26 @@ export type ApiRequestLogBlobUpload = {
   uploadError: string | null;
 };
 
+export const enkryptRequestLogSchema = z.object({
+  guardrail: z.enum(['input', 'output']),
+  scan: z.enum(['blocking', 'log_only']),
+  request: z.object({
+    text: z.string(),
+    detectors: z.record(z.string(), z.unknown()),
+    user_metadata: z.object({ organization_id: z.string() }),
+  }),
+  response: z.string().nullable(),
+  status_code: z.number().nullable(),
+  error: z.string().nullable(),
+});
+
+export type EnkryptRequestLog = z.infer<typeof enkryptRequestLogSchema>;
+
 export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
+  enkrypt: z.array(enkryptRequestLogSchema).optional(),
 });
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };
@@ -46,16 +62,21 @@ function getStorage(): ApiRequestLogStorage {
 export async function uploadApiRequestLogBlobs({
   request,
   response,
+  enkrypt,
 }: {
   request: Record<string, unknown>;
   response: string | undefined;
+  enkrypt?: EnkryptRequestLog[];
 }): Promise<ApiRequestLogBlobUpload> {
   try {
     const { client, bucket } = getStorage();
     const key = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}/record.v1.json`;
-    const body = { version: 1, request, response: response ?? null } satisfies z.infer<
-      typeof apiRequestLogBlobSchema
-    >;
+    const body = {
+      version: 1,
+      request,
+      response: response ?? null,
+      ...(enkrypt?.length ? { enkrypt } : {}),
+    } satisfies z.infer<typeof apiRequestLogBlobSchema>;
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,

@@ -92,6 +92,7 @@ function isJson(value: unknown): boolean {
 }
 
 type LoadedBody = { value: string | null } | { loadError: string };
+type LoadedBodies = { request: LoadedBody; response: LoadedBody; enkrypt?: LoadedBody };
 
 async function loadBody(key: string | null): Promise<LoadedBody> {
   if (key === null) {
@@ -415,7 +416,7 @@ export async function GET(request: NextRequest) {
       if (rows.length === 0) break;
 
       const bodies = await Promise.all(
-        rows.map(async (row): Promise<{ request: LoadedBody; response: LoadedBody }> => {
+        rows.map(async (row): Promise<LoadedBodies> => {
           if (row.request_r2_key !== null && row.request_r2_key === row.response_r2_key) {
             const body = await loadBody(row.request_r2_key);
             if ('loadError' in body) {
@@ -432,6 +433,9 @@ export async function GET(request: NextRequest) {
               return {
                 request: { value: JSON.stringify(blob.request) },
                 response: { value: blob.response },
+                ...(blob.enkrypt?.length
+                  ? { enkrypt: { value: JSON.stringify(blob.enkrypt) } }
+                  : {}),
               };
             } catch {
               const failure = {

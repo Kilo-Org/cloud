@@ -11,6 +11,7 @@ import {
   type EnkryptUnavailableReason,
 } from './detect';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from './usage-write';
+import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 const mockedWarnExceptInTest = jest.fn();
 
@@ -516,6 +517,121 @@ describe('scanRequest', () => {
     } finally {
       timeout.mockRestore();
     }
+  });
+
+  it.each([402, 503])(
+    'does not wait for a slow HTTP %i body before deciding or retrying',
+    async status => {
+      const body = Promise.withResolvers<string>();
+      const response = new Response(null, { status });
+      jest.spyOn(response, 'text').mockReturnValue(body.promise);
+      const calls: Promise<EnkryptRequestLog>[] = [];
+      let attempts = 0;
+      const dependencies = deps(
+        async () => (attempts++ === 0 ? response : detectResponse({ summary: {} })),
+        {
+          requestLog: {
+            guardrail: 'input',
+            capture: entry => {
+              calls.push(entry);
+            },
+          },
+        }
+      );
+
+      try {
+        const result = await scanRequest(makeScan(), dependencies);
+
+        expect(result.verdict.action).toBe(status === 503 ? 'allow' : 'unavailable');
+        expect(dependencies.fetch).toHaveBeenCalledTimes(status === 503 ? 2 : 1);
+        let captured = false;
+        void calls[0].then(() => {
+          captured = true;
+        });
+        await Promise.resolve();
+        expect(captured).toBe(false);
+        body.resolve('{ "detail": "raw error body" }');
+        expect((await Promise.all(calls))[0]).toMatchObject({
+          guardrail: 'input',
+          scan: 'blocking',
+          response: '{ "detail": "raw error body" }',
+          status_code: status,
+          error: `http_${status}`,
+        });
+      } finally {
+        body.resolve('');
+      }
+    }
+  );
+
+  it.each([
+    ['not json', 'invalid_response'],
+    [
+      '{"summary":{"injection_attack":-1},"vendor_detail":"raw"}',
+      'detector_error:injection_attack',
+    ],
+  ])(
+    'captures invalid responses verbatim without adding payloads to reports: %s',
+    async (body, error) => {
+      const calls: Promise<EnkryptRequestLog>[] = [];
+      const result = await scanRequest(
+        makeScan(),
+        deps(async () => new Response(body), {
+          requestLog: {
+            guardrail: 'output',
+            capture: entry => {
+              calls.push(entry);
+            },
+          },
+        })
+      );
+
+      expect(await Promise.all(calls)).toEqual([
+        {
+          guardrail: 'output',
+          scan: 'blocking',
+          request: {
+            text: 'tool output',
+            detectors: config.detectors,
+            user_metadata: { organization_id: makeScan().organizationId },
+          },
+          response: body,
+          status_code: 200,
+          error,
+        },
+      ]);
+      expect(JSON.stringify(result.report)).not.toContain(body);
+      expect(JSON.stringify(result.report)).not.toContain('tool output');
+    }
+  );
+
+  it('captures normalized network failures without exception messages or API keys', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    await scanRequest(
+      makeScan(),
+      deps(
+        async () => {
+          throw new Error('test-enkrypt-key');
+        },
+        {
+          requestLog: {
+            guardrail: 'input',
+            capture: entry => {
+              calls.push(entry);
+            },
+          },
+        }
+      )
+    );
+
+    const captured = await Promise.all(calls);
+    expect(captured).toHaveLength(2);
+    expect(captured).toEqual([
+      expect.objectContaining({ response: null, status_code: null, error: 'network' }),
+      expect.objectContaining({ response: null, status_code: null, error: 'network' }),
+    ]);
+    expect(JSON.stringify(captured)).not.toContain('test-enkrypt-key');
+    expect(JSON.stringify(captured)).not.toContain('apikey');
   });
 
   describe('client cancellation', () => {

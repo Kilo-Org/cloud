@@ -25,6 +25,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 const notScanned: EnkryptCachedScanResult = {
   verdict: { action: 'skip' },
@@ -47,6 +48,7 @@ export type EnkryptInputGuardrail = {
    * for every scan and verdict cache write, so call it after the response, like `after()` work.
    */
   report(): Promise<EnkryptGuardrailReport | null>;
+  requestLogs(): Promise<EnkryptRequestLog[]>;
 };
 
 type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
@@ -98,6 +100,7 @@ export function startEnkryptInputGuardrail(
   scan: Promise<EnkryptGuardrailRequest | null>,
   signal: AbortSignal
 ): EnkryptInputGuardrail {
+  const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null
   ): Promise<EnkryptCachedScanResult> =>
@@ -108,6 +111,7 @@ export function startEnkryptInputGuardrail(
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
           signal,
           store: verdictCacheStore,
+          requestLog: { guardrail: 'input', capture: entry => requestLogs.push(entry) },
         })
       : notScanned;
   const scans = scan.then(splitScan);
@@ -170,6 +174,10 @@ export function startEnkryptInputGuardrail(
     );
   });
   return {
+    async requestLogs() {
+      await Promise.all([blockingResult, logOnlyResult]);
+      return Promise.all(requestLogs);
+    },
     async awaitVerdict() {
       const waitStartedAt = performance.now();
       const { verdict } = await blockingResult;

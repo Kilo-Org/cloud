@@ -23,6 +23,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  apiRequestLogBlobSchema,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import type { RewriteResponseParams } from './rewriteModelResponse.shared';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
@@ -3111,6 +3115,121 @@ describe('api_request_log storage', () => {
       response: JSON.stringify({ error: 'upstream error' }),
     });
   });
+
+  test('awaits Enkrypt calls only in after() and stores them with the request and response in one PUT', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    const pending = Promise.withResolvers<EnkryptRequestLog[]>();
+    const getterStarted = Promise.withResolvers<void>();
+    const enkrypt = jest.fn(() => {
+      getterStarted.resolve();
+      return pending.promise;
+    });
+    const calls: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        request: {
+          text: 'hello',
+          detectors: { injection_attack: { enabled: true, need_explanation: false } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "injection_attack": 0 }, "vendor_detail": "raw input" }',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        request: {
+          text: 'hello back',
+          detectors: { pii: { enabled: true, entities: ['secrets'] } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "pii": 0 }, "vendor_detail": "raw output" }',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    } satisfies GatewayRequest;
+    const upstream = { model: 'upstream-model', choices: [] };
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    const response = await rewriteModelResponse({
+      response: jsonResponse(upstream),
+      model: request.body.model,
+      providerId: 'custom',
+      kind: request.kind,
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging({ vercel_request_id: vercelRequestId, request, enkrypt }),
+      responseTransforms: null,
+    });
+    await response.text();
+
+    expect(enkrypt).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    const persisted = runScheduledLogInsert();
+    await getterStarted.promise;
+    try {
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+    } finally {
+      pending.resolve(calls);
+      await persisted;
+    }
+
+    const row = await selectLoggedRow();
+    expect(enkrypt).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(row.response_r2_key).toBe(row.request_r2_key);
+    expect(fakeR2.objects.size).toBe(1);
+    expect(
+      apiRequestLogBlobSchema.parse(
+        JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')
+      )
+    ).toEqual({
+      version: 1,
+      request: request.body,
+      response: JSON.stringify(upstream),
+      enkrypt: calls,
+    });
+  });
+
+  test.each([null, 'errors_only'] as const)(
+    'does not invoke the Enkrypt getter for a successful response with logging mode %s',
+    async mode => {
+      const send = jest.spyOn(fakeR2, 'send');
+      const enkrypt = jest.fn(async (): Promise<EnkryptRequestLog[]> => []);
+      mockedOptIn.mockResolvedValueOnce(mode);
+      const response = await rewriteModelResponse({
+        response: jsonResponse({ model: 'upstream-model', choices: [] }),
+        model: 'kilo-internal/my-model',
+        providerId: 'custom',
+        kind: 'chat_completions',
+        isFree: true,
+        userByok: false,
+        customLlmPricing: null,
+        logging: makeLogging({ vercel_request_id: vercelRequestId, enkrypt }),
+        responseTransforms: null,
+      });
+      await response.text();
+      if (mode !== null) await runScheduledLogInsert();
+
+      expect(enkrypt).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+      expect(fakeR2.objects.size).toBe(0);
+      if (mode === null) expect(mockedAfter).not.toHaveBeenCalled();
+    }
+  );
 
   test('keeps the log row and records the failure when the R2 upload fails', async () => {
     jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));

@@ -12,7 +12,10 @@ import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gatewa
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
-import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
+import {
+  uploadApiRequestLogBlobs,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { after, type NextResponse } from 'next/server';
 import type {
   RequestLogCapture,
@@ -28,6 +31,7 @@ export type RequestLoggingParams = {
   session_id: string | null;
   vercel_request_id: string | null;
   request: GatewayRequest;
+  enkrypt?: () => Promise<EnkryptRequestLog[]>;
 };
 
 export type LogUnrewrittenResponseParams = {
@@ -136,6 +140,7 @@ async function createRequestLogCapture(
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
         request: redactApiRequestLogRequest(request),
         response: responseText,
+        enkrypt: await logging.enkrypt?.(),
       });
       const r2UploadError = uploadError?.substring(0, 4000);
       if (r2UploadError !== undefined) {

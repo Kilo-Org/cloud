@@ -48,6 +48,7 @@ function OrganizationFeaturesPreview({
   const parsed = OrganizationFeaturesInputSchema.safeParse({
     experimental_byok: parseOrganizationIds(values.experimental_byok),
     gateway_settings: parseOrganizationIds(values.gateway_settings),
+    request_logs: parseOrganizationIds(values.request_logs),
   });
   const features = parsed.success ? parsed.data : DEFAULT_ORGANIZATION_FEATURES;
   const hasOrganizations = ORGANIZATION_FEATURES.some(feature => features[feature].length > 0);

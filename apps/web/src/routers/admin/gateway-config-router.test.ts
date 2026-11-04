@@ -142,6 +142,7 @@ describe('adminGatewayConfigRouter', () => {
       const preview = await caller.admin.gatewayConfig.previewOrganizationFeatures({
         experimental_byok: [first.id.toUpperCase(), first.id],
         gateway_settings: [first.id.toUpperCase(), second.id.toUpperCase(), second.id],
+        request_logs: [],
       });
 
       expect(preview).toHaveLength(2);
@@ -163,6 +164,7 @@ describe('adminGatewayConfigRouter', () => {
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [crypto.randomUUID()],
           gateway_settings: [organization.id, crypto.randomUUID()],
+          request_logs: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
     });
@@ -179,6 +181,7 @@ describe('adminGatewayConfigRouter', () => {
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
           gateway_settings: [],
+          request_logs: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: true }]);
     });
@@ -190,12 +193,13 @@ describe('adminGatewayConfigRouter', () => {
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
           gateway_settings: [],
+          request_logs: [],
         })
       ).resolves.toEqual([]);
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     });
 
-    it.each(['experimental_byok', 'gateway_settings'] as const)(
+    it.each(['experimental_byok', 'gateway_settings', 'request_logs'] as const)(
       'rejects invalid IDs in %s without writing configuration',
       async feature => {
         const caller = await createCallerForUser(admin.id);
@@ -204,6 +208,7 @@ describe('adminGatewayConfigRouter', () => {
           caller.admin.gatewayConfig.previewOrganizationFeatures({
             experimental_byok: [],
             gateway_settings: [],
+            request_logs: [],
             [feature]: ['not-an-id'],
           })
         ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
@@ -211,7 +216,7 @@ describe('adminGatewayConfigRouter', () => {
       }
     );
 
-    it.each(['experimental_byok', 'gateway_settings'] as const)(
+    it.each(['experimental_byok', 'gateway_settings', 'request_logs'] as const)(
       'rejects more than 1000 entries in %s before deduplication',
       async feature => {
         const caller = await createCallerForUser(admin.id);
@@ -220,6 +225,7 @@ describe('adminGatewayConfigRouter', () => {
           caller.admin.gatewayConfig.previewOrganizationFeatures({
             experimental_byok: [],
             gateway_settings: [],
+            request_logs: [],
             [feature]: Array.from(
               { length: ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT + 1 },
               () => '9d278969-5453-4ae3-a51f-a8d2274a7b56'
@@ -237,6 +243,7 @@ describe('adminGatewayConfigRouter', () => {
       await caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: [],
         gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+        request_logs: [],
       });
       const beforePreview = await db.select().from(ai_gateway_config);
 
@@ -244,6 +251,7 @@ describe('adminGatewayConfigRouter', () => {
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
           gateway_settings: [],
+          request_logs: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
 
@@ -259,6 +267,7 @@ describe('adminGatewayConfigRouter', () => {
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
           gateway_settings: [],
+          request_logs: [],
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);

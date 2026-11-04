@@ -86,6 +86,7 @@ describe('TRPCContext transport', () => {
     const input = {
       experimental_byok: Array.from({ length: 1000 }, () => crypto.randomUUID()),
       gateway_settings: Array.from({ length: 1000 }, () => crypto.randomUUID()),
+      request_logs: Array.from({ length: 1000 }, () => crypto.randomUUID()),
     };
 
     if (skipBatch === undefined) {

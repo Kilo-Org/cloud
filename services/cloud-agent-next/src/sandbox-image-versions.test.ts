@@ -3,11 +3,14 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { runtimeDistributionSourceFiles } from '../scripts/runtime-manifest.js';
 import { DEFAULT_SLASH_COMMANDS_SOURCE } from './shared/default-slash-commands.generated.js';
 import { KILO_CLI_VERSION } from './shared/kilo-cli-version.js';
 import {
+  CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
+  RUNTIME_INSTALL_DIR,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
 } from './shared/runtime-distribution.js';
@@ -54,6 +57,18 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
     expect(RUNTIME_DISTRIBUTION.gh).toBe('2.103.3');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
+    const e2eWorkflow = readServiceFile('../../../.github/workflows/cloud-agent-e2e-deploy.yml');
+    const bunSetup = 'uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6';
+    expect(e2eWorkflow.match(/uses: oven-sh\/setup-bun@\S+/g)).toEqual([bunSetup]);
+    expect(e2eWorkflow.match(/bun-version: \S+/g)).toEqual([
+      `bun-version: ${RUNTIME_DISTRIBUTION.bun}`,
+    ]);
+    expect(e2eWorkflow.indexOf(bunSetup)).toBeLessThan(
+      e2eWorkflow.indexOf('name: Deploy fake-LLM Worker')
+    );
+    expect(e2eWorkflow.indexOf(bunSetup)).toBeLessThan(
+      e2eWorkflow.indexOf('name: Deploy Cloud Agent e2e Worker')
+    );
   });
 
   it('keeps wrapper Bun types aligned with the runtime', () => {
@@ -64,13 +79,40 @@ describe('runtime distribution packaging', () => {
     expect(wrapperPackageJson.devDependencies['@types/bun']).toBe(RUNTIME_DISTRIBUTION.bun);
   });
 
-  it('builds wrapper bundles from the shared entrypoint list instead of duplicate commands', () => {
-    const dockerfile = readServiceFile(containersDockerfile);
-    expect(dockerfile).toContain('bun run build.ts --install-dir');
-    expect(dockerfile).not.toContain('bun build');
+  it('copies the prebuilt shared runtime inventory without rebuilding wrappers in any image', () => {
+    const inventory = runtimeDistributionSourceFiles('/package');
+    expect(inventory.map(artifact => artifact.installName)).toEqual([
+      ...WRAPPER_BUNDLES.map(bundle => bundle.installName),
+      CONTROL_PLANE_SUPERVISOR.installName,
+      GIT_CREDENTIAL_HELPER.installName,
+    ]);
     for (const bundle of WRAPPER_BUNDLES) {
-      expect(dockerfile).not.toContain(`outfile=/usr/local/bin/${bundle.installName}`);
+      expect(inventory).toContainEqual({
+        installName: bundle.installName,
+        installPath: runtimeInstallPath(bundle.installName),
+        executable: bundle.executable,
+        localPath: `/package/wrapper/dist/${bundle.distName}`,
+      });
     }
+    expect(inventory).toContainEqual({
+      installName: CONTROL_PLANE_SUPERVISOR.installName,
+      installPath: runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName),
+      executable: true,
+      localPath: `/package/wrapper/${CONTROL_PLANE_SUPERVISOR.wrapperPath}`,
+    });
+    const builder = readServiceFile('../wrapper/build.ts');
+    expect(builder).toContain("const runtimeDir = resolve('dist/runtime')");
+    expect(builder).toContain(
+      'copyFile(resolve(artifactDir, bundle.installName), resolve(runtimeDir, bundle.installName))'
+    );
+    expect(builder).toContain('resolve(runtimeDir, CONTROL_PLANE_SUPERVISOR.installName)');
+    const dockerfile = readServiceFile(containersDockerfile);
+    expect(dockerfile.match(/^COPY wrapper\S* .*$/gm)).toEqual([
+      `COPY wrapper/dist/runtime/ ${RUNTIME_INSTALL_DIR}/`,
+    ]);
+    expect(dockerfile).not.toMatch(/\bbun (?:build|install|run build\.ts)\b/);
+    expect(dockerfile).not.toContain('COPY src/shared');
+    expect(dockerfile).not.toContain('SENTRY_AUTH_TOKEN');
   });
 
   it('keeps Docker bootstrap ARG pins aligned with the contract', () => {

@@ -718,6 +718,7 @@ describe('production session host composition', () => {
       expect(f.host.getHeartbeat().active).toBe(true);
       f.event(feed, 'session.status', { sessionID: 'ses_other', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_other', reason: 'completed' });
+      await settle();
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.dispose();

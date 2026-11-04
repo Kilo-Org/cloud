@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,8 @@ function patchEnv(name: string, updates: Record<string, string>) {
   while (kept.at(-1) === '') kept.pop();
   for (const [key, value] of Object.entries(updates)) kept.push(`${key}=${JSON.stringify(value)}`);
   writeFileSync(filename, `${kept.join('\n')}\n`, { mode: 0o600 });
+  // `mode` applies only on creation; the file usually exists already.
+  chmodSync(filename, 0o600);
 }
 
 class LocalSetupError extends Error {}

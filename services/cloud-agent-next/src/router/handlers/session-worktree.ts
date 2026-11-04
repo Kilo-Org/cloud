@@ -36,6 +36,7 @@ import { getPgDb } from '../../db/pg.js';
 import {
   CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
+  retiredRuntimeMessage,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
@@ -332,8 +333,7 @@ async function loadSourceMetadata(
     (requirements.requireSourceScopeId !== undefined &&
       ownership.cloudAgentSessionScopeId !== requirements.requireSourceScopeId) ||
     metadata.identity.botId !== undefined ||
-    metadata.devcontainer !== undefined ||
-    workspace.devcontainerRequested === true ||
+    retiredRuntimeMessage(metadata) !== null ||
     workspace.worktreeId !== worktreeId ||
     workspace.workspacePath !==
       getWorktreeWorkspacePath(requirements.organizationId, ctx.userId, worktreeId) ||
@@ -675,13 +675,14 @@ async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<v
   if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
 }
 
+/**
+ * A source on a retired runtime, including a legacy shared sandbox, never loads
+ * (`loadSourceMetadata`), so the sandbox needs no check here.
+ */
 function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
   return (
     source.metadata.allowSubagentSessions !== false &&
-    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform) &&
-    source.workspace.sandboxAllocation !== 'cloudflare-shared' &&
-    source.workspace.sandboxKind !== 'shared' &&
-    source.workspace.sandboxRoute?.kind !== 'shared'
+    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform)
   );
 }
 

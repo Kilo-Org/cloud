@@ -12,6 +12,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
 
 type DoltHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -27,11 +28,11 @@ const dolthubConnectionErrorMessages: Record<string, string> = {
 };
 
 function describeConnectionError(error: string): string {
-  // The code comes from the query string, so skip inherited keys.
-  const known = Object.hasOwn(dolthubConnectionErrorMessages, error)
-    ? dolthubConnectionErrorMessages[error]
-    : undefined;
-  return known ?? `Connection failed: ${error}`;
+  return resolveConnectionErrorMessage(
+    dolthubConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
 }
 
 export function DoltHubIntegrationDetails({

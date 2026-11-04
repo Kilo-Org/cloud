@@ -115,6 +115,7 @@ import {
 } from './schema-types';
 import type {
   EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
   WatchPrPolicy,
   WatchPrStatus,
   EnkryptFailureCategory,
@@ -6940,6 +6941,7 @@ export type CloudAgentFailureReason =
   | 'session_import_failed'
   | 'setup_command_timeout'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -7076,6 +7078,7 @@ export type CloudAgentSessionRunFailureStage =
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
@@ -8523,6 +8526,11 @@ export const cloud_agent_environments = pgTable(
     // Saved sandbox allocation key for this repository's sessions; null uses the
     // owner's default. Not a build input, so it never advances the revision.
     sandbox_allocation: text(),
+    // Saved network egress policy. Both null keeps the legacy unrestricted
+    // behavior. `unrestricted` also has no list. `allowlist` always has a list,
+    // where an empty list permits only the server-owned Kilo/Git baseline.
+    egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
+    egress_allowlist: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -8607,6 +8615,17 @@ export const cloud_agent_environments = pgTable(
           ${table.bitbucket_workspace_uuid} IS NULL AND
           ${table.bitbucket_repository_uuid} IS NULL
         )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_egress_policy_check',
+      sql`(
+        (
+          (${table.egress_mode} IS NULL AND ${table.egress_allowlist} IS NULL) OR
+          (${table.egress_mode} IS NOT NULL AND ${table.egress_mode} IN ('unrestricted', 'allowlist'))
+        ) AND
+        (${table.egress_mode} IS DISTINCT FROM 'unrestricted' OR ${table.egress_allowlist} IS NULL) AND
+        (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
   ]
@@ -10736,6 +10755,15 @@ export const enkrypt_usage_decision = pgTable(
   table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
 );
 
+export const enkrypt_usage_guardrail = pgTable(
+  'enkrypt_usage_guardrail',
+  {
+    guardrail_id: serial().notNull().primaryKey(),
+    guardrail: text().notNull().$type<EnkryptGuardrailDirection>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_guardrail').on(table.guardrail)]
+);
+
 // Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
 export const enkrypt_usage = pgTable(
   'enkrypt_usage',
@@ -10754,11 +10782,14 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the final call of the request's blocking scan, or of its log-only scan when no blocking call
-    // was recorded, so it is counted once per request; null on other calls or when the request
-    // returned before awaiting the verdict.
+    // How long the request waited for the guardrail verdict: before its upstream call for the input
+    // guardrail, and between the end of the upstream response and its release for the output
+    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
+    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
+    // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
+    // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
+    guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

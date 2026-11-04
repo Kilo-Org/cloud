@@ -12,7 +12,16 @@ import {
   runtimeSpecForContract,
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
-import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
+import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
+import { admitScmRequest } from '../../scm-broker/admission.js';
+import {
+  verifiedVercelSandboxIdentityContract,
+  VercelScmContainmentError,
+} from '../../scm-broker/vercel-identity.js';
+import type {
+  ControlPlaneScmForwardAdmission,
+  ControlPlaneScmForwardAdmissionResult,
+} from '../../shared/control-plane-protocol.js';
 import { z } from 'zod';
 import {
   readSessionSnapshotAllocation,
@@ -34,7 +43,6 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
-  forceDestroyControlPlaneSandbox,
   parseSandboxBillingInput,
   SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
@@ -60,10 +68,9 @@ import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admiss
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
-  createCloudflareProviderAdapter,
-  decodeCloudflareProviderRef,
-} from '../../sandbox-control/cloudflare-provider.js';
-import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
+  createRetiredCloudflareProviderAdapter,
+  RetiredSandboxProviderError,
+} from '../../sandbox-control/retired-cloudflare-provider.js';
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
@@ -93,11 +100,9 @@ import {
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
-import { grantScmAliases } from '../../sandbox-control/session-credential-members.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
-  resolveSandboxNamespace,
   resolveSandboxIdClass,
   sandboxKindMatchesKey,
   type SandboxKind,
@@ -738,7 +743,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
     this.db = drizzle(ctx.storage, { logger: false });
-    this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
+    this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -1462,8 +1467,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       allocationKind: allocation.kind,
       providerRef: allocation.providerRef,
       provider: this.currentProvider(),
-      pinnedAllocationName: this.providerPin?.allocationName ?? this.sandboxId,
-      sandboxKind: this.providerPin?.sandboxKind,
       logicalSandboxId: this.sandboxId,
     });
   }
@@ -1571,43 +1574,80 @@ export class SandboxControlV2 extends DurableObject<Env> {
     outboundContainerId: string;
     url: string;
     method: string;
-  }): Promise<{ credential: string; organizationId?: string } | null> {
+  }): Promise<{ credential: string } | null> {
     await this.initialized;
-    return this.enqueue(async () => {
-      try {
-        const state = await this.readAllocation();
-        if (!this.sandboxCanResolveCredentials(state)) return null;
-        const ownerId = await this.requireOwner();
-        if (ownerId === null) return null;
-        const alias = parseControlPlaneCredential(input.credential);
-        if (alias === null || alias.sandboxId !== this.sandboxId) return null;
-        const expectedOutbound = this.outboundContainerIdFor(state);
-        if (expectedOutbound === null || input.outboundContainerId !== expectedOutbound) {
-          return null;
+    try {
+      const result = await admitScmRequest(
+        {
+          target: { url: input.url, method: input.method },
+          authorization: { authorization: `Bearer ${input.credential}` },
+        },
+        {
+          ...this.scmAdmissionDependencies(),
+          readContext: async () => {
+            const context = await this.readScmAdmissionContext();
+            return {
+              ...context,
+              available: providerUsesOutboundCredentialProxy(context.provider),
+              identityBinding: '',
+            };
+          },
+          // Only the platform outbound handler supplies this container identity.
+          authenticate: async context =>
+            context.outboundContainerId === input.outboundContainerId
+              ? { ok: true, isCurrent: () => true }
+              : { ok: false, status: 403, code: 'invalid_identity' },
         }
-        for (const grant of listScopeGrants(this.db)) {
-          if (grant.userId !== ownerId) continue;
-          if (!(await this.grantMatchesAlias(grant, input.credential))) continue;
-          const resolved = await resolveSessionCredential({ env: this.env, grant, ...input });
-          if (!resolved) return null;
-          const current = await this.readAllocation();
-          if (
-            !this.sandboxCanResolveCredentials(current) ||
-            Date.now() >= resolved.grant.expiresAt
-          ) {
-            return null;
-          }
-          writeScopeGrant(this.db, resolved.grant);
-          return {
-            credential: resolved.credential,
-            ...(alias.purpose === 'kilo' ? { organizationId: resolved.organizationId ?? '' } : {}),
-          };
-        }
-        return null;
-      } catch {
-        return null;
-      }
+      );
+      return result.ok && result.authority.type === 'managed'
+        ? { credential: result.authority.capability }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async admitScmForward(
+    input: ControlPlaneScmForwardAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult> {
+    await this.initialized;
+    return admitVercelScmForward(input, {
+      ...this.scmAdmissionDependencies(),
+      env: this.env,
+      contract: verifiedVercelSandboxIdentityContract,
+      readContext: () => this.readScmAdmissionContext(),
     });
+  }
+
+  private scmAdmissionDependencies() {
+    return {
+      serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
+      resolve: (request: Omit<Parameters<typeof resolveSessionCredential>[0], 'env'>) =>
+        resolveSessionCredential({ ...request, env: this.env }),
+      persist: (grant: SessionCredentialGrant) => writeScopeGrant(this.db, grant),
+    };
+  }
+
+  private async readScmAdmissionContext() {
+    const allocation = await this.readAllocation();
+    return {
+      sandboxId: this.sandboxId,
+      ownerId: await this.requireOwner(),
+      provider: this.currentProvider(),
+      containmentEnabled: this.credentialContainmentEnabled(),
+      allocation,
+      outboundContainerId:
+        allocation.kind === 'stopped' || allocation.kind === 'stopping'
+          ? null
+          : this.outboundContainerIdFor(),
+      physicalName: this.providerPin?.allocationName ?? this.sandboxId,
+      byoc: this.providerPin?.byoc,
+      locator: this.providerPin?.locator ?? null,
+      grants: listScopeGrants(this.db),
+      liveSessionIds: (await listRoutes(this.db))
+        .filter(route => route.state !== 'failed')
+        .map(route => route.sessionId),
+    };
   }
 
   /**
@@ -2102,13 +2142,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
           retainedBilling.set(key, value);
         }
       }
+      // Build the adapter before erasing anything. A construction failure must
+      // leave the persisted IDs, provider ref and pin available for a retry.
+      const pin = this.cutoverPin(cutover);
+      const provider = this.createProviderAdapter(pin);
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
       for (const [key, value] of retainedBilling) await this.ctx.storage.put(key, value);
-      const pin = this.cutoverPin(cutover);
       this.providerPin = pin;
-      this.provider = this.createProviderAdapter(pin);
+      this.provider = provider;
       const state: AllocationState = {
         ...initialAllocationState(),
         ...(cutover.providerRef === null
@@ -2135,6 +2178,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let state = rowToState(row);
     const routes = this.db.select().from(routesTable).all();
     if (
+      (pin.containment && (!pin.containment.kilocode || !pin.containment.github)) ||
+      listScopeGrants(this.db).some(grant => grant.containmentEnabled === false) ||
       routes.some(
         route =>
           route.grant?.trimStart().startsWith('{') ||
@@ -2187,7 +2232,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private currentProvider(): AgentSandboxProvider {
-    return this.providerPin?.provider ?? 'cloudflare';
+    return this.providerPin?.provider ?? 'cloudflare-containers';
   }
 
   private cutoverPin(cutover: LegacyCutover): StoredProviderPin {
@@ -2222,7 +2267,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
-    const provider = input.provider ?? 'cloudflare';
+    const provider = input.provider ?? 'cloudflare-containers';
     if (
       (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
       (provider !== 'cloudflare-containers' ||
@@ -2241,7 +2286,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       configuration: input.configuration ?? { provider },
       locator: input.locator ?? null,
       billing: input.byoc ? null : (input.billing ?? null),
-      containment: input.containment ?? null,
+      containment: getWorktreeCredentialContainment(),
       ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
       ...(policy.data.egressMode !== 'allowlist'
         ? {}
@@ -2258,19 +2303,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  /** The Cloudflare Sandbox namespace for a physical sandbox: the pinned kind, else the legacy prefix. */
-  private sandboxNamespace(
-    pin: StoredProviderPin | null,
-    physicalSandboxId: string,
-    contained: boolean
-  ): DurableObjectNamespace<Sandbox> {
-    return resolveSandboxNamespace(this.env, {
-      sandboxId: physicalSandboxId,
-      sandboxKind: pin?.sandboxKind,
-      contained,
-    });
-  }
-
   private async readLegacyCutover(): Promise<LegacyCutover> {
     const [kindRaw, configRaw, locatorRaw, allocationRaw, billingRaw] = await Promise.all([
       this.ctx.storage.get<unknown>('provider_kind'),
@@ -2279,7 +2311,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.ctx.storage.get<unknown>('sandbox_allocation_state'),
       this.ctx.storage.get<unknown>('billing_input'),
     ]);
-    let provider: AgentSandboxProvider = 'cloudflare';
+    // A fresh DO has no legacy state and starts on the current native runtime.
+    // Any legacy storage keeps its historical default (cloudflare) so the
+    // factory can refuse it instead of silently migrating the allocation.
+    const hasLegacyStorage = [kindRaw, configRaw, locatorRaw, allocationRaw, billingRaw].some(
+      value => value !== undefined
+    );
+    let provider: AgentSandboxProvider = hasLegacyStorage ? 'cloudflare' : 'cloudflare-containers';
     let configuration: SandboxProviderConfiguration | null = null;
     const parsedConfiguration = sandboxProviderConfigurationSchema.safeParse(configRaw);
     if (parsedConfiguration.success) {
@@ -2603,7 +2641,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       containment: this.credentialContainmentEnabled() ? 'enabled' : 'disabled',
     });
     const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
-    const outboundContainerId = this.outboundContainerIdFor(allocation, diagnostic) ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -2618,6 +2655,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const existing = scopes.find(
       grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
+    const outboundContainerId = this.outboundContainerIdFor() ?? undefined;
     if (
       runtimeContract !== 'legacy' &&
       !scopes.some(
@@ -3207,76 +3245,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /** The managed outbound container id for the current provider/allocation. */
-  private outboundContainerIdFor(
-    state: AllocationState,
-    diagnostic?: GrantDiagnostic
-  ): string | null {
+  private outboundContainerIdFor(): string | null {
     // The container is the containment boundary. When containment is off there
     // is no proxy container to name, and the environment may not even bind the
     // containment namespaces (the e2e Worker strips them).
     if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
+    if (provider === 'cloudflare') return null;
+    if (provider === 'vercel') return this.sandboxId;
     if (!providerUsesOutboundCredentialProxy(provider)) return null;
-    if (provider === 'cloudflare-containers') {
-      return (
-        getManagedOutboundContainerId(provider, this.env, {
-          logicalSandboxId: this.sandboxId,
-          physicalSandboxId: this.sandboxId,
-        }) ?? null
-      );
-    }
-    // The physical id is knowable before `create`: the provider builds its ref
-    // from `intent.allocationName ?? sandboxId`. Use the current pin even when
-    // stopped, because the ensure for this same queued operation will create the
-    // sandbox with that pin's allocation name (B3 review 1, N1).
-    const physicalSandboxId =
-      decodeCloudflareProviderRef(state.providerRef)?.sandboxId ??
-      this.providerPin?.allocationName ??
-      this.sandboxId;
-    const selected: DurableObjectNamespace<Sandbox> | null | undefined = this.sandboxNamespace(
-      this.providerPin,
-      physicalSandboxId,
-      true
-    );
-    if (selected === null || selected === undefined) {
-      diagnostic?.record({ grantPhase: 'configuration', grantFailureReason: 'namespace_unbound' });
-    }
-    return selected.idFromName(physicalSandboxId).toString();
-  }
-
-  private sandboxCanResolveCredentials(state: AllocationState): boolean {
     return (
-      state.kind !== 'stopped' &&
-      state.kind !== 'stopping' &&
-      state.providerRef !== null &&
-      providerUsesOutboundCredentialProxy(this.currentProvider())
+      getManagedOutboundContainerId(provider, this.env, {
+        logicalSandboxId: this.sandboxId,
+        physicalSandboxId: this.sandboxId,
+      }) ?? null
     );
   }
 
-  private async grantMatchesAlias(
-    grant: SessionCredentialGrant,
-    credential: string
-  ): Promise<boolean> {
-    const alias = parseControlPlaneCredential(credential);
-    if (alias === null) return false;
-    const expected = alias.purpose === 'kilo' ? [grant.kilo.alias] : grantScmAliases(grant);
-    // Constant-time comparison of a secret-bearing alias (B3 review 5).
-    for (const candidate of expected) {
-      if (candidate === undefined) continue;
-      if (await sandboxCredentialMatchesHash(credential, await hashSandboxCredential(candidate))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * The one containment decision for this sandbox. The Worker-selected
-   * per-requirement containment (H2) owns it; the environment default applies
-   * only when no selection was stored. Never derived from the session plane, so
-   * a local `CREDENTIAL_CONTAINMENT_ENABLED=false` control session stays on
-   * direct credentials.
-   */
+  /** Saved requirements remain authoritative until the old allocation stops. */
   private credentialContainmentEnabled(): boolean {
     const containment = this.resolvedContainment();
     return containment.kilocode || containment.github;
@@ -3289,10 +3275,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * container class and the grant can never disagree.
    */
   private resolvedContainment(): CredentialContainmentRequirements {
-    return (
-      this.providerPin?.containment ??
-      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false')
-    );
+    return this.providerPin?.containment ?? getWorktreeCredentialContainment();
   }
 
   private matchesContainment(required: CredentialContainmentRequirements): boolean {
@@ -3482,6 +3465,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     previous: AllocationState,
     next: AllocationState
   ): Promise<void> {
+    const pin = this.providerPin;
+    if (pin?.containment && (!pin.containment.kilocode || !pin.containment.github)) {
+      const upgraded = { ...pin, containment: getWorktreeCredentialContainment() };
+      await this.writeProviderPin(upgraded);
+      this.providerPin = upgraded;
+      this.provider = this.createProviderAdapter(upgraded);
+    }
     const ctx = this.routeContext(next);
     this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
@@ -3578,16 +3568,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     current: boolean
   ): void {
     if (!current) return;
-    const outcome: ControlPlaneOutcome = {
-      sessionId: frame.sessionId,
-      status: frame.status,
-      ...(frame.reason === undefined ? {} : { reason: frame.reason }),
-      ...(frame.assistantReason === undefined ? {} : { assistantReason: frame.assistantReason }),
-      ...(frame.providerOwnership === undefined
-        ? {}
-        : { providerOwnership: frame.providerOwnership }),
-      lastMessageId: frame.lastMessageId,
-    };
+    const { type: _type, ...outcome } = frame;
     this.notifications.enqueue(outcome.sessionId, { kind: 'outcome', payload: outcome });
   }
 
@@ -4383,7 +4364,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        const pin = this.providerPin;
+        if (pin === null) throw new ProviderCreationError('invalid_configuration');
         const selection = selectStartup(this.env, pin.provider, {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
@@ -4437,18 +4419,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
         createdRef = created.providerRef;
-        if (pin.provider === 'cloudflare' || pin.provider === 'cloudflare-containers') {
+        if (pin.provider === 'cloudflare-containers') {
           try {
-            const containerInstanceId =
-              pin.provider === 'cloudflare-containers'
-                ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
-                : this.sandboxNamespace(
-                    pin,
-                    intent.allocationName ?? this.sandboxId,
-                    this.credentialContainmentEnabled()
-                  )
-                    .idFromName(intent.allocationName ?? this.sandboxId)
-                    .toString();
+            const containerInstanceId = this.env.SANDBOX_CONTAINERS.idFromName(
+              this.sandboxId
+            ).toString();
             logControlDiagnostic('container_launch_identity', {
               sandboxId: this.sandboxId,
               allocationId,
@@ -4594,8 +4569,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        if (error instanceof RetiredSandboxProviderError) {
+          logControlDiagnostic(
+            'create_failed',
+            {
+              allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+              stage: createdRef === null ? 'create' : 'launch',
+              permanentReason: 'invalid_configuration',
+              errorName: diagnosticCause(error.name),
+              cause: diagnosticCause(error.message),
+            },
+            'warn'
+          );
+          await this.failCreationRoutes(allocationId, false, 'invalid_configuration');
+          return;
+        }
         if (await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId))) return;
-        if (error instanceof ByocVercelProviderError) {
+        if (
+          error instanceof ByocVercelProviderError ||
+          error instanceof VercelScmContainmentError
+        ) {
           await this.failCreationRoutes(allocationId, false, error.reason);
           return;
         }
@@ -4948,11 +4941,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async runStop(stopAttempt: number): Promise<void> {
     const state = await this.readAllocation();
     if (state.kind !== 'stopping' || state.stopAttempt !== stopAttempt || state.stopPending) return;
-    const pin = this.providerPin ?? this.defaultPin('cloudflare');
     const intent: ProviderAllocationIntent = {
       intentId: state.allocationId ?? '',
       createdAt: Date.now(),
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
     let confirmed = false;
     try {
@@ -4967,7 +4959,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     logControlDiagnostic('stop_origin', {
       origin: 'ladder',
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
       allocationId: state.allocationId,
       stopAttempt,
       confirmed,
@@ -4989,11 +4981,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     providerRef: string | null,
     allocationId: string | null
   ): Promise<boolean> {
-    const pin = this.providerPin ?? this.defaultPin('cloudflare');
     const intent: ProviderAllocationIntent = {
       intentId: allocationId ?? '',
       createdAt: Date.now(),
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
     try {
       return (
@@ -5534,6 +5525,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sandboxName: allocationName,
             resources,
             locator: pin.locator,
+            persistRuntimeLocator: locator =>
+              this.enqueue(async () => {
+                if (
+                  this.providerPin?.allocationName !== allocationName ||
+                  JSON.stringify(this.providerPin.byoc) !== JSON.stringify(pin.byoc)
+                ) {
+                  throw new Error('Vercel allocation changed during runtime resolution');
+                }
+                const resolved = { ...this.providerPin, locator };
+                await this.writeProviderPin(resolved);
+                this.providerPin = resolved;
+              }),
             // Authoritative live grants: read at create and on every credential
             // refresh, never frozen into the adapter at construction.
             readContainedGrants: () => this.activeGrants(Date.now()),
@@ -5558,16 +5561,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
       }
       case 'cloudflare':
-        return createCloudflareProviderAdapter({
-          sandboxId: allocationName,
-          billingContainment: this.credentialContainmentEnabled(),
-          getSandbox: (id, options) =>
-            getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
-          destroy: (id, options) =>
-            forceDestroyControlPlaneSandbox(
-              this.sandboxNamespace(pin, id, options.containment).getByName(id)
-            ),
-        });
+        return createRetiredCloudflareProviderAdapter();
       default: {
         void (pin.provider satisfies never);
         throw new ProviderCreationError('invalid_configuration');

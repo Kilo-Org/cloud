@@ -36,8 +36,8 @@ import {
   recordSupportWriteUse,
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
+import { alias, type AnyPgColumn, type SelectedFields } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { activeOrganizationJoinCondition } from '@kilocode/worker-utils/organization-membership';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
@@ -48,6 +48,91 @@ const warnSupportLookupFailure = sentryLogger('support_access_lookup', 'error');
 export const OrganizationIdInputSchema = z.object({
   organizationId: z.uuid(),
 });
+
+/** Matches the caller's organizations by id, used by {@link selectCallerRoleRows}. */
+type OrganizationIdFilter = (column: AnyPgColumn) => SQL;
+
+const callerRoleFields = {
+  role: organization_memberships.role,
+  organizationId: organizations.id,
+} as const;
+
+const callerRoleWithOrganizationFields = {
+  ...callerRoleFields,
+  organization: organizations,
+} as const;
+
+type CallerRoleRow = {
+  role: OrganizationRole;
+  organizationId: Organization['id'];
+};
+
+type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organization };
+
+/**
+ * The caller's membership roles in the organizations matched by
+ * `organizationFilter`: a direct membership in a live organization, plus the
+ * roles inherited from a live parent organization. The membership,
+ * live-organization and inheritable-role rules live only here, so the role
+ * check and the organization fetch cannot drift.
+ *
+ * The selection is a compile-time argument: Drizzle cannot build its query
+ * types from a generic selection, so the overloads declare the projection and
+ * the implementation takes the selection loosely. The organization overload
+ * comes first because a wider object is assignable to the narrower one.
+ */
+async function selectCallerRoleRows(
+  kiloUserId: string,
+  organizationFilter: OrganizationIdFilter,
+  fields: typeof callerRoleWithOrganizationFields
+): Promise<CallerRoleRowWithOrganization[]>;
+async function selectCallerRoleRows(
+  kiloUserId: string,
+  organizationFilter: OrganizationIdFilter,
+  fields: typeof callerRoleFields
+): Promise<CallerRoleRow[]>;
+async function selectCallerRoleRows(
+  kiloUserId: string,
+  organizationFilter: OrganizationIdFilter,
+  fields: SelectedFields
+): Promise<unknown[]> {
+  const [directRows, inheritedRows] = await Promise.all([
+    db
+      .select(fields)
+      .from(organization_memberships)
+      .innerJoin(
+        organizations,
+        activeOrganizationJoinCondition(organization_memberships.organization_id)
+      )
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, kiloUserId),
+          organizationFilter(organization_memberships.organization_id)
+        )
+      ),
+    db
+      .select(fields)
+      .from(organizations)
+      .innerJoin(
+        parentOrganizations,
+        and(
+          eq(parentOrganizations.id, organizations.parent_organization_id),
+          isNull(parentOrganizations.deleted_at)
+        )
+      )
+      .innerJoin(
+        organization_memberships,
+        and(
+          eq(organization_memberships.organization_id, organizations.parent_organization_id),
+          eq(organization_memberships.kilo_user_id, kiloUserId),
+          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+        )
+      )
+      .where(and(organizationFilter(organizations.id), isNull(organizations.deleted_at))),
+  ]);
+
+  return [...directRows, ...inheritedRows];
+}
 
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
@@ -102,43 +187,8 @@ async function observeBatchMembershipRoles(
 export async function loadEffectiveMembershipRows(
   userId: string,
   organizationId: Organization['id']
-): Promise<{ role: OrganizationRole }[]> {
-  const [directRows, inheritedRows] = await Promise.all([
-    db
-      .select({ role: organization_memberships.role })
-      .from(organization_memberships)
-      .innerJoin(
-        organizations,
-        activeOrganizationJoinCondition(organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organization_memberships.kilo_user_id, userId),
-          eq(organization_memberships.organization_id, organizationId)
-        )
-      ),
-    db
-      .select({ role: organization_memberships.role })
-      .from(organizations)
-      .innerJoin(
-        parentOrganizations,
-        and(
-          eq(parentOrganizations.id, organizations.parent_organization_id),
-          isNull(parentOrganizations.deleted_at)
-        )
-      )
-      .innerJoin(
-        organization_memberships,
-        and(
-          eq(organization_memberships.organization_id, organizations.parent_organization_id),
-          eq(organization_memberships.kilo_user_id, userId),
-          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-        )
-      )
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at))),
-  ]);
-
-  return [...directRows, ...inheritedRows];
+): Promise<CallerRoleRow[]> {
+  return selectCallerRoleRows(userId, column => eq(column, organizationId), callerRoleFields);
 }
 
 export async function loadEffectiveMembershipRowsWithOrganization(
@@ -571,52 +621,9 @@ function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext):
  * roles inherited from a parent org (owner/billing_manager). Orgs the caller has
  * no access to are simply absent from the returned map.
  */
-async function loadBatchMembershipRoles(
-  userId: string,
-  organizationIds: Organization['id'][]
-): Promise<Map<string, OrganizationRole[]>> {
-  const directRows = await db
-    .select({
-      organizationId: organization_memberships.organization_id,
-      role: organization_memberships.role,
-    })
-    .from(organization_memberships)
-    .innerJoin(
-      organizations,
-      activeOrganizationJoinCondition(organization_memberships.organization_id)
-    )
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.organization_id, organizationIds)
-      )
-    );
-
-  const inheritedRows = await db
-    .select({
-      organizationId: organizations.id,
-      role: organization_memberships.role,
-    })
-    .from(organizations)
-    .innerJoin(
-      parentOrganizations,
-      and(
-        eq(parentOrganizations.id, organizations.parent_organization_id),
-        isNull(parentOrganizations.deleted_at)
-      )
-    )
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, organizations.parent_organization_id),
-        eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-      )
-    )
-    .where(and(inArray(organizations.id, organizationIds), isNull(organizations.deleted_at)));
-
+function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, OrganizationRole[]> {
   const rolesByOrg = new Map<string, OrganizationRole[]>();
-  for (const row of [...directRows, ...inheritedRows]) {
+  for (const row of rows) {
     const list = rolesByOrg.get(row.organizationId) ?? [];
     list.push(row.role);
     rolesByOrg.set(row.organizationId, list);
@@ -635,7 +642,13 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
   if (isSupportAccessEnabled()) {
-    const rolesByOrg = await loadBatchMembershipRoles(ctx.user.id, uniqueIds);
+    const rolesByOrg = groupRolesByOrganization(
+      await selectCallerRoleRows(
+        ctx.user.id,
+        column => inArray(column, uniqueIds),
+        callerRoleFields
+      )
+    );
     for (const [organizationId, roles] of rolesByOrg) {
       const best = rolePriority.find(role => roles.includes(role));
       if (best) result.set(organizationId, best);
@@ -651,7 +664,15 @@ export async function getOrganizationsAccessRoles(
         .select({ id: organizations.id })
         .from(organizations)
         .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at))),
-      observeBatchMembershipRoles(() => loadBatchMembershipRoles(ctx.user.id, uniqueIds)),
+      observeBatchMembershipRoles(async () =>
+        groupRolesByOrganization(
+          await selectCallerRoleRows(
+            ctx.user.id,
+            column => inArray(column, uniqueIds),
+            callerRoleFields
+          )
+        )
+      ),
     ]);
     const liveIds = liveOrgRows.map(row => row.id);
     if (liveIds.length === 0) {
@@ -677,7 +698,9 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
 
-  const rolesByOrg = await loadBatchMembershipRoles(ctx.user.id, uniqueIds);
+  const rolesByOrg = groupRolesByOrganization(
+    await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
+  );
   for (const [organizationId, roles] of rolesByOrg) {
     const best = rolePriority.find(role => roles.includes(role));
     if (best) result.set(organizationId, best);

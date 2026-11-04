@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Arrow as PopoverArrow } from '@radix-ui/react-popover';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
-import { appliesImplicitProfiles } from '@kilocode/cloud-agent-profile';
 import {
   AlertCircle,
   Brain,
@@ -230,8 +230,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
-  const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
-  const [showEnvironmentRequiredMessage, setShowEnvironmentRequiredMessage] = useState(false);
+  const [startValidation, setStartValidation] = useState<{
+    field: 'repository' | 'environment';
+  } | null>(null);
+  useEffect(() => {
+    if (!startValidation) return;
+    const timeout = setTimeout(() => setStartValidation(null), 5000);
+    return () => clearTimeout(timeout);
+  }, [startValidation]);
   // Dev-only: clone a public repository by URL when no source-control
   // integration is configured. See `public-repo-url`.
   const [publicRepoUrl, setPublicRepoUrl] = useState('');
@@ -531,21 +537,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   });
   const repositoryEnvironment = sessionEnvironment.environment;
   const { requestedEnvironment } = sessionEnvironment;
-  const environmentChoiceRequired =
-    showEnvironmentRequiredMessage && sessionEnvironment.selection.status === 'choose';
+  const startValidationMessage =
+    startValidation?.field === 'repository'
+      ? 'Select a repository to start the session.'
+      : startValidation?.field === 'environment' && sessionEnvironment.selection.status === 'choose'
+        ? 'Select an environment to start the session.'
+        : null;
 
   // Resolve the profile whose custom agents should appear in the mode picker.
   // Prefers an explicit selection; otherwise falls back to the effective
   // default (personal default wins over org default). This mirrors the
   // server-side resolution in mergeProfileConfiguration for a useful preview.
-  // A V2 environment applies no implicit default, only an explicit selection.
   const effectiveAgentProfileId =
     selectedProfileId ??
-    (!appliesImplicitProfiles(repositoryEnvironment)
-      ? null
-      : organizationId
-        ? combinedProfilesData?.effectiveDefaultId
-        : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
+    (organizationId
+      ? combinedProfilesData?.effectiveDefaultId
+      : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
     null;
   const effectiveAgentProfileOrg =
     effectiveAgentProfileId && organizationId
@@ -618,8 +625,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         repo.platform === 'github' ? repo.platformIntegrationId : undefined
       );
       setPublicRepoUrl('');
-      setShowRepositoryRequiredMessage(false);
-      setShowEnvironmentRequiredMessage(false);
+      setStartValidation(null);
       if (userInitiated) setIsRepoUserSelected(true);
       if (repo.platform) {
         setSelectedPlatform(repo.platform);
@@ -1102,12 +1108,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       return;
     }
     if (!selectedRepo && !hasPublicRepo) {
-      setShowRepositoryRequiredMessage(true);
+      setStartValidation({ field: 'repository' });
       guard.end();
       return;
     }
     if (environmentBlocksStart(sessionEnvironment.selection)) {
-      setShowEnvironmentRequiredMessage(true);
+      setStartValidation({ field: 'environment' });
       guard.end();
       return;
     }
@@ -1538,44 +1544,42 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
-            {showRepositoryRequiredMessage && (
-              <p
-                id="new-session-repository-required"
-                className="flex shrink-0 items-center gap-1 text-xs text-amber-400"
-                role="alert"
-              >
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Select a repository
-              </p>
-            )}
-            {environmentChoiceRequired && (
-              <p
-                id="new-session-environment-required"
-                className="text-destructive flex min-w-0 items-center gap-1 text-xs"
-                role="alert"
-              >
-                <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
-                Select an environment to start the session.
-              </p>
-            )}
-            <UIButton
-              type="button"
-              variant="primary"
-              size="icon"
-              onClick={() => void handleStartSession()}
-              disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
-              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-              aria-describedby={
-                environmentChoiceRequired
-                  ? 'new-session-environment-required'
-                  : showRepositoryRequiredMessage
-                    ? 'new-session-repository-required'
-                    : undefined
-              }
-              aria-label="Start session"
+            <Popover
+              open={Boolean(startValidationMessage)}
+              onOpenChange={open => {
+                if (!open) setStartValidation(null);
+              }}
             >
-              <Send className="h-4 w-4" />
-            </UIButton>
+              <PopoverAnchor asChild>
+                <UIButton
+                  type="button"
+                  variant="primary"
+                  size="icon"
+                  onClick={() => void handleStartSession()}
+                  disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
+                  className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+                  aria-describedby={
+                    startValidationMessage ? 'new-session-start-validation' : undefined
+                  }
+                  aria-label="Start session"
+                >
+                  <Send className="h-4 w-4" />
+                </UIButton>
+              </PopoverAnchor>
+              <PopoverContent
+                id="new-session-start-validation"
+                role="alert"
+                side="left"
+                sideOffset={8}
+                className="flex w-auto max-w-[min(16rem,calc(100vw-2rem))] items-center gap-2 p-3 text-xs"
+                onOpenAutoFocus={event => event.preventDefault()}
+                onCloseAutoFocus={event => event.preventDefault()}
+              >
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+                {startValidationMessage}
+                <PopoverArrow className="fill-popover" />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -1617,7 +1621,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                       value={publicRepoUrl}
                       onChange={event => {
                         setPublicRepoUrl(event.target.value);
-                        setShowRepositoryRequiredMessage(false);
+                        setStartValidation(null);
                       }}
                       aria-invalid={publicRepoUrlError ? true : undefined}
                       aria-describedby={
@@ -1805,7 +1809,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               environments={sessionEnvironment.matches}
               environment={repositoryEnvironment}
               onChooseEnvironment={environmentId => {
-                setShowEnvironmentRequiredMessage(false);
+                setStartValidation(null);
                 sessionEnvironment.chooseEnvironment(environmentId);
               }}
               selectedProfileId={selectedProfileId}

@@ -16,7 +16,6 @@ import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
  * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
-import { assertCloudAgentIsolatedAllocation } from '../cloud-agent-authority.js';
 import { and, eq } from 'drizzle-orm';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
@@ -28,7 +27,9 @@ import {
 import {
   assertSandboxAllocationAvailable,
   getSandboxSelectionCapabilities,
+  isRetiredSandboxAllocation,
   isSandboxAllocationAvailable,
+  RETIRED_SANDBOX_ALLOCATION_MESSAGE,
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
 import {
@@ -93,7 +94,6 @@ import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cloudflareSandboxSmallNativeReplacement,
   recordedSandboxAllocationMatchesRequest,
-  credentialContainmentEnabled,
   resolveNewSessionSandboxAllocation,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -101,7 +101,7 @@ import {
   sandboxKindMatchesKey,
   sandboxKindSchema,
   selectControlPlaneSandbox,
-  type SandboxKind,
+  type PlacedSandboxKind,
 } from '../sandbox-placement.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -137,8 +137,8 @@ export type SessionRegistrationInput = SessionCreateRequest;
 /**
  * Whether a create may launch child Cloud Agent sessions. The capability is not
  * caller-controlled: a session gets it when a person created it through an
- * interactive client, it is not itself a spawned child, and it does not run on
- * a shared sandbox.
+ * interactive client and it is not itself a spawned child. Every sandbox serves
+ * one workspace, so the sandbox never removes the capability.
  */
 export function allowsSubagentSessions(
   input: Pick<
@@ -148,20 +148,7 @@ export function allowsSubagentSessions(
 ): boolean {
   return (
     input.parentCloudAgentSessionId === undefined &&
-    isInteractiveSessionOrigin(input.options?.createdOnPlatform) &&
-    requestedSandboxAllocation(input) !== 'cloudflare-shared'
-  );
-}
-
-function resolvedAllowsSubagentSessions(
-  input: SessionRegistrationInput,
-  sandboxAllocation: SandboxAllocation | undefined,
-  sandboxKind?: SandboxKind
-): boolean {
-  return (
-    allowsSubagentSessions(input) &&
-    sandboxAllocation !== 'cloudflare-shared' &&
-    sandboxKind !== 'shared'
+    isInteractiveSessionOrigin(input.options?.createdOnPlatform)
   );
 }
 
@@ -180,6 +167,12 @@ function assertSupportedSandboxAllocation(
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
+  // cloudflare-single is the compatibility alias for the native containers
+  // default. The other retired allocations are rejected rather than silently
+  // remapped; a saved legacy value is skipped before reaching this check.
+  if (isRetiredSandboxAllocation(allocation)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
+  }
   if (
     options?.billingOrigin === 'code-review' ||
     input.options?.createdOnPlatform === 'code-review'
@@ -193,13 +186,10 @@ function assertSupportedSandboxAllocation(
 
 function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
-  allocation: Pick<SessionRegistrationResult, 'sandboxProvider' | 'sandboxKind'>
+  allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
   if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
-  if (
-    allocation.sandboxProvider !== 'cloudflare-containers' ||
-    allocation.sandboxKind === 'shared'
-  ) {
+  if (allocation.sandboxProvider !== 'cloudflare-containers') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
@@ -219,7 +209,7 @@ export type SessionRegistrationResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   sandboxId: SandboxId;
-  sandboxKind?: SandboxKind;
+  sandboxKind?: PlacedSandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
@@ -614,21 +604,19 @@ function ownershipRequestForCreate(
 
 function computeCredentialContainment(
   sessionId: string,
-  input: SessionRegistrationInput,
-  env: Env
+  input: SessionRegistrationInput
 ): CredentialContainment {
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     sessionId,
     input.repository,
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+    true
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
-    github: containmentEnabled && input.repository.type === 'github',
-    gitlab: containmentEnabled && input.repository.type === 'gitlab',
-    bitbucket: containmentEnabled && input.repository.type === 'bitbucket',
-    kilocode: containmentEnabled,
+    github: input.repository.type === 'github',
+    gitlab: input.repository.type === 'gitlab',
+    bitbucket: input.repository.type === 'bitbucket',
+    kilocode: true,
   };
 }
 
@@ -890,7 +878,7 @@ function sandboxSmallReplacementForSession(
     userId: ctx.userId,
     sessionId,
     requestedAllocation: requestedSandboxAllocation(input),
-    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
+    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
@@ -925,9 +913,7 @@ async function allocateNewSession(
     userId: ctx.userId,
     sessionId: cloudAgentSessionId,
     requestedAllocation,
-    contained: hasCredentialContainment(
-      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
-    ),
+    contained: hasCredentialContainment(computeCredentialContainment(cloudAgentSessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
@@ -935,15 +921,13 @@ async function allocateNewSession(
     assertEnvironmentSupportsSandbox({
       environment: input.environment,
       allocation: sandboxAllocation,
-      contained: credentialContainmentEnabled(ctx.env),
+      contained: true,
     });
   } catch (error) {
     // A saved allocation resolved after admission can still fail here; the ledger
     // row must settle failed so a retry does not wait on its lease.
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
-  const childSession = input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(childSession, sandboxAllocation);
   const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
@@ -991,9 +975,9 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'report', error);
   }
 
-  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
+  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input);
   let sandboxId: SandboxId;
-  let sandboxKind: SandboxKind | undefined;
+  let sandboxKind: PlacedSandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
   try {
@@ -1002,9 +986,9 @@ async function allocateNewSession(
       sessionId: cloudAgentSessionId,
       userId: ctx.userId,
       orgId,
-      botId: ctx.botId,
       codeReview: options?.billingOrigin === 'code-review',
       sandboxAllocation,
+      ...(requestedAllocation !== undefined ? { requestedAllocation } : {}),
     });
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
@@ -1056,7 +1040,7 @@ async function allocateNewSession(
   }
 
   try {
-    assertEgressPolicyAllocation(input, { sandboxProvider, sandboxKind });
+    assertEgressPolicyAllocation(input, { sandboxProvider });
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
@@ -1229,9 +1213,16 @@ function rebuildRecordedSessionAllocation(
   ) {
     throw creationInProgressError();
   }
+  // A create recorded before shared sandboxes were retired cannot be replayed
+  // onto one: every sandbox serves one workspace.
+  if (recordedKind.data === 'shared') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
+  }
   const sandboxKind = recordedKind.data;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
   const replacement = sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options);
   if (
@@ -1292,7 +1283,7 @@ function rebuildRecordedSessionAllocation(
     initialTurn = { ...accepted, messageId: initialMessageId };
   }
 
-  assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data, sandboxKind });
+  assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data });
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
   const parsedBinding = SandboxProviderBindingSchema.safeParse(
@@ -1315,7 +1306,7 @@ function rebuildRecordedSessionAllocation(
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     sandboxProviderBinding: normalizedBinding,
     initialTurn,
-    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
+    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input),
     rollbackCliSession: async () => {
       try {
         await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
@@ -1342,17 +1333,9 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
-  const childSession = input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(childSession, allocation.sandboxAllocation);
-  if (childSession && allocation.sandboxKind === 'shared') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Cloud Agent spawn authority requires an isolated sandbox',
-    });
-  }
   return {
     allowSubagentSessions:
-      resolvedAllowsSubagentSessions(input, allocation.sandboxAllocation, allocation.sandboxKind) &&
+      allowsSubagentSessions(input) &&
       isPolicyBearingAuthToken(ctx.authToken) &&
       ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
@@ -2040,6 +2023,16 @@ export async function sessionCreateIntentFingerprint(
 }
 
 /**
+ * Explicit create choices include the retired-name compatibility alias so a
+ * retry cannot drop it and inherit an unrelated recorded allocation.
+ */
+function isExplicitSandboxAllocationChoice(
+  allocation: SandboxAllocation | undefined
+): allocation is SandboxAllocation {
+  return allocation === 'cloudflare-single' || isSelectableSandboxAllocation(allocation);
+}
+
+/**
  * Rejects a same-key retry whose create intent differs from the admitted
  * fingerprint. Rows admitted before the fingerprint contract carry no
  * comparison data and keep the legacy replay/reconcile behavior.
@@ -2052,11 +2045,13 @@ async function assertCreateIntentUnchanged(
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
-  const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
+  const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema
     .optional()
     .safeParse(row.canonical_result?.sandboxAllocation);
@@ -2175,7 +2170,7 @@ export async function createSessionWithLedger(
   assertEnvironmentSupportsSandbox({
     environment: input.environment,
     allocation: requestedSandboxAllocation(input),
-    contained: credentialContainmentEnabled(ctx.env),
+    contained: true,
   });
   const initialWorktreeEnabled = isEligibleFirstWorktreeSession(input, ctx);
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);
@@ -2197,8 +2192,12 @@ export async function createSessionWithLedger(
         await sessionCreateIntentFingerprint(initialEffectiveInput),
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-      // Match the replay comparison, which only considers selectable choices.
-      ...(isSelectableSandboxAllocation(requestedSandboxAllocationChoice)
+      // Match the replay comparison, which only considers explicit choices.
+      // `cloudflare-single` is pinned as the compatibility alias so a retry
+      // keeps the same intent; its resolved runtime is the native default.
+      ...(requestedSandboxAllocationChoice !== undefined &&
+      (isSelectableSandboxAllocation(requestedSandboxAllocationChoice) ||
+        requestedSandboxAllocationChoice === 'cloudflare-single')
         ? { sandboxAllocation: requestedSandboxAllocationChoice }
         : {}),
       ...(savedSandboxAllocation !== undefined

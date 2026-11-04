@@ -14,6 +14,8 @@
  * endpoint is empty.
  */
 
+import { requestUrlString, TRPC_PATH, trpcProcedureText } from '@/lib/telemetry/request-target';
+
 /** Request header carrying the per-call id the server logs on its timing line. */
 export const LATENCY_REQUEST_ID_HEADER = 'x-kilo-request-id';
 
@@ -25,8 +27,6 @@ export const MAX_PAYLOAD_BYTES = 64 * 1024;
 
 /** Flush a batch this long after its first pending sample. */
 export const FLUSH_INTERVAL_MS = 5000;
-
-const TRPC_PATH = '/api/trpc/';
 
 /** One measured tRPC HTTP call. Mirrors the ingest worker's sample schema. */
 export type LatencySample = {
@@ -67,24 +67,12 @@ export type LatencyFetchOptions = {
 
 /**
  * Split `<procs>` from a `/api/trpc/<procs>` URL into a procedure list.
- * Returns `[]` for a URL without the tRPC path; the query string is never
- * included.
+ * Returns `[]` for a URL without the tRPC path. Both telemetry producers read
+ * the procedure text through `trpcProcedureText`, so neither reports the query
+ * string, the fragment or the authority's userinfo.
  */
 export function trpcProceduresFromUrl(url: string): string[] {
-  try {
-    const queryIndex = url.indexOf('?');
-    const pathOnly = queryIndex === -1 ? url : url.slice(0, queryIndex);
-    const index = pathOnly.indexOf(TRPC_PATH);
-    if (index === -1) {
-      return [];
-    }
-    return pathOnly
-      .slice(index + TRPC_PATH.length)
-      .split(',')
-      .filter(procedure => procedure.length > 0);
-  } catch {
-    return [];
-  }
+  return (trpcProcedureText(url) ?? '').split(',').filter(procedure => procedure.length > 0);
 }
 
 /** UTF-8 size of the serialized batch, matching the worker's 64 KiB limit. */
@@ -180,16 +168,6 @@ export function createLatencyBuffer({ send, now, schedule }: LatencyBufferOption
   }
 
   return { record, flush };
-}
-
-function requestUrlString(input: RequestInfo | URL): string {
-  if (input instanceof URL) {
-    return input.href;
-  }
-  if (input instanceof Request) {
-    return input.url;
-  }
-  return input;
 }
 
 /** Copy the caller's headers and set the per-call request id, replacing any

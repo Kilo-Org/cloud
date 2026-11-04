@@ -5,6 +5,19 @@ import * as z from 'zod';
 
 type JsonSchema = Record<string, unknown>;
 
+/**
+ * Marker class used to attach an upstream API error code to a TRPCError so the
+ * error-formatter can surface it to the client in `err.data.upstreamCode`.
+ *
+ * Usage:
+ *   throw new TRPCError({
+ *     code: 'CONFLICT',
+ *     message: 'Config was modified',
+ *     cause: new UpstreamApiError('etag_mismatch'),
+ *   });
+ *
+ * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
+ */
 export class UpstreamApiError extends Error {
   constructor(public readonly upstreamCode: string) {
     super(upstreamCode);

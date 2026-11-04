@@ -24,7 +24,6 @@ import {
   type SandboxKind,
 } from '../sandbox-placement.js';
 import { isControlSession } from '../session-identity.js';
-import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
@@ -45,10 +44,14 @@ const SandboxIdSchema = z
   .refine(isValidSandboxId, 'Invalid sandboxId format')
   .transform(s => s);
 
+/** Legacy decode only: the key of a retired owner-scoped shared sandbox. */
 const SharedSandboxIdSchema = z
   .string()
   .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
   .transform(s => s);
+
+/** Legacy decode only: the failover slot a retired shared sandbox route could record. */
+const LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX = 'shared-slot-v1';
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 const SandboxProviderSchema = agentSandboxProviderSchema;
@@ -240,11 +243,16 @@ const MetadataCallbackSchema = z
   })
   .strip();
 
+/**
+ * Legacy decode only. Every sandbox serves one workspace; this route belongs to
+ * a retired owner-scoped shared sandbox. Stored metadata can still carry it, so
+ * it must keep parsing, but no new session writes it.
+ */
 const MetadataSharedSandboxRouteSchema = z
   .object({
     kind: z.literal('shared'),
     routeKey: SharedSandboxIdSchema,
-    suffix: z.literal(SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
+    suffix: z.literal(LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
   })
   .strip();
 
@@ -257,7 +265,10 @@ const CredentialContainmentSchema = z
   })
   .strip();
 
-/** Sandbox-ID class each isolated allocation must have in persisted metadata. */
+/**
+ * Sandbox-ID class each isolated allocation must have in persisted metadata.
+ * `cloudflare-shared` is legacy decode only and is matched separately.
+ */
 const SANDBOX_ALLOCATION_ID_CLASS: Record<
   Exclude<SandboxAllocation, 'cloudflare-shared'>,
   SandboxIdClass
@@ -554,6 +565,44 @@ export function hasRetiredDevcontainerRuntime(metadata: SessionMetadata): boolea
     metadata.workspace?.sandboxId?.startsWith('dind-') === true ||
     metadata.workspace?.devcontainerRequested === true ||
     metadata.devcontainer !== undefined
+  );
+}
+
+export const CLOUDFLARE_RUNTIME_RETIRED_MESSAGE =
+  'The Cloudflare Sandbox runtime has been retired. This session cannot be started or resumed. Create a new session using the default sandbox.';
+
+/**
+ * The reason a stored session can no longer start compute, or null when its
+ * runtime is still active. A missing workspace is not evidence of a retired
+ * runtime; a workspace without an explicit provider keeps the historical
+ * Cloudflare default.
+ */
+export function retiredRuntimeMessage(metadata: SessionMetadata): string | null {
+  if (hasRetiredDevcontainerRuntime(metadata)) return DEVCONTAINER_RETIRED_MESSAGE;
+  if (metadata.workspace === undefined) return null;
+  return getSandboxProvider(metadata) === 'cloudflare' ? CLOUDFLARE_RUNTIME_RETIRED_MESSAGE : null;
+}
+
+/**
+ * Legacy decode only: whether a stored workspace names a retired owner-scoped
+ * shared sandbox. Every sandbox now serves one workspace. Such a workspace ran
+ * on the retired Cloudflare Sandbox runtime, so {@link retiredRuntimeMessage}
+ * already stops its compute; this check keeps it from gaining new authority or
+ * from being registered again.
+ */
+export function isLegacySharedSandboxWorkspace(
+  workspace:
+    | {
+        sandboxAllocation?: SandboxAllocation;
+        sandboxKind?: SandboxKind;
+        sandboxRoute?: unknown;
+      }
+    | undefined
+): boolean {
+  return (
+    workspace?.sandboxAllocation === 'cloudflare-shared' ||
+    workspace?.sandboxKind === 'shared' ||
+    workspace?.sandboxRoute !== undefined
   );
 }
 

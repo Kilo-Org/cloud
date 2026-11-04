@@ -1,11 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
+  createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
   type EnkryptDetectRequestDetectors,
 } from './detectors';
 import {
   resolveEnkryptInputGuardrail,
+  resolveEnkryptOutputGuardrail,
   splitEnkryptInputGuardrail,
   type EnkryptInputGuardrailConfig,
 } from './settings';
@@ -150,5 +152,101 @@ describe('splitEnkryptInputGuardrail', () => {
     const config: EnkryptInputGuardrailConfig = { scanToolResults: true, status: 'invalid' };
 
     expect(splitEnkryptInputGuardrail(config)).toEqual({ blocking: config, logOnly: null });
+  });
+});
+
+describe('resolveEnkryptOutputGuardrail', () => {
+  function resolveOutput(settings: OrganizationSettings) {
+    return resolveEnkryptOutputGuardrail(organizationId, { kilo_encrypt: true, ...settings });
+  }
+
+  function savedOutputDetectors() {
+    const detectors = createEmptyEnkryptOutputDetectors();
+    detectors.pii = { enabled: true, action: 'block', entities: ['secrets'] };
+    detectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: ['Phoenix'] };
+    detectors.topic_detector = { enabled: true, action: 'block', topic: ['weapons'] };
+    detectors.toxicity = { enabled: true, action: 'block' };
+    detectors.nsfw = { enabled: true, action: 'log' };
+    return detectors;
+  }
+
+  it.each([
+    ['no settings', {}],
+    ['no output guardrail setting', { enkrypt: {} }],
+    ['only an input guardrail', { enkrypt: { input_guardrail: { enabled: true } } }],
+    [
+      'a disabled output guardrail',
+      { enkrypt: { output_guardrail: { enabled: false, detectors: savedOutputDetectors() } } },
+    ],
+    [
+      'an invalid output guardrail',
+      { enkrypt: { output_guardrail: { enabled: 'yes' } } } as unknown as OrganizationSettings,
+    ],
+  ] satisfies [string, OrganizationSettings][])('is off for %s', (_name, settings) => {
+    expect(resolveOutput(settings)).toBeNull();
+  });
+
+  it.each([
+    ['not granted', undefined],
+    ['revoked', false],
+  ] as const)('is off when kilo_encrypt is %s', (_name, kiloEncrypt) => {
+    expect(
+      resolveEnkryptOutputGuardrail(organizationId, {
+        kilo_encrypt: kiloEncrypt,
+        enkrypt: { output_guardrail: { enabled: true, detectors: savedOutputDetectors() } },
+      })
+    ).toBeNull();
+  });
+
+  it('applies no default preset when no detectors were saved', () => {
+    expect(resolveOutput({ enkrypt: { output_guardrail: { enabled: true } } })).toBeNull();
+  });
+
+  it('is off when the saved detectors enable none', () => {
+    expect(
+      resolveOutput({
+        enkrypt: {
+          output_guardrail: { enabled: true, detectors: createEmptyEnkryptOutputDetectors() },
+        },
+      })
+    ).toBeNull();
+  });
+
+  it('reports invalid saved detectors instead of disabling the guardrail', () => {
+    expect(
+      resolveOutput({ enkrypt: { output_guardrail: { enabled: true, detectors: { pii: 'bad' } } } })
+    ).toEqual({ scanToolResults: false, status: 'invalid' });
+  });
+
+  it('maps the saved detectors to the Enkrypt request and blocks only on block actions', () => {
+    expect(
+      resolveOutput({
+        enkrypt: { output_guardrail: { enabled: true, detectors: savedOutputDetectors() } },
+      })
+    ).toEqual({
+      scanToolResults: false,
+      status: 'ready',
+      detectors: {
+        pii: { enabled: true, entities: ['secrets'] },
+        keyword_detector: { enabled: true, banned_keywords: ['Phoenix'] },
+        topic_detector: { enabled: true, topic: ['weapons'] },
+        toxicity: { enabled: true },
+        nsfw: { enabled: true },
+      },
+      blockingDetectors: ['pii', 'topic_detector', 'toxicity'],
+    });
+  });
+
+  it('is unaffected by the input guardrail settings', () => {
+    const outputGuardrail = { enabled: true, detectors: savedOutputDetectors() };
+
+    expect(
+      resolveOutput({
+        enkrypt: {
+          input_guardrail: { enabled: true, detectors: { injection_attack: true } },
+          output_guardrail: outputGuardrail,
+        },
+      })
+    ).toEqual(resolveOutput({ enkrypt: { output_guardrail: outputGuardrail } }));
   });
 });

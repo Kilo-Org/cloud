@@ -5,11 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Button, BUTTON_BUSY_OVERLAY_CLASS, type ButtonProps } from './button';
 
+// Every token the ink table names, with a distinct value each: a mark drawn
+// from the wrong token renders a different colour, so the case below fails
+// instead of passing on two tokens that happen to share a value.
 const theme = vi.hoisted(() => ({
   colors: {
     foreground: '#123456',
     primary: '#345678',
     primaryForeground: '#abcdef',
+    secondaryForeground: '#223344',
+    destructive: '#654321',
+    destructiveSolidForeground: '#fedcba',
     accentSoftTintForeground: '#1a1a10',
   },
 }));
@@ -64,6 +70,28 @@ describe('Button busy mark', () => {
     } finally {
       theme.colors.accentSoftTintForeground = '#1a1a10';
     }
+  });
+
+  // The label paints from the same table entry the mark does, so every variant
+  // draws its busy mark in the ink its own label carries. Listing the pairs here
+  // rather than deriving them keeps the contract independent of the table.
+  it.each([
+    ['default', theme.colors.primaryForeground],
+    ['destructive', theme.colors.destructiveSolidForeground],
+    ['outline', theme.colors.foreground],
+    ['outline-destructive', theme.colors.destructive],
+    ['secondary', theme.colors.secondaryForeground],
+    ['ghost', theme.colors.foreground],
+    ['link', theme.colors.primary],
+    ['accent-soft', theme.colors.accentSoftTintForeground],
+  ] as const)('draws the %s mark in the ink its own label paints', (variant, ink) => {
+    const root = render({ variant, loading: true, accessibilityLabel: 'Send' });
+
+    expect(busyMarks(root)[0]?.props.color).toBe(ink);
+    const track = root.find(
+      n => n.type === View && `${n.props.className ?? ''}`.includes('rounded-full')
+    );
+    expect(track.props.style).toMatchObject({ borderColor: ink });
   });
 
   it('paints a full ring track in the label ink, so the mark never shrinks to the arc sweep', () => {

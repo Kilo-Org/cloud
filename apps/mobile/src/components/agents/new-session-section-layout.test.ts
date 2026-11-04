@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveNewSessionInlineSections } from './new-session-section-layout';
+import {
+  NEW_SESSION_SECTION_LABEL_WIDTH_RATIO,
+  resolveNewSessionInlineSections,
+} from './new-session-section-layout';
 
 describe('resolveNewSessionInlineSections', () => {
   it('puts the headings beside their controls on the compact design-gate window', () => {
     // The cell where the stacked form ended its first screenful on the
     // `Repository` heading with the picker cut by the pinned footer.
     expect(resolveNewSessionInlineSections(360, 640, 1)).toBe(true);
+    // The heading's share there is what the rule is measured against: 45% of
+    // the row, which is the 162 points of text the 144-point word needs.
+    expect(360 * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO).toBeCloseTo(162, 5);
   });
 
   it('keeps the stacked heading on the windows that already reach the picker', () => {
@@ -28,9 +34,9 @@ describe('resolveNewSessionInlineSections', () => {
     expect(resolveNewSessionInlineSections(1024, 600, 1)).toBe(true);
   });
 
-  it('keeps the stacked heading where a shortened heading would break a word', () => {
-    // The narrowest common phone is the smallest row that still holds one word
-    // of a long localized heading in its 45% share; below it, and on the
+  it('keeps the stacked heading where the share cannot hold one word', () => {
+    // The narrowest common phone is the smallest row whose 45% share still
+    // holds a word of the longest localized heading; below it, and on the
     // split-screen and cover-display windows the repo names, the form scrolls
     // the picker into view instead.
     expect(resolveNewSessionInlineSections(320, 640, 1)).toBe(true);
@@ -39,10 +45,10 @@ describe('resolveNewSessionInlineSections', () => {
     expect(resolveNewSessionInlineSections(160, 640, 1)).toBe(false);
   });
 
-  it('judges the row in points of text, so a large font scale keeps the stacked form', () => {
-    // The same 360 dp cell at the system's own large-text steps: the heading's
-    // room shrinks with the scale, so the row stops holding a word at scale
-    // 1.25 and beyond, and the stacked form returns.
+  it('judges the heading share by the font scale, so large text keeps the stacked form', () => {
+    // The same 360 dp cell at the system's own large-text steps: the share
+    // shrinks with the scale, so the row stops holding a word past 1.125 and
+    // the stacked form returns.
     expect(resolveNewSessionInlineSections(360, 640, 1)).toBe(true);
     expect(resolveNewSessionInlineSections(360, 640, 1.125)).toBe(true);
     expect(resolveNewSessionInlineSections(360, 640, 1.25)).toBe(false);

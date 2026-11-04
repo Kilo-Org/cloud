@@ -488,6 +488,7 @@ describe('NewSessionConfigureForm', () => {
   it('merges the Run on heading into its row on a short window', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    windowState.width = 360;
     windowState.height = 640;
     try {
       // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -500,6 +501,7 @@ describe('NewSessionConfigureForm', () => {
       // above the pinned footer at this window height.
       expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(true);
     } finally {
+      windowState.width = 411;
       windowState.height = 914;
     }
   });
@@ -507,6 +509,7 @@ describe('NewSessionConfigureForm', () => {
   it('keeps the stacked heading at a font scale that leaves one word no room', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    windowState.width = 360;
     windowState.height = 640;
     liveFontScale.value = 1.8;
     try {
@@ -520,6 +523,7 @@ describe('NewSessionConfigureForm', () => {
       // at this scale, so the form keeps its stacked heading and scrolls.
       expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(false);
     } finally {
+      windowState.width = 411;
       windowState.height = 914;
       liveFontScale.value = 1;
     }

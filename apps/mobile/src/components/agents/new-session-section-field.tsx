@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
+import { NEW_SESSION_SECTION_LABEL_WIDTH_RATIO } from '@/components/agents/new-session-section-layout';
 import { Text } from '@/components/ui/text';
 
 type NewSessionSectionFieldProps = {
@@ -22,10 +23,9 @@ type NewSessionSectionFieldProps = {
  * sections that sit above the repository picker merge theirs into the row on a
  * short window so the picker itself stays above the pinned Start footer.
  *
- * The label never takes the row: it is capped at 45% of it, so a long localized
- * name or a large font scale wraps the heading instead of squeezing the control
- * it names, and the 240 dp width gate keeps the row off windows where even a
- * capped heading would leave no word of room.
+ * The label never takes the row: its share is capped by the same ratio the
+ * layout rule measures, so a long localized name or a large font scale wraps
+ * the heading instead of squeezing the control it names.
  */
 export function NewSessionSectionField({
   label,
@@ -42,10 +42,12 @@ export function NewSessionSectionField({
   }
   return (
     <View className="mt-5 flex-row items-center gap-2">
-      {/* The heading may not take the row: a long localized label (or a large
-          font scale) would leave the control it names no room for a word. Above
-          240 dp the form only takes this row, so the cap is the label's share. */}
-      <Text className="max-w-[45%] text-sm font-medium text-muted-foreground">{label}</Text>
+      <Text
+        className="text-sm font-medium text-muted-foreground"
+        style={{ maxWidth: `${NEW_SESSION_SECTION_LABEL_WIDTH_RATIO * 100}%` }}
+      >
+        {label}
+      </Text>
       <View className="flex-1">{children}</View>
     </View>
   );

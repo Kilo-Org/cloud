@@ -23,30 +23,46 @@
  * are short too and take the row, and only a window taller than the threshold
  * keeps the stacked heading.
  *
- * The width gate is judged in points of text, not of screen: the heading shares
- * its row with the control at most 45% of the width, so the room a word has is
- * `windowWidth / fontScale`. Below the narrowest common phone (320 dp) — and at
- * any system font scale that shrinks that room below it — a long localized name
- * no longer fits one word and would break mid-word, the defect `narrow-layout`
- * documents. Those windows keep the stacked layout and scroll the picker into
- * view. An unknown width, height or scale keeps the stacked form for the same
- * reason: the compact row is the exception, never the default.
+ * The width rule measures the room the heading itself gets, in points of text.
+ * The heading takes at most `NEW_SESSION_SECTION_LABEL_WIDTH_RATIO` of the row,
+ * and a word of the longest localized name needs about 144 dp at the base text
+ * size; a system font scale multiplies the word and not the share. A window
+ * whose label share still holds that word keeps the row — a 360 dp phone does
+ * up to scale 1.125 — and everything narrower or larger-scaled keeps the
+ * stacked form and scrolls the picker into view. An unknown width, height or
+ * scale keeps the stacked form for the same reason: the compact row is the
+ * exception, never the default.
  */
 const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
-const NEW_SESSION_INLINE_SECTION_MIN_TEXT_WIDTH = 320;
+
+/** The largest share of its row the inline heading may take. */
+export const NEW_SESSION_SECTION_LABEL_WIDTH_RATIO = 0.45;
+
+/**
+ * Room one word of the longest localized heading needs, in points at the base
+ * text size. `narrow-layout` draws its equivalent line at 240 dp of row for a
+ * row with fixed neighbours; here the share is capped, so the comparison is
+ * made against the share itself.
+ */
+const NEW_SESSION_SECTION_LABEL_MIN_TEXT_WIDTH = 144;
 
 export function resolveNewSessionInlineSections(
   windowWidth: number,
   windowHeight: number,
   fontScale: number
 ): boolean {
+  if (
+    !Number.isFinite(windowWidth) ||
+    !Number.isFinite(windowHeight) ||
+    !Number.isFinite(fontScale) ||
+    fontScale <= 0 ||
+    windowHeight <= 0
+  ) {
+    return false;
+  }
+  const labelRoom = (windowWidth * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO) / fontScale;
   return (
-    Number.isFinite(windowWidth) &&
-    Number.isFinite(fontScale) &&
-    fontScale > 0 &&
-    windowWidth / fontScale >= NEW_SESSION_INLINE_SECTION_MIN_TEXT_WIDTH &&
-    Number.isFinite(windowHeight) &&
-    windowHeight > 0 &&
+    labelRoom >= NEW_SESSION_SECTION_LABEL_MIN_TEXT_WIDTH &&
     windowHeight < NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT
   );
 }

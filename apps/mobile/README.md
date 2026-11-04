@@ -34,6 +34,23 @@ temporary Home route cannot replace the recovery destination. Credential
 preloads are used only for the first auth-provider mount; recovery reads the
 current stored credentials through the normal bounded retry path.
 
+## Voice-input terminal ownership
+
+Stop, cancel, and a queued next start wait for a terminal event with a 60-second
+silence bound. Completed gateway segments and final transcripts extend that
+window; interim text does not. A timed-out stop reports the retryable stopped
+message, while cancel stays silent.
+
+The OS adapter assigns each start a numeric `kiloSessionId` and consumes only
+the patched recognizer's `kiloEvent` channel. Native callbacks retain their
+originating run identity, and old teardown owns only that run's resources.
+Foreign-run events are dropped before controller delivery and iOS transcript
+deduplication. A genuine failed-start error and end remain valid without start.
+
+The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+and its lockfile hash form one native compatibility change. Rebuild both native
+clients; reloading JavaScript onto an older recognizer binary is not supported.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and

@@ -60,7 +60,7 @@ describe('POST /api/auth/native/exchange', () => {
       challenge: 'challenge',
       payload: 'integrity-token',
     });
-    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android', keyId: '' });
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
   });
 
   it('refuses a request with no proof before reading any credential', async () => {

@@ -78,7 +78,7 @@ describe('POST /api/auth/native/exchange integration', () => {
     mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockIssueSessionCredentials.mockReset();
     mockVerifyAdmissionAsync.mockReset();
-    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android', keyId: '' });
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
   });
 
   test('exchanges a legacy generated API token with a null pepper and device authorization code', async () => {

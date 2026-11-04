@@ -874,7 +874,6 @@ describe('verifyAdmissionAsync', () => {
     expect(result).toEqual({
       ok: true,
       platform: 'android',
-      keyId: '',
     });
   });
 
@@ -1006,7 +1005,6 @@ describe('persistAttestedKey', () => {
     await persistAttestedKey('user1', {
       ok: true,
       platform: 'android',
-      keyId: '',
     });
 
     // Should not attempt insert or update
@@ -1095,7 +1093,6 @@ describe('dev sentinel', () => {
     expect(await verifyAdmissionAsync(admission)).toEqual({
       ok: true,
       platform: 'android',
-      keyId: '',
     });
     expect(mockVerifyPlayIntegrity).not.toHaveBeenCalled();
   });

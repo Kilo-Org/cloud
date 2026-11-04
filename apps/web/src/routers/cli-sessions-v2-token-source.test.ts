@@ -20,7 +20,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 // stubbed; the helper sends a complete proof shape.
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
-  verifyAdmissionAsync: async () => ({ ok: true, platform: 'android', keyId: '' }),
+  verifyAdmissionAsync: async () => ({ ok: true, platform: 'android' }),
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

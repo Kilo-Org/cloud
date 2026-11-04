@@ -183,6 +183,30 @@ export async function createDeviceSession(params: {
 }
 
 /**
+ * Mint an access token + refresh token pair for a device session and persist the
+ * refresh token's hash, through `executor` so a transaction caller keeps the
+ * insert atomic with the rows around it.
+ *
+ * The access token is short-lived (one hour). The refresh token is 30 days.
+ */
+async function mintSessionCredentials(
+  executor: typeof db | DrizzleTransaction,
+  user: User,
+  deviceSessionId: string
+): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
+  const token = generateApiToken(user, { deviceSessionId }, { expiresIn: TOKEN_EXPIRY.oneHour });
+  const refreshToken = generateRefreshToken();
+
+  await executor.insert(device_refresh_tokens).values({
+    token_hash: hashToken(refreshToken),
+    device_session_id: deviceSessionId,
+    expires_at: new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString(),
+  });
+
+  return { token, refreshToken, expiresIn: TOKEN_EXPIRY.oneHour };
+}
+
+/**
  * Issue an access token + refresh token pair for a device session.
  * The access token is short-lived (one hour). The refresh token is 30 days.
  */
@@ -190,27 +214,7 @@ export async function issueSessionCredentials(
   user: User,
   deviceSessionId: string
 ): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
-  const accessToken = generateApiToken(
-    user,
-    { deviceSessionId },
-    { expiresIn: TOKEN_EXPIRY.oneHour }
-  );
-
-  const refreshToken = generateRefreshToken();
-  const tokenHash = hashToken(refreshToken);
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-  await db.insert(device_refresh_tokens).values({
-    token_hash: tokenHash,
-    device_session_id: deviceSessionId,
-    expires_at: expiresAt,
-  });
-
-  return {
-    token: accessToken,
-    refreshToken,
-    expiresIn: TOKEN_EXPIRY.oneHour,
-  };
+  return mintSessionCredentials(db, user, deviceSessionId);
 }
 
 /**
@@ -434,25 +438,9 @@ export async function rotateRefreshToken(
       .where(eq(device_sessions.id, lockedSession.id));
 
     // Step 7: Issue the replacement pair in the same transaction.
-    const accessToken = generateApiToken(
-      user,
-      { deviceSessionId: lockedSession.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
-    );
+    const pair = await mintSessionCredentials(tx, user, lockedSession.id);
 
-    const newRefreshToken = generateRefreshToken();
-    const newExpiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-    await tx.insert(device_refresh_tokens).values({
-      token_hash: hashToken(newRefreshToken),
-      device_session_id: lockedSession.id,
-      expires_at: newExpiresAt,
-    });
-
-    return {
-      kind: 'ok',
-      pair: { token: accessToken, refreshToken: newRefreshToken, expiresIn: TOKEN_EXPIRY.oneHour },
-    } as const;
+    return { kind: 'ok', pair } as const;
   });
 
   if (outcome.kind === 'session_revoked') {
@@ -510,31 +498,12 @@ export async function createDeviceSessionWithAttestedKey(params: {
 
     const evictedSessionIds = await enforceLiveAppSessionLimit(tx, params.userId);
 
-    const accessToken = generateApiToken(
-      params.user,
-      { deviceSessionId: session.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
-    );
-
-    const refreshToken = generateRefreshToken();
-    const tokenHash = hashToken(refreshToken);
-    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY.thirtyDays * 1000).toISOString();
-
-    await tx.insert(device_refresh_tokens).values({
-      token_hash: tokenHash,
-      device_session_id: session.id,
-      expires_at: expiresAt,
-    });
-
-    return {
-      credentials: {
-        token: accessToken,
-        refreshToken,
-        expiresIn: TOKEN_EXPIRY.oneHour,
-        sessionId: session.id,
-      },
-      evictedSessionIds,
+    const credentials = {
+      ...(await mintSessionCredentials(tx, params.user, session.id)),
+      sessionId: session.id,
     };
+
+    return { credentials, evictedSessionIds };
   });
 
   for (const evictedSessionId of evictedSessionIds) {

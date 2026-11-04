@@ -63,11 +63,9 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
   // Deliver the code so the response does not reveal account existence; the
   // token exchange refuses the signup with a step-up shipped apps can render.
   if (!eligibility.ok && eligibility.errorCode !== 'EMAIL-SIGNUP-DISABLED') {
-    if (eligibility.errorCode === 'INVALID_EMAIL') {
-      await enforceResponseFloor(startTime);
-      return NextResponse.json({ success: true, challengeId: randomUUID() });
-    }
-    if (eligibility.errorCode === 'BLOCKED') {
+    // A rejected address and a blocked domain are deliberately
+    // indistinguishable from an eligible sign-in.
+    if (eligibility.errorCode === 'INVALID_EMAIL' || eligibility.errorCode === 'BLOCKED') {
       await enforceResponseFloor(startTime);
       return NextResponse.json({ success: true, challengeId: randomUUID() });
     }

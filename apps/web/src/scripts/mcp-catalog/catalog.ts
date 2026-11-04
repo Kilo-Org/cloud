@@ -68,6 +68,9 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.mcpGuardrails.approveConnection': true,
   'organizations.mcpGuardrails.delete': true,
   'organizations.guardrails.update': true,
+  // Disabling a gateway or pinning a data region changes routing for every member, so org admins
+  // set it in the app only.
+  'organizations.settings.updateGatewaySettings': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
 };
@@ -92,7 +95,7 @@ export function isDenylistedPath(path: string): boolean {
 
 /**
  * Procedure builders that reject non-admin users. `packages/web-shared/src/lib/trpc/init.ts`
- * builds every admin-only procedure from `adminProcedure`, and the other three
+ * builds every admin-only procedure from `adminProcedure`, and the other
  * variants in `apps/web/src/lib/trpc/admin-procedures.ts` chain on it, so a
  * chain whose head is any of these is admin-guarded.
  */
@@ -101,6 +104,7 @@ export const ADMIN_GUARD_PROCEDURES = [
   'creditManagerProcedure',
   'superadminProcedure',
   'sessionViewerProcedure',
+  'apiRequestLogExporterProcedure',
 ] as const;
 
 /** Instruction every generated summary must follow. */

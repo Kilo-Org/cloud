@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "翻译工具摘要",
     "toolSummaryTranslationSubtitle": "将每个工具摘要发送给模型，翻译成你的应用语言。翻译失败时将显示原文。",
     "toolSummaryTranslationModelUnavailableNotice": "此模型已不再提供。点按$t(common.model)选择其他模型。",
+    "translateSummaries": "翻译摘要",
     "autoExpandThinkingInactiveSubtitle": "思考详情处于隐藏状态时不产生任何效果。"
   },
   "notifications": {
@@ -1048,6 +1049,7 @@
       "prOpened": "已创建 REVIEW.md 拉取请求",
       "alreadyPresent": "REVIEW.md 中已包含这些审查准则",
       "status": {
+        "open": "待处理",
         "edited": "已编辑",
         "opening_change_request": "正在创建 PR",
         "change_request_failed": "PR 创建失败",
@@ -1083,6 +1085,8 @@
     "overview": {
       "allAreas": "所有方面",
       "nSelected": "已选 {{displayCount}} 项",
+      "nSelected_one": "已选 {{displayCount}} 项",
+      "nSelected_other": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "set": "已设置",
       "notSet": "未设置"
@@ -1182,6 +1186,8 @@
       "triageReasoning": "初步评估依据",
       "watchInCloudAgent": "在云端智能体中查看",
       "whereFound": "发现位置（{{displayCount}}）",
+      "whereFound_one": "发现位置（{{displayCount}}）",
+      "whereFound_other": "发现位置（{{displayCount}}）",
       "yes": "是",
       "action": {
         "analyzeCodebase": "分析代码库",
@@ -1310,6 +1316,7 @@
       "repoSummaryHigh_other": "{{displayCount}} 个高危",
       "repositoryActionPlan": "仓库处理计划",
       "settings": "设置",
+      "syncing": "同步中…",
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态",
@@ -1340,6 +1347,8 @@
       "breakdownMediumLow_other": "中低危：{{displayCount}} 个",
       "dueThisWeek": "本周到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
+      "dueThisWeekDetail_one": "其中 {{exploitable}} 个已确认可利用",
+      "dueThisWeekDetail_other": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",
       "reviewSlaAssignment": "检查 SLA 设置",
       "allOpenFindingsTracked": "所有未解决的安全问题均已纳入跟踪"
@@ -1458,6 +1467,7 @@
     },
     "scopeEntry": {
       "connectDescription": "安装 Kilo GitHub 应用，即可自动同步 Dependabot 警报，并统一管理各仓库的安全问题。",
+      "connectOwnerOnly": "请组织所有者或管理员连接 {{platform}}。",
       "connectTitle": "连接 GitHub 开始使用",
       "couldNotLoad": "无法加载安全智能体",
       "installApp": "安装 GitHub 应用",
@@ -1533,6 +1543,7 @@
       "actionFailed": "无法完成此操作。请重试。",
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
+      "syncNoRepositoriesNoManage": "同步范围内没有仓库。组织所有者、管理员或账单管理员必须先连接仓库，然后才能同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
       "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
       "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
@@ -1689,6 +1700,8 @@
       "cannotCompleteTitle": "无法完成安装",
       "notAdminMessage": "只有该账号的 GitHub 管理员才能建立连接。请联系组织管理员安装 Kilo。",
       "alreadyClaimedMessage": "此 GitHub 应用安装已关联另一个 Kilo 账号。请先在那个账号中断开连接。",
+      "installationUnavailableMessage": "此 GitHub App 安装已暂停或不再可用。请在 GitHub 中恢复或重新安装，然后重新开始。",
+      "multipleInstallationsMessage": "此 Kilo 组织目前只能连接一个 GitHub 组织。",
       "didNotCompleteTitle": "安装未完成",
       "didNotCompleteMessage": "GitHub 应用安装未完成。请从应用中重试。"
     },
@@ -1845,7 +1858,6 @@
       "defaultProfileResolvesTo": "当前为 {{name}}",
       "defaultProfileResolvesToAccessibility": "默认配置文件：{{name}}",
       "manageProfiles": "管理配置文件",
-      "noProfiles": "还没有配置文件。创建一个以添加环境变量、MCP 服务器和技能。",
       "advancedConfig": "高级配置",
       "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
       "saveAsProfile": "另存为配置文件",
@@ -2531,7 +2543,8 @@
     "newSessionOn": "在 {{name}} 上新建会话",
     "noMatchingSessions": "暂无匹配的会话。",
     "onlyFirstFilesAttached": "仅附加前 {{displayCount}} 个文件。",
-    "staleMessage": "此分享内容已失效。",
+    "staleMessage": "请从你分享时使用的应用重新发送。",
+    "staleTitle": "分享不可用",
     "retryableMessage": "无法加载你的会话。",
     "emptyMessage": "暂无会话。请新建会话来发送此内容。",
     "cliNotConnectedTitle": "会话未连接",
@@ -2709,8 +2722,13 @@
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
+      "reconnectTitleGitLab": "重新连接 GitLab",
+      "reconnectTitleBitbucket": "重新连接 Bitbucket",
       "reconnectDescription": "你的 GitHub 连接授权已被撤销。",
       "gitlabDescription": "在手机上审查合并请求",
+      "gitlabInstanceMismatchTitle": "GitLab 连接指向其他实例",
+      "gitlabInstanceMismatchDescription": "你的 GitLab 连接指向 {{connected}}，但此合并请求位于 {{requested}}。请在该实例上连接 GitLab 以便审查。",
+      "checkActiveConnection": "连接已激活，但此项仍无法加载。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
@@ -2985,7 +3003,6 @@
         "squash": "压缩合并"
       },
       "terminal": {
-        "alreadyMerged": "已合并",
         "closed": "此拉取请求已关闭",
         "closedMergeRequest": "此合并请求已关闭"
       },
@@ -3002,7 +3019,6 @@
         "requiredReviewsTitle": "尚未获得所需的审查批准",
         "requiredReviewsDetail": "尚未获得必需审查者的批准，或仍在等待批准。",
         "failingChecksTitle": "必需检查未通过",
-        "failingChecksDetail": "必需的状态检查未通过。",
         "unstableTitle": "部分检查未通过",
         "unstableDetail": "部分非必需检查未通过，但不影响合并。",
         "draftTitle": "拉取请求草稿",
@@ -3109,7 +3125,12 @@
       "pendingComment_other": "条待提交评论",
       "pendingComment_one": "条待提交的评论",
       "summaryOptional": "总结（可选）",
-      "partialPostedMessage": "已发布 {{displayFreshCount}} 条评论。另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
+      "partialPostedFresh": "已发布 {{displayFreshCount}} 条评论。",
+      "partialPostedFresh_one": "已发布 {{displayFreshCount}} 条评论。",
+      "partialPostedFresh_other": "已发布 {{displayFreshCount}} 条评论。",
+      "partialPostedStale": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
+      "partialPostedStale_one": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
+      "partialPostedStale_other": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查意见",
       "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "你没有管理支出提醒的权限。",
     "pushOffByCategory": "已在通知中关闭",
     "multiplierMaxError": "请输入 {{max}} 或更小的倍数",
-    "thresholdMaxError": "请输入不大于 {{max}} 的金额。"
+    "thresholdMaxError": "请输入不大于 {{max}} 的金额"
   },
   "profiles": {
     "title": "配置文件",

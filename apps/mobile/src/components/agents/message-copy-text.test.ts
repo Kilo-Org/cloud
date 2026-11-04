@@ -166,6 +166,18 @@ describe('messageTextParts — the Copy message payload', () => {
     expect(collectCopyableText({ parts: messageTextParts(parts) })).toBe('Hello\n\nworld');
   });
 
+  it('drops injected server context and keeps the human prompt', () => {
+    const parts: Part[] = [
+      makeTextPart({
+        id: 'context',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      }),
+      makeTextPart({ id: 'prompt', text: 'Fix the bug' }),
+    ];
+    expect(collectCopyableText({ parts: messageTextParts(parts) })).toBe('Fix the bug');
+  });
+
   it('still drops the synthetic snapshot-progress text', () => {
     const parts: Part[] = [
       makeTextPart({ text: '⠋ Initializing snapshot…', synthetic: true }),

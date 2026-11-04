@@ -78,6 +78,11 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useUpdateBranchMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useDisableAutoMergeMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
 }));
+// This suite asserts the action buttons' variants; the blocked panel's rows
+// have their own selector tests.
+vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
+  useMergeBlockedReasons: () => ({ reasons: [] }),
+}));
 
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -195,6 +200,20 @@ describe('PrReviewOverview action hierarchy', () => {
     // Exactly one primary action in the overview body.
     const primaries = buttons.filter(node => (node.props.variant ?? 'default') === 'default');
     expect(primaries).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('offers no review re-entry once the pull request is merged', async () => {
+    query.data = { ...MERGEABLE_OVERVIEW, state: 'merged' };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    expect(
+      buttons.find(node => node.props.accessibilityLabel === 'Review pull request')
+    ).toBeUndefined();
 
     unmount();
   });

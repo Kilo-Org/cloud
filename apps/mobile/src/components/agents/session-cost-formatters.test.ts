@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 import { formatSpokenCost } from './session-row-accessibility-label';
 import {
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
+  formatSessionCostBadge,
   formatSessionTotalCost,
   selectSessionCostInputs,
 } from './session-list-helpers';
@@ -53,6 +55,43 @@ describe('formatSessionTotalCost (visible)', () => {
 
   it('formats multi-dollar values to two decimals', () => {
     expect(formatSessionTotalCost(1_234_567)).toBe('$1.23');
+  });
+});
+
+describe('formatSessionCostBadge (header pill)', () => {
+  it('keeps the sign in front of the amount in every language', async () => {
+    // Several locales format USD as a suffix with a separator (`0.0005 $`),
+    // which the pill's dense slot cannot show beside the percentage; the sign
+    // leads the number so the run reads as the one value it is. The digits stay
+    // the locale's own: a locale that resolves to a non-Latin numbering system
+    // still gets its own numerals after the sign, so the assertion derives them
+    // from the formatter instead of assuming one.
+    await i18n.changeLanguage('ar');
+    try {
+      const micro = formatNumber(0.0005, 'ar', {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      });
+      const cents = formatNumber(0.01, 'ar', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      expect(formatSessionCostBadge(500)).toBe(`$${micro}`);
+      expect(formatSessionCostBadge(13_113)).toBe(`$${cents}`);
+      // No separator between the sign and the first digit.
+      expect(formatSessionCostBadge(500)).toMatch(/^\$\S/u);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    expect(formatSessionCostBadge(500)).toBe('$0.0005');
+  });
+
+  it('keeps the canonical omit band and decimal thresholds', () => {
+    expect(formatSessionCostBadge(null)).toBeNull();
+    expect(formatSessionCostBadge(0)).toBeNull();
+    expect(formatSessionCostBadge(49)).toBeNull();
+    expect(formatSessionCostBadge(50)).toBe('$0.0001');
+    expect(formatSessionCostBadge(5000)).toBe('$0.01');
   });
 });
 

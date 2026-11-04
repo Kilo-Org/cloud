@@ -72,6 +72,17 @@ describe('classifyAuthResponse', () => {
     });
   });
 
+  it('classifies a 408 as retryable and carries Retry-After', () => {
+    expect(
+      classifyAuthResponse({ path: '/api/auth/native/token', status: 408, retryAfterHeader: '12' })
+    ).toEqual({ kind: 'retry', status: 408, retryAfterMs: 12_000 });
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 408 })).toEqual({
+      kind: 'retry',
+      status: 408,
+      retryAfterMs: undefined,
+    });
+  });
+
   it('classifies a 429 as retryable and carries Retry-After', () => {
     expect(
       classifyAuthResponse({ path: '/api/auth/native/otp', status: 429, retryAfterHeader: '12' })

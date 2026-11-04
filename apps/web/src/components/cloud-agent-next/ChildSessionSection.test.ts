@@ -316,6 +316,62 @@ describe('ChildSessionSection live subscription', () => {
     });
     expect(container.textContent).toContain('1 tool call');
   });
+
+  it.each([
+    [
+      'read',
+      { filePath: '/cloud-agent/sessions/ses_test/src/nested/read.ts' },
+      'Read src/nested/read.ts',
+    ],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'Edit src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'Write src/write.ts'],
+    ['read', { filePath: '/cloud-agent/sessions/ses_test' }, 'Read .'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/src' }, 'List src'],
+    [
+      'bash',
+      { command: 'pnpm test', cwd: '/cloud-agent/sessions/ses_test/src' },
+      'Shell pnpm · src',
+    ],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/root.ts' }, 'Custom src/root.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test', pattern: '*.ts' }, 'Glob . · *.ts'],
+    [
+      'grep',
+      { path: '/cloud-agent/sessions/ses_test/src', pattern: 'needle' },
+      'Grep src · needle',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'Mcp src/mcp.ts',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'normalizes file and directory context in child %s activity',
+    (tool, input, expected) => {
+      const child = childMessageWithTools(1);
+      const part = readToolPart('tool-1');
+      part.tool = tool;
+      part.state = { status: 'running', input, time: { start: 1 } };
+      child.parts = [part];
+
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            childMessages: [child],
+          })
+        )
+      );
+
+      expect(container.textContent).toContain(expected);
+      expect(container.innerHTML).not.toContain('ses_test');
+      expect(container.textContent).not.toContain('/cloud-agent/');
+    }
+  );
 });
 
 describe('ChildSessionSection drawer entry', () => {

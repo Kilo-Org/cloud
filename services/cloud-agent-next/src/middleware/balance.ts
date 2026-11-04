@@ -28,6 +28,16 @@ const SESSION_SCOPED_MUTATIONS = new Set([
   'send',
 ]);
 
+/**
+ * Balance-required mutations whose billing is deferred to the handler. The
+ * procedure stays in `BALANCE_REQUIRED_MUTATIONS` so the classification, auth
+ * and skip-header rejection still run; only the personal-scope charge is
+ * skipped. `continueHostedWorkspace` derives its payer (organization or
+ * personal) from its source sessions after authorizing them, which the
+ * middleware cannot see.
+ */
+const HANDLER_VALIDATED_BALANCE_MUTATIONS = new Set(['continueHostedWorkspace']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -81,6 +91,11 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     const balanceCalls = parsed.calls.filter(call =>
       BALANCE_REQUIRED_MUTATIONS.has(call.procedure)
     );
+    // Procedures that own their own balance check are excluded from the
+    // middleware charge but still count for authorization/classification.
+    const billedCalls = balanceCalls.filter(
+      call => !HANDLER_VALIDATED_BALANCE_MUTATIONS.has(call.procedure)
+    );
     const procedureLabel = balanceCalls.map(call => call.procedure).join(',');
     const skipBalanceCheck = c.req.header(SKIP_BALANCE_CHECK_HEADER) === 'true';
 
@@ -124,7 +139,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     let validatedSessionAccess: ValidatedSessionAccess | undefined;
     let sessionAccessCount = 0;
 
-    for (const call of balanceCalls) {
+    for (const call of billedCalls) {
       if (!isRecord(call.input)) {
         return buildTrpcErrorResponse(400, 'Invalid request body', call.procedure);
       }

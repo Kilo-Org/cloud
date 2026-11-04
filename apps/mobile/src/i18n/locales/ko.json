@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "도구 요약 번역",
     "toolSummaryTranslationSubtitle": "각 도구 요약을 모델로 보내 앱 언어로 번역합니다. 번역에 실패하면 원본이 표시됩니다.",
     "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요.",
+    "translateSummaries": "요약 번역",
     "autoExpandThinkingInactiveSubtitle": "추론 내용이 숨겨진 동안에는 효과가 없습니다."
   },
   "notifications": {
@@ -1048,6 +1049,7 @@
       "prOpened": "REVIEW.md 풀 리퀘스트가 생성되었습니다",
       "alreadyPresent": "지침이 이미 REVIEW.md에 있습니다",
       "status": {
+        "open": "열림",
         "edited": "수정됨",
         "opening_change_request": "PR 생성 중",
         "change_request_failed": "PR 생성 실패",
@@ -1083,6 +1085,8 @@
     "overview": {
       "allAreas": "모든 영역",
       "nSelected": "{{displayCount}}개 선택됨",
+      "nSelected_one": "{{displayCount}}개 선택됨",
+      "nSelected_other": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "set": "설정됨",
       "notSet": "설정 안 됨"
@@ -1182,6 +1186,8 @@
       "triageReasoning": "분류 근거",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
+      "whereFound_one": "발견 위치({{displayCount}})",
+      "whereFound_other": "발견 위치({{displayCount}})",
       "yes": "예",
       "action": {
         "analyzeCodebase": "코드베이스 분석",
@@ -1310,6 +1316,7 @@
       "repoSummaryHigh_other": "높음 {{displayCount}}건",
       "repositoryActionPlan": "저장소 조치 계획",
       "settings": "설정",
+      "syncing": "동기화 중…",
       "syncNow": "지금 동기화",
       "syncQueued": "동기화를 대기열에 추가했습니다.",
       "syncStatusUnavailable": "동기화 상태를 확인할 수 없습니다.",
@@ -1340,6 +1347,8 @@
       "breakdownMediumLow_other": "중간·낮음 {{displayCount}}건",
       "dueThisWeek": "이번 주 마감",
       "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
+      "dueThisWeekDetail_one": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
+      "dueThisWeekDetail_other": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",
       "reviewSlaAssignment": "SLA 지정 내역 검토",
       "allOpenFindingsTracked": "모든 미해결 문제 추적 중"
@@ -1458,6 +1467,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub 앱을 설치하여 모든 저장소의 Dependabot 알림을 자동으로 동기화하고 보안 문제를 관리하세요.",
+      "connectOwnerOnly": "조직 소유자 또는 관리자에게 {{platform}}을(를) 연결해 달라고 요청하세요.",
       "connectTitle": "GitHub 연결로 시작하기",
       "couldNotLoad": "보안 에이전트를 불러올 수 없습니다.",
       "installApp": "GitHub 앱 설치",
@@ -1533,6 +1543,7 @@
       "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요.",
       "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다.",
       "syncNoRepositories": "동기화 범위에 리포지토리가 없습니다. 보안 에이전트가 모니터링할 리포지토리를 선택한 후 다시 동기화하세요.",
+      "syncNoRepositoriesNoManage": "동기화 범위에 리포지토리가 없습니다. 동기화하려면 조직 소유자, 관리자 또는 결제 관리자가 리포지토리를 연결해야 합니다.",
       "syncIntegrationInactive": "보안 에이전트의 GitHub 연결이 활성화되어 있지 않습니다. Kilo GitHub App을 다시 연결한 후 다시 동기화하세요.",
       "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요.",
       "configConflict": "보안 에이전트 설정이 다른 곳에서 변경되었습니다. 최신 설정을 검토하고 다시 저장하세요."
@@ -1689,6 +1700,8 @@
       "cannotCompleteTitle": "설치 완료 불가",
       "notAdminMessage": "해당 계정의 GitHub 관리자만 연결할 수 있습니다. 조직 관리자에게 Kilo 설치를 요청하세요.",
       "alreadyClaimedMessage": "해당 GitHub 앱 설치는 이미 다른 Kilo 계정에 연결되어 있습니다. 먼저 해당 계정에서 연결을 해제하세요.",
+      "installationUnavailableMessage": "이 GitHub App 설치는 일시 중단되었거나 더 이상 사용할 수 없습니다. GitHub에서 복원하거나 다시 설치한 후 다시 시작하세요.",
+      "multipleInstallationsMessage": "이 Kilo 조직은 현재 하나의 GitHub 조직만 연결할 수 있습니다.",
       "didNotCompleteTitle": "설치 미완료",
       "didNotCompleteMessage": "GitHub 앱 설치가 완료되지 않았습니다. 앱에서 다시 시도하세요."
     },
@@ -1845,7 +1858,6 @@
       "defaultProfileResolvesTo": "{{name}}(으)로 설정됨",
       "defaultProfileResolvesToAccessibility": "기본 프로필: {{name}}",
       "manageProfiles": "프로필 관리",
-      "noProfiles": "아직 프로필이 없습니다. 환경 변수, MCP 서버 및 기술을 추가하려면 하나를 만드십시오.",
       "advancedConfig": "고급 구성",
       "advancedConfigDescription": "이 세션에 적용됩니다. 프로필로 저장하면 다음에도 그대로 유지됩니다.",
       "saveAsProfile": "프로필로 저장",
@@ -2531,7 +2543,8 @@
     "newSessionOn": "{{name}}의 새 세션",
     "noMatchingSessions": "일치하는 세션이 없습니다.",
     "onlyFirstFilesAttached": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
-    "staleMessage": "이 공유 항목은 더 이상 사용할 수 없습니다.",
+    "staleMessage": "공유한 앱에서 다시 보내세요.",
+    "staleTitle": "공유할 수 없음",
     "retryableMessage": "세션을 불러오지 못했습니다.",
     "emptyMessage": "아직 세션이 없습니다. 이 내용을 보내려면 새 세션을 시작하세요.",
     "cliNotConnectedTitle": "세션 연결 끊김",
@@ -2709,8 +2722,13 @@
       "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
       "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
       "reconnectTitle": "GitHub 다시 연결",
+      "reconnectTitleGitLab": "GitLab 다시 연결",
+      "reconnectTitleBitbucket": "Bitbucket 다시 연결",
       "reconnectDescription": "GitHub 연결이 해제되었습니다.",
       "gitlabDescription": "모바일에서 머지 요청 리뷰",
+      "gitlabInstanceMismatchTitle": "GitLab 연결이 다른 인스턴스용입니다",
+      "gitlabInstanceMismatchDescription": "GitLab 연결은 {{connected}}용이지만, 이 머지 요청은 {{requested}}에 있습니다. 검토하려면 해당 인스턴스에서 GitLab을 연결하세요.",
+      "checkActiveConnection": "연결은 활성 상태이지만 이 항목은 여전히 불러올 수 없습니다.",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
       "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
       "gitlabReconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
@@ -2985,7 +3003,6 @@
         "squash": "스쿼시"
       },
       "terminal": {
-        "alreadyMerged": "이미 병합됨",
         "closed": "풀 리퀘스트 닫힘",
         "closedMergeRequest": "머지 요청 닫힘"
       },
@@ -3002,7 +3019,6 @@
         "requiredReviewsTitle": "필수 리뷰 미완료",
         "requiredReviewsDetail": "필수 리뷰어의 승인이 없거나 대기 중입니다.",
         "failingChecksTitle": "필수 검사 실패",
-        "failingChecksDetail": "필수 상태 검사가 실패했습니다.",
         "unstableTitle": "일부 검사 실패",
         "unstableDetail": "필수가 아닌 검사가 실패했습니다. 병합은 진행할 수 있습니다.",
         "draftTitle": "초안 풀 리퀘스트",
@@ -3109,7 +3125,12 @@
       "pendingComment_other": "제출 대기 중인 댓글",
       "pendingComment_one": "제출 대기 중인 댓글",
       "summaryOptional": "요약(선택 사항)",
-      "partialPostedMessage": "댓글 {{displayFreshCount}}개를 게시했습니다. 이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
+      "partialPostedFresh": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
+      "partialPostedFresh_one": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
+      "partialPostedFresh_other": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
+      "partialPostedStale": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
+      "partialPostedStale_one": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
+      "partialPostedStale_other": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitReview": "리뷰 제출",
       "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "이 범위의 지출이 한도를 넘거나 평소 시간당 속도를 크게 웃돌면 청구 담당자에게 이메일 또는 푸시로 알림을 보냅니다.",
     "thresholdTitle": "임계값 초과",
-    "thresholdSubtitle": "누적 지출이 한도를 초과합니다",
+    "thresholdSubtitle": "선택한 기간 동안 이 범위의 누적 지출이 한도를 초과합니다",
     "anomalyTitle": "시간당 급증",
-    "anomalySubtitle": "한 시간의 지출이 이 범위의 평소 속도를 크게 웃돕니다",
+    "anomalySubtitle": "이 범위의 시간당 요율이 자체 p95 기준선을 크게 웃돕니다",
     "limitLabel": "한도 (USD)",
     "windowLabel": "기간",
     "window24h": "24시간",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
     "pushOffByCategory": "알림에서 꺼짐",
     "multiplierMaxError": "{{max}} 이하의 배수를 입력하세요",
-    "thresholdMaxError": "{{max}} 이하의 금액을 입력하세요."
+    "thresholdMaxError": "{{max}} 이하의 금액을 입력하세요"
   },
   "profiles": {
     "title": "프로필",

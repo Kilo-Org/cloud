@@ -62,6 +62,11 @@ export function ModelPickerContent() {
     router.back();
   }, [router]);
 
+  // A caller that keeps no variant cannot apply an effort picked here, so the
+  // rows leave the chips out and a model tap is the whole selection. Read from
+  // the bridge rather than a prop: the slot is the picker route's only input.
+  const acceptsVariant = bridge?.acceptsVariant ?? true;
+
   useFocusEffect(
     useCallback(() => {
       const nextBridge = modelPickerSlot.get(routeKey);
@@ -172,11 +177,11 @@ export function ModelPickerContent() {
       selectedVariantRef.current = selection.variant;
       setSelectedModel(option.id);
       setSelectedVariant(selection.variant);
-      if (option.variants.length <= 1) {
+      if (!acceptsVariant || option.variants.length <= 1) {
         closePicker();
       }
     },
-    [bridge, closePicker]
+    [acceptsVariant, bridge, closePicker]
   );
 
   // Hoisted out of the list body: the inline arrow gave the virtualized list a
@@ -204,6 +209,7 @@ export function ModelPickerContent() {
           option={item.model}
           selected={item.model.id === selectedModel}
           selectedVariant={selectedVariant}
+          acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
           showProvider={item.showsProvider}
           onSelectModel={handleSelectModel}
@@ -212,7 +218,14 @@ export function ModelPickerContent() {
         />
       );
     },
-    [handleSelectModel, handleSelectVariant, handleToggleFavorite, selectedModel, selectedVariant]
+    [
+      acceptsVariant,
+      handleSelectModel,
+      handleSelectVariant,
+      handleToggleFavorite,
+      selectedModel,
+      selectedVariant,
+    ]
   );
 
   if (!bridge) {

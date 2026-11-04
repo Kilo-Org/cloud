@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request pour REVIEW.md ouverte",
       "alreadyPresent": "Les consignes figurent déjà dans REVIEW.md",
       "status": {
+        "open": "Ouverte",
         "edited": "Modifiée",
         "opening_change_request": "Ouverture de la PR",
         "change_request_failed": "Échec de l’ouverture de la PR",
@@ -1054,6 +1055,9 @@
     "overview": {
       "allAreas": "Tous les domaines",
       "nSelected": "{{displayCount}} sélectionnés",
+      "nSelected_one": "{{displayCount}} sélectionnés",
+      "nSelected_other": "{{displayCount}} sélectionnés",
+      "nSelected_many": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
       "set": "Défini",
       "notSet": "Non défini"
@@ -1153,6 +1157,9 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
+      "whereFound_one": "Emplacements détectés ({{displayCount}})",
+      "whereFound_many": "Emplacements détectés ({{displayCount}})",
+      "whereFound_other": "Emplacements détectés ({{displayCount}})",
       "yes": "Oui",
       "action": {
         "analyzeCodebase": "Analyser la base de code",
@@ -1289,6 +1296,7 @@
       "repoSummaryHigh_zero": "{{displayCount}} de gravité élevée",
       "repositoryActionPlan": "Plan d'action par dépôt",
       "settings": "Paramètres",
+      "syncing": "Synchronisation…",
       "syncNow": "Synchroniser maintenant",
       "syncQueued": "Synchronisation en file d'attente",
       "syncStatusUnavailable": "L'état de la synchronisation est indisponible.",
@@ -1327,6 +1335,9 @@
       "breakdownMediumLow_zero": "{{displayCount}} de gravité moyenne ou faible",
       "dueThisWeek": "Échéance cette semaine",
       "dueThisWeekDetail": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_one": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_many": "Dont {{exploitable}} confirmés exploitables",
+      "dueThisWeekDetail_other": "Dont {{exploitable}} confirmés exploitables",
       "noDeadline": "Aucune échéance",
       "reviewSlaAssignment": "Vérifier l'attribution des SLA",
       "allOpenFindingsTracked": "Tous les signalements ouverts sont suivis"
@@ -1445,6 +1456,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installez l'application GitHub de Kilo pour synchroniser automatiquement les alertes Dependabot et gérer les signalements de sécurité dans tous vos dépôts.",
+      "connectOwnerOnly": "Demandez à un propriétaire ou à un administrateur de l'organisation de connecter {{platform}}.",
       "connectTitle": "Connecter GitHub pour commencer",
       "couldNotLoad": "Impossible de charger l'agent de sécurité.",
       "installApp": "Installer l'application GitHub",
@@ -1521,6 +1533,7 @@
       "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
       "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer.",
       "syncNoRepositories": "Aucun dépôt ne fait partie du périmètre de synchronisation. Choisissez les dépôts que «Agent de sécurité» surveille, puis relancez la synchronisation.",
+      "syncNoRepositoriesNoManage": "Aucun dépôt ne fait partie du périmètre de synchronisation. Un propriétaire, un administrateur ou un responsable de la facturation de l'organisation doit connecter des dépôts avant que la synchronisation puisse être lancée.",
       "syncIntegrationInactive": "La connexion GitHub pour l'Agent de sécurité n'est pas active. Reconnectez Kilo GitHub App, puis relancez la synchronisation.",
       "syncMissingPermission": "L'application GitHub de Kilo ne peut pas lire les alertes de vulnérabilité. Accordez cette autorisation dans GitHub, puis synchronisez à nouveau.",
       "configConflict": "Les paramètres de l'agent de sécurité ont été modifiés ailleurs. Vérifiez les paramètres les plus récents et enregistrez à nouveau."
@@ -1771,7 +1784,6 @@
       "defaultProfileResolvesTo": "Correspond à {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil par défaut : {{name}}",
       "manageProfiles": "Gérer les profils",
-      "noProfiles": "Aucun profil pour l'instant. Créez-en un pour ajouter des variables d'environnement, des serveurs MCP et des compétences.",
       "advancedConfig": "Configuration avancée",
       "advancedConfigDescription": "S’applique à cette session. L’enregistrer comme profil le conserve pour la prochaine fois.",
       "saveAsProfile": "Enregistrer en tant que profil",
@@ -1998,9 +2010,9 @@
       "detailRetryingClone": "Nouvelle tentative de clonage (tentative {{attempt}} sur {{total}})",
       "detailSetupCommandFailed": "Échec de la commande de configuration {{index}}",
       "detailSetupCommandTimedOut": "Délai dépassé pour la commande de configuration {{index}}",
-      "detailColdRestore": "Restauration à froid, instantané appliqué, {{applied}} fichiers sur {{total}} restaurés",
+      "detailColdRestore": "Restauration à froid, instantané appliqué, fichiers restaurés : {{applied}} sur {{total}}",
       "detailProgressPercent": "{{percent}}% terminé",
-      "detailRestoreIncompleteReport": "Restauration de session incomplète : {{skipped}} fichiers sur {{total}} n'ont pas été restaurés ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauration de session incomplète — fichiers non restaurés : {{skipped}} sur {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Fichiers manquants : {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} et {{omitted}} autres",
       "detailReasonPatchFailed": "le correctif n'a pas pu être appliqué",
@@ -2378,6 +2390,7 @@
     "toolSummaryTranslation": "Traduire les résumés d'outils",
     "toolSummaryTranslationSubtitle": "Envoyez chaque résumé d'outil à un modèle pour le traduire dans la langue de votre application. L'original s'affiche si la traduction échoue.",
     "toolSummaryTranslationModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(common.model) pour en choisir un autre.",
+    "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
   "addCredits": {
@@ -2496,7 +2509,8 @@
     "newSessionOn": "Nouvelle session sur {{name}}",
     "noMatchingSessions": "Aucune session correspondante.",
     "onlyFirstFilesAttached": "Seuls les {{displayCount}} premiers fichiers seront joints.",
-    "staleMessage": "Ce partage n'est plus disponible.",
+    "staleMessage": "Envoyez-le à nouveau depuis l'app où vous l'avez partagé.",
+    "staleTitle": "Partage indisponible",
     "retryableMessage": "Impossible de charger vos sessions.",
     "emptyMessage": "Aucune session pour le moment — démarrez-en une nouvelle pour envoyer ceci.",
     "cliNotConnectedTitle": "Session non connectée",
@@ -2680,6 +2694,8 @@
       "cannotCompleteTitle": "Impossible de terminer l'installation",
       "notAdminMessage": "Seul un administrateur GitHub de ce compte peut le connecter. Demandez à un administrateur de l'organisation d'installer Kilo.",
       "alreadyClaimedMessage": "Cette installation GitHub est déjà liée à un autre compte Kilo. Déconnectez-la d'abord depuis cet autre compte.",
+      "installationUnavailableMessage": "Cette installation de GitHub App est suspendue ou n'est plus disponible. Restaurez-la ou réinstallez-la dans GitHub, puis réessayez.",
+      "multipleInstallationsMessage": "Cette organisation Kilo ne peut actuellement connecter qu'une seule organisation GitHub.",
       "didNotCompleteTitle": "Installation non terminée",
       "didNotCompleteMessage": "L'installation de l'application GitHub n'a pas été terminée. Réessayez depuis l'application."
     },
@@ -2749,8 +2765,13 @@
       "checkFailedTitleBitbucket": "Impossible de vérifier la connexion Bitbucket.",
       "providerCheckFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
       "reconnectTitle": "Reconnecter GitHub",
+      "reconnectTitleGitLab": "Reconnecter GitLab",
+      "reconnectTitleBitbucket": "Reconnecter Bitbucket",
       "reconnectDescription": "L'accès à votre compte GitHub a été révoqué.",
       "gitlabDescription": "Examiner les merge requests sur mobile",
+      "gitlabInstanceMismatchTitle": "La connexion GitLab concerne une autre instance",
+      "gitlabInstanceMismatchDescription": "Votre connexion GitLab concerne {{connected}}, mais cette merge request se trouve sur {{requested}}. Connectez GitLab sur cette instance pour l’examiner.",
+      "checkActiveConnection": "La connexion est active, mais cet élément ne peut toujours pas être chargé.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
       "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
@@ -3035,7 +3056,6 @@
         "squash": "Regroupement"
       },
       "terminal": {
-        "alreadyMerged": "Déjà fusionnée",
         "closed": "Demande de fusion fermée",
         "closedMergeRequest": "Ce merge request est fermé"
       },
@@ -3052,7 +3072,6 @@
         "requiredReviewsTitle": "Revues requises manquantes",
         "requiredReviewsDetail": "Les personnes dont la revue est requise n'ont pas encore donné leur approbation.",
         "failingChecksTitle": "Échec des vérifications requises",
-        "failingChecksDetail": "Les vérifications d'état requises échouent.",
         "unstableTitle": "Certaines vérifications échouent",
         "unstableDetail": "Certaines vérifications facultatives échouent. Elles ne bloquent pas la fusion.",
         "draftTitle": "PR en brouillon",
@@ -3162,7 +3181,14 @@
       "pendingComment_other": "commentaires en attente",
       "pendingComment_one": "commentaire en attente",
       "summaryOptional": "Résumé (facultatif)",
-      "partialPostedMessage": "Commentaires publiés : {{displayFreshCount}}. Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedFresh": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Commentaires publiés : {{displayFreshCount}}. ",
+      "partialPostedStale": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_one": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_many": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "partialPostedStale_other": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
       "submitReview": "Envoyer la revue",
       "pendingComment_many": "commentaires en attente",
@@ -3833,9 +3859,9 @@
   "spendAlerts": {
     "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
     "thresholdTitle": "Franchissement du seuil",
-    "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
+    "thresholdSubtitle": "Les dépenses cumulées de ce périmètre sur la fenêtre choisie dépassent votre limite",
     "anomalyTitle": "Pic horaire",
-    "anomalySubtitle": "Une heure est bien au-dessus du rythme habituel de ce périmètre",
+    "anomalySubtitle": "Le rythme horaire de ce périmètre est bien au-dessus de sa propre référence p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Fenêtre",
     "window24h": "24 heures",
@@ -3852,7 +3878,7 @@
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
     "pushOffByCategory": "Désactivé dans les notifications",
     "multiplierMaxError": "Saisissez un multiplicateur de {{max}} ou moins",
-    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins."
+    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins"
   },
   "profiles": {
     "title": "Profils",

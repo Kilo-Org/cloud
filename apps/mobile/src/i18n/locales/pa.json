@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ਟੂਲ ਸਾਰਾਂਸ਼ਾਂ ਦਾ ਅਨੁਵਾਦ ਕਰੋ",
     "toolSummaryTranslationSubtitle": "ਹਰ ਟੂਲ ਸਾਰਾਂਸ਼ ਨੂੰ ਤੁਹਾਡੀ ਐਪ ਦੀ ਭਾਸ਼ਾ ਵਿੱਚ ਅਨੁਵਾਦ ਕਰਨ ਲਈ ਮਾਡਲ ਨੂੰ ਭੇਜੋ। ਜੇ ਅਨੁਵਾਦ ਅਸਫਲ ਹੋਵੇ ਤਾਂ ਅਸਲ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ।",
     "toolSummaryTranslationModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(common.model) 'ਤੇ ਟੈਪ ਕਰੋ।",
+    "translateSummaries": "ਸਾਰਾਂਸ਼ਾਂ ਦਾ ਅਨੁਵਾਦ ਕਰੋ",
     "autoExpandThinkingInactiveSubtitle": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਲੁਕਾਇਆ ਹੋਣ 'ਤੇ ਕੋਈ ਅਸਰ ਨਹੀਂ ਹੁੰਦਾ।"
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "ਰੀਬੇਸ"
       },
       "terminal": {
-        "alreadyMerged": "ਪਹਿਲਾਂ ਹੀ ਮਰਜ ਹੋ ਗਈ",
         "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ",
         "closedMergeRequest": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "ਲੋੜੀਂਦੀਆਂ ਸਮੀਖਿਆਵਾਂ ਅਜੇ ਬਾਕੀ",
         "requiredReviewsDetail": "ਲੋੜੀਂਦੇ ਸਮੀਖਿਅਕਾਂ ਦੀ ਮਨਜ਼ੂਰੀ ਅਜੇ ਨਹੀਂ ਮਿਲੀ ਜਾਂ ਬਾਕੀ ਹੈ।",
         "failingChecksTitle": "ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ",
-        "failingChecksDetail": "ਸਥਿਤੀ ਦੀਆਂ ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ।",
         "unstableTitle": "ਕੁਝ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ",
         "unstableDetail": "ਕੁਝ ਵਿਕਲਪਿਕ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ। ਇਹ ਮਰਜ ਨੂੰ ਨਹੀਂ ਰੋਕਣਗੀਆਂ।",
         "draftTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਖਰੜਾ",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
+      "reconnectTitleGitLab": "GitLab ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
+      "reconnectTitleBitbucket": "Bitbucket ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectDescription": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
       "gitlabDescription": "ਮੋਬਾਈਲ 'ਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
+      "gitlabInstanceMismatchTitle": "GitLab ਕਨੈਕਸ਼ਨ ਹੋਰ ਇੰਸਟੈਂਸ ਲਈ ਹੈ",
+      "gitlabInstanceMismatchDescription": "ਤੁਹਾਡਾ GitLab ਕਨੈਕਸ਼ਨ {{connected}} ਲਈ ਹੈ, ਪਰ ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ {{requested}} 'ਤੇ ਹੈ। ਇਸ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉਸ ਇੰਸਟੈਂਸ 'ਤੇ GitLab ਕਨੈਕਟ ਕਰੋ।",
+      "checkActiveConnection": "ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਹੈ, ਪਰ ਇਹ ਆਈਟਮ ਅਜੇ ਵੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਦੀ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
@@ -704,7 +708,12 @@
       "pendingComment_other": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "submitCountOfTotal": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
       "submitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰੋ",
-      "partialPostedMessage": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedFresh": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedFresh_one": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedFresh_other": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedStale": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedStale_one": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedStale_other": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
       "blockedRequestChanges": "ਬਦਲਾਵਾਂ ਦੀ ਬੇਨਤੀ ਕਰਨ ਲਈ ਸਾਰ ਜਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਟਿੱਪਣੀ ਜੋੜੋ।",
       "blockedComment": "ਟਿੱਪਣੀ ਵਾਲੀ ਸਮੀਖਿਆ ਪੋਸਟ ਕਰਨ ਲਈ ਸਾਰ ਜਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਟਿੱਪਣੀ ਜੋੜੋ।"
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
       "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
       "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
       "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md ਲਈ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੀ ਗਈ",
       "alreadyPresent": "ਹਦਾਇਤਾਂ REVIEW.md ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹਨ",
       "status": {
+        "open": "ਖੁੱਲ੍ਹਾ",
         "edited": "ਸੰਪਾਦਿਤ",
         "opening_change_request": "PR ਖੋਲ੍ਹੀ ਜਾ ਰਹੀ ਹੈ",
         "change_request_failed": "PR ਅਸਫਲ ਰਹੀ",
@@ -1610,6 +1620,8 @@
       "set": "ਸੈੱਟ ਕੀਤਾ ਹੋਇਆ",
       "notSet": "ਸੈੱਟ ਨਹੀਂ ਹੈ",
       "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_one": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_other": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "ਦੁਰਵਰਤੋਂ ਦੀ ਸੰਭਾਵਨਾ ਦਾ ਆਧਾਰ",
       "suggestedFix": "ਸੁਝਾਇਆ ਗਿਆ ਹੱਲ",
       "whereFound": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
+      "whereFound_one": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
+      "whereFound_other": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
       "fullReport": "ਤਿਆਰ ਕੀਤੀ ਪੂਰੀ ਰਿਪੋਰਟ",
       "yes": "ਹਾਂ",
       "no": "ਨਹੀਂ",
@@ -1794,6 +1808,7 @@
       "priorityFindingsPending": "ਪਹਿਲੇ ਸਿੰਕ ਤੋਂ ਬਾਅਦ ਤਰਜੀਹ ਵਾਲੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "refreshFailed": "ਰਿਫਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ — ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ ਡੇਟਾ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "settings": "ਸੈਟਿੰਗਾਂ",
+      "syncing": "ਸਿੰਕ ਹੋ ਰਿਹਾ ਹੈ…",
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
       "syncQueued": "ਸਿੰਕ ਕਰਨ ਦੀ ਬੇਨਤੀ ਕਤਾਰ ਵਿੱਚ ਪਾਈ ਗਈ",
       "syncStatusUnavailable": "ਸਿੰਕ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
@@ -1827,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} ਦਰਮਿਆਨੀ ਤੇ ਘੱਟ",
       "dueThisWeek": "ਇਸ ਹਫ਼ਤੇ ਆਖ਼ਰੀ ਮਿਤੀ",
       "dueThisWeekDetail": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
+      "dueThisWeekDetail_one": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
+      "dueThisWeekDetail_other": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
       "noDeadline": "ਕੋਈ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
       "reviewSlaAssignment": "SLA ਨਿਰਧਾਰਨ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "allOpenFindingsTracked": "ਸਾਰੀਆਂ ਖੁੱਲ੍ਹੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦੀ ਨਿਗਰਾਨੀ ਜਾਰੀ"
@@ -2038,6 +2055,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਆਪਣੇ ਆਪ ਸਿੰਕ ਕਰਨ ਅਤੇ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਦੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਦਾ ਪ੍ਰਬੰਧ ਕਰਨ ਲਈ Kilo GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ।",
+      "connectOwnerOnly": "ਕਿਸੇ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ {{platform}} ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "connectTitle": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ GitHub ਕਨੈਕਟ ਕਰੋ",
       "couldNotLoad": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "installApp": "GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
@@ -2070,6 +2088,7 @@
       "actionFailed": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।",
       "syncNoRepositories": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਉਹ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ ਜਿਨ੍ਹਾਂ ਦੀ ਨਿਗਰਾਨੀ ਸੁਰੱਖਿਆ ਏਜੰਟ ਕਰਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "syncNoRepositoriesNoManage": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਸਿੰਕ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਕਨੈਕਟ ਕਰਨੀਆਂ ਹੋਣਗੀਆਂ।",
       "syncIntegrationInactive": "«ਸੁਰੱਖਿਆ ਏਜੰਟ» ਲਈ GitHub ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਨਹੀਂ ਹੈ। Kilo GitHub App ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "configConflict": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਕਿਤੇ ਹੋਰ ਬਦਲੀਆਂ ਗਈਆਂ ਹਨ। ਨਵੀਨਤਮ ਸੈਟਿੰਗਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਸੰਭਾਲੋ।"
@@ -2226,6 +2245,8 @@
       "cannotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ",
       "notAdminMessage": "ਉਸ ਖਾਤੇ ਦਾ GitHub ਪ੍ਰਸ਼ਾਸਕ ਹੀ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦਾ ਹੈ। ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ Kilo ਸਥਾਪਿਤ ਕਰਨ ਲਈ ਕਹੋ।",
       "alreadyClaimedMessage": "ਉਹ GitHub ਸਥਾਪਨਾ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਕਨੈਕਟ ਹੈ। ਪਹਿਲਾਂ ਉੱਥੇ ਇਸਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰੋ।",
+      "installationUnavailableMessage": "ਇਹ GitHub App ਸਥਾਪਨਾ ਮੁਅੱਤਲ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ GitHub ਵਿੱਚ ਬਹਾਲ ਕਰੋ ਜਾਂ ਦੁਬਾਰਾ ਸਥਾਪਿਤ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
+      "multipleInstallationsMessage": "ਇਹ Kilo ਸੰਗਠਨ ਇਸ ਸਮੇਂ ਸਿਰਫ਼ ਇੱਕ GitHub ਸੰਗਠਨ ਨਾਲ ਕਨੈਕਟ ਹੋ ਸਕਦਾ ਹੈ।",
       "didNotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ",
       "didNotCompleteMessage": "GitHub ਐਪ ਦੀ ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
@@ -2382,7 +2403,6 @@
       "defaultProfileResolvesTo": "ਮੌਜੂਦਾ ਤੌਰ ਤੇ {{name}}",
       "defaultProfileResolvesToAccessibility": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "manageProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ",
-      "noProfiles": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ। ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, MCP ਸਰਵਰ, ਅਤੇ ਹੁਨਰ ਜੋੜਨ ਲਈ ਇੱਕ ਬਣਾਓ।",
       "advancedConfig": "ਉੱਨਤ ਸੰਰਚਨਾ",
       "advancedConfigDescription": "ਇਹ ਇਸ ਸੈਸ਼ਨ ’ਤੇ ਲਾਗੂ ਹੁੰਦਾ ਹੈ। ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰਨ ਨਾਲ ਇਹ ਅਗਲੀ ਵਾਰ ਲਈ ਰਹਿੰਦਾ ਹੈ।",
       "saveAsProfile": "ਪ੍ਰੋਫਾਈਲ ਵਜੋਂ ਸੁਰੱਖਿਅਤ ਕਰੋ",
@@ -2605,9 +2625,9 @@
       "detailRetryingClone": "ਕਲੋਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਜਾਰੀ ({{total}} ਵਿੱਚੋਂ {{attempt}})",
       "detailSetupCommandFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਅਸਫਲ ਰਹੀ",
       "detailSetupCommandTimedOut": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਦਾ ਸਮਾਂ ਸਮਾਪਤ",
-      "detailColdRestore": "ਕੋਲਡ ਰੀਸਟੋਰ, ਸਨੈਪਸ਼ਾਟ ਲਾਗੂ ਹੋਈ, {{total}} ਵਿੱਚੋਂ {{applied}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਹੋਈਆਂ",
+      "detailColdRestore": "ਕੋਲਡ ਰੀਸਟੋਰ, ਸਨੈਪਸ਼ਾਟ ਲਾਗੂ, ਰੀਸਟੋਰ ਹੋਈਆਂ ਫਾਈਲਾਂ: {{total}} ਵਿੱਚੋਂ {{applied}}",
       "detailProgressPercent": "{{percent}}% ਪੂਰਾ",
-      "detailRestoreIncompleteReport": "ਸੈਸ਼ਨ ਰੀਸਟੋਰ ਅਧੂਰਾ: {{total}} ਵਿੱਚੋਂ {{skipped}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ ਹੋਈਆਂ ({{reasons}})।",
+      "detailRestoreIncompleteReport": "ਸੈਸ਼ਨ ਰੀਸਟੋਰ ਅਧੂਰਾ — ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ: {{total}} ਵਿੱਚੋਂ {{skipped}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "ਗੁੰਮ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ਅਤੇ {{omitted}} ਹੋਰ",
       "detailReasonPatchFailed": "ਪੈਚ ਲਾਗੂ ਨਹੀਂ ਹੋਈ",
@@ -3068,7 +3088,8 @@
     "newSessionOn": "{{name}} 'ਤੇ ਨਵਾਂ ਸੈਸ਼ਨ",
     "noMatchingSessions": "ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਸੈਸ਼ਨ ਨਹੀਂ ਮਿਲਿਆ।",
     "onlyFirstFilesAttached": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।",
-    "staleMessage": "ਸਾਂਝੀ ਕੀਤੀ ਸਮੱਗਰੀ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+    "staleMessage": "ਜਿਸ ਐਪ ਤੋਂ ਤੁਸੀਂ ਸਾਂਝਾ ਕੀਤਾ ਸੀ, ਉਸੇ ਐਪ ਤੋਂ ਇਸਨੂੰ ਦੁਬਾਰਾ ਭੇਜੋ।",
+    "staleTitle": "ਸਾਂਝਾ ਉਪਲਬਧ ਨਹੀਂ",
     "retryableMessage": "ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "emptyMessage": "ਅਜੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ ਹੈ — ਇਹ ਭੇਜਣ ਲਈ ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ।",
     "cliNotConnectedTitle": "ਸੈਸ਼ਨ ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
@@ -3782,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "ਜਦੋਂ ਇਸ ਸਕੋਪ ਦਾ ਖਰਚਾ ਕੋਈ ਸੀਮਾ ਟੱਪ ਜਾਵੇ ਜਾਂ ਆਪਣੀ ਆਮ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਤੋਂ ਉੱਪਰ ਚੜ੍ਹ ਜਾਵੇ, ਤਾਂ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਈਮੇਲ ਜਾਂ ਪੁਸ਼ ਰਾਹੀਂ ਚੇਤਾਵਨੀ ਭੇਜੋ।",
     "thresholdTitle": "ਸੀਮਾ ਟੱਪਣਾ",
-    "thresholdSubtitle": "ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
+    "thresholdSubtitle": "ਚੁਣੇ ਗਏ ਸਮੇਂ ਦੌਰਾਨ ਇਸ ਸਕੋਪ ਦਾ ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
     "anomalyTitle": "ਪ੍ਰਤੀ ਘੰਟਾ ਵਾਧਾ",
-    "anomalySubtitle": "ਇੱਕ ਘੰਟਾ ਇਸ ਸਕੋਪ ਦੀ ਆਮ ਦਰ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
+    "anomalySubtitle": "ਇਸ ਸਕੋਪ ਦੀ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਉਸ ਦੇ ਆਪਣੇ p95 ਬੇਸਲਾਈਨ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
     "limitLabel": "ਸੀਮਾ (USD)",
     "windowLabel": "ਸਮਾਂ",
     "window24h": "24 ਘੰਟੇ",
@@ -3801,7 +3822,7 @@
     "permissionDenied": "ਤੁਹਾਨੂੰ ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਪ੍ਰਬੰਧਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "pushOffByCategory": "ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਬੰਦ",
     "multiplierMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
-    "thresholdMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦੀ ਰਕਮ ਦਰਜ ਕਰੋ।"
+    "thresholdMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦੀ ਰਕਮ ਦਰਜ ਕਰੋ"
   },
   "profiles": {
     "title": "ਪ੍ਰੋਫਾਈਲਾਂ",

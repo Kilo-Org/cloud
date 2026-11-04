@@ -24,7 +24,7 @@
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "مداخله شوه: {{detail}}"
+      "body": "ودرېد: {{detail}}"
     }
   },
   "agentSession": {

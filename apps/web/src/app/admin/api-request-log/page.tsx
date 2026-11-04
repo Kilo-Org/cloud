@@ -29,10 +29,10 @@ export default function ApiRequestLogPage() {
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
-  const { canViewSessions, isPermissionResolved, isError, refetch } = useAdminPermissions();
+  const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
   const summaryQuery = useQuery(
     trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
-      enabled: canViewSessions,
+      enabled: canExportApiRequestLogs,
     })
   );
 
@@ -80,7 +80,7 @@ export default function ApiRequestLogPage() {
       <AdminPage breadcrumbs={breadcrumbs}>
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Could not check session viewing access</CardTitle>
+            <CardTitle>Could not check API request log export access</CardTitle>
             <CardDescription>The permission check request failed.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -103,21 +103,21 @@ export default function ApiRequestLogPage() {
       <AdminPage breadcrumbs={breadcrumbs}>
         <Card className="max-w-xl">
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
-            Checking session viewing access...
+            Checking API request log export access...
           </CardContent>
         </Card>
       </AdminPage>
     );
   }
 
-  if (!canViewSessions) {
+  if (!canExportApiRequestLogs) {
     return (
       <AdminPage breadcrumbs={breadcrumbs}>
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Session viewing access required</CardTitle>
+            <CardTitle>API request log export access required</CardTitle>
             <CardDescription>
-              Ask a superadmin to grant Session viewer permission on the Admins page.
+              Ask a superadmin to grant API request log exporter permission on the Admins page.
             </CardDescription>
           </CardHeader>
         </Card>

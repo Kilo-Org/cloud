@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ترجمه خلاصه‌های ابزار",
     "toolSummaryTranslationSubtitle": "هر خلاصه ابزار را به یک مدل بفرست تا آن را به زبان برنامه شما ترجمه کند. در صورت شکست ترجمه، متن اصلی نمایش داده می‌شود.",
     "toolSummaryTranslationModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(common.model) ضربه بزنید.",
+    "translateSummaries": "ترجمه خلاصه‌ها",
     "autoExpandThinkingInactiveSubtitle": "تا زمانی که جزئیات تفکر پنهان باشند، اثری ندارد."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "ری‌بیس"
       },
       "terminal": {
-        "alreadyMerged": "قبلاً ادغام شده",
         "closed": "این درخواست ادغام بسته شده است",
         "closedMergeRequest": "این درخواست ادغام بسته شده است"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "بازبینی‌های الزامی انجام نشده‌اند",
         "requiredReviewsDetail": "بازبین‌های تعیین‌شده هنوز تأیید لازم را نداده‌اند.",
         "failingChecksTitle": "بررسی‌های الزامی ناموفق",
-        "failingChecksDetail": "بررسی‌های الزامی وضعیت با خطا روبه‌رو شده‌اند.",
         "unstableTitle": "برخی بررسی‌ها ناموفق‌اند",
         "unstableDetail": "بررسی‌های غیرالزامی با خطا روبه‌رو شده‌اند. این خطاها مانع ادغام نمی‌شوند.",
         "draftTitle": "پول ریکوئست پیش‌نویس",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
+      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
+      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
+      "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",
+      "gitlabInstanceMismatchDescription": "اتصال GitLab شما برای {{connected}} است، اما این درخواست ادغام روی {{requested}} قرار دارد. برای بازبینی آن، GitLab را روی همان نمونه متصل کنید.",
+      "checkActiveConnection": "اتصال فعال است، اما این مورد هنوز قابل بارگذاری نیست.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
-      "partialPostedMessage": "{{displayFreshCount}} نظر ارسال شد. {{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedStale": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedStale_one": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedStale_other": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
       "blockedRequestChanges": "برای درخواست تغییرات، یک خلاصه یا حداقل یک نظر اضافه کنید.",
       "blockedComment": "برای ارسال بازبینی از نوع نظر، یک خلاصه یا دست‌کم یک نظر اضافه کنید."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
       "viewOnProvider": "مشاهده در {{provider}}",
       "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
-      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید دسترسی به آن نداشته باشید.",
+      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید به آن دسترسی نداشته باشید.",
       "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
       "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
       "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",
@@ -1523,6 +1532,7 @@
       "prOpened": "پول ریکوئست برای REVIEW.md باز شد",
       "alreadyPresent": "دستورالعمل‌ها از قبل در REVIEW.md موجود است",
       "status": {
+        "open": "باز",
         "edited": "ویرایش‌شده",
         "opening_change_request": "در حال باز کردن PR",
         "change_request_failed": "باز کردن PR ناموفق بود",
@@ -1610,6 +1620,8 @@
       "set": "تنظیم‌شده",
       "notSet": "تنظیم‌نشده",
       "nSelected": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_one": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_other": "{{displayCount}} مورد انتخاب‌شده",
       "proposedReviewMdGuidance": "دستورالعمل‌های پیشنهادی برای REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "دلایل ارزیابی قابلیت بهره‌برداری",
       "suggestedFix": "اصلاح پیشنهادی",
       "whereFound": "محل شناسایی ({{displayCount}})",
+      "whereFound_one": "محل شناسایی ({{displayCount}})",
+      "whereFound_other": "محل شناسایی ({{displayCount}})",
       "fullReport": "گزارش کامل تولیدشده",
       "yes": "بله",
       "no": "خیر",
@@ -1794,6 +1808,7 @@
       "priorityFindingsPending": "پس از اولین همگام‌سازی، یافته‌های اولویت‌دار نمایش داده می‌شوند.",
       "refreshFailed": "تازه‌سازی ممکن نشد. داده‌های آخرین همگام‌سازی نمایش داده می‌شوند.",
       "settings": "تنظیمات",
+      "syncing": "در حال همگام‌سازی…",
       "syncNow": "همگام‌سازی فوری",
       "syncQueued": "همگام‌سازی در صف قرار گرفت",
       "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست.",
@@ -1827,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} متوسط و پایین",
       "dueThisWeek": "سررسید این هفته",
       "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
+      "dueThisWeekDetail_one": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
+      "dueThisWeekDetail_other": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
       "reviewSlaAssignment": "بررسی مهلت‌های تعیین‌شده در SLA",
       "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
@@ -2038,6 +2055,7 @@
     },
     "scopeEntry": {
       "connectDescription": "برای همگام‌سازی خودکار هشدارهای Dependabot و مدیریت یافته‌های امنیتی در مخازن خود، برنامه Kilo را در GitHub نصب کنید.",
+      "connectOwnerOnly": "از مالک یا مدیر سازمان بخواهید {{platform}} را متصل کند.",
       "connectTitle": "برای شروع GitHub را وصل کنید",
       "couldNotLoad": "بارگذاری عامل امنیتی ممکن نشد.",
       "installApp": "نصب برنامه GitHub",
@@ -2070,6 +2088,7 @@
       "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
       "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید.",
       "syncNoRepositories": "هیچ مخزنی در محدوده همگام‌سازی نیست. مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncNoRepositoriesNoManage": "هیچ مخزنی در محدوده همگام‌سازی نیست. مالک سازمان، مدیر یا مدیر صورتحساب باید مخازن را متصل کند تا همگام‌سازی انجام شود.",
       "syncIntegrationInactive": "اتصال GitHub برای عامل امنیتی فعال نیست. برنامه Kilo در GitHub را دوباره متصل کنید، سپس دوباره همگام‌سازی کنید.",
       "syncMissingPermission": "برنامه Kilo در GitHub نمی‌تواند هشدارهای آسیب‌پذیری را بخواند. آن مجوز را در GitHub اعطا کنید، سپس دوباره همگام‌سازی کنید.",
       "configConflict": "تنظیمات عامل امنیتی جای دیگری تغییر کرده است. آخرین تنظیمات را بررسی و دوباره ذخیره کنید."
@@ -2226,6 +2245,8 @@
       "cannotCompleteTitle": "تکمیل نصب ممکن نیست",
       "notAdminMessage": "فقط مدیر آن حساب در GitHub می‌تواند آن را متصل کند. از مدیر سازمان بخواهید Kilo را نصب کند.",
       "alreadyClaimedMessage": "این برنامهٔ نصب‌شده در GitHub از قبل به حساب Kilo دیگری متصل است. ابتدا اتصال آن را از همان حساب قطع کنید.",
+      "installationUnavailableMessage": "این نصب GitHub App تعلیق شده یا دیگر در دسترس نیست. آن را در GitHub بازیابی یا دوباره نصب کنید، سپس دوباره شروع کنید.",
+      "multipleInstallationsMessage": "سازمان Kilo شما در حال حاضر فقط می‌تواند به یک سازمان GitHub متصل شود.",
       "didNotCompleteTitle": "نصب تکمیل نشد",
       "didNotCompleteMessage": "نصب برنامهٔ GitHub کامل نشد. از داخل برنامه دوباره تلاش کنید."
     },
@@ -2382,7 +2403,6 @@
       "defaultProfileResolvesTo": "در حال حاضر {{name}}",
       "defaultProfileResolvesToAccessibility": "نمایه پیش فرض: {{name}}",
       "manageProfiles": "مدیریت پروفایل ها",
-      "noProfiles": "هنوز پروفایلی وجود ندارد یکی برای اضافه کردن متغیرهای محیطی، سرورهای MCP و مهارت‌ها ایجاد کنید.",
       "advancedConfig": "پیکربندی پیشرفته",
       "advancedConfigDescription": "برای این نشست اعمال می‌شود. ذخیره به عنوان نمایه آن را برای بار بعدی نگه می‌دارد.",
       "saveAsProfile": "ذخیره به عنوان نمایه",
@@ -2605,9 +2625,9 @@
       "detailRetryingClone": "تلاش مجدد برای کلون (تلاش {{attempt}} از {{total}})",
       "detailSetupCommandFailed": "دستور راه‌اندازی {{index}} ناموفق بود",
       "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
-      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، {{applied}} از {{total}} فایل بازیابی شد",
+      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، فایل‌های بازیابی‌شده: {{applied}} از {{total}}",
       "detailProgressPercent": "{{percent}}٪ کامل شد",
-      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود: {{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
+      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود، فایل‌های بازیابی‌نشده: {{skipped}} از {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
       "detailReasonPatchFailed": "وصله اعمال نشد",
@@ -3068,7 +3088,8 @@
     "newSessionOn": "نشست جدید در {{name}}",
     "noMatchingSessions": "نشستی مطابق با جستجو پیدا نشد.",
     "onlyFirstFilesAttached": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
-    "staleMessage": "این محتوای اشتراک‌گذاری‌شده دیگر در دسترس نیست.",
+    "staleMessage": "دوباره از اپی که از آن اشتراک‌گذاری کردید ارسالش کنید.",
+    "staleTitle": "اشتراک‌گذاری ممکن نیست",
     "retryableMessage": "بارگذاری نشست‌های شما ممکن نشد.",
     "emptyMessage": "هنوز نشستی وجود ندارد. برای ارسال این محتوا، نشست جدیدی شروع کنید.",
     "cliNotConnectedTitle": "نشست متصل نیست",
@@ -3782,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "وقتی هزینهٔ این حوزه از حدی فراتر می‌رود یا از نرخ ساعتی معمول آن بالاتر می‌جهد، هشداری را با ایمیل یا نوتیفیکیشن برای مخاطبان صورتحساب بفرست.",
     "thresholdTitle": "عبور از آستانه",
-    "thresholdSubtitle": "هزینهٔ جاری از حد شما فراتر می‌رود",
+    "thresholdSubtitle": "هزینهٔ جاری این حوزه در بازهٔ زمانی انتخاب‌شده از حد شما فراتر می‌رود",
     "anomalyTitle": "جهش ساعتی",
-    "anomalySubtitle": "یک ساعت بسیار بالاتر از نرخ معمول این حوزه است",
+    "anomalySubtitle": "نرخ ساعتی این حوزه بسیار بالاتر از خط پایه p95 خودش است",
     "limitLabel": "حد (USD)",
     "windowLabel": "بازهٔ زمانی",
     "window24h": "۲۴ ساعت",
@@ -3801,7 +3822,7 @@
     "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
     "pushOffByCategory": "در اعلان‌ها خاموش",
     "multiplierMaxError": "ضریبی برابر {{max}} یا کمتر وارد کن",
-    "thresholdMaxError": "مبلغی برابر {{max}} یا کمتر وارد کنید."
+    "thresholdMaxError": "مبلغی برابر {{max}} یا کمتر وارد کنید"
   },
   "profiles": {
     "title": "پروفایل ها",

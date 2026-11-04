@@ -193,7 +193,7 @@ describe('public custom model leaderboard usage', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual(expected);
         const statement = executeStatement.mock.calls[0][0].statement.replace(/\s+/g, ' ');
-        const providerFilter = `( mu.provider != 'custom' or ${modelExpression} like 'reflection/%' or ${modelExpression} like 'inclusionai/%' or ${modelExpression} like 'stealth/%' )`;
+        const providerFilter = `( mu.provider != 'custom' or ${modelExpression} = 'reflection/beam-free' or ${modelExpression} = 'stealth/glyph-cluster' )`;
         expect(statement).toContain(`and ${providerFilter}`);
         expect(statement).not.toContain('direct-byok');
         if (modelExpression === 'mu.requested_model') {
@@ -202,14 +202,16 @@ describe('public custom model leaderboard usage', () => {
 
         const included = await db.execute<{ id: string }>(sql`
         select mu.id from (values
-          ('historical-reflection', 'custom', 'reflection/beam', 'upstream/beam'),
+          ('historical-reflection', 'custom', 'reflection/beam-free', 'upstream/beam'),
+          ('historical-stealth', 'custom', 'stealth/glyph-cluster', 'upstream/model'),
           ('historical-inclusionai', 'custom', 'inclusionai/ling', 'upstream/ling'),
-          ('historical-stealth', 'custom', 'stealth/model', 'upstream/model'),
+          ('other-reflection-model', 'custom', 'reflection/beam', 'upstream/beam'),
+          ('other-stealth-model', 'custom', 'stealth/model', 'upstream/model'),
           ('private', 'custom', 'private/model', 'upstream/model'),
           ('prefix-lookalike', 'custom', 'stealth-private/model', 'upstream/model'),
           ('embedded-prefix', 'custom', 'private/reflection/model', 'upstream/model'),
-          ('private-upstream', 'custom', 'private/model', 'reflection/beam'),
-          ('missing-requested', 'custom', null, 'reflection/beam'),
+          ('private-upstream', 'custom', 'private/model', 'reflection/beam-free'),
+          ('missing-requested', 'custom', null, 'reflection/beam-free'),
           ('public', 'custom-public', 'acme/deleted-public-model', 'upstream/model'),
           ('ordinary', 'openrouter', 'acme/model', 'upstream/model')
         ) as mu(id, provider, requested_model, model)
@@ -219,7 +221,6 @@ describe('public custom model leaderboard usage', () => {
         expect(included.rows.map(row => row.id)).toEqual(
           [
             'historical-reflection',
-            'historical-inclusionai',
             'historical-stealth',
             ...(modelExpression.startsWith('coalesce') ? ['missing-requested'] : []),
             'public',

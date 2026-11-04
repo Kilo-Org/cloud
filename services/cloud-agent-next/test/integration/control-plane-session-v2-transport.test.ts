@@ -52,13 +52,13 @@ async function setup() {
       repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
       callback: { target: { url: 'https://callback.test/hook' } },
       workspace: {
-        sandboxId: await generateSandboxId('*', undefined, 'user_transport', sessionId),
-        sandboxProvider: 'cloudflare',
+        sandboxId: await generateSandboxId(sessionId),
+        sandboxProvider: 'cloudflare-containers',
         branchName: 'kilo/test',
       },
       lifecycle: { version: 1, timestamp: 1 },
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   expect(registered).toEqual({ success: true });
   await installPeer(stub, peer);

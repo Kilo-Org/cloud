@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Oversett verktøysammendrag",
     "toolSummaryTranslationSubtitle": "Send hvert verktøysammendrag til en modell for å oversette det til appens språk. Originalen vises hvis oversettelsen mislykkes.",
     "toolSummaryTranslationModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(common.model) for å velge en annen.",
+    "translateSummaries": "Oversett sammendrag",
     "autoExpandThinkingInactiveSubtitle": "Ingen effekt mens detaljer om resonnering er skjult."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne PR-en er lukket",
         "closedMergeRequest": "Denne merge request-en er lukket"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Påkrevde kodegjennomganger mangler",
         "requiredReviewsDetail": "Godkjenninger fra de påkrevde kodegranskerne mangler eller avventes.",
         "failingChecksTitle": "Påkrevde sjekker feiler",
-        "failingChecksDetail": "Påkrevde statussjekker feiler.",
         "unstableTitle": "Noen sjekker feiler",
         "unstableDetail": "Valgfrie sjekker feiler. De blokkerer ikke flettingen.",
         "draftTitle": "PR-utkast",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Kunne ikke sjekke Bitbucket-tilkoblingen.",
       "providerCheckFailedMessage": "Tilkoblingsstatusen er ikke tilgjengelig før innlastingen er fullført.",
       "reconnectTitle": "Koble til GitHub på nytt",
+      "reconnectTitleGitLab": "Koble til GitLab på nytt",
+      "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
       "gitlabDescription": "Gå gjennom merge requests på mobilen",
+      "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",
+      "gitlabInstanceMismatchDescription": "GitLab-tilkoblingen din er for {{connected}}, men denne merge requesten er på {{requested}}. Koble til GitLab på den instansen for å gå gjennom den.",
+      "checkActiveConnection": "Tilkoblingen er aktiv, men dette elementet kan fortsatt ikke lastes inn.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "gitlabReconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
-      "partialPostedMessage": "{{displayFreshCount}} kommentar(er) er publisert. {{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedStale": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedStale_one": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedStale_other": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
       "blockedRequestChanges": "Legg til et sammendrag eller minst én kommentar for å be om endringer.",
       "blockedComment": "Legg til et sammendrag eller minst én kommentar for å sende inn kodegjennomgangen som en kommentar."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "Del merge request",
       "viewOnProvider": "Vis på {{provider}}",
       "mergeRequestUnavailable": "Merge request er utilgjengelig",
-      "unavailableDescription": "Den kan ha blitt slettet, eller du har ikke tilgang til den.",
+      "unavailableDescription": "Den kan være slettet, eller du kan mangle tilgang.",
       "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
       "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
       "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",
@@ -1523,6 +1532,7 @@
       "prOpened": "Pull request for REVIEW.md er åpnet",
       "alreadyPresent": "Retningslinjene finnes allerede i REVIEW.md",
       "status": {
+        "open": "Åpen",
         "edited": "Redigert",
         "opening_change_request": "Åpner PR",
         "change_request_failed": "PR mislyktes",
@@ -1610,6 +1620,8 @@
       "set": "Angitt",
       "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Begrunnelse for utnyttbarhet",
       "suggestedFix": "Foreslått rettelse",
       "whereFound": "Funnet her ({{displayCount}})",
+      "whereFound_one": "Funnet her ({{displayCount}})",
+      "whereFound_other": "Funnet her ({{displayCount}})",
       "fullReport": "Hele den genererte rapporten",
       "yes": "Ja",
       "no": "Nei",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Prioriterte funn vises etter den første synkroniseringen.",
       "refreshFailed": "Kunne ikke oppdatere. Viser de sist synkroniserte dataene.",
       "settings": "Innstillinger",
+      "syncing": "Synkroniserer…",
       "syncNow": "Synkroniser nå",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Synkroniseringsstatusen er ikke tilgjengelig.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} middels og lav",
       "dueThisWeek": "Frist denne uken",
       "dueThisWeekDetail": "{{exploitable}} av disse er bekreftet utnyttbare",
+      "dueThisWeekDetail_one": "{{exploitable}} av disse er bekreftet utnyttbare",
+      "dueThisWeekDetail_other": "{{exploitable}} av disse er bekreftet utnyttbare",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gjennomgå tildelingen av SLA-frister",
       "allOpenFindingsTracked": "Alle åpne funn følges opp"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installer Kilos GitHub-app for å synkronisere Dependabot-varsler automatisk og administrere sikkerhetsfunn i kodelagrene dine.",
+      "connectOwnerOnly": "Be en organisasjonseier eller administrator om å koble til {{platform}}.",
       "connectTitle": "Koble til GitHub for å komme i gang",
       "couldNotLoad": "Kunne ikke laste inn sikkerhetsagenten.",
       "installApp": "Installer GitHub-appen",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
       "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen.",
       "syncNoRepositories": "Ingen repositorier er i synkroniseringsomfanget. Velg repositoriene Sikkerhetsagenten overvåker, og synkroniser på nytt.",
+      "syncNoRepositoriesNoManage": "Ingen repositorier er i synkroniseringsomfanget. En organisasjonseier, administrator eller faktureringsansvarlig må koble til repositorier før det kan synkroniseres.",
       "syncIntegrationInactive": "GitHub-tilkoblingen for Sikkerhetsagenten er ikke aktiv. Koble Kilo GitHub App til på nytt, og synkroniser deretter på nytt.",
       "syncMissingPermission": "Kilo GitHub App kan ikke lese vulnerability alerts. Gi denne tillatelsen i GitHub, og synkroniser på nytt.",
       "configConflict": "Innstillingene for sikkerhetsagenten ble endret et annet sted. Se gjennom de nyeste innstillingene og lagre på nytt."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Kan ikke fullføre installasjonen",
       "notAdminMessage": "Bare en GitHub-administrator for den kontoen kan koble den til. Be en organisasjonsadministrator om å installere Kilo.",
       "alreadyClaimedMessage": "Den GitHub-installasjonen er allerede tilkoblet en annen Kilo-konto. Koble den fra der først.",
+      "installationUnavailableMessage": "Denne GitHub App-installasjonen er suspendert eller ikke lenger tilgjengelig. Gjenopprett eller installer den på nytt i GitHub, og start deretter på nytt.",
+      "multipleInstallationsMessage": "Denne Kilo-organisasjonen kan for øyeblikket kun koble til én GitHub-organisasjon.",
       "didNotCompleteTitle": "Installasjonen ble ikke fullført",
       "didNotCompleteMessage": "Installasjonen av GitHub-appen ble ikke fullført. Prøv igjen fra appen."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Er satt til {{name}}",
       "defaultProfileResolvesToAccessibility": "Standard profil: {{name}}",
       "manageProfiles": "Administrer profiler",
-      "noProfiles": "Ingen profiler ennå. Lag en for å legge til miljøvariabler, MCP-servere og ferdigheter.",
       "advancedConfig": "Avansert konfigurasjon",
       "advancedConfigDescription": "Gjelder for denne økten. Lagres den som profil, beholdes den til neste gang.",
       "saveAsProfile": "Lagre som profil",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Prøver kloning på nytt (forsøk {{attempt}} av {{total}})",
       "detailSetupCommandFailed": "Oppsettskommando {{index}} mislyktes",
       "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
-      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
+      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, gjenopprettede filer: {{applied}} av {{total}}",
       "detailProgressPercent": "{{percent}} % fullført",
-      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig, filer som ikke ble gjenopprettet: {{skipped}} av {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
       "detailReasonPatchFailed": "patchen ble ikke anvendt",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Ny økt på {{name}}",
     "noMatchingSessions": "Ingen økter passer til søket.",
     "onlyFirstFilesAttached": "Bare de første {{displayCount}} filene legges ved.",
-    "staleMessage": "Denne delingen er ikke lenger tilgjengelig.",
+    "staleMessage": "Send det på nytt fra appen du delte fra.",
+    "staleTitle": "Deling utilgjengelig",
     "retryableMessage": "Kunne ikke laste inn øktene dine.",
     "emptyMessage": "Ingen økter ennå — start en ny for å sende dette.",
     "cliNotConnectedTitle": "Økten er ikke tilkoblet",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Send et varsel på e-post eller push til faktureringskontaktene når forbruket i dette området overskrider en grense eller stiger over den vanlige timesraten.",
     "thresholdTitle": "Grenseoverskridelse",
-    "thresholdSubtitle": "Løpende forbruk overskrider grensen din",
+    "thresholdSubtitle": "Dette områdets løpende forbruk i det valgte vinduet overskrider grensen din",
     "anomalyTitle": "Topp per time",
-    "anomalySubtitle": "Én time er langt over dette områdets vanlige rate",
+    "anomalySubtitle": "Dette områdets rate per time ligger langt over områdets egen p95-baselinje",
     "limitLabel": "Grense (USD)",
     "windowLabel": "Vindu",
     "window24h": "24 timer",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler",
     "multiplierMaxError": "Angi en multiplikator på {{max}} eller mindre",
-    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre."
+    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre"
   },
   "profiles": {
     "title": "Profiler",

@@ -40,8 +40,10 @@ export type RewriteResponseParams = {
 
 export type ResponseUsageContext = Pick<
   MicrodollarUsageContext,
-  'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
-> & { custom_pricing_config: CustomPricingConfig };
+  'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind' | 'custom_llm_pricing'
+> & {
+  custom_pricing_config: CustomPricingConfig;
+};
 
 export type ResponseUsage = {
   cost?: number;
@@ -65,6 +67,7 @@ export type ResponseUsage = {
 };
 
 export type ResponseMetadata = {
+  id?: string;
   model?: string;
   provider_metadata?: VercelProviderMetaData;
   providerMetadata?: VercelProviderMetaData;

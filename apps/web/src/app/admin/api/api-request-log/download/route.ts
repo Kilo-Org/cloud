@@ -5,9 +5,18 @@ import { api_request_log, kilocode_users } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, like, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
-import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
+import {
+  apiRequestLogBlobSchema,
+  getApiRequestLogBlob,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
-import { canCurrentUserViewSessions } from '@/lib/admin/admin-permissions';
+import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
+import {
+  adminActionContextFromHeaders,
+  organizationActionTarget,
+  recordAdminAction,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -167,6 +176,12 @@ function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&');
 }
 
+function auditIdentifier(value: string | null): string | null {
+  return value && value.length <= 255 && /^[a-zA-Z0-9_.:|-]+(?:\/[a-zA-Z0-9_.:|-]+)*$/.test(value)
+    ? value
+    : null;
+}
+
 function buildFilter({
   id,
   userId,
@@ -228,8 +243,8 @@ export async function GET(request: NextRequest) {
   if (authFailedResponse) {
     return authFailedResponse;
   }
-  if (!user || !(await canCurrentUserViewSessions(user.id))) {
-    return jsonError('Session viewing access required', 403);
+  if (!user || !(await canCurrentUserExportApiRequestLogs(user.id))) {
+    return jsonError('API request log export access required', 403);
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -282,6 +297,37 @@ export async function GET(request: NextRequest) {
   if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
+
+  const auditUserId = auditIdentifier(resolvedUserId);
+  const auditOrganizationId = auditIdentifier(organizationId);
+  await recordAdminAction(
+    {
+      ...adminActionContextFromHeaders(user, request.headers),
+      trpcPath: '/admin/api/api-request-log/download',
+    },
+    {
+      action: 'api_request_log.download',
+      target: auditUserId
+        ? userActionTarget(auditUserId)
+        : auditOrganizationId
+          ? organizationActionTarget(auditOrganizationId)
+          : null,
+      message: 'Started API request log ZIP export',
+      metadata: {
+        logId: parsedId?.toString() ?? null,
+        userId: auditUserId,
+        organizationId: auditOrganizationId,
+        startAt: parsedStart.value?.toISOString() ?? null,
+        endAt: parsedEnd.value?.toISOString() ?? null,
+        hasUserFilter: Boolean(resolvedUserId),
+        hasOrganizationFilter: Boolean(organizationId),
+        hasModelPrefixFilter: Boolean(model),
+        hasSessionFilter: Boolean(sessionId),
+        errorsOnly,
+        matchingRows: result.total,
+      },
+    }
+  );
 
   const archive = archiver('zip', { zlib: { level: 6 } });
   let totalAppendedEntries = 0;
@@ -369,7 +415,31 @@ export async function GET(request: NextRequest) {
       if (rows.length === 0) break;
 
       const bodies = await Promise.all(
-        rows.map(async row => {
+        rows.map(async (row): Promise<{ request: LoadedBody; response: LoadedBody }> => {
+          if (row.request_r2_key !== null && row.request_r2_key === row.response_r2_key) {
+            const body = await loadBody(row.request_r2_key);
+            if ('loadError' in body) {
+              return { request: body, response: body };
+            }
+            if (body.value === null) {
+              const failure = {
+                loadError: `Failed to load ${row.request_r2_key} from R2: Object not found`,
+              };
+              return { request: failure, response: failure };
+            }
+            try {
+              const blob = apiRequestLogBlobSchema.parse(JSON.parse(body.value));
+              return {
+                request: { value: JSON.stringify(blob.request) },
+                response: { value: blob.response },
+              };
+            } catch {
+              const failure = {
+                loadError: `Failed to decode ${row.request_r2_key} from R2: Invalid API request log envelope`,
+              };
+              return { request: failure, response: failure };
+            }
+          }
           const [request, response] = await Promise.all([
             loadBody(row.request_r2_key),
             loadBody(row.response_r2_key),

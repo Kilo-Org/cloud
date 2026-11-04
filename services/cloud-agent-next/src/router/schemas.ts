@@ -420,6 +420,31 @@ export const CloseTerminalOutput = z.object({
 });
 
 /**
+ * The environment the client selected: its id, and the branch of each
+ * additional repository of a multi-repository environment. The server checks
+ * both against the owner and the launch repository.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.string().uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: branchNameSchema.optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .describe(
+    'Repository environment the client selected. The server verifies it belongs to the owner and contains the launch repository.'
+  );
+
+/**
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
  * Used by backend-to-backend flows.
@@ -436,6 +461,13 @@ const PrepareSessionSharedFields = {
     .optional()
     .describe(
       'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  requireEnvironmentChoice: z
+    .literal(true)
+    .optional()
+    .describe(
+      'Set by a client that can ask its user to choose. Several matching environments then fail the start with a conflict; without it they resolve to no environment.'
     ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
@@ -1155,6 +1187,10 @@ export const GetSessionOutput = z.object({
     .nullable()
     .optional()
     .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+  parentCloudAgentSessionId: z
+    .string()
+    .optional()
+    .describe('Canonical parent Cloud Agent session ID when this session was spawned by a parent'),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),

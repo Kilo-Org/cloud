@@ -6,6 +6,7 @@ import {
   controlPlaneRouteSpecSchema,
   type ControlPlaneCredentialSource,
   type ControlPlaneRouteSpec,
+  type ControlPlaneWorkspaceRoot,
 } from '../../shared/control-plane-protocol.js';
 import {
   controlPlaneSandboxSelectionSchema,
@@ -33,7 +34,7 @@ import {
 import { hasModernRuntimeAuthorization } from '../../session/runtime-authorization-persistence.js';
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
-import { getControlPlaneSessionDirectory } from '../../workspace.js';
+import { sessionWorkspace } from './workspace-roots.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
@@ -136,20 +137,11 @@ export function controlPlaneRouteSpecFromAttachPayload(
 function materializeAttachPayload(
   metadata: SessionMetadata,
   mcpPrivateKey: string | undefined
-): SessionAttachPayload {
+): { payload: SessionAttachPayload; roots: ControlPlaneWorkspaceRoot[] | undefined } {
   try {
-    const payload = buildSessionAttachPayload(metadata, undefined, mcpPrivateKey);
-    return {
-      ...payload,
-      directory: getControlPlaneSessionDirectory({
-        workspacePath: metadata.workspace?.workspacePath,
-        sandboxId: metadata.workspace?.sandboxId,
-        sandboxKind: metadata.workspace?.sandboxKind,
-        orgId: metadata.identity.orgId,
-        userId: metadata.identity.userId,
-        sessionId: metadata.identity.sessionId,
-      }),
-    };
+    const attach = buildSessionAttachPayload(metadata, undefined, mcpPrivateKey);
+    const workspace = sessionWorkspace(metadata, attach.git);
+    return { payload: { ...attach, directory: workspace.directory }, roots: workspace.roots };
   } catch (error) {
     if (error instanceof McpConfigurationError) {
       throw new McpAttachValidationError(
@@ -227,12 +219,7 @@ export function buildControlPlaneSessionRegistration(
   ) {
     throw new Error('Sandbox selection kind does not match session metadata');
   }
-  const containment =
-    sandboxSelection.containment ??
-    getWorktreeCredentialContainment(runtimeConfiguration?.containmentEnabled ?? true);
-  if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
-    throw new Error('Vercel requires credential containment');
-  }
+  const containment = getWorktreeCredentialContainment();
   if (!hasModernRuntimeAuthorization(metadata)) {
     throw new SessionCredentialUpgradeRequiredError();
   }
@@ -243,7 +230,7 @@ export function buildControlPlaneSessionRegistration(
   ) {
     throw new Error('Runtime credential proxy configuration is unavailable');
   }
-  const payload = materializeAttachPayload(metadata, mcpPrivateKey);
+  const { payload, roots } = materializeAttachPayload(metadata, mcpPrivateKey);
   if (payload.mcp !== undefined) {
     const validated = parseSessionAttachMcpServers(payload.mcp);
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
@@ -285,7 +272,9 @@ export function buildControlPlaneSessionRegistration(
   };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...runtimeProfile,
+    ...(metadata.continuation ? { continuation: true } : {}),
     ...(Object.keys(permission).length > 0 ? { permission } : {}),
+    ...(roots === undefined ? {} : { roots }),
     ...controlPlaneRouteSpecFromAttachPayload(
       payload,
       { sessionId: metadata.identity.sessionId, kiloSessionId },

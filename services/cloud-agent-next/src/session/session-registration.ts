@@ -16,7 +16,6 @@ import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
  * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
-import { assertCloudAgentIsolatedAllocation } from '../cloud-agent-authority.js';
 import { and, eq } from 'drizzle-orm';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
@@ -28,9 +27,15 @@ import {
 import {
   assertSandboxAllocationAvailable,
   getSandboxSelectionCapabilities,
+  isRetiredSandboxAllocation,
   isSandboxAllocationAvailable,
+  RETIRED_SANDBOX_ALLOCATION_MESSAGE,
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
+import {
+  profileResolutionPolicyForSessionCreateOrigin,
+  resolveEffectiveSessionConfiguration,
+} from '../router/handlers/session-creation-preflight.js';
 import {
   admitOperation,
   markReconcilePending,
@@ -96,7 +101,7 @@ import {
   sandboxKindMatchesKey,
   sandboxKindSchema,
   selectControlPlaneSandbox,
-  type SandboxKind,
+  type PlacedSandboxKind,
 } from '../sandbox-placement.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -108,6 +113,7 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import { createMessageId } from './message-id.js';
+import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
@@ -118,6 +124,7 @@ import type {
 import { throwAdmissionError } from './queue-message.js';
 import {
   allocationCapabilityFor,
+  assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
@@ -130,8 +137,8 @@ export type SessionRegistrationInput = SessionCreateRequest;
 /**
  * Whether a create may launch child Cloud Agent sessions. The capability is not
  * caller-controlled: a session gets it when a person created it through an
- * interactive client, it is not itself a spawned child, and it does not run on
- * a shared sandbox.
+ * interactive client and it is not itself a spawned child. Every sandbox serves
+ * one workspace, so the sandbox never removes the capability.
  */
 export function allowsSubagentSessions(
   input: Pick<
@@ -141,20 +148,7 @@ export function allowsSubagentSessions(
 ): boolean {
   return (
     input.parentCloudAgentSessionId === undefined &&
-    isInteractiveSessionOrigin(input.options?.createdOnPlatform) &&
-    requestedSandboxAllocation(input) !== 'cloudflare-shared'
-  );
-}
-
-function resolvedAllowsSubagentSessions(
-  input: SessionRegistrationInput,
-  sandboxAllocation: SandboxAllocation | undefined,
-  sandboxKind?: SandboxKind
-): boolean {
-  return (
-    allowsSubagentSessions(input) &&
-    sandboxAllocation !== 'cloudflare-shared' &&
-    sandboxKind !== 'shared'
+    isInteractiveSessionOrigin(input.options?.createdOnPlatform)
   );
 }
 
@@ -173,6 +167,12 @@ function assertSupportedSandboxAllocation(
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
+  // cloudflare-single is the compatibility alias for the native containers
+  // default. The other retired allocations are rejected rather than silently
+  // remapped; a saved legacy value is skipped before reaching this check.
+  if (isRetiredSandboxAllocation(allocation)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
+  }
   if (
     options?.billingOrigin === 'code-review' ||
     input.options?.createdOnPlatform === 'code-review'
@@ -186,13 +186,10 @@ function assertSupportedSandboxAllocation(
 
 function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
-  allocation: Pick<SessionRegistrationResult, 'sandboxProvider' | 'sandboxKind'>
+  allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
   if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
-  if (
-    allocation.sandboxProvider !== 'cloudflare-containers' ||
-    allocation.sandboxKind === 'shared'
-  ) {
+  if (allocation.sandboxProvider !== 'cloudflare-containers') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
@@ -212,7 +209,7 @@ export type SessionRegistrationResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   sandboxId: SandboxId;
-  sandboxKind?: SandboxKind;
+  sandboxKind?: PlacedSandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
@@ -331,6 +328,7 @@ export function assertSessionOperationIdentity(
       | 'create_cloud'
       | 'create_worktree_chat'
       | 'create_workspace_session'
+      | 'continue_workspace_session'
       | 'delete_workspace_session';
     organizationId?: string | null;
     resourceKey?: string | null;
@@ -556,23 +554,69 @@ function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): str
   return normalizeGitUrl(repository.url);
 }
 
+/**
+ * The one complete Session Ingest ownership request for a create. Fresh
+ * allocation and both resume windows call this so every window sends the same
+ * fields (clone source, title, organization, platform, git URL, resolved
+ * profile id, and the worktree id plus location when the allocation has a
+ * worktree). A continuation first session is a clone-only create that also
+ * carries a worktree, so the resume path must include the worktree fields the
+ * clone resume previously omitted.
+ */
+function ownershipRequestForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  allocation: {
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    sandboxId: SandboxId;
+    sandboxProvider: SessionRegistrationResult['sandboxProvider'];
+    worktreeId?: CloudAgentWorktreeId;
+  }
+): CreateSessionForCloudAgentParams {
+  const worktreeId = allocation.worktreeId;
+  return {
+    sessionId: allocation.kiloSessionId,
+    kiloUserId: ctx.userId,
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    organizationId: input.options?.kilocodeOrganizationId,
+    createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
+    title: input.ownershipTitle ?? `New session - ${new Date().toISOString()}`,
+    gitUrl: deriveCanonicalRepositoryUrl(input.repository),
+    profileId: input.profile?.resolvedProfileId,
+    // Always present (undefined when there is no clone), matching the previous
+    // ingest request shape.
+    cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
+    ...(input.clone?.cloneUpToMessageId
+      ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
+      : {}),
+    ...(worktreeId ? { cloudAgentWorktreeId: worktreeId } : {}),
+    ...(worktreeId
+      ? {
+          cloudAgentWorktreeLocation: {
+            sandboxId: allocation.sandboxId,
+            provider: allocation.sandboxProvider,
+          },
+        }
+      : {}),
+  };
+}
+
 function computeCredentialContainment(
   sessionId: string,
-  input: SessionRegistrationInput,
-  env: Env
+  input: SessionRegistrationInput
 ): CredentialContainment {
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     sessionId,
     input.repository,
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+    true
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
-    github: containmentEnabled && input.repository.type === 'github',
-    gitlab: containmentEnabled && input.repository.type === 'gitlab',
-    bitbucket: containmentEnabled && input.repository.type === 'bitbucket',
-    kilocode: containmentEnabled,
+    github: input.repository.type === 'github',
+    gitlab: input.repository.type === 'gitlab',
+    bitbucket: input.repository.type === 'bitbucket',
+    kilocode: true,
   };
 }
 
@@ -596,19 +640,47 @@ export function isTrustedWorktreeCreateOrigin(
   );
 }
 
-function isEligibleFirstWorktreeSession(
+/**
+ * A scoped Cloud Agent launch is authenticated by the parent authority in the
+ * request context, not by caller-selected provenance or origin.
+ */
+export function isAuthenticatedChildWorktreeCreate(
+  input: Pick<SessionRegistrationInput, 'parentCloudAgentSessionId' | 'options'>,
+  ctx: Pick<SessionRegistrationContext, 'cloudAgentAuthority'>
+): boolean {
+  return (
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId
+  );
+}
+
+export function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
+  if (input.options?.operationKey === undefined || ctx.botId !== undefined) {
+    return false;
+  }
+  // A continuation first session is a clone-only create placed in the
+  // workspace worktree. The marker is server-only: only the continuation
+  // handler sets it, so mobile and web clone creates stay standalone.
+  if (input.options?.workspaceContinuation === true) {
+    return (
+      input.options.clientProvenance === 'agent-manager' &&
+      input.options.createdOnPlatform === 'cloud-agent-web' &&
+      input.initialTurn === undefined &&
+      input.clone !== undefined
+    );
+  }
   return (
-    isTrustedWorktreeCreateOrigin(
+    (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
-    ) &&
-    input.options?.operationKey !== undefined &&
+    ) ||
+      isAuthenticatedChildWorktreeCreate(input, ctx)) &&
     input.initialTurn !== undefined &&
-    input.clone === undefined &&
-    ctx.botId === undefined
+    input.clone === undefined
   );
 }
 
@@ -806,7 +878,7 @@ function sandboxSmallReplacementForSession(
     userId: ctx.userId,
     sessionId,
     requestedAllocation: requestedSandboxAllocation(input),
-    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
+    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
@@ -841,19 +913,25 @@ async function allocateNewSession(
     userId: ctx.userId,
     sessionId: cloudAgentSessionId,
     requestedAllocation,
-    contained: hasCredentialContainment(
-      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
-    ),
+    contained: hasCredentialContainment(computeCredentialContainment(cloudAgentSessionId, input)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
-  const childSession = input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(childSession, sandboxAllocation);
+  try {
+    assertEnvironmentSupportsSandbox({
+      environment: input.environment,
+      allocation: sandboxAllocation,
+      contained: true,
+    });
+  } catch (error) {
+    // A saved allocation resolved after admission can still fail here; the ledger
+    // row must settle failed so a retry does not wait on its lease.
+    rethrowAllocationFailure(ledger, 'sandbox', error);
+  }
   const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
     : undefined;
-  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
   const runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
@@ -897,9 +975,9 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'report', error);
   }
 
-  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
+  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input);
   let sandboxId: SandboxId;
-  let sandboxKind: SandboxKind | undefined;
+  let sandboxKind: PlacedSandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
   try {
@@ -908,9 +986,9 @@ async function allocateNewSession(
       sessionId: cloudAgentSessionId,
       userId: ctx.userId,
       orgId,
-      botId: ctx.botId,
       codeReview: options?.billingOrigin === 'code-review',
       sandboxAllocation,
+      ...(requestedAllocation !== undefined ? { requestedAllocation } : {}),
     });
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
@@ -962,7 +1040,7 @@ async function allocateNewSession(
   }
 
   try {
-    assertEgressPolicyAllocation(input, { sandboxProvider, sandboxKind });
+    assertEgressPolicyAllocation(input, { sandboxProvider });
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
@@ -993,29 +1071,19 @@ async function allocateNewSession(
   });
   logger.info('Creating new session ownership row');
 
-  const defaultTitle = `New session - ${new Date().toISOString()}`;
-  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await createIngestOwnershipRow(ctx.env, {
-      sessionId: kiloSessionId,
-      kiloUserId: ctx.userId,
-      cloudAgentSessionId,
-      organizationId: input.options?.kilocodeOrganizationId,
-      createdOnPlatform,
-      title: defaultTitle,
-      gitUrl: canonicalRepositoryUrl,
-      profileId: input.profile?.resolvedProfileId,
-      cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
-      ...(input.clone?.cloneUpToMessageId
-        ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
-        : {}),
-      ...(worktreeId ? { cloudAgentWorktreeId: worktreeId } : {}),
-      ...(worktreeId
-        ? { cloudAgentWorktreeLocation: { sandboxId, provider: sandboxProvider } }
-        : {}),
-    });
+    ingestResult = await createIngestOwnershipRow(
+      ctx.env,
+      ownershipRequestForCreate(input, ctx, {
+        cloudAgentSessionId,
+        kiloSessionId,
+        sandboxId,
+        sandboxProvider,
+        ...(worktreeId ? { worktreeId } : {}),
+      })
+    );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1145,9 +1213,16 @@ function rebuildRecordedSessionAllocation(
   ) {
     throw creationInProgressError();
   }
+  // A create recorded before shared sandboxes were retired cannot be replayed
+  // onto one: every sandbox serves one workspace.
+  if (recordedKind.data === 'shared') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
+  }
   const sandboxKind = recordedKind.data;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
   const replacement = sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options);
   if (
@@ -1208,7 +1283,7 @@ function rebuildRecordedSessionAllocation(
     initialTurn = { ...accepted, messageId: initialMessageId };
   }
 
-  assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data, sandboxKind });
+  assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data });
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
   const parsedBinding = SandboxProviderBindingSchema.safeParse(
@@ -1231,7 +1306,7 @@ function rebuildRecordedSessionAllocation(
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     sandboxProviderBinding: normalizedBinding,
     initialTurn,
-    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
+    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input),
     rollbackCliSession: async () => {
       try {
         await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
@@ -1258,17 +1333,9 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
-  const childSession = input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(childSession, allocation.sandboxAllocation);
-  if (childSession && allocation.sandboxKind === 'shared') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Cloud Agent spawn authority requires an isolated sandbox',
-    });
-  }
   return {
     allowSubagentSessions:
-      resolvedAllowsSubagentSessions(input, allocation.sandboxAllocation, allocation.sandboxKind) &&
+      allowsSubagentSessions(input) &&
       isPolicyBearingAuthToken(ctx.authToken) &&
       ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
@@ -1295,6 +1362,8 @@ function buildSessionRegistrationCommand(
             : {}),
         }
       : undefined,
+    // Server-only continuation marker, set only by the continuation handler.
+    continuation: input.options?.workspaceContinuation === true ? true : undefined,
     ...(allocation.initialTurn
       ? {
           message: {
@@ -1309,7 +1378,12 @@ function buildSessionRegistrationCommand(
     },
     repository: input.repository,
     profile: input.profile?.resolved,
-    ...(input.environment ? { environment: input.environment } : {}),
+    ...(input.environment
+      ? {
+          environment: input.environment,
+          requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
+        }
+      : {}),
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -1906,6 +1980,11 @@ export async function sessionCreateIntentFingerprint(
         appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt || undefined,
       },
       repository: repositoryCreateIntent(input.repository),
+      // Only a client-sent selection is part of the intent; an implicit match is
+      // not, so its fingerprint is unchanged. A different selection is a
+      // different intent, so a same-key retry conflicts.
+      requestedEnvironment: canonicalRequestedEnvironment(input.requestedEnvironment),
+      requireEnvironmentChoice: input.requireEnvironmentChoice,
       finalization: input.finalization,
       runtime:
         input.runtime?.sandboxAllocation ||
@@ -1944,6 +2023,16 @@ export async function sessionCreateIntentFingerprint(
 }
 
 /**
+ * Explicit create choices include the retired-name compatibility alias so a
+ * retry cannot drop it and inherit an unrelated recorded allocation.
+ */
+function isExplicitSandboxAllocationChoice(
+  allocation: SandboxAllocation | undefined
+): allocation is SandboxAllocation {
+  return allocation === 'cloudflare-single' || isSelectableSandboxAllocation(allocation);
+}
+
+/**
  * Rejects a same-key retry whose create intent differs from the admitted
  * fingerprint. Rows admitted before the fingerprint contract carry no
  * comparison data and keep the legacy replay/reconcile behavior.
@@ -1956,11 +2045,13 @@ async function assertCreateIntentUnchanged(
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
-  const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
+  const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema
     .optional()
     .safeParse(row.canonical_result?.sandboxAllocation);
@@ -1985,9 +2076,25 @@ async function assertCreateIntentUnchanged(
   if (typeof stored !== 'string' || stored.length === 0) {
     return;
   }
-  if ((await sessionCreateIntentFingerprint(input)) !== stored) {
-    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+  const current = await sessionCreateIntentFingerprint(input);
+  if (current === stored) return;
+  // Deployed scoped children used the forced origin's profile policy, without web defaults.
+  const scopedChild =
+    ctx.cloudAgentAuthority !== undefined &&
+    input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId;
+  if (scopedChild) {
+    const legacyInput = await resolveEffectiveSessionConfiguration(
+      ctx,
+      {
+        ...input,
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+        profile: { id: input.profile?.id, overrides: input.profile?.overrides },
+      },
+      profileResolutionPolicyForSessionCreateOrigin('cloud-agent')
+    );
+    if ((await sessionCreateIntentFingerprint(legacyInput)) === stored) return;
   }
+  throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
 }
 
 /**
@@ -2058,6 +2165,13 @@ export async function createSessionWithLedger(
       }
     }
   }
+  // A V2 environment that no allocation can serve fails before the ledger admits
+  // the create, so the client sees the reason and no row waits on a lease.
+  assertEnvironmentSupportsSandbox({
+    environment: input.environment,
+    allocation: requestedSandboxAllocation(input),
+    contained: true,
+  });
   const initialWorktreeEnabled = isEligibleFirstWorktreeSession(input, ctx);
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);
   const savedSandboxAllocation = input.savedSandboxAllocation;
@@ -2078,8 +2192,12 @@ export async function createSessionWithLedger(
         await sessionCreateIntentFingerprint(initialEffectiveInput),
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-      // Match the replay comparison, which only considers selectable choices.
-      ...(isSelectableSandboxAllocation(requestedSandboxAllocationChoice)
+      // Match the replay comparison, which only considers explicit choices.
+      // `cloudflare-single` is pinned as the compatibility alias so a retry
+      // keeps the same intent; its resolved runtime is the native default.
+      ...(requestedSandboxAllocationChoice !== undefined &&
+      (isSelectableSandboxAllocation(requestedSandboxAllocationChoice) ||
+        requestedSandboxAllocationChoice === 'cloudflare-single')
         ? { sandboxAllocation: requestedSandboxAllocationChoice }
         : {}),
       ...(savedSandboxAllocation !== undefined
@@ -2366,26 +2484,13 @@ async function resumeCloneCreate(
 
   const allocation = rebuildRecordedSessionAllocation(input, ctx, row, options);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
-  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
-  const defaultTitle = `New session - ${new Date().toISOString()}`;
-  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
 
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await createIngestOwnershipRow(ctx.env, {
-      sessionId: ids.kiloSessionId,
-      kiloUserId: ctx.userId,
-      cloudAgentSessionId: ids.cloudAgentSessionId,
-      organizationId: input.options?.kilocodeOrganizationId,
-      createdOnPlatform,
-      title: defaultTitle,
-      gitUrl: canonicalRepositoryUrl,
-      profileId: input.profile?.resolvedProfileId,
-      cloneFromKiloSessionId: input.clone?.cloneFromKiloSessionId,
-      ...(input.clone?.cloneUpToMessageId
-        ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
-        : {}),
-    });
+    ingestResult = await createIngestOwnershipRow(
+      ctx.env,
+      ownershipRequestForCreate(input, ctx, allocation)
+    );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -2429,31 +2534,7 @@ async function resumeCloneCreate(
     await hooks.onTransportFailure();
     throw creationInProgressError();
   }
-  // `ready` continues.
-
-  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
-    input,
-    ctx,
-    allocation.cloudAgentSessionId,
-    allocation.initialTurn
-  );
-  const billingOrigin = { billingOrigin: options.billingOrigin };
-  if (input.initialTurn === undefined) {
-    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
-    return { ...result, replayed: true };
-  }
-  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
-  return {
-    cloudAgentSessionId: result.cloudAgentSessionId,
-    kiloSessionId: result.kiloSessionId,
-    ...(options.includeInitialMessage
-      ? {
-          messageId: result.admission.messageId,
-          delivery: result.admission.compatibilityDelivery,
-        }
-      : {}),
-    replayed: true,
-  };
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
 }
 
 async function resumeFirstWorktreeCreate(
@@ -2474,21 +2555,10 @@ async function resumeFirstWorktreeCreate(
   if (!ownershipExists) {
     let ingestResult: CreateSessionForCloudAgentResult | undefined;
     try {
-      ingestResult = await createIngestOwnershipRow(ctx.env, {
-        sessionId: allocation.kiloSessionId,
-        kiloUserId: ctx.userId,
-        cloudAgentSessionId: allocation.cloudAgentSessionId,
-        organizationId: input.options?.kilocodeOrganizationId,
-        createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
-        title: `New session - ${new Date().toISOString()}`,
-        gitUrl: deriveCanonicalRepositoryUrl(input.repository),
-        profileId: input.profile?.resolvedProfileId,
-        cloudAgentWorktreeId: worktreeId,
-        cloudAgentWorktreeLocation: {
-          sandboxId: allocation.sandboxId,
-          provider: allocation.sandboxProvider,
-        },
-      });
+      ingestResult = await createIngestOwnershipRow(
+        ctx.env,
+        ownershipRequestForCreate(input, ctx, allocation)
+      );
     } catch (error) {
       await recordPostSetupFailure(() =>
         recordCloudAgentSessionFailure(
@@ -2513,19 +2583,28 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  return resumeAllocatedSession(input, ctx, options, allocation, hooks);
+}
+
+async function resumeAllocatedSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: SessionLedgerCreateOptions,
+  allocation: NewSessionAllocation,
+  hooks: SessionCreationLedgerHooks
+): Promise<LedgerSessionCreateResult> {
   allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
     allocation.cloudAgentSessionId,
     allocation.initialTurn
   );
-  const result = await registerAndAdmitInitialTurn(
-    input,
-    ctx,
-    { billingOrigin: options.billingOrigin },
-    allocation,
-    hooks
-  );
+  const billingOrigin = { billingOrigin: options.billingOrigin };
+  if (input.initialTurn === undefined) {
+    const result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
+    return { ...result, replayed: true };
+  }
+  const result = await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,

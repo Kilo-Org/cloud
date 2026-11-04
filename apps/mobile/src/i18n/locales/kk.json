@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Құралдар қорытындыларын аудару",
     "toolSummaryTranslationSubtitle": "Әрбір құрал қорытындысын қолданба тіліне аудару үшін модельге жіберіңіз. Аудару сәтсіз болса, түпнұсқа көрсетіледі.",
     "toolSummaryTranslationModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(common.model) түртіңіз.",
+    "translateSummaries": "Қорытындыларды аудару",
     "autoExpandThinkingInactiveSubtitle": "Ойлау мәліметтері жасырылғанда әсері болмайды."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Негізін ауыстыру"
       },
       "terminal": {
-        "alreadyMerged": "Бұрын біріктірілген",
         "closed": "Бұл біріктіру сұрауы жабылған",
         "closedMergeRequest": "Бұл біріктіру сұрауы жабылған"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Міндетті код тексерулері жоқ",
         "requiredReviewsDetail": "Міндетті тексерушілердің мақұлдауы жоқ немесе әлі күтілуде.",
         "failingChecksTitle": "Міндетті тексерулер сәтсіз аяқталды",
-        "failingChecksDetail": "Міндетті күй тексерулері сәтсіз аяқталды.",
         "unstableTitle": "Кейбір тексерулер сәтсіз аяқталды",
         "unstableDetail": "Міндетті емес тексерулер сәтсіз аяқталды. Олар біріктіруге кедергі болмайды.",
         "draftTitle": "Біріктіру сұрауының нобайы",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
       "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
+      "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
+      "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды.",
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
+      "gitlabInstanceMismatchTitle": "GitLab қосылымы басқа инстанцияға арналған",
+      "gitlabInstanceMismatchDescription": "Сіздің GitLab қосылымыңыз {{connected}} инстанциясына арналған, бірақ бұл біріктіру сұрауы {{requested}} инстанциясында. Оны тексеру үшін GitLab-ты сол инстанцияда қосыңыз.",
+      "checkActiveConnection": "Қосылым белсенді, бірақ бұл элемент әлі де жүктеле алмайды.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "gitlabReconnectAdminOnlyDescription": "Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "жіберілмеген пікір",
       "submitCountOfTotal": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
       "submitReview": "Тексеру нәтижесін жіберу",
-      "partialPostedMessage": "{{displayFreshCount}} пікір жарияланды. {{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedFresh": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedStale": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedStale_one": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedStale_other": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
       "blockedRequestChanges": "Өзгеріс енгізуді сұрау үшін қорытынды немесе кемінде бір пікір қосыңыз.",
       "blockedComment": "Кодты тексеру нәтижесін пікір түрінде жариялау үшін қорытынды немесе кемінде бір пікір қосыңыз."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md үшін pull request ашылды",
       "alreadyPresent": "Нұсқаулар REVIEW.md файлында бұрыннан бар",
       "status": {
+        "open": "Ашық",
         "edited": "Өңделген",
         "opening_change_request": "PR ашылуда",
         "change_request_failed": "PR ашу сәтсіз аяқталды",
@@ -1610,6 +1620,8 @@
       "set": "Белгіленген",
       "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
+      "nSelected_one": "{{displayCount}} таңдалды",
+      "nSelected_other": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Шабуылға пайдалану мүмкіндігінің негіздемесі",
       "suggestedFix": "Ұсынылған түзету",
       "whereFound": "Табылған орындар ({{displayCount}})",
+      "whereFound_one": "Табылған орындар ({{displayCount}})",
+      "whereFound_other": "Табылған орындар ({{displayCount}})",
       "fullReport": "Жасалған толық есеп",
       "yes": "Иә",
       "no": "Жоқ",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Бірінші синхрондаудан кейін басымдықты мәселелер пайда болады.",
       "refreshFailed": "Жаңарту мүмкін болмады — соңғы синхрондалған деректер көрсетілуде.",
       "settings": "Параметрлер",
+      "syncing": "Синхрондалуда…",
       "syncNow": "Қазір синхрондау",
       "syncQueued": "Синхрондау кезекке қойылды",
       "syncStatusUnavailable": "Синхрондау күйі қолжетімсіз.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} орташа және төмен",
       "dueThisWeek": "Мерзімі осы аптада",
       "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail_one": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail_other": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",
       "reviewSlaAssignment": "SLA мерзімдерінің белгіленуін тексеру",
       "allOpenFindingsTracked": "Барлық ашық мәселелер қадағаланады"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ескертулерін автоматты түрде синхрондап, репозиторийлеріңіздегі қауіпсіздік мәселелерін басқару үшін GitHub-тағы Kilo қолданбасын орнатыңыз.",
+      "connectOwnerOnly": "Ұйым иесіне немесе әкімшісіне {{platform}} қосуды сұраңыз.",
       "connectTitle": "Бастау үшін GitHub-ты қосыңыз",
       "couldNotLoad": "Қауіпсіздік агентін жүктеу мүмкін болмады.",
       "installApp": "GitHub қолданбасын орнату",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Бұл әрекетті аяқтау мүмкін болмады. Қайталап көріңіз.",
       "actionBlocked": "Бұл әрекетті аяқтау мүмкін болмады. Мәселені алдымен шешу қажет.",
       "syncNoRepositories": "Синхрондау аясында репозиторийлер жоқ. Қауіпсіздік агенті бақылайтын репозиторийлерді таңдап, қайтадан синхрондаңыз.",
+      "syncNoRepositoriesNoManage": "Синхрондау аясында репозиторийлер жоқ. Синхрондау мүмкін болуы үшін ұйым иесі, әкімшісі немесе төлем менеджері репозиторийлерді қосуы керек.",
       "syncIntegrationInactive": "Қауіпсіздік агенті үшін GitHub байланысы белсенді емес. Kilo GitHub App қайта қосып, қайтадан синхрондаңыз.",
       "syncMissingPermission": "Kilo GitHub App осалдықтар туралы ескертулерді оқи алмайды. GitHub-та сол рұқсатты беріп, қайтадан синхрондаңыз.",
       "configConflict": "Қауіпсіздік агентінің параметрлері басқа жерде өзгертілді. Ең соңғы параметрлерді қарап, қайта сақтаңыз."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Орнатуды аяқтау мүмкін емес",
       "notAdminMessage": "Бұл тіркелгіні тек оның GitHub әкімшісі қоса алады. Ұйым әкімшісінен Kilo қолданбасын орнатуды сұраңыз.",
       "alreadyClaimedMessage": "Бұл GitHub қолданбасының орнатылымы басқа Kilo тіркелгісіне қосылған. Алдымен оны сол тіркелгіден ажыратыңыз.",
+      "installationUnavailableMessage": "Бұл GitHub App орнатылымы тоқтатылған немесе енді қолжетімді емес. Оны GitHub ішінде қалпына келтіріңіз немесе қайта орнатыңыз, содан кейін қайтадан бастаңыз.",
+      "multipleInstallationsMessage": "Бұл Kilo ұйымы ағымдағы уақытта тек бір ғана GitHub ұйымына қосыла алады.",
       "didNotCompleteTitle": "Орнату аяқталмады",
       "didNotCompleteMessage": "GitHub қолданбасын орнату аяқталмады. Қолданбадан қайталап көріңіз."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Қазіргі мәні: {{name}}",
       "defaultProfileResolvesToAccessibility": "Әдепкі профиль: {{name}}",
       "manageProfiles": "Профильдерді басқару",
-      "noProfiles": "Әзірге профильдер жоқ. Айнымалы ортаны, MCP серверлерін және дағдыларды қосу үшін біреуін жасаңыз.",
       "advancedConfig": "Кеңейтілген конфигурация",
       "advancedConfigDescription": "Осы сеансқа қолданылады. Профиль ретінде сақтасаңыз, ол келесі жолы да қалады.",
       "saveAsProfile": "Профиль ретінде сақтау",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
       "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
-      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, қалпына келтірілген файлдар: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады — қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "{{name}} құрылғысында жаңа сеанс",
     "noMatchingSessions": "Сәйкес сеанстар жоқ.",
     "onlyFirstFilesAttached": "Тек алғашқы {{displayCount}} файл тіркеледі.",
-    "staleMessage": "Бөлісуге арналған мазмұн енді қолжетімсіз.",
+    "staleMessage": "Оны бөліскен қолданбадан қайта жіберіңіз.",
+    "staleTitle": "Бөлісу мүмкін емес",
     "retryableMessage": "Сеанстарыңызды жүктеу мүмкін болмады.",
     "emptyMessage": "Әзірге сеанстар жоқ — мұны жіберу үшін жаңа сеанс бастаңыз.",
     "cliNotConnectedTitle": "Сеанс қосылмаған",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Осы ауқымның шығысы шектен асып кеткенде немесе әдеттегі сағаттық қарқынынан жоғары көтерілгенде, төлем бойынша байланыстарға электрондық пошта немесе push арқылы ескерту жібер.",
     "thresholdTitle": "Шектен асу",
-    "thresholdSubtitle": "Ағымдағы шығыс шегіңізден асады",
+    "thresholdSubtitle": "Осы ауқымның таңдалған терезедегі ағымдағы шығысы шегіңізден асады",
     "anomalyTitle": "Сағаттық секіріс",
-    "anomalySubtitle": "Бір сағат осы ауқымның әдеттегі қарқынынан әлдеқайда жоғары",
+    "anomalySubtitle": "Осы ауқымның сағаттық қарқыны оның өзінің p95 базалық деңгейінен әлдеқайда жоғары",
     "limitLabel": "Шек (USD)",
     "windowLabel": "Терезе",
     "window24h": "24 сағат",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
     "pushOffByCategory": "Хабарландыруларда өшірулі",
     "multiplierMaxError": "{{max}} немесе одан кіші көбейткіш енгіз",
-    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз."
+    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз"
   },
   "profiles": {
     "title": "Профильдер",

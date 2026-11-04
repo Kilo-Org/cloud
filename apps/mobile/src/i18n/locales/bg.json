@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Преведи обобщенията на инструментите",
     "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
     "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг.",
+    "translateSummaries": "Преведи обобщенията",
     "autoExpandThinkingInactiveSubtitle": "Няма ефект, докато подробностите за разсъжденията са скрити."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Пребазиране"
       },
       "terminal": {
-        "alreadyMerged": "Вече обединена",
         "closed": "Заявката е затворена",
         "closedMergeRequest": "Тази merge заявка е затворена"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Липсват задължителни прегледи",
         "requiredReviewsDetail": "Липсват одобрения от задължителните проверяващи или все още се очакват.",
         "failingChecksTitle": "Неуспешни задължителни проверки",
-        "failingChecksDetail": "Задължителните проверки на състоянието са неуспешни.",
         "unstableTitle": "Някои проверки са неуспешни",
         "unstableDetail": "Незадължителните проверки са неуспешни. Те няма да попречат на обединяването.",
         "draftTitle": "Чернова на заявка за сливане",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
       "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
       "reconnectTitle": "Повторно свързване с GitHub",
+      "reconnectTitleGitLab": "Повторно свързване с GitLab",
+      "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
+      "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
+      "gitlabInstanceMismatchDescription": "Връзката ви с GitLab е за {{connected}}, но тази merge заявка е на {{requested}}. Свържете GitLab на тази инстанция, за да я прегледате.",
+      "checkActiveConnection": "Връзката е активна, но този елемент все още не може да бъде зареден.",
       "bitbucketOrgOnlyDescription": "Превключете акаунта горе към организация, за да преглеждате нейните заявки за сливане в Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Този акаунт все още няма организации. Заявките за сливане в Bitbucket могат да се преглеждат, след като създадете организация или се присъедините към такава.",
       "gitlabReconnectAdminOnlyDescription": "Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "неизпратени коментара",
       "submitCountOfTotal": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
       "submitReview": "Изпрати прегледа",
-      "partialPostedMessage": "Публикувани коментари: {{displayFreshCount}}. Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedFresh": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedStale": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
       "blockedRequestChanges": "Добави обобщение или поне един коментар, за да поискаш промени.",
       "blockedComment": "Добави обобщение или поне един коментар, за да изпратиш преглед с коментар."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "Отворен е pull request за REVIEW.md",
       "alreadyPresent": "Насоките вече са в REVIEW.md",
       "status": {
+        "open": "Отворено",
         "edited": "Редактирано",
         "opening_change_request": "Отваряне на PR",
         "change_request_failed": "Неуспешен PR",
@@ -1610,6 +1620,8 @@
       "set": "Зададено",
       "notSet": "Не е зададено",
       "nSelected": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Обосновка на възможността за атака",
       "suggestedFix": "Предложена корекция",
       "whereFound": "Къде е открито ({{displayCount}})",
+      "whereFound_one": "Къде е открито ({{displayCount}})",
+      "whereFound_other": "Къде е открито ({{displayCount}})",
       "fullReport": "Пълен генериран доклад",
       "yes": "Да",
       "no": "Не",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Приоритетните проблеми ще се появят след първата синхронизация.",
       "refreshFailed": "Не успяхме да обновим данните. Показват се последните синхронизирани данни.",
       "settings": "Настройки",
+      "syncing": "Синхронизиране…",
       "syncNow": "Синхронизирай сега",
       "syncQueued": "Синхронизацията е добавена в опашката",
       "syncStatusUnavailable": "Състоянието на синхронизацията не е достъпно.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} със средна и ниска тежест",
       "dueThisWeek": "С краен срок тази седмица",
       "dueThisWeekDetail": "От тях {{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail_one": "От тях {{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail_other": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
       "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Инсталирай приложението на Kilo за GitHub, за да синхронизираш автоматично сигналите от Dependabot и да управляваш проблемите със сигурността в хранилищата си.",
+      "connectOwnerOnly": "Поискай от собственик на организацията или администратор да свърже {{platform}}.",
       "connectTitle": "Свържи GitHub, за да започнеш",
       "couldNotLoad": "Не успяхме да заредим агента по сигурността.",
       "installApp": "Инсталирай приложението за GitHub",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Не можахме да завършим това действие. Опитай отново.",
       "actionBlocked": "Не можахме да завършим това действие. Проблемът трябва да бъде отстранен, преди да опиташ отново.",
       "syncNoRepositories": "Няма репозиторита в обхвата на синхронизиране. Изберете репозиторитата, които Агентът по сигурността наблюдава, и синхронизирайте отново.",
+      "syncNoRepositoriesNoManage": "Няма репозиторита в обхвата на синхронизиране. Собственик на организацията, администратор или отговорник за плащанията трябва да свърже репозиторита, преди да може да се извърши синхронизиране.",
       "syncIntegrationInactive": "Връзката с GitHub за Агент по сигурността не е активна. Свържете отново Kilo GitHub App и след това синхронизирайте отново.",
       "syncMissingPermission": "Приложението на Kilo за GitHub не може да чете vulnerability alerts. Дай това разрешение в GitHub и синхронизирай отново.",
       "configConflict": "Настройките на Агента по сигурността са променени другаде. Прегледай последните настройки и запази отново."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Инсталирането не може да завърши",
       "notAdminMessage": "Само администратор на този акаунт в GitHub може да го свърже. Помоли администратор на организацията да инсталира Kilo.",
       "alreadyClaimedMessage": "Тази инсталация в GitHub вече е свързана с друг акаунт в Kilo. Първо прекъсни връзката оттам.",
+      "installationUnavailableMessage": "Тази инсталация на GitHub App е спряна или вече не е налична. Възстанови я или я преинсталирай в GitHub, след което започни отново.",
+      "multipleInstallationsMessage": "Тази организация в Kilo в момента може да свързва само една организация в GitHub.",
       "didNotCompleteTitle": "Инсталирането не е завършено",
       "didNotCompleteMessage": "Инсталирането на приложението за GitHub не завърши. Опитай отново от приложението."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Насочва към {{name}}",
       "defaultProfileResolvesToAccessibility": "Профил по подразбиране: {{name}}",
       "manageProfiles": "Управление на профили",
-      "noProfiles": "Все още няма профили. Създайте такъв, за да добавите променливи на средата, MCP сървъри и умения.",
       "advancedConfig": "Разширена конфигурация",
       "advancedConfigDescription": "Вали за тази сесия. Запазването като профил го запазва за следващия път.",
       "saveAsProfile": "Запази като профил",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Нов опит за клониране (опит {{attempt}} от {{total}})",
       "detailSetupCommandFailed": "Командата за настройка {{index}} не успя",
       "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
-      "detailColdRestore": "Студено възстановяване, снимката е приложена, {{applied}} от {{total}} файла са възстановени",
+      "detailColdRestore": "Студено възстановяване, снимката е приложена, възстановени файлове: {{applied}} от {{total}}",
       "detailProgressPercent": "{{percent}}% завършено",
-      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно: {{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно — невъзстановени файлове: {{skipped}} от {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
       "detailReasonPatchFailed": "кръпката не беше приложена",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Нова сесия на {{name}}",
     "noMatchingSessions": "Няма съвпадащи сесии.",
     "onlyFirstFilesAttached": "Ще бъдат прикачени само първите {{displayCount}} файла.",
-    "staleMessage": "Това споделяне вече не е налично.",
+    "staleMessage": "Изпрати го отново от приложението, от което го сподели.",
+    "staleTitle": "Споделянето не е налично",
     "retryableMessage": "Не можахме да заредим сесиите ти.",
     "emptyMessage": "Все още няма сесии — започни нова, за да изпратиш това съдържание.",
     "cliNotConnectedTitle": "Сесията не е свързана",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Изпращай известие по имейл или push до контактите за фактуриране, когато разходите на този обхват надхвърлят лимит или скочат над обичайната си часова норма.",
     "thresholdTitle": "Преминаване на праг",
-    "thresholdSubtitle": "Текущите разходи надхвърлят лимита ти",
+    "thresholdSubtitle": "Текущите разходи на този обхват за избрания прозорец надхвърлят лимита ти",
     "anomalyTitle": "Часов скок",
-    "anomalySubtitle": "Един час е далеч над обичайната норма за този обхват",
+    "anomalySubtitle": "Часовата норма на този обхват е далеч над собствената му p95 базова линия",
     "limitLabel": "Лимит (USD)",
     "windowLabel": "Прозорец",
     "window24h": "24 часа",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
     "pushOffByCategory": "Изключено в „Известия“",
     "multiplierMaxError": "Въведи множител {{max}} или по-малко",
-    "thresholdMaxError": "Въведи сума {{max}} или по-малко."
+    "thresholdMaxError": "Въведи сума {{max}} или по-малко"
   },
   "profiles": {
     "title": "Профили",

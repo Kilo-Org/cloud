@@ -1859,7 +1859,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
       enabled: true,
       defaultDestination: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       options: [
-        { allocation: getSandboxAllocationRequest('cloudflare-single') },
+        { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
         {
           allocation: getSandboxAllocationRequest('vercel-large'),
         },
@@ -1886,7 +1886,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it.each([false, true])('ignores retired devcontainer context %s', async devcontainer => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: getSandboxAllocationRequest('cloudflare-shared'),
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       options: [],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
@@ -1986,6 +1986,32 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         createdOnPlatform: 'cloud-agent-web',
         clientProvenance: 'browser',
       })
+    );
+  });
+
+  it('forwards the selected environment and the choice marker to the worker', async () => {
+    const caller = createCaller({
+      user: { id: 'user-environment', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    const requestedEnvironment = {
+      id: '123e4567-e89b-12d3-a456-426614174099',
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    };
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      requestedEnvironment,
+      requireEnvironmentChoice: true,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedEnvironment, requireEnvironmentChoice: true })
     );
   });
 
@@ -2354,7 +2380,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     await expect(
       caller.prepareSession({
         ...sandboxInput,
-        sandboxAllocation: 'cloudflare-single',
+        sandboxAllocation: 'cloudflare-containers-standard-3',
         devcontainer: true,
       })
     ).rejects.toThrow('Sandbox selection is not available with dev containers');

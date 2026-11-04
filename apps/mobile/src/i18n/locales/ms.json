@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Terjemah ringkasan alat",
     "toolSummaryTranslationSubtitle": "Hantar setiap ringkasan alat kepada model untuk menterjemahkannya ke dalam bahasa aplikasi anda. Yang asal dipaparkan jika terjemahan gagal.",
     "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(common.model) untuk memilih yang lain.",
+    "translateSummaries": "Terjemah ringkasan",
     "autoExpandThinkingInactiveSubtitle": "Tiada kesan semasa butiran pemikiran disembunyikan."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Asas semula"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "Permintaan tarik ini telah ditutup",
         "closedMergeRequest": "Permintaan gabungan ini telah ditutup"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Semakan wajib belum diterima",
         "requiredReviewsDetail": "Kelulusan daripada penyemak yang ditetapkan belum diterima atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan yang tidak wajib gagal. Kegagalan ini tidak menghalang penggabungan.",
         "draftTitle": "PR draf",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
       "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
       "reconnectTitle": "Sambung semula ke GitHub",
+      "reconnectTitleGitLab": "Sambung semula ke GitLab",
+      "reconnectTitleBitbucket": "Sambung semula ke Bitbucket",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan.",
       "gitlabDescription": "Semak permintaan gabungan pada peranti mudah alih",
+      "gitlabInstanceMismatchTitle": "Sambungan GitLab adalah untuk instans lain",
+      "gitlabInstanceMismatchDescription": "Sambungan GitLab anda adalah untuk {{connected}}, tetapi permintaan gabungan ini berada pada {{requested}}. Sambungkan GitLab pada instans tersebut untuk menyemaknya.",
+      "checkActiveConnection": "Sambungan aktif, tetapi item ini masih tidak dapat dimuatkan.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "komen belum dihantar",
       "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
       "submitReview": "Hantar semakan",
-      "partialPostedMessage": "{{displayFreshCount}} komen telah disiarkan. {{displayStaleCount}} komen merujuk kepada komit lama dan kekal dalam senarai menunggu anda.",
+      "partialPostedFresh": "{{displayFreshCount}} komen telah disiarkan. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} komen telah disiarkan. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} komen telah disiarkan. ",
+      "partialPostedStale": "{{displayStaleCount}} komen merujuk kepada komit lama dan kekal dalam senarai menunggu anda.",
+      "partialPostedStale_one": "{{displayStaleCount}} komen merujuk kepada komit lama dan kekal dalam senarai menunggu anda.",
+      "partialPostedStale_other": "{{displayStaleCount}} komen merujuk kepada komit lama dan kekal dalam senarai menunggu anda.",
       "blockedRequestChanges": "Tambah ringkasan atau sekurang-kurangnya satu komen untuk meminta perubahan.",
       "blockedComment": "Tambah ringkasan atau sekurang-kurangnya satu komen untuk menghantar semakan berbentuk komen."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "Kongsi permintaan gabungan",
       "viewOnProvider": "Lihat pada {{provider}}",
       "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",
-      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda tiada akses kepadanya.",
+      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda mungkin tiada akses kepadanya.",
       "accessDeniedMergeRequest": "Anda tidak mempunyai kebenaran untuk melihat permintaan gabungan ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuatkan permintaan gabungan.",
       "discussionAccessDenied": "Anda tidak mempunyai kebenaran untuk melihat perbincangan permintaan gabungan ini.",
@@ -1523,6 +1532,7 @@
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada dalam REVIEW.md",
       "status": {
+        "open": "Terbuka",
         "edited": "Disunting",
         "opening_change_request": "Membuka PR",
         "change_request_failed": "PR gagal",
@@ -1610,6 +1620,8 @@
       "set": "Ditetapkan",
       "notSet": "Tidak ditetapkan",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Rasional penilaian keboleheksploitan",
       "suggestedFix": "Pembetulan yang dicadangkan",
       "whereFound": "Lokasi penemuan ({{displayCount}})",
+      "whereFound_one": "Lokasi penemuan ({{displayCount}})",
+      "whereFound_other": "Lokasi penemuan ({{displayCount}})",
       "fullReport": "Laporan penuh yang dijana",
       "yes": "Ya",
       "no": "Tidak",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Penemuan keutamaan akan muncul selepas penyegerakan pertama.",
       "refreshFailed": "Tidak dapat memuat semula data. Data daripada penyegerakan terakhir dipaparkan.",
       "settings": "Tetapan",
+      "syncing": "Sedang menyegerakkan…",
       "syncNow": "Segerakkan sekarang",
       "syncQueued": "Penyegerakan dimasukkan ke dalam baris gilir",
       "syncStatusUnavailable": "Status penyegerakan tidak tersedia.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} sederhana atau rendah",
       "dueThisWeek": "Tarikh akhir minggu ini",
       "dueThisWeekDetail": "{{exploitable}} daripada ini disahkan boleh dieksploitasi",
+      "dueThisWeekDetail_one": "{{exploitable}} daripada ini disahkan boleh dieksploitasi",
+      "dueThisWeekDetail_other": "{{exploitable}} daripada ini disahkan boleh dieksploitasi",
       "noDeadline": "Tiada tarikh akhir",
       "reviewSlaAssignment": "Semak penetapan SLA",
       "allOpenFindingsTracked": "Semua penemuan terbuka dijejaki"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Pasang apl GitHub Kilo untuk menyegerakkan amaran Dependabot secara automatik dan mengurus penemuan keselamatan dalam semua repositori anda.",
+      "connectOwnerOnly": "Minta pemilik atau pentadbir organisasi menyambungkan {{platform}}.",
       "connectTitle": "Sambungkan GitHub untuk bermula",
       "couldNotLoad": "Tidak dapat memuatkan Ejen Keselamatan.",
       "installApp": "Pasang apl GitHub",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
       "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu.",
       "syncNoRepositories": "Tiada repositori dalam skop segerak. Pilih repositori yang dipantau oleh Ejen Keselamatan, kemudian segerakkan semula.",
+      "syncNoRepositoriesNoManage": "Tiada repositori dalam skop segerak. Pemilik organisasi, pentadbir atau pengurus pengebilan mesti menyambungkan repositori sebelum ia boleh disegerakkan.",
       "syncIntegrationInactive": "Sambungan GitHub untuk Ejen Keselamatan tidak aktif. Sambung semula Apl GitHub Kilo, kemudian segerakkan semula.",
       "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula.",
       "configConflict": "Tetapan Ejen Keselamatan diubah di tempat lain. Semak tetapan terkini dan simpan semula."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Tidak dapat menyelesaikan pemasangan",
       "notAdminMessage": "Hanya pentadbir GitHub bagi akaun itu boleh menyambungkannya. Minta pentadbir organisasi memasang Kilo.",
       "alreadyClaimedMessage": "Pemasangan GitHub itu sudah disambungkan ke akaun Kilo lain. Putuskan sambungannya di sana dahulu.",
+      "installationUnavailableMessage": "Pemasangan GitHub App ini digantung atau tidak lagi tersedia. Pulihkan atau pasang semula di GitHub, kemudian mulakan semula.",
+      "multipleInstallationsMessage": "Organisasi Kilo ini pada masa ini hanya boleh menyambungkan satu organisasi GitHub.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan apl GitHub tidak selesai. Cuba lagi daripada apl."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Bersamaan dengan {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil lalai: {{name}}",
       "manageProfiles": "Urus profil",
-      "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Sesi baharu pada {{name}}",
     "noMatchingSessions": "Tiada sesi yang sepadan.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} fail pertama akan dilampirkan.",
-    "staleMessage": "Perkongsian ini tidak lagi tersedia.",
+    "staleMessage": "Hantar semula daripada aplikasi yang anda gunakan untuk berkongsi.",
+    "staleTitle": "Perkongsian tidak tersedia",
     "retryableMessage": "Tidak dapat memuatkan sesi anda.",
     "emptyMessage": "Belum ada sesi. Mulakan sesi baharu untuk menghantar kandungan ini.",
     "cliNotConnectedTitle": "Sesi tidak bersambung",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Hantar amaran melalui e-mel atau push kepada kenalan pengebilan apabila perbelanjaan skop ini melepasi had atau melonjak melebihi kadar setiap jam biasanya.",
     "thresholdTitle": "Melepasi ambang",
-    "thresholdSubtitle": "Perbelanjaan berjalan melepasi had anda",
+    "thresholdSubtitle": "Perbelanjaan berjalan skop ini dalam tetingkap yang dipilih melepasi had anda",
     "anomalyTitle": "Lonjakan setiap jam",
-    "anomalySubtitle": "Satu jam jauh melebihi kadar biasa skop ini",
+    "anomalySubtitle": "Kadar setiap jam skop ini jauh melebihi garis dasar p95 miliknya sendiri",
     "limitLabel": "Had (USD)",
     "windowLabel": "Tetingkap",
     "window24h": "24 jam",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
     "pushOffByCategory": "Dimatikan dalam Pemberitahuan",
     "multiplierMaxError": "Masukkan pengganda {{max}} atau kurang",
-    "thresholdMaxError": "Masukkan amaun {{max}} atau kurang."
+    "thresholdMaxError": "Masukkan amaun {{max}} atau kurang"
   },
   "profiles": {
     "title": "Profil",

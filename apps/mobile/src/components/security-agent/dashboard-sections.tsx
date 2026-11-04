@@ -9,11 +9,12 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
+import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -28,6 +29,17 @@ import { cn } from '@/lib/utils';
 // priorityFinding and repoHealth from the full tRPC output.
 type DashboardStats = NonNullable<ReturnType<typeof useSecurityAgentDashboardStats>['data']>;
 
+/**
+ * A card's one way out of an empty state: the label it shows, the busy state a
+ * tap owes, and what that tap does. The owner of the state builds it, because
+ * only the owner knows what the reader is allowed to do.
+ */
+export type SectionAction = {
+  label: string;
+  pending: boolean;
+  handlePress: () => void;
+};
+
 type SectionProps = Readonly<{
   scope: string;
   data: DashboardStats;
@@ -35,6 +47,14 @@ type SectionProps = Readonly<{
   repoFullName: string | undefined;
   /** No sync has completed yet, so nothing here counts a measured result. */
   neverSynced: boolean;
+  /**
+   * The GitHub App grant is a settled empty list: no repository can be scanned
+   * until the grant holds one, so the repository card names that state instead
+   * of promising findings that cannot arrive.
+   */
+  emptyGrant: boolean;
+  /** The step out of an empty grant, or `null` while the role read has no answer. */
+  emptyGrantAction: SectionAction | null;
 }>;
 
 function repoTrailingLabel(
@@ -127,6 +147,10 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   }
 
   if (!finding) {
+    // The all-clear row still opens the scope's open-findings list — the same
+    // list its own count describes — so it stays a destination on the screen
+    // even when that list is empty. Its whole row is the target, so the row
+    // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Pressable
@@ -207,14 +231,14 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'danger')}
+        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'warn')}
+        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
@@ -228,7 +252,7 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
         value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
         valueTone="muted"
         valueFace="numeric"
-        dotTone={rowTone(neverSynced, 'good')}
+        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
         last
       />
     </SectionCard>
@@ -292,7 +316,7 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
             value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
             valueTone="muted"
             valueFace="numeric"
-            dotTone={rowTone(neverSynced, row.tone)}
+            dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
             last={index === rows.length - 1}
           />
         </Pressable>
@@ -301,12 +325,23 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
   );
 }
 
-function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
+function RepoHealthSection({
+  scope,
+  data,
+  slaEnabled,
+  emptyGrant,
+  emptyGrantAction,
+}: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
   if (data.repoHealth.length === 0) {
+    // A grant that holds nothing is not a scope that has not synced yet:
+    // priorities cannot arrive until a repository can be scanned, so the card
+    // names the grant and carries the step out of it instead. The step is the
+    // owner's, since only the owner knows what this reader may do — a manager
+    // opens the repository settings, a member is handed to the GitHub App page.
     return (
       <SectionCard title={t('securityAgent.dashboard.repositoryActionPlan')}>
         <EmptyState
@@ -314,7 +349,23 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
           placement="top"
           className="py-3"
           title={t('securityAgent.dashboard.noRepositoryData')}
-          description={t('securityAgent.dashboard.noRepositoryDataDescription')}
+          description={
+            emptyGrant
+              ? t('securityAgent.repositories.noRepositoriesDescription')
+              : t('securityAgent.dashboard.noRepositoryDataDescription')
+          }
+          action={
+            emptyGrantAction ? (
+              <Button
+                className={STATE_ACTION_CLASS}
+                variant="default"
+                loading={emptyGrantAction.pending}
+                onPress={emptyGrantAction.handlePress}
+              >
+                <Text>{emptyGrantAction.label}</Text>
+              </Button>
+            ) : undefined
+          }
         />
       </SectionCard>
     );

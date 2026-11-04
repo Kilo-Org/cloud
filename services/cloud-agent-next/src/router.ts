@@ -14,6 +14,7 @@ import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
 import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
+import { createHostedWorkspaceContinuationHandlers } from './router/handlers/hosted-workspace-continuation.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
@@ -57,6 +58,7 @@ export const appRouter = router({
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
   ...createHostedWorkspaceMutationHandlers(),
+  ...createHostedWorkspaceContinuationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
   ...createSessionEgressAuditHandlers(),
 });

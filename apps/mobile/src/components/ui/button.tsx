@@ -1,8 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text, TextClassContext } from '@/components/ui/text';
 import { COMPACT_BUTTON_HIT_SLOP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -36,7 +36,12 @@ const buttonVariants = cva(
         secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
-        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // A soft accent action is low-emphasis, so it paints a tint of the
+        // accent rather than the full-strength surface user bubbles fill with.
+        // The tint is what keeps it behind a filled primary: in dark mode that
+        // primary already fills with #ffdd00, and a solid accent-soft button
+        // could not be told apart from it.
+        'accent-soft': 'bg-accent-soft-tint active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
         // min-h (not fixed h) so a button with a label grows to fit text scaled
@@ -87,6 +92,14 @@ const buttonGapVariants = cva('', {
 // accessibility tree, because the button carries its own busy name.
 export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center';
 export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
+/** The busy mark draws at the label's own line height, so it replaces its ink. */
+const BUTTON_BUSY_MARK_SIZE = 20;
+/**
+ * The platform's small indicator strokes a ring centred on a 7.5 dp radius; a
+ * 17 dp box with a 2 dp border paints the same ring behind it as a track, in
+ * the indicator's own ink rather than a washed-out version of it.
+ */
+const BUSY_TRACK_SIZE = 17;
 
 /**
  * The visible text of the button's children, for a label a loading button can
@@ -121,41 +134,48 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
   return text === '' ? undefined : text;
 }
 
-// Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
-// but is identical in both themes (global.css --accent-soft-foreground).
-function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
-  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
-    return colors.foreground;
-  }
-  if (variant === 'link') {
-    return colors.primary;
-  }
-  if (variant === 'accent-soft') {
-    return '#1A1A10';
-  }
-  if (variant === 'destructive') {
-    return colors.destructiveSolidForeground;
-  }
-  if (variant === 'outline-destructive') {
-    return colors.destructive;
-  }
-  // default
-  return colors.primaryForeground;
-}
+type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
+
+/**
+ * Each variant's ink in one place: the class its label paints and the theme
+ * token its busy mark follows. The mark has to read in the label's own colour —
+ * a busy button shows the mark where the label was, and a still capture of the
+ * platform indicator is otherwise a speck on the fill — so the two columns
+ * cannot be kept apart. Recording both here makes a variant added to
+ * `buttonVariants` without an ink pair, or an ink pair naming a token the
+ * palette does not define, a type error instead of a mark in the default
+ * variant's colour.
+ */
+const BUTTON_INK = {
+  default: { label: 'text-primary-foreground', mark: 'primaryForeground' },
+  destructive: {
+    label: 'text-destructive-solid-foreground',
+    mark: 'destructiveSolidForeground',
+  },
+  outline: { label: 'text-foreground', mark: 'foreground' },
+  'outline-destructive': { label: 'text-destructive', mark: 'destructive' },
+  secondary: { label: 'text-secondary-foreground', mark: 'secondaryForeground' },
+  ghost: { label: 'text-foreground', mark: 'foreground' },
+  link: { label: 'text-primary group-active:underline', mark: 'primary' },
+  'accent-soft': {
+    label: 'text-accent-soft-tint-foreground',
+    mark: 'accentSoftTintForeground',
+  },
+} as const satisfies Record<ButtonVariant, { label: string; mark: keyof ThemeColors }>;
+
+/**
+ * The label column of `BUTTON_INK`, keyed by the variant union. The table above
+ * is what makes it complete and what ties each label to its mark; `fromEntries`
+ * only rebuilds the same keys and widens them to `string`, so the record type
+ * restores the union cva reads its `variant` prop from.
+ */
+const buttonLabelClasses = Object.fromEntries(
+  Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
+) as Record<ButtonVariant, string>;
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      destructive: 'text-destructive-solid-foreground',
-      outline: 'text-foreground',
-      'outline-destructive': 'text-destructive',
-      secondary: 'text-secondary-foreground',
-      ghost: 'text-foreground',
-      link: 'text-primary group-active:underline',
-      'accent-soft': 'text-accent-soft-foreground',
-    },
+    variant: buttonLabelClasses,
     size: {
       default: '',
       sm: '',
@@ -225,9 +245,29 @@ function Button({
   // The children sit one level deeper in that layout, so their spacing moves
   // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
-  const busyIndicator = loading ? (
-    <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
-  ) : null;
+  // A busy mark has to read in a still capture as well as on screen. The
+  // platform indicator's indeterminate arc sweeps from near-zero on Android, so
+  // a still can land on a speck of ink where the label used to be. A track at
+  // the arc's own radius and stroke, painted in the label's own ink, keeps the
+  // mark a ring in every frame without diluting the ink the label used.
+  const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
+  const busyMark = (
+    <View
+      className="items-center justify-center"
+      // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+      style={{ width: BUTTON_BUSY_MARK_SIZE, height: BUTTON_BUSY_MARK_SIZE }}
+    >
+      <View className="absolute inset-0 items-center justify-center">
+        <View
+          className="rounded-full border-2"
+          // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+          style={{ width: BUSY_TRACK_SIZE, height: BUSY_TRACK_SIZE, borderColor: busyInk }}
+        />
+      </View>
+      <ActivityIndicator accessible={false} size="small" color={busyInk} />
+    </View>
+  );
+  const busyIndicator = loading ? busyMark : null;
   // A bare string or number child has no host to draw on: Pressable is a View,
   // and a View draws no text, so the button collapses to its padding and the
   // label disappears while the accessibility tree still names it. Wrap scalars
@@ -289,8 +329,15 @@ function Button({
           normalizedChildren
         )}
         {loading && size !== 'icon' ? (
-          <View className={BUTTON_BUSY_OVERLAY_CLASS}>
-            <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
+          // The button already carries the busy state and its name, so the
+          // mark inside it stays out of the accessibility tree instead of
+          // adding a second stop that reads only the wait.
+          <View
+            className={BUTTON_BUSY_OVERLAY_CLASS}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {busyMark}
           </View>
         ) : null}
         {size === 'icon' ? busyIndicator : null}

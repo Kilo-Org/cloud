@@ -54,12 +54,7 @@ export function ScopeAccessDeniedScreen({
       )}
       action={
         <View className="gap-3">
-          <Button
-            variant="outline"
-            onPress={onRetry}
-            loading={isRetrying}
-            accessibilityLabel={t('common.retry')}
-          >
+          <Button onPress={onRetry} loading={isRetrying} accessibilityLabel={t('common.retry')}>
             <Text>{t('common.retry')}</Text>
           </Button>
           <Button

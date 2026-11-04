@@ -270,6 +270,64 @@ describe('replacement workspace local recovery', () => {
     }
   });
 
+  it('skips transcript file restoration for a continued session but still imports history', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-continuation-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(
+        path.join(bin, 'kilo'),
+        `#!/bin/sh\ncp "$2" "${path.join(root, 'imported.json')}"\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const harness = createHarness(FAST_TIMERS);
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          continuation: true,
+        })
+      );
+      // The continuation marker disables transcript file restoration even with
+      // no recovery, and the pushed branch stays untouched.
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('base\n');
+      // Transcript import still runs for the message history.
+      expect(await fs.readFile(path.join(root, 'imported.json'), 'utf8')).toContain('messages');
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not fail preparation when local recovery fails', async () => {
     const harness = createHarness(FAST_TIMERS, {
       recoverWorktree: async () => {
@@ -3192,6 +3250,86 @@ describe('workspace Git credentials', () => {
       expect(harness.gitCalls).toEqual([]);
       expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
         'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('workspace Git credentials of a V2 environment', () => {
+  const GITLAB_PROJECT = 'https://gitlab.com/group/sub/project.git';
+  const record = (host: string, username: string, password: string) =>
+    `protocol=https\nhost=${host}\nusername=${username}\npassword=${password}\n`;
+
+  it('records one alias for each host at preparation, for the helper to answer by host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab')}`
+      );
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('alias-');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites every host record on a credential renewal', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github-2', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab-2', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github-2')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab-2')}`
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the V1 record when the credentials carry no extra host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        record('github.com', 'x-access-token', 'alias-github')
       );
     } finally {
       await fs.rm(root, { recursive: true, force: true });

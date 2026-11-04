@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ແປບົດສະຫຼຸບເຄື່ອງມື",
     "toolSummaryTranslationSubtitle": "ສົ່ງບົດສະຫຼຸບເຄື່ອງມືແຕ່ລະອັນໄປຫາຕົວແບບເພື່ອແປມັນເປັນພາສາແອັບຂອງທ່ານ. ຖ້າການແປລົ້ມເຫຼວ ຕົ້ນສະບັບຈະຖືກສະແດງ.",
     "toolSummaryTranslationModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(common.model) ເພື່ອເລືອກອັນອື່ນ.",
+    "translateSummaries": "ແປບົດສະຫຼຸບ",
     "autoExpandThinkingInactiveSubtitle": "ບໍ່ມີຜົນເມື່ອເຊື່ອງລາຍລະອຽດການຄິດ."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "ປ່ຽນຖານ"
       },
       "terminal": {
-        "alreadyMerged": "ລວມແລ້ວ",
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
         "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "ຍັງຂາດການກວດທານທີ່ບັງຄັບ",
         "requiredReviewsDetail": "ຍັງບໍ່ໄດ້ຮັບການອະນຸມັດຈາກຜູ້ກວດທານທີ່ກຳນົດ ຫຼື ຍັງລໍຖ້າການອະນຸມັດຢູ່.",
         "failingChecksTitle": "ການກວດສອບທີ່ບັງຄັບບໍ່ຜ່ານ",
-        "failingChecksDetail": "ການກວດສອບສະຖານະທີ່ບັງຄັບບໍ່ຜ່ານ.",
         "unstableTitle": "ການກວດສອບບາງລາຍການບໍ່ຜ່ານ",
         "unstableDetail": "ການກວດສອບທີ່ບໍ່ບັງຄັບບໍ່ຜ່ານ. ຜົນນີ້ບໍ່ຂັດຂວາງການລວມ.",
         "draftTitle": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ Bitbucket ໄດ້.",
       "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
+      "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
+      "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
+      "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",
+      "gitlabInstanceMismatchDescription": "ການເຊື່ອມຕໍ່ GitLab ຂອງທ່ານແມ່ນສຳລັບ {{connected}}, ແຕ່ merge request ນີ້ຢູ່ໃນ {{requested}}. ເຊື່ອມຕໍ່ GitLab ໃນ instance ນັ້ນເພື່ອກວດສອບມັນ.",
+      "checkActiveConnection": "ການເຊື່ອມຕໍ່ເຮັດວຽກຢູ່, ແຕ່ລາຍການນີ້ຍັງບໍ່ສາມາດໂຫຼດໄດ້.",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
-      "partialPostedMessage": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedFresh_other": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedStale": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedStale_one": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedStale_other": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
       "blockedRequestChanges": "ເພີ່ມບົດສະຫຼຸບ ຫຼື ຄຳເຫັນຢ່າງໜ້ອຍໜຶ່ງລາຍການເພື່ອຂໍໃຫ້ແກ້ໄຂ.",
       "blockedComment": "ເພີ່ມບົດສະຫຼຸບ ຫຼື ຄຳເຫັນຢ່າງໜ້ອຍໜຶ່ງລາຍການເພື່ອສົ່ງຜົນການກວດທານແບບໃຫ້ຄຳເຫັນ."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "ແບ່ງປັນ merge request",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
       "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
-      "unavailableDescription": "ມັນອາດຖືກລຶບໄປແລ້ວ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
+      "unavailableDescription": "ມັນອາດຖືກລຶບ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
       "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
       "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
       "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",
@@ -1523,6 +1532,7 @@
       "prOpened": "ເປີດ PR ສຳລັບ REVIEW.md ແລ້ວ",
       "alreadyPresent": "ມີຄຳແນະນຳຢູ່ໃນ REVIEW.md ແລ້ວ",
       "status": {
+        "open": "ເປີດ",
         "edited": "ແກ້ໄຂແລ້ວ",
         "opening_change_request": "ກຳລັງເປີດ PR",
         "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
@@ -1610,6 +1620,8 @@
       "set": "ຕັ້ງຄ່າແລ້ວ",
       "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_one": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_other": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "ເຫດຜົນການປະເມີນວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ຫຼືບໍ່",
       "suggestedFix": "ວິທີແກ້ໄຂທີ່ແນະນຳ",
       "whereFound": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
+      "whereFound_one": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
+      "whereFound_other": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນສະບັບເຕັມ",
       "yes": "ແມ່ນ",
       "no": "ບໍ່ແມ່ນ",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "ບັນຫາທີ່ກວດພົບຕາມລຳດັບຄວາມສຳຄັນຈະປາກົດຫຼັງຈາກຊິງຂໍ້ມູນຄັ້ງທຳອິດ.",
       "refreshFailed": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໃໝ່ໄດ້ — ກຳລັງສະແດງຂໍ້ມູນທີ່ຊິງໄວ້ຄັ້ງລ່າສຸດ.",
       "settings": "ການຕັ້ງຄ່າ",
+      "syncing": "ກຳລັງຊິງຂໍ້ມູນ…",
       "syncNow": "ຊິງຂໍ້ມູນຕອນນີ້",
       "syncQueued": "ເພີ່ມການຊິງຂໍ້ມູນໃສ່ຄິວແລ້ວ",
       "syncStatusUnavailable": "ບໍ່ສາມາດເບິ່ງສະຖານະການຊິງຂໍ້ມູນໄດ້.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "ປານກາງ ແລະ ຕ່ຳ {{displayCount}}",
       "dueThisWeek": "ຄົບກຳນົດອາທິດນີ້",
       "dueThisWeekDetail": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
+      "dueThisWeekDetail_one": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
+      "dueThisWeekDetail_other": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
       "noDeadline": "ບໍ່ມີວັນຄົບກຳນົດ",
       "reviewSlaAssignment": "ກວດທານການຕັ້ງກຳນົດ SLA",
       "allOpenFindingsTracked": "ຕິດຕາມບັນຫາທີ່ຍັງເປີດຢູ່ທັງໝົດແລ້ວ"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "ຕິດຕັ້ງແອັບ GitHub ຂອງ Kilo ເພື່ອຊິງຂໍ້ມູນການແຈ້ງເຕືອນ Dependabot ໂດຍອັດຕະໂນມັດ ແລະ ຈັດການບັນຫາຄວາມປອດໄພທີ່ກວດພົບໃນຄັງໂຄ້ດຂອງເຈົ້າ.",
+      "connectOwnerOnly": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບເຊື່ອມຕໍ່ {{platform}}.",
       "connectTitle": "ເຊື່ອມຕໍ່ GitHub ເພື່ອເລີ່ມຕົ້ນ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເອເຈນດ້ານຄວາມປອດໄພໄດ້.",
       "installApp": "ຕິດຕັ້ງແອັບ GitHub",
@@ -2064,6 +2082,7 @@
       "actionFailed": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ກະລຸນາລອງໃໝ່.",
       "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້.",
       "syncNoRepositories": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກ repository ທີ່ «ເອເຈນດ້ານຄວາມປອດໄພ» ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncNoRepositoriesNoManage": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນ ຕ້ອງເຊື່ອມຕໍ່ repository ກ່ອນຈຶ່ງຈະຊິງຄ໌ໄດ້.",
       "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ ເອເຈນດ້ານຄວາມປອດໄພ ບໍ່ໄດ້ເປີດໃຊ້ງານ. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "configConflict": "ການຕັ້ງຄ່າຂອງເອເຈນດ້ານຄວາມປອດໄພຖືກປ່ຽນແປງຢູ່ບ່ອນອື່ນ. ກວດເບິ່ງການຕັ້ງຄ່າລ່າສຸດແລ້ວບັນທຶກອີກຄັ້ງ."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "ບໍ່ສາມາດຕິດຕັ້ງໃຫ້ສຳເລັດໄດ້",
       "notAdminMessage": "ມີພຽງຜູ້ດູແລ GitHub ຂອງບັນຊີນັ້ນທີ່ເຊື່ອມຕໍ່ບັນຊີໄດ້. ຂໍໃຫ້ຜູ້ດູແລອົງກອນຕິດຕັ້ງ Kilo.",
       "alreadyClaimedMessage": "ການຕິດຕັ້ງ GitHub ນັ້ນເຊື່ອມຕໍ່ກັບບັນຊີ Kilo ອື່ນແລ້ວ. ຕັດການເຊື່ອມຕໍ່ຈາກບັນຊີນັ້ນກ່ອນ.",
+      "installationUnavailableMessage": "ການຕິດຕັ້ງ GitHub App ນີ້ຖືກໂຈະ ຫຼື ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ກູ້ຄືນ ຫຼື ຕິດຕັ້ງຄືນໃໝ່ໃນ GitHub ແລ້ວເລີ່ມອີກຄັ້ງ.",
+      "multipleInstallationsMessage": "ອົງກອນ Kilo ນີ້ສາມາດເຊື່ອມຕໍ່ກັບອົງກອນ GitHub ໄດ້ພຽງແຕ່ໜຶ່ງອົງກອນເທົ່ານັ້ນໃນປັດຈຸບັນ.",
       "didNotCompleteTitle": "ການຕິດຕັ້ງບໍ່ສຳເລັດ",
       "didNotCompleteMessage": "ການຕິດຕັ້ງແອັບ GitHub ຍັງບໍ່ສຳເລັດ. ລອງອີກຄັ້ງຈາກແອັບ."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "ຕັ້ງຄ່າເປັນ {{name}}",
       "defaultProfileResolvesToAccessibility": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ: {{name}}",
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
-      "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
       "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "ເຊດຊັນໃໝ່ໃນ {{name}}",
     "noMatchingSessions": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ.",
     "onlyFirstFilesAttached": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ.",
-    "staleMessage": "ເນື້ອຫາທີ່ແບ່ງປັນນີ້ບໍ່ພ້ອມໃຊ້ງານອີກແລ້ວ.",
+    "staleMessage": "ສົ່ງມັນອີກຄັ້ງຈາກແອັບທີ່ທ່ານແບ່ງປັນ.",
+    "staleTitle": "ການແບ່ງປັນບໍ່ໄດ້",
     "retryableMessage": "ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງທ່ານໄດ້.",
     "emptyMessage": "ຍັງບໍ່ມີເຊດຊັນ — ເລີ່ມເຊດຊັນໃໝ່ເພື່ອສົ່ງເນື້ອຫານີ້.",
     "cliNotConnectedTitle": "ເຊດຊັນບໍ່ໄດ້ເຊື່ອມຕໍ່",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "ສົ່ງການແຈ້ງເຕືອນຜ່ານອີເມວ ຫຼື push ໄປຫາຜູ້ຕິດຕໍ່ການຮຽກເກັບເງິນ ເມື່ອການໃຊ້ຈ່າຍຂອງຂອບເຂດນີ້ຂ້າມຂີດຈຳກັດ ຫຼື ເພີ່ມຂຶ້ນເໜືອອັດຕາຕໍ່ຊົ່ວໂມງປົກກະຕິ.",
     "thresholdTitle": "ການຂ້າມຂີດຈຳກັດ",
-    "thresholdSubtitle": "ການໃຊ້ຈ່າຍປັດຈຸບັນຂ້າມຂີດຈຳກັດຂອງທ່ານ",
+    "thresholdSubtitle": "ການໃຊ້ຈ່າຍປັດຈຸບັນຂອງຂອບເຂດນີ້ໃນໄລຍະເວລາທີ່ເລືອກຂ້າມຂີດຈຳກັດຂອງທ່ານ",
     "anomalyTitle": "ການເພີ່ມຂຶ້ນຕໍ່ຊົ່ວໂມງ",
-    "anomalySubtitle": "ໜຶ່ງຊົ່ວໂມງສູງກວ່າອັດຕາປົກກະຕິຂອງຂອບເຂດນີ້ຫຼາຍ",
+    "anomalySubtitle": "ອັດຕາຊົ່ວໂມງຂອງຂອບເຂດນີ້ສູງກວ່າຄ່າພື້ນຖານ p95 ຂອງມັນເອງຫຼາຍ",
     "limitLabel": "ຂີດຈຳກັດ (USD)",
     "windowLabel": "ໄລຍະເວລາ",
     "window24h": "24 ຊົ່ວໂມງ",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ.",
     "pushOffByCategory": "ປິດໃນການແຈ້ງເຕືອນ",
     "multiplierMaxError": "ໃສ່ຕົວຄູນ {{max}} ຫຼື ໜ້ອຍກວ່າ",
-    "thresholdMaxError": "ໃສ່ຈຳນວນເງິນ {{max}} ຫຼື ໜ້ອຍກວ່າ."
+    "thresholdMaxError": "ໃສ່ຈຳນວນເງິນ {{max}} ຫຼື ໜ້ອຍກວ່າ"
   },
   "profiles": {
     "title": "ໂປຣໄຟລ໌",

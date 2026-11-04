@@ -134,6 +134,13 @@ type PrepareSessionSharedFields = {
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
   kilocodeOrganizationId?: string;
+  /** The repository environment the user selected, with branches for its additional repositories. */
+  requestedEnvironment?: {
+    id: string;
+    repositories?: { repoFullName: string; branch?: string }[];
+  };
+  /** Set by a client that shows an environment picker; see the worker's `requireEnvironmentChoice`. */
+  requireEnvironmentChoice?: true;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
   envVars?: Record<string, string>;
@@ -376,6 +383,7 @@ export type GetSessionOutput = {
   worktreeId?: string | null;
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
+  parentCloudAgentSessionId?: string;
 
   githubRepo?: string;
   gitUrl?: string;

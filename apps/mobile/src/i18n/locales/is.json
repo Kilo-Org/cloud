@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Þýða samantektir tóla",
     "toolSummaryTranslationSubtitle": "Sendu hverja samantekt tóls til líkans til að þýða hana á tungumál appsins þíns. Upprunalega textinn birtist ef þýðing mistekst.",
     "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað.",
+    "translateSummaries": "Þýða samantektir",
     "autoExpandThinkingInactiveSubtitle": "Hefur engin áhrif á meðan upplýsingar um hugsun eru faldar."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Endurgrunnun"
       },
       "terminal": {
-        "alreadyMerged": "Þegar sameinað",
         "closed": "Þessi sameiningarbeiðni er lokuð",
         "closedMergeRequest": "Þessi merge request er lokuð"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Áskildar yfirferðir vantar",
         "requiredReviewsDetail": "Samþykki frá tilskildum yfirlesurum vantar eða er enn í bið.",
         "failingChecksTitle": "Áskildar athuganir standast ekki",
-        "failingChecksDetail": "Áskildar stöðuathuganir standast ekki.",
         "unstableTitle": "Sumar athuganir standast ekki",
         "unstableDetail": "Athuganir sem ekki eru áskildar standast ekki. Þær hindra ekki sameiningu.",
         "draftTitle": "Drög að samrunabeiðni",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Ekki tókst að athuga Bitbucket-tenginguna.",
       "providerCheckFailedMessage": "Ekki er hægt að sýna tengistöðu fyrr en hleðslu lýkur.",
       "reconnectTitle": "Tengja GitHub aftur",
+      "reconnectTitleGitLab": "Tengja GitLab aftur",
+      "reconnectTitleBitbucket": "Tengja Bitbucket aftur",
       "reconnectDescription": "Heimild fyrir GitHub-tengingunni þinni var afturkölluð.",
       "gitlabDescription": "Yfirfara merge requests í símanum",
+      "gitlabInstanceMismatchTitle": "GitLab tenging er fyrir annað tilvik",
+      "gitlabInstanceMismatchDescription": "GitLab tengingin þín er fyrir {{connected}}, en þessi sameiningarbeiðni er á {{requested}}. Tengdu GitLab á því tilviki til að yfirfara hana.",
+      "checkActiveConnection": "Tengingin er virk, en samt er ekki hægt að hlaða þessu atriði.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "ósendar athugasemdir",
       "submitCountOfTotal": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
       "submitReview": "Senda rýni",
-      "partialPostedMessage": "Fjöldi birtra athugasemda: {{displayFreshCount}}. Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedFresh": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
+      "partialPostedStale": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Athugasemdir sem vísa í eldri innsendingu eru enn í biðröðinni þinni: {{displayStaleCount}}.",
       "blockedRequestChanges": "Bættu við samantekt eða að minnsta kosti einni athugasemd til að biðja um breytingar.",
       "blockedComment": "Bættu við samantekt eða að minnsta kosti einni athugasemd til að senda yfirferð með athugasemdum."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "Deila merge request",
       "viewOnProvider": "Skoða á {{provider}}",
       "mergeRequestUnavailable": "Merge request ekki tiltæk",
-      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú hefur ekki aðgang að henni.",
+      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú gætir skort aðgang.",
       "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
       "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
       "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",
@@ -1523,6 +1532,7 @@
       "prOpened": "Samrunabeiðni fyrir REVIEW.md opnuð",
       "alreadyPresent": "Leiðbeiningarnar eru þegar í REVIEW.md",
       "status": {
+        "open": "Opið",
         "edited": "Breytt",
         "opening_change_request": "Opna PR",
         "change_request_failed": "Ekki tókst að opna PR",
@@ -1610,6 +1620,8 @@
       "set": "Stillt",
       "notSet": "Ekki stillt",
       "nSelected": "Valið: {{displayCount}}",
+      "nSelected_one": "Valið: {{displayCount}}",
+      "nSelected_other": "Valið: {{displayCount}}",
       "proposedReviewMdGuidance": "Tillögur að leiðbeiningum í REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Rökstuðningur um mögulega misnotkun",
       "suggestedFix": "Tillaga að lagfæringu",
       "whereFound": "Staðsetningar fráviks ({{displayCount}})",
+      "whereFound_one": "Staðsetningar fráviks ({{displayCount}})",
+      "whereFound_other": "Staðsetningar fráviks ({{displayCount}})",
       "fullReport": "Sjálfvirk skýrsla í heild",
       "yes": "Já",
       "no": "Nei",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Forgangsfrávik birtast eftir fyrstu samstillingu.",
       "refreshFailed": "Ekki tókst að endurnýja gögnin. Gögn úr síðustu samstillingu eru sýnd.",
       "settings": "Stillingar",
+      "syncing": "Samstillir…",
       "syncNow": "Samstilla núna",
       "syncQueued": "Samstilling í biðröð",
       "syncStatusUnavailable": "Staða samstillingar er ekki tiltæk.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} á miðlungs og lágu stigi",
       "dueThisWeek": "Frestur rennur út í vikunni",
       "dueThisWeekDetail": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
+      "dueThisWeekDetail_one": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
+      "dueThisWeekDetail_other": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
       "noDeadline": "Enginn frestur",
       "reviewSlaAssignment": "Yfirfara úthlutun SLA-fresta",
       "allOpenFindingsTracked": "Fylgst með öllum opnum frávikum"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Settu upp GitHub-forrit Kilo til að samstilla Dependabot-viðvaranir sjálfkrafa og stjórna öryggisfrávikum í geymslunum þínum.",
+      "connectOwnerOnly": "Biddu eiganda fyrirtækisins eða stjórnanda um að tengja {{platform}}.",
       "connectTitle": "Tengdu GitHub til að byrja",
       "couldNotLoad": "Ekki tókst að hlaða öryggiserindrekanum.",
       "installApp": "Setja upp GitHub-forrit",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
       "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
       "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
+      "syncNoRepositoriesNoManage": "Engar geymslur eru í samstillingarsviðinu. Eigandi fyrirtækisins, stjórnandi eða innheimtustjóri verður að tengja geymslur áður en hægt er að samstilla.",
       "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
       "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur.",
       "configConflict": "Stillingar öryggiserindrekans voru breyttar annars staðar. Farðu yfir nýjustu stillingarnar og vistaðu aftur."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Ekki er hægt að ljúka uppsetningu",
       "notAdminMessage": "Aðeins stjórnandi viðkomandi GitHub-reiknings getur tengt hann. Biddu stjórnanda fyrirtækisins um að setja upp Kilo.",
       "alreadyClaimedMessage": "Þessi GitHub-uppsetning er þegar tengd öðrum Kilo-reikningi. Aftengdu hana þar fyrst.",
+      "installationUnavailableMessage": "Þessi GitHub App-uppsetning er í biðstöðu eða ekki lengur tiltæk. Endurheimtu hana eða settu hana upp aftur á GitHub og byrjaðu svo aftur.",
+      "multipleInstallationsMessage": "Þessi Kilo-stofnun getur sem stendur aðeins tengt eina GitHub-stofnun.",
       "didNotCompleteTitle": "Uppsetningu var ekki lokið",
       "didNotCompleteMessage": "Ekki var lokið við uppsetningu GitHub-forritsins. Reyndu aftur í appinu."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Samsvarar {{name}}",
       "defaultProfileResolvesToAccessibility": "Sjálfgefið snið: {{name}}",
       "manageProfiles": "Stjórna prófílum",
-      "noProfiles": "Engir prófílar ennþá. Búðu til einn til að bæta við umhverfisbreytum, MCP netþjónum og færni.",
       "advancedConfig": "Ítarleg stilling",
       "advancedConfigDescription": "Gildir fyrir þessa lotu. Að vista sem prófíl varðveitir það fyrir næsta skipti.",
       "saveAsProfile": "Vista sem prófíl",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Reynir klónun aftur (tilraun {{attempt}} af {{total}})",
       "detailSetupCommandFailed": "Uppsetningarskipun {{index}} mistókst",
       "detailSetupCommandTimedOut": "Uppsetningarskipun {{index}} rann út á tíma",
-      "detailColdRestore": "Köld endurheimt, skyndimynd notuð, {{applied}} af {{total}} skrám endurheimtar",
+      "detailColdRestore": "Köld endurheimt, skyndimynd notuð, endurheimtaðar skrár: {{applied}} af {{total}}",
       "detailProgressPercent": "{{percent}}% klárað",
-      "detailRestoreIncompleteReport": "Setuendurheimt ófullgerð: {{skipped}} af {{total}} skrám voru ekki endurheimtar ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Setuendurheimt ófullgerð, skrár ekki endurheimtaðar: {{skipped}} af {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Vantar: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} í viðbót",
       "detailReasonPatchFailed": "plástrið tókst ekki að setja á",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Ný lota á {{name}}",
     "noMatchingSessions": "Engar lotur samsvara leitinni.",
     "onlyFirstFilesAttached": "Aðeins fyrstu {{displayCount}} skrárnar verða hengdar við.",
-    "staleMessage": "Efnið sem átti að deila er ekki lengur tiltækt.",
+    "staleMessage": "Sendu þetta aftur úr forritinu sem þú deildir úr.",
+    "staleTitle": "Deiling ekki möguleg",
     "retryableMessage": "Ekki tókst að hlaða lotunum þínum.",
     "emptyMessage": "Engar lotur eru til enn — byrjaðu nýja lotu til að senda þetta.",
     "cliNotConnectedTitle": "Lota ekki tengd",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
     "thresholdTitle": "Yfirferð þröskulds",
-    "thresholdSubtitle": "Safnað útgjöld fara yfir mörkin þín",
+    "thresholdSubtitle": "Safnað útgjöld þessa svæðis yfir valda gluggann fara yfir mörkin þín",
     "anomalyTitle": "Uppsveifla á klukkustund",
-    "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
+    "anomalySubtitle": "Klukkustundarhraði þessa svæðis er langt yfir eigin p95 grunnlínu",
     "limitLabel": "Mörk (USD)",
     "windowLabel": "Gluggi",
     "window24h": "24 klukkustundir",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum",
     "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
-    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri."
+    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri"
   },
   "profiles": {
     "title": "Snið",

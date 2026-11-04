@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ടൂൾ സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
     "toolSummaryTranslationSubtitle": "ഓരോ ടൂൾ സംഗ്രഹവും നിങ്ങളുടെ ആപ്പിന്റെ ഭാഷയിലേക്ക് വിവർത്തനം ചെയ്യാൻ ഒരു മോഡലിലേക്ക് അയയ്ക്കുക. വിവർത്തനം പരാജയപ്പെട്ടാൽ യഥാർത്ഥ പാഠം കാണിക്കും.",
     "toolSummaryTranslationModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(common.model) ടാപ്പ് ചെയ്യുക.",
+    "translateSummaries": "സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
     "autoExpandThinkingInactiveSubtitle": "ചിന്തയുടെ വിശദാംശങ്ങൾ മറയ്ക്കപ്പെട്ടിരിക്കുമ്പോൾ ഇതിന് ഫലമുണ്ടാകില്ല."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "റീബേസ്"
       },
       "terminal": {
-        "alreadyMerged": "ഇതിനകം മെർജ് ചെയ്തു",
         "closed": "ഈ പുൾ റിക്വസ്റ്റ് അടച്ചു",
         "closedMergeRequest": "ഈ മെർജ് റിക്വസ്റ്റ് അടച്ചു"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "ആവശ്യമായ അവലോകനങ്ങൾ ലഭിച്ചിട്ടില്ല",
         "requiredReviewsDetail": "അംഗീകാരം നൽകേണ്ട അവലോകകരുടെ അംഗീകാരങ്ങൾ ലഭിച്ചിട്ടില്ല അല്ലെങ്കിൽ അവയ്ക്കായി കാത്തിരിക്കുന്നു.",
         "failingChecksTitle": "നിർബന്ധമായ പരിശോധനകൾ പരാജയപ്പെടുന്നു",
-        "failingChecksDetail": "ആവശ്യമായ സ്റ്റാറ്റസ് പരിശോധനകൾ പരാജയപ്പെടുന്നു.",
         "unstableTitle": "ചില പരിശോധനകൾ പരാജയപ്പെടുന്നു",
         "unstableDetail": "നിർബന്ധമല്ലാത്ത പരിശോധനകൾ പരാജയപ്പെടുന്നു. അവ മെർജ് തടയില്ല.",
         "draftTitle": "ഡ്രാഫ്റ്റ് പുൾ റിക്വസ്റ്റ്",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket കണക്ഷൻ പരിശോധിക്കാനായില്ല.",
       "providerCheckFailedMessage": "ഇത് ലോഡ് ആകുന്നതുവരെ കണക്ഷൻ നില ലഭ്യമല്ല.",
       "reconnectTitle": "GitHub വീണ്ടും കണക്റ്റ് ചെയ്യുക",
+      "reconnectTitleGitLab": "GitLab വീണ്ടും കണക്റ്റ് ചെയ്യുക",
+      "reconnectTitleBitbucket": "Bitbucket വീണ്ടും കണക്റ്റ് ചെയ്യുക",
       "reconnectDescription": "നിങ്ങളുടെ GitHub കണക്ഷൻ റദ്ദാക്കി.",
       "gitlabDescription": "മൊബൈലിൽ മെർജ് റിക്വസ്റ്റുകൾ അവലോകനം ചെയ്യുക",
+      "gitlabInstanceMismatchTitle": "GitLab കണക്ഷൻ മറ്റൊരു ഇൻസ്റ്റൻസിനുള്ളതാണ്",
+      "gitlabInstanceMismatchDescription": "നിങ്ങളുടെ GitLab കണക്ഷൻ {{connected}}-നുള്ളതാണ്, എന്നാൽ ഈ മെർജ് റിക്വസ്റ്റ് {{requested}}-ൽ ആണ്. അത് അവലോകനം ചെയ്യാൻ ആ ഇൻസ്റ്റൻസിൽ GitLab കണക്റ്റ് ചെയ്യുക.",
+      "checkActiveConnection": "കണക്ഷൻ സജീവമാണ്, എന്നാൽ ഈ ഇനം ഇപ്പോഴും ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
       "bitbucketOrgOnlyDescription": "അതിന്റെ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ മുകളിലുള്ള അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷനിലേക്ക് മാറ്റുക.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ഈ അക്കൗണ്ടിൽ ഇതുവരെ ഓർഗനൈസേഷനുകളൊന്നുമില്ല. നിങ്ങൾ ഒരു ഓർഗനൈസേഷൻ സൃഷ്ടിക്കുകയോ ചേരുകയോ ചെയ്താൽ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ കഴിയും.",
       "gitlabReconnectAdminOnlyDescription": "ഒരു ഓർഗനൈസേഷൻ ഉടമ, അഡ്മിൻ അല്ലെങ്കിൽ ബില്ലിംഗ് മാനേജറോട് അത് വീണ്ടും കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "പരിശോധന സമർപ്പിക്കുക",
-      "partialPostedMessage": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. {{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedFresh": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
+      "partialPostedStale": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedStale_one": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
+      "partialPostedStale_other": "{{displayStaleCount}} അഭിപ്രായങ്ങൾ പഴയ കമ്മിറ്റിനെക്കുറിച്ചുള്ളതിനാൽ സമർപ്പിക്കാനുള്ള പട്ടികയിൽ തുടരുന്നു.",
       "blockedRequestChanges": "മാറ്റങ്ങൾ അഭ്യർത്ഥിക്കാൻ ഒരു സംഗ്രഹമോ കുറഞ്ഞത് ഒരു അഭിപ്രായമോ ചേർക്കുക.",
       "blockedComment": "അഭിപ്രായം മാത്രമുള്ള അവലോകനം പോസ്റ്റ് ചെയ്യാൻ ഒരു സംഗ്രഹമോ കുറഞ്ഞത് ഒരു അഭിപ്രായമോ ചേർക്കുക."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md പുൾ റിക്വസ്റ്റ് തുറന്നു",
       "alreadyPresent": "മാർഗ്ഗനിർദ്ദേശങ്ങൾ REVIEW.md-ൽ ഇതിനകം ഉണ്ട്",
       "status": {
+        "open": "തുറന്നത്",
         "edited": "തിരുത്തി",
         "opening_change_request": "PR തുറക്കുന്നു",
         "change_request_failed": "PR പരാജയപ്പെട്ടു",
@@ -1610,6 +1620,8 @@
       "set": "സജ്ജമാക്കി",
       "notSet": "സജ്ജമാക്കിയിട്ടില്ല",
       "nSelected": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_one": "{{displayCount}} തിരഞ്ഞെടുത്തു",
+      "nSelected_other": "{{displayCount}} തിരഞ്ഞെടുത്തു",
       "proposedReviewMdGuidance": "REVIEW.md-നായി മുന്നോട്ടുവച്ച മാർഗ്ഗനിർദ്ദേശങ്ങൾ"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "ചൂഷണസാധ്യത വിലയിരുത്തിയതിന്റെ അടിസ്ഥാനം",
       "suggestedFix": "നിർദ്ദേശിച്ച പരിഹാരം",
       "whereFound": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
+      "whereFound_one": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
+      "whereFound_other": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
       "fullReport": "തയ്യാറാക്കിയ പൂർണ്ണ റിപ്പോർട്ട്",
       "yes": "അതെ",
       "no": "ഇല്ല",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "ആദ്യ സമന്വയത്തിന് ശേഷം മുൻഗണന കണ്ടെത്തലുകൾ ദൃശ്യമാകും.",
       "refreshFailed": "പുതുക്കാൻ കഴിഞ്ഞില്ല — അവസാനം സമന്വയിപ്പിച്ച ഡാറ്റ കാണിക്കുന്നു.",
       "settings": "ക്രമീകരണങ്ങൾ",
+      "syncing": "സമന്വയിപ്പിക്കുന്നു…",
       "syncNow": "ഇപ്പോൾ സമന്വയിപ്പിക്കുക",
       "syncQueued": "സമന്വയം ക്യൂവിൽ ചേർത്തു",
       "syncStatusUnavailable": "സമന്വയത്തിന്റെ നില ലഭ്യമല്ല.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} ഇടത്തരം, കുറഞ്ഞത്",
       "dueThisWeek": "ഈ ആഴ്ച സമയപരിധി അവസാനിക്കുന്നവ",
       "dueThisWeekDetail": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
+      "dueThisWeekDetail_one": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
+      "dueThisWeekDetail_other": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "noDeadline": "സമയപരിധിയില്ല",
       "reviewSlaAssignment": "നൽകിയ SLA സമയപരിധികൾ പരിശോധിക്കുക",
       "allOpenFindingsTracked": "തീർപ്പാകാത്ത എല്ലാ കണ്ടെത്തലുകളും നിരീക്ഷണത്തിലാണ്"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Dependabot അറിയിപ്പുകൾ സ്വയമേവ സമന്വയിപ്പിക്കാനും നിങ്ങളുടെ റിപ്പോസിറ്ററികളിലെ സുരക്ഷാ കണ്ടെത്തലുകൾ നിയന്ത്രിക്കാനും Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക.",
+      "connectOwnerOnly": "ഒരു ഓർഗനൈസേഷൻ ഉടമയോടോ അഡ്മിനോടോ {{platform}} കണക്റ്റുചെയ്യാൻ ആവശ്യപ്പെടുക.",
       "connectTitle": "ആരംഭിക്കാൻ GitHub കണക്റ്റ് ചെയ്യുക",
       "couldNotLoad": "സുരക്ഷാ ഏജന്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "installApp": "GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
@@ -2064,6 +2082,7 @@
       "actionFailed": "ഈ നടപടി പൂർത്തിയാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "actionBlocked": "ഈ നടപടി പൂർത്തിയാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുന്നതിന് മുമ്പ് പ്രശ്നം പരിഹരിക്കണം.",
       "syncNoRepositories": "സമന്വയ പരിധിയിൽ റിപ്പോസിറ്ററികൾ ഒന്നുമില്ല. സുരക്ഷാ ഏജന്റ് നിരീക്ഷിക്കേണ്ട റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്ത ശേഷം വീണ്ടും സമന്വയിപ്പിക്കുക.",
+      "syncNoRepositoriesNoManage": "സമന്വയ പരിധിയിൽ റിപോസിറ്ററികൾ ഒന്നുമില്ല. സമന്വയിപ്പിക്കാനാകുന്നതിന് മുമ്പ് ഒരു ഓർഗനൈസേഷൻ ഉടമയോ അഡ്മിനോ ബില്ലിംഗ് മാനേജറോ റിപോസിറ്ററികൾ ബന്ധിപ്പിക്കണം.",
       "syncIntegrationInactive": "സുരക്ഷാ ഏജന്റിനുള്ള GitHub കണക്ഷൻ സജീവമല്ല. Kilo GitHub ആപ്പ് വീണ്ടും കണക്ട് ചെയ്ത ശേഷം വീണ്ടും സമന്വയിപ്പിക്കുക.",
       "syncMissingPermission": "Kilo GitHub ആപ്പിന് vulnerability alerts വായിക്കാൻ കഴിയില്ല. GitHub-ൽ ആ അനുമതി നൽകിയ ശേഷം വീണ്ടും സമന്വയിപ്പിക്കുക.",
       "configConflict": "സുരക്ഷാ ഏജന്റിന്റെ ക്രമീകരണങ്ങൾ മറ്റൊരിടത്ത് മാറ്റിയിട്ടുണ്ട്. ഏറ്റവും പുതിയ ക്രമീകരണങ്ങൾ പരിശോധിച്ച് വീണ്ടും സംരക്ഷിക്കുക."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "ഇൻസ്റ്റാളേഷൻ പൂർത്തിയാക്കാൻ കഴിയില്ല",
       "notAdminMessage": "ആ അക്കൗണ്ടിന്റെ GitHub അഡ്മിന് മാത്രമേ അത് കണക്റ്റ് ചെയ്യാനാകൂ. Kilo ഇൻസ്റ്റാൾ ചെയ്യാൻ ഓർഗനൈസേഷൻ അഡ്മിനോട് ആവശ്യപ്പെടുക.",
       "alreadyClaimedMessage": "ആ GitHub ഇൻസ്റ്റാളേഷൻ ഇതിനകം മറ്റൊരു Kilo അക്കൗണ്ടുമായി കണക്റ്റ് ചെയ്തിട്ടുണ്ട്. ആദ്യം അവിടെയുള്ള ബന്ധം വിച്ഛേദിക്കുക.",
+      "installationUnavailableMessage": "ഈ GitHub ആപ്പ് ഇൻസ്റ്റാളേഷൻ താൽക്കാലികമായി നിർത്തിവച്ചിരിക്കുന്നു അല്ലെങ്കിൽ ഇനി ലഭ്യമല്ല. GitHub-ൽ അത് പുനഃസ്ഥാപിക്കുകയോ വീണ്ടും ഇൻസ്റ്റാൾ ചെയ്യുകയോ ചെയ്ത ശേഷം വീണ്ടും ആരംഭിക്കുക.",
+      "multipleInstallationsMessage": "ഈ Kilo ഓർഗനൈസേഷന് നിലവിൽ ഒരു GitHub ഓർഗനൈസേഷനുമായി മാത്രമേ കണക്റ്റ് ചെയ്യാൻ കഴിയൂ.",
       "didNotCompleteTitle": "ഇൻസ്റ്റാളേഷൻ പൂർത്തിയായില്ല",
       "didNotCompleteMessage": "GitHub ആപ്പ് ഇൻസ്റ്റാളേഷൻ പൂർത്തിയായില്ല. ആപ്പിൽ നിന്ന് വീണ്ടും ശ്രമിക്കുക."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "നിലവിൽ {{name}}",
       "defaultProfileResolvesToAccessibility": "ഡിഫോൾട്ട് പ്രൊഫൈൽ: {{name}}",
       "manageProfiles": "പ്രൊഫൈലുകൾ കൈകാര്യം ചെയ്യുക",
-      "noProfiles": "ഇതുവരെ പ്രൊഫൈലുകളൊന്നുമില്ല. പരിസ്ഥിതി വേരിയബിളുകൾ, MCP സെർവറുകൾ, കഴിവുകൾ എന്നിവ ചേർക്കാൻ ഒരെണ്ണം സൃഷ്‌ടിക്കുക.",
       "advancedConfig": "വിപുലമായ കോൺഫിഗറേഷൻ",
       "advancedConfigDescription": "ഈ സെഷനിൽ ബാധകമാണ്. പ്രൊഫൈലായി സംരക്ഷിച്ചാൽ അടുത്ത തവണയ്ക്കും ഇത് നിലനിൽക്കും.",
       "saveAsProfile": "പ്രൊഫൈലായി സംരക്ഷിക്കുക",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "ക്ലോൺ വീണ്ടും ശ്രമിക്കുന്നു ({{total}}-ൽ {{attempt}} ശ്രമം)",
       "detailSetupCommandFailed": "സജ്ജീകരണ കമാൻഡ് {{index}} പരാജയപ്പെട്ടു",
       "detailSetupCommandTimedOut": "സജ്ജീകരണ കമാൻഡ് {{index}} കാലഹരണപ്പെട്ടു",
-      "detailColdRestore": "കോൾഡ് പുനഃസ്ഥാപനം, സ്നാപ്ഷോട്ട് പ്രയോഗിച്ചു, {{total}} ഫയലുകളിൽ {{applied}} പുനഃസ്ഥാപിച്ചു",
+      "detailColdRestore": "കോൾഡ് പുനഃസ്ഥാപനം, സ്നാപ്ഷോട്ട് പ്രയോഗിച്ചു, പുനഃസ്ഥാപിച്ച ഫയലുകൾ: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% പൂർത്തിയായി",
-      "detailRestoreIncompleteReport": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല: {{total}} ഫയലുകളിൽ {{skipped}} പുനഃസ്ഥാപിച്ചില്ല ({{reasons}}).",
+      "detailRestoreIncompleteReport": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല — പുനഃസ്ഥാപിക്കാത്ത ഫയലുകൾ: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "കാണുന്നില്ല: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}}, കൂടാതെ {{omitted}} കൂടുതൽ",
       "detailReasonPatchFailed": "പാച്ച് പ്രയോഗിക്കാനായില്ല",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "{{name}}-ൽ പുതിയ സെഷൻ",
     "noMatchingSessions": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല.",
     "onlyFirstFilesAttached": "ആദ്യത്തെ {{displayCount}} ഫയലുകൾ മാത്രമേ അറ്റാച്ച് ചെയ്യൂ.",
-    "staleMessage": "പങ്കിടാനുള്ള ഈ ഉള്ളടക്കം ഇനി ലഭ്യമല്ല.",
+    "staleMessage": "നിങ്ങൾ പങ്കിട്ട ആപ്പിൽ നിന്ന് ഇത് വീണ്ടും അയയ്ക്കുക.",
+    "staleTitle": "പങ്കിടൽ ലഭ്യമല്ല",
     "retryableMessage": "നിങ്ങളുടെ സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
     "emptyMessage": "ഇതുവരെ സെഷനുകളില്ല. ഇത് അയയ്ക്കാൻ പുതിയ സെഷൻ ആരംഭിക്കുക.",
     "cliNotConnectedTitle": "സെഷൻ കണക്റ്റ് ചെയ്തിട്ടില്ല",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "ഈ സ്കോപ്പിന്റെ ചെലവ് ഒരു പരിധി കടക്കുമ്പോഴോ അതിന്റെ സാധാരണ മണിക്കൂർ നിരക്കിന് മുകളിൽ കയറുമ്പോഴോ ബില്ലിംഗ് കോൺടാക്റ്റുകൾക്ക് ഇമെയിൽ അല്ലെങ്കിൽ പുഷ് വഴി മുന്നറിയിപ്പ് അയയ്ക്കുക.",
     "thresholdTitle": "പരിധി ലംഘനം",
-    "thresholdSubtitle": "നിലവിലെ ചെലവ് നിങ്ങളുടെ പരിധി കടക്കുന്നു",
+    "thresholdSubtitle": "തിരഞ്ഞെടുത്ത കാലയളവിലെ ഈ സ്കോപ്പിന്റെ നിലവിലെ ചെലവ് നിങ്ങളുടെ പരിധി കടക്കുന്നു",
     "anomalyTitle": "മണിക്കൂർ വർധന",
-    "anomalySubtitle": "ഒരു മണിക്കൂർ ഈ സ്കോപ്പിന്റെ സാധാരണ നിരക്കിനേക്കാൾ വളരെ ഉയരത്തിലാണ്",
+    "anomalySubtitle": "ഈ സ്കോപ്പിന്റെ മണിക്കൂർ നിരക്ക് അതിന്റെ സ്വന്തം p95 ബേസ്‌ലൈനിനേക്കാൾ വളരെ ഉയരത്തിലാണ്",
     "limitLabel": "പരിധി (USD)",
     "windowLabel": "കാലയളവ്",
     "window24h": "24 മണിക്കൂർ",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "ചെലവ് മുന്നറിയിപ്പുകൾ നിയന്ത്രിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
     "pushOffByCategory": "അറിയിപ്പുകളിൽ ഓഫ്",
     "multiplierMaxError": "{{max}} അല്ലെങ്കിൽ അതിൽ കുറവുള്ള ഗുണിതം നൽകുക",
-    "thresholdMaxError": "{{max}} അല്ലെങ്കിൽ അതിൽ കുറവുള്ള തുക നൽകുക."
+    "thresholdMaxError": "{{max}} അല്ലെങ്കിൽ അതിൽ കുറവുള്ള തുക നൽകുക"
   },
   "profiles": {
     "title": "പ്രൊഫൈലുകൾ",

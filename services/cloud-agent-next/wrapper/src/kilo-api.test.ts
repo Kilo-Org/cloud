@@ -893,6 +893,26 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     }
   });
 
+  it('sends server context as a synthetic part before the prompt', async () => {
+    const stub = startStub(200, true);
+    await createClient(stub.url).sendPromptAsync({
+      sessionId: 'ses_1',
+      messageId: 'msg_1',
+      prompt: 'hello',
+      context: '<cloud-agent-context session-id="workspace_1" />',
+    });
+    expect(stub.requests[0]?.body).toMatchObject({
+      parts: [
+        {
+          type: 'text',
+          text: '<cloud-agent-context session-id="workspace_1" />',
+          synthetic: true,
+        },
+        { type: 'text', text: 'hello' },
+      ],
+    });
+  });
+
   it('probes one tool part and returns only metadata', async () => {
     const stub = startStub(200, {
       info: { id: 'assistant_1', role: 'assistant' },

@@ -1,4 +1,5 @@
 import { isVersionBelow } from '@kilocode/app-shared/app-version';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import * as z from 'zod';
 
 /** Reject a request whose raw body is larger than this before parsing it. */
@@ -129,20 +130,6 @@ function errorResponse(status: number): Response {
 }
 
 /**
- * The bearer is only the per-session identity: presence-checked as the caller's
- * session signal and never logged. It is deliberately NOT the rate-limit key,
- * because it is not verified here and a caller could rotate it to get a fresh
- * bucket on every request.
- */
-function bearerToken(authorization: string | null): string | null {
-  if (!authorization || !authorization.startsWith('Bearer ')) {
-    return null;
-  }
-  const token = authorization.slice('Bearer '.length).trim();
-  return token.length > 0 ? token : null;
-}
-
-/**
  * The trusted dimension for the rate limiter. Cloudflare sets
  * `cf-connecting-ip` at the edge and overwrites any caller-supplied value, so
  * a caller cannot mint a new limiter bucket by rotating a header the way it
@@ -218,7 +205,11 @@ async function routeLatencyIngest(
     return { response: errorResponse(404), dimensions: null };
   }
 
-  const bearer = bearerToken(request.headers.get('authorization'));
+  // The bearer is only the per-session identity: presence-checked as the
+  // caller's session signal and never logged. It is deliberately NOT the
+  // rate-limit key, because it is not verified here and a caller could rotate
+  // it to get a fresh bucket on every request.
+  const bearer = extractBearerToken(request.headers.get('authorization'));
   if (!bearer) {
     return { response: errorResponse(401), dimensions: null };
   }

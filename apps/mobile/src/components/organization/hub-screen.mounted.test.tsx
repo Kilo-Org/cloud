@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One suite covers the hub's rename control, its settings availability, the billing card's loading states and the Kilo Pass placeholder, all against the same mocked data layer and fixture. */
 // The organization hub's rename control is icon-only. Before this slice it
 // rendered a bare `<Pencil size={16} />`, so its accessibility node was the
 // 16dp glyph and the audit read it below the 28dp floor. This suite pins the
@@ -5,14 +6,18 @@
 // proves its tap opens the rename sheet. The role gate (`showMoney`) still
 // decides whether the control exists at all.
 
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
 
 /** The smallest box the control-size audit accepts on a control's own node. */
@@ -24,13 +29,15 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({
   role: 'owner' as string,
+  parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
 }));
 const routerPush = vi.hoisted(() => vi.fn());
+const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
-    | { parent_organization_id: null; settings: { minimum_balance?: number } }
+    | { parent_organization_id: string | null; settings: { minimum_balance?: number } }
     | undefined,
   isLoading: false,
   isError: false,
@@ -54,6 +61,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     org: {
       organizationId: 'org-1',
       organizationName: 'Acme',
+      parentOrganizationId: boundary.parentOrganizationId,
       balance: 5_000_000,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
@@ -61,7 +69,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
-  useOrgKiloPassSummary: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
+    kiloPassQuery.enabled.push(enabled);
+    return { data: undefined, isError: false, refetch: vi.fn() };
+  },
 }));
 
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
@@ -94,10 +105,35 @@ vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
-vi.mock('@/components/organization/org-kilo-pass-row-state', () => ({
-  getOrgKiloPassRowState: () => null,
+// A suite that sets `current` pins the row state it needs; every other suite
+// renders what the real mapper derives from the mocked payloads, including the
+// loading state the row shows while the summary query has no data
+// (`org-kilo-pass-row-state.ts`).
+const kiloPassRowState = vi.hoisted(() => ({
+  current: null as null | {
+    subtitle: string;
+    attention: boolean;
+    action: 'manage' | 'setup' | 'retry' | 'none';
+    actionLabel: string | null;
+    accessibilityHint: string | null;
+    loading: boolean;
+  },
 }));
 
+vi.mock('@/components/organization/org-kilo-pass-row-state', async importOriginal => {
+  const actual = (await importOriginal()) as {
+    getOrgKiloPassRowState: (params: {
+      data: OrgKiloPassSummary | undefined;
+      isError: boolean;
+    }) => OrgKiloPassRowState;
+  };
+  return {
+    getOrgKiloPassRowState: (params: {
+      data: OrgKiloPassSummary | undefined;
+      isError: boolean;
+    }): OrgKiloPassRowState => kiloPassRowState.current ?? actual.getOrgKiloPassRowState(params),
+  };
+});
 vi.mock('@/components/organization/org-usage-stats', () => ({ OrgUsageStats: 'OrgUsageStats' }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
@@ -203,9 +239,12 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  kiloPassRowState.current = null;
   routerPush.mockClear();
+  kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
   membersQuery.isPaused = false;
@@ -317,6 +356,121 @@ describe('OrganizationHubScreen rename control', () => {
   });
 });
 
+describe('Organization hub Kilo Pass placeholder', () => {
+  const loadingState = {
+    subtitle: 'Loading…',
+    attention: false,
+    action: 'none',
+    actionLabel: null,
+    accessibilityHint: null,
+    loading: true,
+  } as const;
+
+  function skeletonClasses(root: TestRenderer.ReactTestInstance): string[] {
+    return root
+      .findAll(node => String(node.type) === 'Skeleton')
+      .map(node => String(node.props.className));
+  }
+
+  function subtitleNode(root: TestRenderer.ReactTestInstance, subtitle = 'Not subscribed') {
+    return root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === subtitle
+    )[0];
+  }
+
+  it('renders the loading bar on the subtitle line box, not above it', async () => {
+    // Compile the box the subtitle actually lays out, from the class the screen
+    // renders, then the bar's. Both go through the installed Tailwind and
+    // react-native-css compilers, so this is the box the emulator paints rather
+    // than a hand-written utility map. `h-3` (10.5dp) fails here: it drops the
+    // text block below the 30dp icon tile and the whole row with it.
+    kiloPassRowState.current = { ...loadingState, loading: false, subtitle: 'Not subscribed' };
+    const loaded = await renderHub();
+    const subtitleClass = String(subtitleNode(loaded.renderer.root)?.props.className);
+    loaded.unmount();
+
+    kiloPassRowState.current = { ...loadingState };
+    const loading = await renderHub();
+    const bar = skeletonClasses(loading.renderer.root)[0];
+    loading.unmount();
+
+    // `text-xs` carries a unitless line height (`calc(1 / 0.75)`), so its line
+    // box is that multiple of the font size; both halves compile through the
+    // installed Tailwind and react-native-css compilers, and the product is the
+    // 14dp the emulator measures for a loaded subtitle. `h-3` (10.5dp) fails
+    // here: it drops the text block below the 30dp icon tile and the row with it.
+    const fontSize = await compiledLengthDp(subtitleClass, 'fontSize');
+    const leading = await compiledLengthDp(subtitleClass, 'lineHeight');
+    const lineBox = Math.round(fontSize * leading);
+    // 1 rem at this app's 14-point rem: the height the row keeps in both states.
+    expect(lineBox).toBe(14);
+
+    if (bar === undefined) {
+      throw new Error('Kilo Pass placeholder missing');
+    }
+    expect(Math.round(await compiledLengthDp(bar, 'height'))).toBe(lineBox);
+  });
+
+  it('paints the bar in the token that differs from the card it sits on', async () => {
+    kiloPassRowState.current = { ...loadingState };
+
+    const { renderer, unmount } = await renderHub();
+    const classes = skeletonClasses(renderer.root)[0] ?? '';
+    const tokens = classes.split(/\s+/).filter(Boolean);
+
+    // `bg-muted` equals the `bg-secondary` row card in both palettes, so the
+    // default bar drew nothing on this screen.
+    expect(tokens).toContain('bg-muted-soft');
+    expect(tokens).not.toContain('bg-muted');
+
+    unmount();
+  });
+
+  it('swaps the bar for the status line once the summary resolves', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: null,
+      accessibilityHint: null,
+      loading: false,
+    };
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(skeletonClasses(renderer.root)).toHaveLength(0);
+    const subtitle = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === 'Not subscribed'
+    );
+    expect(subtitle).toHaveLength(1);
+    expect(String(subtitle[0]?.props.className)).toContain('text-xs');
+
+    unmount();
+  });
+
+  it('guards the theme tokens: bg-muted collides with the card, bg-muted-soft does not', () => {
+    const css = readFileSync(new URL('../../global.css', import.meta.url), 'utf8');
+    const values = (name: string) =>
+      [...css.matchAll(new RegExp(`--${name}:\\s*([^;]+);`, 'g'))].map(match =>
+        (match[1] ?? '').trim().toLowerCase()
+      );
+    const secondary = values('secondary');
+    const muted = values('muted');
+    const mutedSoft = values('muted-soft');
+
+    // Both theme blocks are present.
+    expect(secondary.length).toBeGreaterThanOrEqual(2);
+    expect(muted).toHaveLength(secondary.length);
+    expect(mutedSoft).toHaveLength(secondary.length);
+    // The collision that made the default bar invisible on the organization
+    // card, pinned so the token assertions above stay meaningful.
+    expect(muted).toEqual(secondary);
+    for (const [index, soft] of mutedSoft.entries()) {
+      expect(soft).not.toBe(secondary[index]);
+    }
+  });
+});
+
 describe('Organization hub settings availability', () => {
   it.each(['paused', 'failed'] as const)('retries unavailable settings when %s', async state => {
     membersQuery.data = undefined;
@@ -355,6 +509,138 @@ describe('Organization hub settings availability', () => {
       '/(app)/(tabs)/(3_profile)/organization/low-balance-alert'
     );
     expect(membersQuery.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('Organization hub billing card while its data loads', () => {
+  function bellRow(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findAllByType('ConfigureRow').find(node => node.props.icon === 'Bell');
+  }
+
+  it('keeps every row from the first frame and reserves the subtitle line', async () => {
+    const hub = await renderHub();
+    expect(bellRow(hub.renderer)?.props.subtitle).toBe(i18n.t('common.off'));
+    expect(bellRow(hub.renderer)?.props.subtitlePlaceholder).toBeUndefined();
+    // The name is set in every state, so the node it produces changes with the
+    // state instead of keeping the name it had while the value loaded.
+    expect(bellRow(hub.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.off')}`
+    );
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    hub.unmount();
+
+    membersQuery.data = undefined;
+    const loading = await renderHub();
+    // The Kilo Pass row used to appear only once the membership payload arrived.
+    expect(loading.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    // Loading copy is not a subtitle; the row reserves its settled line instead.
+    expect(bellRow(loading.renderer)?.props.subtitle).toBeUndefined();
+    expect(bellRow(loading.renderer)?.props.subtitlePlaceholder).toBeTruthy();
+    // The placeholder has no text, so the row's name carries the loading state;
+    // a reader hears the title and the cue instead of the bare title.
+    expect(bellRow(loading.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.loading')}`
+    );
+    loading.unmount();
+
+    // A failed membership read names the failure and the retry the row shows,
+    // so the name never disagrees with the row it describes.
+    membersQuery.isError = true;
+    const failed = await renderHub();
+    expect(bellRow(failed.renderer)?.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.lowBalanceAlert.title')}. ${i18n.t('common.somethingWentWrong')}. ${i18n.t('common.retry')}`
+    );
+    failed.unmount();
+    membersQuery.isError = false;
+
+    // A list payload persisted before the parent link existed is unknown, not a
+    // child, so the row is still there from the first frame.
+    boundary.parentOrganizationId = undefined;
+    const upgraded = await renderHub();
+    expect(upgraded.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    upgraded.unmount();
+
+    // Either payload saying "child" removes the row and keeps the parent-only
+    // summary query off.
+    boundary.parentOrganizationId = 'org-parent';
+    membersQuery.data = { parent_organization_id: null, settings: {} };
+    const child = await renderHub();
+    expect(child.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    child.unmount();
+
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const cachedChild = await renderHub();
+    expect(cachedChild.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    cachedChild.unmount();
+
+    // A list entry that persisted "top-level" before the organization was moved
+    // under a parent loses to the membership payload's parent id, instead of
+    // summoning the parent-only summary until the list refetches.
+    boundary.parentOrganizationId = null;
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const movedChild = await renderHub();
+    expect(movedChild.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    movedChild.unmount();
+
+    // A `null` from the membership payload alone confirms a top-level entry
+    // whose list entry predates the field, so its row settles without a refetch.
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = { parent_organization_id: null, settings: {} };
+    const settled = await renderHub();
+    expect(settled.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    settled.unmount();
+  });
+
+  it('waits for the membership payload before asking for the parent-only summary', async () => {
+    // A persisted list entry still says "top-level" while the organization has
+    // since been moved under a parent, so the summary must not fire on that
+    // cached value: the membership payload decides.
+    membersQuery.data = undefined;
+    const pending = await renderHub();
+    expect(pending.renderer.root.findAllByType('KiloPassIcon')).not.toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    pending.unmount();
+
+    membersQuery.data = { parent_organization_id: 'org-parent', settings: {} };
+    const child = await renderHub();
+    expect(child.renderer.root.findAllByType('KiloPassIcon')).toEqual([]);
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    child.unmount();
+
+    membersQuery.data = { parent_organization_id: null, settings: {} };
+    const topLevel = await renderHub();
+    expect(kiloPassQuery.enabled.at(-1)).toBe(true);
+    topLevel.unmount();
+  });
+
+  it('offers the membership retry when the row cannot learn its parent link', async () => {
+    boundary.parentOrganizationId = undefined;
+    membersQuery.data = undefined;
+    membersQuery.isError = true;
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => String(node.props.accessibilityLabel).startsWith(i18n.t('kiloPass.title')));
+    if (!row) {
+      throw new Error('Kilo Pass row missing');
+    }
+    // The retryable state, not the placeholder that would never settle.
+    expect(row.props.accessibilityLabel).toBe(
+      `${i18n.t('kiloPass.title')}. ${i18n.t('organization.kiloPass.couldNotLoadStatus')}. ${i18n.t('common.retry')}`
+    );
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(membersQuery.refetch).toHaveBeenCalledOnce();
+    expect(kiloPassQuery.enabled.at(-1)).toBe(false);
     unmount();
   });
 });

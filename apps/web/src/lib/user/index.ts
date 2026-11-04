@@ -26,6 +26,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
   todo_lists,
   enrichment_data,
   source_embeddings,
@@ -996,7 +997,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * What is kept:
  * - The kilocode_users row (anonymized)
  * - Stripe link (stripe_customer_id unchanged)
- * - credit_transactions, microdollar_usage (billing records)
+ * - credit_transactions, microdollar_usage, enkrypt_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
@@ -1184,8 +1185,10 @@ export async function anonymizeCloudUserData(
       is_super_admin: false,
       can_view_sessions: false,
       can_manage_credits: false,
+      can_export_api_request_logs: false,
       customer_source: null,
       signup_ip: null,
+      external_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1215,6 +1218,7 @@ export async function anonymizeCloudUserData(
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
   await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
+  await tx.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })

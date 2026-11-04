@@ -10,6 +10,7 @@ import {
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { modelPickerSlot } from '@/lib/route-registry';
 import { i18n } from '@/i18n';
 
 import {
@@ -17,6 +18,7 @@ import {
   cliCatalogOption,
   countWithAccessibilityLabel,
   isInstance,
+  radioChoices,
   renderRow,
   renderSelector,
   rowContainer,
@@ -392,6 +394,61 @@ describe('openModelPicker sheet anchoring', () => {
     expect(keyboardDismiss.mock.invocationCallOrder[0]).toBeLessThan(
       routerPush.mock.invocationCallOrder[0] ?? 0
     );
+  });
+});
+
+// The row only offers a thinking effort where the picker's caller keeps one. A
+// chip under a caller that stores only the model id closes the sheet and drops
+// the pick, so those callers get a plain model row instead.
+describe('ModelPickerOptionRow thinking effort availability', () => {
+  const effortOptions = cliCatalogOption({ variants: ['low', 'high'] });
+
+  it('offers one chip per effort on the selected multi-variant row a caller can keep', () => {
+    const renderer = renderRow(effortOptions, { selected: true });
+
+    expect(radioChoices(renderer)).toHaveLength(2);
+  });
+
+  it('leaves the chips out when the picker caller keeps no variant', () => {
+    const renderer = renderRow(effortOptions, { selected: true, acceptsVariant: false });
+
+    expect(radioChoices(renderer)).toHaveLength(0);
+  });
+});
+
+describe('ModelSelector picker effort availability', () => {
+  it('opens the picker as a model-only selection when its caller keeps no variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      acceptsVariant: false,
+    });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(false);
+  });
+
+  it('opens the picker with the effort kept when its caller stores a variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(true);
   });
 });
 

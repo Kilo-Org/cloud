@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "টুলের সারসংক্ষেপ অনুবাদ করুন",
     "toolSummaryTranslationSubtitle": "প্রতিটি টুলের সারসংক্ষেপ আপনার অ্যাপের ভাষায় অনুবাদ করতে একটি মডেলে পাঠান। অনুবাদ ব্যর্থ হলে মূলটি দেখানো হয়।",
     "toolSummaryTranslationModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(common.model) স্পর্শ করুন।",
+    "translateSummaries": "সারসংক্ষেপ অনুবাদ করুন",
     "autoExpandThinkingInactiveSubtitle": "চিন্তাভাবনার বিস্তারিত লুকানো থাকলে এর কোনো প্রভাব থাকবে না।"
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "রিবেস"
       },
       "terminal": {
-        "alreadyMerged": "ইতিমধ্যে মার্জ হয়েছে",
         "closed": "এই পুল রিকোয়েস্ট বন্ধ",
         "closedMergeRequest": "এই মার্জ রিকোয়েস্ট বন্ধ"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "প্রয়োজনীয় রিভিউ বাকি",
         "requiredReviewsDetail": "যাঁদের রিভিউ প্রয়োজন, তাঁদের অনুমোদন এখনও পাওয়া যায়নি বা অপেক্ষমাণ।",
         "failingChecksTitle": "প্রয়োজনীয় চেক ব্যর্থ হচ্ছে",
-        "failingChecksDetail": "প্রয়োজনীয় স্ট্যাটাস চেকগুলো ব্যর্থ হচ্ছে।",
         "unstableTitle": "কিছু চেক ব্যর্থ হচ্ছে",
         "unstableDetail": "বাধ্যতামূলক নয় এমন কিছু চেক ব্যর্থ হচ্ছে। এগুলো মার্জে বাধা দেবে না।",
         "draftTitle": "খসড়া পুল রিকোয়েস্ট",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "লোড হওয়া পর্যন্ত সংযোগের অবস্থা উপলব্ধ নয়।",
       "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
+      "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
+      "gitlabInstanceMismatchDescription": "আপনার GitLab সংযোগটি {{connected}}-এর জন্য, কিন্তু এই মার্জ রিকোয়েস্টটি {{requested}}-এ আছে। এটি রিভিউ করতে সেই ইনস্ট্যান্সে GitLab সংযোগ করুন।",
+      "checkActiveConnection": "সংযোগ সক্রিয় আছে, তবে এই আইটেমটি এখনও লোড করা যাচ্ছে না।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
       "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
       "gitlabReconnectAdminOnlyDescription": "এটি পুনরায় সংযুক্ত করতে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
@@ -704,7 +708,12 @@
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
-      "partialPostedMessage": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। {{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_other": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedStale": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_one": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_other": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
       "blockedRequestChanges": "পরিবর্তনের অনুরোধ করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।",
       "blockedComment": "মন্তব্যসহ রিভিউ পোস্ট করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।"
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
-      "unavailableDescription": "সম্ভবত এটি মুছে ফেলা হয়েছে, অথবা আপনার এর অ্যাক্সেস নেই।",
+      "unavailableDescription": "এটি মুছে ফেলা হতে পারে, অথবা আপনার অ্যাক্সেস নাও থাকতে পারে।",
       "accessDeniedMergeRequest": "এই মার্জ রিকোয়েস্ট দেখার অনুমতি আপনার নেই।",
       "couldNotLoadMergeRequest": "মার্জ রিকোয়েস্ট লোড করা যায়নি।",
       "discussionAccessDenied": "এই মার্জ রিকোয়েস্ট-এর আলোচনা দেখার অনুমতি আপনার নেই।",
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md-এর পুল রিকোয়েস্ট খোলা হয়েছে",
       "alreadyPresent": "নির্দেশনা ইতিমধ্যেই REVIEW.md-এ রয়েছে",
       "status": {
+        "open": "খোলা",
         "edited": "সম্পাদিত",
         "opening_change_request": "PR খোলা হচ্ছে",
         "change_request_failed": "PR ব্যর্থ হয়েছে",
@@ -1610,6 +1620,8 @@
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_one": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_other": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "আক্রমণে কাজে লাগানোর সম্ভাবনার যুক্তি",
       "suggestedFix": "প্রস্তাবিত সমাধান",
       "whereFound": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_one": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_other": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
       "fullReport": "তৈরি করা সম্পূর্ণ রিপোর্ট",
       "yes": "হ্যাঁ",
       "no": "না",
@@ -1794,6 +1808,7 @@
       "priorityFindingsPending": "প্রথম সিঙ্কের পর অগ্রাধিকারপ্রাপ্ত ত্রুটিগুলো দেখা যাবে।",
       "refreshFailed": "রিফ্রেশ করা যায়নি — শেষবার সিঙ্ক করা তথ্য দেখানো হচ্ছে।",
       "settings": "সেটিংস",
+      "syncing": "সিঙ্ক করা হচ্ছে…",
       "syncNow": "এখন সিঙ্ক করুন",
       "syncQueued": "সিঙ্কের অনুরোধ সারিতে যোগ করা হয়েছে।",
       "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।",
@@ -1827,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}}টি মাঝারি ও নিম্ন",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
       "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_one": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_other": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
       "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"
@@ -2038,6 +2055,7 @@
     },
     "scopeEntry": {
       "connectDescription": "আপনার রিপোজিটরিগুলোর Dependabot সতর্কতা স্বয়ংক্রিয়ভাবে সিঙ্ক করতে এবং নিরাপত্তা ত্রুটি পরিচালনা করতে Kilo GitHub অ্যাপ ইনস্টল করুন।",
+      "connectOwnerOnly": "একজন সংস্থার মালিক বা অ্যাডমিনকে {{platform}} সংযুক্ত করতে বলুন।",
       "connectTitle": "শুরু করতে GitHub সংযুক্ত করুন",
       "couldNotLoad": "নিরাপত্তা এজেন্ট লোড করা যায়নি।",
       "installApp": "GitHub অ্যাপ ইনস্টল করুন",
@@ -2070,6 +2088,7 @@
       "actionFailed": "এই কাজটি সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।",
       "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।",
       "syncNoRepositories": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। নিরাপত্তা এজেন্ট যে রিপোজিটরিগুলো মনিটর করে সেগুলো বেছে নিন, তারপর আবার সিঙ্ক করুন।",
+      "syncNoRepositoriesNoManage": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। সিঙ্ক চালানোর আগে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে রিপোজিটরি সংযুক্ত করতে হবে।",
       "syncIntegrationInactive": "«নিরাপত্তা এজেন্ট»-এর জন্য GitHub সংযোগ সক্রিয় নয়। Kilo GitHub App আবার সংযুক্ত করুন, তারপর আবার সিঙ্ক করুন।",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।",
       "configConflict": "নিরাপত্তা এজেন্টের সেটিংস অন্য জায়গায় পরিবর্তিত হয়েছে। সর্বশেষ সেটিংস দেখে আবার সংরক্ষণ করুন।"
@@ -2226,6 +2245,8 @@
       "cannotCompleteTitle": "ইনস্টলেশন সম্পূর্ণ করা যাচ্ছে না",
       "notAdminMessage": "শুধু সেই অ্যাকাউন্টের একজন GitHub অ্যাডমিনই সেটি সংযুক্ত করতে পারবেন। সংস্থার একজন অ্যাডমিনকে Kilo ইনস্টল করতে বলুন।",
       "alreadyClaimedMessage": "সেই GitHub ইনস্টলেশনটি ইতিমধ্যে অন্য একটি Kilo অ্যাকাউন্টের সঙ্গে সংযুক্ত। প্রথমে সেই অ্যাকাউন্ট থেকে এর সংযোগ বিচ্ছিন্ন করুন।",
+      "installationUnavailableMessage": "এই GitHub App ইনস্টলেশনটি স্থগিত বা আর উপলব্ধ নেই। GitHub-এ এটি পুনরুদ্ধার করুন বা পুনরায় ইনস্টল করুন, তারপর আবার শুরু করুন।",
+      "multipleInstallationsMessage": "এই Kilo সংস্থা বর্তমানে শুধুমাত্র একটি GitHub সংস্থার সঙ্গে সংযোগ স্থাপন করতে পারে।",
       "didNotCompleteTitle": "ইনস্টলেশন সম্পূর্ণ হয়নি",
       "didNotCompleteMessage": "GitHub অ্যাপ ইনস্টলেশনটি সম্পূর্ণ হয়নি। অ্যাপ থেকে আবার চেষ্টা করুন।"
     },
@@ -2382,7 +2403,6 @@
       "defaultProfileResolvesTo": "বর্তমানে {{name}} নির্ধারিত",
       "defaultProfileResolvesToAccessibility": "ডিফল্ট প্রোফাইল: {{name}}",
       "manageProfiles": "প্রোফাইল পরিচালনা করুন",
-      "noProfiles": "এখনো কোনো প্রোফাইল নেই. পরিবেশ ভেরিয়েবল, MCP সার্ভার এবং দক্ষতা যোগ করতে একটি তৈরি করুন।",
       "advancedConfig": "উন্নত কনফিগারেশন",
       "advancedConfigDescription": "এই সেশনের জন্য প্রযোজ্য। প্রোফাইল হিসেবে সংরক্ষণ করলে এটি পরের বারের জন্য থাকে।",
       "saveAsProfile": "প্রোফাইল হিসাবে সংরক্ষণ করুন",
@@ -3068,7 +3088,8 @@
     "newSessionOn": "{{name}}-এ নতুন সেশন",
     "noMatchingSessions": "মিলে যায় এমন কোনো সেশন নেই।",
     "onlyFirstFilesAttached": "শুধুমাত্র প্রথম {{displayCount}}টি ফাইল সংযুক্ত হবে।",
-    "staleMessage": "শেয়ার করা বিষয়বস্তু আর পাওয়া যাচ্ছে না।",
+    "staleMessage": "যে অ্যাপ থেকে শেয়ার করেছেন সেখান থেকে এটি আবার পাঠান।",
+    "staleTitle": "শেয়ার অনুপলব্ধ",
     "retryableMessage": "আপনার সেশনগুলো লোড করা যায়নি।",
     "emptyMessage": "এখনও কোনো সেশন নেই — এটি পাঠাতে একটি নতুন সেশন শুরু করুন।",
     "cliNotConnectedTitle": "সেশন সংযুক্ত নয়",
@@ -3782,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "এই স্কোপের খরচ একটি সীমা ছাড়িয়ে গেলে বা স্বাভাবিক ঘণ্টাভিত্তিক হারের চেয়ে বেড়ে গেলে বিলিং পরিচিতিদের ইমেল বা পুশের মাধ্যমে সতর্কতা পাঠান।",
     "thresholdTitle": "সীমা অতিক্রম",
-    "thresholdSubtitle": "চলমান খরচ আপনার সীমা ছাড়িয়ে যাচ্ছে",
+    "thresholdSubtitle": "নির্বাচিত সময়সীমায় এই স্কোপের চলমান খরচ আপনার সীমা ছাড়িয়ে যাচ্ছে",
     "anomalyTitle": "ঘণ্টাভিত্তিক বৃদ্ধি",
-    "anomalySubtitle": "এক ঘণ্টার খরচ এই স্কোপের স্বাভাবিক হারের চেয়ে অনেক বেশি",
+    "anomalySubtitle": "এই স্কোপের ঘণ্টাভিত্তিক হার তার নিজের p95 বেসলাইনের চেয়ে অনেক বেশি",
     "limitLabel": "সীমা (USD)",
     "windowLabel": "সময়সীমা",
     "window24h": "24 ঘণ্টা",
@@ -3801,7 +3822,7 @@
     "permissionDenied": "খরচের সতর্কতা পরিচালনার অনুমতি আপনার নেই।",
     "pushOffByCategory": "বিজ্ঞপ্তিতে বন্ধ",
     "multiplierMaxError": "{{max}} বা তার কম গুণক লিখুন",
-    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন।"
+    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন"
   },
   "profiles": {
     "title": "প্রোফাইল",

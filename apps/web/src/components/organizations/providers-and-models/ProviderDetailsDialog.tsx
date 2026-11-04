@@ -64,6 +64,7 @@ export function ProviderDetailsDialog({
               <img
                 src={infoProvider.providerIconUrl}
                 alt=""
+                referrerPolicy="no-referrer"
                 className="h-6 w-6 shrink-0 object-contain"
               />
             ) : null}
@@ -125,7 +126,7 @@ export function ProviderDetailsDialog({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Model allowed</TableHead>
+                <TableHead>Model enabled</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>

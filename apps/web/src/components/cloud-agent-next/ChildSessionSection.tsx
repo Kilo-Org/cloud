@@ -12,6 +12,7 @@ import { formatModelRefName } from '@/lib/format-model-name';
 import { useOptionalManager } from './CloudAgentProvider';
 import type { SubtaskPart, StoredMessage, ToolPart } from './types';
 import { isToolPart } from './types';
+import { getToolArguments, getToolInputPath } from './toolCardUtils';
 
 const MAX_NESTING_DEPTH = 5;
 
@@ -304,20 +305,23 @@ function getLatestToolActivity(childMessages: StoredMessage[]): string | undefin
       if (!isToolPart(part)) continue;
 
       const tool = part.tool;
-      let context: string | undefined;
+      let context = getToolInputPath(getToolArguments(part));
       const input = part.state.input;
-      if (tool === 'read' || tool === 'edit' || tool === 'write') {
-        const filePath = getStringProperty(input, 'filePath');
-        if (filePath) context = filePath.split('/').pop();
-      } else if (tool === 'bash') {
+      if (tool === 'bash') {
         const command = getStringProperty(input, 'command');
         if (command) {
           const firstWord = command.split(/\s+/)[0];
-          context = firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord;
+          context = [firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord, context]
+            .filter(Boolean)
+            .join(' · ');
         }
       } else if (tool === 'glob' || tool === 'grep') {
         const pattern = getStringProperty(input, 'pattern');
-        if (pattern) context = pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern;
+        if (pattern) {
+          context = [context, pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern]
+            .filter(Boolean)
+            .join(' · ');
+        }
       } else if (tool === 'task') {
         const taskDescription = getStringProperty(input, 'description');
         if (taskDescription) {

@@ -14,13 +14,8 @@ import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { TRPCError } from '@trpc/server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import { and, eq } from 'drizzle-orm';
+import { mergeSecurityAgentConfigPatch, parseSecurityAgentConfig } from '../core/constants';
 import {
-  DEFAULT_SECURITY_AGENT_CONFIG,
-  mergeSecurityAgentConfigPatch,
-  parseSecurityAgentConfig,
-} from '../core/constants';
-import {
-  SecurityAgentConfigSchema,
   type AutoAnalysisMinSeverity,
   type SecurityAgentConfig,
   type SecurityReviewOwner,
@@ -55,12 +50,7 @@ export async function getSecurityAgentConfig(
   platform: string = DEFAULT_PLATFORM
 ): Promise<SecurityAgentConfig> {
   const config = await getAgentConfigForOwner(owner, AGENT_TYPE, platform);
-
-  if (!config) {
-    return SecurityAgentConfigSchema.parse(DEFAULT_SECURITY_AGENT_CONFIG);
-  }
-
-  return parseSecurityAgentConfig(config.config);
+  return parseSecurityAgentConfig(config?.config);
 }
 
 export async function getSecurityAgentConfigWithStatus(
@@ -107,10 +97,6 @@ function computeMergedSecurityConfig(
     (!wasAutoRemediationEnabled || !fullConfig.auto_remediation_enabled_at)
   ) {
     fullConfig.auto_remediation_enabled_at = new Date().toISOString();
-  }
-  if (!fullConfig.remediation_model_slug) {
-    fullConfig.remediation_model_slug =
-      fullConfig.analysis_model_slug ?? fullConfig.model_slug ?? fullConfig.triage_model_slug;
   }
 
   return fullConfig;

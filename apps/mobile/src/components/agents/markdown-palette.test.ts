@@ -29,6 +29,8 @@ const colors = {
   ringTrack: 'rgba(20, 15, 10, 0.05)',
   accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
+  accentSoftTint: '#4F5A1029',
+  accentSoftTintForeground: '#4F5A10',
   good: '#2F9A5F',
   warn: '#B27214',
   warnForeground: '#FFFFFF',

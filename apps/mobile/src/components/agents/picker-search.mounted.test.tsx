@@ -107,6 +107,7 @@ beforeEach(() => {
     options: [model],
     currentValue: '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope: {
       sessionId: UNFENCED_ROUTE_KEY,
       ownerConnectionId: null,

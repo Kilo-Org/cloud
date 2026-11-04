@@ -259,6 +259,37 @@ describe('getAuthHeaders', () => {
 
     await expect(headers()).rejects.toThrow('keychain unavailable');
   });
+
+  it('resolves unauthenticated while protected data is unavailable and files nothing', async () => {
+    // `afterEach` resets the module registry, so the sink, the owner, and the
+    // gate must be loaded from the same graph as `./trpc` inside the case.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    setProtectedDataAvailable(false);
+    try {
+      // The locked request still resolves: no rejection reaches tRPC, so
+      // nothing wraps the lock state into a reported client error.
+      const unauthenticated = await headers();
+      expect(unauthenticated).not.toHaveProperty('Authorization');
+      // The refused read never reached the keychain.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    // After unlock the same request resolves the stored token and sends it.
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(events).toEqual([]);
+  });
 });
 
 const mockFetch = vi.fn();

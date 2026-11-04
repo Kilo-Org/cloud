@@ -131,16 +131,19 @@ their members access to the platform. Two plan tiers exist -- Teams
 and Enterprise -- each with distinct per-seat pricing. Both monthly
 and annual billing cycles are available for each tier, with annual
 billing discounted to 10 months' worth of the monthly rate (12 months
-for the price of 10). All self-service signups begin on the Enterprise
-plan with a 14-day free trial; users choose their plan tier (Teams or
-Enterprise) and billing cycle (monthly or annual) when converting to a
-paid subscription. Seat counts are tracked per organization and
-enforced against active members and pending invitations. Organizations
-without an active subscription operate under a time-limited free trial
-with escalating restrictions: informational banners, then a
-dismissible read-only lock, then a non-dismissible hard lock that
-blocks all server-side mutations. A "billing manager" role exists that
-grants billing access without consuming a seat.
+for the price of 10). Self-service creation of top-level organizations
+starts them on the Enterprise plan with a 14-day free trial; users
+choose their plan tier (Teams or Enterprise) and billing cycle (monthly
+or annual) when converting to a paid subscription. New child
+organizations start on their parent's plan at creation, whether Teams or
+Enterprise. Seat counts are tracked per organization and enforced
+against active members and pending invitations. Organizations without
+an active subscription purchase that are subject to trial enforcement
+operate under a time-limited free trial with escalating restrictions:
+informational banners, then a dismissible read-only lock, then a
+non-dismissible hard lock that blocks all server-side mutations. A
+"billing manager" role exists that grants billing access without
+consuming a seat.
 
 ## Rules
 
@@ -150,11 +153,10 @@ grants billing access without consuming a seat.
    Enterprise.
 2. The system MUST default the organization plan to Teams at the
    data layer when no plan is explicitly provided by the creation
-   flow and no parent organization supplies one. (The self-service
-   signup flow for top-level organizations always provides
-   Enterprise; see rule 3. Child organizations take their parent's
-   plan; see rule 10.)
-3. The self-service signup flow MUST create new top-level
+   flow, even if a parent is specified. (Self-service creation of
+   top-level organizations explicitly provides Enterprise; see rule 3.
+   Child creation explicitly provides the parent's plan; see rule 10.)
+3. The self-service creation flow MUST create new top-level
    organizations on the Enterprise plan with a 14-day free trial.
    Child organizations follow rule 10 instead.
 4. The user MUST NOT be offered a choice of plan or billing cycle
@@ -446,7 +448,8 @@ grants billing access without consuming a seat.
    set to false as having an active subscription for all access
    checks (bypassing trial and subscription requirements).
 2. The system MUST set the require-seats flag to true for all new
-   organization signups, including enterprise trials.
+   top-level organization signups, including Enterprise trials. When
+   creating a child organization, the system MUST set the flag to false.
 3. The system MUST allow platform administrators (users with the
    site-wide admin role) to manually set the require-seats flag to
    false for any organization at the administrator's discretion,
@@ -460,8 +463,8 @@ grants billing access without consuming a seat.
 
 ### Free Trial
 
-1. The system MUST place organizations without an active
-   subscription into a free trial period.
+1. Organizations without an active subscription purchase and subject
+   to trial enforcement MUST operate under a free trial period.
 2. The system MUST compute trial expiration from an explicit end
    date when set, or fall back to the organization creation date
    plus a configurable number of days (default: 14).
@@ -614,8 +617,9 @@ in the current codebase:
 
 - Added Organization Plans rule 10: new child organizations are
   created with their parent's current plan as a creation-time
-  default. Clarified rules 2 and 3 accordingly, scoping the
-  Enterprise trial default to top-level self-service signup.
+  default. Clarified the Teams data-layer default, scoped the
+  Enterprise trial default to top-level self-service creation, and
+  clarified seat and trial enforcement for new child organizations.
 
 ### 2026-05-28 -- Organization EFW review boundary
 

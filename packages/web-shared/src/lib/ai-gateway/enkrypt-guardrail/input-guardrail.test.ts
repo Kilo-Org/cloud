@@ -436,6 +436,25 @@ describe('startEnkryptInputGuardrail', () => {
     ]);
   });
 
+  it('reports the settings of a log-only guardrail whose scan throws unexpectedly', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedScanRequest.mockRejectedValue(new RangeError('Maximum call stack size exceeded'));
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
+
+    expect(await guardrail.report()).toEqual({
+      settings: {
+        status: 'ready',
+        scan_tool_results: true,
+        detectors: [{ detector: 'pii', action: 'log', pii_entities: ['secrets'] }],
+      },
+      verdict: 'skip',
+      unavailable_reason: null,
+      added_latency_ms: null,
+      scans: [],
+    });
+  });
+
   it('reports a rejected request whose scan could not be prepared', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
 

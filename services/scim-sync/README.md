@@ -123,11 +123,21 @@ Three classes, and they decide cursor movement:
 | 409 | A dependency is missing — an unactivated directory, or a group whose directory resolves to a sub-organization | Hold and retry; the body names the dependency |
 | 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
 
-A 409 is not always recoverable by waiting. `Could not provision directory user:
-EMAIL-ALREADY-USED` means a personal account already owns that address, and a
-group under a sub-organization is structural — no arrival order fixes either.
-Separating those from the retryable cases is open, and is why the loop needs a
-bound rather than indefinite retry.
+A 409 is not always recoverable by waiting. A group under a sub-organization is
+structural, and `Could not provision directory user: EMAIL-ALREADY-USED` means a
+pre-existing Kilo account already holds that address — no arrival order fixes
+either.
+
+The email collision has an intended resolution rather than a retry: where the
+address's domain equals the organization's Effective SSO policy domain, domain
+capture already establishes the enterprise's claim to it, so the existing
+account is converted to the SSO authority's WorkOS identity and bound to the
+Directory user. See `.specs/organization-sso.md`, Directory Sync rule 13. That
+conversion is not implemented yet, so the collision is still a 409 today. A
+non-matching domain stays refused.
+
+Separating genuinely terminal failures from the retryable ones is still open,
+and is why the loop needs a retry bound rather than indefinite retry.
 
 ## Logging
 

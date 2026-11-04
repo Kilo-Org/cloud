@@ -256,6 +256,20 @@ export async function upsertDirectoryUser(
   );
 
   if (!result.success) {
+    // `EMAIL-ALREADY-USED` is the one failure here that no arrival order and no
+    // retry can clear: a pre-existing Kilo account holds that address, and
+    // `findUserByNormalizedEmail` above already adopted every account this code
+    // is willing to claim.
+    //
+    // It should not stay a refusal. Where the address's domain equals the
+    // Effective SSO policy domain of the directory's organization, the
+    // enterprise's claim to it is already established by domain capture and the
+    // identity provider has asserted that this person holds it, so the existing
+    // account must be convertible to the SSO authority's WorkOS identity and
+    // bound to this Directory user instead — see `.specs/organization-sso.md`,
+    // Directory Sync rule 13. That conversion is not implemented here yet: it
+    // needs the SSO policy lookup, session invalidation under Authentication
+    // rule 7, and an audit record. A non-matching domain stays refused.
     throw new DirectorySyncConflictError(`Could not provision directory user: ${result.error}`);
   }
 

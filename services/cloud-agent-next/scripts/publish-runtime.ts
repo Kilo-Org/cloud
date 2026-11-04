@@ -324,29 +324,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const build = spawnSync('bun', ['run', 'build:wrapper'], { cwd: packageRoot, stdio: 'inherit' });
   if (build.status !== 0) throw new Error('Wrapper build failed');
-  const version = argValue(argv, '--cli-version') ?? KILO_CLI_VERSION;
-  const file = argValue(argv, '--cli');
-  const cliTarball = file
-    ? new Uint8Array(await fs.readFile(file))
-    : await downloadVerified(version);
-  const wrapperManifest = z
-    .object({ dependencies: z.object({ '@kilocode/sdk': z.string().min(1) }) })
-    .parse(JSON.parse(await fs.readFile(path.join(packageRoot, 'wrapper/package.json'), 'utf8')));
-  const packaged = await packageRuntimeRelease({
-    cliTarball,
-    cliVersion: version,
-    cliExecutable: 'package/bin/kilo',
-    wrapperSdkVersion: wrapperManifest.dependencies['@kilocode/sdk'],
-    protocol: String(CONTROL_PLANE_PROTOCOL_VERSION),
-    abi: RUNTIME_BASE_ABI,
-    platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
-    caps: {
-      maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
-      maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
-      maxFileCount: RUNTIME_HARD_MAX_FILE_COUNT,
-    },
-    controlEntries: await controlBundleEntries(packageRoot),
-  });
   const {
     RUNTIME_R2_ACCOUNT_ID: accountId,
     RUNTIME_R2_ACCESS_KEY_ID: accessKeyId,
@@ -364,6 +341,29 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         : null);
   if (!store) throw new Error('Runtime publisher target is invalid');
   try {
+    const version = argValue(argv, '--cli-version') ?? KILO_CLI_VERSION;
+    const file = argValue(argv, '--cli');
+    const cliTarball = file
+      ? new Uint8Array(await fs.readFile(file))
+      : await downloadVerified(version, { cache: out === undefined ? store : undefined });
+    const wrapperManifest = z
+      .object({ dependencies: z.object({ '@kilocode/sdk': z.string().min(1) }) })
+      .parse(JSON.parse(await fs.readFile(path.join(packageRoot, 'wrapper/package.json'), 'utf8')));
+    const packaged = await packageRuntimeRelease({
+      cliTarball,
+      cliVersion: version,
+      cliExecutable: 'package/bin/kilo',
+      wrapperSdkVersion: wrapperManifest.dependencies['@kilocode/sdk'],
+      protocol: String(CONTROL_PLANE_PROTOCOL_VERSION),
+      abi: RUNTIME_BASE_ABI,
+      platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+      caps: {
+        maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
+        maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
+        maxFileCount: RUNTIME_HARD_MAX_FILE_COUNT,
+      },
+      controlEntries: await controlBundleEntries(packageRoot),
+    });
     const published = await publishRuntimeRelease(store, packaged);
     const descriptorOut = argValue(argv, '--descriptor-out');
     if (descriptorOut)

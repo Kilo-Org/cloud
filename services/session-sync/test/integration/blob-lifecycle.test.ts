@@ -274,3 +274,59 @@ describe('bounded blob cleanup', () => {
     if (!result.ok) expect(result.error.code).toBe('storage_budget_exceeded');
   });
 });
+
+describe('unreferenced blob grace period', () => {
+  it('reclaims a superseded blob and reports blob_missing on a later reference', async () => {
+    const { principal, api, sessionID, sourceID, stub } = await fixture();
+    const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('old content'));
+    await store(upload);
+    expect((await stub.commitBlob(upload.input)).ok).toBe(true);
+    const ref = upload.input.blob;
+    expect((await api.apply(sessionID, batch(sourceID, 0, 1, [
+      { op: 'put', kind: 'message', id: 'm', blob: ref },
+    ]))).status).toBe(200);
+    expect((await api.apply(sessionID, batch(sourceID, 1, 2, [
+      { op: 'put', kind: 'message', id: 'm', value: 'replacement' },
+    ]))).status).toBe(200);
+    await runInDurableObject(stub, (_instance, state) => {
+      const row = drizzle(state.storage).select().from(blobs).get();
+      expect(row).toMatchObject({ state: 'unreferenced' });
+      expect(row!.deadline).toBeGreaterThan(Date.now() + LIMITS.unreferencedMs - 10_000);
+    });
+    expect((await api.getBlob(sessionID, ref.hash)).status).toBe(200);
+    await expire(stub);
+    await runDurableObjectAlarm(stub);
+    expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).toBeNull();
+    const response = await api.apply(sessionID, batch(sourceID, 2, 3, [
+      { op: 'put', kind: 'message', id: 'm', blob: ref },
+    ]));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: 'blob_missing', details: { hash: ref.hash } } });
+    expect(await (await api.state(sessionID)).json()).toMatchObject({ usage: { blobBytes: 0 } });
+  });
+
+  it('keeps a blob re-referenced within grace, including a same-batch transfer', async () => {
+    const { principal, api, sessionID, sourceID, stub } = await fixture();
+    const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('reused content'));
+    await store(upload);
+    expect((await stub.commitBlob(upload.input)).ok).toBe(true);
+    const ref = upload.input.blob;
+    expect((await api.apply(sessionID, batch(sourceID, 0, 1, [
+      { op: 'put', kind: 'message', id: 'm', blob: ref },
+    ]))).status).toBe(200);
+    expect((await api.apply(sessionID, batch(sourceID, 1, 2, [
+      { op: 'remove', kind: 'message', id: 'm', cause: 'revert' },
+    ]))).status).toBe(200);
+    expect((await api.apply(sessionID, batch(sourceID, 2, 3, [
+      { op: 'put', kind: 'message', id: 'new', blob: ref },
+      { op: 'put', kind: 'message', id: 'other', blob: ref },
+      { op: 'remove', kind: 'message', id: 'new', cause: 'revert' },
+    ]))).status).toBe(200);
+    await expire(stub);
+    await runDurableObjectAlarm(stub);
+    expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).not.toBeNull();
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(blobs).get()).toMatchObject({ state: 'ready' });
+    });
+  });
+});

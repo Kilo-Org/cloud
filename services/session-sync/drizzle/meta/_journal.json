@@ -15,6 +15,13 @@
       "when": 1793222402451,
       "tag": "0001_lean_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793806317648,
+      "tag": "0002_nosy_alice",
+      "breakpoints": true
     }
   ]
 }

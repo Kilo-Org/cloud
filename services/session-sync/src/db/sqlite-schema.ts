@@ -19,6 +19,7 @@ export const session = sqliteTable('session', {
   entity_count: integer('entity_count').notNull(),
   inline_bytes: integer('inline_bytes').notNull(),
   blob_bytes: integer('blob_bytes').notNull(),
+  tenant_lease: integer('tenant_lease').notNull().default(0),
   created_at: integer('created_at').notNull(),
   updated_at: integer('updated_at').notNull(),
   deleted_at: integer('deleted_at'),
@@ -36,7 +37,12 @@ export const entities = sqliteTable(
     blob_bytes: integer('blob_bytes'),
     inline_bytes: integer('inline_bytes').notNull(),
   },
-  table => [primaryKey({ columns: [table.kind, table.id] })]
+  table => [
+    primaryKey({ columns: [table.kind, table.id] }),
+    index('entities_blob_hash_idx')
+      .on(table.blob_hash)
+      .where(sql`${table.blob_hash} IS NOT NULL`),
+  ]
 );
 
 /** Bounded tail of durable batch receipts, keyed by the producer batch ID. */
@@ -55,9 +61,9 @@ export const receipts = sqliteTable(
 );
 
 /**
- * One admitted upload attempt per hash. Only `ready` rows satisfy references.
- * Each attempt has its own R2 key; pending and cleaning rows retain their
- * upload deadline until cleanup deletes the object and releases the row.
+ * One admitted upload attempt per hash. Verified rows can satisfy references.
+ * Each attempt has its own R2 key; unfinished attempts and unreferenced blobs
+ * retain their deadline until cleanup deletes the object and releases the row.
  */
 export const blobs = sqliteTable(
   'blobs',
@@ -65,7 +71,7 @@ export const blobs = sqliteTable(
     hash: text('hash').primaryKey(),
     attempt: text('attempt').notNull(),
     bytes: integer('bytes').notNull(),
-    state: text('state', { enum: ['pending', 'ready', 'cleaning'] }).notNull(),
+    state: text('state', { enum: ['pending', 'unreferenced', 'ready', 'cleaning'] }).notNull(),
     deadline: integer('deadline').notNull(),
     created_at: integer('created_at').notNull(),
   },

@@ -49,10 +49,16 @@ export function apply(
   const revision = meta.revision + 1;
   let entityCount = meta.entity_count;
   let inlineBytes = meta.inline_bytes;
+  const touched = new Set<string>();
 
   for (const change of batch.changes) {
     const key = and(eq(entities.kind, change.kind), eq(entities.id, change.id));
-    const prev = db.select({ inline: entities.inline_bytes }).from(entities).where(key).get();
+    const prev = db
+      .select({ inline: entities.inline_bytes, hash: entities.blob_hash })
+      .from(entities)
+      .where(key)
+      .get();
+    if (prev?.hash) touched.add(prev.hash);
 
     if (change.op === 'remove') {
       if (!prev) continue;
@@ -68,7 +74,7 @@ export function apply(
     >;
     if ('blob' in change) {
       const blob = db.select().from(blobs).where(eq(blobs.hash, change.blob.hash)).get();
-      if (!blob || blob.state !== 'ready') {
+      if (!blob || (blob.state !== 'ready' && blob.state !== 'unreferenced')) {
         raise('blob_missing', 'Upload the blob before referencing it', { hash: change.blob.hash });
       }
       if (blob.bytes !== change.blob.bytes) {
@@ -78,6 +84,7 @@ export function apply(
         });
       }
       row = { value: null, blob_hash: blob.hash, blob_bytes: blob.bytes, inline_bytes: 0 };
+      touched.add(blob.hash);
     } else {
       const value = JSON.stringify(change.value);
       row = { value, blob_hash: null, blob_bytes: null, inline_bytes: utf8Bytes(value) };
@@ -96,6 +103,21 @@ export function apply(
       entities: LIMITS.sessionEntities,
       inlineBytes: LIMITS.sessionInlineBytes,
     });
+  }
+  for (const hash of touched) {
+    const referenced = db
+      .select({ id: entities.id })
+      .from(entities)
+      .where(eq(entities.blob_hash, hash))
+      .limit(1)
+      .get();
+    db.update(blobs)
+      .set({
+        state: referenced ? 'ready' : 'unreferenced',
+        deadline: now + LIMITS.unreferencedMs,
+      })
+      .where(eq(blobs.hash, hash))
+      .run();
   }
 
   update(db, {

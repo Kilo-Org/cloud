@@ -21,6 +21,7 @@ import {
   type Result,
   type SyncError,
 } from './protocol';
+import { rateLimit } from './rate-limit';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -117,6 +118,12 @@ app.use('/v1/sessions/*', async (c, next) => {
   const principal = await authorize(c.req.raw, c.env);
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
+  const denied = await rateLimit(c.env.USER_REQUEST_LIMITER, principal.userID);
+  if (denied) return denied;
+  if (c.req.method === 'PUT' && /^\/v1\/sessions\/[^/]+\/blobs\/[^/]+$/.test(c.req.path)) {
+    const blobDenied = await rateLimit(c.env.USER_BLOB_LIMITER, principal.userID);
+    if (blobDenied) return blobDenied;
+  }
   await next();
 });
 

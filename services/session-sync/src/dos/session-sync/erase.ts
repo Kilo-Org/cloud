@@ -1,4 +1,4 @@
-import { eq, isNotNull } from 'drizzle-orm';
+import { inArray, isNotNull } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import type { Principal, SessionState } from '../../protocol';
@@ -29,7 +29,7 @@ export function tombstone(
   // has finished its PUT, so its object is eligible for immediate cleanup.
   db.update(blobs)
     .set({ state: 'cleaning', deadline: now - SWEEP_MARGIN_MS })
-    .where(eq(blobs.state, 'ready'))
+    .where(inArray(blobs.state, ['ready', 'unreferenced']))
     .run();
   update(db, {
     entity_count: 0,

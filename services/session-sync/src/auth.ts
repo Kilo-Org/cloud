@@ -13,6 +13,7 @@ import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 
 import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
+import { rateLimit } from './rate-limit';
 
 export type { Principal };
 
@@ -24,6 +25,8 @@ export type AuthEnv = {
   SESSION_SYNC_SECRET: SecretBinding;
   HYPERDRIVE: Hyperdrive;
   ENVIRONMENT?: string;
+  EXCHANGE_IP_LIMITER?: RateLimit;
+  EXCHANGE_ACCOUNT_LIMITER?: RateLimit;
 };
 
 const GRANT_ISSUER = 'session-sync';
@@ -252,6 +255,8 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (request.method !== 'POST') {
     return failure(405, 'method_not_allowed', 'Use POST for credential exchange');
   }
+  const ipDenied = await rateLimit(env.EXCHANGE_IP_LIMITER, request.headers.get('CF-Connecting-IP') ?? 'local');
+  if (ipDenied) return ipDenied;
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token) return failure(401, 'unauthenticated', 'A Kilo bearer credential is required');
   const body = await readExchangeBody(request);
@@ -262,6 +267,8 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
     const grantSecret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
     const credential = await verifyCredential(token, nextAuthSecret, env.ENVIRONMENT);
     if (credential instanceof Response) return credential;
+    const accountDenied = await rateLimit(env.EXCHANGE_ACCOUNT_LIMITER, credential.userID);
+    if (accountDenied) return accountDenied;
 
     const issued = principalSchema.safeParse({
       userID: credential.userID,

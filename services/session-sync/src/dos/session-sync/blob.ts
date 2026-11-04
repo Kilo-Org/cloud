@@ -1,6 +1,6 @@
-import { and, asc, count, eq, lte, ne } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, lte, ne } from 'drizzle-orm';
 
-import { blobs } from '../../db/sqlite-schema';
+import { blobs, entities } from '../../db/sqlite-schema';
 import { LIMITS, type BlobAck, type BlobRef, type Principal } from '../../protocol';
 import { live, load, raise, update, visible, writable, type Db, type Meta } from './session';
 
@@ -43,6 +43,13 @@ export function begin(
       });
     }
     if (row.state === 'ready') return { status: 'ready' };
+    if (row.state === 'unreferenced') {
+      db.update(blobs)
+        .set({ deadline: now + LIMITS.unreferencedMs })
+        .where(eq(blobs.hash, ref.hash))
+        .run();
+      return { status: 'ready' };
+    }
     raise(
       'upload_in_progress',
       'Another upload or cleanup owns this hash; retry after its deadline',
@@ -115,15 +122,21 @@ export function commit(
     });
   }
   if (row.bytes !== ref.bytes) raise('blob_hash_mismatch', 'The upload size does not match');
-  if (row.state === 'ready')
+  if (row.state === 'ready' || row.state === 'unreferenced')
     return { version: 1, hash: ref.hash, bytes: ref.bytes, created: false };
   if (row.deadline + SWEEP_MARGIN_MS <= now) {
     raise('upload_timeout', 'The upload reservation expired; upload the blob again', {
       hash: ref.hash,
     });
   }
+  const referenced = db
+    .select({ id: entities.id })
+    .from(entities)
+    .where(eq(entities.blob_hash, ref.hash))
+    .limit(1)
+    .get();
   db.update(blobs)
-    .set({ state: 'ready' })
+    .set({ state: referenced ? 'ready' : 'unreferenced', deadline: now + LIMITS.unreferencedMs })
     .where(and(eq(blobs.hash, ref.hash), eq(blobs.attempt, attempt)))
     .run();
   return { version: 1, hash: ref.hash, bytes: ref.bytes, created: true };
@@ -150,7 +163,7 @@ export function locate(db: Db, principal: Principal, sessionID: string, hash: st
   const row = db
     .select({ bytes: blobs.bytes, attempt: blobs.attempt })
     .from(blobs)
-    .where(and(eq(blobs.hash, hash), eq(blobs.state, 'ready')))
+    .where(and(eq(blobs.hash, hash), inArray(blobs.state, ['ready', 'unreferenced'])))
     .get();
   if (!row) raise('blob_not_found', 'The blob is not stored for this session', { hash });
   return { key: key(meta, hash, row.attempt), bytes: row.bytes };

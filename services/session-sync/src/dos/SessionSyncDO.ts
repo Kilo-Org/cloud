@@ -26,12 +26,18 @@ import {
   type Tenant,
 } from '../protocol';
 import * as batches from './session-sync/batch';
+import { getTenantStub } from './SessionSyncTenantDO';
 import * as blob from './session-sync/blob';
 import * as erase from './session-sync/erase';
 import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 
 const PURGE_RETRY_MS = 60_000;
+class LeaseRequired extends Error {
+  constructor(readonly bytes: number) {
+    super('A larger tenant lease is required');
+  }
+}
 
 const target = { principal: principalSchema, sessionID: sessionIDSchema };
 const stateInput = z.strictObject(target);
@@ -81,6 +87,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
+      await this.scheduleSweep();
     });
   }
 
@@ -94,13 +101,74 @@ export class SessionSyncDO extends DurableObject<Env> {
     }
   }
 
+  /** Rolls back an over-lease mutation before obtaining capacity outside SQLite. */
+  private async leased<T>(principal: z.infer<typeof principalSchema>, sessionID: string, fn: () => T): Promise<Result<T>> {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      for (;;) {
+        try {
+          return this.tx(() => {
+            const value = fn();
+            const meta = session.load(this.db);
+            if (meta && meta.blob_bytes + meta.inline_bytes > meta.tenant_lease) {
+              throw new LeaseRequired(meta.blob_bytes + meta.inline_bytes);
+            }
+            return value;
+          });
+        } catch (error) {
+          if (!(error instanceof LeaseRequired)) throw error;
+          const bytes = Math.min(
+            LIMITS.sessionBlobBytes + LIMITS.sessionInlineBytes,
+            Math.ceil(error.bytes / LIMITS.tenantLeaseBytes) * LIMITS.tenantLeaseBytes
+          );
+          const lease = await getTenantStub(this.env, principal.tenant).reserve({
+            tenant: principal.tenant, sessionID, bytes,
+          });
+          if (!lease.ok) return lease;
+          session.update(this.db, { tenant_lease: lease.value.bytes });
+        }
+      }
+    });
+  }
+
+  private async reconcileLease(): Promise<void> {
+    await this.ctx.blockConcurrencyWhile(async () => {
+      const meta = session.load(this.db);
+      if (!meta) return;
+      const tenant = { type: meta.tenant_type, id: meta.tenant_id } as Tenant;
+      const stub = getTenantStub(this.env, tenant);
+      const input = { tenant, sessionID: meta.session_id, bytes: 0 };
+      if (meta.deleted_at !== null) {
+        const released = await stub.release(input);
+        if (!released.ok) throw new Error(released.error.message);
+        session.update(this.db, { tenant_lease: -1 });
+      } else if (meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes) {
+        const bytes = Math.ceil((meta.blob_bytes + meta.inline_bytes) / LIMITS.tenantLeaseBytes) * LIMITS.tenantLeaseBytes;
+        const shrunk = await stub.reserve({ ...input, bytes });
+        if (!shrunk.ok) throw new Error(shrunk.error.message);
+        session.update(this.db, { tenant_lease: bytes });
+      }
+    });
+  }
+
   async register(input: unknown): Promise<Result<{ created: boolean; state: SessionState }>> {
     const parsed = parse(registerInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, request } = parsed.value;
-    return this.tx(() =>
-      session.register(this.db, principal, sessionID, request.sourceID, Date.now())
-    );
+    return this.ctx.blockConcurrencyWhile(async () => {
+      const existing = session.load(this.db);
+      if (existing) {
+        const registered = this.tx(() => session.register(this.db, principal, sessionID, request.sourceID, Date.now()));
+        if (!registered.ok) return registered;
+        const bytes = Math.max(existing.tenant_lease, Math.ceil((existing.blob_bytes + existing.inline_bytes) / LIMITS.tenantLeaseBytes) * LIMITS.tenantLeaseBytes);
+        const admitted = await getTenantStub(this.env, principal.tenant).reserve({ tenant: principal.tenant, sessionID, bytes });
+        if (!admitted.ok) return admitted;
+        session.update(this.db, { tenant_lease: bytes });
+        return registered;
+      }
+      const admitted = await getTenantStub(this.env, principal.tenant).reserve({ tenant: principal.tenant, sessionID, bytes: 0 });
+      if (!admitted.ok) return admitted;
+      return this.tx(() => session.register(this.db, principal, sessionID, request.sourceID, Date.now()));
+    });
   }
 
   async getState(input: unknown): Promise<Result<SessionState>> {
@@ -119,9 +187,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     if (!batch.ok) return batch;
     // Hash before the transaction: every check and write below runs synchronously.
     const digest = await sha256Hex(body);
-    return this.tx(() =>
+    const applied = await this.leased(principal, sessionID, () =>
       batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now())
     );
+    if (applied.ok) await this.scheduleSweep();
+    return applied;
   }
 
   async readEntities(input: unknown): Promise<Result<string>> {
@@ -135,11 +205,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(blobInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref } = parsed.value;
-    const begun = this.tx(() => blob.begin(this.db, principal, sessionID, ref, Date.now()));
-    if (
-      (begun.ok && begun.value.status === 'upload') ||
-      (!begun.ok && begun.error.code === 'upload_in_progress')
-    ) {
+    const begun = await this.leased(principal, sessionID, () => blob.begin(this.db, principal, sessionID, ref, Date.now()));
+    if (begun.ok || begun.error.code === 'upload_in_progress') {
       await this.scheduleSweep();
     }
     return begun;
@@ -187,6 +254,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     const committed = this.tx(() =>
       blob.commit(this.db, principal, sessionID, ref, attempt, Date.now())
     );
+    if (committed.ok) await this.scheduleSweep();
     if (
       !committed.ok &&
       (committed.error.code === 'session_deleted' || committed.error.code === 'upload_timeout')
@@ -211,10 +279,13 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
-    const erased = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
+    const erased = await this.ctx.blockConcurrencyWhile(async () =>
+      this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()))
+    );
     if (!erased.ok) return erased;
     try {
       await this.scheduleSweep();
+      await this.reconcileLease();
     } finally {
       await this.cleanup();
     }
@@ -222,7 +293,13 @@ export class SessionSyncDO extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
-    await this.cleanup();
+    try {
+      await this.cleanup();
+      await this.reconcileLease();
+    } catch (error) {
+      await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
+      throw error;
+    }
   }
 
   /** Claims at most one bounded page before yielding, then finalizes those exact attempts. */
@@ -246,7 +323,11 @@ export class SessionSyncDO extends DurableObject<Env> {
   }
 
   private async scheduleSweep(): Promise<void> {
-    const due = blob.nextSweep(this.db);
+    const meta = session.load(this.db);
+    const leaseDue = meta && ((meta.deleted_at !== null && meta.tenant_lease >= 0) || meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes)
+      ? Date.now() + PURGE_RETRY_MS : null;
+    const blobDue = blob.nextSweep(this.db);
+    const due = blobDue === null ? leaseDue : leaseDue === null ? blobDue : Math.min(blobDue, leaseDue);
     if (due === null) return;
     const current = await this.ctx.storage.getAlarm();
     const scheduled = Math.max(Date.now() + 1, due);

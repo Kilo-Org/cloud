@@ -36,6 +36,13 @@ export const LIMITS = {
   receipts: 256,
   /** Time an upload has to store its object after it starts. */
   uploadMs: 5 * 60_000,
+  /** Grace period for verified blobs without a current entity reference. */
+  unreferencedMs: 15 * 60_000,
+  tenantLeaseBytes: 32 * 1024 * 1024,
+  userTenantSessions: 10_000,
+  userTenantBytes: 100 * 1024 * 1024 * 1024,
+  organizationTenantSessions: 200_000,
+  organizationTenantBytes: 2 * 1024 * 1024 * 1024 * 1024,
 } as const;
 
 /** The session entity leaves only through cloud deletion, never through a batch removal. */
@@ -327,6 +334,8 @@ export const ERROR_STATUS = {
   length_required: 411,
   request_too_large: 413,
   storage_budget_exceeded: 413,
+  tenant_budget_exceeded: 413,
+  rate_limited: 429,
   internal_error: 500,
 } as const;
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -357,5 +366,12 @@ export function ok<T>(value: T): { ok: true; value: T } {
 }
 
 export function errorBody(error: SyncError) {
-  return { error: { code: error.code, message: error.message, ...error.details } };
+  return {
+    error: {
+      code: error.code,
+      message: error.message,
+      ...error.details,
+      ...(error.details ? { details: error.details } : {}),
+    },
+  };
 }

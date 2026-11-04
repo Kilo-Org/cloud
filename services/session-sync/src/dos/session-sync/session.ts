@@ -152,6 +152,7 @@ export function register(
     entity_count: 0,
     inline_bytes: 0,
     blob_bytes: 0,
+    tenant_lease: 0,
     created_at: now,
     updated_at: now,
     deleted_at: null,

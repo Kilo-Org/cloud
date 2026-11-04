@@ -23,7 +23,20 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
+    "USER_TENANT_SESSIONS": "10000",
+    "USER_TENANT_BYTES": "107374182400",
+    "ORGANIZATION_TENANT_SESSIONS": "200000",
+    "ORGANIZATION_TENANT_BYTES": "2199023255552",
   },
+  "ratelimits": [
+    { "name": "EXCHANGE_IP_LIMITER", "namespace_id": "1020", "simple": { "limit": 120, "period": 60 } },
+    { "name": "EXCHANGE_ACCOUNT_LIMITER", "namespace_id": "1021", "simple": { "limit": 60, "period": 60 } },
+    { "name": "USER_REQUEST_LIMITER", "namespace_id": "1022", "simple": { "limit": 1200, "period": 60 } },
+    { "name": "USER_BLOB_LIMITER", "namespace_id": "1023", "simple": { "limit": 300, "period": 60 } },
+  ],
+  "analytics_engine_datasets": [
+    { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },
+  ],
   // NEXTAUTH_SECRET and SESSION_SYNC_SECRET come from .dev.vars locally.
   "hyperdrive": [
     {
@@ -39,6 +52,7 @@
         "name": "SESSION_SYNC_DO",
         "class_name": "SessionSyncDO",
       },
+      { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
     ],
   },
   "migrations": [
@@ -46,6 +60,7 @@
       "tag": "v1",
       "new_sqlite_classes": ["SessionSyncDO"],
     },
+    { "tag": "v2", "new_sqlite_classes": ["SessionSyncTenantDO"] },
   ],
   "r2_buckets": [
     {

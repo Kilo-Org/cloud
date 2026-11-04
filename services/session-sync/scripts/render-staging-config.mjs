@@ -56,11 +56,15 @@ try {
   requireValue(errors.length === 0, 'The source wrangler.jsonc is invalid');
   requireValue(
     source.main === 'src/index.ts' &&
-      source.durable_objects?.bindings?.length === 1 &&
+      source.durable_objects?.bindings?.length === 2 &&
       source.durable_objects.bindings[0].name === 'SESSION_SYNC_DO' &&
       source.durable_objects.bindings[0].class_name === 'SessionSyncDO' &&
       !source.durable_objects.bindings[0].script_name &&
-      !source.durable_objects.bindings[0].environment,
+      !source.durable_objects.bindings[0].environment &&
+      source.durable_objects.bindings[1].name === 'SESSION_SYNC_TENANT_DO' &&
+      source.durable_objects.bindings[1].class_name === 'SessionSyncTenantDO' &&
+      !source.durable_objects.bindings[1].script_name &&
+      !source.durable_objects.bindings[1].environment,
     'Review the staging renderer when the entrypoint or Durable Object bindings change'
   );
   // Select only service code/runtime settings. Never inherit local credentials,
@@ -76,9 +80,15 @@ try {
     observability: source.observability,
     workers_dev: true,
     preview_urls: false,
-    vars: { ENVIRONMENT: 'staging' },
+    vars: { ...source.vars, ENVIRONMENT: 'staging' },
+    ratelimits: source.ratelimits.map((binding, index) => ({
+      ...binding, namespace_id: String(1028 + index),
+    })),
+    analytics_engine_datasets: [
+      { binding: 'SESSION_SYNC_METRICS', dataset: 'session_sync_staging_metrics' },
+    ],
     durable_objects: {
-      bindings: [{ name: 'SESSION_SYNC_DO', class_name: 'SessionSyncDO' }],
+      bindings: source.durable_objects.bindings,
     },
     migrations: source.migrations,
     hyperdrive: [{ binding: 'HYPERDRIVE', id: manifest.hyperdriveID }],

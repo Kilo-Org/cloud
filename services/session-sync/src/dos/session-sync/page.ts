@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, or } from 'drizzle-orm';
+import { and, asc, sql } from 'drizzle-orm';
 
 import { entities } from '../../db/sqlite-schema';
 import {
@@ -52,34 +52,45 @@ export function read(
 
   const after = input.cursor;
   const rows = db
-    .select()
+    .select({ kind: entities.kind, id: entities.id, inline_bytes: entities.inline_bytes })
     .from(entities)
     .where(
       after
-        ? or(
-            gt(entities.kind, after.kind),
-            and(eq(entities.kind, after.kind), gt(entities.id, after.id))
-          )
+        ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})`
         : undefined
     )
     .orderBy(asc(entities.kind), asc(entities.id))
     .limit(input.limit + 1)
     .all();
 
-  const selected: Row[] = [];
+  const selected: typeof rows = [];
   let bytes = 0;
   for (const row of rows.slice(0, input.limit)) {
     if (selected.length > 0 && bytes + row.inline_bytes > LIMITS.pageBytes) break;
     bytes += row.inline_bytes;
     selected.push(row);
   }
+  const end = selected.at(-1);
+  const values = end
+    ? db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            after ? sql`(${entities.kind}, ${entities.id}) > (${after.kind}, ${after.id})` : undefined,
+            sql`(${entities.kind}, ${entities.id}) <= (${end.kind}, ${end.id})`
+          )
+        )
+        .orderBy(asc(entities.kind), asc(entities.id))
+        .all()
+    : [];
 
   const last = selected.at(-1);
   return {
     version: 1,
     sessionID,
     revision: meta.revision,
-    entities: selected.map(toEntity),
+    entities: values.map(toEntity),
     next:
       last && selected.length < rows.length
         ? encodeCursor({ kind: kindSchema.parse(last.kind), id: last.id })

@@ -145,8 +145,46 @@ The initial storage policy is explicit:
 | Current entities per session | 100,000 |
 | Retained batch receipts | 256 |
 
-Unreferenced ready blobs count against the storage policy until session deletion in the initial delivery.
+Verified uploads without a current entity reference enter `unreferenced` for 15 minutes.
+Replacing or removing the last reference starts the same grace window after the whole batch.
+References within grace return the blob to `ready`; duplicate uploads refresh the grace deadline.
+Reads accept both verified states. Alarms reclaim expired unreferenced blobs like expired uploads:
+claim first, delete the private R2 object, then release its reserved bytes.
+The cleanup clock-skew margin is one minute. A missing reclaimed hash returns `blob_missing`
+with `error.details.hash`, so producers discard their acknowledgement hint and upload again.
 An old receipt leaving the bounded tail never makes its packet eligible to apply again.
+
+Entity pages seek on the composite `(kind, id)` key. They select identities and sizes first,
+then load only values within the 2 MiB inline-byte budget, plus a bounded identity lookahead.
+
+### Tenant admission
+
+One tenant Durable Object admits session IDs idempotently and accounts for byte leases.
+Default personal limits are 10,000 sessions and 100 GiB; organization limits are
+200,000 sessions and 2 TiB. Wrangler vars `USER_TENANT_SESSIONS`, `USER_TENANT_BYTES`,
+`ORGANIZATION_TENANT_SESSIONS`, and `ORGANIZATION_TENANT_BYTES` override these defaults.
+Leases include inline values and all reserved or stored blobs. A session grows its lease in
+32 MiB steps, capped at its combined inline/blob bound, only when its usage needs more space.
+An alarm shrinks a lease when usage drops at least two steps below it. Deletion releases
+the session admission and its whole lease. Tenant calls never run inside SQLite transactions.
+Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
+`error.details.sessions` and `error.details.bytes` containing the configured limits.
+
+### Request admission
+
+Wrangler rate-limit bindings are tunable per deployment and apply per Cloudflare location:
+
+| Binding | Key | Default per 60 seconds |
+|---|---|---|
+| `EXCHANGE_IP_LIMITER` | Client IP, before credential verification | 120 |
+| `EXCHANGE_ACCOUNT_LIMITER` | Verified account, before account SQL | 60 |
+| `USER_REQUEST_LIMITER` | Authenticated user, all data routes | 1,200 |
+| `USER_BLOB_LIMITER` | Authenticated user, blob PUT | 300 |
+
+Each binding uses a distinct namespace, including staging and tests.
+Denial returns retryable `rate_limited` (429), `Retry-After: 60`, and an epoch-ms
+`error.retryAt`. Clients honor both header and JSON deadlines before adding jitter.
+
 
 A tombstone survives entity cleanup.
 A deleted ID cannot be registered again.
@@ -259,7 +297,7 @@ Before rendering, an operator must obtain and review all of the following:
    signs only this staging deployment's one-minute sync grants.
 5. Confirm that `session-sync-staging` is a dedicated Worker identity, with no
    existing production deployment or production routes. Its SQLite namespace is
-   created by the eventual separately authorized deployment's `v1` migration;
+   created by the eventual separately authorized deployment's `v1` and `v2` migrations;
    the renderer does not bind another Worker's Durable Objects.
 
 Store a nonsecret resource manifest outside tracked source, for example

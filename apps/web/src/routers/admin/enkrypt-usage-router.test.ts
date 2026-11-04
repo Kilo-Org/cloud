@@ -21,6 +21,7 @@ describe('admin enkrypt usage router', () => {
     const allowedAt = hoursAgo(2);
     const blockedAt = hoursAgo(1);
     const errorAt = hoursAgo(0.5);
+    const outputAt = hoursAgo(0.25);
     const expiredAt = hoursAgo(31 * 24);
     const partitions = await provisionEnkryptUsagePartitions(db, new Date(expiredAt));
     expect(partitions.errors).toEqual([]);
@@ -76,6 +77,17 @@ describe('admin enkrypt usage router', () => {
       {
         organization_id: organization.id,
         kilo_user_id: user.id,
+        api_kind_id: apiKindId('messages'),
+        decision_id: decisionId('allowed'),
+        enkrypt_credits_cost: 1,
+        charged_microdollars: 100,
+        added_latency_ms: 900,
+        guardrail: 'output',
+        created_at: outputAt,
+      },
+      {
+        organization_id: organization.id,
+        kilo_user_id: user.id,
         api_kind_id: apiKindId('responses'),
         decision_id: decisionId('error'),
         charged_microdollars: 0,
@@ -99,25 +111,29 @@ describe('admin enkrypt usage router', () => {
       await createCallerForUser(admin.id)
     ).admin.enkryptUsage.list({ organizationId: organization.id });
 
-    expect(result.rows.map(row => [row.api_kind, row.decision, row.created_at])).toEqual([
-      ['responses', 'error', errorAt],
-      ['messages', 'blocked', blockedAt],
-      ['chat_completions', 'allowed', allowedAt],
+    expect(
+      result.rows.map(row => [row.api_kind, row.decision, row.guardrail, row.created_at])
+    ).toEqual([
+      ['messages', 'allowed', 'output', outputAt],
+      ['responses', 'error', 'input', errorAt],
+      ['messages', 'blocked', 'input', blockedAt],
+      ['chat_completions', 'allowed', 'input', allowedAt],
     ]);
-    expect(result.rows[1]).toMatchObject({
+    expect(result.rows[2]).toMatchObject({
       organization_name: 'Enkrypt Usage Org',
       user_email: 'user-enkrypt-usage@example.com',
       session_id: 'ses_test',
       api_kind: 'messages',
     });
     expect(result.summary).toEqual({
-      total_calls: 3,
-      allowed: 1,
+      total_calls: 4,
+      allowed: 2,
       blocked: 1,
       errors: 1,
-      total_credits: 3.5,
-      total_charged_microdollars: 350,
+      total_credits: 4.5,
+      total_charged_microdollars: 450,
       avg_added_latency_ms: 50,
+      avg_output_added_latency_ms: 900,
       organizations: 1,
     });
 

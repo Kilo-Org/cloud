@@ -41,6 +41,7 @@ export const adminEnkryptUsageRouter = createTRPCRouter({
           enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
           charged_microdollars: enkrypt_usage.charged_microdollars,
           added_latency_ms: enkrypt_usage.added_latency_ms,
+          guardrail: enkrypt_usage.guardrail,
           created_at: enkrypt_usage.created_at,
         })
         .from(enkrypt_usage)
@@ -62,7 +63,12 @@ export const adminEnkryptUsageRouter = createTRPCRouter({
           errors: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'error')::int`,
           total_credits: sql<number>`coalesce(sum(${enkrypt_usage.enkrypt_credits_cost}), 0)::float8`,
           total_charged_microdollars: sql<number>`coalesce(sum(${enkrypt_usage.charged_microdollars}), 0)::float8`,
-          avg_added_latency_ms: sql<number | null>`avg(${enkrypt_usage.added_latency_ms})::float8`,
+          avg_added_latency_ms: sql<
+            number | null
+          >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkrypt_usage.guardrail} = 'input'))::float8`,
+          avg_output_added_latency_ms: sql<
+            number | null
+          >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkrypt_usage.guardrail} = 'output'))::float8`,
           organizations: sql<number>`count(distinct ${enkrypt_usage.organization_id})::int`,
         })
         .from(enkrypt_usage)

@@ -1,0 +1,1 @@
+ALTER TABLE "enkrypt_usage" ADD COLUMN "guardrail" text DEFAULT 'input' NOT NULL;

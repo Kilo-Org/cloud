@@ -98,6 +98,10 @@ import {
   logUnrewrittenResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import {
+  guardEnkryptOutput,
+  resolveEnkryptOutputScan,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
+import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
@@ -1332,15 +1336,46 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  return await rewriteModelResponse({
+  const { settings: organizationSettings } = await balanceAndSettingsPromise;
+  return await guardEnkryptOutput({
     response,
-    model: effectiveModelIdLowerCased,
-    providerId: effectiveProviderContext.provider.type,
+    scan:
+      organizationId && !isAnonymousContext(user)
+        ? resolveEnkryptOutputScan(
+            {
+              sessionId: usageContext.session_id,
+              organizationId,
+              kiloUserId: user.id,
+              apiKind: requestBodyParsed.kind,
+              clientRequestId,
+            },
+            organizationSettings
+          )
+        : null,
     kind: requestBodyParsed.kind,
-    isFree: usageContext.is_free,
-    userByok: usageContext.user_byok,
-    customLlmPricing: usageContext.custom_llm_pricing,
-    logging: requestLogging,
-    responseTransforms: effectiveProviderContext.provider.responseTransforms,
+    stream: usageContext.isStreaming,
+    signal: request.signal,
+    release: released =>
+      rewriteModelResponse({
+        response: released,
+        model: effectiveModelIdLowerCased,
+        providerId: effectiveProviderContext.provider.type,
+        kind: requestBodyParsed.kind,
+        isFree: usageContext.is_free,
+        userByok: usageContext.user_byok,
+        customLlmPricing: usageContext.custom_llm_pricing,
+        logging: requestLogging,
+        responseTransforms: effectiveProviderContext.provider.responseTransforms,
+      }),
+    onReject: async (rejection, verdict) => {
+      if (request.signal.aborted) return;
+      await logUnrewrittenResponse({
+        response: rejection.clone(),
+        model: effectiveModelIdLowerCased,
+        providerId: effectiveProviderContext.provider.type,
+        logging: requestLogging,
+        error: { guardrail_rejection: verdict.action, guardrail: 'output' },
+      });
+    },
   });
 }

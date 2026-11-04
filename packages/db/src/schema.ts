@@ -115,6 +115,7 @@ import {
 } from './schema-types';
 import type {
   EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
   WatchPrPolicy,
   WatchPrStatus,
   EnkryptFailureCategory,
@@ -10680,11 +10681,13 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the final call of the request's blocking scan, or of its log-only scan when no blocking call
-    // was recorded, so it is counted once per request; null on other calls or when the request
-    // returned before awaiting the verdict.
+    // How long the request waited for the guardrail verdict: before its upstream call for the input
+    // guardrail, and between the end of the upstream response and its release for the output
+    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
+    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
+    // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
+    guardrail: text().notNull().default('input').$type<EnkryptGuardrailDirection>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

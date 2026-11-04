@@ -47,7 +47,7 @@ function splitScan(scan: EnkryptGuardrailScan | null): EnkryptGuardrailScans {
  * on the final log-only call when the blocking scan recorded no call. Without blocking detectors
  * the request waits for no scan, so that wait is about 0 ms.
  */
-function usageRecordsWithAddedLatency(
+export function usageRecordsWithAddedLatency(
   blockingCalls: EnkryptGuardrailCall[],
   logOnlyCalls: EnkryptGuardrailCall[],
   addedLatencyMs: number | null

@@ -5,7 +5,10 @@ import type {
 } from '@kilocode/db/schema-types';
 import type { Organization, OrganizationGuardrail } from '@kilocode/db/schema';
 import { organization_guardrails } from '@kilocode/db/schema';
-import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  resolveEnkryptInputGuardrail,
+  resolveEnkryptOutputGuardrail,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq } from 'drizzle-orm';
 import { isKiloEncryptEnabled } from '../kilo-encrypt';
@@ -26,8 +29,10 @@ export type AllowedMcpServer = {
   config: OrganizationMcpGuardrailConfig;
 };
 
+/** `buffersResponses`: a response detector blocks, so streamed responses arrive all at once. */
 export type OrganizationGuardrailsPolicy = {
   inputScan: { enabled: boolean; scanToolResults: boolean };
+  outputScan: { enabled: boolean; buffersResponses: boolean };
   mcp: {
     enforcement: OrganizationGuardrailEnforcement;
     allowedServers: AllowedMcpServer[];
@@ -44,22 +49,31 @@ type GuardrailSettingsOrganization = Pick<Organization, 'id' | 'settings'>;
  */
 export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganization): {
   inputScan: OrganizationGuardrailsPolicy['inputScan'];
+  outputScan: OrganizationGuardrailsPolicy['outputScan'];
   mcpEnforcement: OrganizationGuardrailEnforcement;
   skill: OrganizationGuardrailsPolicy['skill'];
 } {
   if (!isKiloEncryptEnabled(organization.settings)) {
     return {
       inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcpEnforcement: 'off',
       skill: { enabled: false, scanBeforeUse: false },
     };
   }
   const guardrailsSettings = organization.settings.guardrails;
   const inputGuardrail = resolveEnkryptInputGuardrail(organization.id, organization.settings);
+  const outputGuardrail = resolveEnkryptOutputGuardrail(organization.id, organization.settings);
   return {
     inputScan: {
       enabled: inputGuardrail !== null,
       scanToolResults: inputGuardrail?.scanToolResults ?? false,
+    },
+    outputScan: {
+      enabled: outputGuardrail !== null,
+      buffersResponses:
+        outputGuardrail !== null &&
+        (outputGuardrail.status === 'invalid' || outputGuardrail.blockingDetectors.length > 0),
     },
     mcpEnforcement: guardrailsSettings?.mcp?.enforcement ?? 'off',
     skill: {
@@ -99,9 +113,10 @@ export async function listAllowedMcpServers(organizationId: string): Promise<All
 export async function getOrganizationGuardrailsPolicy(
   organization: GuardrailSettingsOrganization
 ): Promise<OrganizationGuardrailsPolicy> {
-  const { mcpEnforcement, inputScan, skill } = resolveGuardrailsSettings(organization);
+  const { mcpEnforcement, inputScan, outputScan, skill } = resolveGuardrailsSettings(organization);
   return {
     inputScan,
+    outputScan,
     skill,
     mcp: {
       enforcement: mcpEnforcement,

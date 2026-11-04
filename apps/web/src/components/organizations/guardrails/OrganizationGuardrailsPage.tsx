@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ChevronDown } from 'lucide-react';
+import { AlertCircle, ChevronDown, Clock } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { ENKRYPT_OUTPUT_DETECTOR_IDS } from '@kilocode/db/schema-types';
 import {
   blockingEnkryptDetectorIds,
   buildEnkryptDetectRequestDetectors,
@@ -22,7 +23,12 @@ import { cn } from '@/lib/utils';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
 import { McpSkillGuardrailsSection } from './mcp-and-skills/McpSkillGuardrailsSection';
 import { useDebouncedValue } from './mcp-and-skills/use-debounced-value';
-import { EnkryptDetectorList, type UpdateEnkryptDetector } from './EnkryptDetectorList';
+import {
+  EnkryptDetectorList,
+  EnkryptOutputDetectorList,
+  type UpdateEnkryptDetector,
+  type UpdateEnkryptOutputDetector,
+} from './EnkryptDetectorList';
 import {
   applyKiloDefaultPreset,
   configKey,
@@ -30,9 +36,11 @@ import {
   fromDraft,
   fromDraftDetectors,
   getEnkryptGuardrailsIssues,
+  getEnkryptOutputGuardrailIssues,
   toDraft,
   type EnkryptGuardrailsConfig,
   type EnkryptGuardrailsDraft,
+  type EnkryptGuardrailsIssues,
 } from './enkrypt-guardrails-draft';
 import { RadioCardGroup } from './RadioCardGroup';
 
@@ -118,12 +126,13 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
       </Alert>
     );
   }
-  const { invalid_saved_detectors, ...saved } = configQuery.data;
+  const { invalid_saved_detectors, invalid_saved_output_detectors, ...saved } = configQuery.data;
   return (
     <GuardrailsForm
       organizationId={organizationId}
       saved={saved}
       invalidSavedDetectors={invalid_saved_detectors}
+      invalidSavedOutputDetectors={invalid_saved_output_detectors}
     />
   );
 }
@@ -132,10 +141,12 @@ function GuardrailsForm({
   organizationId,
   saved,
   invalidSavedDetectors,
+  invalidSavedOutputDetectors,
 }: {
   organizationId: string;
   saved: EnkryptGuardrailsConfig;
   invalidSavedDetectors: boolean;
+  invalidSavedOutputDetectors: boolean;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -146,6 +157,7 @@ function GuardrailsForm({
   const attemptedKey = useRef<string | null>(null);
   const failedKey = useRef<string | null>(null);
   const issues = getEnkryptGuardrailsIssues(draft);
+  const outputIssues = getEnkryptOutputGuardrailIssues(draft.output);
   const isDirty = !draftsEqual(draft, savedDraft);
   const configurationError = issues.get('detectors') ?? issues.get('');
   const firstIssue = issues.values().next().value;
@@ -159,7 +171,11 @@ function GuardrailsForm({
           }),
         }),
       onSuccess: result => {
-        const { invalid_saved_detectors: _invalid, ...savedConfig } = result;
+        const {
+          invalid_saved_detectors: _invalid,
+          invalid_saved_output_detectors: _invalidOutput,
+          ...savedConfig
+        } = result;
         failedKey.current = null;
         setSyncedKey(configKey(savedConfig));
         setSavedDraft(toDraft(savedConfig));
@@ -212,6 +228,18 @@ function GuardrailsForm({
       detectors: {
         ...current.detectors,
         [id]: { ...current.detectors[id], ...patch },
+      },
+    }));
+
+  const updateOutputDetector: UpdateEnkryptOutputDetector = (id, patch) =>
+    setDraft(current => ({
+      ...current,
+      output: {
+        ...current.output,
+        detectors: {
+          ...current.output.detectors,
+          [id]: { ...current.output.detectors[id], ...patch },
+        },
       },
     }));
 
@@ -288,6 +316,38 @@ function GuardrailsForm({
         </>
       )}
 
+      {invalidSavedOutputDetectors && (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Saved response detector settings can&apos;t be read</AlertTitle>
+          <AlertDescription className="grid gap-3">
+            <span>
+              {saved.output.enabled
+                ? 'Responses are withheld until the response detectors are saved again. '
+                : ''}
+              Choose response detectors below. Your changes save automatically.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              disabled={issues.size > 0 || isPending}
+              onClick={() => save(draft)}
+            >
+              Save detector settings
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <ResponseGuardrailCard
+        draft={draft}
+        issues={outputIssues}
+        onChange={setDraft}
+        onUpdateDetector={updateOutputDetector}
+      />
+
       <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
         {isDirty && firstIssue ? (
           <p className="text-destructive">Not saved yet. {firstIssue}</p>
@@ -359,12 +419,98 @@ function GuardrailsSettingsCard({
               Kilo sends the text of each checked input to Enkrypt AI with your organization ID.
               Member names and email addresses aren&apos;t sent.
             </li>
-            <li>Response scanning isn&apos;t available. Only inputs are checked.</li>
             <li>
               Detection history isn&apos;t available yet. A per-organization history in Kilo Cloud
               is planned.
             </li>
           </ul>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function ResponseGuardrailCard({
+  draft,
+  issues,
+  onChange,
+  onUpdateDetector,
+}: {
+  draft: EnkryptGuardrailsDraft;
+  issues: EnkryptGuardrailsIssues;
+  onChange: (update: (current: EnkryptGuardrailsDraft) => EnkryptGuardrailsDraft) => void;
+  onUpdateDetector: UpdateEnkryptOutputDetector;
+}) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const { output } = draft;
+  const configurationError = issues.get('detectors') ?? issues.get('');
+  const holdsResponses = ENKRYPT_OUTPUT_DETECTOR_IDS.some(
+    id => output.detectors[id].enabled && output.detectors[id].action === 'block'
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="grid gap-1.5">
+            <CardTitle id={titleId}>Response checks</CardTitle>
+            <CardDescription id={descriptionId}>
+              Check model responses with Enkrypt AI before your members receive them. Off unless you
+              turn it on, separately from input checks.
+            </CardDescription>
+          </div>
+          <Switch
+            checked={output.enabled}
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
+            onCheckedChange={enabled =>
+              onChange(current => ({ ...current, output: { ...current.output, enabled } }))
+            }
+          />
+        </div>
+      </CardHeader>
+      {output.enabled && (
+        <CardContent className="grid gap-6">
+          <ul className="text-muted-foreground grid list-disc gap-1 pl-5 text-sm">
+            <li>
+              A detector set to Block holds back each response until Enkrypt has checked all of it,
+              so responses no longer stream.
+            </li>
+            <li>
+              Blocked responses are replaced with an error, and responses are withheld while Enkrypt
+              is unavailable. The model&apos;s usage is still charged.
+            </li>
+            <li>
+              Log only detectors check a copy of the response after it&apos;s sent and never delay
+              it.
+            </li>
+            <li>
+              Kilo sends the text of each response, including tool calls and reasoning that
+              isn&apos;t encrypted, to Enkrypt AI with your organization ID.
+            </li>
+          </ul>
+          {holdsResponses && (
+            <Alert>
+              <Clock />
+              <AlertTitle>Responses no longer stream</AlertTitle>
+              <AlertDescription>
+                With a blocking response detector, members see nothing until the model has finished
+                the whole response and Enkrypt has checked it, then it arrives all at once. Long
+                responses can take minutes. Use Log only to monitor without the delay.
+              </AlertDescription>
+            </Alert>
+          )}
+          {configurationError && (
+            <p className="text-destructive text-sm" role="status">
+              {configurationError}
+            </p>
+          )}
+          <EnkryptOutputDetectorList
+            detectors={output.detectors}
+            issues={issues}
+            onUpdate={onUpdateDetector}
+          />
         </CardContent>
       )}
     </Card>

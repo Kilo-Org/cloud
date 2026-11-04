@@ -3,7 +3,11 @@ import 'server-only';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { api_kind, enkrypt_usage, enkrypt_usage_decision } from '@kilocode/db/schema';
-import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
+import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
+} from '@kilocode/db/schema-types';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -13,6 +17,7 @@ import {
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
 import type {
   EnkryptUsageWrite,
+  EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 
@@ -36,6 +41,8 @@ export type EnkryptGuardrailCall = {
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
   /** The request's wait for the verdict, on one call per request only; see the ledger column. */
   addedLatencyMs: number | null;
+  /** Defaults to the input guardrail. */
+  guardrail?: EnkryptGuardrailDirection;
 };
 
 export function enkryptCreditsToMicrodollars(creditsCost: number | null): number {
@@ -50,13 +57,16 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
  * defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const usageWrite: EnkryptUsageWrite = {
-    ...usageRecord,
+  const { guardrail = 'input', ...call } = usageRecord;
+  const usageWrite: EnkryptUsageWriteInput = {
+    ...call,
+    // Input calls omit the field, so a web app deployed before it still accepts them.
+    ...(guardrail === 'output' ? { guardrail } : {}),
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
   if (isUSRegion() && (await recordEnkryptUsageInPrimaryRegion(usageWrite))) return;
-  await recordEnkryptUsageLocally(usageWrite);
+  await recordEnkryptUsageLocally({ ...usageWrite, guardrail });
 }
 
 /**
@@ -121,6 +131,7 @@ export async function recordEnkryptUsageLocally(
         enkrypt_credits_cost: usageWrite.creditsCost,
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
+        guardrail: usageWrite.guardrail,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

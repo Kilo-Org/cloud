@@ -39,6 +39,7 @@ async function usageWriteForNewOrganization(): Promise<EnkryptUsageWrite> {
     decision: 'blocked',
     creditsCost: 7,
     addedLatencyMs: 212,
+    guardrail: 'output',
   };
 }
 
@@ -84,6 +85,7 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     ['a body that is not JSON', () => 'not json'],
     ['a non-UUID id', (write: EnkryptUsageWrite) => ({ ...write, id: 'usage-1' })],
     ['an unknown decision', (write: EnkryptUsageWrite) => ({ ...write, decision: 'maybe' })],
+    ['an unknown guardrail', (write: EnkryptUsageWrite) => ({ ...write, guardrail: 'both' })],
     ['negative credits', (write: EnkryptUsageWrite) => ({ ...write, creditsCost: -1 })],
     [
       'credits above the per-call maximum',
@@ -120,11 +122,23 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
+        guardrail: 'output',
       }),
     ]);
     expect(await microdollarsUsed(usageWrite.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
+  });
+
+  test('records a write from a gateway that does not send the guardrail as an input call', async () => {
+    const { guardrail: _guardrail, ...usageWrite } = await usageWriteForNewOrganization();
+
+    const response = await post(usageWrite);
+
+    expect(response.status).toBe(200);
+    expect(await ledgerRows(usageWrite.organizationId)).toEqual([
+      expect.objectContaining({ id: usageWrite.id, guardrail: 'input' }),
+    ]);
   });
 
   test('reports a failed write without logging query parameters', async () => {

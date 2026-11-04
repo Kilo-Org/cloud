@@ -106,3 +106,56 @@ it('calls the user block binding once per ten admitted batch requests', async ()
     expect(exposed.chargedBlocks).toBe(3);
   });
 });
+
+it('keeps one user within its aggregate prepaid ceiling across many session objects', async () => {
+  const principal = personal(`aggregate-limit-${crypto.randomUUID()}`);
+  const api = client(principal);
+  const ids = Array.from({ length: 8 }, newSessionID);
+  const blockLimit = 3;
+  let successfulCharges = 0;
+  const limiter: RateLimit = {
+    limit: async ({ key }) => {
+      expect(key).toBe(principal.userID);
+      if (successfulCharges === blockLimit) return { success: false };
+      successfulCharges++;
+      return { success: true };
+    },
+  };
+  for (const sessionID of ids) {
+    expect((await api.register(sessionID, crypto.randomUUID())).status).toBe(201);
+    const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    await runInDurableObject(stub, instance => {
+      // Replace only the binding; admission still runs in each real session object.
+      const exposed = instance as unknown as { env: Env };
+      exposed.env = { ...exposed.env, USER_DATA_BLOCK_LIMITER: limiter };
+    });
+  }
+  let admitted = 0;
+  const check = async (response: Response) => {
+    if (response.status === 200) {
+      admitted++;
+    } else {
+      expect(response.status).toBe(429);
+      expect(response.headers.get('Retry-After')).toBe('60');
+      expect(await response.json()).toMatchObject({
+        error: { code: 'rate_limited', retryAt: expect.any(Number) },
+      });
+    }
+    expect(admitted).toBeLessThanOrEqual(10 * successfulCharges);
+  };
+  // A fresh session cannot admit even its first request without charging the user.
+  for (const id of ids) await check(await api.state(id));
+  expect(admitted).toBe(blockLimit);
+  expect(successfulCharges).toBe(blockLimit);
+  // Spread further requests over all sessions, consuming purchased credits only.
+  // Window expiry may discard unused credits, but must never increase admission.
+  for (let round = 0; round < 10; round++) {
+    for (const id of ids) await check(await api.state(id));
+  }
+  expect(admitted).toBeLessThanOrEqual(10 * blockLimit);
+  for (const id of ids) {
+    const response = await api.state(id);
+    expect(response.status).toBe(429);
+    await check(response);
+  }
+});

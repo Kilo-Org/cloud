@@ -8,6 +8,7 @@ import {
   scheduleAiProviderMetadataArchive,
 } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
 import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const LOG_SOURCE = 'kilo-routing-decision';
 
@@ -47,7 +48,13 @@ export function createAiProviderMetadataCapture(
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();
-          const enkrypt = await enkryptReport?.();
+          const enkrypt = await enkryptReport?.().catch((error: unknown) => {
+            errorExceptInTest(`[${LOG_SOURCE}] Enkrypt report failed; archived without it`, {
+              usageId,
+              errorType: error instanceof Error ? error.name : 'unknown',
+            });
+            return null;
+          });
           return JSON.stringify({
             ...record,
             ...(metadata ? { vercel: { metadata } } : {}),

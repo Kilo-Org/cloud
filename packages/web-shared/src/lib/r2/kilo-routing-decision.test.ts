@@ -222,6 +222,27 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
   });
 });
 
+test('still archives the routing decision when the Enkrypt report fails', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => {
+    throw new RangeError('Maximum call stack size exceeded');
+  });
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+  });
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] Enkrypt report failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'RangeError' }
+  );
+});
+
 test('omits the Enkrypt entry when no guardrail applied', async () => {
   const capture = createAiProviderMetadataCapture(USAGE_ID);
   capture?.captureEnkryptReport(async () => null);

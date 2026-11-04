@@ -1,13 +1,14 @@
 import { z } from 'zod';
 
 export const PUBLICATION_WORKFLOW = 'cloud-agent-runtime-publish.yml';
+const CI_WORKFLOW = 'ci.yml';
 const NO_RUN_GRACE_MS = 10 * 60_000;
 
 /** Must match `run-name` in the publication workflow; the deploy finds its runs by this title. */
 export const publicationRunTitle = (sourceSha: string) =>
   'Publish Cloud Agent runtime ' + sourceSha;
 
-const runsSchema = z.object({
+const publicationRunsSchema = z.object({
   workflow_runs: z.array(
     z.object({
       display_title: z.string(),
@@ -17,16 +18,28 @@ const runsSchema = z.object({
     })
   ),
 });
-export type PublicationRun = z.infer<typeof runsSchema>['workflow_runs'][number];
+export type PublicationRun = z.infer<typeof publicationRunsSchema>['workflow_runs'][number];
 
-export async function readPublicationRuns(
-  sourceSha: string,
+const ciRunsSchema = z.object({
+  workflow_runs: z.array(
+    z.object({
+      status: z.string(),
+      conclusion: z.string().nullable(),
+      updated_at: z.string().datetime(),
+    })
+  ),
+});
+export type CiRun = z.infer<typeof ciRunsSchema>['workflow_runs'][number];
+
+async function readWorkflowRuns(
   repository: string,
   token: string,
-  request: typeof fetch = fetch
-): Promise<PublicationRun[]> {
+  workflow: string,
+  query: string,
+  request: typeof fetch
+): Promise<unknown> {
   const response = await request(
-    `https://api.github.com/repos/${repository}/actions/workflows/${PUBLICATION_WORKFLOW}/runs?per_page=100`,
+    `https://api.github.com/repos/${repository}/actions/workflows/${workflow}/runs?${query}`,
     {
       headers: {
         Authorization: 'Bearer ' + token,
@@ -36,30 +49,89 @@ export async function readPublicationRuns(
       signal: AbortSignal.timeout(30_000),
     }
   );
-  if (!response.ok)
-    throw new Error(`Runtime publication runs could not be read (${response.status})`);
-  return runsSchema
-    .parse(await response.json())
+  if (!response.ok) throw new Error(`${workflow} runs could not be read (${response.status})`);
+  return response.json();
+}
+
+export async function readPublicationRuns(
+  sourceSha: string,
+  repository: string,
+  token: string,
+  request: typeof fetch = fetch
+): Promise<PublicationRun[]> {
+  return publicationRunsSchema
+    .parse(await readWorkflowRuns(repository, token, PUBLICATION_WORKFLOW, 'per_page=100', request))
     .workflow_runs.filter(run => run.display_title === publicationRunTitle(sourceSha));
 }
 
+/** Main push CI runs for the SHA; only their success starts an automatic publication. */
+export async function readCiRuns(
+  sourceSha: string,
+  repository: string,
+  token: string,
+  request: typeof fetch = fetch
+): Promise<CiRun[]> {
+  return ciRunsSchema.parse(
+    await readWorkflowRuns(
+      repository,
+      token,
+      CI_WORKFLOW,
+      `head_sha=${sourceSha}&event=push&branch=main&per_page=10`,
+      request
+    )
+  ).workflow_runs;
+}
+
+/** Skipped runs belong to unsuccessful CI attempts and never publish. */
+const publicationAttempts = (runs: readonly PublicationRun[]) =>
+  runs.filter(run => run.conclusion !== 'skipped');
+
 /**
  * Explain why waiting for a missing handoff cannot succeed, or return null while it still can.
- * Any queued or running publication (including a re-run) keeps the deploy waiting. Skipped runs
- * belong to unsuccessful CI attempts and never publish.
+ * Any queued or running publication (including a re-run) keeps the deploy waiting. A publication
+ * run starts only after main CI for the SHA succeeds, so queued or running CI keeps the deploy
+ * waiting and the no-run grace counts from that success.
  */
 export function publicationFailure(
   sourceSha: string,
   runs: readonly PublicationRun[],
-  waitedMs: number
+  ciRuns: readonly CiRun[],
+  waitedMs: number,
+  now = Date.now()
 ): string | null {
-  const attempts = runs.filter(run => run.conclusion !== 'skipped');
+  const attempts = publicationAttempts(runs);
   if (attempts.some(run => run.status !== 'completed')) return null;
   const retry = `Re-run publication with: gh workflow run ${PUBLICATION_WORKFLOW} --ref main -f source_sha=${sourceSha}`;
-  if (attempts.length === 0) {
-    if (waitedMs < NO_RUN_GRACE_MS) return null;
-    return `No runtime publication run for ${sourceSha} started within ${NO_RUN_GRACE_MS / 60_000} minutes. ${retry}`;
+  if (attempts.length > 0) {
+    const outcomes = attempts
+      .map(run => `${run.conclusion ?? 'unknown'} ${run.html_url}`)
+      .join(', ');
+    return `Runtime publication for ${sourceSha} finished without a handoff (${outcomes}). ${retry}`;
   }
-  const outcomes = attempts.map(run => `${run.conclusion ?? 'unknown'} ${run.html_url}`).join(', ');
-  return `Runtime publication for ${sourceSha} finished without a handoff (${outcomes}). ${retry}`;
+  if (ciRuns.some(run => run.status !== 'completed')) return null;
+  const ciSuccesses = ciRuns
+    .filter(run => run.conclusion === 'success')
+    .map(run => Date.parse(run.updated_at));
+  if (ciSuccesses.length === 0) {
+    if (waitedMs < NO_RUN_GRACE_MS) return null;
+    return `No successful main CI run exists for ${sourceSha}; runtime publication starts only after one succeeds.`;
+  }
+  if (now - Math.max(...ciSuccesses) < NO_RUN_GRACE_MS) return null;
+  return `No runtime publication run for ${sourceSha} started within ${NO_RUN_GRACE_MS / 60_000} minutes of its CI succeeding. ${retry}`;
+}
+
+/** Read run state for the SHA. CI is read only while no publication attempt exists. */
+export async function probePublication(
+  sourceSha: string,
+  repository: string,
+  token: string,
+  waitedMs: number,
+  request: typeof fetch = fetch
+): Promise<string | null> {
+  const runs = await readPublicationRuns(sourceSha, repository, token, request);
+  const ciRuns =
+    publicationAttempts(runs).length > 0
+      ? []
+      : await readCiRuns(sourceSha, repository, token, request);
+  return publicationFailure(sourceSha, runs, ciRuns, waitedMs);
 }

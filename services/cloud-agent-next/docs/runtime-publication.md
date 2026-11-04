@@ -77,10 +77,12 @@ Downloaded deployment preparation uses the exact checked-out source SHA. The sam
 starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
 without holding the publisher's concurrency lock. Publication runs are titled with their source SHA,
 so preparation reads their state with the deploy's read-only token. While any run for the SHA is
-queued or running, including a re-run, preparation keeps waiting. When every run has finished without
-a handoff, or no run starts within 10 minutes, preparation fails immediately with the run links and the
-`workflow_dispatch` command, instead of holding the deployment for the full wait. If run state cannot
-be read, preparation keeps waiting within the same bound. It checks source identity,
+queued or running, including a re-run, preparation keeps waiting. Before any run exists, preparation
+also keeps waiting while the SHA's main push CI is queued or running. When every run has finished without
+a handoff, or no run starts within 10 minutes of that CI succeeding, preparation fails immediately with
+the run links and the `workflow_dispatch` command, instead of holding the deployment for the full wait.
+A SHA without a successful main CI run fails after 10 minutes of waiting, since it cannot publish.
+If run state cannot be read, preparation keeps waiting within the same bound. It checks source identity,
 base inputs, stored payload bytes, compatibility and target image configuration before Wrangler or
 its custom build can run. Runtime-free targets use the recorded registry digest. Registry credentials
 stay in a temporary Docker configuration, which the command removes on exit.

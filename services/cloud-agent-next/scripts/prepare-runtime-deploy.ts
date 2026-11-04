@@ -11,7 +11,7 @@ import {
 import { verifyRuntimeSourceCheckout } from './runtime-source.js';
 import { remoteArtifactStore } from './runtime-publish-store.js';
 import { loadRuntimeHandoff, runtimeHandoffKey } from './runtime-handoff.js';
-import { publicationFailure, readPublicationRuns } from './runtime-publication-runs.js';
+import { probePublication } from './runtime-publication-runs.js';
 import {
   runtimeBaseInputId,
   verifyRuntimeBase,
@@ -160,8 +160,7 @@ export async function main(
     token && repository
       ? async waitedMs => {
           try {
-            const runs = await readPublicationRuns(sourceSha, repository, token);
-            return publicationFailure(sourceSha, runs, waitedMs);
+            return await probePublication(sourceSha, repository, token, waitedMs);
           } catch (error) {
             console.warn('Runtime publication status is unavailable; still waiting', error);
             return null;

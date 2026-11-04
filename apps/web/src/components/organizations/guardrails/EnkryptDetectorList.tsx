@@ -98,12 +98,13 @@ const OUTPUT_DETECTOR_DETAILS: Record<EnkryptOutputDetectorId, DetectorDetails> 
   },
 };
 
-export const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> = {
-  pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
-  secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
-  ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
-  url: { label: 'URLs', description: 'Web addresses.' },
-};
+export const PII_ENTITY_DETAILS: Record<EnkryptPiiEntity, { label: string; description: string }> =
+  {
+    pii: { label: 'Personal data', description: 'Names, email addresses, phone numbers.' },
+    secrets: { label: 'Secrets', description: 'API keys, tokens, passwords.' },
+    ip_address: { label: 'IP addresses', description: 'IPv4 and IPv6 addresses.' },
+    url: { label: 'URLs', description: 'Web addresses.' },
+  };
 
 const POLICY_FORMAT_OPTIONS = [
   {

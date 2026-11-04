@@ -11,6 +11,7 @@ import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   feature,
   finish_reason,
   microdollar_usage,
@@ -116,9 +117,22 @@ async function enkryptDecisionId(decision: EnkryptDecision): Promise<number> {
   return row.id;
 }
 
+async function enkryptGuardrailId(guardrail: 'input' | 'output'): Promise<number> {
+  await db
+    .insert(enkrypt_usage_guardrail)
+    .values({ guardrail })
+    .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail });
+  const [row] = await db
+    .select({ id: enkrypt_usage_guardrail.guardrail_id })
+    .from(enkrypt_usage_guardrail)
+    .where(eq(enkrypt_usage_guardrail.guardrail, guardrail));
+  return row.id;
+}
+
 type EnkryptLookups = {
   apiKind: Record<'chat_completions' | 'messages' | 'responses', number>;
   decision: Record<'allowed' | 'blocked' | 'error', number>;
+  guardrail: Record<'input' | 'output', number>;
 };
 
 async function enkryptLookups(): Promise<EnkryptLookups> {
@@ -132,6 +146,10 @@ async function enkryptLookups(): Promise<EnkryptLookups> {
       allowed: await enkryptDecisionId('allowed'),
       blocked: await enkryptDecisionId('blocked'),
       error: await enkryptDecisionId('error'),
+    },
+    guardrail: {
+      input: await enkryptGuardrailId('input'),
+      output: await enkryptGuardrailId('output'),
     },
   };
 }
@@ -479,7 +497,8 @@ describe('organizations.requestLogs trpc router', () => {
           blocked: 0,
           errors: 0,
           total_charged_microdollars: 0,
-          avg_added_latency_ms: null,
+          avg_input_added_latency_ms: null,
+          avg_output_added_latency_ms: null,
         },
       });
     });
@@ -495,6 +514,7 @@ describe('organizations.requestLogs trpc router', () => {
         organization_id: organization.id,
         api_kind_id: lookups.apiKind.responses,
         decision_id: lookups.decision.error,
+        guardrail_id: lookups.guardrail.input,
         enkrypt_credits_cost: null,
         charged_microdollars: 0,
         added_latency_ms: null,
@@ -506,6 +526,7 @@ describe('organizations.requestLogs trpc router', () => {
         session_id: 'ses_enkrypt_blocked',
         api_kind_id: lookups.apiKind.messages,
         decision_id: lookups.decision.blocked,
+        guardrail_id: lookups.guardrail.output,
         enkrypt_credits_cost: 2,
         charged_microdollars: 200,
         added_latency_ms: 60,
@@ -549,6 +570,7 @@ describe('organizations.requestLogs trpc router', () => {
           session_id: null,
           api_kind: 'responses',
           decision: 'error',
+          guardrail: 'input',
           charged_microdollars: 0,
           added_latency_ms: null,
         },
@@ -559,6 +581,7 @@ describe('organizations.requestLogs trpc router', () => {
           session_id: 'ses_enkrypt_blocked',
           api_kind: 'messages',
           decision: 'blocked',
+          guardrail: 'output',
           charged_microdollars: 200,
           added_latency_ms: 60,
         },
@@ -569,6 +592,7 @@ describe('organizations.requestLogs trpc router', () => {
           session_id: null,
           api_kind: 'chat_completions',
           decision: 'allowed',
+          guardrail: 'input',
           charged_microdollars: 150,
           added_latency_ms: 40,
         },
@@ -582,7 +606,8 @@ describe('organizations.requestLogs trpc router', () => {
         blocked: 1,
         errors: 1,
         total_charged_microdollars: 350,
-        avg_added_latency_ms: 50,
+        avg_input_added_latency_ms: 40,
+        avg_output_added_latency_ms: 60,
       });
       expect(result.summary).not.toHaveProperty('total_credits');
     });
@@ -616,7 +641,8 @@ describe('organizations.requestLogs trpc router', () => {
         blocked: 1,
         errors: 0,
         total_charged_microdollars: (REQUEST_LOGS_LIMIT + 1) * 10,
-        avg_added_latency_ms: 1_010 / (REQUEST_LOGS_LIMIT + 1),
+        avg_input_added_latency_ms: 1_010 / (REQUEST_LOGS_LIMIT + 1),
+        avg_output_added_latency_ms: null,
       });
     });
   });

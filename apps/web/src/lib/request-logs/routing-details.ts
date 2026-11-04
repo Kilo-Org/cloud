@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { EnkryptGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import {
+  EnkryptGuardrailReportSchema,
+  EnkryptOutputGuardrailReportSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 /**
  * Reads AI provider metadata objects (see `KiloRoutingDecisionRecordSchema`) for display. Older
@@ -121,6 +124,7 @@ const AiProviderMetadataRecordSchema = z.object({
     .optional()
     .catch(undefined),
   enkrypt: EnkryptGuardrailReportSchema.optional().catch(undefined),
+  enkrypt_output: EnkryptOutputGuardrailReportSchema.optional().catch(undefined),
 });
 
 export type RequestLogInferenceRegion = {
@@ -163,6 +167,7 @@ export type RequestLogRoutingDetails = {
   result: RequestLogRoutingResult | null;
   vercel: RequestLogVercelRouting | null;
   enkrypt: z.infer<typeof EnkryptGuardrailReportSchema> | null;
+  enkrypt_output: z.infer<typeof EnkryptOutputGuardrailReportSchema> | null;
 };
 
 const EXECUTION_ORDER_PREFIX = 'Total execution order:';
@@ -250,5 +255,6 @@ export function parseRoutingDetails(body: string): RequestLogRoutingDetails | nu
     result: record.result,
     vercel: vercelMetadata ? toVercelRouting(vercelMetadata) : null,
     enkrypt: record.enkrypt ?? null,
+    enkrypt_output: record.enkrypt_output ?? null,
   };
 }

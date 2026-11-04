@@ -1,16 +1,22 @@
 import type { EnkryptDetectorId } from '@kilocode/db/schema-types';
-import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type {
+  EnkryptGuardrailReport,
+  EnkryptOutputGuardrailReport,
+  EnkryptScanReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type { ReactNode } from 'react';
 import {
   DETECTOR_DETAILS,
   PII_ENTITY_DETAILS,
 } from '@/components/organizations/guardrails/EnkryptDetectorList';
-import { DetailGrid, DetailSection, ToneBadge, yesNo } from './detail-primitives';
+import { DetailGrid, DetailSection, ToneBadge, yesNo, type DetailItem } from './detail-primitives';
 import { formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
 type Verdict = EnkryptGuardrailReport['verdict'];
-type Scan = EnkryptGuardrailReport['scans'][number];
-type DetectorSetting = NonNullable<EnkryptGuardrailReport['settings']>['detectors'][number];
+type Scan = EnkryptScanReport & { verdict_cache_write?: 'written' | 'failed' | 'skipped' };
+type Settings = NonNullable<EnkryptGuardrailReport['settings']>;
+type DetectorSetting = Settings['detectors'][number];
 
 const VERDICTS: Record<Verdict, { label: string; tone: StepTone }> = {
   skip: { label: 'Not gated', tone: 'skipped' },
@@ -41,6 +47,15 @@ const UNAVAILABLE_REASON_LABELS: Record<
   transient: 'Transient error',
   timeout: 'Timed out',
   failed: 'Failed',
+};
+
+const NOT_SCANNED_REASON_LABELS: Record<
+  NonNullable<EnkryptOutputGuardrailReport['not_scanned_reason']>,
+  string
+> = {
+  invalid_config: 'Invalid configuration',
+  output_too_large: 'Response too large',
+  held_output_too_large: 'Held-back response too large',
 };
 
 function detectorLabel(detector: EnkryptDetectorId): string {
@@ -115,38 +130,56 @@ function ScanCard({ scan }: { scan: Scan }) {
   );
 }
 
-export function EnkryptReportSection({ report }: { report: EnkryptGuardrailReport }) {
-  const verdict = VERDICTS[report.verdict];
-  const settings = report.settings;
+type GuardrailReportBodyProps = {
+  title: string;
+  description: string;
+  verdict: Verdict;
+  unavailableReason: EnkryptGuardrailReport['unavailable_reason'];
+  addedLatencyMs: number | null;
+  settings: Settings | null;
+  scans: Scan[];
+  items?: DetailItem[];
+  notice?: ReactNode;
+};
+
+function GuardrailReportBody({
+  title,
+  description,
+  verdict,
+  unavailableReason,
+  addedLatencyMs,
+  settings,
+  scans,
+  items = [],
+  notice,
+}: GuardrailReportBodyProps) {
+  const verdictDetails = VERDICTS[verdict];
   return (
-    <DetailSection
-      title="Enkrypt input guardrail"
-      description="How the organization's Enkrypt guardrail scanned this request. Prompt text is never stored."
-    >
+    <DetailSection title={title} description={description}>
       <DetailGrid
         items={[
-          { label: 'Verdict', value: <ToneBadge tone={verdict.tone}>{verdict.label}</ToneBadge> },
-          { label: 'Added latency', value: formatDurationMs(report.added_latency_ms) },
+          {
+            label: 'Verdict',
+            value: <ToneBadge tone={verdictDetails.tone}>{verdictDetails.label}</ToneBadge>,
+          },
+          { label: 'Added latency', value: formatDurationMs(addedLatencyMs) },
           {
             label: 'Scans tool results',
             value: settings ? yesNo(settings.scan_tool_results) : '—',
           },
-          ...(report.unavailable_reason
+          ...(unavailableReason
             ? [
                 {
                   label: 'Unavailable because',
-                  value: UNAVAILABLE_REASON_LABELS[report.unavailable_reason],
+                  value: UNAVAILABLE_REASON_LABELS[unavailableReason],
                 },
               ]
             : []),
           ...(settings?.status === 'invalid' ? [{ label: 'Configuration', value: 'Invalid' }] : []),
+          ...items,
         ]}
       />
-      {settings === null && (
-        <p className="text-status-destructive text-xs">
-          The guardrail could not be prepared, so the request was rejected.
-        </p>
-      )}
+      {notice}
       {settings && settings.detectors.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="text-muted-foreground text-xs">Configured detectors</span>
@@ -166,13 +199,71 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
           </ul>
         </div>
       )}
-      {report.scans.length > 0 && (
-        <ol className="flex flex-col gap-2" aria-label="Enkrypt scans">
-          {report.scans.map((scan, index) => (
+      {scans.length > 0 && (
+        <ol className="flex flex-col gap-2" aria-label={`${title} scans`}>
+          {scans.map((scan, index) => (
             <ScanCard key={`${scan.scan}-${index}`} scan={scan} />
           ))}
         </ol>
       )}
     </DetailSection>
+  );
+}
+
+export function EnkryptReportSection({ report }: { report: EnkryptGuardrailReport }) {
+  return (
+    <GuardrailReportBody
+      title="Enkrypt input guardrail"
+      description="How the organization's Enkrypt guardrail scanned this request. Prompt text is never stored."
+      verdict={report.verdict}
+      unavailableReason={report.unavailable_reason}
+      addedLatencyMs={report.added_latency_ms}
+      settings={report.settings}
+      scans={report.scans}
+      notice={
+        report.settings === null && (
+          <p className="text-status-destructive text-xs">
+            The guardrail could not be prepared, so the request was rejected.
+          </p>
+        )
+      }
+    />
+  );
+}
+
+export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGuardrailReport }) {
+  return (
+    <GuardrailReportBody
+      title="Enkrypt output guardrail"
+      description="How the organization's Enkrypt guardrail scanned the response. Response text is never stored."
+      verdict={report.verdict}
+      unavailableReason={report.unavailable_reason}
+      addedLatencyMs={report.added_latency_ms}
+      settings={report.settings}
+      scans={report.scans}
+      items={[
+        { label: 'Held back', value: yesNo(report.held_back) },
+        { label: 'Held for', value: formatDurationMs(report.held_ms) },
+        {
+          label: 'Characters scanned',
+          value: report.output_characters === null ? '—' : formatCount(report.output_characters),
+        },
+        ...(report.not_scanned_reason
+          ? [
+              {
+                label: 'Not scanned because',
+                value: NOT_SCANNED_REASON_LABELS[report.not_scanned_reason],
+              },
+            ]
+          : []),
+      ]}
+      notice={
+        report.upstream_read_failed && (
+          <p className="text-status-destructive text-xs">
+            The upstream response could not be read completely.
+          </p>
+        )
+      }
+    />
   );
 }

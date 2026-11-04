@@ -3,6 +3,7 @@ import {
   editor_name,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   feature,
   finish_reason,
   inference_region,
@@ -11,6 +12,7 @@ import {
   microdollar_usage_metadata,
   mode,
 } from '@kilocode/db/schema';
+import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { readAiProviderMetadata } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -53,6 +55,9 @@ function withinRequestLogWindow() {
     sql`NOW() - make_interval(hours => ${REQUEST_LOGS_MAX_AGE_HOURS})`
   );
 }
+
+/** Rows recorded before the output guardrail existed have no guardrail and are input scans. */
+const enkryptGuardrail = sql<EnkryptGuardrailDirection>`coalesce(${enkrypt_usage_guardrail.guardrail}, 'input')`;
 
 function withinEnkryptUsageWindow() {
   return gte(
@@ -180,6 +185,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
               session_id: enkrypt_usage.session_id,
               api_kind: api_kind.api_kind,
               decision: enkrypt_usage_decision.decision,
+              guardrail: enkryptGuardrail,
               charged_microdollars: enkrypt_usage.charged_microdollars,
               added_latency_ms: enkrypt_usage.added_latency_ms,
             })
@@ -188,6 +194,10 @@ export const organizationRequestLogsRouter = createTRPCRouter({
             .innerJoin(
               enkrypt_usage_decision,
               eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+            )
+            .leftJoin(
+              enkrypt_usage_guardrail,
+              eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
             )
             .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
             .where(where)
@@ -200,14 +210,21 @@ export const organizationRequestLogsRouter = createTRPCRouter({
               blocked: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'blocked')::int`,
               errors: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'error')::int`,
               total_charged_microdollars: sql<number>`coalesce(sum(${enkrypt_usage.charged_microdollars}), 0)::float8`,
-              avg_added_latency_ms: sql<
+              avg_input_added_latency_ms: sql<
                 number | null
-              >`avg(${enkrypt_usage.added_latency_ms})::float8`,
+              >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkryptGuardrail} = 'input'))::float8`,
+              avg_output_added_latency_ms: sql<
+                number | null
+              >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkryptGuardrail} = 'output'))::float8`,
             })
             .from(enkrypt_usage)
             .innerJoin(
               enkrypt_usage_decision,
               eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+            )
+            .leftJoin(
+              enkrypt_usage_guardrail,
+              eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
             )
             .where(where),
         ])
@@ -221,6 +238,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
         session_id: row.session_id,
         api_kind: row.api_kind,
         decision: row.decision,
+        guardrail: row.guardrail,
         charged_microdollars: row.charged_microdollars,
         added_latency_ms: row.added_latency_ms,
       })),

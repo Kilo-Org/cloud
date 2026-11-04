@@ -41,6 +41,7 @@ const COLUMNS = [
   { label: 'Time' },
   { label: 'User' },
   { label: 'API' },
+  { label: 'Guardrail' },
   { label: 'Decision' },
   { label: 'Charged', numeric: true },
   { label: 'Added latency', numeric: true },
@@ -74,7 +75,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function Summary({ summary }: { summary: EnkryptUsage['summary'] | undefined }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <Stat label="Scans" value={summary ? formatCount(summary.total_calls) : '—'} />
       <Stat
         label="Allowed / blocked / error"
@@ -85,10 +86,18 @@ function Summary({ summary }: { summary: EnkryptUsage['summary'] | undefined }) 
         value={summary ? formatMicrodollarsAsUsd(summary.total_charged_microdollars) : '—'}
       />
       <Stat
-        label="Avg added latency"
+        label="Avg added latency (input)"
         value={
-          summary?.avg_added_latency_ms != null
-            ? formatDurationMs(summary.avg_added_latency_ms)
+          summary?.avg_input_added_latency_ms != null
+            ? formatDurationMs(summary.avg_input_added_latency_ms)
+            : '—'
+        }
+      />
+      <Stat
+        label="Avg added latency (output)"
+        value={
+          summary?.avg_output_added_latency_ms != null
+            ? formatDurationMs(summary.avg_output_added_latency_ms)
             : '—'
         }
       />
@@ -109,6 +118,7 @@ function EnkryptUsageTableRow({ row }: { row: EnkryptUsageRow }) {
         </div>
       </TableCell>
       <TableCell className="font-mono text-xs">{row.api_kind}</TableCell>
+      <TableCell>{row.guardrail === 'output' ? 'Output' : 'Input'}</TableCell>
       <TableCell>
         <ToneBadge tone={decision.tone}>{decision.label}</ToneBadge>
       </TableCell>
@@ -138,8 +148,8 @@ export function EnkryptUsageTab({ organizationId }: { organizationId: string }) 
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          The organization&apos;s latest 100 Enkrypt input guardrail scans from the past 24 hours.
-          The totals cover every scan in that window.
+          The organization&apos;s latest 100 Enkrypt guardrail scans from the past 24 hours. The
+          totals cover every scan in that window.
         </p>
         <Button
           variant="outline"

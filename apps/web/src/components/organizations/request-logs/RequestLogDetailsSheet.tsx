@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
 import { DetailGrid, DetailSection, yesNo } from './detail-primitives';
-import { EnkryptReportSection } from './EnkryptReportSection';
+import { EnkryptOutputReportSection, EnkryptReportSection } from './EnkryptReportSection';
 import {
   formatCount,
   formatDurationMs,
@@ -113,6 +113,7 @@ function RoutingSections({ metadata }: { metadata: RequestLogDetails['metadata']
       </DetailSection>
       {routing.vercel && <VercelRoutingSection routing={routing.vercel} />}
       {routing.enkrypt && <EnkryptReportSection report={routing.enkrypt} />}
+      {routing.enkrypt_output && <EnkryptOutputReportSection report={routing.enkrypt_output} />}
     </>
   );
 }

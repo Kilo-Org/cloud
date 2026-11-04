@@ -103,6 +103,7 @@ describe('parseRoutingDetails', () => {
       result: expectedResult,
       vercel: expectedVercel,
       enkrypt: expectedEnkrypt,
+      enkrypt_output: null,
     });
   });
 
@@ -195,6 +196,7 @@ describe('parseRoutingDetails', () => {
       },
       vercel: null,
       enkrypt: null,
+      enkrypt_output: null,
     });
   });
 
@@ -275,7 +277,57 @@ describe('parseRoutingDetails', () => {
         generation_id: 'gen_1',
       },
       enkrypt: null,
+      enkrypt_output: null,
     });
+  });
+
+  test('returns the Enkrypt output guardrail report and drops a malformed one', () => {
+    const outputReport = {
+      settings: {
+        status: 'ready',
+        scan_tool_results: false,
+        detectors: [{ detector: 'toxicity', action: 'block' }],
+      },
+      held_back: true,
+      held_bytes: 2048,
+      held_ms: 1200,
+      upstream_read_failed: false,
+      output_characters: 512,
+      not_scanned_reason: null,
+      verdict: 'allow',
+      unavailable_reason: null,
+      added_latency_ms: 140,
+      scans: [
+        {
+          scan: 'blocking',
+          detectors_enabled: ['toxicity'],
+          detectors_blocking: ['toxicity'],
+          verdict_cache: 'off',
+          total_characters: 512,
+          total_segments: 1,
+          cached_characters: 0,
+          cached_segments: 0,
+          scanned_characters: 512,
+          decision: 'allowed',
+          error: null,
+          detectors_fired: [],
+          attempts: 1,
+          credits_cost: 1,
+          latency_ms: 140,
+        },
+      ],
+    };
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+
+    expect(
+      parseRoutingDetails(JSON.stringify({ ...record, enkrypt_output: outputReport }))
+        ?.enkrypt_output
+    ).toEqual(outputReport);
+    const malformed = parseRoutingDetails(
+      JSON.stringify({ ...record, enkrypt_output: { ...outputReport, verdict: 'maybe' } })
+    );
+    expect(malformed?.enkrypt_output).toBeNull();
+    expect(malformed?.enkrypt).toEqual(expectedEnkrypt);
   });
 
   test('returns null vercel when gateway metadata has no routing', () => {

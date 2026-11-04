@@ -38,3 +38,7 @@ apps/web/src/lib/organizations/guardrails/mcp-identity\.test\.ts
 apps/web/src/lib/organizations/guardrails/guardrails-policy\.test\.ts
 apps/web/src/routers/organizations/organization-mcp-guardrails-router\.test\.ts
 apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test\.ts
+
+# Sentry privacy fixtures use synthetic URL credentials to test sanitization.
+# Exclude this fixture path because the literal URI remains in branch history.
+services/cloud-agent-next/src/shared/sentry\.test\.ts

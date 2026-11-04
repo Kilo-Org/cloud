@@ -854,6 +854,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable().optional(),
   cloudAgentSessionScopeId: z.string().nullable().optional(),
+  parentCloudAgentSessionId: z.string().optional(),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),

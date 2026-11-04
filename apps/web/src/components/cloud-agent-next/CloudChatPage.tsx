@@ -11,8 +11,8 @@ import {
 } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,6 +23,9 @@ import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
+import { ParentSessionLink } from './ParentSessionLink';
+import { worktreeParentQueryOptions } from './worktree-parent-query';
+import { sessionResumeHref } from '@/lib/cloud-agent/session-resume-target';
 import {
   getWorkspaceControlSession,
   getWorktreeBranch,
@@ -205,6 +208,17 @@ export default function CloudChatPage({
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
+  const { data: parentSession } = useQuery(
+    worktreeParentQueryOptions({
+      trpc,
+      client: trpcClient,
+      userId: currentUserId,
+      worktreeId: selectedWorktreeId,
+      organizationId: organizationId ?? null,
+    })
+  );
+  const parentSessionHref = parentSession ? sessionResumeHref(parentSession, null) : undefined;
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
@@ -1359,6 +1373,7 @@ export default function CloudChatPage({
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
+      parentSessionHref={parentSessionHref}
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
       changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
       worktreeId={selectedWorktreeId ?? undefined}
@@ -1449,6 +1464,11 @@ export default function CloudChatPage({
         >
           <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
             <SetPageTitle
+              subtitle={
+                parentSession && parentSessionHref ? (
+                  <ParentSessionLink href={parentSessionHref} title={parentSession.title} />
+                ) : null
+              }
               title={
                 !sessionIdFromParams && selectedWorktreeId
                   ? 'Worktree'

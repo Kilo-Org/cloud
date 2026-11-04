@@ -483,6 +483,9 @@ export function createSessionManagementHandlers() {
                   cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
                 }
               : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
+              : {}),
 
             githubRepo: repositoryFields.githubRepo,
             gitUrl: repositoryFields.gitUrl,

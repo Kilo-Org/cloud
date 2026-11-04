@@ -41,7 +41,7 @@ import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/u
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
+import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
@@ -96,7 +96,7 @@ export function ProfileOverviewScreen({
   stack: ProfileManagementStack;
 }>) {
   const router = useRouter();
-  const popWhenFocused = usePopWhenFocused();
+  const popOnce = usePopOnce();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
@@ -157,9 +157,10 @@ export function ProfileOverviewScreen({
       // The profile is gone, so there is nothing left to keep: the pop must not
       // ask about edits to it.
       metadataGuard.markClean();
-      // Back during the delete already left this profile; a second pop would
-      // remove the profiles list beneath it.
-      popWhenFocused();
+      // Back during the delete already left this profile, and a Back handled
+      // while this dismissal runs is the same leave; a second pop would remove
+      // the profiles list beneath it.
+      popOnce();
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));

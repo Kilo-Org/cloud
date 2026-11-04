@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
     "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
     "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს.",
+    "translateSummaries": "შეჯამებების თარგმნა",
     "autoExpandThinkingInactiveSubtitle": "მსჯელობის დეტალების დამალვისას ეფექტს არ მოახდენს."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "ბაზის შეცვლა"
       },
       "terminal": {
-        "alreadyMerged": "უკვე შერწყმულია",
         "closed": "ეს შერწყმის მოთხოვნა დახურულია",
         "closedMergeRequest": "ეს შერწყმის მოთხოვნა დახურულია"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "სავალდებულო განხილვები აკლია",
         "requiredReviewsDetail": "სავალდებულო შემფასებლების თანხმობა აკლია ან ჯერ მოლოდინშია.",
         "failingChecksTitle": "სავალდებულო შემოწმებები წარუმატებელია",
-        "failingChecksDetail": "სტატუსის სავალდებულო შემოწმებები წარუმატებელია.",
         "unstableTitle": "ზოგიერთი შემოწმება წარუმატებელია",
         "unstableDetail": "არასავალდებულო შემოწმებები წარუმატებელია. ისინი შერწყმას ხელს არ შეუშლის.",
         "draftTitle": "PR-ის მონახაზი",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
+      "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
+      "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა.",
       "gitlabDescription": "შერწყმის მოთხოვნების შემოწმება მობილურზე",
+      "gitlabInstanceMismatchTitle": "GitLab-ის დაკავშირება სხვა ინსტანციისთვისაა",
+      "gitlabInstanceMismatchDescription": "თქვენი GitLab-თან დაკავშირება განკუთვნილია {{connected}}-ისთვის, თუმცა ეს შერწყმის მოთხოვნა {{requested}}-ზეა. დააკავშირეთ GitLab იმ ინსტანციაზე მისი განსახილველად.",
+      "checkActiveConnection": "დაკავშირება აქტიურია, მაგრამ ეს ელემენტი ჯერ კიდევ ვერ იტვირთება.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ამ ანგარიშს ჯერ არ ჰყავს ორგანიზაციები. შექმენით ორგანიზაცია ან შეუერთდით მას, Bitbucket-ის PR-ების განსახილველად.",
       "gitlabReconnectAdminOnlyDescription": "სთხოვეთ ორგანიზაციის მფლობელს, ადმინისტრატორს ან ანგარიშსწორების მენეჯერს, რომ დააკავშიროს ის.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "გაუგზავნელი კომენტარი",
       "submitCountOfTotal": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
       "submitReview": "შემოწმების შედეგის გაგზავნა",
-      "partialPostedMessage": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. {{displayStaleCount}} კომენტარი ძველ კომიტს ეხება და რიგში დარჩა.",
+      "partialPostedFresh": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
+      "partialPostedFresh_one": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
+      "partialPostedFresh_other": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
+      "partialPostedStale": "{{displayStaleCount}} კომენტარი ძველ კომიტს ეხება და რიგში დარჩა.",
+      "partialPostedStale_one": "{{displayStaleCount}} კომენტარი ძველ კომიტს ეხება და რიგში დარჩა.",
+      "partialPostedStale_other": "{{displayStaleCount}} კომენტარი ძველ კომიტს ეხება და რიგში დარჩა.",
       "blockedRequestChanges": "ცვლილებების მოსათხოვნად დაამატე შეჯამება ან ერთი კომენტარი მაინც.",
       "blockedComment": "განხილვის კომენტარად გამოსაქვეყნებლად დაამატე შეჯამება ან ერთი კომენტარი მაინც."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md-ის pull request გახსნილია",
       "alreadyPresent": "მითითებები უკვე არის REVIEW.md-ში",
       "status": {
+        "open": "ღია",
         "edited": "შეცვლილია",
         "opening_change_request": "PR იხსნება",
         "change_request_failed": "PR-ის გახსნა ვერ მოხერხდა",
@@ -1610,6 +1620,8 @@
       "set": "მითითებულია",
       "notSet": "არ არის მითითებული",
       "nSelected": "არჩეულია {{displayCount}}",
+      "nSelected_one": "არჩეულია {{displayCount}}",
+      "nSelected_other": "არჩეულია {{displayCount}}",
       "proposedReviewMdGuidance": "შემოთავაზებული მითითებები REVIEW.md-ისთვის"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "ბოროტად გამოყენების შესაძლებლობის დასაბუთება",
       "suggestedFix": "შემოთავაზებული შესწორება",
       "whereFound": "აღმოჩენის ადგილები ({{displayCount}})",
+      "whereFound_one": "აღმოჩენის ადგილები ({{displayCount}})",
+      "whereFound_other": "აღმოჩენის ადგილები ({{displayCount}})",
       "fullReport": "შექმნილი სრული ანგარიში",
       "yes": "კი",
       "no": "არა",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "პრიორიტეტული მიგნებები პირველი სინქრონიზაციის შემდეგ გამოჩნდება.",
       "refreshFailed": "განახლება ვერ მოხერხდა — ნაჩვენებია ბოლო სინქრონიზებული მონაცემები.",
       "settings": "პარამეტრები",
+      "syncing": "სინქრონიზაცია მიმდინარეობს…",
       "syncNow": "ახლავე სინქრონიზაცია",
       "syncQueued": "სინქრონიზაცია რიგშია",
       "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} საშუალო და დაბალი",
       "dueThisWeek": "ვადა ამ კვირაშია",
       "dueThisWeekDetail": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
+      "dueThisWeekDetail_one": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
+      "dueThisWeekDetail_other": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
       "noDeadline": "ვადის გარეშე",
       "reviewSlaAssignment": "SLA-ის ვადების მინიჭების შემოწმება",
       "allOpenFindingsTracked": "ყველა ღია მიგნება კონტროლდება"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "დააყენე Kilo-ს GitHub აპი, რათა ავტომატურად დაასინქრონიზო Dependabot-ის გაფრთხილებები და მართო უსაფრთხოების მიგნებები შენს რეპოზიტორებში.",
+      "connectOwnerOnly": "სთხოვე ორგანიზაციის მფლობელს ან ადმინისტრატორს {{platform}}-ის დაკავშირება.",
       "connectTitle": "დასაწყებად დააკავშირე GitHub",
       "couldNotLoad": "უსაფრთხოების აგენტის ჩატვირთვა ვერ მოხერხდა.",
       "installApp": "GitHub აპის დაყენება",
@@ -2064,6 +2082,7 @@
       "actionFailed": "ეს მოქმედება ვერ დასრულდა. სცადე ხელახლა.",
       "actionBlocked": "ეს მოქმედება ვერ დასრულდა. ხელახლა ცდამდე პრობლემა ჯერ უნდა მოგვარდეს.",
       "syncNoRepositories": "სინქრონიზაციის არეალში რეპოზიტორიები არ არის. აირჩიე რეპოზიტორიები, რომლებსაც უსაფრთხოების აგენტი აკონტროლებს, შემდეგ კვლავ დაასინქრონე.",
+      "syncNoRepositoriesNoManage": "სინქრონიზაციის არეალში რეპოზიტორიები არ არის. სანამ სინქრონიზაცია შესრულდება, რეპოზიტორიები უნდა დააკავშიროს ორგანიზაციის მფლობელმა, ადმინისტრატორმა ან ანგარიშსწორების მენეჯერმა.",
       "syncIntegrationInactive": "უსაფრთხოების აგენტის GitHub კავშირი აქტიური არ არის. ხელახლა დაუკავშირე Kilo GitHub აპი, შემდეგ კვლავ დაასინქრონე.",
       "syncMissingPermission": "Kilo GitHub აპი მოწყვლადობის შეტყობინებებს ვერ კითხულობს. მიანიჭე ეს ნებართვა GitHub-ში, შემდეგ კვლავ დაასინქრონე.",
       "configConflict": "უსაფრთხოების აგენტის პარამეტრები სხვაგან შეიცვალა. გადახედე უახლეს პარამეტრებს და კვლავ შეინახე."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "დაყენების დასრულება შეუძლებელია",
       "notAdminMessage": "ამ ანგარიშის დაკავშირება მხოლოდ მის GitHub ადმინისტრატორს შეუძლია. სთხოვე ორგანიზაციის ადმინისტრატორს Kilo-ს დაყენება.",
       "alreadyClaimedMessage": "GitHub-ის ეს დაყენებული აპი უკვე სხვა Kilo ანგარიშთან არის დაკავშირებული. ჯერ იმ ანგარიშიდან გათიშე.",
+      "installationUnavailableMessage": "GitHub App-ის ეს დაყენება შეჩერებულია ან აღარ არის ხელმისაწვდომი. აღადგინე ან ხელახლა დააყენე ის GitHub-ში, შემდეგ თავიდან დაიწყე.",
+      "multipleInstallationsMessage": "ამ Kilo ორგანიზაციას ამჟამად მხოლოდ ერთი GitHub ორგანიზაციის დაკავშირება შეუძლია.",
       "didNotCompleteTitle": "დაყენება არ დასრულდა",
       "didNotCompleteMessage": "GitHub აპის დაყენება არ დასრულდა. აპიდან ხელახლა სცადე."
     },
@@ -2362,7 +2383,7 @@
       "discardDraftMessage": "თქვენი მოთხოვნა დაიკარგება.",
       "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardFailed": "მონახაზის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
-      "remoteHint": "ლოკალური kilo პროცესის სამართავად კომპიუტერზე გაუშვით `kilo remote`, ან მიმდინარე CLI სესიაში — `/remote`.",
+      "remoteHint": "თქვენს კომპიუტერზე გასაშვებლად გაუშვით Kilo იქ და დატოვეთ გაშვებული.",
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "ახლა {{name}}-ია",
       "defaultProfileResolvesToAccessibility": "ნაგულისხმევი პროფილი: {{name}}",
       "manageProfiles": "პროფილების მართვა",
-      "noProfiles": "ჯერ არ არის პროფილები. შექმენით ერთი გარემოს ცვლადების, MCP სერვერების და უნარების დასამატებლად.",
       "advancedConfig": "გაფართოებული კონფიგურაცია",
       "advancedConfigDescription": "ვრცელდება ამ სესიაზე. პროფილად შენახვისას ის შემდეგ ჯერზეც დარჩება.",
       "saveAsProfile": "პროფილად შენახვა",
@@ -2601,7 +2621,7 @@
       "detailSetupCommandTimedOut": "გამართვის ბრძანება {{index}}-ის ვადა ამოიწურა",
       "detailColdRestore": "ცივი აღდგენა, სნეპშოტი გამოყენებულია, აღდგენილია {{total}} ფაილიდან {{applied}}",
       "detailProgressPercent": "დასრულებულია {{percent}}%",
-      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: {{total}} ფაილიდან {{skipped}} არ აღდგენილა ({{reasons}}).",
+      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: არააღდგენილი ფაილები — {{total}}-დან {{skipped}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "აკლია: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} და კიდევ {{omitted}}",
       "detailReasonPatchFailed": "პაჩი არ გამოიყენებოდა",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "ახალი სესია {{name}}-ზე",
     "noMatchingSessions": "შესაბამისი სესიები არ არის.",
     "onlyFirstFilesAttached": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება.",
-    "staleMessage": "ეს გაზიარებული შიგთავსი აღარ არის ხელმისაწვდომი.",
+    "staleMessage": "გაგზავნე ხელახლა იმ აპიდან, საიდანაც გააზიარე.",
+    "staleTitle": "გაზიარება მიუწვდომელია",
     "retryableMessage": "შენი სესიების ჩატვირთვა ვერ მოხერხდა.",
     "emptyMessage": "სესიები ჯერ არ არის — შიგთავსის გასაგზავნად ახალი სესია დაიწყე.",
     "cliNotConnectedTitle": "სესია არ არის დაკავშირებული",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "გაუგზავნე შეტყობინება ელფოსტით ან push-ით ბილინგის კონტაქტებს, როცა ამ სფეროს ხარჯვა გადააჭარბებს ლიმიტს ან ავა მის ჩვეულ საათობრივ ტემპს.",
     "thresholdTitle": "ზღვრის გადაცილება",
-    "thresholdSubtitle": "მიმდინარე ხარჯვა აჭარბებს შენს ლიმიტს",
+    "thresholdSubtitle": "ამ სფეროს მიმდინარე ხარჯვა შერჩეულ ფანჯარაში აჭარბებს შენს ლიმიტს",
     "anomalyTitle": "საათობრივი ნახტომი",
-    "anomalySubtitle": "ერთი საათი ბევრად აღემატება ამ სფეროს ჩვეულ ტემპს",
+    "anomalySubtitle": "ამ სფეროს საათობრივი ტემპი ბევრად აღემატება თავისსავე p95 საბაზო დონეს",
     "limitLabel": "ლიმიტი (USD)",
     "windowLabel": "ფანჯარა",
     "window24h": "24 საათი",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "ხარჯვის შეტყობინებების მართვის უფლება არ გაქვთ.",
     "pushOffByCategory": "გამორთულია შეტყობინებებში",
     "multiplierMaxError": "შეიყვანე {{max}}-მდე მამრავლი",
-    "thresholdMaxError": "შეიყვანეთ {{max}}-მდე თანხა."
+    "thresholdMaxError": "შეიყვანეთ {{max}}-მდე თანხა"
   },
   "profiles": {
     "title": "პროფილები",

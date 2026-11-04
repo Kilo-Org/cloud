@@ -13,9 +13,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * is visible to sighted and screen-reader users alike; Android Back and the
  * scrim keep working beside it.
  *
- * The title stays a header, and the close control keeps the 44pt target the
- * `icon` button size gives it, labelled with the shared `common.close` copy so
- * every catalog announces it in the reader's language.
+ * The title stays a header, and the close control keeps the shared 48dp icon
+ * target the `icon` button size renders, labelled with the shared `common.close`
+ * copy so every catalog announces it in the reader's language.
  */
 export function SheetTitleRow({
   title,

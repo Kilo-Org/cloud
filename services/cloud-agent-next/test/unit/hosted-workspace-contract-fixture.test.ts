@@ -11,7 +11,6 @@ vi.mock('../../src/session/model-preflight.js', () => ({
   preflightExistingPromptModel: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn(), Sandbox: class {} }));
 
 import {
   CreateHostedWorkspaceInput,
@@ -19,6 +18,10 @@ import {
   DeleteHostedWorkspaceSessionInput,
   DeleteHostedWorkspaceSessionOutput,
 } from '../../src/router/handlers/hosted-workspace-mutations.js';
+import {
+  ContinueHostedWorkspaceOutput,
+  ContinueHostedWorkspaceRequestSchema,
+} from '../../src/router/handlers/hosted-workspace-continuation.js';
 import {
   getHostedWorkspaceInput,
   getHostedWorkspaceOutput,
@@ -103,6 +106,7 @@ const requestSchemas: Record<string, unknown> = {
   getHostedWorkspaceStatus: getHostedWorkspaceStatusInput,
   createHostedWorkspace: CreateHostedWorkspaceInput,
   createHostedWorkspaceSession: CreateHostedWorkspaceSessionInput,
+  continueHostedWorkspace: ContinueHostedWorkspaceRequestSchema,
   deleteHostedWorkspaceSession: DeleteHostedWorkspaceSessionInput,
   deleteWorktree: DeleteWorktreeInput,
 };
@@ -113,6 +117,7 @@ const responseSchemas: Record<string, unknown> = {
   getHostedWorkspaceStatus: getHostedWorkspaceStatusOutput,
   createHostedWorkspace: CreateHostedWorkspaceOutput,
   createHostedWorkspaceSession: CreateHostedWorkspaceSessionOutput,
+  continueHostedWorkspace: ContinueHostedWorkspaceOutput,
   deleteHostedWorkspaceSession: DeleteHostedWorkspaceSessionOutput,
   deleteWorktree: DeleteWorktreeOutput,
 };

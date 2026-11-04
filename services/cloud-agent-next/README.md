@@ -9,62 +9,50 @@ Every session uses the control plane in [`docs/control-plane.md`](docs/control-p
 ### Child session callbacks
 
 An opted-in Cloud Agent can request a callback when it launches a child through
-`cloudAgentNext.prepareSession` (or the organization equivalent):
+`cloudAgentNext.prepareSession` (or the organization equivalent). Two workspace
+destinations are supported:
 
 ```json
-{ "callbackTarget": { "url": "session:parent" } }
+{ "callbackTarget": { "url": "workspace:<session-id>" } }
+{ "callbackTarget": { "url": "workspace:new-chat" } }
 ```
 
-The server resolves the parent from the authenticated spawn authority. Completion,
-failure, or interruption sends a queued message with the child's IDs, status,
-branch, and up to 12,000 characters of output. An idle parent resumes; an active
-parent receives a queued follow-up. The parent uses its current authorization.
-Delivery uses the existing five-attempt callback retry policy and one persisted
-message ID per callback. Missing or inaccessible parents reject delivery.
+`workspace:<session-id>` queues the child result into that existing chat. The
+server verifies the target exists, belongs to the same user and organization as
+the authenticated spawn authority, shares the spawning parent's workspace, is a
+root or sibling chat rather than a child session, and is still accessible. The
+invoking chat receives its own session id in a `cloud-agent-context` line so it
+can pass that id to `spawn_session`; the MCP transport does not carry the
+invoking chat's identity, so a callback is scoped to the workspace rather than
+cryptographically proven to come from that chat.
 
-Omit `callbackTarget` for no callback. Arbitrary session destinations are not
-supported. Existing HTTP callback targets remain available to trusted integrations.
+`workspace:new-chat` opens a new chat in the parent workspace. Its first message
+contains the same child result and the new chat's own session ID. The new chat
+inherits the workspace's repository, sandbox and agent, and can itself launch
+children when the workspace allows it. Queue retries do not duplicate the chat.
 
-### Building the Development Docker Image
+Completion, failure, or interruption sends the child's IDs, status, branch, and
+up to 12,000 characters of output. The destination chat uses its current
+authorization. Delivery uses the existing five-attempt callback retry policy and
+one persisted message ID per callback.
 
-The `Dockerfile.dev` is used for local development and testing. It requires a pre-built `kilo` binary from the [kilo-cli](https://github.com/kilocode/kilo-cli) repository.
+Omit `callbackTarget` for no callback. A target outside the spawning parent's
+workspace is rejected, as is any target that is a child session. Callback
+targets are available only with authenticated spawn authority. Existing HTTP
+callback targets remain available to trusted integrations.
 
-**Prerequisites:**
+### Sandbox images
 
-- [Bun](https://bun.sh) 1.3+
-- Docker
-- Clone of the kilo-cli repository
+Local and deployed workers use the native DO-managed containers runtime; the
+SDK-backed sandbox classes are retired. Its images are `Dockerfile.containers`
+(all-in-one) and `Dockerfile.containers.runtime-free` (runtime-free base for
+downloaded startup). Both use Debian's current Git packages; no third-party APT
+source is required.
 
-**Build the kilo binary and Docker image:**
-
-```bash
-# Set the path to your kilo-cli checkout (required)
-export KILO_CLI_DIR=/path/to/kilo-cli
-
-# From services/cloud-agent-next
-./cloud-agent-build.sh
-
-# Use it
-pnpm run dev
-```
-
-The `cloud-agent-build.sh` script:
-
-1. Builds kilo-cli from source (all targets including linux-x64)
-2. Copies the `linux-x64` binary to `./kilo`
-
-By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override with `KILO_CLI_DIR` environment variable.
-
-**What's in Dockerfile.dev:**
-
-- Base image: `cloudflare/sandbox:0.12.1`
-- Pre-built `kilo` binary (from `cloud-agent-build.sh`)
-- GitHub CLI (`gh`) and GitLab CLI (`glab`)
-- Wrapper bundle built inside the container
-
-Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa) directly.
-APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
-This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
+The retired SDK class names remain exported as no-op tombstones so their
+historical migrations and stored instances stay valid. They have no binding or
+container, so drain every session on a retired class (stop or delete it) before
+deploying; a removed binding cannot stop, inspect or reclaim a running instance.
 
 ### Managed GitLab requests
 
@@ -695,45 +683,23 @@ cp .dev.vars.example .dev.vars
 # The worker will reuse the Authorization bearer token as the kilo code api token (because thats what it is).
 ```
 
+For existing `.dev.vars` files, set `CREDENTIAL_CONTAINMENT_ENABLED=true`,
+`CLOUDFLARE_CONTAINERS_ORG_IDS=*`, and `CODE_REVIEW_CONTAINERS_ORG_IDS=*`.
+These values select the retained runtimes. Non-contained runtimes have been retired.
+
 3. Run locally:
 
 ```bash
 pnpm --filter cloud-agent-next dev
 ```
 
-### Local Development with Dockerfile.dev
+### Local Development with the native image
 
-For development with a local/custom Kilocode CLI build, use the `dev` environment which uses `Dockerfile.dev` to create a sandbox image with your CLI changes.
-
-#### Prerequisites
-
-1. Clone and build the Kilocode CLI from the [kilocode repository](https://github.com/Kilo-Org/kilocode):
-
-```bash
-# In the kilocode repo directory
-cd kilocode
-pnpm install
-pnpm cli:bundle
-cd cli && npm pack ./dist
-mv kilocode-cli-*.tgz ../kilocode-cli.tgz
-```
-
-2. Copy the CLI tarball to the service directory:
-
-```bash
-cp kilocode/kilocode-cli.tgz services/cloud-agent-next/
-```
-
-#### The Dev Environment
-
-The `dev` named environment in [`wrangler.jsonc`](wrangler.jsonc:128) automatically:
-
-- Uses `./Dockerfile.dev` for the sandbox container image
-- Sets `KILOCODE_BACKEND_BASE_URL=http://localhost:3000` you will almost certainly want to override this.
-
-#### Building the Dev Image
-
-When you run the dev environment, Cloudflare will build `Dockerfile.dev` automatically.
+The `dev` named environment in [`wrangler.jsonc`](wrangler.jsonc) uses
+`./Dockerfile.containers` for the native sandbox container image and sets
+`KILOCODE_BACKEND_BASE_URL=http://localhost:3000`, which you will almost
+certainly want to override. Cloudflare builds the image automatically when you
+run the dev environment.
 
 #### Environment Variables
 
@@ -749,8 +715,9 @@ cp .dev.vars.example .dev.vars
 # Start the worker in dev mode with the dev environment
 pnpm --filter cloud-agent-next dev -- --env dev
 
-# Or directly with wrangler:
-cd services/cloud-agent-next && wrangler dev --env dev
+# Or directly with the native startup script (sets the Docker endpoint and
+# the ARM egress image):
+cd services/cloud-agent-next && scripts/dev.sh --env dev
 ```
 
 ### GitHub Actions Deployment
@@ -766,6 +733,14 @@ This project also ships with an on-demand GitHub Action (`Deploy Cloud Agent`) l
 Required secrets:
 
 - `CLOUDFLARE_API_TOKEN` — must have permission to deploy the worker for the selected environment.
+
+**Deployment drain prerequisite:** this release removes the SDK sandbox
+bindings and containers. Before deploying it, stop or delete every session
+still running on a retired SDK sandbox class and confirm none remain. The new
+Worker has no binding to reach them, so an instance left running cannot be
+stopped, inspected or reclaimed through the Worker afterwards. The historical
+migrations stay unchanged; do not add a destructive `deleted_classes`
+migration to force the deploy.
 
 Cloud Agent Next owns its operational reporting projection. Deploy the reporting database migration before this worker release and provision `cloud-agent-next-report-queue` plus `cloud-agent-next-report-queue-dlq` with four-day message retention. A deployed `dev` environment requires isolated `cloud-agent-next-report-queue-dev` and `cloud-agent-next-report-queue-dlq-dev` resources with the same retention. New sessions synchronously create their reporting anchor before setup; queued run reports do not synthesize parents when an anchor is absent.
 
@@ -826,7 +801,7 @@ pnpm --filter cloud-agent-next lint:fix
 - **Session**: one Session DO per `workspace_*` session ID. It owns the message queue and states, route view, event log, questions, callbacks and the client stream.
 - **Sandbox**: one Sandbox DO per sandbox ID. It owns the physical allocation, provider lease, wrapper socket, credentials and idle stop.
   - The default control-plane allocation is an isolated per-session `ses-*` sandbox.
-  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats in one runtime.
+  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats, with one runtime per worktree directory. Sibling chats in one worktree share its runtime and MCP configuration; independent worktrees stay isolated.
 - **Worktree**: a shared checkout and chat group. A worktree chat gets a `worktree_*` ID and the path `/workspace/<org>/<user>/worktrees/<worktreeId>`; isolated sessions use `/workspace/app`.
 - **Wrapper**: one control wrapper per sandbox. It connects to the Sandbox DO, prepares routes, supervises Kilo, submits prompts and reports turn outcomes.
 
@@ -857,7 +832,7 @@ Cloud-agent sessions are linked to Kilocode CLI sessions:
 
 ### GitHub Integration
 
-- Repository preparation/cloning occurs during wrapper preparation using `src/workspace.ts` helpers. Devcontainer support is retired; stored devcontainer sessions can be stopped or deleted but cannot start or resume.
+- Repository preparation/cloning occurs during wrapper preparation using `src/workspace.ts` helpers. Devcontainer support and its sandbox namespace are retired. Stored devcontainer sessions cannot access that runtime.
 - Branch handling:
   - **Default**: Creates isolated `session/<sessionId>` branches for each session
   - **Upstream branches**: Use `upstreamBranch` to work on existing branches (e.g., `main`, `develop`)

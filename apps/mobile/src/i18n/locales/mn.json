@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Хэрэгслийн хураангуйг орчуулах",
     "toolSummaryTranslationSubtitle": "Хэрэгсэл бүрийн хураангуйг аппынхаа хэл рүү орчуулахын тулд загвар руу илгээ. Орчуулга бүтэлгүйтвэл эх хувийг харуулна.",
     "toolSummaryTranslationModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(common.model)-г товшино уу.",
+    "translateSummaries": "Хураангуйг орчуулах",
     "autoExpandThinkingInactiveSubtitle": "Бодлын дэлгэрэнгүйг нуух үед нөлөө үзүүлэхгүй."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Суурь солих"
       },
       "terminal": {
-        "alreadyMerged": "Аль хэдийн нэгтгэсэн",
         "closed": "Энэ нэгтгэх хүсэлт хаагдсан",
         "closedMergeRequest": "Энэ нэгтгэх хүсэлт хаагдсан"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Шаардлагатай хяналт дутуу",
         "requiredReviewsDetail": "Заавал хянах хүмүүсийн зөвшөөрөл дутуу эсвэл хүлээгдэж байна.",
         "failingChecksTitle": "Шаардлагатай шалгалтууд амжилтгүй",
-        "failingChecksDetail": "Шаардлагатай төлөвийн шалгалтууд амжилтгүй болж байна.",
         "unstableTitle": "Зарим шалгалт амжилтгүй болж байна",
         "unstableDetail": "Заавал амжилттай байх шаардлагагүй шалгалтууд амжилтгүй болж байна. Энэ нь нэгтгэхэд саад болохгүй.",
         "draftTitle": "Ноорог нэгтгэх хүсэлт",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
       "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
+      "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
+      "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
       "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна.",
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
+      "gitlabInstanceMismatchTitle": "GitLab холболт нь өөр инстанцад хамаарна",
+      "gitlabInstanceMismatchDescription": "Таны GitLab холболт {{connected}}-д хамаарна, гэхдээ энэ нэгтгэх хүсэлт {{requested}}-д байна. Үүнийг хянахын тулд тухайн инстанц дээр GitLab-ыг холбоно уу.",
+      "checkActiveConnection": "Холболт идэвхтэй боловч энэ зүйлийг ачаалж чадахгүй хэвээр байна.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",
       "submitCountOfTotal": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
       "submitReview": "Шалгалтын дүнг илгээх",
-      "partialPostedMessage": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. {{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedFresh": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedStale": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedStale_one": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedStale_other": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
       "blockedRequestChanges": "Өөрчлөлт хүсэхийн тулд хураангуй эсвэл дор хаяж нэг сэтгэгдэл нэмнэ үү.",
       "blockedComment": "Сэтгэгдэл хэлбэрээр хяналт илгээхийн тулд хураангуй эсвэл дор хаяж нэг сэтгэгдэл нэмнэ үү."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md файлын pull request нээгдлээ",
       "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
       "status": {
+        "open": "Нээлттэй",
         "edited": "Засварласан",
         "opening_change_request": "PR нээж байна",
         "change_request_failed": "PR амжилтгүй болсон",
@@ -1610,6 +1620,8 @@
       "set": "Тохируулсан",
       "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
+      "nSelected_one": "{{displayCount}} сонгогдсон",
+      "nSelected_other": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Халдлагад ашиглах боломжийн үндэслэл",
       "suggestedFix": "Санал болгосон засвар",
       "whereFound": "Илэрсэн байршлууд ({{displayCount}})",
+      "whereFound_one": "Илэрсэн байршлууд ({{displayCount}})",
+      "whereFound_other": "Илэрсэн байршлууд ({{displayCount}})",
       "fullReport": "Боловсруулсан бүрэн тайлан",
       "yes": "Тийм",
       "no": "Үгүй",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Нэн түрүүнд шийдэх асуудлууд анхны синхрончлолын дараа энд харагдана.",
       "refreshFailed": "Шинэчилж чадсангүй. Сүүлд синхрончилсон өгөгдлийг харуулж байна.",
       "settings": "Тохиргоо",
+      "syncing": "Синхрончилж байна…",
       "syncNow": "Одоо синхрончлох",
       "syncQueued": "Синхрончлолыг дараалалд орууллаа",
       "syncStatusUnavailable": "Синхрончлолын төлөвийг авах боломжгүй байна.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} дунд ба бага",
       "dueThisWeek": "Эцсийн хугацаа энэ долоо хоногт",
       "dueThisWeekDetail": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail_one": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail_other": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
       "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Репозиториудад илэрсэн аюулгүй байдлын асуудлыг удирдаж, Dependabot мэдэгдлийг автоматаар синхрончлохын тулд Kilo GitHub аппыг суулгана уу.",
+      "connectOwnerOnly": "Байгууллагын эзэмшигч эсвэл админаас {{platform}}-ыг холбохыг хүсээрэй.",
       "connectTitle": "Эхлэхийн тулд GitHub-ыг холбох",
       "couldNotLoad": "Аюулгүй байдлын агентыг ачаалж чадсангүй.",
       "installApp": "GitHub апп суулгах",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
       "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
       "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
+      "syncNoRepositoriesNoManage": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Синхрончлол ажиллахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер репозиторуудыг холбох ёстой.",
       "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
       "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү.",
       "configConflict": "Аюулгүй байдлын агентын тохиргоо өөр газар өөрчлөгдсөн. Хамгийн сүүлийн тохиргоог шалгаад дахин хадгална уу."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Суулгалтыг дуусгах боломжгүй",
       "notAdminMessage": "Тухайн GitHub бүртгэлийг зөвхөн админ нь холбох боломжтой. Kilo-г суулгахыг байгууллагын админаас хүснэ үү.",
       "alreadyClaimedMessage": "Тэр GitHub суулгалт өөр Kilo бүртгэлтэй аль хэдийн холбогдсон байна. Эхлээд тэр бүртгэлээс салгана уу.",
+      "installationUnavailableMessage": "Энэ GitHub App суулгалт түр зогссон эсвэл цаашид ашиглах боломжгүй байна. GitHub дээр сэргээх эсвэл дахин суулгаад, дараа нь дахин эхлүүлнэ үү.",
+      "multipleInstallationsMessage": "Энэ Kilo байгууллага одоогоор зөвхөн нэг GitHub байгууллагыг холбох боломжтой.",
       "didNotCompleteTitle": "Суулгалт дуусаагүй",
       "didNotCompleteMessage": "GitHub аппыг суулгаж дуусаагүй байна. Аппаас дахин оролдоно уу."
     },
@@ -2362,7 +2383,7 @@
       "discardDraftMessage": "Таны бичсэн заавар устах болно.",
       "discardWithUploadsMessage": "Таны бичсэн заавар болон илгээсэн мессежид хавсаргаагүй файлууд устах болно.",
       "discardFailed": "Нооргийг устгаж чадсангүй. Дахин оролдоно уу.",
-      "remoteHint": "Компьютер дээрээ ажиллаж буй kilo процессыг удирдахын тулд `kilo remote`, эсвэл ажиллаж буй CLI сессэд `/remote` командыг ажиллуулна уу.",
+      "remoteHint": "Өөрийн компьютер дээрээ ажиллуулахын тулд тэнд Kilo-г эхлүүлж, ажиллаж байгаагаар нь үлдээгээрэй.",
       "continueFrom": "«{{title}}» сессийг үргэлжлүүлж байна.",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сессийг үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Одоо {{name}} гэж тохируулагдсан",
       "defaultProfileResolvesToAccessibility": "Өгөгдмөл профайл: {{name}}",
       "manageProfiles": "Профайлуудыг удирдах",
-      "noProfiles": "Одоогоор профайл байхгүй байна. Орчны хувьсагч, MCP сервер, ур чадвар нэмэхийн тулд нэгийг үүсгэ.",
       "advancedConfig": "Нарийвчилсан тохиргоо",
       "advancedConfigDescription": "Энэ сессэд хамаарна. Профайл болгон хадгалбал дараагийн удаад хадгалагдана.",
       "saveAsProfile": "Профайл болгон хадгалах",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "{{name}} дээрх шинэ сесс",
     "noMatchingSessions": "Тохирох сесс олдсонгүй.",
     "onlyFirstFilesAttached": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана.",
-    "staleMessage": "Энэ агуулгыг хуваалцах боломжгүй болсон.",
+    "staleMessage": "Үүнийг хуваалцсан аппаасаа дахин илгээнэ үү.",
+    "staleTitle": "Хуваалцах боломжгүй",
     "retryableMessage": "Таны сессүүдийг ачаалж чадсангүй.",
     "emptyMessage": "Одоогоор сесс байхгүй. Үүнийг илгээхийн тулд шинэ сесс эхлүүлнэ үү.",
     "cliNotConnectedTitle": "Сесс холбогдоогүй",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Энэ хүрээний зарцуулалт хязгаараас хэтэрсэн эсвэл ердийн цагийн хурдаас дээш өссөн үед төлбөрийн холбоо барих хаягуудад имэйл эсвэл push-ээр анхааруулга илгээ.",
     "thresholdTitle": "Босго давсан",
-    "thresholdSubtitle": "Гүйлтийн зарцуулалт таны хязгаараас хэтэрч байна",
+    "thresholdSubtitle": "Сонгосон цонхны хугацаанд энэ хүрээний гүйлтийн зарцуулалт таны хязгаараас хэтэрч байна",
     "anomalyTitle": "Цагийн огцом өсөлт",
-    "anomalySubtitle": "Нэг цаг энэ хүрээний ердийн хурдаас хамаагүй өндөр байна",
+    "anomalySubtitle": "Энэ хүрээний цагийн хурд өөрийн p95 түвшингээс хамаагүй өндөр байна",
     "limitLabel": "Хязгаар (USD)",
     "windowLabel": "Цонх",
     "window24h": "24 цаг",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Зарцуулалтын анхааруулгыг удирдах эрх танд байхгүй.",
     "pushOffByCategory": "Мэдэгдэлд унтарсан",
     "multiplierMaxError": "{{max}} буюу түүнээс бага үржүүлэгч оруул",
-    "thresholdMaxError": "{{max}} буюу түүнээс бага дүн оруулна уу."
+    "thresholdMaxError": "{{max}} буюу түүнээс бага дүн оруулна уу"
   },
   "profiles": {
     "title": "Профайлууд",

@@ -16,12 +16,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
+const JWT_TOKEN_VERSION = 3;
 import { eq, or } from 'drizzle-orm';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
-const JWT_TOKEN_VERSION = 3;
 
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.

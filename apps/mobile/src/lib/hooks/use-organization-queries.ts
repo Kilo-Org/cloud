@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
 import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -109,8 +110,13 @@ export function isInvitedOrgMember(member: OrgMember): member is InvitedOrgMembe
  * Parent organization's Kilo Pass for Orgs summary. The API is restricted to
  * the parent agreement owner (`organizationParentBillingProcedure` rejects
  * child orgs and non-billing roles), so `enabled` must only be true when the
- * user has a billing-capable role AND `withMembers` confirmed
- * `parent_organization_id === null` — children must never fire this query.
+ * user has a billing-capable role AND no payload reports a parent id AND the
+ * membership payload confirmed this organization is top-level
+ * (`parent_organization_id === null` on `withMembers`). A child organization —
+ * from either payload — and one whose parent link is still unknown must never
+ * fire this query. A `null` in an `organizations.list` entry is not
+ * confirmation on its own: that entry can be a persisted value written before
+ * an admin moved the organization under a parent.
  */
 export function useOrgKiloPassSummary(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();
@@ -190,11 +196,8 @@ export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries
  * retention bound, the fixed `period: 'year'` input, and the cursor
  * passthrough are testable without mounting the hook.
  *
- * The first page must settle while the online manager reports offline: a
- * paused read leaves the screen's `isLoading` branch (its skeleton rows) with
- * no exit, because a paused query is pending but never fetching, so it neither
- * errors nor loads. This read either answers or fails once the control-plane
- * deadline lands, and the screen's error state then offers Retry.
+ * The first page waits on the screen's loading branch, so a read that never
+ * settles would leave its skeleton rows with no exit.
  */
 export function buildOrgInvoicesPageQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
@@ -209,11 +212,8 @@ export function buildOrgInvoicesPageQueryOptions(
           lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
-        networkMode: 'always',
-        // `networkMode: 'always'` also disables the derived reconnect refetch
-        // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-        // 'always'` when it is undefined), so ask for it explicitly.
-        refetchOnReconnect: true,
+        // A paused first page leaves the skeleton rows with no exit.
+        ...SETTLE_WHILE_OFFLINE,
       }
     )
   );

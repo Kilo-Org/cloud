@@ -15,10 +15,14 @@ export function genericPushContentForPushData(
   // Old callers omit locale; remove the default when every caller passes a token locale.
   locale: string | null | undefined = 'en'
 ): { title: string; body: string } {
+  // The one generic title: content-free and identical for every variant, so
+  // only each body's key and fallback differ below. Reading it here per branch,
+  // rather than once above the switch, keeps it off the unreachable default.
+  const genericTitle = () => translatePush(locale, 'generic.title', undefined, 'Kilo');
   switch (data.type) {
     case 'cloud_agent_session':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.cloudAgentSession',
@@ -28,7 +32,7 @@ export function genericPushContentForPushData(
       };
     case 'chat.message':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.chatMessage',
@@ -38,7 +42,7 @@ export function genericPushContentForPushData(
       };
     case 'instance-lifecycle':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.instanceLifecycle',
@@ -48,7 +52,7 @@ export function genericPushContentForPushData(
       };
     case 'scheduled-action':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.scheduledAction',
@@ -58,7 +62,7 @@ export function genericPushContentForPushData(
       };
     case 'low_balance':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.lowBalance',
@@ -68,7 +72,7 @@ export function genericPushContentForPushData(
       };
     case 'spend_alert':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.spendAlert',
@@ -77,9 +81,8 @@ export function genericPushContentForPushData(
         ),
       };
     case 'security_finding':
-    case 'security_lifecycle':
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.securityFinding',
@@ -87,12 +90,24 @@ export function genericPushContentForPushData(
           'A security finding needs attention'
         ),
       };
+    case 'security_lifecycle':
+      // A status change (analysis finished, remediation queued, …) is not an
+      // outstanding finding, so it must not reuse the finding body.
+      return {
+        title: genericTitle(),
+        body: translatePush(
+          locale,
+          'generic.body.securityUpdate',
+          undefined,
+          'A security check has an update'
+        ),
+      };
     case 'agent_briefing':
     case 'active_agents_glanceable':
       // Generic, count-free lock-screen banner copy: the ongoing notification
       // never leaks how many agents are running or which sessions they are.
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.activeAgentsGlanceable',
@@ -103,7 +118,7 @@ export function genericPushContentForPushData(
     case 'session_live_update':
       // Data-only: the app draws the notification. Never the session title.
       return {
-        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        title: genericTitle(),
         body: translatePush(
           locale,
           'generic.body.cloudAgentSession',

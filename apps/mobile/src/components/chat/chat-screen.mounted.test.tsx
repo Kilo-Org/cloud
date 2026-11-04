@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
 
@@ -50,7 +50,10 @@ const state = vi.hoisted(() => ({
 }));
 
 type AlertAction = { onPress?: () => void };
-const router = vi.hoisted(() => ({ push: vi.fn<(href: string) => void>() }));
+const router = vi.hoisted(() => ({
+  push: vi.fn<(href: string) => void>(),
+  dismissTo: vi.fn<(href: string) => void>(),
+}));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 const backendUi = vi.hoisted(() => ({
   profiles: [] as StoredChatBackend[],
@@ -170,11 +173,17 @@ vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
   MessageCircle: 'MessageCircle',
-  Wrench: 'Wrench',
+  SearchX: 'SearchX',
   Server: 'Server',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
+  Wrench: 'Wrench',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -241,6 +250,7 @@ beforeEach(() => {
   state.failureKey = null;
   state.retry.mockClear();
   router.push.mockClear();
+  router.dismissTo.mockClear();
   backendUi.profiles = [];
   backendUi.alert.mockClear();
   backendUi.loaded = true;
@@ -267,6 +277,52 @@ function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
 }
 
+/** The props each state surface on screen was drawn with. */
+type StateProps = { title?: unknown; description?: unknown; action?: unknown };
+
+const emptyStatesOf = (tree: ReactTestRenderer): StateProps[] =>
+  tree.root.findAll(node => (node.type as string) === 'EmptyState').map(node => node.props);
+
+/** The copy the state's description node was given. */
+const descriptionMessageOf = (surface: StateProps): unknown =>
+  (surface.description as ReactElement<{ message: unknown }>).props.message;
+
+/** Mounts the state's action row, which the harness's stubbed `EmptyState` does not draw. */
+function mountAction(tree: ReactTestRenderer): Promise<RenderWithProvidersResult> {
+  const [surface] = emptyStatesOf(tree);
+  if (surface === undefined || surface.action === undefined) {
+    throw new TypeError('The state has no action');
+  }
+  return renderWithProviders(surface.action as ReactElement);
+}
+
+/** The copy the screen's status nodes carry, in tree order. */
+const messagesOf = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'AccessibleStatus')
+    .map(node => node.props.message);
+
+const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+
+function press(tree: ReactTestRenderer, label: unknown): void {
+  const button = tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+  if (button === undefined) {
+    throw new TypeError(`No button ${String(label)}`);
+  }
+  const { onPress } = button.props;
+  if (!isHandler(onPress)) {
+    throw new TypeError(`The ${String(label)} button has no press handler`);
+  }
+  act(() => {
+    onPress();
+  });
+}
+
 describe('the chat transcript while it opens', () => {
   it('shows a loading transcript instead of the empty state', async () => {
     const tree = await mount();
@@ -280,8 +336,16 @@ describe('the chat transcript while it opens', () => {
     state.status = 'idle';
     const tree = await mount();
 
-    expect(count(tree, 'EmptyState')).toBe(1);
+    /* A chat that finished opening with nothing in it and nothing wrong is the
+       one case that keeps the invitation to start one, with no failure beside
+       it. */
+    expect(emptyStatesOf(tree).map(surface => surface.title)).toEqual([
+      i18n.t('modelChat.empty.title'),
+    ]);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+    expect(messagesOf(tree)).toEqual([]);
+    /* Nothing failed, so the chat takes a first message. */
+    expect(count(tree, 'ChatComposer')).toBe(1);
   });
 
   it.each([
@@ -610,13 +674,78 @@ describe('the thinking effort of a chat', () => {
 });
 
 describe('a retained chat failure', () => {
-  it('shows only fixed copy and retries the retained work', async () => {
+  it('says the balance blocked the send and opens where the credit is bought', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    /* The question is still on screen, so the failure belongs to the composer
+       row above it rather than replacing the transcript. */
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(count(tree, 'EmptyState')).toBe(0);
+    /* The question kept in the transcript carries the only Retry; the row adds
+       the one action the message cannot offer. */
+    expect(buttonLabels(tree)).toEqual([i18n.t('addCredits.cta')]);
+    press(tree, i18n.t('addCredits.cta'));
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+});
+
+describe('a chat that settled without a transcript', () => {
+  it('draws the not-found copy once, with a way back and no empty state', async () => {
+    state.status = 'idle';
+    state.failureKey = 'queryError.notFoundDescription';
+    const tree = await mount();
+
+    /* One state, not two: the area says what is true — in the empty state's
+       place — and the composer is not drawn at all below it. */
+    expect(count(tree, 'EmptyState')).toBe(1);
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.notFound'));
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.notFoundDescription'));
+    expect(messagesOf(tree)).toEqual([]);
+    /* Entering it again settles the same state, so no Retry is offered. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.back'));
+    action.unmount();
+    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)');
+  });
+
+  it('offers Retry and Back for a failure that could settle differently', async () => {
+    state.status = 'idle';
+    state.failureKey = 'common.somethingWentWrong';
+    const tree = await mount();
+
+    /* No transcript means nothing to send into, whichever failure it was. */
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.somethingWentWrong'));
+    /* The title already says it, so the state does not repeat the sentence;
+       the neutral description carries the retry invitation instead. */
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.neutralDescription'));
+    /* A balance caused nothing here, so no Add credits joins the two ways out. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.retry'), i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
+    expect(state.retry).toHaveBeenCalledOnce();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('shows only fixed copy for a failure a provider body caused', async () => {
     state.status = 'idle';
     state.failed = 'Bearer provider-secret from a raw provider body';
     state.failureKey = 'modelChat.backends.deletedBackend';
     const tree = await mount();
-    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
-    expect(status.props.message).toBe(
+
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(descriptionMessageOf(failure ?? {})).toBe(
       'This chat backend was deleted. Choose another backend to continue.'
     );
     expect(
@@ -626,71 +755,10 @@ describe('a retained chat failure', () => {
         )
       )
     ).toHaveLength(0);
-    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
-    if (!isHandler(onPress)) {
-      throw new TypeError('Retry button has no press handler');
-    }
-    act(() => {
-      onPress();
-    });
+    const action = await mountAction(tree);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
     expect(state.retry).toHaveBeenCalledOnce();
-  });
-
-  it('offers no retry for a chat this place cannot open', async () => {
-    /* Entering it again settles the same state, so the row says what is true
-       without offering a button that cannot change it. */
-    state.status = 'idle';
-    state.failureKey = 'queryError.notFoundDescription';
-
-    const tree = await mount();
-
-    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
-    expect(status.props.message).toBe('This item may have been removed or is no longer available.');
-    const retryLabels = tree.root.findAll(
-      node => (node.type as string) === 'Text' && node.props.children === i18n.t('common.retry')
-    );
-    expect(retryLabels).toHaveLength(0);
-  });
-
-  it('says the balance blocked the send and opens where the credit is bought', async () => {
-    state.status = 'idle';
-    state.asked = 'what is a monad';
-    state.failureKey = CREDITS_FAILURE_KEY;
-    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
-    const tree = await mount();
-
-    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
-      'Not enough credits to send this message.'
-    );
-    /* The question kept in the transcript carries the only Retry; the row adds
-       the one action the message cannot offer. */
-    expect(count(tree, 'Button')).toBe(1);
-    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
-    if (!isHandler(onPress)) {
-      throw new TypeError('Add credits button has no press handler');
-    }
-    act(() => {
-      onPress();
-    });
-    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
-    expect(state.retry).not.toHaveBeenCalled();
-  });
-
-  it('offers no Add credits for a failure a balance did not cause', async () => {
-    state.status = 'idle';
-    state.failureKey = 'common.somethingWentWrong';
-    const tree = await mount();
-
-    expect(count(tree, 'Button')).toBe(1);
-    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
-    if (!isHandler(onPress)) {
-      throw new TypeError('Retry button has no press handler');
-    }
-    act(() => {
-      onPress();
-    });
-    expect(state.retry).toHaveBeenCalledOnce();
-    expect(router.push).not.toHaveBeenCalled();
   });
 });
 

@@ -31,12 +31,28 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * sets `isEnabled`, so the platform draws no unavailable appearance of its own;
  * without this pair a row whose title dims for "not available" keeps a
  * full-strength accent track beside it and reads as both unavailable and on.
- * On keeps the grip but takes the palette's disabled primary fill, which is
- * built to hold `primaryForeground` at text contrast (5.4:1 light, 4.8:1 dark);
- * off drops to the dimmer neutral track and the mid-neutral grip. Both muted
- * tracks clear a visible step on the row's `secondary` surface (4.6:1 light,
- * 4.5:1 dark for on; 2.2:1 for off) and stay apart from each other (2.2:1
- * light, 2.1:1 dark), so a disabled switch still says which way it points.
+ * On takes the palette's disabled primary fill and a grip that sits below it in
+ * strength; off drops to the dimmer neutral track and the mid-neutral grip.
+ * Both muted tracks clear a visible step on the row's `secondary` surface
+ * (4.6:1 light, 4.5:1 dark for on; 2.2:1 for off) and stay apart from each
+ * other (2.2:1 light, 2.1:1 dark), so a disabled switch still says which way it
+ * points.
+ *
+ * The disabled on grip is the one thing a disabled pair cannot share with its
+ * enabled one. Enabled, the grip is the scheme's light ink (`primaryForeground`
+ * in light, `selectionForeground` in dark) on the accent fill, and that is the
+ * signal of a working control. Kept there when disabled, a near-white thumb on
+ * the muted fill reads as switched on and glares on a row the user cannot
+ * change — the complaint that the read-only switches look active. Dropped to
+ * `primaryForeground` instead, as both schemes once did, dark paints the thumb
+ * the card's own near-black: Android's thumb is wider than the track, so its
+ * outer arc sits on the row rather than on the fill, 1.1:1 there, and the dark
+ * scheme draws no shadow to outline it — the right end of the pill dissolves
+ * and what is left reads as a blank grey bar. Dark therefore takes
+ * `mutedSoft`, the mid neutral its off track already uses: a dark thumb on the
+ * light disabled fill, 2.1:1 against the fill and 2.2:1 against the row, muted
+ * beside the olive of a control that works. Light keeps the white grip, which
+ * already reads as a muted fill under a plain thumb.
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that
@@ -79,10 +95,15 @@ export function Switch({
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
   // The off grip sits on the off track; the grip and track lose their strength
   // when the control is unavailable, and the on track takes the disabled fill.
+  // The on grip leaves the scheme's on ink as well: a light thumb on the muted
+  // fill reads as a working control. Dark takes the mid neutral, a dark thumb
+  // on the light disabled fill, which keeps the thumb's overhanging arc off the
+  // row's own near-black; light keeps its white grip.
   const offGrip = inactive ? colors.mutedForeground : enabledOffGrip;
   const offTrack = inactive ? colors.mutedSoft : enabledOffTrack;
   const onTrack = inactive ? colors.primaryDisabled : enabledOnTrack;
-  const onGrip = inactive ? colors.primaryForeground : enabledOnGrip;
+  const disabledOnGrip = dark ? colors.mutedSoft : colors.primaryForeground;
+  const onGrip = inactive ? disabledOnGrip : enabledOnGrip;
 
   return (
     <NativeSwitch

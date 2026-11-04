@@ -2,11 +2,15 @@ import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encr
 import { z } from 'zod';
 import { hasCanonicalEncryptedValueFormat } from './github-session-capability.js';
 import { GitLabProjectPathSchema, normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import {
+  CURRENT_CAPABILITY_PREFIX,
+  LEGACY_CAPABILITY_PREFIX,
+} from '@kilocode/worker-utils/scm-capability-contract';
 export { parseGitLabCloneUrl } from './gitlab-url.js';
 export type { GitLabCloneUrlFailureReason, GitLabCloneUrlResult } from './gitlab-url.js';
 
-const LEGACY_CAPABILITY_PREFIX = 'kgl1.';
-const BOUND_CAPABILITY_PREFIX = 'kgl2.';
+const LEGACY_PREFIX = LEGACY_CAPABILITY_PREFIX.gitlab;
+const BOUND_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.gitlab;
 const CAPABILITY_PURPOSE = 'gitlab_scm_session';
 const MAX_LEGACY_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
 const MAX_BOUND_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
@@ -185,7 +189,7 @@ export class GitLabSessionCapabilityCodec {
     });
     if (!parsed.success) throw new GitLabSessionCapabilityError('invalid_capability');
     try {
-      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_PREFIX;
       return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitLabSessionCapabilityError('capability_configuration_error');
@@ -193,8 +197,8 @@ export class GitLabSessionCapabilityCodec {
   }
 
   decode(capability: string): GitLabSessionCapabilityClaims {
-    const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
-      ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
+    const format = capability.startsWith(LEGACY_PREFIX)
+      ? { prefix: LEGACY_PREFIX, version: 1 as const }
       : capability.startsWith(BOUND_CAPABILITY_PREFIX)
         ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
         : null;

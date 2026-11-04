@@ -35,6 +35,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'dolthub_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/dolthub-service')).getDoltHubOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [

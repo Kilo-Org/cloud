@@ -113,7 +113,10 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({
-    githubPrReview: { getPullRequest: { queryOptions: () => ({}) } },
+    githubPrReview: {
+      getPullRequest: { queryOptions: () => ({}) },
+      listChecks: { queryOptions: () => ({}) },
+    },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
     // s6: the submit/merge screens build the provider seam's capability and
     // merge-state options even on the GitHub arm (the queries register
@@ -122,6 +125,7 @@ vi.mock('@/lib/trpc', () => ({
       getCapabilities: { queryOptions: () => ({}) },
       getMergeState: { queryOptions: () => ({}) },
       getPullRequest: { queryOptions: () => ({}) },
+      listChecks: { queryOptions: () => ({}) },
     },
   }),
 }));

@@ -450,6 +450,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 options={models}
                 value={effectiveModel.modelSlug}
                 variant={effectiveModel.thinkingEffort ?? ''}
+                acceptsVariant
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
                   start.reset();

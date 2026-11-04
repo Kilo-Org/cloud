@@ -57,7 +57,7 @@ const WORDING_EXCEPTIONS = JSON.parse(
 const TWO_SENSE_COPY = new Map([
   [
     'open',
-    'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice',
+    'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice, versus the state of a review-memory proposal awaiting a decision',
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
@@ -406,6 +406,23 @@ function edges(value) {
  * key keeps English's edges exactly.
  */
 const LOCALE_SEPARATED_KEYS = new Set(['login.termsPrefix', 'login.termsConnector']);
+
+/**
+ * The counted clause the review-submit message renders before its stale
+ * clause. Its trailing whitespace is the sentence separator, so every form of
+ * the family states how the catalog joins one sentence to the next: a space
+ * after the terminator in almost every language, nothing in Japanese and
+ * Chinese. The helper concatenates the two clauses and adds no separator.
+ */
+const SENTENCE_SEPARATED_FAMILY = 'prReview.submit.partialPostedFresh';
+
+/** The catalogs whose sentence terminator is the whole separator. */
+const UNSPACED_SENTENCE_TAGS = new Set(['ja', 'zh-Hans', 'zh-Hant']);
+
+/** Whether the key's own edge whitespace is a separator this catalog chooses. */
+function carriesOwnEdges(key) {
+  return LOCALE_SEPARATED_KEYS.has(key) || pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY;
+}
 
 const QUOTE_PAIRS = [
   ['\u201c', '\u201d'],
@@ -920,7 +937,7 @@ for (const catalog of CATALOGS) {
           `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
         );
       }
-      if (!LOCALE_SEPARATED_KEYS.has(key) && edges(value) !== edges(englishValue)) {
+      if (!carriesOwnEdges(key) && edges(value) !== edges(englishValue)) {
         fail(`${label}: "${key}" leading or trailing space differs from English`);
       }
       if (/ {2}/.test(value) && !/ {2}/.test(englishValue)) {
@@ -951,6 +968,28 @@ for (const catalog of CATALOGS) {
       if (paddedPrefix !== paddedConnector) {
         fail(
           `${label}: "login.termsPrefix" and "login.termsConnector" disagree about their separator; pad both or neither`
+        );
+      }
+    }
+
+    // The composed message appends the stale clause to the fresh one verbatim,
+    // so the separator is one choice per catalog: every form of the family
+    // agrees on it, and only a catalog that writes no space after its
+    // terminator leaves the clause bare.
+    const freshForms = [...translated].filter(
+      ([key]) => pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY
+    );
+    if (freshForms.length > 0) {
+      const padded = freshForms.filter(([, value]) => /\s$/.test(value)).length;
+      if (padded !== 0 && padded !== freshForms.length) {
+        fail(
+          `${label}: "${SENTENCE_SEPARATED_FAMILY}" family disagrees about its sentence separator; pad every form or none`
+        );
+      }
+      const shouldPad = !UNSPACED_SENTENCE_TAGS.has(tag);
+      if (padded > 0 !== shouldPad) {
+        fail(
+          `${label}: "${SENTENCE_SEPARATED_FAMILY}" must ${shouldPad ? 'end with a space' : 'end without a space'}, which is how ${tag} separates two sentences`
         );
       }
     }

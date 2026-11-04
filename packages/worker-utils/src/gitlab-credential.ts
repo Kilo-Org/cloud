@@ -28,6 +28,8 @@ export const GitLabProjectAccessTokenMetadataSchema = z
   .object({
     providerCredentialId: GitLabPositiveDecimalIdSchema,
     expiresOn: z.iso.date(),
+    authorizedAccountId: GitLabPositiveDecimalIdSchema.optional(),
+    unusableReason: z.literal('account-changed').optional(),
   })
   .strict();
 

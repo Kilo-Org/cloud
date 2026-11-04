@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Adikao ny famintinana fitaovana",
     "toolSummaryTranslationSubtitle": "Alefaso any amin'ny maodely ny famintinana fitaovana tsirairay mba hadika azy amin'ny fitenin'ny rindranasa. Asehoy ny voalohany raha tsy mahomby ny fandikana.",
     "toolSummaryTranslationModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(common.model) hisafidianana ny hafa.",
+    "translateSummaries": "Adikao ny famintinana",
     "autoExpandThinkingInactiveSubtitle": "Tsy misy akony raha afeno ny antsipirian'ny fisainana."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Famindrana fototra"
       },
       "terminal": {
-        "alreadyMerged": "Efa nampiraisina",
         "closed": "Nakatona ity fangatahana fampiraisana ity",
         "closedMergeRequest": "Nakatona ity fangatahana fampiraisana ity"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Tsy ampy ny fandinihana takina",
         "requiredReviewsDetail": "Mbola tsy azo na mbola andrasana ny fankatoavan'ireo mpandinika voatendry.",
         "failingChecksTitle": "Tsy mahomby ny fanamarinana takina",
-        "failingChecksDetail": "Tsy mahomby ny fanamarinana sata takina.",
         "unstableTitle": "Misy fanamarinana tsy mahomby",
         "unstableDetail": "Tsy mahomby ny fanamarinana tsy takina. Tsy hanakana ny fampiraisana izany.",
         "draftTitle": "PR mbola volavola",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Tsy voamarina ny fifandraisana amin'ny Bitbucket.",
       "providerCheckFailedMessage": "Tsy azo ny satan'ny fifandraisana raha tsy tafiditra izao.",
       "reconnectTitle": "Fampifandraisana indray amin'ny GitHub",
+      "reconnectTitleGitLab": "Fampifandraisana indray amin'ny GitLab",
+      "reconnectTitleBitbucket": "Fampifandraisana indray amin'ny Bitbucket",
       "reconnectDescription": "Nofoanana ny fifandraisanao amin'ny GitHub.",
       "gitlabDescription": "Diniho amin'ny finday ny fangatahana fampiraisana",
+      "gitlabInstanceMismatchTitle": "Ny fampifandraisana amin'ny GitLab dia ho an'ny instance hafa",
+      "gitlabInstanceMismatchDescription": "Ny fampifandraisanao amin'ny GitLab dia ho an'ny {{connected}}, fa ity fangatahana fampiraisana ity dia ao amin'ny {{requested}}. Ampifandraiso amin'ny GitLab amin'io instance io mba hijerena azy.",
+      "checkActiveConnection": "Mavitrika ny fampifandraisana, fa mbola tsy azo ampidirina ity singa ity.",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
       "gitlabReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "fanehoan-kevitra miandry",
       "submitCountOfTotal": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
       "submitReview": "Alefaso ny fandinihana",
-      "partialPostedMessage": "Hevitra {{displayFreshCount}} no navoaka. Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedFresh": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedFresh_one": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedFresh_other": "Hevitra {{displayFreshCount}} no navoaka. ",
+      "partialPostedStale": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedStale_one": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
+      "partialPostedStale_other": "Mbola manondro firaketana fanovana taloha ny hevitra {{displayStaleCount}} ka mijanona ao amin'ny filaharanao.",
       "blockedRequestChanges": "Ampio famintinana na hevitra farafahakeliny iray mba hangatahana fanovana.",
       "blockedComment": "Ampio famintinana na hevitra iray farafahakeliny mba handefasana fandinihana maneho hevitra."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "Nosokafana ny PR ho an'ny REVIEW.md",
       "alreadyPresent": "Efa ao amin'ny REVIEW.md ny torolalana",
       "status": {
+        "open": "Misokatra",
         "edited": "Voahitsy",
         "opening_change_request": "Manokatra PR",
         "change_request_failed": "Tsy nety nosokafana ny PR",
@@ -1610,6 +1620,8 @@
       "set": "Voafaritra",
       "notSet": "Tsy voafaritra",
       "nSelected": "{{displayCount}} voafidy",
+      "nSelected_one": "{{displayCount}} voafidy",
+      "nSelected_other": "{{displayCount}} voafidy",
       "proposedReviewMdGuidance": "Torolalana naroso ho an'ny REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Fanazavana ny fahafahana manararaotra ilay olana",
       "suggestedFix": "Fanamboarana soso-kevitra",
       "whereFound": "Toerana nahitana ilay olana ({{displayCount}})",
+      "whereFound_one": "Toerana nahitana ilay olana ({{displayCount}})",
+      "whereFound_other": "Toerana nahitana ilay olana ({{displayCount}})",
       "fullReport": "Tatitra feno noforonina",
       "yes": "Eny",
       "no": "Tsia",
@@ -1794,6 +1808,7 @@
       "priorityFindingsPending": "Hiseho ny olana hita araka ny laharam-pahamehana rehefa vita ny fampifanarahana voalohany.",
       "refreshFailed": "Tsy nety nohavaozina ny angona. Ny angona tamin'ny fampifanarahana farany no aseho.",
       "settings": "Fikirana",
+      "syncing": "Mampifanaraka…",
       "syncNow": "Ampifanaraho izao",
       "syncQueued": "Voalahatra ny fampifanarahana",
       "syncStatusUnavailable": "Tsy azo jerena ny satan'ny fampifanarahana.",
@@ -1827,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} antonony na ambany hamafy",
       "dueThisWeek": "Fe-potoana farany amin'ity herinandro ity",
       "dueThisWeekDetail": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
+      "dueThisWeekDetail_one": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
+      "dueThisWeekDetail_other": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
       "noDeadline": "Tsy misy fe-potoana",
       "reviewSlaAssignment": "Hamarino ny famaritana ny SLA",
       "allOpenFindingsTracked": "Arahi-maso ny olana hita rehetra mbola misokatra"
@@ -2038,6 +2055,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Apetraho ny rindranasa Kilo ao amin'ny GitHub mba hampifanarahana ho azy ny fampandrenesan'ny Dependabot sy hitantanana ny olana hita amin'ny fiarovana ao amin'ny tahirin-kaodinao.",
+      "connectOwnerOnly": "Mangataha amin'ny tompon'ny fikambanana na mpitantana iray mba hampifandray an'i {{platform}}.",
       "connectTitle": "Ampifandraiso ny GitHub mba hanombohana",
       "couldNotLoad": "Tsy nety nampidirina ny mpanampy amin'ny fiarovana.",
       "installApp": "Apetraho ny rindranasa GitHub",
@@ -2070,6 +2088,7 @@
       "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
       "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
       "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
+      "syncNoRepositoriesNoManage": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Tsy maintsy mampifandray depo ny tompon'ny fikambanana, ny mpitantana, na ny mpitantana ny faktiora vao afaka mifanaraka.",
       "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
       "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync.",
       "configConflict": "Niova tany an-kafa ny fandrindran'ny mpanampy amin'ny fiarovana. Jereo ny fandrindrana farany ary tehirizo indray."
@@ -2226,6 +2245,8 @@
       "cannotCompleteTitle": "Tsy afaka mamita ny fametrahana",
       "notAdminMessage": "Ny mpitantana an'io kaonty io ao amin'ny GitHub ihany no afaka mampifandray azy. Angataho ny mpitantana ny fikambanana hametraka ny Kilo.",
       "alreadyClaimedMessage": "Efa mifandray amin'ny kaonty Kilo hafa io fametrahana GitHub io. Tapaho any aloha ny fifandraisana.",
+      "installationUnavailableMessage": "Ity fametrahana GitHub App ity dia naato na tsy misy intsony. Avereno na apetraho indray ao amin'ny GitHub izy, dia atombohy indray.",
+      "multipleInstallationsMessage": "Ity fikambanana Kilo ity dia afaka mifandray amin'ny fikambanana GitHub iray ihany amin'izao fotoana izao.",
       "didNotCompleteTitle": "Tsy vita ny fametrahana",
       "didNotCompleteMessage": "Tsy vita ny fametrahana ny rindranasa GitHub. Andramo indray ao amin'ny rindranasa."
     },
@@ -2368,7 +2389,7 @@
       "discardDraftMessage": "Ho very ny toromarikanao.",
       "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardFailed": "Tsy nahomby ny fanariana ny volavola. Andramo indray azafady.",
-      "remoteHint": "Alefaso ny `kilo remote` amin'ny solosainao, na ny `/remote` ao amin'ny fotoam-piasana CLI mandeha, mba hifehezana ny kilo mandeha eo an-toerana.",
+      "remoteHint": "Mba hampandehanana azy amin'ny solosainao dia alefaso an'i Kilo any amin'ilay solosaina ary avelao hitohy ny fiasany.",
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
@@ -2382,7 +2403,6 @@
       "defaultProfileResolvesTo": "Mifanaraka amin'ny {{name}}",
       "defaultProfileResolvesToAccessibility": "Profile default: {{name}}",
       "manageProfiles": "Tantano ny mombamomba",
-      "noProfiles": "Tsy mbola misy mombamomba. Mamorona iray hanampiana ireo fari-piainan'ny tontolo iainana, mpizara MCP ary fahaiza-manao.",
       "advancedConfig": "Fandrindrana mandroso",
       "advancedConfigDescription": "Mihatra amin’ity sesiona ity. Raha tehirizina ho profile dia mitoetra ho an’ny manaraka.",
       "saveAsProfile": "Tehirizo ho Profile",
@@ -3068,7 +3088,8 @@
     "newSessionOn": "Fotoam-piasana vaovao amin'ny {{name}}",
     "noMatchingSessions": "Tsy misy fotoam-piasana mifanaraka.",
     "onlyFirstFilesAttached": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra.",
-    "staleMessage": "Tsy azo zaraina intsony ity votoaty ity.",
+    "staleMessage": "Alefaso indray avy amin'ny rindranasa nizaranao azy.",
+    "staleTitle": "Tsy azo zaraina",
     "retryableMessage": "Tsy tafiditra ny fotoam-piasanao.",
     "emptyMessage": "Mbola tsy misy fotoam-piasana — manomboha vaovao handefasana ity.",
     "cliNotConnectedTitle": "Tsy mifandray ny fotoam-piasana",
@@ -3782,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
     "thresholdTitle": "Fihoaram-bidy",
-    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
+    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy amin'ity faritra ity mandritra ny fe-potoana voafidy",
     "anomalyTitle": "Fitsambikinana isan'ora",
-    "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
+    "anomalySubtitle": "Ny taha isan'oran'ity faritra ity dia ambony lavitra noho ny fototra p95 azy manokana",
     "limitLabel": "Fetra (USD)",
     "windowLabel": "Fe-potoana",
     "window24h": "Adiny 24",
@@ -3801,7 +3822,7 @@
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana",
     "multiplierMaxError": "Ampidiro mpamaro tsy mihoatra ny {{max}}",
-    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}."
+    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}"
   },
   "profiles": {
     "title": "mombamomba",

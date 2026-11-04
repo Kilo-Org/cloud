@@ -100,6 +100,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -145,6 +146,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -346,6 +348,13 @@ jobs:
       - name: Test meta-janitor approval gates
         run: node --test scripts/meta-janitor-approve.test.mjs
 
+      # sbom.yml is only reached by a PR that changes the workflow or its test,
+      # and that path set does not trip the kilocode_backend filter that gates
+      # test-scripts. Run the SBOM wiring checks here so a PR cannot drop the
+      # push filter unnoticed.
+      - name: Test SBOM workflow wiring
+        run: node --test scripts/mobile-sbom-workflow.test.mjs
+
   typecheck-groups:
     needs: changes
     if: needs.changes.outputs.typecheck_groups != '[]'
@@ -444,18 +453,9 @@ jobs:
         if: matrix.group == 'trpc'
         uses: ./.github/actions/trpc-declarations
 
-      - name: Cache compiler plugins
+      - name: Restore or build the harness SDK
         if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      - name: Build harness SDK
-        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Lint
         env:
@@ -696,6 +696,9 @@ jobs:
 
       - name: Run Session Ingest Postgres tests
         run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+
+      - name: Run SCIM Sync Postgres tests
+        run: NODE_ENV=development pnpm --filter cloudflare-scim-sync test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
@@ -980,10 +983,6 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next check:duplication
 
-      - name: Run cloud-agent-next SDK provenance tests
-        if: matrix.part == 'other'
-        run: pnpm --filter cloud-agent-next test:sdk-provenance
-
       - name: Run the wrapper process tests
         if: matrix.part == 'wrapper-process'
         working-directory: services/cloud-agent-next/wrapper
@@ -1058,6 +1057,20 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
 
       # No --with-deps: the runner image already ships the Chromium system
       # libraries, and the apt-get behind --with-deps can hang until the job

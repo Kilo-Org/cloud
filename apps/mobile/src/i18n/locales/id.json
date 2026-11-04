@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Terjemahkan ringkasan alat",
     "toolSummaryTranslationSubtitle": "Kirim setiap ringkasan alat ke model untuk diterjemahkan ke bahasa aplikasi Anda. Teks asli ditampilkan jika terjemahan gagal.",
     "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain.",
+    "translateSummaries": "Terjemahkan ringkasan",
     "autoExpandThinkingInactiveSubtitle": "Tidak berpengaruh saat detail pemikiran disembunyikan."
   },
   "notifications": {
@@ -1048,6 +1049,7 @@
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada di REVIEW.md",
       "status": {
+        "open": "Terbuka",
         "edited": "Diedit",
         "opening_change_request": "Membuka PR",
         "change_request_failed": "PR gagal dibuka",
@@ -1083,6 +1085,8 @@
     "overview": {
       "allAreas": "Semua area",
       "nSelected": "{{displayCount}} dipilih",
+      "nSelected_one": "{{displayCount}} dipilih",
+      "nSelected_other": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",
       "set": "Sudah diatur",
       "notSet": "Belum diatur"
@@ -1182,6 +1186,8 @@
       "triageReasoning": "Dasar penilaian triase",
       "watchInCloudAgent": "Pantau di Agen cloud",
       "whereFound": "Lokasi temuan ({{displayCount}})",
+      "whereFound_one": "Lokasi temuan ({{displayCount}})",
+      "whereFound_other": "Lokasi temuan ({{displayCount}})",
       "yes": "Ya",
       "action": {
         "analyzeCodebase": "Analisis basis kode",
@@ -1310,6 +1316,7 @@
       "repoSummaryHigh_other": "{{displayCount}} tinggi",
       "repositoryActionPlan": "Rencana tindakan repositori",
       "settings": "Pengaturan",
+      "syncing": "Menyinkronkan…",
       "syncNow": "Sinkronkan sekarang",
       "syncQueued": "Sinkronisasi diantrekan",
       "syncStatusUnavailable": "Status sinkronisasi tidak tersedia.",
@@ -1340,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} sedang dan rendah",
       "dueThisWeek": "Jatuh tempo minggu ini",
       "dueThisWeekDetail": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail_one": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail_other": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
       "noDeadline": "Tanpa tenggat",
       "reviewSlaAssignment": "Tinjau penetapan SLA",
       "allOpenFindingsTracked": "Semua temuan terbuka sudah dilacak"
@@ -1458,6 +1467,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Pasang aplikasi GitHub Kilo untuk menyinkronkan peringatan Dependabot secara otomatis dan mengelola temuan keamanan di semua repositorimu.",
+      "connectOwnerOnly": "Minta pemilik organisasi atau admin untuk menghubungkan {{platform}}.",
       "connectTitle": "Hubungkan GitHub untuk memulai",
       "couldNotLoad": "Tidak dapat memuat Agen keamanan.",
       "installApp": "Pasang aplikasi GitHub",
@@ -1533,6 +1543,7 @@
       "actionFailed": "Tindakan ini tidak dapat diselesaikan. Coba lagi.",
       "actionBlocked": "Tindakan ini tidak dapat diselesaikan. Masalahnya harus diperbaiki terlebih dahulu sebelum mencoba lagi.",
       "syncNoRepositories": "Tidak ada repositori dalam cakupan sinkronisasi. Pilih repositori yang dipantau Agen keamanan, lalu sinkronkan lagi.",
+      "syncNoRepositoriesNoManage": "Tidak ada repositori dalam cakupan sinkronisasi. Pemilik organisasi, admin, atau manajer penagihan harus menghubungkan repositori sebelum dapat melakukan sinkronisasi.",
       "syncIntegrationInactive": "Koneksi GitHub untuk Agen keamanan tidak aktif. Hubungkan ulang Aplikasi GitHub Kilo, lalu sinkronkan lagi.",
       "syncMissingPermission": "Aplikasi GitHub Kilo tidak dapat membaca vulnerability alerts. Berikan izin tersebut di GitHub, lalu sinkronkan lagi.",
       "configConflict": "Pengaturan Agen keamanan diubah di tempat lain. Tinjau pengaturan terbaru dan simpan lagi."
@@ -1689,6 +1700,8 @@
       "cannotCompleteTitle": "Tidak dapat menyelesaikan pemasangan",
       "notAdminMessage": "Hanya admin GitHub dari akun tersebut yang dapat menghubungkannya. Minta admin organisasi untuk memasang Kilo.",
       "alreadyClaimedMessage": "Instalasi aplikasi GitHub tersebut sudah terhubung ke akun Kilo lain. Putuskan koneksinya dari akun tersebut terlebih dahulu.",
+      "installationUnavailableMessage": "Instalasi GitHub App ini ditangguhkan atau tidak lagi tersedia. Pulihkan atau pasang ulang di GitHub, lalu mulai lagi.",
+      "multipleInstallationsMessage": "Organisasi Kilo ini saat ini hanya dapat menghubungkan satu organisasi GitHub.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan aplikasi GitHub belum selesai. Coba lagi dari aplikasi."
     },
@@ -1831,7 +1844,7 @@
       "discardDraftMessage": "Instruksimu akan hilang.",
       "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardFailed": "Tidak dapat membuang draf. Coba lagi.",
-      "remoteHint": "Jalankan `kilo remote` di komputermu, atau `/remote` dalam sesi CLI yang sedang berjalan, untuk mengendalikan proses kilo lokal.",
+      "remoteHint": "Untuk menjalankan sesi di komputermu, mulailah Kilo di sana dan biarkan tetap berjalan.",
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
@@ -1845,7 +1858,6 @@
       "defaultProfileResolvesTo": "Mengarah ke {{name}}",
       "defaultProfileResolvesToAccessibility": "Profil bawaan: {{name}}",
       "manageProfiles": "Kelola profil",
-      "noProfiles": "Belum ada profil. Buat satu untuk menambahkan variabel lingkungan, server MCP, dan keterampilan.",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
       "saveAsProfile": "Simpan sebagai Profil",
@@ -2531,7 +2543,8 @@
     "newSessionOn": "Sesi baru di {{name}}",
     "noMatchingSessions": "Tidak ada sesi yang cocok.",
     "onlyFirstFilesAttached": "Hanya {{displayCount}} file pertama yang akan dilampirkan.",
-    "staleMessage": "Konten yang dibagikan ini sudah tidak tersedia.",
+    "staleMessage": "Kirim lagi dari aplikasi tempat kamu membagikannya.",
+    "staleTitle": "Berbagi tidak tersedia",
     "retryableMessage": "Tidak dapat memuat sesimu.",
     "emptyMessage": "Belum ada sesi. Mulai sesi baru untuk mengirim konten ini.",
     "cliNotConnectedTitle": "Sesi tidak terhubung",
@@ -2709,8 +2722,13 @@
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
+      "reconnectTitleGitLab": "Hubungkan ulang GitLab",
+      "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
       "gitlabDescription": "Tinjau merge request di perangkat seluler",
+      "gitlabInstanceMismatchTitle": "Koneksi GitLab untuk instance lain",
+      "gitlabInstanceMismatchDescription": "Koneksi GitLab Anda untuk {{connected}}, tetapi merge request ini berada di {{requested}}. Hubungkan GitLab di instance tersebut untuk meninjaunya.",
+      "checkActiveConnection": "Koneksi aktif, tetapi item ini tetap tidak dapat dimuat.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
@@ -2985,7 +3003,6 @@
         "squash": "Ringkas"
       },
       "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
         "closed": "PR ini sudah ditutup",
         "closedMergeRequest": "Merge request ini sudah ditutup"
       },
@@ -3002,7 +3019,6 @@
         "requiredReviewsTitle": "Tinjauan wajib belum lengkap",
         "requiredReviewsDetail": "Persetujuan dari peninjau wajib belum ada atau masih ditunggu.",
         "failingChecksTitle": "Pemeriksaan wajib gagal",
-        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
         "unstableTitle": "Beberapa pemeriksaan gagal",
         "unstableDetail": "Pemeriksaan opsional gagal. Kegagalan ini tidak menghalangi penggabungan.",
         "draftTitle": "Draf PR",
@@ -3109,7 +3125,12 @@
       "pendingComment_other": "komentar belum dikirim",
       "pendingComment_one": "komentar dalam antrean",
       "summaryOptional": "Ringkasan (opsional)",
-      "partialPostedMessage": "{{displayFreshCount}} komentar terkirim. {{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedFresh": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} komentar terkirim. ",
+      "partialPostedStale": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedStale_one": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "partialPostedStale_other": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
@@ -3177,7 +3198,7 @@
       "shareMergeRequest": "Bagikan merge request",
       "viewOnProvider": "Lihat di {{provider}}",
       "mergeRequestUnavailable": "Merge request tidak tersedia",
-      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses ke sana.",
+      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses.",
       "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
       "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
       "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Kirim peringatan lewat email atau push ke kontak penagihan saat pengeluaran cakupan ini melewati batas atau melonjak di atas laju per jam biasanya.",
     "thresholdTitle": "Melewati ambang batas",
-    "thresholdSubtitle": "Pengeluaran berjalan melewati batas kamu",
+    "thresholdSubtitle": "Pengeluaran berjalan cakupan ini selama jendela yang dipilih melewati batas kamu",
     "anomalyTitle": "Lonjakan per jam",
-    "anomalySubtitle": "Satu jam jauh di atas laju biasanya cakupan ini",
+    "anomalySubtitle": "Laju per jam cakupan ini jauh di atas garis dasar p95-nya sendiri",
     "limitLabel": "Batas (USD)",
     "windowLabel": "Jendela",
     "window24h": "24 jam",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
     "pushOffByCategory": "Nonaktif di Notifikasi",
     "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
-    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang."
+    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang"
   },
   "profiles": {
     "title": "Profil",

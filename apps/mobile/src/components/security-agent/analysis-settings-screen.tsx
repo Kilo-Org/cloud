@@ -41,16 +41,61 @@ const ANALYSIS_MODES = [
   { value: 'deep', labelKey: 'securityAgent.analysisMode.deep' },
 ] as const satisfies readonly { value: AnalysisMode; labelKey: string }[];
 
+/**
+ * The loaded screen's line boxes at the app's 14pt rem, so the placeholder
+ * reserves the same frames the content replaces: the `small` depth label
+ * (`text-sm leading-none`, one 12.25pt line), the segmented control (the
+ * group's `p-1` around a 48pt pill, which is how the group measures itself),
+ * and a `ConfigureRow` (a 30pt icon tile beside a 17.5pt title over a 14pt
+ * subtitle behind `mt-0.5`, in `py-3`, with the group's hairline divider under
+ * every row but the last). A bare stack of hand-sized bars made the screen
+ * redraw in a different shape when the config arrived.
+ */
+const LABEL_LINE_CLASS = 'h-[12.25px] justify-center';
+const SEGMENTED_FRAME_CLASS = 'rounded-full p-1';
+const ROW_FRAME_CLASS = 'flex-row items-center gap-3 py-3';
+const ROW_DIVIDER_CLASS = 'border-b-[0.5px] border-hair-soft';
+const ROW_ICON_CLASS = 'h-[30px] w-[30px] rounded-lg';
+const ROW_TITLE_LINE_CLASS = 'h-[17.5px] justify-center';
+const ROW_SUBTITLE_LINE_CLASS = 'mt-0.5 h-[14px] justify-center';
+const ROW_COUNT = 3;
+
 function AnalysisSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader className="px-6" title={t('securityAgent.analysisSettings.title')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
+      {/* A plain body rather than the loaded scroll view: the settings screens
+          guard that no body frame paints before the draft hydrates, and the
+          skeleton's own frames stay out of that check. */}
+      <View className="flex-1 gap-6 px-6 pt-4">
+        <View className="gap-2">
+          <View className={LABEL_LINE_CLASS}>
+            <Skeleton className="h-2.5 w-24 rounded-full" />
+          </View>
+          <View className={SEGMENTED_FRAME_CLASS}>
+            <Skeleton className="h-[48px] w-full rounded-full" />
+          </View>
+        </View>
+        <View>
+          {Array.from({ length: ROW_COUNT }, (_, index) => (
+            <View
+              key={index}
+              className={cn(ROW_FRAME_CLASS, index < ROW_COUNT - 1 && ROW_DIVIDER_CLASS)}
+            >
+              <Skeleton className={ROW_ICON_CLASS} />
+              <View className="flex-1">
+                <View className={ROW_TITLE_LINE_CLASS}>
+                  <Skeleton className="h-3.5 w-2/3 rounded-full" />
+                </View>
+                <View className={ROW_SUBTITLE_LINE_CLASS}>
+                  <Skeleton className="h-2.5 w-1/3 rounded-full" />
+                </View>
+              </View>
+              <Skeleton className="h-3.5 w-3.5 rounded-full" />
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -151,7 +196,15 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
-          openModelPicker(router, { options: models, value, variant: '', onSelect });
+          // The Security Agent config stores a model slug and nothing else, so
+          // the picker must not offer a thinking effort it would have to drop.
+          openModelPicker(router, {
+            options: models,
+            value,
+            variant: '',
+            acceptsVariant: false,
+            onSelect,
+          });
         }
       : undefined;
 

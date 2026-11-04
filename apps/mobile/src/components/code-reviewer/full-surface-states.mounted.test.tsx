@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the code-reviewer surface states */
-import { createElement, type ReactElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode, type Ref } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,6 +73,7 @@ const state = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
   toastError: vi.fn(),
   resync: vi.fn(() => Promise.resolve()),
+  toggleRepo: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
@@ -84,6 +85,7 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   Pressable: 'Pressable',
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -100,19 +102,39 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@shopify/flash-list', async () => {
   // `vi.mock` factories run before the file's imports bind, so React is loaded
   // here rather than from the top-level import.
-  const { createElement: create } = await import('react');
+  const {
+    createElement: create,
+    forwardRef,
+    isValidElement,
+    useImperativeHandle,
+  } = await import('react');
+  // The header and empty slots render as given, so a screen that moved its
+  // controls into the list keeps them reachable from the mounted tree.
+  const slot = (value: unknown) => (isValidElement(value) ? value : null);
   return {
-    FlashList: (props: {
-      data?: unknown[];
-      renderItem: (info: { item: never; index: number }) => ReactNode;
-    }) =>
-      create(
+    FlashList: forwardRef(function FlashListStub(
+      props: {
+        data?: unknown[];
+        renderItem: (info: { item: never; index: number }) => ReactNode;
+        ListHeaderComponent?: unknown;
+        ListEmptyComponent?: unknown;
+      },
+      ref: Ref<unknown>
+    ) {
+      // The screen resets its offset when the query changes, so the stub keeps
+      // the imperative surface the real list exposes.
+      useImperativeHandle(ref, () => ({ scrollToOffset: () => undefined }), []);
+      const data = props.data ?? [];
+      return create(
         'FlashList',
         props,
-        (props.data ?? []).map((item, index) =>
+        slot(props.ListHeaderComponent),
+        data.map((item, index) =>
           create('ReviewRow', { key: index }, props.renderItem({ item: item as never, index }))
-        )
-      ),
+        ),
+        data.length === 0 ? slot(props.ListEmptyComponent) : null
+      );
+    }),
   };
 });
 vi.mock('react-native-reanimated', () => ({
@@ -127,9 +149,11 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: 'ScrollView',
+  TAB_SCREEN_TRAILING_GAP: 16,
   useTabBarBottomPadding: () => 0,
+  useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
 }));
+vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
@@ -139,6 +163,9 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   FolderGit2: 'FolderGit2',
   GitPullRequest: 'GitPullRequest',
+  Search: 'Search',
+  SearchX: 'SearchX',
+  X: 'X',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
@@ -196,7 +223,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useBitbucketReadiness: () => state.bitbucket,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
-  useRepoSelectionToggle: () => vi.fn(),
+  useRepoSelectionToggle: () => state.toggleRepo,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
   useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
@@ -293,10 +320,32 @@ function firstRowAge(renderer: Awaited<ReturnType<typeof renderWithProviders>>['
 
 /** The GitHub empty state's action button, typed enough for oxlint. */
 function pressManageAccess(renderer: RenderWithProvidersResult['renderer']) {
-  const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
-  const empty = scroll.find(node => String(node.type) === 'EmptyState');
+  const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
   const action = empty.props.action as { props: { onPress: () => void } };
   action.props.onPress();
+}
+
+/** The rows the list is drawing, in list order. */
+function rows(renderer: RenderWithProvidersResult['renderer']) {
+  return firstList(renderer).findAll(node => String(node.type) === 'RepoToggleRow');
+}
+
+/** The full names of the rows on screen, in list order. */
+function rowNames(renderer: RenderWithProvidersResult['renderer']): string[] {
+  return rows(renderer).map(row => {
+    // The row stub is a host node, so the test renderer exposes its props
+    // untyped; this suite's own mock defines the shape.
+    const { repo } = row.props as { repo: { fullName: string } };
+    return repo.fullName;
+  });
+}
+
+/** Types into the query field the way the native field reports it. */
+function typeQuery(renderer: RenderWithProvidersResult['renderer'], query: string) {
+  const input = renderer.root.findByType('TextInput');
+  act(() => {
+    (input.props.onChangeText as (text: string) => void)(query);
+  });
 }
 
 describe('Reviewer repository bodies', () => {
@@ -316,9 +365,9 @@ describe('Reviewer repository bodies', () => {
   it('keeps the GitHub empty state beside its selection controls', async () => {
     state.platform = 'github';
     const { renderer, unmount } = await renderWithProviders(reposRoute());
-    const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
-    expect(scroll.find(node => String(node.type) === 'RadioGroup')).toBeDefined();
-    expect(scroll.find(node => String(node.type) === 'EmptyState').props.placement).toBe('top');
+    const list = firstList(renderer);
+    expect(list.find(node => String(node.type) === 'RadioGroup')).toBeDefined();
+    expect(list.find(node => String(node.type) === 'EmptyState').props.placement).toBe('top');
     unmount();
   });
 
@@ -382,9 +431,63 @@ describe('Reviewer repository bodies', () => {
     state.repositories.isError = true;
     state.repositories.data = { repositories: [{ id: 1, fullName: 'org/repo', private: false }] };
     const { renderer, unmount } = await renderWithProviders(reposRoute());
-    const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
-    expect(scroll.find(node => String(node.type) === 'RepoToggleRow')).toBeDefined();
-    expect(scroll.find(node => String(node.type) === 'QueryError').props.placement).toBe('top');
+    const list = firstList(renderer);
+    expect(list.find(node => String(node.type) === 'RepoToggleRow')).toBeDefined();
+    expect(list.find(node => String(node.type) === 'QueryError').props.placement).toBe('top');
+    unmount();
+  });
+});
+
+// A snapshot long enough to scroll is only usable if the reader can narrow it.
+// The rows come from the query; a row the query hides keeps its place in the
+// stored selection, so clearing the query brings every row back.
+describe('repository search', () => {
+  const REPOSITORIES = [
+    { id: 1, fullName: 'kilo-org/cloud', private: false },
+    { id: 2, fullName: 'kilo-org/cloud-tools', private: true },
+    { id: 3, fullName: 'other-lab/website', private: false },
+  ];
+  const ALL_NAMES = REPOSITORIES.map(repository => repository.fullName);
+
+  beforeEach(() => {
+    state.platform = 'github';
+    state.repositories.data = { repositories: REPOSITORIES };
+  });
+
+  it('narrows the rows to a case-insensitive name fragment and restores them on clear', async () => {
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    expect(rowNames(renderer)).toEqual(ALL_NAMES);
+
+    typeQuery(renderer, 'CLOUD');
+    expect(rowNames(renderer)).toEqual(['kilo-org/cloud', 'kilo-org/cloud-tools']);
+
+    typeQuery(renderer, '');
+    expect(rowNames(renderer)).toEqual(ALL_NAMES);
+    unmount();
+  });
+
+  it('reports a toggle on a filtered row with that row id', async () => {
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    typeQuery(renderer, 'website');
+    const row = rows(renderer)[0];
+    if (!row) {
+      throw new Error('the filtered row was not rendered');
+    }
+    const { onPress } = row.props as { onPress: () => void };
+    act(() => {
+      onPress();
+    });
+    expect(state.toggleRepo).toHaveBeenCalledWith(3);
+    unmount();
+  });
+
+  it('shows the empty result state when nothing matches', async () => {
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    typeQuery(renderer, 'missing');
+    expect(rows(renderer)).toHaveLength(0);
+    expect(renderer.root.find(node => String(node.type) === 'EmptyState').props.title).toBe(
+      'No matches'
+    );
     unmount();
   });
 });

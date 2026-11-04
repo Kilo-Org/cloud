@@ -7,8 +7,14 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
-import { _resetGlanceablePersistForTests, _setLastGlanceableSnapshotForTests } from './persist';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests as _setPersistSecureStoreForTests,
+  restorePersistedGlanceable,
+} from './persist';
 import {
   _flushWaitingAskMirrorForTests,
   _resetWaitingAskForTests,
@@ -23,6 +29,8 @@ import {
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 const ASK_KEY = 'glanceable-waiting-ask';
+const SNAPSHOT_KEY = 'glanceable-snapshot';
+const LEGACY_SCOPE_KEY = 'glanceable-scope-key';
 
 const store = new Map<string, string>();
 
@@ -219,6 +227,9 @@ describe('waiting ask store', () => {
     _resetWaitingAskForTests();
     _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
+    // The restore and the ask read the same keychain, so both modules take the
+    // one fake store.
+    _setPersistSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
   });
@@ -404,9 +415,126 @@ describe('waiting ask store', () => {
     // is still on disk; hydration must not accept the ask without a scope to
     // fence it.
     _resetGlanceablePersistForTests();
+    _setPersistSecureStoreForTests(secureStoreMock);
 
     await expect(readWaitingAsk()).resolves.toBeNull();
     expect(getWaitingAsk()).toBeNull();
+  });
+
+  // The headless paths restore the snapshot, then read the ask. The record on
+  // disk names the account that published it; when that is not the account
+  // holding the device, the ask it was written beside must not be hydrated.
+  it('drops the ask that sits beside a restored record of another account', async () => {
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(
+      SNAPSHOT_KEY,
+      JSON.stringify(
+        buildGlanceableSnapshot({
+          sessions: [],
+          userId: 'u2',
+          organizationId: null,
+          now: NOW,
+        })
+      )
+    );
+    store.set(ASK_KEY, JSON.stringify(askFor({ scopeKey: otherScope, userId: 'u2' })));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+    // The record is not left for whichever account reads the device next.
+    await _flushWaitingAskMirrorForTests();
+    expect(store.has(ASK_KEY)).toBe(false);
+  });
+
+  it('keeps the ask that sits beside a restored record of the signed-in account', async () => {
+    const ask = askFor();
+    store.set(
+      SNAPSHOT_KEY,
+      JSON.stringify(
+        buildGlanceableSnapshot({
+          sessions: [],
+          userId: 'u1',
+          organizationId: null,
+          now: NOW,
+        })
+      )
+    );
+    store.set(ASK_KEY, JSON.stringify(ask));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
+  });
+
+  // The previous release kept the scope key in its own entry. It names the
+  // scope that wrote it, so on an account that does not match it must not fence
+  // an ask on its own.
+  it('drops an ask the previous release fenced with another account scope key', async () => {
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(LEGACY_SCOPE_KEY, otherScope);
+    store.set(ASK_KEY, JSON.stringify(askFor({ scopeKey: otherScope, userId: 'u2' })));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  it('keeps an ask fenced by a legacy scope key of the signed-in account', async () => {
+    const scopeKey = buildOpaqueScopeKey(CTX);
+    store.set(LEGACY_SCOPE_KEY, scopeKey);
+    store.set(ASK_KEY, JSON.stringify(askFor()));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+    await expect(readWaitingAsk()).resolves.toEqual(askFor());
+  });
+
+  // Every surface reads the ask at draw time. An account switch publishes the
+  // new scope's frame before the next ask selection lands, and the actions of
+  // the scope that just ended must not survive it.
+  it('stops offering the ask once the process publishes another scope', async () => {
+    const ask = askFor();
+    recordWaitingAsk(ask);
+    expect(getWaitingAsk()).toEqual(ask);
+
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: 'u2',
+        organizationId: null,
+        now: NOW,
+      })
+    );
+
+    expect(getWaitingAsk()).toBeNull();
+    await expect(readWaitingAsk()).resolves.toBeNull();
+  });
+
+  // The platform sinks draw a frame before the persist sink writes it, and the
+  // publisher records the ask before it emits: the record's own scope is the
+  // one the frame belongs to, so the first frame of a new scope already offers
+  // the ask it selected.
+  it('draws the ask the next frame records before that frame reaches the sink', () => {
+    recordWaitingAsk(askFor());
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+      })
+    );
+
+    const nextCtx = { userId: 'u2', organizationId: null };
+    const next = askFor({ scopeKey: buildOpaqueScopeKey(nextCtx), userId: 'u2' });
+    recordWaitingAsk(next);
+
+    expect(getWaitingAsk()).toEqual(next);
   });
 
   it('treats a malformed mirror as absent', async () => {

@@ -1,10 +1,6 @@
 import { NextRequest } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import {
-  createSalesDemoOrganization,
-  restoreSalesDemoOrganization,
-  salesDemoMemberId,
-} from '@/lib/organizations/sales-demo';
+import { restoreSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
@@ -83,9 +79,11 @@ describe('GET /api/cron/sales-demo-reset failure handling', () => {
   it('logs, captures the exception, counts the failure, and still returns 200', async () => {
     mockedRestoreSalesDemoOrganization.mockRejectedValueOnce(new Error('boom'));
 
-    await db.transaction(async tx =>
-      createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn: tx })
-    );
+    await db.insert(organizations).values({
+      name: 'Sales Demo Cron Failure',
+      created_by_kilo_user_id: target.id,
+      settings: { is_sales_demo: true },
+    });
 
     const response = await GET(
       new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', {

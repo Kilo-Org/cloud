@@ -234,7 +234,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoAnalysis')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoAnalysis')}
               subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
@@ -267,7 +267,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoRemediation')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoRemediation')}
               subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
@@ -309,7 +309,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoDismiss')}
           </Text>
-          <View className="gap-2">
+          <View className="gap-3">
             <ToggleRow
               title={t('securityAgent.automation.enableAutoDismiss')}
               subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}

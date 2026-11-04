@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Itzuli tresnen laburpenak",
     "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
     "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko.",
+    "translateSummaries": "Itzuli laburpenak",
     "autoExpandThinkingInactiveSubtitle": "Ez du eraginik pentsamenduaren xehetasunak ezkutatuta dauden bitartean."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Oinarri-aldaketa"
       },
       "terminal": {
-        "alreadyMerged": "Dagoeneko bateratuta",
         "closed": "Bateratze-eskaera hau itxita dago",
         "closedMergeRequest": "Merge-eskaera hau itxita dago"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Beharrezko berrikuspenak falta dira",
         "requiredReviewsDetail": "Beharrezko berrikusleen onespenak falta dira edo jasotzeko daude.",
         "failingChecksTitle": "Beharrezko egiaztapenek huts egiten dute",
-        "failingChecksDetail": "Beharrezko egoera-egiaztapenek huts egiten dute.",
         "unstableTitle": "Egiaztapen batzuek huts egiten dute",
         "unstableDetail": "Beharrezkoak ez diren egiaztapenek huts egiten dute. Ez dute bateratzea eragotziko.",
         "draftTitle": "Bateratze-eskaeraren zirriborroa",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
       "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
+      "reconnectTitleGitLab": "Konektatu GitLab berriro",
+      "reconnectTitleBitbucket": "Konektatu Bitbucket berriro",
       "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da.",
       "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
+      "gitlabInstanceMismatchTitle": "GitLab konexioa beste instantzia baterako da",
+      "gitlabInstanceMismatchDescription": "Zure GitLab konexioa {{connected}}-rako da, baina merge-eskaera hau {{requested}}-n dago. Konektatu GitLab instantzia horretan berrikusteko.",
+      "checkActiveConnection": "Konexioa aktibo dago, baina elementu hau oraindik ezin da kargatu.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
-      "partialPostedMessage": "{{displayFreshCount}} iruzkin argitaratu dira. Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedStale": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_one": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_other": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
       "blockedRequestChanges": "Gehitu laburpen bat edo gutxienez iruzkin bat aldaketak eskatzeko.",
       "blockedComment": "Gehitu laburpen bat edo gutxienez iruzkin bat berrikuspena iruzkin gisa argitaratzeko."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "Partekatu merge-eskaera",
       "viewOnProvider": "Ikusi {{provider}}(e)n",
       "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",
-      "unavailableDescription": "Baliteke ezabatuta egotea, edo agian ez duzu sarbiderik.",
+      "unavailableDescription": "Baliteke ezabatuta egotea edo agian ez duzu sarbiderik.",
       "accessDeniedMergeRequest": "Ez duzu baimenik merge-eskaera hau ikusteko.",
       "couldNotLoadMergeRequest": "Ezin izan da merge-eskaera kargatu.",
       "discussionAccessDenied": "Ez duzu baimenik merge-eskaera honen eztabaida ikusteko.",
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
       "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
       "status": {
+        "open": "Irekita",
         "edited": "Editatuta",
         "opening_change_request": "PRa irekitzen",
         "change_request_failed": "PRak huts egin du",
@@ -1610,6 +1620,8 @@
       "set": "Ezarrita",
       "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
+      "nSelected_one": "{{displayCount}} hautatuta",
+      "nSelected_other": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Ustiagarritasunari buruzko arrazoibidea",
       "suggestedFix": "Proposatutako konponketa",
       "whereFound": "Non aurkitu den ({{displayCount}})",
+      "whereFound_one": "Non aurkitu den ({{displayCount}})",
+      "whereFound_other": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
       "no": "Ez",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Lehentasunezko aurkikuntzak lehen sinkronizazioaren ondoren agertuko dira.",
       "refreshFailed": "Ezin izan dira datuak eguneratu. Azken sinkronizazioko datuak erakusten dira.",
       "settings": "Ezarpenak",
+      "syncing": "Sinkronizatzen…",
       "syncNow": "Sinkronizatu orain",
       "syncQueued": "Sinkronizazioa ilaran",
       "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} larritasun ertaineko eta txikiko",
       "dueThisWeek": "Aste honetan amaitzen da",
       "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_one": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_other": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
       "reviewSlaAssignment": "Berrikusi SLAren esleipena",
       "allOpenFindingsTracked": "Aurkikuntza ireki guztien jarraipena egiten da"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instalatu Kiloren GitHub aplikazioa Dependabot-en abisuak automatikoki sinkronizatzeko eta zure biltegietako segurtasun-aurkikuntzak kudeatzeko.",
+      "connectOwnerOnly": "Eskatu erakundeko jabe bati edo administratzaile bati {{platform}} konekta dezan.",
       "connectTitle": "Konektatu GitHub hasteko",
       "couldNotLoad": "Ezin izan da segurtasun-agentea kargatu.",
       "installApp": "Instalatu GitHub aplikazioa",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncNoRepositoriesNoManage": "Ez dago biltegirik sinkronizazio-esparruan. Erakundeko jabe batek, administratzaile batek edo fakturazio-kudeatzaile batek biltegiak konektatu behar ditu sinkronizatu ahal izateko.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
       "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
       "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Ezin da instalazioa osatu",
       "notAdminMessage": "Kontu hori haren GitHub administratzaile batek soilik konekta dezake. Eskatu erakundeko administratzaile bati Kilo instalatzeko.",
       "alreadyClaimedMessage": "GitHub instalazio hori jada beste Kilo kontu batekin konektatuta dago. Deskonektatu lehenengo han.",
+      "installationUnavailableMessage": "GitHub App instalazio hau etenda dago edo jada ez dago erabilgarri. Berrezarri edo instalatu berriro GitHub-en, eta gero hasi berriro.",
+      "multipleInstallationsMessage": "Kilo erakunde honek une honetan soilik GitHub erakunde bat konekta dezake.",
       "didNotCompleteTitle": "Instalazioa ez da osatu",
       "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },
@@ -2362,7 +2383,7 @@
       "discardDraftMessage": "Zure eskaera galduko da.",
       "discardWithUploadsMessage": "Zure eskaera eta igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
       "discardFailed": "Ezin izan da zirriborroa baztertu. Saiatu berriro.",
-      "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko.",
+      "remoteHint": "Zure ordenagailuan exekutatzeko, abiarazi Kilo han eta utzi martxan.",
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Une honetan {{name}} da",
       "defaultProfileResolvesToAccessibility": "Profil lehenetsia: {{name}}",
       "manageProfiles": "Kudeatu profilak",
-      "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
       "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Klonatzen berriro saiatzen ({{total}} saiotatik {{attempt}}. saiakera)",
       "detailSetupCommandFailed": "{{index}}. konfigurazio-komandoak huts egin du",
       "detailSetupCommandTimedOut": "{{index}}. konfigurazio-komandoaren denbora-muga gainditu da",
-      "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, {{total}} fitxategitatik {{applied}} berrezarri dira",
+      "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, berrezarritako fitxategiak: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% osatuta",
-      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe: {{total}} fitxategitatik {{skipped}} ez dira berrezarri ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe, berrezarri gabeko fitxategiak: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Falta dira: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} eta beste {{omitted}}",
       "detailReasonPatchFailed": "adabakia ezin izan da aplikatu",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Saio berria {{name}} izeneko instantzian",
     "noMatchingSessions": "Ez dago bat datorren saiorik.",
     "onlyFirstFilesAttached": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira.",
-    "staleMessage": "Partekatutako eduki hau ez dago jada eskuragarri.",
+    "staleMessage": "Bidali berriro partekatu zenuen aplikaziotik.",
+    "staleTitle": "Ezin da partekatu",
     "retryableMessage": "Ezin izan dira zure saioak kargatu.",
     "emptyMessage": "Oraindik ez dago saiorik — hasi berri bat hau bidaltzeko.",
     "cliNotConnectedTitle": "Saioa ez dago konektatuta",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
     "thresholdTitle": "Atalasaren gainditzea",
-    "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
+    "thresholdSubtitle": "Eremu honen metatutako gastuak aukeratutako leihoan zehar zure muga gainditzen du",
     "anomalyTitle": "Orduko gorakada",
-    "anomalySubtitle": "Ordu bat eremu honen ohiko tasatik oso gainetik dago",
+    "anomalySubtitle": "Eremu honen orduko tasa bere p95 oinarritik oso gainetik dago",
     "limitLabel": "Muga (USD)",
     "windowLabel": "Leihoa",
     "window24h": "24 ordu",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
     "pushOffByCategory": "Jakinarazpenetan itzalita",
     "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
-    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat."
+    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat"
   },
   "profiles": {
     "title": "Profilak",

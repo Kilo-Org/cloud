@@ -36,6 +36,13 @@ describe('profilePickerFixtureRoute', () => {
     expect(slot.set.mock.calls[1]?.[1]).toMatchObject({ organizationId: 'org-1' });
   });
 
+  it('keeps an empty org value in the personal scope', () => {
+    expect(profilePickerFixtureRoute('/dev/profile-picker-fixture?org=')).toBe(
+      '/(app)/agent-chat/profile-picker'
+    );
+    expect(slot.set.mock.calls[0]?.[1]).toMatchObject({ organizationId: undefined });
+  });
+
   it('opens the sheet in the organization scope the link names', () => {
     expect(profilePickerFixtureRoute('/dev/profile-picker-fixture?org=org-1')).toBe(
       '/(app)/agent-chat/profile-picker'

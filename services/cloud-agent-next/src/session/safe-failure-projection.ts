@@ -63,6 +63,7 @@ const GENERIC_FAILURE_MESSAGES = {
     'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
     'Concurrent container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
   user_interrupt: 'The message was interrupted by the user',
   container_shutdown: 'The agent container shut down',
   system_interrupt: 'The message was interrupted',

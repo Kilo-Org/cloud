@@ -37,10 +37,14 @@ import {
   baseSendMessageNextSchema,
   baseGetMessageResultNextSchema,
   baseGetMessageResultNextOutputSchema,
+  baseListChildSessionsNextSchema,
+  baseListChildSessionsNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseGetEgressAuditNextSchema,
+  baseGetEgressAuditNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -337,6 +341,24 @@ export const cloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * List the sessions directly created by the current workspace-scoped parent.
+   * Requires the delegated parent authority; the Worker re-validates lineage.
+   */
+  listChildSessions: baseProcedure
+    .input(baseListChildSessionsNextSchema)
+    .output(baseListChildSessionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      if (ctx.cloudAgentAuthority === undefined) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Cloud Agent authority required',
+        });
+      }
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).listChildSessions(input);
+    }),
+
+  /**
    * Send a message to an existing session (V2 - WebSocket-based).
    *
    * Returns immediately with execution info and WebSocket URL for streaming.
@@ -413,10 +435,23 @@ export const cloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Read one message's lifecycle result.
+   *
+   * `expectedWorktreeId` is required for ordinary user calls and optional only
+   * for delegated Cloud Agent authority, where the Worker re-checks direct-child
+   * lineage. Ownership checks stay mandatory for both paths.
+   */
   getMessageResult: baseProcedure
     .input(baseGetMessageResultNextSchema)
     .output(baseGetMessageResultNextOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
+      if (ctx.cloudAgentAuthority === undefined && input.expectedWorktreeId === undefined) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'expectedWorktreeId is required',
+        });
+      }
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
       const client = createCloudAgentNextClient(
         await createCloudAgentControlToken(ctx.user, ctx.headersList)
@@ -688,6 +723,16 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  getEgressAudit: baseProcedure
+    .input(baseGetEgressAuditNextSchema)
+    .output(baseGetEgressAuditNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      return await createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      ).getEgressAudit(input);
     }),
 
   getSandboxStatus: baseProcedure

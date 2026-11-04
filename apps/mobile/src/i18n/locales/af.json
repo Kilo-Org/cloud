@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
     "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies.",
+    "translateSummaries": "Vertaal opsommings",
     "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Herbasering"
       },
       "terminal": {
-        "alreadyMerged": "Reeds saamgevoeg",
         "closed": "Hierdie trekversoek is gesluit",
         "closedMergeRequest": "Hierdie merge request is gesluit"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Vereiste hersienings ontbreek",
         "requiredReviewsDetail": "Goedkeurings van die vereiste hersieners ontbreek of is nog uitstaande.",
         "failingChecksTitle": "Vereiste kontroles misluk",
-        "failingChecksDetail": "Vereiste statuskontroles misluk.",
         "unstableTitle": "Sommige kontroles misluk",
         "unstableDetail": "Sommige opsionele kontroles misluk. Dit sal nie die samevoeging blokkeer nie.",
         "draftTitle": "Konseptrekversoek",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Kon nie die Bitbucket-verbinding kontroleer nie.",
       "providerCheckFailedMessage": "Verbindingsstatus is nie beskikbaar voordat die laai voltooi is nie.",
       "reconnectTitle": "Koppel GitHub weer",
+      "reconnectTitleGitLab": "Koppel GitLab weer",
+      "reconnectTitleBitbucket": "Koppel Bitbucket weer",
       "reconnectDescription": "Jou GitHub-verbinding is herroep.",
       "gitlabDescription": "Hersien merge requests op jou selfoon",
+      "gitlabInstanceMismatchTitle": "GitLab-koppeling is vir 'n ander instansie",
+      "gitlabInstanceMismatchDescription": "Jou GitLab-koppeling is vir {{connected}}, maar hierdie merge request is op {{requested}}. Koppel GitLab op daardie instansie om dit te hersien.",
+      "checkActiveConnection": "Die koppeling is aktief, maar hierdie item kan steeds nie gelaai word nie.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
       "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
-      "partialPostedMessage": "{{displayFreshCount}} kommentaar(e) is geplaas. {{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedStale": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedStale_one": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedStale_other": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
       "blockedRequestChanges": "Voeg 'n opsomming of minstens een kommentaar by om veranderings te versoek.",
       "blockedComment": "Voeg 'n opsomming of minstens een kommentaar by om 'n hersiening met kommentaar te plaas."
     },
@@ -821,7 +830,7 @@
       "shareMergeRequest": "Deel merge request",
       "viewOnProvider": "Bekyk op {{provider}}",
       "mergeRequestUnavailable": "Merge request onbeskikbaar",
-      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
+      "unavailableDescription": "Dit is dalk uitgevee, of jy het moontlik nie toegang daartoe nie.",
       "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
       "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
       "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
@@ -1523,6 +1532,7 @@
       "prOpened": "Pull request vir REVIEW.md oopgemaak",
       "alreadyPresent": "Riglyne is reeds in REVIEW.md",
       "status": {
+        "open": "Oop",
         "edited": "Gewysig",
         "opening_change_request": "Maak PR oop",
         "change_request_failed": "PR het misluk",
@@ -1610,6 +1620,8 @@
       "set": "Ingestel",
       "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
+      "nSelected_one": "{{displayCount}} gekies",
+      "nSelected_other": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Redes vir uitbuitbaarheidsoordeel",
       "suggestedFix": "Voorgestelde regstelling",
       "whereFound": "Waar dit gevind is ({{displayCount}})",
+      "whereFound_one": "Waar dit gevind is ({{displayCount}})",
+      "whereFound_other": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "yes": "Ja",
       "no": "Nee",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Prioriteitsbevindings sal verskyn nadat die eerste sinkronisasie voltooi is.",
       "refreshFailed": "Die data kon nie verfris word nie. Die laaste gesinkroniseerde data word gewys.",
       "settings": "Instellings",
+      "syncing": "Sinkroniseer tans…",
       "syncNow": "Sinkroniseer nou",
       "syncQueued": "Sinkronisasie in die tou geplaas",
       "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} matig en laag",
       "dueThisWeek": "Sperdatum hierdie week",
       "dueThisWeekDetail": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
+      "dueThisWeekDetail_one": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
+      "dueThisWeekDetail_other": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
       "noDeadline": "Geen sperdatum nie",
       "reviewSlaAssignment": "Hersien SLA-toewysing",
       "allOpenFindingsTracked": "Alle oop bevindings word gemonitor"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installeer die Kilo GitHub-app om Dependabot-waarskuwings outomaties te sinkroniseer en sekuriteitsbevindings in jou bewaarplekke te bestuur.",
+      "connectOwnerOnly": "Vra 'n organisasie-eienaar of administrateur om {{platform}} te koppel.",
       "connectTitle": "Koppel GitHub om te begin",
       "couldNotLoad": "Die Sekuriteitsagent kon nie gelaai word nie.",
       "installApp": "Installeer die GitHub-app",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer.",
       "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer.",
       "syncNoRepositories": "Geen bewaarplekke is in die sinkroniseringsomvang nie. Kies die bewaarplekke wat die Sekuriteitsagent monitor en sinkroniseer dan weer.",
+      "syncNoRepositoriesNoManage": "Geen bewaarplekke is in die sinkroniseringsomvang nie. 'n Organisasie-eienaar, administrateur of faktureringsbestuurder moet bewaarplekke koppel voordat dit kan sinkroniseer.",
       "syncIntegrationInactive": "Die GitHub-verbinding vir die Sekuriteitsagent is nie aktief nie. Herkoppel die Kilo GitHub-app en sinkroniseer dan weer.",
       "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer.",
       "configConflict": "Die Sekuriteitsagent se instellings is elders verander. Hersien die nuutste instellings en stoor weer."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Kan installasie nie voltooi nie",
       "notAdminMessage": "Slegs 'n GitHub-administrateur van daardie rekening kan dit koppel. Vra 'n administrateur van die organisasie om Kilo te installeer.",
       "alreadyClaimedMessage": "Daardie GitHub-installasie is reeds aan 'n ander Kilo-rekening gekoppel. Ontkoppel dit eers daar.",
+      "installationUnavailableMessage": "Hierdie GitHub App-installasie is opgeskort of nie meer beskikbaar nie. Herstel of herinstalleer dit in GitHub en begin dan weer.",
+      "multipleInstallationsMessage": "Hierdie Kilo-organisasie kan tans slegs een GitHub-organisasie koppel.",
       "didNotCompleteTitle": "Installasie is nie voltooi nie",
       "didNotCompleteMessage": "Die GitHub-toepinstallasie is nie voltooi nie. Probeer weer vanuit die toep."
     },
@@ -2362,7 +2383,7 @@
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
       "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
-      "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n aktiewe CLI-sessie, om 'n plaaslike kilo-proses te beheer.",
+      "remoteHint": "Om op jou rekenaar uit te voer, moet jy Kilo daar begin en laat loop.",
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Los tans op {{name}}",
       "defaultProfileResolvesToAccessibility": "Verstek profiel: {{name}}",
       "manageProfiles": "Bestuur profiele",
-      "noProfiles": "Nog geen profiele nie. Skep een om omgewingsveranderlikes, MCP-bedieners en vaardighede by te voeg.",
       "advancedConfig": "Gevorderde konfigurasie",
       "advancedConfigDescription": "Geld vir hierdie sessie. As jy dit as profiel stoor, bly dit vir volgende keer.",
       "saveAsProfile": "Stoor as profiel",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Probeer kloon weer (poging {{attempt}} van {{total}})",
       "detailSetupCommandFailed": "Opstelopdrag {{index}} het misluk",
       "detailSetupCommandTimedOut": "Opstelopdrag {{index}} se tyd het uitgeloop",
-      "detailColdRestore": "Koue herstel, momentopname toegepas, {{applied}} van {{total}} lêers herstel",
+      "detailColdRestore": "Koue herstel, momentopname toegepas, herstelde lêers: {{applied}} van {{total}}",
       "detailProgressPercent": "{{percent}}% voltooi",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sessieherstel onvolledig, nie-herstelde lêers: {{skipped}} van {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbreek: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "die pleister is nie toegepas nie",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Nuwe sessie op {{name}}",
     "noMatchingSessions": "Geen ooreenstemmende sessies nie.",
     "onlyFirstFilesAttached": "Slegs die eerste {{displayCount}} lêers sal aangeheg word.",
-    "staleMessage": "Hierdie gedeelde inhoud is nie meer beskikbaar nie.",
+    "staleMessage": "Stuur dit weer uit die toep waaruit jy dit gedeel het.",
+    "staleTitle": "Deling nie beskikbaar nie",
     "retryableMessage": "Kon nie jou sessies laai nie.",
     "emptyMessage": "Nog geen sessies nie — begin 'n nuwe een om dit te stuur.",
     "cliNotConnectedTitle": "Sessie nie gekoppel nie",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
     "thresholdTitle": "Oorskryding van drempel",
-    "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
+    "thresholdSubtitle": "Hierdie omvang se lopende besteding oor die gekose venster oorskry jou limiet",
     "anomalyTitle": "Uurlikse piek",
-    "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
+    "anomalySubtitle": "Hierdie omvang se uurlikse tempo is ver bo sy eie p95-basislyn",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
     "window24h": "24 uur",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
     "pushOffByCategory": "Af in Kennisgewings",
     "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in."
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in"
   },
   "profiles": {
     "title": "Profiele",

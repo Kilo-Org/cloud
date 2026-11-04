@@ -69,21 +69,6 @@ catalogs:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
-  - '@cloudflare/sandbox@0.12.12'
-  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
-  # wrangler 4.134.0 is the first release with local development support for
-  # DO-managed Containers (named-image selection via ctx.container.images).
-  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
-  # are exempted with it. Approved early-access exception; remove all eight entries
-  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
-  - wrangler@4.135.0
-  - workerd@1.20260918.1
-  - miniflare@5.20260918.0-alpha
-  - '@cloudflare/workerd-darwin-64@1.20260918.1'
-  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
-  - '@cloudflare/workerd-linux-64@1.20260918.1'
-  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
-  - '@cloudflare/workerd-windows-64@1.20260918.1'
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -165,14 +150,14 @@ overrides:
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
   form-data: 4.0.6
-  follow-redirects: 1.16.1
+  follow-redirects: 1.16.2
   ws@^7: 7.5.11
   ws@^8: 8.21.0
   tmp: 0.2.7
   dompurify: 3.4.17
   handlebars: 4.7.10
   brace-expansion: 5.0.12
-  node-forge: 1.4.0
+  node-forge: 1.4.2
   proxy-addr: 2.0.8
   compression: 1.8.2
   source-map-js: 1.2.2
@@ -238,7 +223,7 @@ overrides:
   lightningcss: 1.30.1
   axios: 1.20.0
   fast-uri: 3.1.8
-  joi: 17.13.8
+  joi: 17.13.9
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
   webpack-dev-middleware@^6: 7.4.6

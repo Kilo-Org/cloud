@@ -34,6 +34,13 @@ const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
   useGrouping: false,
 };
 
+/**
+ * A disclosure names the limit to the nearest hundredth of a minute, so a
+ * duration that is not a whole number of minutes reads as `0.13`, not as the
+ * full quotient. Locale formatting supplies the decimal separator.
+ */
+const SAFEGUARD_DISCLOSURE_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
+
 export function BriefingContextSettings({
   preference,
   defaultModel,
@@ -141,7 +148,7 @@ export function BriefingContextSettings({
       t('agentBriefing.paidDisclosure', {
         estimate: briefingMoney(quote.estimatedCostMicrodollars, i18n.language),
         maximum: briefingMoney(quote.maximumCostMicrodollars, i18n.language),
-        minutes: quote.maxDurationSeconds / 60,
+        minutes: formatNumber(quote.maxDurationSeconds / 60, locale, SAFEGUARD_DISCLOSURE_FORMAT),
       }),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -195,6 +202,9 @@ export function BriefingContextSettings({
         options={catalog.models}
         isLoading={catalog.isLoading}
         disabled={offline || update.isPending}
+        // The brief's context stores a model slug only, so the picker must not
+        // offer a thinking effort it would have to drop.
+        acceptsVariant={false}
         onSelect={id => {
           setModel(id);
         }}

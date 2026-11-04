@@ -9,6 +9,9 @@ coupon-allocation contract was verified in Stripe test mode on 2026-08-10; resul
 under Invariants. On 2026-08-11, finance/tax treatment was confirmed: the 5% service-fee line uses
 the same Stripe `tax_behavior` as the eligible product it accompanies.
 
+On 2026-11-02, fee collection was disabled by moving the activation instant to
+`2099-01-01T00:00:00Z`. Re-enabling requires choosing a new activation instant.
+
 Planning detail lives in `.plans/service-fees/GOAL.md` and `.plans/service-fees/SPEC.md`. That
 directory is not tracked, so this ADR is the durable record.
 

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
+import { clearAcceptedBack } from '@/lib/navigation/leave-settle';
 
 export type MetadataLeaveGuard = Readonly<{
   /** Wire this to the metadata form's `onDirtyChange`. */
@@ -85,6 +86,10 @@ export function useMetadataLeaveGuard({
       },
       onCancel: () => {
         pendingLeaveRef.current = null;
+        // The Back that opened this prompt never leaves the screen, so the
+        // dismissal it would otherwise suppress is live again — a delete that
+        // resolves now must still pop.
+        clearAcceptedBack();
       },
     });
   });

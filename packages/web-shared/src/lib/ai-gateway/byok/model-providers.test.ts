@@ -10,7 +10,6 @@ import {
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { StoredModel } from '@kilocode/db';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -128,15 +127,13 @@ describe('getModelUserByokProviders', () => {
     expect(getVercelModelsMetadataFromDatabase).not.toHaveBeenCalled();
   });
 
-  test.each(['vendor/model:free', kiloExclusiveModels[0].public_id])(
-    'keeps %s on Kilo accounts',
-    async modelId => {
-      jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([modelId]));
+  test('keeps free models on Kilo accounts', async () => {
+    const modelId = 'vendor/model:free';
+    jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([modelId]));
 
-      const providers = await getModelUserByokProviders(modelId);
+    const providers = await getModelUserByokProviders(modelId);
 
-      expect(providers).not.toContain('vercel-ai-gateway');
-      expect(providers).not.toContain('openrouter');
-    }
-  );
+    expect(providers).not.toContain('vercel-ai-gateway');
+    expect(providers).not.toContain('openrouter');
+  });
 });

@@ -1,4 +1,6 @@
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { applyPricingTiers } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
@@ -7,6 +9,17 @@ import { isCustomLlmDeniedInCountry } from './country-deny-list';
 
 const PRIVATE_CUSTOM_LLM_DESCRIPTION =
   'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
+
+const FREE_PRICING = {
+  prompt: '0',
+  completion: '0',
+  request: '0',
+  image: '0',
+  web_search: '0',
+  internal_reasoning: '0',
+  input_cache_read: '0',
+  input_cache_write: '0',
+};
 
 export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLlmDefinition) {
   const opencode = orderOpenCodeSettings(model.opencode_settings);
@@ -26,16 +39,7 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
       tokenizer: 'Other',
       instruct_type: null,
     },
-    pricing: {
-      prompt: '0',
-      completion: '0',
-      request: '0',
-      image: '0',
-      web_search: '0',
-      internal_reasoning: '0',
-      input_cache_read: '0',
-      input_cache_write: '0',
-    },
+    pricing: model.pricing ? applyPricingTiers(FREE_PRICING, model.pricing) : FREE_PRICING,
     top_provider: {
       context_length: model.context_length,
       max_completion_tokens: model.max_completion_tokens,
@@ -44,8 +48,8 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    isFree: true,
-    mayTrainOnYourPrompts: true,
+    isFree: isFreeModel(publicId),
+    mayTrainOnYourPrompts: model.may_train_on_prompts !== false,
     opencode: opencode && withLegacyVariants(opencode),
   };
 }

@@ -13,6 +13,7 @@ import {
   buildCreateSessionWireData,
   createSessionWireMutationIds,
   hasExtendedCreateSessionFields,
+  isInvalidCreateSessionCommand,
   parseCreateSessionResponse,
 } from './create-session';
 import { parseExitSessionResponse } from './exit-session';
@@ -37,14 +38,10 @@ import type {
   SessionSnapshotPageOutcome,
 } from './types';
 import {
-  CommandDeliveredError,
   UserWebCommandError,
   type UserWebCliEvent,
   type UserWebConnection,
 } from './user-web-connection';
-
-/** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
-const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
@@ -962,12 +959,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           // Old form is one bare protocolVersion 1 retry for extended fields;
           // a clone id must never use that fallback because it would create a
           // fresh session.
-          if (
-            !hasCloneField &&
-            hasExtendedFields &&
-            error instanceof CommandDeliveredError &&
-            error.message === INVALID_CREATE_SESSION_COMMAND
-          ) {
+          if (!hasCloneField && hasExtendedFields && isInvalidCreateSessionCommand(error)) {
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },

@@ -9,6 +9,7 @@
       "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
       "spendAlert": "ستاسو لګښت ته پاملرنه اړینه ده",
       "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
+      "securityUpdate": "یوه امنیتي کتنه تازه معلومات لري",
       "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
   },
@@ -23,7 +24,7 @@
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "مداخله شوه: {{detail}}"
+      "body": "ودرېد: {{detail}}"
     }
   },
   "agentSession": {
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "یو امنیتي موندنې ته پاملرنه اړینه ده"
+      "body": "یوه امنیتي کتنه تازه معلومات لري"
     }
   },
   "instanceLifecycle": {

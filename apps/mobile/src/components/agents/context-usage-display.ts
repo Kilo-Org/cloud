@@ -2,7 +2,7 @@ import { i18n } from '@/i18n';
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
-import { formatSessionTotalCost } from './session-list-helpers';
+import { formatSessionCostBadge, formatSessionTotalCost } from './session-list-helpers';
 import { formatSpokenCost } from './session-row-accessibility-label';
 
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
@@ -121,7 +121,7 @@ export function getHeaderPillContent({
       info.percentage === undefined
         ? UNKNOWN_WINDOW_LABEL
         : formatPercent(info.percentage, i18n.language);
-    const secondary = formatSessionTotalCost(totalCostMicrodollars);
+    const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
       secondary,
@@ -133,7 +133,7 @@ export function getHeaderPillContent({
     };
   }
 
-  const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
+  const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
   // Usage unknown. The pill keeps the placeholder it shows while the session
   // resolves — the track-only ring and, when this screen already knows it, the
   // session's cost — and never a dash standing in for a value that has not

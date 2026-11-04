@@ -67,6 +67,37 @@ function renderCard(
 }
 
 describe('file context tool cards', () => {
+  it('shows the filename from a public session path', () => {
+    const html = renderCard(
+      ReadToolCard,
+      toolPart('read', {
+        filePath: '/cloud-agent/sessions/ses_example/src/router.ts',
+        offset: 340,
+        limit: 110,
+      })
+    );
+    expect(html).toContain('router.ts offset=340 limit=110');
+    expect(html).toContain('title="src/router.ts"');
+    expect(html).not.toContain('ses_example');
+  });
+
+  it.each([
+    { Card: ListToolCard, tool: 'list', args: {} },
+    { Card: GlobToolCard, tool: 'glob', args: { pattern: '**/*folder*' } },
+    { Card: GrepToolCard, tool: 'grep', args: { pattern: 'workspaceFolders' } },
+  ])('shows a root or search target rather than a session ID for $tool', ({ Card, tool, args }) => {
+    for (const suffix of ['', '/', '/src', '/src/router.ts']) {
+      const html = renderCard(
+        Card,
+        toolPart(tool, { path: `/cloud-agent/sessions/ses_example${suffix}`, ...args })
+      );
+      const label = suffix === '' || suffix === '/' ? '.' : suffix.split('/').pop();
+      expect(html).toContain(`title="${suffix.replace(/^\//, '') || '.'}"`);
+      expect(html).toContain(`>${label}${tool === 'list' ? '<' : ' '}`);
+      expect(html).not.toContain('ses_example');
+    }
+  });
+
   it.each([
     [{ offset: 0, limit: 2 }, 'file.ts offset=0 limit=2'],
     [{ offset: 12 }, 'file.ts offset=12'],

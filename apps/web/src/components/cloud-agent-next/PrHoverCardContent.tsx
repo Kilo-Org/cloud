@@ -102,6 +102,32 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
       )}
 
       <div className="border-border/60 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 border-t pt-3 text-xs">
+        {pr.platform === 'github' && (
+          <>
+            <span
+              className="text-muted-foreground"
+              title="Checks received via webhooks for the current commit. Earlier checks may be missing; requiredness is unknown."
+            >
+              Checks (observed)
+            </span>
+            <span className="tabular-nums">
+              {pr.observations?.checks
+                ? `${pr.observations.checks.total} total / ${pr.observations.checks.failed} failed`
+                : 'Unknown'}
+            </span>
+            <span
+              className="text-muted-foreground"
+              title="Unresolved review threads observed via webhooks, not individual replies. Earlier threads may be missing."
+            >
+              Unresolved threads
+            </span>
+            <span className="tabular-nums">
+              {pr.observations?.unresolvedThreads == null
+                ? 'Unknown'
+                : pr.observations.unresolvedThreads}
+            </span>
+          </>
+        )}
         {pr.reviewDecision && (
           <>
             <span className="text-muted-foreground">Review</span>
@@ -125,6 +151,12 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <span className="text-muted-foreground">Synced</span>
         <span>{formatRelativeSync(pr.lastSyncedAt)}</span>
       </div>
+
+      {pr.platform === 'github' && pr.observations?.truncated && (
+        <p className="text-muted-foreground text-xs">
+          Partial observations; some evidence is missing.
+        </p>
+      )}
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
         {(awaitingSync || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (

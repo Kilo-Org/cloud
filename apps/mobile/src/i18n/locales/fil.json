@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
     "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
     "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba.",
+    "translateSummaries": "Isalin ang mga buod",
     "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Pag-rebase"
       },
       "terminal": {
-        "alreadyMerged": "Na-merge na",
         "closed": "Nakasara ang pull request na ito",
         "closedMergeRequest": "Nakasara ang merge request na ito"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Kulang ang mga kinakailangang pagsusuri",
         "requiredReviewsDetail": "Kulang o hinihintay pa ang pag-apruba ng mga kinakailangang tagasuri.",
         "failingChecksTitle": "Hindi pumasa ang mga kinakailangang pagsusuri",
-        "failingChecksDetail": "Hindi pumasa ang mga kinakailangang pagsusuri ng status.",
         "unstableTitle": "May mga pagsusuring hindi pumasa",
         "unstableDetail": "Hindi pumasa ang ilang opsyonal na pagsusuri. Hindi nito pipigilan ang pag-merge.",
         "draftTitle": "Burador na PR",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Hindi masuri ang koneksyon sa Bitbucket.",
       "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
+      "reconnectTitleGitLab": "Kumonekta muli sa GitLab",
+      "reconnectTitleBitbucket": "Kumonekta muli sa Bitbucket",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub.",
       "gitlabDescription": "Suriin ang mga merge request sa mobile",
+      "gitlabInstanceMismatchTitle": "Ang koneksyon sa GitLab ay para sa ibang instance",
+      "gitlabInstanceMismatchDescription": "Ang iyong koneksyon sa GitLab ay para sa {{connected}}, ngunit ang merge request na ito ay nasa {{requested}}. Kumonekta sa GitLab sa instance na iyon para suriin ito.",
+      "checkActiveConnection": "Aktibo ang koneksyon, ngunit hindi pa rin ma-load ang item na ito.",
       "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Wala pang mga organisasyon ang account na ito. Masusuri ang mga pull request sa Bitbucket kapag gumawa ka o sumali ka ng isang organisasyon.",
       "gitlabReconnectAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "na nakabinbing komento",
       "submitCountOfTotal": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
       "submitReview": "Isumite ang pagsusuri",
-      "partialPostedMessage": "Na-post ang {{displayFreshCount}} na komento. Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedFresh": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_one": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_other": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedStale": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_one": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_other": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
       "blockedRequestChanges": "Magdagdag ng buod o kahit isang komento para humingi ng pagbabago.",
       "blockedComment": "Magdagdag ng buod o kahit isang komento para makapagsumite ng pagsusuri na komento lang."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
       "alreadyPresent": "Nasa REVIEW.md na ang gabay",
       "status": {
+        "open": "Nakaopen",
         "edited": "Na-edit",
         "opening_change_request": "Binubuksan ang PR",
         "change_request_failed": "Nabigong buksan ang PR",
@@ -1610,6 +1620,8 @@
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
+      "nSelected_one": "{{displayCount}} napili",
+      "nSelected_other": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Batayan kung maaaring samantalahin",
       "suggestedFix": "Iminungkahing pag-aayos",
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_one": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_other": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
       "no": "Hindi",
@@ -1794,6 +1808,7 @@
       "priorityFindingsPending": "Lalabas ang mga natukoy na isyung dapat unahin pagkatapos ng unang sync",
       "refreshFailed": "Hindi ma-refresh — ipinapakita ang huling na-sync na data.",
       "settings": "Mga setting",
+      "syncing": "Sini-sync…",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
       "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",
@@ -1827,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_one": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_other": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"
@@ -2038,6 +2055,7 @@
     },
     "scopeEntry": {
       "connectDescription": "I-install ang Kilo GitHub App para awtomatikong i-sync ang mga alerto ng Dependabot at pamahalaan ang mga natukoy na isyu sa seguridad sa iyong mga repository.",
+      "connectOwnerOnly": "Sabihan ang isang may-ari ng organisasyon o admin para ikonekta ang {{platform}}.",
       "connectTitle": "Ikonekta ang GitHub para magsimula",
       "couldNotLoad": "Hindi ma-load ang Ahente sa seguridad.",
       "installApp": "I-install ang GitHub App",
@@ -2070,6 +2088,7 @@
       "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
       "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
       "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
+      "syncNoRepositoriesNoManage": "Walang mga repositoryo sa saklaw ng pag-sync. Kailangan ng may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta ang mga repositoryo bago ito maisync.",
       "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
       "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli.",
       "configConflict": "Nagbago ang mga setting ng Ahente sa seguridad sa ibang lugar. Suriin ang pinakabagong mga setting at i-save muli."
@@ -2226,6 +2245,8 @@
       "cannotCompleteTitle": "Hindi makumpleto ang pag-install",
       "notAdminMessage": "GitHub admin lang ng account na iyon ang puwedeng magkonekta rito. Hilingin sa admin ng organisasyon na i-install ang Kilo.",
       "alreadyClaimedMessage": "Nakakonekta na sa ibang Kilo account ang naka-install na GitHub App na iyon. Idiskonekta muna ito roon.",
+      "installationUnavailableMessage": "Ang pag-install ng GitHub App na ito ay nakasuspinde o hindi na available. I-restore o i-install muli ito sa GitHub, pagkatapos ay magsimula muli.",
+      "multipleInstallationsMessage": "Sa kasalukuyan, makakakonekta lamang ng isang GitHub organization ang Kilo organization na ito.",
       "didNotCompleteTitle": "Hindi natapos ang pag-install",
       "didNotCompleteMessage": "Hindi natapos ang pag-install ng GitHub App. Subukan muli mula sa app."
     },
@@ -2368,7 +2389,7 @@
       "discardDraftMessage": "Mawawala ang iyong prompt.",
       "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
-      "remoteHint": "Patakbuhin ang `kilo remote` sa iyong computer, o ang `/remote` sa isang tumatakbong sesyon ng CLI, para kontrolin ang isang lokal na proseso ng kilo.",
+      "remoteHint": "Para patakbuhin sa iyong computer, simulan ang Kilo doon at iwanan itong tumatakbo.",
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
@@ -2382,7 +2403,6 @@
       "defaultProfileResolvesTo": "Kasalukuyang nakatakda sa {{name}}",
       "defaultProfileResolvesToAccessibility": "Default na profile: {{name}}",
       "manageProfiles": "Pamahalaan ang mga profile",
-      "noProfiles": "Wala pang mga profile. Gumawa ng isa upang magdagdag ng mga variable ng kapaligiran, mga server ng MCP, at mga kasanayan.",
       "advancedConfig": "Advanced na kompigurasyon",
       "advancedConfigDescription": "Nalalapat sa session na ito. Ang pag-save bilang profile ay nagpapanatili nito para sa susunod.",
       "saveAsProfile": "I-save bilang Profile",
@@ -2605,9 +2625,9 @@
       "detailRetryingClone": "Sumusubok ulit i-clone (pagsubok {{attempt}} sa {{total}})",
       "detailSetupCommandFailed": "Nabigo ang utos sa paghahanda {{index}}",
       "detailSetupCommandTimedOut": "Nag-time out ang utos sa paghahanda {{index}}",
-      "detailColdRestore": "Cold restore, nailapat ang snapshot, {{applied}} sa {{total}} files ang nabalik",
+      "detailColdRestore": "Cold restore, nailapat ang snapshot, nabalik na files: {{applied}} sa {{total}}",
       "detailProgressPercent": "{{percent}}% kumpleto",
-      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session: {{skipped}} sa {{total}} files ang hindi naibalik ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session, hindi naibalik na files: {{skipped}} sa {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Nawawala: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} at {{omitted}} pa",
       "detailReasonPatchFailed": "hindi naaplay ang patch",
@@ -3068,7 +3088,8 @@
     "newSessionOn": "Bagong session sa {{name}}",
     "noMatchingSessions": "Walang tugmang session.",
     "onlyFirstFilesAttached": "Ang unang {{displayCount}} na file lang ang ilalakip.",
-    "staleMessage": "Hindi na magagamit ang ibinahaging nilalamang ito.",
+    "staleMessage": "Ipadala itong muli mula sa app kung saan mo ito ibinahagi.",
+    "staleTitle": "Hindi mababahagi",
     "retryableMessage": "Hindi ma-load ang iyong mga session.",
     "emptyMessage": "Wala pang session — magsimula ng bago para maipadala ito.",
     "cliNotConnectedTitle": "Hindi nakakonekta ang session",
@@ -3782,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
     "thresholdTitle": "Paglampas sa hangganan",
-    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ng saklaw na ito sa loob ng napiling panahon ay lumampas sa iyong limitasyon",
     "anomalyTitle": "Pagtaas bawat oras",
-    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "anomalySubtitle": "Ang rate ng saklaw na ito bawat oras ay malayo sa itaas ng sarili nitong p95 baseline",
     "limitLabel": "Limitasyon (USD)",
     "windowLabel": "Panahon",
     "window24h": "24 na oras",
@@ -3801,7 +3822,7 @@
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso",
     "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
-    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa"
   },
   "profiles": {
     "title": "Mga profile",

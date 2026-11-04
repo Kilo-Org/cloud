@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Traduce os resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro.",
+    "translateSummaries": "Traduce os resumos",
     "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Cambio de base"
       },
       "terminal": {
-        "alreadyMerged": "Xa fusionada",
         "closed": "Solicitude de integración pechada",
         "closedMergeRequest": "Solicitude de fusión pechada"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Faltan revisións obrigatorias",
         "requiredReviewsDetail": "Faltan as aprobacións dos revisores obrigatorios ou aínda están pendentes.",
         "failingChecksTitle": "Comprobacións obrigatorias con erros",
-        "failingChecksDetail": "As comprobacións de estado obrigatorias dan erro.",
         "unstableTitle": "Algunhas comprobacións dan erro",
         "unstableDetail": "As comprobacións non obrigatorias dan erro, pero non bloquearán a fusión.",
         "draftTitle": "Solicitude de cambios en borrador",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Non se puido comprobar a conexión con Bitbucket.",
       "providerCheckFailedMessage": "O estado da conexión non está dispoñible ata que cargue.",
       "reconnectTitle": "Volver conectar con GitHub",
+      "reconnectTitleGitLab": "Volver conectar con GitLab",
+      "reconnectTitleBitbucket": "Volver conectar con Bitbucket",
       "reconnectDescription": "Revogouse a túa conexión con GitHub.",
       "gitlabDescription": "Revisar solicitudes de fusión no móbil",
+      "gitlabInstanceMismatchTitle": "A conexión de GitLab é para outra instancia",
+      "gitlabInstanceMismatchDescription": "A túa conexión de GitLab é para {{connected}}, pero esta solicitude de fusión está en {{requested}}. Conecta GitLab nesa instancia para revisala.",
+      "checkActiveConnection": "A conexión está activa, pero este elemento aínda non se pode cargar.",
       "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta aínda non ten organizacións. As solicitudes de integración de Bitbucket pódense revisar en canto crees ou te unas a unha organización.",
       "gitlabReconnectAdminOnlyDescription": "Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que a reconecte.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar a revisión",
-      "partialPostedMessage": "Comentarios publicados: {{displayFreshCount}}. Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
       "blockedRequestChanges": "Engade un resumo ou polo menos un comentario para solicitar cambios.",
       "blockedComment": "Engade un resumo ou polo menos un comentario para enviar unha revisión con comentarios."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
       "alreadyPresent": "As pautas xa están en REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "Abrindo a PR",
         "change_request_failed": "Erro ao abrir a PR",
@@ -1610,6 +1620,8 @@
       "set": "Definido",
       "notSet": "Non definido",
       "nSelected": "{{displayCount}} seleccionados",
+      "nSelected_one": "{{displayCount}} seleccionados",
+      "nSelected_other": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Pautas propostas para REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Xustificación da explotabilidade",
       "suggestedFix": "Corrección suxerida",
       "whereFound": "Localizacións do achado ({{displayCount}})",
+      "whereFound_one": "Localizacións do achado ({{displayCount}})",
+      "whereFound_other": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
       "no": "Non",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Os achados prioritarios aparecerán despois da primeira sincronización.",
       "refreshFailed": "Non se puido actualizar: móstranse os últimos datos sincronizados.",
       "settings": "Axustes",
+      "syncing": "Sincronizando…",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronización na cola",
       "syncStatusUnavailable": "O estado da sincronización non está dispoñible.",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} de gravidade media e baixa",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_one": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_other": "{{exploitable}} destes confirmados como explotables",
       "noDeadline": "Sen prazo",
       "reviewSlaAssignment": "Revisar a asignación do SLA",
       "allOpenFindingsTracked": "Todos os achados abertos en seguimento"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Instala a aplicación de Kilo en GitHub para sincronizar automaticamente os avisos de Dependabot e xestionar os achados de seguridade nos teus repositorios.",
+      "connectOwnerOnly": "Pídelle a un propietario ou administrador da organización que conecte {{platform}}.",
       "connectTitle": "Conecta GitHub para comezar",
       "couldNotLoad": "Non se puido cargar o axente de seguridade.",
       "installApp": "Instalar a aplicación de GitHub",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
       "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
       "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
+      "syncNoRepositoriesNoManage": "Non hai repositorios no ámbito de sincronización. Un propietario da organización, un administrador ou un xestor de facturación debe conectar repositorios antes de poder sincronizar.",
       "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
       "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo.",
       "configConflict": "Os axustes do axente de seguridade cambiáronse noutro lugar. Revisa os axustes máis recentes e garda de novo."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Non se pode completar a instalación",
       "notAdminMessage": "Só un administrador desa conta de GitHub pode conectala. Pídelle a un administrador da organización que instale Kilo.",
       "alreadyClaimedMessage": "Esa instalación de GitHub xa está conectada a outra conta de Kilo. Desconéctaa alí primeiro.",
+      "installationUnavailableMessage": "Esta instalación da GitHub App está suspendida ou xa non está dispoñible. Restáuraa ou reinstálaa en GitHub e despois comeza de novo.",
+      "multipleInstallationsMessage": "Esta organización de Kilo agora mesmo só pode conectar unha organización de GitHub.",
       "didNotCompleteTitle": "A instalación non se completou",
       "didNotCompleteMessage": "A instalación da aplicación de GitHub non se completou. Téntao de novo desde a aplicación."
     },
@@ -2362,7 +2383,7 @@
       "discardDraftMessage": "Perderase a túa instrución.",
       "discardWithUploadsMessage": "Eliminaranse a túa instrución e os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
-      "remoteHint": "Executa `kilo remote` no teu computador, ou `/remote` nunha sesión CLI activa, para controlar un proceso kilo local.",
+      "remoteHint": "Para executalo no teu computador, inicia Kilo nel e déixao en execución.",
       "continueFrom": "Continúas a sesión {{title}}.",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Corresponde a {{name}}",
       "defaultProfileResolvesToAccessibility": "Perfil predeterminado: {{name}}",
       "manageProfiles": "Xestionar perfís",
-      "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
       "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Reintentando a clonación (intento {{attempt}} de {{total}})",
       "detailSetupCommandFailed": "Fallou o comando de configuración {{index}}",
       "detailSetupCommandTimedOut": "O comando de configuración {{index}} esgotou o tempo de espera",
-      "detailColdRestore": "Restauración en frío, aplicouse a instantánea, restauráronse {{applied}} de {{total}} ficheiros",
+      "detailColdRestore": "Restauración en frío, aplicouse a instantánea, ficheiros restaurados: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% completado",
-      "detailRestoreIncompleteReport": "Restauración da sesión incompleta: non se restauraron {{skipped}} de {{total}} ficheiros ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauración da sesión incompleta — ficheiros non restaurados: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Faltan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e {{omitted}} máis",
       "detailReasonPatchFailed": "o parche non se aplicou",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Nova sesión en {{name}}",
     "noMatchingSessions": "Non hai sesións que coincidan.",
     "onlyFirstFilesAttached": "Só se anexarán os primeiros {{displayCount}} ficheiros.",
-    "staleMessage": "Este contido compartido xa non está dispoñible.",
+    "staleMessage": "Envíao de novo desde a aplicación onde o compartes.",
+    "staleTitle": "Compartición non dispoñible",
     "retryableMessage": "Non se puideron cargar as túas sesións.",
     "emptyMessage": "Aínda non hai sesións — inicia unha nova para enviar isto.",
     "cliNotConnectedTitle": "Sesión non conectada",
@@ -3776,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Envía unha alerta por correo ou notificación push aos contactos de facturación cando o gasto deste ámbito supere un límite ou se dispare por riba do seu ritmo horario habitual.",
     "thresholdTitle": "Superación do limiar",
-    "thresholdSubtitle": "O gasto acumulado supera o teu límite",
+    "thresholdSubtitle": "O gasto acumulado deste ámbito na ventá elixida supera o teu límite",
     "anomalyTitle": "Pico por hora",
-    "anomalySubtitle": "Unha hora está moi por riba do ritmo habitual deste ámbito",
+    "anomalySubtitle": "O ritmo por hora deste ámbito está moi por riba da súa propia liña base p95",
     "limitLabel": "Límite (USD)",
     "windowLabel": "Ventá",
     "window24h": "24 horas",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificacións",
     "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos."
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfís",

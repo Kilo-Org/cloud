@@ -297,6 +297,7 @@
     "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
     "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
     "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model).",
+    "translateSummaries": "Käännä yhteenvedot",
     "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu."
   },
   "prReview": {
@@ -441,7 +442,6 @@
         "rebase": "Uudelleenperustus"
       },
       "terminal": {
-        "alreadyMerged": "Jo yhdistetty",
         "closed": "Muutospyyntö suljettu",
         "closedMergeRequest": "Yhdistämispyyntö suljettu"
       },
@@ -458,7 +458,6 @@
         "requiredReviewsTitle": "Pakolliset katselmoinnit puuttuvat",
         "requiredReviewsDetail": "Pakollisten katselmoijien hyväksynnät puuttuvat tai niitä odotetaan vielä.",
         "failingChecksTitle": "Pakollisia tarkistuksia epäonnistui",
-        "failingChecksDetail": "Pakollisia tilatarkistuksia on epäonnistunut.",
         "unstableTitle": "Osa tarkistuksista epäonnistui",
         "unstableDetail": "Osa valinnaisista tarkistuksista on epäonnistunut. Ne eivät estä yhdistämistä.",
         "draftTitle": "Muutospyyntöluonnos",
@@ -680,8 +679,13 @@
       "checkFailedTitleBitbucket": "Bitbucket-yhteyttä ei voitu tarkistaa",
       "providerCheckFailedMessage": "Yhteyden tila näkyy vasta latauksen valmistuttua.",
       "reconnectTitle": "Yhdistä GitHub uudelleen",
+      "reconnectTitleGitLab": "Yhdistä GitLab uudelleen",
+      "reconnectTitleBitbucket": "Yhdistä Bitbucket uudelleen",
       "reconnectDescription": "GitHub-yhteytesi käyttöoikeus on peruttu.",
       "gitlabDescription": "Katselmoi yhdistämispyyntöjä mobiililaitteella",
+      "gitlabInstanceMismatchTitle": "GitLab-yhteys kuuluu toiselle instanssille",
+      "gitlabInstanceMismatchDescription": "GitLab-yhteytesi kuuluu instanssille {{connected}}, mutta tämä yhdistämispyyntö on instanssissa {{requested}}. Yhdistä GitLab kyseiselle instanssille, niin voit katselmoida sen.",
+      "checkActiveConnection": "Yhteys on aktiivinen, mutta tätä kohdetta ei vieläkään voi ladata.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
@@ -704,7 +708,12 @@
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä katselmointi",
-      "partialPostedMessage": "Julkaistuja kommentteja: {{displayFreshCount}}. Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedFresh": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
+      "partialPostedStale": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
       "blockedRequestChanges": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit pyytää muutoksia.",
       "blockedComment": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit lähettää kommentoivan katselmoinnin."
     },
@@ -1523,6 +1532,7 @@
       "prOpened": "REVIEW.md-tiedoston pull request avattu",
       "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
       "status": {
+        "open": "Avoin",
         "edited": "Muokattu",
         "opening_change_request": "Avataan PR:ää",
         "change_request_failed": "PR:n avaaminen epäonnistui",
@@ -1610,6 +1620,8 @@
       "set": "Määritetty",
       "notSet": "Ei määritetty",
       "nSelected": "Valittu: {{displayCount}}",
+      "nSelected_one": "Valittu: {{displayCount}}",
+      "nSelected_other": "Valittu: {{displayCount}}",
       "proposedReviewMdGuidance": "Ehdotetut REVIEW.md-ohjeet"
     },
     "decision": {
@@ -1744,6 +1756,8 @@
       "exploitabilityReasoning": "Hyödynnettävyyden perustelut",
       "suggestedFix": "Ehdotettu korjaus",
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
+      "whereFound_one": "Havainnon sijainnit ({{displayCount}})",
+      "whereFound_other": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
       "no": "Ei",
@@ -1791,6 +1805,7 @@
       "priorityFindingsPending": "Havaintojen tärkeysjärjestys näkyy ensimmäisen synkronoinnin jälkeen.",
       "refreshFailed": "Päivitys epäonnistui — näytetään viimeksi synkronoidut tiedot.",
       "settings": "Asetukset",
+      "syncing": "Synkronoidaan…",
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi lisättiin jonoon",
       "syncStatusUnavailable": "Synkronoinnin tilaa ei ole saatavilla",
@@ -1821,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} keskivakavaa ja lievää",
       "dueThisWeek": "Määräaika tällä viikolla",
       "dueThisWeekDetail": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
+      "dueThisWeekDetail_one": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
+      "dueThisWeekDetail_other": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
       "noDeadline": "Ei määräaikaa",
       "reviewSlaAssignment": "Tarkista SLA-määräajan asetus",
       "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"
@@ -2032,6 +2049,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Asenna Kilon GitHub-sovellus, niin voit synkronoida Dependabot-hälytykset automaattisesti ja hallinnoida koodivarastojesi tietoturvahavaintoja.",
+      "connectOwnerOnly": "Pyydä organisaation omistajaa tai ylläpitäjää yhdistämään {{platform}}.",
       "connectTitle": "Aloita yhdistämällä GitHub",
       "couldNotLoad": "Tietoturva-agenttia ei voitu ladata",
       "installApp": "Asenna GitHub-sovellus",
@@ -2064,6 +2082,7 @@
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncNoRepositoriesNoManage": "Synkronointilaajuudessa ei ole yhtään repositoriota. Organisaation omistajan, ylläpitäjän tai laskutusvastaavan on yhdistettävä repositoriot, ennen kuin synkronointi voi tapahtua.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
       "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
       "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."
@@ -2220,6 +2239,8 @@
       "cannotCompleteTitle": "Asennusta ei voi suorittaa loppuun",
       "notAdminMessage": "Vain kyseisen GitHub-tilin ylläpitäjä voi yhdistää sen. Pyydä organisaation ylläpitäjää asentamaan Kilo.",
       "alreadyClaimedMessage": "Kyseinen GitHub-asennus on jo yhdistetty toiseen Kilo-tiliin. Katkaise yhteys sieltä ensin.",
+      "installationUnavailableMessage": "Tämä GitHub App -asennus on keskeytetty tai ei ole enää saatavilla. Palauta asennus tai asenna se uudelleen GitHubissa ja aloita sitten uudelleen.",
+      "multipleInstallationsMessage": "Tämä Kilo-organisaatio voi tällä hetkellä yhdistää vain yhden GitHub-organisaation.",
       "didNotCompleteTitle": "Asennus ei valmistunut",
       "didNotCompleteMessage": "GitHub-sovelluksen asennus jäi kesken. Yritä uudelleen sovelluksesta."
     },
@@ -2376,7 +2397,6 @@
       "defaultProfileResolvesTo": "Käytössä: {{name}}",
       "defaultProfileResolvesToAccessibility": "Oletusprofiili: {{name}}",
       "manageProfiles": "Hallitse profiileja",
-      "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",
       "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",
@@ -2599,9 +2619,9 @@
       "detailRetryingClone": "Yritetään kloonausta uudelleen (yritys {{attempt}} / {{total}})",
       "detailSetupCommandFailed": "Valmistelukomento {{index}} epäonnistui",
       "detailSetupCommandTimedOut": "Valmistelukomento {{index}} aikakatkesi",
-      "detailColdRestore": "Kylmä palautus, tilannevedos otettu käyttöön, {{applied}} / {{total}} tiedostoa palautettu",
+      "detailColdRestore": "Kylmä palautus, tilannevedos otettu käyttöön, palautetut tiedostot: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}} % valmis",
-      "detailRestoreIncompleteReport": "Istunnon palautus vaillinainen: {{skipped}} / {{total}} tiedostoa ei palautettu ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Istunnon palautus vaillinainen, palauttamatta jääneet tiedostot: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Puuttuvat: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ja {{omitted}} lisää",
       "detailReasonPatchFailed": "muutosta ei voitu soveltaa",
@@ -3062,7 +3082,8 @@
     "newSessionOn": "Uusi istunto laitteessa {{name}}",
     "noMatchingSessions": "Hakua vastaavia istuntoja ei löytynyt.",
     "onlyFirstFilesAttached": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään.",
-    "staleMessage": "Jaettava sisältö ei ole enää käytettävissä.",
+    "staleMessage": "Lähetä se uudelleen sovelluksesta, josta jaoit sen.",
+    "staleTitle": "Jakaminen ei onnistu",
     "retryableMessage": "Istuntojasi ei voitu ladata.",
     "emptyMessage": "Istuntoja ei vielä ole. Aloita uusi istunto, jotta voit lähettää tämän sisällön.",
     "cliNotConnectedTitle": "Istuntoa ei ole yhdistetty",
@@ -3795,7 +3816,7 @@
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
     "pushOffByCategory": "Pois päältä Ilmoituksissa",
     "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
-    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi."
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi"
   },
   "profiles": {
     "title": "Profiilit",

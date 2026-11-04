@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { Cpu, WandSparkles } from '@/components/ui/icons';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -85,16 +84,6 @@ export function ToolSummaryTranslationSettingsScreen() {
     models.length > 0 &&
     !models.some(candidate => candidate.id === model.id);
 
-  // The translation model carries no reasoning effort: the chosen id is the
-  // whole preference. The shared picker only commits and closes on tap for a
-  // single-variant row, so drop the catalogue's gateway variants here; without
-  // this, choosing a variant model left the sheet open and the row on its
-  // previous value, and Done was the only way to commit.
-  const pickerOptions = useMemo(
-    () => models.map(candidate => ({ ...candidate, variants: [] as string[] })),
-    [models]
-  );
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.toolSummaryTranslation')} />
@@ -105,7 +94,7 @@ export function ToolSummaryTranslationSettingsScreen() {
       >
         <PreferenceRow
           icon={WandSparkles}
-          title={t('preferences.toolSummaryTranslation')}
+          title={t('preferences.translateSummaries')}
           subtitle={t('preferences.toolSummaryTranslationSubtitle')}
           value={enabled}
           disabled={!hasLoaded}
@@ -121,9 +110,13 @@ export function ToolSummaryTranslationSettingsScreen() {
           disabled={modelRowDisabled}
           onPress={() => {
             openModelPicker(router, {
-              options: pickerOptions,
+              options: models,
               value: model.id,
               variant: '',
+              // The translation model carries no reasoning effort: the chosen id
+              // is the whole preference, so the picker offers no effort chips
+              // and a model tap commits and closes in one press.
+              acceptsVariant: false,
               onSelect: id => {
                 setModel({
                   id,

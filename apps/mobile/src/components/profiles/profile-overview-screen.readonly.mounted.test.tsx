@@ -55,7 +55,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ isFocused: () => true }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   usePreventRemove: (enabled: boolean) => {
     h.guard.enabled = enabled;
   },
@@ -76,6 +76,7 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',

@@ -22,6 +22,7 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
@@ -43,7 +44,11 @@ const slackConnectionErrorMessages: Record<string, string> = {
 const duplicateSlackWorkspaceMigration = 'duplicate_slack_workspace_migration';
 
 function getSlackConnectionErrorMessage(error: string): string {
-  return slackConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+  return resolveConnectionErrorMessage(
+    slackConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
 }
 
 function getSuspendedSlackIntegrationMessage(suspendedBy: string | null): string {

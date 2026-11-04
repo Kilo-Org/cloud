@@ -4,7 +4,6 @@ import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import {
-  USAGE_QUEUE_ONLY_ENABLED,
   USAGE_QUEUE_SFO_CONFIG,
   USAGE_QUEUE_FRA_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
@@ -352,7 +351,7 @@ async function enqueueUsageWithinLifetime(
 type UsageAccountingTransport = 'queue' | 'direct';
 
 function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
-  return USAGE_QUEUE_ONLY_ENABLED ||
+  return (process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production') ||
     isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext) ||
     isFraUsageQueueSelected(USAGE_QUEUE_FRA_CONFIG, usageContext)
     ? 'queue'

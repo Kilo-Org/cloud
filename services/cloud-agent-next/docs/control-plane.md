@@ -53,8 +53,9 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 
 ## 3. Topology and identities
 
-- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. A shared sandbox
-  (`usr-`, `org-`, `bot-`, `ubt-`) hosts many sessions and worktrees; an isolated sandbox hosts one.
+- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. One sandbox
+  serves one workspace: it hosts the sibling chats and worktrees of that workspace and of no other.
+  Legacy shared keys (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them.
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
@@ -1379,8 +1380,14 @@ The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktre
 the canonical workspace parent, the original root chat that remains the authorization anchor for
 the existing child-session API. Every grant renewal checks that root's authorization and its owner,
 organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and parent callbacks belong to that root, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity. Built-in credential
+becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
+invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
+either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
+existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
+as the new chat's first message and derives its operation and session identity from the persisted
+callback message ID. The session form checks that the target is a root or sibling chat with the
+same owner, organization and workspace, and that it is still accessible; the invoking chat learns
+its own session id from the `cloud-agent-context` line in its turns. Built-in credential
 refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
 the workspace's MCP set.
 
@@ -1524,7 +1531,7 @@ Request and response bodies stream; there is no body-size cap.
   on 4096 or a random port, so a preview can reach it; the wrapper starts every `kilo serve` with
   its own random `KILO_SERVER_PASSWORD` and sends Basic auth on each of its own connections, so a
   preview request to that port gets 401 from Kilo. The physical boundary is still the
-  sandbox/workspace (owner scope for shared sandboxes), not the individual chat. An entry ticket
+  sandbox/workspace, not the individual chat. An entry ticket
   is single use and expires after 60 seconds, so a stolen ticket yields a session only if the thief
   uses it before its owner does. Service workers are not blocked, so an app on a stable
   `(session, port)` origin can register one. Established WebSockets are not re-authorised after

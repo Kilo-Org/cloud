@@ -1,13 +1,15 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 const mockDeleteGitHubInstallation = jest.fn();
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   ...(jest.requireActual('@/lib/integrations/platforms/github/adapter') as object),
   deleteGitHubInstallation: (...args: unknown[]) => mockDeleteGitHubInstallation(...args),
+  fetchGitHubRepositories: jest.fn(),
 }));
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -18,9 +20,12 @@ import {
   checkUserPendingInstallation,
   getInstallation,
   isInstallationGoneError,
+  listRepositories,
   uninstallApp,
   updateModel,
 } from './github-apps-service';
+
+const mockFetchGitHubRepositories = jest.mocked(fetchGitHubRepositories);
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -397,6 +402,134 @@ describe('isInstallationGoneError', () => {
 
   it('should return false for number errors', () => {
     expect(isInstallationGoneError(404)).toBe(false);
+  });
+});
+
+describe('listRepositories', () => {
+  type IntegrationRow = typeof platform_integrations.$inferInsert;
+
+  beforeEach(() => {
+    mockFetchGitHubRepositories.mockReset();
+  });
+
+  const providerRepository = {
+    id: 42,
+    name: 'widgets',
+    full_name: 'acme/widgets',
+    private: false,
+    created_at: '2026-05-01T00:00:00.000Z',
+  };
+
+  async function insertIntegration(overrides: Partial<IntegrationRow> = {}) {
+    const user = await insertTestUser();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        ...overrides,
+      })
+      .returning();
+    return { user, row };
+  }
+
+  async function readRow(id: string) {
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, id));
+    return row;
+  }
+
+  async function cleanup(userId: string) {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  }
+
+  it('answers a synced empty snapshot without reading the provider or writing the row', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).resolves.toEqual({
+        repositories: [],
+        syncedAt: row.repositories_synced_at,
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([]);
+      expect(after?.repositories_synced_at).toBe(row.repositories_synced_at);
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('reads the provider and stores the new snapshot on an explicit refresh', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+    mockFetchGitHubRepositories.mockResolvedValueOnce([providerRepository]);
+
+    try {
+      const result = await listRepositories({ type: 'user', id: user.id }, row.id, true);
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([providerRepository]);
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([providerRepository]);
+      expect(after?.repositories_synced_at).not.toBe(row.repositories_synced_at);
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('reads the provider for a row that has never produced a snapshot', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: null,
+    });
+    mockFetchGitHubRepositories.mockResolvedValueOnce([providerRepository]);
+
+    try {
+      const result = await listRepositories({ type: 'user', id: user.id }, row.id);
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([providerRepository]);
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([providerRepository]);
+      expect(after?.repositories_synced_at).not.toBeNull();
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('answers a non-empty snapshot without reading the provider', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [providerRepository],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).resolves.toEqual({
+        repositories: [providerRepository],
+        syncedAt: row.repositories_synced_at,
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    } finally {
+      await cleanup(user.id);
+    }
   });
 });
 

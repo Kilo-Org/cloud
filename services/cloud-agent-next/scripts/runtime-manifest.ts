@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
+import { shellQuote } from '../src/kilo/utils.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
@@ -10,6 +11,7 @@ import {
   runtimeInstallPath,
   wrapperBundle,
 } from '../src/shared/runtime-distribution.js';
+import { toolchainVerificationScript } from '../src/shared/runtime-toolchain.js';
 
 export const SNAPSHOT_RUNTIME = 'node24';
 export const PINNED_BUN_VERSION = RUNTIME_DISTRIBUTION.bun;
@@ -169,24 +171,9 @@ export function runtimeManifestArtifacts(
   return artifacts.map(({ installName, sha256 }) => ({ installName, sha256 }));
 }
 
-export function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function exactVersionCommand(binary: string): string {
-  return `${binary} --version | head -n1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1`;
-}
-
-export function exactVersionCheck(binary: string, version: string): string {
-  return `test "$(${exactVersionCommand(binary)})" = ${shellQuote(version)}`;
-}
-
 export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[]): string {
   const pins = [
-    `test "$(bun --version)" = ${shellQuote(RUNTIME_DISTRIBUTION.bun)}`,
-    `test "$(pnpm --version)" = ${shellQuote(RUNTIME_DISTRIBUTION.pnpm)}`,
-    exactVersionCheck('glab', RUNTIME_DISTRIBUTION.glab),
-    exactVersionCheck('gh', RUNTIME_DISTRIBUTION.gh),
+    toolchainVerificationScript(['bun', 'pnpm', 'gh', 'glab', 'rg', 'kilo']),
     `case "$(node --version)" in v${RUNTIME_DISTRIBUTION.nodeMajor}.*) ;; *) echo "unexpected node" >&2; exit 1 ;; esac`,
   ];
   const presence = RUNTIME_REQUIRED_BINARIES.map(binary => `command -v ${binary} >/dev/null`);
@@ -198,5 +185,6 @@ export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[])
     if (artifact.linkPath) checks.push(`test -L ${shellQuote(artifact.linkPath)}`);
     return checks.join(' && ');
   });
-  return [...pins, ...presence, ...files].join(' && ');
+  // One check per line, so the first failure ends the script.
+  return ['set -euo pipefail', ...pins, ...presence, ...files].join('\n');
 }

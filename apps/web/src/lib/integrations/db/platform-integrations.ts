@@ -1317,6 +1317,10 @@ export async function upsertPlatformIntegrationForOwner(
     repository_access: data.repositoryAccess,
     integration_status: INTEGRATION_STATUS.ACTIVE,
     repositories: data.repositories || null,
+    // A stored list is the snapshot the caller read from the provider for this
+    // request, so it carries its sync time; a row without one stays unsynced
+    // and the next repository read fetches a fresh list.
+    repositories_synced_at: data.repositories?.length ? now : null,
     installed_at: data.installedAt || new Date().toISOString(),
     github_app_type: appType,
     ...authorizationProvenance,
@@ -1411,6 +1415,7 @@ export async function upsertPlatformIntegrationForOwner(
           repository_access: values.repository_access,
           integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
+          repositories_synced_at: values.repositories_synced_at,
           github_app_type: appType,
           auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
           auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
@@ -1449,6 +1454,7 @@ export async function upsertPlatformIntegrationForOwner(
         repository_access: values.repository_access,
         integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
+        repositories_synced_at: values.repositories_synced_at,
         github_app_type: appType,
         auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
         auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,

@@ -2,7 +2,7 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
@@ -383,7 +383,7 @@ const requestedEnvironmentSchema = z
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+  callbackTarget: ParentCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()

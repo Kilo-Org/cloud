@@ -486,15 +486,18 @@ describe('scope-preserving control token exchange', () => {
 });
 
 describe('ordinary prepare schema', () => {
-  it('preserves the parent callback through personal and organization web prepare schemas', () => {
-    const input = { ...launch, callbackTarget: { url: 'session:parent' } };
-    expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
-      input.callbackTarget
-    );
-    expect(
-      organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
-    ).toEqual(input.callbackTarget);
-  });
+  it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(
+    'preserves the %s callback through personal and organization web prepare schemas',
+    url => {
+      const input = { ...launch, callbackTarget: { url } };
+      expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
+        input.callbackTarget
+      );
+      expect(
+        organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
+      ).toEqual(input.callbackTarget);
+    }
+  );
   it('strips the retired spawn opt-in through prepare parsing', () => {
     expect(
       personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: true })

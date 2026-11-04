@@ -2158,6 +2158,7 @@
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "syncNoRepositoriesNoManage": "Sinchronizavimo apimtyje nėra saugyklų. Kad būtų galima sinchronizuoti, organizacijos savininkas, administratorius arba atsiskaitymų administratorius turi prijungti saugyklas.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
       "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
       "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."

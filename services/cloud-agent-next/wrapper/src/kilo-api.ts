@@ -239,6 +239,8 @@ type PromptOptions = {
     { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
   >;
   prompt?: string;
+  /** Server-owned context sent as a synthetic text part before the prompt. */
+  context?: string;
   variant?: string;
   agent?: string;
   model?: { providerID?: string; modelID: string };
@@ -412,11 +414,17 @@ export function createWrapperKiloClient(
   function promptParameters(opts: PromptOptions) {
     const rawParts =
       opts.parts ?? (opts.prompt ? [{ type: 'text' as const, text: opts.prompt }] : []);
+    const parts = [
+      ...(opts.context
+        ? [{ type: 'text' as const, text: opts.context, synthetic: true as const }]
+        : []),
+      ...rawParts,
+    ];
     return {
       sessionID: opts.sessionId,
       directory: opts.directory ?? workspacePath,
       messageID: opts.messageId,
-      parts: rawParts.map(part =>
+      parts: parts.map(part =>
         part.type === 'file'
           ? {
               type: 'file' as const,
@@ -424,7 +432,11 @@ export function createWrapperKiloClient(
               url: part.url,
               ...(part.filename ? { filename: part.filename } : {}),
             }
-          : { type: 'text' as const, text: part.text }
+          : {
+              type: 'text' as const,
+              text: part.text,
+              ...('synthetic' in part ? { synthetic: true as const } : {}),
+            }
       ),
       ...(opts.variant ? { variant: opts.variant } : {}),
       ...(opts.model

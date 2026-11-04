@@ -406,10 +406,9 @@ including a failed one, the gate:
 2. interrupts, then deletes them, newest first (idempotent: the scenarios also
    clean up in their own `finally`);
 3. on the `local` profile, stops each sandbox those sessions provably owned,
-   primary and `-proxy` together. The dev config sets
-   `PER_SESSION_SANDBOX_ORG_IDS` to `*`, so every session, for any user, has its
-   own `ses-…` sandbox derived from its unique session id, and the proxy is named
-   after it. Once the sessions are deleted nothing can address that sandbox
+   primary and `-proxy` together. One sandbox serves one workspace, so every
+   workspace, for any user, has its own sandbox derived from its unique session
+   id, and the proxy is named after it. Once the sessions are deleted nothing can address that sandbox
    again. (A proxy is only reused when the same sandbox gets a replacement
    primary during a test; deleting it then is a separate proxy-chaos case.)
 
@@ -962,7 +961,7 @@ reusable catalog of planned and existing scenarios, see
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
 | `worktree-chat` | Creates a worktree chat through the public tRPC surface; verifies workspace/worktree identity, idempotent same-key replay, a cold echo boot, and one hot echo turn with stable allocation references. |
 | `worktree-multi-chat` | Boots a root chat, lazily creates a sibling in the same worktree/sandbox, and proves: shared uncommitted file write→read→overwrite (parsed echo equals an independent writer nonce), sequential question ownership/replay/answer isolation (asked in the root while the sibling is idle), targeted interrupt of the sibling while the root holds a paced turn (root nonterminal then completing, allocation unchanged), and targeted delete of the sibling leaving the root accepting another turn. The runtime serializes streaming model turns, so it does not claim two chats streaming at one instant. |
-| `hosted-workspace-contract` | Proves the complete workspace-first Cloud contract on the real Worker, Durable Objects, Docker sandbox and fake LLM: owner/current-org authorization and non-leakage, same-key replay plus changed-intent conflict for workspace and sibling creation, three roots on one shared sandbox, independent turn abort, middle-child deletion and final-root rejection, passive catalog/get/status and durable transcript reads while idle-stopped (no new provider container, no allocation, unchanged billing interval), automatic idle shutdown plus wake-on-input, a second-repository workspace on its own sandbox, and journaled `deleteWorktree` with a completed tombstone, replay and post-delete rejection. Needs `sessionSandbox` + `sandbox` + `database`; budget ~50 minutes. |
+| `hosted-workspace-contract` | Proves the complete workspace-first Cloud contract on the real Worker, Durable Objects, Docker sandbox and fake LLM: owner/current-org authorization and non-leakage, same-key replay plus changed-intent conflict for workspace and sibling creation, three roots on the one sandbox of their workspace, independent turn abort, middle-child deletion and final-root rejection, passive catalog/get/status and durable transcript reads while idle-stopped (no new provider container, no allocation, unchanged billing interval), automatic idle shutdown plus wake-on-input, a second-repository workspace on its own sandbox, and journaled `deleteWorktree` with a completed tombstone, replay and post-delete rejection. Needs `sessionSandbox` + `sandbox` + `database`; budget ~50 minutes. |
 | `long-conversation` | One cold `echo:cold` turn plus twelve hot turns — nine `echo:<token>`, one paced `slow:2:50`, and a real `file:write`/`file:read` pair whose parsed echo body equals the writer nonce. Every hot turn completes with no re-preparation and a stable allocation reference. |
 | `leave-and-return` | Boots, completes a boot echo turn, then leaves the session unattended; requires the allocation to disappear, then a resume turn on a distinct non-null allocation with the boot content replayed from a fresh stream. |
 | `large-stream` | Stages a real file and asks the model to read it; requires a correlated completed read whose persisted output meets the byte floor, plus a paced follow-up on the same session. |

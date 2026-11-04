@@ -30,7 +30,7 @@ const launch = {
   mode: 'code',
   prompt: 'Implement an independent task, verify it, and report results.',
   operationKey: '55555555-5555-4555-8555-555555555555',
-  callbackTarget: { url: 'session:parent' },
+  callbackTarget: { url: 'workspace:new-chat' },
 };
 const model = {
   id: 'provider/model',
@@ -241,6 +241,39 @@ describe('dedicated child session tools', () => {
     }
   );
 
+  it.each(['workspace:new-chat'])('forwards the %s callback destination', async url => {
+    const body = await rpc(
+      'tools/call',
+      { name: 'spawn_session', arguments: { ...launch, callbackTarget: { url } } },
+      auth
+    );
+    expect(JSON.parse(body.result.content[0].text)).toEqual({
+      cloudAgentSessionId: childId,
+      kiloSessionId: 'ses_fixture',
+    });
+    const [requestUrl, init] = fetchImpl.mock.calls[0]!;
+    expect(await new Request(requestUrl, init).json()).toMatchObject({
+      callbackTarget: { url },
+    });
+  });
+
+  it('forwards a workspace session callback target', async () => {
+    const callbackTarget = {
+      url: 'workspace:workspace_22345678-1234-4234-8234-123456789abc',
+    };
+    const body = await rpc(
+      'tools/call',
+      { name: 'spawn_session', arguments: { ...launch, callbackTarget } },
+      auth
+    );
+    expect(JSON.parse(body.result.content[0].text)).toEqual({
+      cloudAgentSessionId: childId,
+      kiloSessionId: 'ses_fixture',
+    });
+    const [requestUrl, init] = fetchImpl.mock.calls[0]!;
+    expect(await new Request(requestUrl, init).json()).toMatchObject({ callbackTarget });
+  });
+
   it.each([
     { organizationId },
     { autoInitiate: false },
@@ -249,6 +282,18 @@ describe('dedicated child session tools', () => {
     { parentCloudAgentSessionId: childId },
     { allowSubagentSessions: true },
     { callbackTarget: { url: 'https://other.invalid' } },
+    {
+      callbackTarget: {
+        url: 'workspace:workspace_22345678-1234-4234-8234-123456789abc',
+        token: 'short',
+      },
+    },
+    {
+      callbackTarget: {
+        url: 'workspace:not-a-session',
+        token: 'a'.repeat(64),
+      },
+    },
     { operationKey: 'invalid' },
   ])('rejects extra or invalid launch arguments before forwarding: %j', async override => {
     await expect(run('spawn_session', { ...launch, ...override })).rejects.toThrow('schema');

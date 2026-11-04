@@ -29,7 +29,6 @@ const E2E_INTERNAL_SECRET_PATTERN = /^[A-Za-z0-9._~-]+$/;
 const CALLBACK_QUEUE = 'cloud-agent-next-callback-queue';
 const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
-const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
 // Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
 // same `SandboxContainers` class as production.
@@ -186,7 +185,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     KILO_OPENROUTER_BASE: kiloOpenRouterBase,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
-    PER_SESSION_SANDBOX_ORG_IDS: '*',
     TOOL_CGROUP_ORG_IDS: '*',
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',
@@ -207,12 +205,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
       secret_name: 'NEXTAUTH_SECRET',
     });
   }
-
-  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
-    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-      : kvNamespace
-  );
 
   config.queues = {
     ...config.queues,

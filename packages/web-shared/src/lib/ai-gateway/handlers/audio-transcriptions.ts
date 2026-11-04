@@ -14,12 +14,13 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import {
   countAndStoreTranscriptionUsage,
   invalidRequestResponse,
+  malformedJsonResponse,
   modelDoesNotExistResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { validateRequestBody } from '@kilocode/web-shared/lib/ai-gateway/request-validation';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -105,7 +106,7 @@ type ParsedTranscriptionRequest =
 
 async function parseMultipartTranscriptionRequest(
   request: NextRequest
-): Promise<ParsedTranscriptionRequest | null> {
+): Promise<ParsedTranscriptionRequest | NextResponseType<unknown>> {
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -114,12 +115,16 @@ async function parseMultipartTranscriptionRequest(
     // data. This is client input, so answer the controlled 400 without
     // reporting it to Sentry. Never log the body: it is audio.
     errorExceptInTest('[transcription-proxy] Invalid multipart body:', error);
-    return null;
+    return invalidRequestResponse('Invalid multipart request body.');
   }
   const modelField = formData.get('model');
-  if (typeof modelField !== 'string' || modelField.trim().length === 0) return null;
+  if (typeof modelField !== 'string' || modelField.trim().length === 0) {
+    return invalidRequestResponse('Invalid request field "model".');
+  }
   const filePart = formData.get('file');
-  if (!filePart || typeof filePart === 'string') return null;
+  if (!filePart || typeof filePart === 'string') {
+    return invalidRequestResponse('Invalid request field "file".');
+  }
   return {
     kind: 'multipart',
     file: filePart,
@@ -128,20 +133,18 @@ async function parseMultipartTranscriptionRequest(
   };
 }
 
-function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscriptionRequest | null {
+function parseJsonTranscriptionRequest(
+  requestBodyText: string
+): ParsedTranscriptionRequest | NextResponseType<unknown> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(requestBodyText);
   } catch (error) {
-    errorExceptInTest('[transcription-proxy] Invalid JSON body:', error);
-    return null;
+    return malformedJsonResponse(error);
   }
 
-  const result = TranscriptionRequestSchema.safeParse(parsed);
-  if (!result.success) {
-    errorExceptInTest('[transcription-proxy] Invalid request body:', result.error.issues);
-    return null;
-  }
+  const result = validateRequestBody(parsed, TranscriptionRequestSchema);
+  if (!result.success) return result.response;
 
   return { kind: 'json', body: result.data };
 }
@@ -157,7 +160,7 @@ export async function handleAudioTranscriptionsRequest(
     .startsWith('multipart/form-data');
 
   let requestBodyText: string | undefined;
-  let parsedRequest: ParsedTranscriptionRequest | null;
+  let parsedRequest: ParsedTranscriptionRequest | NextResponseType<unknown>;
   if (isMultipartRequest) {
     parsedRequest = await parseMultipartTranscriptionRequest(request);
   } else {
@@ -165,7 +168,7 @@ export async function handleAudioTranscriptionsRequest(
     debugSaveProxyRequest(requestBodyText);
     parsedRequest = parseJsonTranscriptionRequest(requestBodyText);
   }
-  if (!parsedRequest) return invalidRequestResponse();
+  if (parsedRequest instanceof NextResponse) return parsedRequest;
 
   const requestedModel =
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
@@ -260,9 +263,8 @@ export async function handleAudioTranscriptionsRequest(
   // OpenRouter's transcription endpoint accepts the same provider preferences
   // as chat, so the organization data-collection policy and provider routes are
   // forwarded with the request instead of rejecting it.
-  const requestProvider = parsedRequest.kind === 'json' ? parsedRequest.body.provider : undefined;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
+  const requestProvider =
+    parsedRequest.kind === 'json' ? (parsedRequest.body.provider ?? undefined) : undefined;
   const organizationDecision = organizationId
     ? (
         await resolveOrganizationMemberModelDecision({
@@ -276,7 +278,7 @@ export async function handleAudioTranscriptionsRequest(
   const preferences = organizationProviderPreferences({
     decision: organizationDecision,
     settings,
-    requestProvider: requestPrivacy.data,
+    requestProvider,
   });
   if (preferences.kind === 'rejected') return preferences.response;
   const organizationProvider = preferences.provider;

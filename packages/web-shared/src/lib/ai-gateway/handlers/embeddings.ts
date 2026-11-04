@@ -1,6 +1,7 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
+import { z } from 'zod';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
@@ -16,7 +17,6 @@ import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cust
 import {
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
-  invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
   wrapInSafeNextResponse,
@@ -24,10 +24,12 @@ import {
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
-  getEffectiveProviderPrivacy,
-  providerPrivacySchema,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+  gatewayModelSchema,
+  gatewayProviderSchema,
+  validateRequestBody,
+} from '@kilocode/web-shared/lib/ai-gateway/request-validation';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
   gatewayUsageContextBase,
@@ -49,7 +51,6 @@ import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
-  type EmbeddingProxyRequest,
   validateEmbeddingDimensions,
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
@@ -60,6 +61,12 @@ import type {
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+
+const embeddingRequestSchema = z.looseObject({
+  model: gatewayModelSchema,
+  input: z.unknown().refine(input => input != null),
+  provider: gatewayProviderSchema.optional(),
+});
 
 async function embeddingProxyRequest(params: {
   body: Record<string, unknown>;
@@ -101,23 +108,17 @@ export async function handleEmbeddingsRequest(
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
   debugSaveProxyRequest(requestBodyText);
-  let requestBodyParsed: EmbeddingProxyRequest;
+  let requestJson: unknown;
   try {
-    requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
+    requestJson = JSON.parse(requestBodyText);
   } catch (e) {
     return malformedJsonResponse(e);
   }
 
-  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
-    return modelDoesNotExistResponse();
-  }
-
-  if (requestBodyParsed.input == null) {
-    return invalidRequestResponse();
-  }
-
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestBodyParsed.provider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
+  const parsed = validateRequestBody(requestJson, embeddingRequestSchema);
+  if (!parsed.success) return parsed.response;
+  const requestBodyParsed = parsed.data;
+  const requestProvider = requestBodyParsed.provider;
 
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
@@ -234,7 +235,7 @@ export async function handleEmbeddingsRequest(
     const preferences = organizationProviderPreferences({
       decision: organizationDecision,
       settings,
-      requestProvider: requestPrivacy.data,
+      requestProvider,
     });
     if (preferences.kind === 'rejected') return preferences.response;
     if (preferences.provider) requestBodyParsed.provider = preferences.provider;
@@ -285,10 +286,7 @@ export async function handleEmbeddingsRequest(
     requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
-    organizationDataCollection
-  );
+  const effectivePrivacy = getEffectiveProviderPrivacy(requestProvider, organizationDataCollection);
   const upstreamBody = buildUpstreamBody(
     {
       ...requestBodyParsed,

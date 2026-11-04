@@ -13,15 +13,16 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreEditUsage,
   extractEditPromptInfo,
-  invalidRequestResponse,
   malformedJsonResponse,
-  temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import {
+  gatewayModelSchema,
+  validateRequestBody,
+} from '@kilocode/web-shared/lib/ai-gateway/request-validation';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
@@ -71,13 +72,12 @@ const EditMessage = z.object({
   content: z.string(),
 });
 
-const EditRequestBody = z.object({
-  model: z.string(),
+const EditRequestBody = z.looseObject({
+  model: gatewayModelSchema,
   messages: z.array(EditMessage).length(1),
-  max_tokens: z.number().int().positive().optional(),
+  max_tokens: z.number().int().positive().max(EDIT_MAX_TOKENS_LIMIT),
   stop: z.string().array().optional(),
-  // Streaming is not supported by Inception's edit endpoint today; reject if requested.
-  stream: z.literal(false).optional(),
+  stream: z.boolean().nullish(),
 });
 
 export async function handleEditCompletionsRequest(request: NextRequest) {
@@ -102,23 +102,17 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   } catch (e) {
     return malformedJsonResponse(e);
   }
-  const { success, data: requestBody, error } = EditRequestBody.safeParse(requestJson);
-  if (!success) {
-    if (error.issues.some(issue => issue.path[0] === 'stream')) {
-      return NextResponse.json(
-        {
-          error: 'Streaming is not supported for edit completions',
-          error_type: ProxyErrorType.unsupported_field,
-        },
-        { status: 400 }
-      );
-    }
-    sentryLogger('edit-proxy')('request failed to parse', {
-      extra: { kiloUserId: user.id, error, organizationId },
-      tags: { source: 'edit-proxy' },
-      user: { id: user.id },
-    });
-    return invalidRequestResponse();
+  const parsed = validateRequestBody(requestJson, EditRequestBody);
+  if (!parsed.success) return parsed.response;
+  const requestBody = parsed.data;
+  if (requestBody.stream) {
+    return NextResponse.json(
+      {
+        error: 'Streaming is not supported for edit completions',
+        error_type: ProxyErrorType.unsupported_field,
+      },
+      { status: 400 }
+    );
   }
 
   const resolved = resolveEditProvider(requestBody.model);
@@ -132,13 +126,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     );
   }
   const { provider: editProvider, upstreamModel } = resolved;
-
-  if (!requestBody.max_tokens || requestBody.max_tokens > EDIT_MAX_TOKENS_LIMIT) {
-    console.warn(`SECURITY: Edit max tokens limit exceeded or missing: ${user.id}`, {
-      maxTokens: requestBody.max_tokens,
-    });
-    return temporarilyUnavailableResponse();
-  }
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));

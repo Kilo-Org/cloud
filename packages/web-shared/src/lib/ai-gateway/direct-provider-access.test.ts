@@ -49,7 +49,7 @@ function decide(decision: { allowed: boolean; eligibleProviderRoutes?: ReadonlyS
 describe('checkDirectProviderAccess', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
     mockedGetBalance.mockResolvedValue({ balance: 10, plan: 'teams', payer, settings: undefined });
     decide({ allowed: true });
   });
@@ -69,7 +69,7 @@ describe('checkDirectProviderAccess', () => {
   });
 
   it('omits usage funding for free models', async () => {
-    mockedIsFreeModel.mockResolvedValue(true);
+    mockedIsFreeModel.mockReturnValue(true);
     await checkDirectProviderAccess(params({ organizationId: undefined }));
     expect(mockedGetBalance.mock.calls).toEqual([[undefined, user, readDb, undefined]]);
   });

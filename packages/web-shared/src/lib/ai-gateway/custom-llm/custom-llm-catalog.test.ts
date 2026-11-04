@@ -7,7 +7,6 @@ import {
   requireCustomLlmsById,
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   customLlmDefinition,
@@ -39,19 +38,6 @@ describe('custom LLM catalog', () => {
     await expect(isCustomLlm('ACME/PRIVATE-MODEL')).resolves.toBe(true);
     await expect(isCustomLlm('kilo-internal/unknown')).resolves.toBe(false);
   });
-
-  test.each(['stealth/glyph-cluster', 'reflection/beam-free'])(
-    'serves a custom LLM with id %s as free',
-    async id => {
-      await insertCustomLlmForTest(id, publicCustomLlmDefinition(['acme']));
-      try {
-        await expect(findCustomLlm(id)).resolves.toMatchObject({ public_id: id });
-        await expect(isFreeModel(id)).resolves.toBe(true);
-      } finally {
-        await deleteCustomLlmForTest(id);
-      }
-    }
-  );
 
   test('picks up new rows only after the cache expires', async () => {
     const now = Date.now();
@@ -86,11 +72,6 @@ describe('custom LLM catalog', () => {
     clock.mockReturnValue(now + 5_000);
     await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
     expect(select).toHaveBeenCalledTimes(2);
-  });
-
-  test('treats every custom LLM as free', async () => {
-    await expect(isFreeModel('acme/public-model')).resolves.toBe(true);
-    await expect(isFreeModel('acme/private-model')).resolves.toBe(true);
   });
 
   test('pins only public custom LLMs to their declared providers', async () => {

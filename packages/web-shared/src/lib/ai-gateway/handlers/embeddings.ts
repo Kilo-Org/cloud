@@ -12,10 +12,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   getOrganizationProviderPrivacy,
@@ -176,7 +173,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!isFreeModelExcludingCustomLlms(requestedModelLowerCased)) {
+    if (!isFreeModel(requestedModelLowerCased)) {
       return NextResponse.json(
         {
           error: {
@@ -195,11 +192,8 @@ export async function handleEmbeddingsRequest(
     user = maybeUser;
   }
 
-  // Custom LLMs are served only through chat routes; never forward their ids
-  // elsewhere for signed-in callers. Anonymous callers can only send ids the
-  // built-in free model rules allow, and such an id must be answered the same
-  // whether or not a custom LLM uses it, so they are not checked.
-  if (!isAnonymousContext(user) && (await isCustomLlm(requestedModelLowerCased))) {
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestedModelLowerCased)) {
     return modelDoesNotExistResponse();
   }
 
@@ -293,7 +287,7 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const freeRequest = await isFreeModel(requestedModelLowerCased);
+    const freeRequest = isFreeModel(requestedModelLowerCased);
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
       await getBalanceAndOrgSettings(
         organizationId,

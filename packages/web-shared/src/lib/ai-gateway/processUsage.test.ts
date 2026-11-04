@@ -40,6 +40,7 @@ import {
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
+  inference_region,
   microdollar_usage_metadata,
   microdollar_usage_view,
   organization_user_usage,
@@ -953,6 +954,7 @@ describe('logMicrodollarUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
@@ -1039,6 +1041,36 @@ describe('logMicrodollarUsage', () => {
       expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
     }
   );
+
+  test.each([
+    { region: 'eu', stored: true },
+    { region: null, stored: false },
+  ] as const)('stores inference region $region in the lookup table', async ({ region, stored }) => {
+    const user = await insertTestUser({
+      id: `test-log-user-region-${region}`,
+      microdollars_used: 1000,
+      google_user_email: `test-region-${region}@example.com`,
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-region-${region}` };
+
+    await logMicrodollarUsage(usageStats, {
+      ...createBaseUsageContext(user),
+      inference_region: region,
+    });
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+    });
+    if (!stored) {
+      expect(metadataRecord?.inference_region_id).toBeNull();
+      return;
+    }
+    const [lookup] = await db
+      .select()
+      .from(inference_region)
+      .where(eq(inference_region.inference_region_id, metadataRecord!.inference_region_id!));
+    expect(lookup?.inference_region).toBe('eu');
+  });
 
   test('stores session_id when provided', async () => {
     const user = await insertTestUser({
@@ -2564,6 +2596,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     }) satisfies MicrodollarUsageContext;

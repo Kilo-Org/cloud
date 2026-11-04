@@ -22,6 +22,12 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
@@ -56,6 +62,7 @@ import {
   extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
+  extractInferenceRegion,
   invalidRequestResponse,
   malformedJsonResponse,
   invalidTokenResponse,
@@ -83,6 +90,7 @@ import {
   chatGptReconnectResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
+  managedGatewayDisabledResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -818,6 +826,7 @@ export async function handleLlmProxyRequest(
             max_tokens: null,
             has_middle_out_transform: null,
             reasoning_setting: null,
+            inference_region: null,
             isStreaming: false,
             prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
@@ -932,6 +941,13 @@ export async function handleLlmProxyRequest(
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
   const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
+  const organizationGatewaySettings = organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        organizationId,
+        (await balanceAndSettingsPromise).settings
+      )
+    : NO_ORGANIZATION_GATEWAY_SETTINGS;
 
   const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
@@ -943,6 +959,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     boundedSpending: requestCostLimit !== null,
+    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
@@ -972,6 +989,9 @@ export async function handleLlmProxyRequest(
           `Organization Auto route target '${routingTarget}' is unavailable: ${message}`
         )
       : directByokCatalogOnlyResponse(message);
+  }
+  if (isManagedGatewayDisabled(organizationGatewaySettings, providerResult.provider.type)) {
+    return managedGatewayDisabledResponse(providerResult.provider.type);
   }
   const effectiveProviderContext = providerResult;
 
@@ -1094,6 +1114,7 @@ export async function handleLlmProxyRequest(
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
+    inference_region: null,
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,
@@ -1179,6 +1200,7 @@ export async function handleLlmProxyRequest(
     method: request.method,
     signal: request.signal,
     vercelRequestId,
+    dataRegion: organizationGatewaySettings.dataRegion,
   };
 
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
@@ -1260,6 +1282,7 @@ export async function handleLlmProxyRequest(
     requestStartedAt
   );
   usageContext.status_code = response.status;
+  usageContext.inference_region = extractInferenceRegion(requestBodyParsed.body);
   const userByokProviderIds =
     effectiveProviderContext.userByok === null
       ? null

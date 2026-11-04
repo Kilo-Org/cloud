@@ -200,7 +200,8 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     return request.body.messages.find(message => message.role === 'tool')?.content;
@@ -257,7 +258,8 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     const tool = request.body.tools?.[0];
@@ -305,7 +307,8 @@ describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     return request.body.tools[0];
@@ -374,7 +377,8 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     const tool = request.body.tools?.[0];
@@ -762,7 +766,8 @@ describe('removeModelsFallback', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     expect(request.body).not.toHaveProperty('fallbacks');
@@ -795,7 +800,8 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       null,
       null,
       null,
-      true
+      true,
+      null
     );
     return request;
   }
@@ -806,7 +812,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       createUserVercelAiGatewayProvider('user-key')
     );
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null, null);
   });
 
   it('passes inference provider keys to the Vercel settings', async () => {
@@ -814,7 +820,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 
     const request = await apply(userByok, VERCEL_AI_GATEWAY);
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok, null);
   });
 
   it.each(['openrouter', 'vercel-ai-gateway'] as const)(
@@ -857,7 +863,8 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
         null,
         null,
         null,
-        true
+        true,
+        null
       );
 
       expect(request.body).toMatchObject(serverFeatures);
@@ -883,7 +890,8 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return { thinking: request.body.thinking, extraHeaders };
   }
@@ -937,7 +945,8 @@ describe('applyProviderSpecificLogic paid server features', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return request.body;
   }
@@ -992,7 +1001,8 @@ describe('applyProviderSpecificLogic paid server features', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     expect(request.body.tools).toEqual([fields.tools[1]]);
@@ -1143,7 +1153,8 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
       'org-1',
       null,
       null,
-      isNonTrialEnterprise
+      isNonTrialEnterprise,
+      null
     );
 
     return request.body.provider;
@@ -1176,7 +1187,8 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
       'org-1',
       null,
       null,
-      false
+      false,
+      null
     );
 
     expect(request.body.provider).toBeUndefined();

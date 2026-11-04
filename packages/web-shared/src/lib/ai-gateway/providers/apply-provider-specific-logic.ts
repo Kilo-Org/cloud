@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
@@ -313,7 +314,8 @@ export async function applyProviderSpecificLogic(
   organizationId: string | null,
   sessionId: string | null,
   taskId: string | null,
-  isNonTrialEnterprise: boolean
+  isNonTrialEnterprise: boolean,
+  dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
@@ -415,7 +417,8 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok
+      usesUserGatewayKey ? null : userByok,
+      dataRegion
     );
   }
 

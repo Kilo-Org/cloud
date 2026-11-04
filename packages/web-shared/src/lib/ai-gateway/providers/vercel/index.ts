@@ -1,4 +1,5 @@
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   AzureCredentialsSchema,
@@ -64,11 +65,24 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
+/** The `GetProviderInput` fields that decide whether Kilo's own route uses the Vercel AI Gateway. */
+export type VercelRoutingInput = {
+  requestedModel: string;
+  boundedSpending: boolean;
+  organizationDisabledVercelAiGateway: boolean;
+};
+
 export async function shouldRouteToVercel(
-  requestedModel: string,
-  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>,
-  boundedSpending: boolean
+  { requestedModel, boundedSpending, organizationDisabledVercelAiGateway }: VercelRoutingInput,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
+  if (organizationDisabledVercelAiGateway) {
+    console.debug(
+      `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because the organization disabled it`
+    );
+    return false;
+  }
+
   if (boundedSpending) {
     console.debug(
       `[shouldRouteToVercel] not routing model ${requestedModel} to Vercel because a spend ceiling is set`
@@ -277,7 +291,8 @@ export function getVercelInferenceProviderConfigForUserByok(
 export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  userByok: BYOKResult[] | null
+  userByok: BYOKResult[] | null,
+  dataRegion: OrganizationDataRegion | null
 ) {
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
@@ -334,6 +349,15 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
+  }
+
+  if (dataRegion && requestToMutate.body.providerOptions?.gateway) {
+    // Vercel fails the request instead of leaving the region, for BYOK credentials too.
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    requestToMutate.body.providerOptions.gateway.inferenceRegion = {
+      scope: 'zone',
+      geoRegion: dataRegion,
+    };
   }
 
   if (requestToMutate.body.providerOptions) {

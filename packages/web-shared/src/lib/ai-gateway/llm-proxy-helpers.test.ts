@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
-import type { GatewayRequest } from './providers/openrouter/types';
+import type { GatewayRequest, VercelProviderConfig } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 
@@ -56,6 +56,7 @@ import {
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
+  extractInferenceRegion,
   getOrganizationProviderPrivacy,
   getOutputHeaders,
   lastUserPromptText,
@@ -100,6 +101,23 @@ describe('getOutputHeaders', () => {
       expect(headers.get('cache-control')).toBe('no-cache, no-transform');
     }
   );
+});
+
+describe('extractInferenceRegion', () => {
+  const body = (gateway?: VercelProviderConfig['gateway']) =>
+    ({ model: 'anthropic/claude-haiku-4.5', messages: [], providerOptions: { gateway } }) as never;
+
+  it('returns the pinned zone', () => {
+    expect(
+      extractInferenceRegion(body({ inferenceRegion: { scope: 'zone', geoRegion: 'eu' } }))
+    ).toBe('eu');
+  });
+
+  it('returns null for global or unset regions', () => {
+    expect(extractInferenceRegion(body({ inferenceRegion: { scope: 'global' } }))).toBeNull();
+    expect(extractInferenceRegion(body({}))).toBeNull();
+    expect(extractInferenceRegion({ model: 'x', messages: [] } as never)).toBeNull();
+  });
 });
 
 describe('extractReasoningSetting', () => {
@@ -556,6 +574,7 @@ describe('countAndStoreFimUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -932,6 +951,7 @@ describe('countAndStoreEditUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;

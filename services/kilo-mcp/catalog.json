@@ -25012,6 +25012,32 @@
     ],
     "searchBlob": "organizations.requestLogs.list List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first. organizations requestlogs list organizationid organizationId"
   },
+  "organizations.requestLogs.listEnkryptUsage": {
+    "path": "organizations.requestLogs.listEnkryptUsage",
+    "kind": "query",
+    "summary": "Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "listenkryptusage",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.requestLogs.listEnkryptUsage Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages. organizations requestlogs listenkryptusage organizationid organizationId"
+  },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",
     "kind": "mutation",

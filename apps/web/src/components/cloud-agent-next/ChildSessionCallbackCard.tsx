@@ -48,7 +48,7 @@ export function ChildSessionCallbackCard({ callback }: { callback: ChildSessionC
     <div className="border-border bg-card w-full rounded-lg border px-3.5 py-3 text-left text-sm">
       <div className="flex min-w-0 items-center gap-2">
         <Bot className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate font-medium">Child agent</span>
+        <span className="min-w-0 flex-1 truncate font-medium">Subagent</span>
         <span
           className={cn(
             'flex shrink-0 items-center gap-1 text-xs font-normal',

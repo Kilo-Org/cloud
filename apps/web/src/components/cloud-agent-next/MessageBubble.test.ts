@@ -292,7 +292,7 @@ describe('MessageBubble', () => {
       React.createElement(MessageBubble, { message: userMessage(raw) })
     );
 
-    expect(html).toContain('Child agent');
+    expect(html).toContain('Subagent');
     expect(html).toContain('Completed');
     expect(html).toContain('PR: ');
     expect(html).toContain(
@@ -317,7 +317,7 @@ ${JSON.stringify({
       React.createElement(MessageBubble, { message: userMessage(raw) })
     );
 
-    expect(html).toContain('Child agent');
+    expect(html).toContain('Subagent');
     expect(html).toContain('Finished the legacy child task.');
     expect(html).not.toContain('A child Cloud Agent task finished');
   });
@@ -333,7 +333,7 @@ ${JSON.stringify({
       React.createElement(MessageBubble, { message: userMessage(raw) })
     );
 
-    expect(html).toContain('Child agent');
+    expect(html).toContain('Subagent');
     expect(html).toContain('Failed');
     expect(html).toContain('The setup command failed');
   });
@@ -349,7 +349,7 @@ ${JSON.stringify({
       React.createElement(MessageBubble, { message: userMessage(raw) })
     );
 
-    expect(html).not.toContain('Child agent');
+    expect(html).not.toContain('Subagent');
     expect(html).toContain('A child Cloud Agent task finished');
   });
 });

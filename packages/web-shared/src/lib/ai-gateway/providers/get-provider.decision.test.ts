@@ -732,6 +732,10 @@ describe('getProvider route order with a ChatGPT connection', () => {
     });
 
     expect(decision.result).toMatchObject({ route: 'direct-byok', payer: 'owner-byok-key' });
+    expect(decision.steps.slice(2)).toEqual([
+      { step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' },
+      { step: 'byok-key', outcome: 'selected', route: 'direct-byok', provider_id: 'zai-coding' },
+    ]);
     expect(decision.byok_candidates).toEqual([
       candidate('direct-byok', 'zai-coding', 0, 'selected'),
     ]);

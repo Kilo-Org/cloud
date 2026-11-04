@@ -20,8 +20,6 @@ const ByokCandidateSkipReasonSchema = z.enum([
   'model-unavailable',
   'provider-settings',
   'ignored-by-request',
-  /** Archived records only: routing now decrypts the key from the read that ranked it. */
-  'not-loaded',
 ]);
 
 export type ByokCandidateSkipReason = z.infer<typeof ByokCandidateSkipReasonSchema>;
@@ -103,7 +101,7 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('skipped'),
     reason: z.literal('unavailable'),
   }),
-  /** Archived records only: the BYOK candidates now show where the connection was ranked. */
+  /** A catalog-mode key that serves ranks above the connection, so it is not checked. */
   z.object({
     step: z.literal('chatgpt'),
     outcome: z.literal('deferred'),
@@ -125,14 +123,6 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('selected'),
     provider_id: UserByokProviderIdSchema,
     supported_api_kinds: z.array(GatewayChatApiKindSchema),
-  }),
-  /** Archived records only, like the `not-loaded` candidate reason. */
-  z.object({
-    step: z.literal('unsupported-api-kind'),
-    outcome: z.literal('skipped'),
-    provider_id: UserByokProviderIdSchema,
-    supported_api_kinds: z.array(GatewayChatApiKindSchema),
-    reason: z.literal('not-loaded'),
   }),
   z.object({
     step: z.literal('kilo'),

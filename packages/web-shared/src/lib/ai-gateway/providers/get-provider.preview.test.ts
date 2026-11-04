@@ -272,10 +272,16 @@ function routedStepsOfPreview(steps: ByokRoutePreviewStep[]): RoutedSteps {
     ];
   });
 
-  const routed: ProviderRoutingDecision['steps'] = steps
-    .slice(0, usedIndex)
-    .filter(step => step.route === 'chatgpt')
-    .map(() => ({ step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' }));
+  const chatGptIndex = steps.findIndex(step => step.route === 'chatgpt');
+  const catalogKeyServesAboveChatGpt = steps
+    .slice(0, Math.max(chatGptIndex, 0))
+    .some(step => step.route === 'direct-byok' && step.reason === 'serves');
+  const routed: ProviderRoutingDecision['steps'] = catalogKeyServesAboveChatGpt
+    ? [{ step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' }]
+    : steps
+        .slice(0, usedIndex)
+        .filter(step => step.route === 'chatgpt')
+        .map(() => ({ step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' }));
   const noKeyServed = {
     step: 'byok-key',
     outcome: 'skipped',

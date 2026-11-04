@@ -261,9 +261,25 @@ export function guardrailBlockMessage(
 ): string {
   const enkryptBlocked = detectors.some(detector => ENKRYPT_DETECTOR_TYPES[detector] === 'block');
   const reason =
-    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ??
-    'The request was flagged by your organization policy. Review it and retry.';
-  return `Your organization's Enkrypt AI guardrail blocked this request (detected: ${detectors.join(', ')}). ${reason}`;
+    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? REQUEST_FLAGGED_REASON;
+  return `${REQUEST_BLOCKED} (detected: ${detectors.join(', ')}). ${reason}`;
+}
+
+const REQUEST_BLOCKED = "Your organization's Enkrypt AI guardrail blocked this request";
+const REQUEST_FLAGGED_REASON =
+  'The request was flagged by your organization policy. Review it and retry.';
+const RESPONSE_BLOCKED = "Your organization's Enkrypt AI guardrail blocked the model's response";
+const RESPONSE_FLAGGED_REASON =
+  'The response was flagged by your organization policy. Rephrase the request and retry.';
+
+/**
+ * `scanRequest` words a block for a request; the output guardrail scans the model's response with
+ * it and rewords the block for the response.
+ */
+export function responseBlockMessage(requestBlockMessage: string): string {
+  return requestBlockMessage
+    .replace(REQUEST_BLOCKED, RESPONSE_BLOCKED)
+    .replace(REQUEST_FLAGGED_REASON, RESPONSE_FLAGGED_REASON);
 }
 
 function attemptDecision(

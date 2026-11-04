@@ -101,7 +101,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
-import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  createEmptyEnkryptOutputDetectors,
+  createKiloDefaultEnkryptInputDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import {
   DEFAULT_ORGANIZATION_FEATURES,
@@ -109,6 +112,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type * as GatewayConfigModule from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
+import { EnkryptOutputGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 jest.mock('next/server', () => {
   return {
@@ -4401,6 +4405,753 @@ describe('briefing gateway accounting receipts', () => {
     expect(response.status).toBe(200);
     await finishAfterTasks();
     expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
+  });
+});
+
+describe('Enkrypt output guardrail', () => {
+  const enkryptDetectUrl = 'https://api.enkryptai.com/guardrails/detect';
+  const mockedRecordEnkryptUsage = jest.mocked(recordEnkryptUsage);
+  const secret = 'sk-live-4f9a2c';
+  const assistantText = `The deploy key is ${secret}`;
+  const assistantDeltas = ['The deploy key is ', secret];
+  let fetchSpy: jest.SpiedFunction<typeof fetch>;
+
+  type ApiKind = 'chat_completions' | 'messages' | 'responses';
+
+  function sse(events: { event?: string; data: unknown }[]) {
+    return events
+      .map(
+        ({ event, data }) =>
+          `${event ? `event: ${event}\n` : ''}data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`
+      )
+      .join('');
+  }
+
+  const upstreamBodies: Record<ApiKind, { json: string; sse: string }> = {
+    chat_completions: {
+      json: JSON.stringify({
+        id: 'chatcmpl-1',
+        object: 'chat.completion',
+        model: 'openai/gpt-4o',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: assistantText },
+            finish_reason: 'stop',
+          },
+        ],
+      }),
+      sse: sse([
+        ...assistantDeltas.map(content => ({
+          data: {
+            id: 'chatcmpl-1',
+            object: 'chat.completion.chunk',
+            model: 'openai/gpt-4o',
+            choices: [{ index: 0, delta: { role: 'assistant', content } }],
+          },
+        })),
+        { data: '[DONE]' },
+      ]),
+    },
+    messages: {
+      json: JSON.stringify({
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
+        model: 'openai/gpt-4o',
+        content: [{ type: 'text', text: assistantText }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 5, output_tokens: 8 },
+      }),
+      sse: sse([
+        {
+          event: 'message_start',
+          data: {
+            type: 'message_start',
+            message: {
+              id: 'msg_1',
+              type: 'message',
+              role: 'assistant',
+              model: 'openai/gpt-4o',
+              content: [],
+              usage: { input_tokens: 5, output_tokens: 0 },
+            },
+          },
+        },
+        {
+          event: 'content_block_start',
+          data: {
+            type: 'content_block_start',
+            index: 0,
+            content_block: { type: 'text', text: '' },
+          },
+        },
+        ...assistantDeltas.map(text => ({
+          event: 'content_block_delta',
+          data: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+        })),
+        { event: 'content_block_stop', data: { type: 'content_block_stop', index: 0 } },
+        {
+          event: 'message_delta',
+          data: {
+            type: 'message_delta',
+            delta: { stop_reason: 'end_turn' },
+            usage: { output_tokens: 8 },
+          },
+        },
+        { event: 'message_stop', data: { type: 'message_stop' } },
+      ]),
+    },
+    responses: {
+      json: JSON.stringify({
+        id: 'resp_1',
+        object: 'response',
+        status: 'completed',
+        model: 'openai/gpt-4o',
+        output: [
+          {
+            type: 'message',
+            id: 'msg_1',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: assistantText, annotations: [] }],
+          },
+        ],
+      }),
+      sse: sse([
+        {
+          event: 'response.created',
+          data: {
+            type: 'response.created',
+            sequence_number: 0,
+            response: { id: 'resp_1', status: 'in_progress', output: [] },
+          },
+        },
+        {
+          event: 'response.output_item.added',
+          data: {
+            type: 'response.output_item.added',
+            sequence_number: 1,
+            output_index: 0,
+            item: { type: 'message', id: 'msg_1', role: 'assistant', content: [] },
+          },
+        },
+        ...assistantDeltas.map((delta, index) => ({
+          event: 'response.output_text.delta',
+          data: {
+            type: 'response.output_text.delta',
+            sequence_number: 2 + index,
+            item_id: 'msg_1',
+            output_index: 0,
+            content_index: 0,
+            delta,
+          },
+        })),
+        {
+          event: 'response.completed',
+          data: {
+            type: 'response.completed',
+            sequence_number: 4,
+            response: { id: 'resp_1', status: 'completed' },
+          },
+        },
+      ]),
+    },
+  };
+
+  const requests: Record<ApiKind, { path: string; body: Record<string, unknown> }> = {
+    chat_completions: { path: '/chat/completions', body: makeBody() },
+    messages: {
+      path: '/messages',
+      body: {
+        model: 'openai/gpt-4o',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    },
+    responses: {
+      path: '/responses',
+      body: { model: 'openai/gpt-4o', input: [{ role: 'user', content: 'hello' }] },
+    },
+  };
+
+  const cases = (['chat_completions', 'messages', 'responses'] as const).flatMap(kind =>
+    [false, true].map(stream => ({ kind, stream }))
+  );
+
+  function upstreamBody(kind: ApiKind, stream: boolean) {
+    return stream ? upstreamBodies[kind].sse : upstreamBodies[kind].json;
+  }
+
+  function upstreamResponse(kind: ApiKind, stream: boolean) {
+    return new Response(upstreamBody(kind, stream), {
+      headers: {
+        'content-type': stream ? 'text/event-stream' : 'application/json',
+        'request-id': 'req-123',
+      },
+    });
+  }
+
+  function respondUpstream(kind: ApiKind, stream: boolean) {
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamResponse(kind, stream),
+    });
+  }
+
+  function sendRequest(kind: ApiKind, stream: boolean) {
+    const { path, body } = requests[kind];
+    return handleLlmProxyRequest(makeRequest({ ...body, stream }, undefined, path));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    respondUpstream('chat_completions', false);
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    fetchSpy = jest.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  function setOrganization(settings: OrganizationSettings | undefined) {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: settings && { kilo_encrypt: true, ...settings },
+      plan: 'enterprise',
+    });
+  }
+
+  function outputGuardrailSettings(action: 'block' | 'log'): OrganizationSettings {
+    return {
+      enkrypt: {
+        output_guardrail: {
+          enabled: true,
+          detectors: {
+            ...createEmptyEnkryptOutputDetectors(),
+            pii: { enabled: true, action, entities: ['secrets'] },
+          },
+        },
+      },
+    };
+  }
+
+  const piiDetected = { summary: { pii: 1 }, result_message: null };
+  const nothingDetected = { summary: { pii: 0 } };
+
+  function enkryptAnswers(body: unknown, status = 200) {
+    fetchSpy.mockImplementation(async () =>
+      Response.json(body, { status, headers: { 'x-enkrypt-credits-cost': '2' } })
+    );
+  }
+
+  function enkryptRequestBodies() {
+    return fetchSpy.mock.calls
+      .filter(([url]) => url === enkryptDetectUrl)
+      .map(([, init]) => JSON.parse(String(init?.body)) as { text: string; detectors: unknown });
+  }
+
+  async function runAfterTasks() {
+    await Promise.all(
+      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+    );
+  }
+
+  const keepAlive = ': KILO PROCESSING\n\n';
+
+  function afterKeepAlive(text: string) {
+    expect(text.slice(0, keepAlive.length)).toBe(keepAlive);
+    return text.slice(keepAlive.length);
+  }
+
+  function sseEvents(text: string) {
+    return text
+      .split('\n\n')
+      .filter(block => block.trim() !== '')
+      .map(block => {
+        const lines = block.split('\n');
+        const event = lines.find(line => line.startsWith('event: '))?.slice('event: '.length);
+        const data = lines.find(line => line.startsWith('data: '))?.slice('data: '.length);
+        return { event, data: JSON.parse(data ?? 'null') as unknown };
+      });
+  }
+
+  function expectedErrorBody(kind: ApiKind, message: unknown, errorType: string) {
+    if (kind === 'messages') {
+      return {
+        type: 'error',
+        error: {
+          type: errorType === 'guardrail_blocked' ? 'invalid_request_error' : 'api_error',
+          message,
+        },
+        error_type: errorType,
+      };
+    }
+    return {
+      error: {
+        message,
+        type: errorType === 'guardrail_blocked' ? 'invalid_request_error' : 'server_error',
+        code: errorType,
+        param: null,
+      },
+      error_type: errorType,
+    };
+  }
+
+  function expectedStreamErrorEvents(kind: ApiKind, message: unknown, errorType: string) {
+    const body = expectedErrorBody(kind, message, errorType);
+    if (kind === 'chat_completions') return [{ event: undefined, data: body }];
+    if (kind === 'messages') return [{ event: 'error', data: body }];
+    return [
+      {
+        event: 'error',
+        data: {
+          type: 'error',
+          sequence_number: 0,
+          code: errorType,
+          message,
+          param: null,
+          error: body.error,
+          error_type: errorType,
+        },
+      },
+    ];
+  }
+
+  it('is off by default and passes the response through', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: false } } });
+    enkryptAnswers(piiDetected);
+
+    const response = await sendRequest('chat_completions', false);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(upstreamBody('chat_completions', false));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes no Enkrypt call when enabled without saved detectors', async () => {
+    setOrganization({ enkrypt: { output_guardrail: { enabled: true } } });
+    enkryptAnswers(piiDetected);
+
+    const response = await sendRequest('chat_completions', false);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(upstreamBody('chat_completions', false));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      name: 'a request without an organization',
+      setUp: () => {
+        setOrganization(outputGuardrailSettings('block'));
+        mockedGetUserFromAuth.mockResolvedValue({
+          user: {
+            id: 'user-123',
+            google_user_email: 'test@example.com',
+            microdollars_used: 0,
+          } as User,
+          authFailedResponse: null,
+          organizationId: undefined,
+        });
+      },
+      model: 'openai/gpt-4o',
+    },
+    {
+      name: 'an anonymous request',
+      setUp: () => {
+        setOrganization(outputGuardrailSettings('block'));
+        setAnonymousAuth();
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider,
+          userByok: null,
+          isFree: true,
+          bypassAccessCheck: false,
+        });
+      },
+      model: 'test/free-model:free',
+    },
+  ])('skips the output guardrail for $name', async ({ setUp, model }) => {
+    setUp();
+    enkryptAnswers(piiDetected);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(upstreamBody('chat_completions', false));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(cases)(
+    'scans and releases an allowed $kind response (stream: $stream) unchanged',
+    async ({ kind, stream }) => {
+      setOrganization(outputGuardrailSettings('block'));
+      respondUpstream(kind, stream);
+      enkryptAnswers(nothingDetected);
+
+      const response = await sendRequest(kind, stream);
+
+      expect(response.status).toBe(200);
+      const text = await response.text();
+      expect(stream ? afterKeepAlive(text) : text).toBe(upstreamBody(kind, stream));
+      expect(response.headers.get('request-id')).toBe('req-123');
+      expect(enkryptRequestBodies()).toEqual([
+        expect.objectContaining({ text: assistantText, detectors: { pii: expect.anything() } }),
+      ]);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(expect.objectContaining({ kind }));
+    }
+  );
+
+  it.each(cases)(
+    'replaces a blocked $kind response (stream: $stream) with a rejection',
+    async ({ kind, stream }) => {
+      setOrganization(outputGuardrailSettings('block'));
+      respondUpstream(kind, stream);
+      enkryptAnswers(piiDetected);
+
+      const response = await sendRequest(kind, stream);
+
+      const text = await response.text();
+      expect(text).not.toContain(secret);
+      const message = expect.stringContaining("blocked the model's response");
+      if (stream) {
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('text/event-stream');
+        expect(sseEvents(afterKeepAlive(text))).toEqual(
+          expectedStreamErrorEvents(kind, message, 'guardrail_blocked')
+        );
+      } else {
+        expect(response.status).toBe(400);
+        expect(response.headers.get('x-should-retry')).toBe('false');
+        expect(JSON.parse(text)).toEqual(expectedErrorBody(kind, message, 'guardrail_blocked'));
+      }
+      expect(enkryptRequestBodies()).toEqual([expect.objectContaining({ text: assistantText })]);
+      expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+      expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ error: { guardrail_rejection: 'block', guardrail: 'output' } })
+      );
+      await runAfterTasks();
+      expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+        [
+          expect.objectContaining({
+            organizationId: 'org-1',
+            kiloUserId: 'user-123',
+            decision: 'blocked',
+            creditsCost: 2,
+            addedLatencyMs: expect.any(Number),
+            guardrail: 'output',
+          }),
+        ],
+      ]);
+    }
+  );
+
+  it('bills the full upstream response even when the output is blocked', async () => {
+    setOrganization(outputGuardrailSettings('block'));
+    respondUpstream('messages', true);
+    enkryptAnswers(piiDetected);
+    let billedBody: string | undefined;
+    mockedAccountForMicrodollarUsage.mockImplementation(async clone => {
+      billedBody = await clone.text();
+      return null;
+    });
+
+    const response = await sendRequest('messages', true);
+
+    expect(await response.text()).not.toContain(secret);
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
+    await mockedAccountForMicrodollarUsage.mock.results[0]?.value;
+    expect(billedBody).toBe(upstreamBody('messages', true));
+  });
+
+  it.each([
+    { stream: true, status: 200 },
+    { stream: false, status: 503 },
+  ])('withholds the response when Enkrypt fails (stream: $stream)', async ({ stream, status }) => {
+    setOrganization(outputGuardrailSettings('block'));
+    respondUpstream('chat_completions', stream);
+    enkryptAnswers({ detail: 'unavailable' }, 500);
+
+    const response = await sendRequest('chat_completions', stream);
+
+    expect(response.status).toBe(status);
+    const text = await response.text();
+    expect(text).not.toContain(secret);
+    const message = expect.stringContaining("could not check the model's response");
+    if (stream) {
+      expect(sseEvents(afterKeepAlive(text))).toEqual(
+        expectedStreamErrorEvents('chat_completions', message, 'guardrail_unavailable')
+      );
+    } else {
+      expect(response.headers.get('retry-after')).toBe('1');
+      expect(JSON.parse(text)).toEqual(
+        expectedErrorBody('chat_completions', message, 'guardrail_unavailable')
+      );
+    }
+    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { stream: false, status: 503 },
+    { stream: true, status: 200 },
+  ])(
+    'withholds the response without an Enkrypt call when the saved detectors are invalid (stream: $stream)',
+    async ({ stream, status }) => {
+      setOrganization({
+        enkrypt: { output_guardrail: { enabled: true, detectors: { pii: true } } },
+      });
+      respondUpstream('chat_completions', stream);
+      enkryptAnswers(nothingDetected);
+
+      const response = await sendRequest('chat_completions', stream);
+
+      expect(response.status).toBe(status);
+      const text = await response.text();
+      expect(text).not.toContain(secret);
+      const message = expect.stringContaining("could not check the model's response");
+      if (stream) {
+        expect(response.headers.get('content-type')).toBe('text/event-stream');
+        expect(sseEvents(text)).toEqual(
+          expectedStreamErrorEvents('chat_completions', message, 'guardrail_unavailable')
+        );
+      } else {
+        expect(response.headers.get('x-should-retry')).toBe('false');
+        expect(JSON.parse(text)).toEqual(
+          expectedErrorBody('chat_completions', message, 'guardrail_unavailable')
+        );
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+      expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: { guardrail_rejection: 'unavailable', guardrail: 'output' },
+        })
+      );
+    }
+  );
+
+  it('starts a blocked stream with a keep-alive comment before Enkrypt answers', async () => {
+    setOrganization(outputGuardrailSettings('block'));
+    respondUpstream('chat_completions', true);
+    const enkrypt = Promise.withResolvers<void>();
+    fetchSpy.mockImplementation(async () => {
+      await enkrypt.promise;
+      return Response.json(piiDetected, { headers: { 'x-enkrypt-credits-cost': '2' } });
+    });
+
+    const response = await sendRequest('chat_completions', true);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/event-stream');
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const decoder = new TextDecoder();
+    const first = await reader?.read();
+    expect(decoder.decode(first?.value)).toBe(keepAlive);
+    expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
+
+    enkrypt.resolve();
+    let rest = '';
+    for (;;) {
+      const next = await reader?.read();
+      if (!next || next.done) break;
+      rest += decoder.decode(next.value, { stream: true });
+    }
+
+    expect(rest).not.toContain(secret);
+    expect(sseEvents(rest)).toEqual(
+      expectedStreamErrorEvents(
+        'chat_completions',
+        expect.stringContaining("blocked the model's response"),
+        'guardrail_blocked'
+      )
+    );
+    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+    expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ error: { guardrail_rejection: 'block', guardrail: 'output' } })
+    );
+  });
+
+  describe('provider metadata archive', () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'organization',
+      steps: [
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'openrouter',
+          bounded_spending: false,
+          organization_disabled_vercel_ai_gateway: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'openrouter',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    };
+
+    async function archivedRecord(settings: OrganizationSettings) {
+      fakeR2.objects.clear();
+      const env = jest.replaceProperty(process, 'env', {
+        ...process.env,
+        R2_ACCOUNT_ID: 'test-metadata-account',
+        R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+        R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+        R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+      });
+      setOrganization(settings);
+      respondUpstream('chat_completions', true);
+      enkryptAnswers(piiDetected);
+      mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+        onDecision?.(decision);
+        return {
+          kind: 'provider',
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        };
+      });
+
+      let text: string;
+      try {
+        const response = await sendRequest('chat_completions', true);
+        text = await response.text();
+        await runAfterTasks();
+      } finally {
+        env.restore();
+      }
+
+      const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+      const key = `test-provider-metadata/${usageId}.json`;
+      expect([...fakeR2.objects.keys()]).toEqual([key]);
+      const archived = fakeR2.objects.get(key) ?? '';
+      return { text, archived, record: JSON.parse(archived) as Record<string, unknown> };
+    }
+
+    it('archives the output report of a blocked streamed response without its text', async () => {
+      const { text, archived, record } = await archivedRecord(outputGuardrailSettings('block'));
+
+      expect(sseEvents(afterKeepAlive(text))).toEqual(
+        expectedStreamErrorEvents(
+          'chat_completions',
+          expect.stringContaining("blocked the model's response"),
+          'guardrail_blocked'
+        )
+      );
+      expect(archived).not.toContain(secret);
+      expect(record).toMatchObject({ usage_id: expect.any(String), ...decision });
+      const report = EnkryptOutputGuardrailReportSchema.parse(record.enkrypt_output);
+      expect(report).toMatchObject({
+        held_back: true,
+        verdict: 'block',
+        not_scanned_reason: null,
+        scans: [
+          {
+            scan: 'blocking',
+            decision: 'blocked',
+            detectors_fired: ['pii'],
+            verdict_cache: 'off',
+            credits_cost: 2,
+          },
+        ],
+      });
+    });
+
+    it('archives no output report when the output guardrail is off', async () => {
+      const { record } = await archivedRecord({
+        enkrypt: { input_guardrail: { enabled: false } },
+      });
+
+      expect(record).toMatchObject({ usage_id: expect.any(String), ...decision });
+      expect(record).not.toHaveProperty('enkrypt_output');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  it('streams the response without waiting for a log-only scan, which never rejects', async () => {
+    setOrganization(outputGuardrailSettings('log'));
+    enkryptAnswers(piiDetected);
+    const body = upstreamBody('chat_completions', true);
+    const encoded = new TextEncoder().encode(body);
+    let upstream: ReadableStreamDefaultController<Uint8Array> | undefined;
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            upstream = controller;
+            controller.enqueue(encoded.slice(0, 10));
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      ),
+    });
+    let enkryptCallsAtRewrite: number | undefined;
+    const { wrapInSafeNextResponse } = jest.requireActual<{
+      wrapInSafeNextResponse: (response: Response) => NextResponse;
+    }>('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
+    mockedRewriteModelResponse.mockImplementationOnce(async ({ response }) => {
+      enkryptCallsAtRewrite = fetchSpy.mock.calls.length;
+      return wrapInSafeNextResponse(response);
+    });
+
+    const response = await sendRequest('chat_completions', true);
+
+    expect(response.status).toBe(200);
+    expect(enkryptCallsAtRewrite).toBe(0);
+    upstream?.enqueue(encoded.slice(10));
+    upstream?.close();
+    expect(await response.text()).toBe(body);
+    await runAfterTasks();
+    expect(enkryptRequestBodies()).toEqual([
+      expect.objectContaining({ text: assistantText, detectors: { pii: expect.anything() } }),
+    ]);
+    expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+      [
+        expect.objectContaining({
+          organizationId: 'org-1',
+          decision: 'allowed',
+          creditsCost: 2,
+          guardrail: 'output',
+        }),
+      ],
+    ]);
   });
 });
 

@@ -4,7 +4,10 @@ import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
-import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type {
+  EnkryptGuardrailReport,
+  EnkryptOutputGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
@@ -221,6 +224,76 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
     ...decision,
     enkrypt,
   });
+});
+
+test('adds the Enkrypt output guardrail report read at upload time', async () => {
+  const enkryptOutput: EnkryptOutputGuardrailReport = {
+    settings: {
+      status: 'ready',
+      scan_tool_results: false,
+      detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
+    },
+    held_back: true,
+    held_bytes: 4_096,
+    held_ms: 8_200,
+    upstream_read_failed: false,
+    output_characters: 1_200,
+    not_scanned_reason: null,
+    verdict: 'block',
+    unavailable_reason: null,
+    added_latency_ms: 310,
+    scans: [
+      {
+        scan: 'blocking',
+        detectors_enabled: ['pii'],
+        detectors_blocking: ['pii'],
+        verdict_cache: 'off',
+        total_characters: 1_200,
+        total_segments: 1,
+        cached_characters: 0,
+        cached_segments: 0,
+        scanned_characters: 1_200,
+        decision: 'blocked',
+        error: null,
+        detectors_fired: ['pii'],
+        attempts: 1,
+        credits_cost: 2,
+        latency_ms: 300,
+      },
+    ],
+  };
+  const report = jest.fn(async () => enkryptOutput);
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptOutputReport(report);
+  capture?.captureRoutingDecision(decision);
+  expect(report).not.toHaveBeenCalled();
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    enkrypt_output: enkryptOutput,
+  });
+});
+
+test('archives the input report when the Enkrypt output report fails', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureEnkryptReport(async () => null);
+  capture?.captureEnkryptOutputReport(async () => {
+    throw new TypeError('boom');
+  });
+  capture?.captureRoutingDecision(decision);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('enkrypt_output');
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] Enkrypt output report failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'TypeError' }
+  );
 });
 
 test('still archives the routing decision when the Enkrypt report fails', async () => {

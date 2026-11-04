@@ -21,6 +21,11 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  guardEnkryptOutput,
+  type EnkryptOutputScan,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
+import type { EnkryptOutputGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 type RespondInput = {
   upstream: Extract<Awaited<ReturnType<typeof sendUpstreamAttempt>>, { type: 'success' }>;
@@ -38,11 +43,16 @@ type RespondInput = {
   requestStartedAt: number;
   briefingSettlementToken: string | null;
   logging: RequestLoggingParams;
+  /** Null when the organization has no output guardrail. */
+  enkryptOutputScan: EnkryptOutputScan | null;
+  signal: AbortSignal;
+  captureEnkryptOutputReport: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
 };
 
 /**
  * Turns a successful upstream attempt into the client response: emits metrics, applies the
- * upstream error policy, starts usage accounting, and rewrites the response for the client.
+ * upstream error policy, starts usage accounting, applies the organization's output guardrail,
+ * and rewrites the response for the client.
  */
 export async function respondToUpstream(input: RespondInput): Promise<NextResponseType<unknown>> {
   const { upstream, request, model, providerResult, user, organizationId, usageContext } = input;
@@ -143,15 +153,34 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     return errorResponse;
   }
 
-  return await rewriteModelResponse({
+  return await guardEnkryptOutput({
     response,
-    model,
-    providerId: provider.type,
+    scan: input.enkryptOutputScan,
     kind: request.kind,
-    isFree: usageContext.is_free,
-    userByok: usageContext.user_byok,
-    customLlmPricing: usageContext.custom_llm_pricing,
-    logging: input.logging,
-    responseTransforms: provider.responseTransforms,
+    stream: usageContext.isStreaming,
+    signal: input.signal,
+    release: released =>
+      rewriteModelResponse({
+        response: released,
+        model,
+        providerId: provider.type,
+        kind: request.kind,
+        isFree: usageContext.is_free,
+        userByok: usageContext.user_byok,
+        customLlmPricing: usageContext.custom_llm_pricing,
+        logging: input.logging,
+        responseTransforms: provider.responseTransforms,
+      }),
+    captureReport: input.captureEnkryptOutputReport,
+    onReject: async (rejection, verdict) => {
+      if (input.signal.aborted) return;
+      await logUnrewrittenResponse({
+        response: rejection.clone(),
+        model,
+        providerId: provider.type,
+        logging: input.logging,
+        error: { guardrail_rejection: verdict.action, guardrail: 'output' },
+      });
+    },
   });
 }

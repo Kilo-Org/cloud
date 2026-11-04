@@ -78,6 +78,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
 import { resolveProviderAndPolicy } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-provider-policy';
 import { respondToUpstream } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-respond';
+import { resolveEnkryptOutputScan } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
 import {
   gatewayUsageContextBase,
   readGatewayBalance,
@@ -495,6 +496,7 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
 
+  const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
     upstream: attempt,
     request: requestBodyParsed,
@@ -508,5 +510,21 @@ export async function handleLlmProxyRequest(
     requestStartedAt,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
     logging: requestLogging,
+    enkryptOutputScan:
+      organizationId && !isAnonymousContext(user)
+        ? resolveEnkryptOutputScan(
+            {
+              sessionId: usageContext.session_id,
+              organizationId,
+              kiloUserId: user.id,
+              apiKind: requestBodyParsed.kind,
+              clientRequestId: headers.clientRequestId,
+            },
+            organizationSettings
+          )
+        : null,
+    signal: request.signal,
+    captureEnkryptOutputReport: report =>
+      providerMetadataCapture?.captureEnkryptOutputReport(report),
   });
 }

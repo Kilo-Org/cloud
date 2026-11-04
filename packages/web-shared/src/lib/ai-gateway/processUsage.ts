@@ -1482,11 +1482,11 @@ export async function parseMicrodollarUsageFromStream(
     }
 
     const rawJson: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(rawJson);
     const json = chatUsageChunkSchema.parse(rawJson);
 
     const choice = json.choices?.[0];
     const chunkProviderMetadata = choice?.delta?.provider_metadata;
-    metadataCapture?.captureVercelMetadata(rawJson);
 
     if (json.error != null) {
       const error = json.error;
@@ -1577,10 +1577,10 @@ export function parseMicrodollarUsageFromString(
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const rawJson: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(rawJson);
   const responseJson = chatUsageResponseSchema.parse(rawJson);
   const choice = responseJson?.choices?.[0];
   const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
-  metadataCapture?.captureVercelMetadata(rawJson);
 
   if (
     providerReportsIsByok(provider) &&

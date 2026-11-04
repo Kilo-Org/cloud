@@ -168,8 +168,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
     }
 
     const payload: unknown = JSON.parse(event.data);
-    const json = messageEventSchema.parse(payload);
     metadataCapture?.captureVercelMetadata(payload);
+    const json = messageEventSchema.parse(payload);
 
     if (json.type === 'error' && json.error != null) {
       reportedError = true;
@@ -264,10 +264,10 @@ export function parseMessagesMicrodollarUsageFromString(
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const payload: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(payload);
   const responseJson = messageResponseSchema.parse(payload);
   const usage = responseJson.usage;
   const providerMetadata = responseJson.provider_metadata ?? null;
-  metadataCapture?.captureVercelMetadata(payload);
   const inference_provider =
     providerMetadata?.gateway?.routing?.finalProvider ?? responseJson.provider ?? null;
 

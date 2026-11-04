@@ -1,3 +1,4 @@
+import { captureMessage } from '@sentry/nextjs';
 import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { fetchGeneration } from './upstream-request';
 import type { Provider } from './types';
@@ -33,6 +34,7 @@ describe('fetchGeneration', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockFetchWithBackoff.mockReset();
+    jest.mocked(captureMessage).mockClear();
   });
 
   afterEach(() => {
@@ -67,5 +69,32 @@ describe('fetchGeneration', () => {
     const retryResponse = mockFetchWithBackoff.mock.calls[0]?.[2]?.retryResponse;
     expect(retryResponse?.(new Response(null, { status: 404 }))).toBe(true);
     expect(retryResponse?.(new Response(null, { status: 200 }))).toBe(false);
+  });
+
+  it('does not include a failed generation response body in the report', async () => {
+    const privateResponseText = 'synthetic-response-secret@example.test';
+    mockFetchWithBackoff.mockResolvedValue(
+      new Response(privateResponseText, { status: 503, statusText: 'Service Unavailable' })
+    );
+
+    const result = fetchGeneration('message-id', provider);
+    await jest.advanceTimersByTimeAsync(200);
+
+    await expect(result).resolves.toBeUndefined();
+    expect(captureMessage).toHaveBeenCalledWith(
+      'Timed out fetching openrouter generation',
+      expect.objectContaining({
+        level: 'info',
+        tags: { source: 'openrouter_generation_fetch' },
+        extra: {
+          messageId: 'message-id',
+          status: 503,
+          statusText: 'Service Unavailable',
+        },
+      })
+    );
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(
+      privateResponseText
+    );
   });
 });

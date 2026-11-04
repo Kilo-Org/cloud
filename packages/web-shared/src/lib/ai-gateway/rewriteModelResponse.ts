@@ -114,9 +114,11 @@ async function createRequestLogCapture(
     const responseText = 'text' in result ? result.text : undefined;
     const responseReadError = 'readError' in result ? result.readError : undefined;
     if (responseReadError !== undefined) {
-      logExceptInTest(
-        `[rewriteModelResponse] failed to read response body (user=${user?.id}, status=${status}, model=${model}): ${responseReadError}`
-      );
+      logExceptInTest('[rewriteModelResponse] failed to read response body', {
+        userId: user?.id,
+        status,
+        model,
+      });
     }
     try {
       const responseError =
@@ -166,10 +168,12 @@ async function createRequestLogCapture(
         apiRequestLogId[0].id
       );
     } catch (e) {
-      const cause = e instanceof Error ? e.cause : undefined;
-      logExceptInTest(
-        `[rewriteModelResponse] failed to insert api_request_log (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
-      );
+      logExceptInTest('[rewriteModelResponse] failed to insert api_request_log', {
+        userId: user?.id,
+        status,
+        model,
+        errorType: e instanceof Error ? e.name : typeof e,
+      });
     }
   });
 

@@ -960,7 +960,10 @@ export async function acceptOrganizationInvite(
 
     return result;
   } catch (error) {
-    console.error('Error accepting organization invite:', error);
+    console.error('Error accepting organization invite:', {
+      userId,
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
     return failureResult('An unexpected error occurred');
   }
 }

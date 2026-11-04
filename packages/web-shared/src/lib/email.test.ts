@@ -8,12 +8,19 @@ jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   sendViaMailgun: jest.fn().mockResolvedValue({}),
 }));
 
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  logExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+}));
+
 import {
   RawHtml,
   renderNonAutolinkedText,
   renderTemplate,
   sendAccountDeletionCompletedEmail,
   sendAccountDeletionSupportNotification,
+  sendBalanceAlertEmail,
   sendKiloPassDuplicateCardCanceledEmail,
   sendSpendAlertEmail,
   subjects,
@@ -23,6 +30,7 @@ import { captureException } from '@sentry/nextjs';
 import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 describe('email rendering helpers', () => {
   it('escapes HTML while neutralizing URL autolinking', () => {
@@ -103,6 +111,44 @@ describe('template loading', () => {
       expect.objectContaining({
         tags: { source: 'email_template', email_template: 'doesNotExist' },
       })
+    );
+  });
+});
+
+describe('balance alert email logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('logs the organization instead of the recipient on success', async () => {
+    await sendBalanceAlertEmail({
+      organizationId: 'org-123',
+      minimum_balance: 25,
+      to: ['synthetic-recipient@example.test'],
+    });
+
+    expect(logExceptInTest).toHaveBeenCalledWith(
+      '[sendBalanceAlertEmail] Sent for org org-123 (threshold: $25)'
+    );
+    expect(JSON.stringify(jest.mocked(logExceptInTest).mock.calls)).not.toContain(
+      'synthetic-recipient@example.test'
+    );
+  });
+
+  it('logs only the organization and failure type when delivery fails', async () => {
+    jest.mocked(sendViaMailgun).mockResolvedValueOnce(false);
+
+    await sendBalanceAlertEmail({
+      organizationId: 'org-123',
+      minimum_balance: 25,
+      to: ['synthetic-recipient@example.test'],
+    });
+
+    expect(warnExceptInTest).toHaveBeenCalledWith(
+      '[sendBalanceAlertEmail] Failed to send for org org-123: reason=provider_not_configured'
+    );
+    expect(JSON.stringify(jest.mocked(warnExceptInTest).mock.calls)).not.toContain(
+      'synthetic-recipient@example.test'
     );
   });
 });

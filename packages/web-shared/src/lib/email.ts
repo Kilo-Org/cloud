@@ -378,11 +378,11 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): 
     });
     if (result.sent) {
       logExceptInTest(
-        `[sendBalanceAlertEmail] Sent to ${email} for org ${organizationId} (threshold: $${minimum_balance})`
+        `[sendBalanceAlertEmail] Sent for org ${organizationId} (threshold: $${minimum_balance})`
       );
     } else {
       warnExceptInTest(
-        `[sendBalanceAlertEmail] Failed to send to ${email} for org ${organizationId}: reason=${result.reason}`
+        `[sendBalanceAlertEmail] Failed to send for org ${organizationId}: reason=${result.reason}`
       );
     }
     return result;

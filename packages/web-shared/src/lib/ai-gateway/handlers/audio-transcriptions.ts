@@ -133,7 +133,9 @@ function parseJsonTranscriptionRequest(requestBodyText: string): ParsedTranscrip
   try {
     parsed = JSON.parse(requestBodyText);
   } catch (error) {
-    errorExceptInTest('[transcription-proxy] Invalid JSON body:', error);
+    errorExceptInTest('[transcription-proxy] Invalid JSON body:', {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
     return null;
   }
 

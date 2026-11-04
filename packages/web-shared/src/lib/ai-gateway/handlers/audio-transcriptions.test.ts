@@ -13,6 +13,7 @@ import {
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 jest.mock('next/server', () => {
   return {
@@ -28,6 +29,10 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight');
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  errorExceptInTest: jest.fn(),
+}));
 jest.mock(
   '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
   () => ({
@@ -53,6 +58,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
 });
 
 const mockedCaptureException = jest.mocked(captureException);
+const mockedErrorExceptInTest = jest.mocked(errorExceptInTest);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsFreeModel = jest.mocked(isFreeModel);
@@ -401,16 +407,22 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     setUserAuth();
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const privateRequestBody = '{"email":"synthetic@example.test","token":"private-token"';
     const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
-      body: 'not json',
+      body: privateRequestBody,
     });
     const response = await handleAudioTranscriptionsRequest(request as never);
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
+      '[transcription-proxy] Invalid JSON body:',
+      { errorType: 'SyntaxError' }
+    );
+    expect(JSON.stringify(mockedErrorExceptInTest.mock.calls)).not.toContain(privateRequestBody);
   });
 
   it('requires authentication for transcription requests', async () => {

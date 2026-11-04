@@ -3128,6 +3128,41 @@ describe('api_request_log storage', () => {
     });
   });
 
+  test('logs only the error type and identifiers when the api_request_log insert fails', async () => {
+    const privateDbError = 'duplicate key for synthetic@example.test invite-token-private';
+    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error(privateDbError);
+    });
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      error: null,
+      logging: makeLogging({
+        user: {
+          id: 'test-user',
+          google_user_email: 'synthetic@example.test',
+        } as RequestLoggingParams['user'],
+        organization_id: 'test-organization',
+        session_id: 'test-session',
+        vercel_request_id: vercelRequestId,
+      }),
+    });
+    await runScheduledLogInsert();
+
+    expect(mockedLog).toHaveBeenCalledWith(
+      '[rewriteModelResponse] failed to insert api_request_log',
+      {
+        userId: 'test-user',
+        status: 400,
+        model: 'kilo-internal/my-model',
+        errorType: 'Error',
+      }
+    );
+  });
+
   test('logs upstream error statuses for errors-only opt-ins', async () => {
     await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only', null);
 
@@ -3150,8 +3185,9 @@ describe('api_request_log storage', () => {
   });
 
   test('logs successful statuses with a response read error for errors-only opt-ins', async () => {
+    const privateResponseError = 'synthetic@example.test private-response-token';
     await logUpstreamResponse(
-      failingResponse('application/json', 'upstream disconnected'),
+      failingResponse('application/json', privateResponseError),
       'errors_only',
       null
     );
@@ -3159,7 +3195,12 @@ describe('api_request_log storage', () => {
     const row = await selectLoggedRow();
     expect(row).toMatchObject({
       status_code: 200,
-      error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
+      error: { response_body_read_error: expect.stringContaining(privateResponseError) },
+    });
+    expect(mockedLog).toHaveBeenCalledWith('[rewriteModelResponse] failed to read response body', {
+      userId: undefined,
+      status: 200,
+      model: 'kilo-internal/my-model',
     });
     expect(row.request_r2_key).not.toBeNull();
     expect(row.response_r2_key).toBe(row.request_r2_key);

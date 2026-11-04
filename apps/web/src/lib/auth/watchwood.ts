@@ -14,6 +14,13 @@ const MAX_AGE_SECONDS = 60 * 60;
 const DEADLINE_MS = 1000;
 const MAX_BODY_BYTES = 16 * 1024;
 const CREATE_ACCOUNT_URL = 'https://api.openai.com/v1/watchwood/check/create_account';
+const incrementBudget = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`;
 const identitySchema = z.object({ safetyIdentifier: z.uuid() });
 const turnstileSchema = z.object({ guid: z.uuid(), ip: z.string() });
 const assessmentBase = z.object({
@@ -181,10 +188,14 @@ export async function prepareWatchwoodSignupSession(request: NextRequest): Promi
 }
 
 function trustedClientIP(request: NextRequest): string | undefined {
-  const address = request.headers
-    .get(process.env.VERCEL ? 'x-vercel-forwarded-for' : 'x-forwarded-for')
-    ?.split(',')[0]
-    ?.trim();
+  const localHeaders = process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV;
+  const header = process.env.VERCEL
+    ? 'x-vercel-forwarded-for'
+    : localHeaders
+      ? 'x-forwarded-for'
+      : undefined;
+  if (!header) return undefined;
+  const address = request.headers.get(header)?.split(',')[0]?.trim();
   return address && isIP(address) ? address : undefined;
 }
 
@@ -240,9 +251,10 @@ async function rateLimited(guid: string, ip: string, signal: AbortSignal): Promi
   ] as const) {
     const digest = createHmac('sha256', NEXTAUTH_SECRET).update(value).digest('hex');
     const key = `watchwood:signup:${scope}:${digest}:${bucket}`;
-    const count = await withinDeadline(() => redisClient.incr(key), signal);
-    if (count === 1)
-      await withinDeadline(() => redisClient.expire(key, MAX_AGE_SECONDS * 2), signal);
+    const count = await withinDeadline(
+      () => redisClient.eval<[number], number>(incrementBudget, [key], [MAX_AGE_SECONDS * 2]),
+      signal
+    );
     if (count > limit) return true;
   }
   return false;
@@ -293,7 +305,7 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
       controller.signal.throwIfAborted();
       const upstream = await fetch(CREATE_ACCOUNT_URL, {
         method: 'POST',
-        redirect: 'error',
+        redirect: 'manual',
         cache: 'no-store',
         signal: controller.signal,
         headers: {

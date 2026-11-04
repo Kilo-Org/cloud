@@ -265,14 +265,19 @@ pnpm web:env set WATCHWOOD_SHADOW_ENABLED
 Set the enabled value to exact `true`, then redeploy.
 The browser receives only the organization and a server-generated signup identity.
 The server sends the token and trusted client IP to OpenAI, without email or phone signals.
+Production assessments require Vercel's trusted client-IP header.
+Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
+Only local development and tests use the forwarded-header fallback.
 Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
 The optional SDK device cookie stays disabled.
 
 The browser allows at most two seconds for shadow submission.
 The server allows one second for body reads, Redis budgets, and the upstream check.
 It retries an upstream server error once and does not retry client errors.
+Upstream redirects count as errors and are never followed.
 Missing tokens, blocked scripts, invalid responses, unavailable services, and high risk scores do not refuse signup.
 Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
+Each budget increment sets its expiry atomically.
 
 Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, and latency.
 Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.

@@ -1543,6 +1543,7 @@
       "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요.",
       "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다.",
       "syncNoRepositories": "동기화 범위에 리포지토리가 없습니다. 보안 에이전트가 모니터링할 리포지토리를 선택한 후 다시 동기화하세요.",
+      "syncNoRepositoriesNoManage": "동기화 범위에 리포지토리가 없습니다. 동기화하려면 조직 소유자, 관리자 또는 결제 관리자가 리포지토리를 연결해야 합니다.",
       "syncIntegrationInactive": "보안 에이전트의 GitHub 연결이 활성화되어 있지 않습니다. Kilo GitHub App을 다시 연결한 후 다시 동기화하세요.",
       "syncMissingPermission": "Kilo GitHub 앱이 취약점 알림을 읽을 수 없습니다. GitHub에서 해당 권한을 부여한 후 다시 동기화하세요.",
       "configConflict": "보안 에이전트 설정이 다른 곳에서 변경되었습니다. 최신 설정을 검토하고 다시 저장하세요."

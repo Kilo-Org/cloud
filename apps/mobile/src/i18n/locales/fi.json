@@ -2082,6 +2082,7 @@
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncNoRepositoriesNoManage": "Synkronointilaajuudessa ei ole yhtään repositoriota. Organisaation omistajan, ylläpitäjän tai laskutusvastaavan on yhdistettävä repositoriot, ennen kuin synkronointi voi tapahtua.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
       "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
       "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."

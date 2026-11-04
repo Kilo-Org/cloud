@@ -28,22 +28,22 @@ const overrides = {
 };
 
 const REMOVED_CONTAINER_CLASSES = [
+  'Sandbox',
+  'SandboxSmall',
+  'SandboxDIND',
+  'SandboxCodeReview',
+  'SandboxCodeReviewContainment',
+];
+
+const OMITTED_MIGRATION_CLASSES = [
   'SandboxSmall',
   'SandboxDIND',
   'SandboxCodeReview',
   'SandboxContainment',
   'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
-  // `SandboxContainers` is the newest production container class (migration
-  // `v11`). The e2e render keeps only `Sandbox`, so it is removed here
-  // alongside the older sandbox classes; the pinned list must gain it whenever
-  // production adds a container class.
   'SandboxContainers',
 ];
-
-// Exported without a binding until a `deleted_classes` migration removes its
-// stored instances.
-const RETIRED_UNBOUND_DO_CLASSES = ['CloudAgentSession'];
 
 const KEPT_DO_CLASSES = [
   'StreamTicketNonceDO',
@@ -66,6 +66,51 @@ describe('buildE2eWorkerConfig', () => {
     expect(new Set(REMOVED_CONTAINER_CLASSES).size).toBe(REMOVED_CONTAINER_CLASSES.length);
   });
 
+  it('preserves deployed E2E history and appends the runtime replacement', () => {
+    const { config } = render();
+    expect(config.migrations.map((entry: { tag: string }) => entry.tag)).toEqual([
+      'v1',
+      'v2',
+      'v5',
+      'v8',
+      'v9',
+      'v10',
+      'v10-e2e',
+      'v12',
+      'v13',
+      'v14',
+      'v15',
+      'v15-e2e',
+    ]);
+    expect(config.migrations.at(-1)).toEqual({
+      tag: 'v15-e2e',
+      new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
+    });
+  });
+
+  it('keeps future production migrations after the runtime anchor and preserves their operations', () => {
+    const source = readSourceConfig();
+    const futureMigrations = [
+      {
+        tag: 'v16',
+        deleted_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
+      },
+      { tag: 'v17', new_sqlite_classes: ['SandboxContainment', 'SandboxContainers'] },
+      { tag: 'v18', new_classes: ['SandboxSmallContainment'] },
+    ];
+    source.migrations.push(...futureMigrations);
+    const config = buildE2eWorkerConfig(source, overrides);
+    const tags = config.migrations.map((entry: { tag: string }) => entry.tag);
+    expect(tags.indexOf('v15-e2e')).toBe(tags.indexOf('v15') + 1);
+    expect(config.migrations.slice(tags.indexOf('v15-e2e') + 1)).toEqual(futureMigrations);
+  });
+
+  it('rejects a missing runtime migration anchor', () => {
+    const source = readSourceConfig();
+    source.migrations = source.migrations.filter((entry: { tag: string }) => entry.tag !== 'v15');
+    expect(() => buildE2eWorkerConfig(source, overrides)).toThrow("anchor tag 'v15' is missing");
+  });
+
   it('rebases identity, main and schema', () => {
     const { config } = render();
     expect(config.main).toBe('../src/e2e-entry.ts');
@@ -74,10 +119,14 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
   });
 
-  it('keeps only Sandbox with a rebased image and a 20-instance cap', () => {
+  it('keeps the three production runtime classes and rebases their images', () => {
     const { config } = render();
-    expect(config.containers).toHaveLength(1);
-    expect(config.containers[0].class_name).toBe('Sandbox');
+    expect(config.containers.map((entry: { class_name: string }) => entry.class_name)).toEqual([
+      'SandboxContainment',
+      'SandboxSmallContainment',
+      'SandboxContainers',
+    ]);
+    expect(config.containers[2].images.app.dockerfile).toBe('../Dockerfile.containers');
     expect(config.containers[0].image).toBe('../Dockerfile');
     expect(config.containers[0].instance_type).toEqual({
       vcpu: 4,
@@ -88,7 +137,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.containers[0].ssh.enabled).toBe(true);
   });
 
-  it('removes the other sandbox classes from containers, bindings and migrations', () => {
+  it('removes retired runtime bindings and preserves their deletion migration', () => {
     const { config } = render();
     for (const className of REMOVED_CONTAINER_CLASSES) {
       expect(
@@ -101,12 +150,10 @@ describe('buildE2eWorkerConfig', () => {
           (binding: { class_name: string }) => binding.class_name === className
         )
       ).toBe(false);
-      expect(
-        config.migrations.some((migration: { new_sqlite_classes: string[] }) =>
-          migration.new_sqlite_classes?.includes(className)
-        )
-      ).toBe(false);
     }
+    expect(
+      config.migrations.find((entry: { tag: string }) => entry.tag === 'v15').deleted_classes
+    ).toEqual(['Sandbox']);
   });
 
   it('keeps the non-container Durable Objects and their migrations', () => {
@@ -137,18 +184,18 @@ describe('buildE2eWorkerConfig', () => {
     for (const migration of config.migrations) {
       for (const className of migration.new_sqlite_classes ?? []) {
         const productionTag = productionTagByClass.get(className);
-        if (productionTag === undefined) continue;
+        if (productionTag === undefined || migration.tag === 'v15-e2e') continue;
         expect(migration.tag).toBe(productionTag);
       }
       if (!productionTags.includes(migration.tag)) {
-        expect(migration.tag).toBe('v10-e2e');
+        expect(['v10-e2e', 'v15-e2e']).toContain(migration.tag);
       }
     }
 
     const tags = config.migrations.map((migration: { tag: string }) => migration.tag);
     expect(new Set(tags).size).toBe(tags.length);
     for (const tag of tags) {
-      if (tag === 'v10-e2e') continue;
+      if (tag === 'v10-e2e' || tag === 'v15-e2e') continue;
       expect(productionTags).toContain(tag);
     }
   });
@@ -156,7 +203,7 @@ describe('buildE2eWorkerConfig', () => {
   it('renders the surviving production migrations as a subsequence with the e2e tag', () => {
     const { source, config } = render();
 
-    const removed = new Set(REMOVED_CONTAINER_CLASSES);
+    const removed = new Set(OMITTED_MIGRATION_CLASSES);
     const survivingProductionMigrations = source.migrations
       .map(
         (migration: {
@@ -165,6 +212,13 @@ describe('buildE2eWorkerConfig', () => {
           deleted_classes?: string[];
         }) => ({
           ...migration,
+          ...(migration.deleted_classes
+            ? {
+                deleted_classes: migration.deleted_classes.filter(
+                  (name: string) => !removed.has(name)
+                ),
+              }
+            : {}),
           ...(migration.new_sqlite_classes
             ? {
                 new_sqlite_classes: migration.new_sqlite_classes.filter(
@@ -186,7 +240,9 @@ describe('buildE2eWorkerConfig', () => {
     expect(e2eIndex).toBe(v10Index + 1);
 
     expect(
-      config.migrations.filter((migration: { tag: string }) => migration.tag !== 'v10-e2e')
+      config.migrations.filter(
+        (migration: { tag: string }) => migration.tag !== 'v10-e2e' && migration.tag !== 'v15-e2e'
+      )
     ).toEqual(survivingProductionMigrations);
 
     for (const migration of config.migrations as {
@@ -206,7 +262,6 @@ describe('buildE2eWorkerConfig', () => {
       for (const className of migration.new_sqlite_classes ?? []) migratedClasses.add(className);
       for (const className of migration.deleted_classes ?? []) migratedClasses.delete(className);
     }
-    for (const className of RETIRED_UNBOUND_DO_CLASSES) migratedClasses.delete(className);
     expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
   });
 
@@ -217,6 +272,7 @@ describe('buildE2eWorkerConfig', () => {
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
         { tag: 'v2', new_classes: ['LegacyDo', 'SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
+        { tag: 'v15', deleted_classes: ['SandboxSmall'] },
       ],
     };
     const config = buildE2eWorkerConfig(source, overrides);
@@ -235,6 +291,7 @@ describe('buildE2eWorkerConfig', () => {
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
         { tag: 'v2', new_classes: ['SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
+        { tag: 'v15', deleted_classes: ['SandboxSmall'] },
       ],
     };
     const config = buildE2eWorkerConfig(source, overrides);
@@ -261,35 +318,22 @@ describe('buildE2eWorkerConfig', () => {
     expect(renderedV10).toEqual(sourceV10);
 
     const productionOrder = source.migrations
-      .map((migration: { tag: string; new_sqlite_classes?: string[]; new_classes?: string[] }) => {
-        const filtered = { ...migration };
-        if (migration.new_sqlite_classes) {
-          filtered.new_sqlite_classes = (migration.new_sqlite_classes ?? []).filter(
-            (className: string) => !REMOVED_CONTAINER_CLASSES.includes(className)
-          );
-        }
-        if (migration.new_classes) {
-          filtered.new_classes = migration.new_classes.filter(
-            (className: string) => !REMOVED_CONTAINER_CLASSES.includes(className)
-          );
-        }
-        return filtered;
-      })
       .filter(
         (migration: {
           new_sqlite_classes?: string[];
           new_classes?: string[];
           deleted_classes?: string[];
         }) =>
-          (migration.new_sqlite_classes?.length ?? 0) +
-            (migration.new_classes?.length ?? 0) +
-            (migration.deleted_classes?.length ?? 0) >
-          0
+          [
+            ...(migration.new_sqlite_classes ?? []),
+            ...(migration.new_classes ?? []),
+            ...(migration.deleted_classes ?? []),
+          ].some(name => !OMITTED_MIGRATION_CLASSES.includes(name))
       )
-      .map((migration: { tag: string }) => migration.tag);
+      .map((entry: { tag: string }) => entry.tag);
     const renderedOrder = config.migrations
       .map((migration: { tag: string }) => migration.tag)
-      .filter((tag: string) => tag !== 'v10-e2e');
+      .filter((tag: string) => tag !== 'v10-e2e' && tag !== 'v15-e2e');
     expect(renderedOrder).toEqual(productionOrder);
   });
 
@@ -353,7 +397,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
-    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('false');
+    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 
@@ -424,6 +468,19 @@ describe('buildE2eWorkerConfig', () => {
 });
 
 describe('local e2e worker config', () => {
+  it('rebases native image paths in both environments and enables the retained runtimes', () => {
+    const config = buildLocalE2eWorkerConfig(readSourceConfig());
+    for (const environment of [config, config.env.dev]) {
+      expect(
+        environment.containers.find(
+          (entry: { class_name: string }) => entry.class_name === 'SandboxContainers'
+        ).images.app.dockerfile
+      ).toBe('../Dockerfile.containers');
+      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+      expect(environment.vars.CODE_REVIEW_CONTAINERS_ORG_IDS).toBe('*');
+    }
+  });
+
   function renderLocalConfig() {
     return {
       config: buildLocalE2eWorkerConfig(readSourceConfig()),

@@ -31,7 +31,7 @@ import type {
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -125,7 +125,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
-  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
+  const isFree = isFreeModel(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,

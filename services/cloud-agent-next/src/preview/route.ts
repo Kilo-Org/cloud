@@ -26,6 +26,7 @@ import {
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSandboxNamespace } from '../sandbox-placement.js';
+import { RetiredSandboxRuntimeError } from '../sandbox-id.js';
 import type { Env } from '../types.js';
 import { isPreviewEnabled, matchPreviewHost, previewLabel, type PreviewHostMatch } from './host.js';
 import { PREVIEW_NOT_RUNNING_TEXT, PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
@@ -407,6 +408,7 @@ async function handleProxy(
       upstreamRequest(request, claims.port, forwarded, coordinates)
     );
   } catch (error) {
+    if (error instanceof RetiredSandboxRuntimeError) return fixed(410, error.message);
     logger
       .withFields({ error: errorMessage(error), provider: coordinates.provider })
       .warn('Preview upstream fetch failed');

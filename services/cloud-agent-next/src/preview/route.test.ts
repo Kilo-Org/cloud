@@ -523,6 +523,17 @@ describe('preview proxy denials that never reach the resolver or stub', () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
+  it('answers 410 without Retry-After when the upstream runtime is retired', async () => {
+    const { deps } = fixture();
+    deps.fetchUpstream = defaultFetchUpstream;
+    const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
+    expect(response.status).toBe(410);
+    expect(response.headers.get('Retry-After')).toBeNull();
+    await expect(response.text()).resolves.toBe(
+      'This sandbox runtime has been retired. Start a new session.'
+    );
+  });
+
   it('leaves the reserved-port refusal to the physical DO', async () => {
     const { deps, fetchUpstream } = fixture();
     const host = `p3000-${HEX}.${SUFFIX}`;
@@ -861,11 +872,8 @@ describe('preview upstream forwarding', () => {
 
 describe('default upstream namespace', () => {
   const namespaces = {
-    Sandbox: { name: 'Sandbox' },
     SandboxContainment: { name: 'SandboxContainment' },
     SandboxSmallContainment: { name: 'SandboxSmallContainment' },
-    SandboxCodeReviewContainment: { name: 'SandboxCodeReviewContainment' },
-    SandboxDIND: { name: 'SandboxDIND' },
   };
   const namespaceEnv = { ...env, ...namespaces } as unknown as Env;
   const PLACED_KEY = `sbx-${'a'.repeat(48)}`;
@@ -908,7 +916,7 @@ describe('default upstream namespace', () => {
     ).resolves.toBe(namespaces.SandboxContainment);
   });
 
-  it('routes a placed key without containment to the standard pool', async () => {
+  it('rejects a placed key in the retired non-contained pool', async () => {
     await expect(
       namespaceFor({
         provider: 'cloudflare',
@@ -916,7 +924,7 @@ describe('default upstream namespace', () => {
         containment: false,
         sandboxKind: 'isolated',
       })
-    ).resolves.toBe(namespaces.Sandbox);
+    ).rejects.toThrow('sandbox runtime has been retired');
   });
 
   it('keeps routing a legacy prefixed key by its prefix', async () => {
@@ -926,7 +934,7 @@ describe('default upstream namespace', () => {
         allocationName: 'ses-11111111111141118111111111111111',
         containment: false,
       })
-    ).resolves.toBe(namespaces.Sandbox);
+    ).rejects.toThrow('sandbox runtime has been retired');
     await expect(
       namespaceFor({
         provider: 'cloudflare',

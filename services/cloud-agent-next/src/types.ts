@@ -527,19 +527,10 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
-  Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for shared sandbox containers with SCM credential containment */
   SandboxContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers (standard-3) */
-  SandboxSmall: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for per-session sandbox containers with SCM credential containment */
   SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
-  SandboxDIND: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers (standard-3) */
-  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
-  SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */

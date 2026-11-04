@@ -20,6 +20,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
     'Container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',

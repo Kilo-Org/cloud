@@ -25,13 +25,8 @@ import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
 
 export const SANDBOX_USAGE_SKUS = {
-  Sandbox: 'cloud-agent-standard-2026-07',
   SandboxContainment: 'cloud-agent-standard-2026-07',
-  SandboxSmall: 'cloud-agent-small-2026-07',
   SandboxSmallContainment: 'cloud-agent-small-2026-07',
-  SandboxDIND: 'cloud-agent-dind-2026-07',
-  SandboxCodeReview: 'cloud-agent-code-review-2026-07',
-  SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
   SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
   SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
   SandboxContainersCodeReview: 'cloud-agent-code-review-2026-07',
@@ -59,13 +54,8 @@ export type LegacySandboxClassName = Exclude<
 // apps/web/src/lib/cloudflare/container-capacity.ts. Keep all three in sync manually.
 // Development intentionally uses different named instance types and does not query Analytics.
 export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity> = {
-  Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-  SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
   SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
-  SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-  SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 20_000 },
 };
 
 // One `SandboxContainers` Durable Object serves every instance size, so there is no per-size
@@ -312,26 +302,13 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   };
 }
 
-/**
- * Isolated sandbox-ID classes each container class may bill. Non-contained
- * `ses-` and `crv-` sandboxes run in the standard `Sandbox` pool
- * (`getSandboxNamespace`), so it accepts every non-devcontainer isolated class.
- */
+/** Isolated sandbox identities accepted by each remaining runtime's billing class. */
 function expectedIsolatedSandboxIdClasses(
   sandboxClassName: SandboxClassName
 ): readonly SandboxIdClass[] {
-  if (sandboxClassName === 'Sandbox') return ['isolated-standard', 'isolated-small', 'code-review'];
   if (sandboxClassName === 'SandboxContainment') return ['isolated-standard'];
   if (sandboxClassName === 'SandboxContainersCodeReview') return ['code-review'];
-  if (
-    isContainersBillingClassName(sandboxClassName) ||
-    isVercelBillingClassName(sandboxClassName) ||
-    sandboxClassName === 'SandboxSmall' ||
-    sandboxClassName === 'SandboxSmallContainment'
-  ) {
-    return ['isolated-small'];
-  }
-  return sandboxClassName === 'SandboxDIND' ? ['devcontainer'] : ['code-review'];
+  return ['isolated-small'];
 }
 
 export function assertSandboxBillingAllocation(
@@ -339,7 +316,7 @@ export function assertSandboxBillingAllocation(
   input: SandboxBillingInput
 ): void {
   const sandboxIdClass = resolveSandboxIdClass(input);
-  const standardClass = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
+  const standardClass = sandboxClassName === 'SandboxContainment';
   const isolatedPrefixedLegacyId =
     /^(ses|istd|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');
   if (isolatedPrefixedLegacyId) {

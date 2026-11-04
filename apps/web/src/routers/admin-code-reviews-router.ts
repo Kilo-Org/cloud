@@ -96,6 +96,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   byok_invalid_key: 'Action Required',
   selected_model_unavailable: 'Action Required',
   billing: 'Billing',
+  account_blocked: 'Account Blocked',
   model_not_found: 'Model Not Found',
   workspace_capacity: 'Sandbox Capacity',
   sandbox_connection: 'Sandbox Connection',

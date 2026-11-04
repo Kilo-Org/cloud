@@ -88,7 +88,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'test-callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: async () => false,
+  isFreeModel: () => false,
 }));
 
 const user = { id: 'oauth/bot-owner', api_token_pepper: 'current-pepper' } as User;

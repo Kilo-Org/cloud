@@ -30,6 +30,7 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'payment_required',
   'admission_billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -144,6 +145,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'session_import_failed',
   'setup_command_timeout',
   'container_limit_reached',
+  'account_blocked',
   'admission_capacity',
   'admission_not_found',
   'admission_internal',
@@ -397,6 +399,8 @@ export function classifyCloudAgentFailure(
   switch (input.code) {
     case 'container_limit_reached':
       return classified('user', 'container_limit_reached');
+    case 'account_blocked':
+      return classified('user', 'account_blocked');
     case 'workspace_setup_failed':
       return classifyWorkspaceFailure(input.workspaceSubtype);
     case 'sandbox_connect_failed':

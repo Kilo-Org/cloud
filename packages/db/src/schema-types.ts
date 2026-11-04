@@ -3206,6 +3206,8 @@ export type StripeSubscriptionStatus =
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
+  // The billed or acting user is blocked (abuse, ToS, deletion), not short on credit.
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',
@@ -3283,6 +3285,7 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
  */
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',

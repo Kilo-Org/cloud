@@ -6848,6 +6848,7 @@ export type CloudAgentFailureReason =
   | 'session_import_failed'
   | 'setup_command_timeout'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -6984,6 +6985,7 @@ export type CloudAgentSessionRunFailureStage =
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'

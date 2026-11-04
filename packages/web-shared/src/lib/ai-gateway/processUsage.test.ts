@@ -2112,16 +2112,20 @@ describe('logMicrodollarUsage', () => {
       expected: null,
     },
     {
-      name: 'does not apply direct BYOK attribution to another provider type',
+      name: 'uses configured attribution regardless of provider type',
       upstream: null,
       servingProvider: { ...OPENROUTER, inferenceProviderId: 'z-ai' },
-      expected: null,
+      expected: 'z-ai',
     },
   ] as const)('$name', async ({ upstream, servingProvider, expected }) => {
     const user = await insertTestUser();
     const result = await processTokenData(
       { ...BASE_USAGE_STATS, messageId: null, inference_provider: upstream },
-      { ...createBaseUsageContext(user), provider: 'direct-byok', user_byok: true },
+      {
+        ...createBaseUsageContext(user),
+        provider: servingProvider?.type ?? 'direct-byok',
+        user_byok: true,
+      },
       servingProvider
     );
 

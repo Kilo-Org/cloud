@@ -1138,7 +1138,7 @@ describe('applyPreferredProvider', () => {
 });
 
 describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
-  async function applyToClaude(isNonTrialEnterprise: boolean, userByok: BYOKResult[] | null) {
+  async function applyToClaude(isAnthropicProviderAllowed: boolean, userByok: BYOKResult[] | null) {
     const model = 'anthropic/claude-sonnet-4.5';
     const request = makeRequest(model);
 
@@ -1153,7 +1153,7 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
       'org-1',
       null,
       null,
-      isNonTrialEnterprise,
+      isAnthropicProviderAllowed,
       null
     );
 

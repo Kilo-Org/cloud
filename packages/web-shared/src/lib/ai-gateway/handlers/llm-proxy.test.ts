@@ -1513,6 +1513,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
   });
 
   describe('Anthropic provider for Claude', () => {
+    beforeEach(() => {
+      mockedIsNonTrialEnterpriseOrganization.mockReset().mockResolvedValue(false);
+    });
+
     function setOrganizationAuth(plan: 'teams' | 'enterprise') {
       mockedGetUserFromAuth.mockResolvedValue({
         user: {
@@ -1531,7 +1535,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     }
 
-    async function sendClaudeRequest() {
+    async function sendClaudeRequest(path = '/chat/completions') {
       let routingProvider: OpenRouterProviderConfig | undefined;
       let kiloIgnoredProviders: string[] | undefined;
       mockedGetProvider.mockImplementationOnce(async input => {
@@ -1546,9 +1550,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
         };
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
-        makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never
-      );
+      const model = 'anthropic/claude-sonnet-4.5';
+      const body =
+        path === '/responses' ? { model, input: 'hello' } : { ...makeBody(model), max_tokens: 100 };
+      const response = await handleLlmProxyRequest(makeRequest(body, undefined, path) as never);
       expect(response.status).toBe(200);
       return {
         routingProvider,
@@ -1578,17 +1583,21 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
     });
 
-    it('ignores Anthropic for trial enterprise organizations', async () => {
-      setOrganizationAuth('enterprise');
-      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
+    it.each(['/chat/completions', '/responses', '/messages'])(
+      'ignores Anthropic for trial enterprise organizations on %s',
+      async path => {
+        setOrganizationAuth('enterprise');
+        mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
 
-      const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
+        const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest(path);
 
-      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
-      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
-      expect(kiloIgnoredProviders).toEqual(['anthropic']);
-      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
-    });
+        expect(mockedIsNonTrialEnterpriseOrganization).toHaveBeenCalledTimes(1);
+        expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
+        expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
+        expect(kiloIgnoredProviders).toEqual(['anthropic']);
+        expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+      }
+    );
 
     it('allows Anthropic for non-trial enterprise organizations', async () => {
       setOrganizationAuth('enterprise');
@@ -1600,17 +1609,99 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(upstreamProvider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
     });
 
-    it('does not ignore Anthropic for non-Claude models of trial enterprise organizations', async () => {
-      setOrganizationAuth('enterprise');
-      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
+    it.each(['/chat/completions', '/responses', '/messages'])(
+      'skips the enterprise lookup for non-Claude models on %s',
+      async path => {
+        setOrganizationAuth('enterprise');
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const body =
+          path === '/responses'
+            ? { model: 'openai/gpt-4o', input: 'hello' }
+            : { ...makeBody(), max_tokens: 100 };
 
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+        const response = await handleLlmProxyRequest(makeRequest(body, undefined, path) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ kiloIgnoredProviders: [] })
+        );
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+          order: ['openai'],
+        });
+      }
+    );
+
+    it('overlaps the Claude enterprise lookup with model catalog resolution', async () => {
+      setOrganizationAuth('enterprise');
+      const lookup = Promise.withResolvers<boolean>();
+      mockedIsNonTrialEnterpriseOrganization.mockReturnValueOnce(lookup.promise);
+      mockedFindCustomLlm.mockImplementationOnce(async () => {
+        expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
+        expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
+        expect(mockedGetProvider).not.toHaveBeenCalled();
+        lookup.resolve(false);
+        return null;
+      });
+
+      const { upstreamProvider } = await sendClaudeRequest();
+
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+    });
+
+    it('propagates the enterprise lookup failure when provider policy consumes it', async () => {
+      setOrganizationAuth('enterprise');
+      const error = new Error('enterprise lookup failed');
+      mockedIsNonTrialEnterpriseOrganization.mockRejectedValueOnce(error);
+
+      await expect(
+        handleLlmProxyRequest(makeRequest(makeBody('anthropic/claude-sonnet-4.5')))
+      ).rejects.toBe(error);
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+    });
+
+    it('observes an enterprise lookup rejection when an invalid routing decision returns early', async () => {
+      setOrganizationAuth('enterprise');
+      const lookup = Promise.withResolvers<boolean>();
+      mockedIsNonTrialEnterpriseOrganization.mockReturnValueOnce(lookup.promise);
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('anthropic/claude-sonnet-4.5'), {
+          'x-kilo-auto-decision': 'invalid',
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockedIsNonTrialEnterpriseOrganization).toHaveBeenCalledTimes(1);
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+      lookup.reject(new Error('lookup failed'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+    });
+
+    it.each([
+      ['kilo-auto/efficient', 'anthropic/claude-sonnet-4.5'],
+      ['kilo-auto/efficient', 'openai/gpt-4o'],
+      ['kilo-auto/custom/org/claude-fallback', 'anthropic/claude-sonnet-4.5'],
+      ['kilo-auto/custom/org/claude-fallback', 'openai/gpt-4o'],
+    ])('uses %s resolved to %s for enterprise provider policy', async (router, model) => {
+      setOrganizationAuth('enterprise');
+      mockedApplyResolvedAutoModel.mockImplementationOnce(async (_options, request) => {
+        request.body.model = model;
+        return { kind: 'ok', resolved: { model } };
+      });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(router)));
 
       expect(response.status).toBe(200);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
-        order: ['openai'],
-      });
+      if (model === 'openai/gpt-4o') {
+        expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.ignore).toBeUndefined();
+      } else {
+        expect(mockedIsNonTrialEnterpriseOrganization).toHaveBeenCalledTimes(1);
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.ignore).toEqual([
+          'anthropic',
+        ]);
+      }
     });
   });
 

@@ -4,10 +4,18 @@ import { captureException } from '@sentry/nextjs';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { app_min_versions } from '@kilocode/db/schema';
 import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
+import {
+  APP_CLIENT_HEADER,
+  APP_PLATFORM_HEADER,
+  APP_VERSION_HEADER,
+  isAppVersion,
+  isKnownPlatform,
+  isMobileClient as isMobileClientValue,
+  type AppHeaderList,
+} from '@kilocode/web-shared/lib/app-headers';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { isVersionBelow } from '@kilocode/app-shared/app-version';
 
-export type MinimumVersionHeaders = { get(name: string): string | null };
 export type MinimumVersions = { ios: string; android: string };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -25,7 +33,6 @@ const READ_MAX_AGE_MS = 15_000;
 // An abandoned read holds its pool connection until it settles, so bound how
 // many reads one stuck database can pin.
 const MAX_LIVE_READS = 2;
-const VERSION_PATTERN = /^\d+(\.\d+)*$/;
 
 type CachedMinimumVersions = {
   /** `null` when the table holds no row; cached like any other successful read. */
@@ -49,8 +56,8 @@ let readGeneration = 0;
 /** Reads still running, including abandoned ones that hold a pool connection. */
 let liveReads = 0;
 
-export function isMobileClient(headersList?: MinimumVersionHeaders | null): boolean {
-  return headersList?.get('x-kilo-client') === 'mobile';
+export function isMobileClient(headersList?: AppHeaderList | null): boolean {
+  return isMobileClientValue(headersList?.get(APP_CLIENT_HEADER));
 }
 
 /**
@@ -60,18 +67,18 @@ export function isMobileClient(headersList?: MinimumVersionHeaders | null): bool
  * return `{ pass: false }`.
  */
 export function enforceMinimumVersion(
-  headersList: MinimumVersionHeaders | null | undefined,
+  headersList: AppHeaderList | null | undefined,
   minimums: MinimumVersions
 ): { pass: boolean } {
   if (!headersList) {
     return { pass: false };
   }
-  const platform = headersList.get('x-kilo-app-platform');
-  if (platform !== 'ios' && platform !== 'android') {
+  const platform = headersList.get(APP_PLATFORM_HEADER);
+  if (!isKnownPlatform(platform)) {
     return { pass: false };
   }
-  const version = headersList.get('x-kilo-app-version');
-  if (!version || !VERSION_PATTERN.test(version)) {
+  const version = headersList.get(APP_VERSION_HEADER);
+  if (!isAppVersion(version)) {
     return { pass: false };
   }
   const platformMinimum = platform === 'ios' ? minimums.ios : minimums.android;

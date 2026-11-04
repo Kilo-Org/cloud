@@ -67,11 +67,7 @@ export function buildDirectProvider(
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
-      if (
-        upstream.prompt_cache_key_as_mt_user_id &&
-        typeof promptCacheKey === 'string' &&
-        /^[\t\x20-\x7e\x80-\xff]+$/.test(promptCacheKey)
-      ) {
+      if (upstream.prompt_cache_key_as_mt_user_id && typeof promptCacheKey === 'string') {
         for (const key of Object.keys(context.extraHeaders)) {
           if (key.toLowerCase() === 'mt-user-id') {
             delete context.extraHeaders[key];

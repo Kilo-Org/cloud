@@ -43,7 +43,8 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
 async function sendThroughSecureProxy(
   disable_url_suffix: boolean,
   prompt_cache_key_as_mt_user_id = false,
-  prompt_cache_key = 'task-cache-key'
+  prompt_cache_key = 'task-cache-key',
+  extraHeaders: Record<string, string> = {}
 ) {
   const fetchMock = jest.fn(
     async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}')
@@ -55,7 +56,6 @@ async function sendThroughSecureProxy(
     prompt_cache_key,
   };
   const provider = secureProxyProvider(disable_url_suffix, prompt_cache_key_as_mt_user_id);
-  const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,
     model: 'public-model',
@@ -92,6 +92,7 @@ async function sendThroughSecureProxy(
 describe('upstreamRequest through the secure proxy', () => {
   afterEach(() => {
     global.fetch = originalFetch;
+    jest.restoreAllMocks();
   });
 
   it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {
@@ -132,13 +133,38 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('task-cache-key');
   });
 
+  it('sends an empty cache key as an empty header', async () => {
+    const { body } = await sendThroughSecureProxy(false, true, '');
+
+    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('');
+  });
+
   it.each(['\u4e2d\u6587', 'key\r\nInjected: value', 'key\0'])(
     'still sends the request when cache key %s cannot be used as a header',
     async cacheKey => {
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
       const { body } = await sendThroughSecureProxy(false, true, cacheKey);
 
       expect(body.kilo_secure_proxy.headers).not.toHaveProperty('mt-user-id');
       expect(body.prompt_cache_key).toBe(cacheKey);
+      expect(debug.mock.calls).toEqual([['[upstreamRequest] Skipping invalid extra header']]);
     }
   );
+
+  it.each([
+    ['invalid header', 'secret-value'],
+    ['authorization', 'Bearer secret\r\nInjected: value'],
+  ])('skips invalid extra header %s and continues setting valid headers', async (key, value) => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    const { body } = await sendThroughSecureProxy(false, false, 'task-cache-key', {
+      [key]: value,
+      'x-valid-header': 'kept',
+    });
+
+    expect(body.kilo_secure_proxy.headers).not.toHaveProperty('invalid header');
+    expect(body.kilo_secure_proxy.headers.authorization).toBe('Bearer upstream-key');
+    expect(body.kilo_secure_proxy.headers['x-valid-header']).toBe('kept');
+    expect(body.kilo_secure_proxy.headers['x-definition-header']).toBe('definition');
+    expect(debug.mock.calls).toEqual([['[upstreamRequest] Skipping invalid extra header']]);
+  });
 });

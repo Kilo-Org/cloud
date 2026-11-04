@@ -201,8 +201,8 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     ).resolves.not.toHaveProperty('Mt-User-Id');
   });
 
-  it.each([undefined, null, '', 42, '\u4e2d\u6587', 'key\r\nInjected: value', 'key\0', 'key\x7f'])(
-    'does not add the header for invalid cache key %s',
+  it.each([undefined, null, 42])(
+    'does not add the header for non-string cache key %s',
     async cacheKey => {
       const request = makeRequest();
       Object.assign(request.body, { prompt_cache_key: cacheKey });
@@ -210,6 +210,18 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
 
       expect(headers).not.toHaveProperty('Mt-User-Id');
+    }
+  );
+
+  it.each(['', '\u4e2d\u6587', 'key\r\nInjected: value', 'key\0', 'key\x7f'])(
+    'leaves HTTP header validation to the header setter for cache key %s',
+    async cacheKey => {
+      const request = makeRequest();
+      request.body.prompt_cache_key = cacheKey;
+
+      const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
+
+      expect(headers['Mt-User-Id']).toBe(cacheKey);
     }
   );
 

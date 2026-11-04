@@ -325,7 +325,11 @@ export async function upstreamRequest({
   headers.set('Content-Type', 'application/json');
 
   Object.entries(extraHeaders).forEach(([key, value]) => {
-    headers.set(key, value);
+    try {
+      headers.set(key, value);
+    } catch {
+      console.debug('[upstreamRequest] Skipping invalid extra header');
+    }
   });
 
   const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;

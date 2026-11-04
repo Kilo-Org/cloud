@@ -50,6 +50,7 @@ vi.mock('react', async () => {
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
 // The composer-reveal hook arms the did-events through Keyboard.addListener;
 // the captured subscribers let the repro fire `keyboardDidShow` directly.
+const windowState = vi.hoisted(() => ({ width: 411, height: 914, scale: 2.625, fontScale: 1 }));
 const keyboardSubscribers = vi.hoisted(() => ({
   show: null as (() => void) | null,
   hide: null as (() => void) | null,
@@ -87,6 +88,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
+  useWindowDimensions: () => windowState,
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -462,6 +464,37 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
       showRunOnSelector: true,
     });
+  });
+
+  it('keeps the Run on heading stacked on a window that holds the stacked form', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(false);
+  });
+
+  it('merges the Run on heading into its row on a short window', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    windowState.height = 640;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm({
+        ...defaultProps(),
+        showRunOnSelector: true,
+      }) as Node;
+
+      // The heading beside the selector is what keeps the repository picker
+      // above the pinned footer at this window height.
+      expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(true);
+    } finally {
+      windowState.height = 914;
+    }
   });
 
   it('renders the account section above the run-target block', async () => {

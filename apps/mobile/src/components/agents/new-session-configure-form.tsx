@@ -1,6 +1,12 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  ScrollView,
+  type ScrollViewInstance,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +19,7 @@ import { NewSessionProfileRow } from '@/components/agents/new-session-environmen
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
+import { resolveNewSessionInlineSections } from '@/components/agents/new-session-section-layout';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
@@ -180,6 +187,11 @@ export function NewSessionConfigureForm({
   // connected yet — the target is the computer either way.
   const isRemote = runOnInstance !== null || pendingComputer === true;
   const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
+  // The Run on section merges its heading into its row on a short window, like
+  // the Account section above it, so the repository picker below them stays
+  // above the pinned footer. The window is read here rather than a measured
+  // frame so the form cannot reflow after the first layout.
+  const inlineSectionHeadings = resolveNewSessionInlineSections(useWindowDimensions().height);
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -270,6 +282,7 @@ export function NewSessionConfigureForm({
           onRefreshInstances={onRefreshInstances}
           pendingComputer={pendingComputer}
           disabled={isStarting}
+          inlineHeading={inlineSectionHeadings}
         />
       </View>
 

@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { NewSessionSectionField } from '@/components/agents/new-session-section-field';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from '@/components/ui/icons';
@@ -29,6 +30,12 @@ type NewSessionRunTargetProps = {
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   onRefreshInstances: () => void;
   disabled: boolean;
+  /**
+   * Puts the `Run on` heading beside the selector instead of above it, so the
+   * section costs the form no height above the repository picker on a short
+   * window. See `resolveNewSessionInlineSections`.
+   */
+  inlineHeading?: boolean;
 };
 
 const REFRESH_SPIN_MS = 800;
@@ -48,6 +55,7 @@ export function NewSessionRunTarget({
   onChangeRunOnInstance,
   onRefreshInstances,
   disabled,
+  inlineHeading = false,
 }: Readonly<NewSessionRunTargetProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -74,10 +82,7 @@ export function NewSessionRunTarget({
     runOnInstance !== null ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   if (showRunOnSelector) {
     return (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.instancePicker.runOn')}
-        </Text>
+      <NewSessionSectionField inline={inlineHeading} label={t('agentChat.instancePicker.runOn')}>
         <View className="flex-row items-center gap-2">
           <View className="flex-1">
             <InstanceSelector
@@ -106,7 +111,7 @@ export function NewSessionRunTarget({
             </Animated.View>
           </Button>
         </View>
-      </View>
+      </NewSessionSectionField>
     );
   }
   if (targetLabel === null) {

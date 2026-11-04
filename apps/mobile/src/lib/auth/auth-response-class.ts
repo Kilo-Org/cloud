@@ -58,7 +58,7 @@ export type AuthResponseClass =
    * pair is dead (a 401 on the refresh route).
    */
   | { readonly kind: 'terminal'; readonly status: number; readonly clearCredential: boolean }
-  /** Retryable: a 429 carries the server's own back-off, if it named one. */
+  /** Retryable: a 408, 429 or 5xx carries the server's own back-off, if it named one. */
   | { readonly kind: 'retry'; readonly status: number; readonly retryAfterMs: number | undefined };
 
 /**
@@ -89,9 +89,10 @@ export function parseRetryAfterMs(
 
 /**
  * Classify a sign-in response. A 401 is terminal (and clears the stored
- * credential on a credential route). A 429 or 5xx is retryable and carries the
- * server's `Retry-After` when it sent one. Every other 4xx — and the 1xx/3xx a
- * sign-in route never returns — is terminal: retrying it cannot change it.
+ * credential on a credential route). A 408, 429 or 5xx is retryable and carries
+ * the server's `Retry-After` when it sent one. Every other 4xx — and the
+ * 1xx/3xx a sign-in route never returns — is terminal: retrying it cannot
+ * change it.
  */
 export function classifyAuthResponse(args: {
   path: string;

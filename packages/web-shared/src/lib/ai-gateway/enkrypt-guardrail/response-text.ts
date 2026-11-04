@@ -9,7 +9,8 @@ type Text = string | null | undefined;
 /**
  * Collects text in groups, such as one content block or one tool call's arguments, so pieces that
  * arrive in interleaved stream deltas are joined in their own order. Groups keep the order in which
- * they first appeared.
+ * they first appeared, and identical groups, such as a finished item repeating its deltas, are
+ * scanned once.
  */
 function createTextGroups() {
   const groups = new Map<string, string[]>();
@@ -23,16 +24,15 @@ function createTextGroups() {
   return {
     add,
     addUngrouped: (text: string) => add(`ungrouped:${ungrouped++}`, text),
-    deleteGroups: (prefix: string) => {
-      for (const key of [...groups.keys()]) if (key.startsWith(prefix)) groups.delete(key);
-    },
     text: () =>
-      [...groups.values()]
-        .flatMap(pieces => {
-          const text = pieces.join('').trim();
-          return text ? [text] : [];
-        })
-        .join('\n\n'),
+      [
+        ...new Set(
+          [...groups.values()].flatMap(pieces => {
+            const text = pieces.join('').trim();
+            return text ? [text] : [];
+          })
+        ),
+      ].join('\n\n'),
   };
 }
 
@@ -134,8 +134,7 @@ function addChatMessage(groups: TextGroups, choice: string, message: ChatMessage
   if (typeof content === 'string') groups.add(`${choice}:content`, content);
   else {
     for (const part of content ?? []) {
-      if (part.type === 'text') groups.add(`${choice}:content`, part.text);
-      if (part.type === 'refusal') groups.add(`${choice}:content`, part.refusal);
+      groups.add(`${choice}:content`, part.type === 'refusal' ? part.refusal : part.text);
     }
   }
   groups.add(`${choice}:refusal`, message.refusal);
@@ -283,6 +282,7 @@ const RESPONSES_DELTA_GROUPS = new Map([
   ['response.output_text.delta', 'content'],
   ['response.refusal.delta', 'content'],
   ['response.reasoning_text.delta', 'content'],
+  ['response.reasoning.delta', 'content'],
   ['response.reasoning_summary_text.delta', 'summary'],
   ['response.function_call_arguments.delta', 'arguments'],
   ['response.custom_tool_call_input.delta', 'arguments'],
@@ -299,8 +299,9 @@ const responsesEventSchema = z.object({
 });
 
 /**
- * A finished output item is what clients act on, so it replaces the deltas of its output index.
- * Deltas still cover an item whose stream was cut off before it finished.
+ * A finished output item is what clients act on, and its deltas are what they display, so both are
+ * scanned. A finished reasoning item can carry only encrypted content while its text arrived as
+ * deltas, and deltas still cover an item whose stream was cut off before it finished.
  */
 const addResponsesEvent: AddJson = (groups, json) => {
   const parsed = responsesEventSchema.safeParse(json);
@@ -311,7 +312,6 @@ const addResponsesEvent: AddJson = (groups, json) => {
     groups.add(`${key}:name`, event.item.name);
   }
   if (event.type === 'response.output_item.done' && event.item) {
-    groups.deleteGroups(`${key}:`);
     addResponsesItem(groups, `${key}:item`, event.item);
     return true;
   }

@@ -703,7 +703,7 @@ describe('extractResponseText responses sse', () => {
     expect(extractResponseText('responses', 'sse', body)).toBe('apply_patch\n\n*** Begin Patch');
   });
 
-  it('scans a finished output item in place of its deltas', () => {
+  it('scans a finished output item and its deltas, and identical text once', () => {
     const body = typedSse([
       {
         type: 'response.output_item.added',
@@ -729,8 +729,27 @@ describe('extractResponseText responses sse', () => {
     ]);
 
     expect(extractResponseText('responses', 'sse', body)).toBe(
-      'run\n\n{"cmd":"cat .env"}\n\n{"type":"local_shell_call","action":{"command":["rm","-rf","/"]}}'
+      'run\n\n{"cmd":"ls"\n\n{"cmd":"cat .env"}\n\n{"type":"local_shell_call","action":{"command":["rm","-rf","/"]}}'
     );
+  });
+
+  it('keeps reasoning deltas when the finished reasoning item carries only encrypted content', () => {
+    const body = typedSse([
+      {
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: { type: 'reasoning', id: 'rs_1', summary: [] },
+      },
+      { type: 'response.reasoning.delta', output_index: 0, delta: 'The key is ' },
+      { type: 'response.reasoning.delta', output_index: 0, delta: 'sk-live-1' },
+      {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'ENCRYPTED' },
+      },
+    ]);
+
+    expect(extractResponseText('responses', 'sse', body)).toBe('The key is sk-live-1');
   });
 
   it('returns an empty string for an empty stream', () => {
@@ -750,5 +769,15 @@ describe('extractResponseText messages unknown blocks', () => {
     expect(extractResponseText('messages', 'json', body)).toBe(
       '{"type":"future_tool_use","command":"cat .env"}'
     );
+  });
+});
+
+describe('extractResponseText chat_completions unknown content parts', () => {
+  it('scans the text of a content part type it does not know', () => {
+    const body = JSON.stringify({
+      choices: [{ index: 0, message: { content: [{ type: 'output_text', text: 'sk-live-2' }] } }],
+    });
+
+    expect(extractResponseText('chat_completions', 'json', body)).toBe('sk-live-2');
   });
 });

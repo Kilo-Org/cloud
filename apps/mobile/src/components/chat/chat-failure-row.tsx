@@ -23,8 +23,10 @@ export function ChatFailureRow({
   return (
     <View className="flex-row items-center gap-3 px-4 py-2">
       <AccessibleStatus message={t(failureKey)} tone="error" className="flex-1 text-sm" />
+      {/* The one action that unblocks the send is the row's primary: the
+          filled variant, while Retry next to it stays outlined. */}
       {onAddCredits ? (
-        <Button variant="outline" size="sm" onPress={onAddCredits}>
+        <Button variant="default" size="sm" onPress={onAddCredits}>
           <Text>{t('addCredits.cta')}</Text>
         </Button>
       ) : null}

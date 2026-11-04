@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
-    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này, hãy nạp tiền và thử lại."
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"

@@ -3856,7 +3856,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"

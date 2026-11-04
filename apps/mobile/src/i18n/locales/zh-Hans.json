@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。"
+    "creditsRequired": "额度不足，无法发送此消息。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"

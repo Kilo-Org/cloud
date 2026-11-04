@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。クレジットを追加して再試行してください。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"

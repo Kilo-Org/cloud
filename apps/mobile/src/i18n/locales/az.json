@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     },
-    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin."
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur."
   },
   "settingsTools": {
     "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"

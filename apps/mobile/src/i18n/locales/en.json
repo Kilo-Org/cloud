@@ -3821,7 +3821,7 @@
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
-    "creditsRequired": "Not enough credits to send this message. Add credits and try again."
+    "creditsRequired": "Not enough credits to send this message."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"

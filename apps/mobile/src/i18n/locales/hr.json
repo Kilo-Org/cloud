@@ -3805,7 +3805,7 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovno."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"

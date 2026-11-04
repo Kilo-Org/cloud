@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"

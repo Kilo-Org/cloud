@@ -3856,7 +3856,7 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov. Dopĺňte kredity a skúste to znova."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdiť túto zmenu?"

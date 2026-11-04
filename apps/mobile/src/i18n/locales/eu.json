@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro."
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"

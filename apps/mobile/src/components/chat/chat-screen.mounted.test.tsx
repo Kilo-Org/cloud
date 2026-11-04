@@ -660,7 +660,7 @@ describe('a retained chat failure', () => {
     const tree = await mount();
 
     expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
-      'Not enough credits to send this message. Add credits and try again.'
+      'Not enough credits to send this message.'
     );
     /* The question kept in the transcript carries the only Retry; the row adds
        the one action the message cannot offer. */

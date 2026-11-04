@@ -3958,7 +3958,7 @@
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"
     },
-    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة. اشحن الرصيد وحاول مرة أخرى."
+    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة."
   },
   "settingsTools": {
     "confirmTitle": "تأكيد هذا التغيير؟"

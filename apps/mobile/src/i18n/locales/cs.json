@@ -3856,7 +3856,7 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
     },
-    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy. Dobijte kredity a zkuste to znovu."
+    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdit tuto změnu?"

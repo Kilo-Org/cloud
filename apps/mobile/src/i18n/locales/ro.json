@@ -3805,7 +3805,7 @@
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
     },
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou."
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"

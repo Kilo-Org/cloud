@@ -3754,7 +3754,7 @@
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut."
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"

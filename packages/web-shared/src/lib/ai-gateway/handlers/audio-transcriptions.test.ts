@@ -5,7 +5,11 @@ import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { countAndStoreTranscriptionUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
@@ -36,6 +40,7 @@ jest.mock(
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
@@ -141,6 +146,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = mockedFetch;
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
+      statsPromise: Promise.resolve(null),
+      usagePromise: Promise.resolve(null),
+    });
   });
 
   afterAll(() => {
@@ -194,13 +203,13 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
-    mockedFetch.mockResolvedValue(
-      makeUpstreamResponse({
-        text: 'hello world',
-        model: 'openai/gpt-4o-mini-transcribe',
-        usage: { cost: 0.00002, is_byok: false, input_tokens: 10, output_tokens: 4 },
-      })
-    );
+    const upstreamResponse = makeUpstreamResponse({
+      text: 'hello world',
+      model: 'openai/gpt-4o-mini-transcribe',
+      usage: { cost: 0.00002, is_byok: false, input_tokens: 10, output_tokens: 4 },
+    });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
     const response = await handleAudioTranscriptionsRequest(
@@ -231,9 +240,40 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    expect(countAndStoreTranscriptionUsage).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[0]).toBe(
+      cloneSpy.mock.results[0]?.value
+    );
+    expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200 }),
+      expect.any(Promise),
+      expect.any(Number)
+    );
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
     expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
       feature: 'vscode-extension',
     });
+  });
+
+  it('emits gateway metrics before accounting a platform-funded upstream error', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'Upstream request failed' }, 402));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(countAndStoreTranscriptionUsage).not.toHaveBeenCalled();
+    expect(mockedEmitApiMetricsForResponse).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 402, completeRequestMs: expect.any(Number) })
+    );
   });
 
   it('forwards the organization data collection policy on JSON requests', async () => {

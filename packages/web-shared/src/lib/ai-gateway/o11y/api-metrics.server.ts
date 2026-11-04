@@ -1,12 +1,11 @@
 import { after } from 'next/server';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
-import { z } from 'zod';
 import {
   O11Y_KILO_GATEWAY_CLIENT_SECRET,
   O11Y_SERVICE_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import type { CompletionUsage } from 'openai/resources/completions';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 export type ApiMetricsTokens = {
   inputTokens?: number;
@@ -205,158 +204,22 @@ export function emitGatewayApiMetrics(params: Omit<ApiMetricsParams, 'clientSecr
 
 export function emitApiMetricsForResponse(
   params: Omit<ApiMetricsParams, 'clientSecret' | 'completeRequestMs'>,
-  responseToDrain: Response,
+  statsPromise: Promise<Pick<MicrodollarUsageStats, 'inference_provider'> | null>,
   requestStartedAt: number
 ) {
   if (!apiMetricsUrl) return;
   if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
 
-  after(async () => {
-    let inferenceProvider: string | undefined;
-    try {
-      // Draining the body lets us measure the full upstream response time.
-      // Cap this so we don't keep background work running forever for SSE.
-      inferenceProvider = await drainResponseBodyForInferenceProvider(responseToDrain, 60_000);
-    } catch {
-      // Ignore body read errors; we still emit a timing.
-    }
+  after(
+    statsPromise.then(async stats => {
+      const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
-    const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-
-    await sendApiMetrics({
-      ...params,
-      inferenceProvider,
-      clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
-      completeRequestMs,
-    } satisfies ApiMetricsParams);
-  });
-}
-
-async function drainResponseBodyForInferenceProvider(
-  response: Response,
-  timeoutMs: number
-): Promise<string | undefined> {
-  const body = response.body;
-  if (!body) return undefined;
-
-  const reader = body.getReader();
-  const contentType = response.headers.get('content-type') ?? '';
-  const isEventStream = contentType.includes('text/event-stream');
-  let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    reader.cancel().catch(() => {});
-  }, timeoutMs);
-  try {
-    const decoder = new TextDecoder();
-    let inferenceProvider: string | undefined;
-
-    const sseParser = isEventStream
-      ? createParser({
-          onEvent(event: EventSourceMessage) {
-            if (event.data === '[DONE]') return;
-            const json = safeParseJson(event.data);
-            if (!json) return;
-            inferenceProvider = extractInferenceProvider(json);
-          },
-        })
-      : null;
-
-    let buffered = '';
-    const MAX_BUFFER_CHARS = 512_000;
-
-    while (true) {
-      const result = await reader.read();
-      if (timedOut) return inferenceProvider;
-
-      if (result.done) {
-        if (!inferenceProvider && !isEventStream && buffered) {
-          const json = safeParseJson(buffered);
-          inferenceProvider = json ? extractInferenceProvider(json) : undefined;
-        }
-        return inferenceProvider;
-      }
-
-      if (result.value) {
-        const chunk = decoder.decode(result.value, { stream: true });
-        if (sseParser) {
-          sseParser.feed(chunk);
-        } else if (buffered.length < MAX_BUFFER_CHARS) {
-          buffered += chunk;
-        }
-      }
-    }
-  } finally {
-    clearTimeout(timeout);
-    reader.releaseLock();
-  }
-}
-
-const inferenceProviderSchema = z.object({
-  provider: z.string().min(1).optional(),
-  choices: z
-    .array(
-      z.object({
-        message: z
-          .object({
-            provider_metadata: z
-              .object({
-                gateway: z
-                  .object({
-                    routing: z.object({
-                      finalProvider: z.string().min(1).optional(),
-                    }),
-                  })
-                  .partial()
-                  .optional(),
-              })
-              .partial()
-              .optional(),
-          })
-          .partial()
-          .optional(),
-        delta: z
-          .object({
-            provider_metadata: z
-              .object({
-                gateway: z
-                  .object({
-                    routing: z.object({
-                      finalProvider: z.string().min(1).optional(),
-                    }),
-                  })
-                  .partial()
-                  .optional(),
-              })
-              .partial()
-              .optional(),
-          })
-          .partial()
-          .optional(),
-      })
-    )
-    .optional(),
-});
-
-function extractInferenceProvider(data: unknown): string | undefined {
-  const parsed = inferenceProviderSchema.safeParse(data);
-  if (!parsed.success) return undefined;
-
-  const directProvider = parsed.data.provider?.trim();
-  if (directProvider) return directProvider;
-
-  const choice = parsed.data.choices?.[0];
-  const finalProvider =
-    choice?.message?.provider_metadata?.gateway?.routing?.finalProvider?.trim() ??
-    choice?.delta?.provider_metadata?.gateway?.routing?.finalProvider?.trim();
-  return finalProvider || undefined;
-}
-
-function safeParseJson(payload: string): unknown {
-  if (!payload) return null;
-  try {
-    return JSON.parse(payload) as unknown;
-  } catch {
-    return null;
-  }
+      await sendApiMetrics({
+        ...params,
+        inferenceProvider: stats?.inference_provider ?? undefined,
+        clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+        completeRequestMs,
+      } satisfies ApiMetricsParams);
+    })
+  );
 }

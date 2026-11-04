@@ -1271,9 +1271,12 @@ export function countAndStoreUsage(
   }
 
   metadataCapture?.waitFor(usageStatsPromise);
-  return usageStatsPromise.then(usageStats =>
-    processTokenData(usageStats, usageContext, servingProvider)
-  );
+  return {
+    statsPromise: usageStatsPromise,
+    usagePromise: usageStatsPromise.then(usageStats =>
+      processTokenData(usageStats, usageContext, servingProvider)
+    ),
+  };
 }
 
 export function processOpenRouterUsage(

@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
-import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { getLastHomeWidgetData } from './home-widget-data';
 import {
@@ -168,12 +169,38 @@ describe('restorePersistedGlanceable', () => {
     const stored = snapshotFor([{ status: 'busy' }]);
     store.set(SNAPSHOT_KEY, JSON.stringify(stored));
     store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     await restorePersistedGlanceable();
 
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
     expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  it('leaves the scope unconfirmed for a record of another account', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+
+    await restorePersistedGlanceable();
+
+    // The record still seeds the revision the next publisher must outrank, but
+    // it never becomes this process's scope: the drawn frame and the
+    // waiting-ask fence both key off that one value.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLocalScopeKey()).toBeNull();
+  });
+
+  it('leaves the scope unconfirmed when no account is signed in', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLocalScopeKey()).toBeNull();
   });
 
   it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
@@ -298,6 +325,7 @@ describe('restorePersistedGlanceable', () => {
     const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = stored;
     store.set(SNAPSHOT_KEY, JSON.stringify(previousRelease));
     store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     await restorePersistedGlanceable();
 
@@ -309,6 +337,28 @@ describe('restorePersistedGlanceable', () => {
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
   });
 
+  it('does not clobber a publish that lands during the legacy scope-key read', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(SCOPE_KEY, scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStoreMock.getItemAsync.mockImplementation((key: string) => {
+      const value = store.get(key) ?? null;
+      if (key === SCOPE_KEY) {
+        // The live publish lands after the identity read and while the legacy
+        // entry is being read.
+        persistGlanceableSink.publish({ ...snapshotFor([]), scopeKey: otherScope });
+      }
+      return Promise.resolve(value);
+    });
+
+    await restorePersistedGlanceable();
+
+    // The publish owns the scope, the same as one that lands during either
+    // earlier read of the restore.
+    expect(getLocalScopeKey()).toBe(otherScope);
+  });
+
   // The previous release stored the snapshot and the scope key as two records.
   // An install that upgrades with that pair on disk must still restore, and the
   // record's own scope key is what a restart uses from then on.
@@ -316,6 +366,7 @@ describe('restorePersistedGlanceable', () => {
     const stored = snapshotFor([{ status: 'busy' }]);
     store.set(SNAPSHOT_KEY, JSON.stringify(stored));
     store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     const restarted = await restartPersistModule();
     await restarted.restorePersistedGlanceable();
@@ -324,14 +375,30 @@ describe('restorePersistedGlanceable', () => {
     expect(restarted.getLocalScopeKey()).toBe(stored.scopeKey);
   });
 
-  it('fills the scope from a key the previous release left without a snapshot', async () => {
-    store.set(SCOPE_KEY, 'legacy-scope');
+  it('fills the scope from a legacy key the signed-in account confirms', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    store.set(SCOPE_KEY, scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     const restarted = await restartPersistModule();
     await restarted.restorePersistedGlanceable();
 
     expect(restarted.getLastGlanceableSnapshot()).toBeNull();
-    expect(restarted.getLocalScopeKey()).toBe('legacy-scope');
+    expect(restarted.getLocalScopeKey()).toBe(scopeKey);
+  });
+
+  // The entry names the scope the previous release published for, not the one
+  // holding the device now: an account that does not match leaves this process
+  // without a scope, which is what every reader of it fails closed on.
+  it('does not fill the scope from a legacy key the account does not confirm', async () => {
+    store.set(SCOPE_KEY, 'legacy-scope');
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toBeNull();
+    expect(restarted.getLocalScopeKey()).toBeNull();
   });
 
   it('restores the Home-widget record on the signed-in scope', async () => {
@@ -438,7 +505,10 @@ describe('mirror writes', () => {
     await restarted.restorePersistedGlanceable();
 
     expect(restarted.getLastGlanceableSnapshot()).toEqual(blank);
-    expect(restarted.getLocalScopeKey()).toBe(blank.scopeKey);
+    // A terminal key never equals a signed-in scope's, so the record names no
+    // scope this process may act for: the surfaces draw its blank copy only
+    // while it is the frame this process published.
+    expect(restarted.getLocalScopeKey()).toBeNull();
   });
 
   // One record per publish carries both facts, so a restart can never pair one
@@ -461,6 +531,10 @@ describe('mirror writes', () => {
     persistGlanceableSink.publish(first);
     persistGlanceableSink.publish(second);
     await _flushGlanceableMirrorForTests();
+
+    // The device holds the org the last publish wrote.
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(ORGANIZATION_STORAGE_KEY, 'org-2');
 
     const restarted = await restartPersistModule();
     await restarted.restorePersistedGlanceable();

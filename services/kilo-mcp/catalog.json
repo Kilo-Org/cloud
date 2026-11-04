@@ -20295,7 +20295,7 @@
                                 "const": "selected"
                               },
                               "model_allow_list": {
-                                "maxItems": 500,
+                                "maxItems": 2000,
                                 "type": "array",
                                 "items": {
                                   "type": "string",
@@ -20740,7 +20740,7 @@
                               "const": "selected"
                             },
                             "model_allow_list": {
-                              "maxItems": 500,
+                              "maxItems": 2000,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -20992,7 +20992,7 @@
                               "const": "selected"
                             },
                             "model_allow_list": {
-                              "maxItems": 500,
+                              "maxItems": 2000,
                               "type": "array",
                               "items": {
                                 "type": "string",

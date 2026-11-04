@@ -53,7 +53,6 @@ function OrganizationFeaturesPreview({
   const { data, isPending, error, refetch } = useQuery(
     trpc.admin.gatewayConfig.previewOrganizationFeatures.queryOptions(features, {
       enabled: parsed.success && hasOrganizations,
-      trpc: { context: { methodOverride: 'POST' } },
     })
   );
   const organizationsById = new Map(data?.map(organization => [organization.id, organization]));

@@ -6,7 +6,6 @@ import type { Root } from 'react-dom/client';
 import { TRPCContext } from './client';
 import { useRawTRPCClient } from './utils';
 
-const emptyFeatures = { experimental_byok: [], gateway_settings: [] };
 const mockFetch = jest.fn<typeof fetch>(async input => {
   const url = new URL(String(input), 'https://example.test');
   const result = { result: { data: [] } };
@@ -79,51 +78,55 @@ describe('TRPCContext transport', () => {
     cleanup?.();
   });
 
-  it.each([false, true])(
-    'sends 1,000 IDs per feature in a short POST request with skipBatch=%s',
-    async skipBatch => {
-      const input = {
-        experimental_byok: Array.from({ length: 1000 }, () => crypto.randomUUID()),
-        gateway_settings: Array.from({ length: 1000 }, () => crypto.randomUUID()),
-      };
+  it.each([
+    { label: 'without context', skipBatch: undefined },
+    { label: 'with skipBatch=false', skipBatch: false },
+    { label: 'with skipBatch=true', skipBatch: true },
+  ])('sends 1,000 IDs per feature in a short POST request $label', async ({ skipBatch }) => {
+    const input = {
+      experimental_byok: Array.from({ length: 1000 }, () => crypto.randomUUID()),
+      gateway_settings: Array.from({ length: 1000 }, () => crypto.randomUUID()),
+    };
 
+    if (skipBatch === undefined) {
+      await client.admin.gatewayConfig.previewOrganizationFeatures.query(input);
+    } else {
       await client.admin.gatewayConfig.previewOrganizationFeatures.query(input, {
-        context: { methodOverride: 'POST', skipBatch },
+        context: { skipBatch },
       });
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toBe('/api/trpc/admin.gatewayConfig.previewOrganizationFeatures');
-      expect(options?.method).toBe('POST');
-      expect(JSON.parse(String(options?.body))).toEqual(input);
     }
-  );
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/trpc/admin.gatewayConfig.previewOrganizationFeatures');
+    expect(options?.method).toBe('POST');
+    expect(JSON.parse(String(options?.body))).toEqual(input);
+  });
 
   it('keeps normal queries as batched GET requests', async () => {
     await Promise.all([
-      client.admin.gatewayConfig.previewOrganizationFeatures.query(emptyFeatures),
-      client.admin.gatewayConfig.previewOrganizationFeatures.query(emptyFeatures),
+      client.admin.gatewayConfig.getOrganizationFeatures.query(),
+      client.admin.gatewayConfig.getOrganizationFeatures.query(),
     ]);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [input, options] = mockFetch.mock.calls[0];
     const url = new URL(String(input), 'https://example.test');
+    expect(url.pathname).toBe(
+      '/api/trpc/admin.gatewayConfig.getOrganizationFeatures,admin.gatewayConfig.getOrganizationFeatures'
+    );
     expect(options?.method).toBe('GET');
     expect(options?.body).toBeUndefined();
     expect(url.searchParams.get('batch')).toBe('1');
-    expect(JSON.parse(url.searchParams.get('input') ?? '')).toEqual({
-      0: emptyFeatures,
-      1: emptyFeatures,
-    });
   });
 
   it('keeps skipBatch queries separate from normal batched GET requests', async () => {
     await Promise.all([
-      client.admin.gatewayConfig.previewOrganizationFeatures.query(emptyFeatures),
-      client.admin.gatewayConfig.previewOrganizationFeatures.query(emptyFeatures, {
+      client.admin.gatewayConfig.getOrganizationFeatures.query(),
+      client.admin.gatewayConfig.getOrganizationFeatures.query(undefined, {
         context: { skipBatch: true },
       }),
-      client.admin.gatewayConfig.previewOrganizationFeatures.query(emptyFeatures),
+      client.admin.gatewayConfig.getOrganizationFeatures.query(),
     ]);
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -134,10 +137,23 @@ describe('TRPCContext transport', () => {
     });
     const unbatched = requests.find(url => !url.searchParams.has('batch'));
     const batched = requests.find(url => url.searchParams.get('batch') === '1');
-    expect(JSON.parse(unbatched?.searchParams.get('input') ?? '')).toEqual(emptyFeatures);
-    expect(JSON.parse(batched?.searchParams.get('input') ?? '')).toEqual({
-      0: emptyFeatures,
-      1: emptyFeatures,
+    expect(unbatched?.pathname).toBe('/api/trpc/admin.gatewayConfig.getOrganizationFeatures');
+    expect(batched?.pathname).toBe(
+      '/api/trpc/admin.gatewayConfig.getOrganizationFeatures,admin.gatewayConfig.getOrganizationFeatures'
+    );
+  });
+
+  it('keeps unrelated queries on GET when methodOverride is POST', async () => {
+    await client.admin.gatewayConfig.getOrganizationFeatures.query(undefined, {
+      context: { methodOverride: 'POST' },
     });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [input, options] = mockFetch.mock.calls[0];
+    const url = new URL(String(input), 'https://example.test');
+    expect(url.pathname).toBe('/api/trpc/admin.gatewayConfig.getOrganizationFeatures');
+    expect(url.searchParams.get('batch')).toBe('1');
+    expect(options?.method).toBe('GET');
+    expect(options?.body).toBeUndefined();
   });
 });

@@ -9,7 +9,6 @@ const activeId = 'aaaaaaaa-1111-4111-8111-111111111111';
 const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
 const emptyFeatures: OrganizationFeatures = { experimental_byok: [], gateway_settings: [] };
-const previewTransport = { context: { methodOverride: 'POST' } };
 const mockMutate = jest.fn();
 const mockRefetchConfig = jest.fn();
 const mockRefetchPreview = jest.fn();
@@ -31,7 +30,7 @@ const mockPreviewQuery: {
   refetch: typeof mockRefetchPreview;
 } = { data: [], isPending: false, error: null, refetch: mockRefetchPreview };
 const mockPreviewOptions = jest.fn(
-  (input: OrganizationFeatures, options: { enabled: boolean; trpc: typeof previewTransport }) => ({
+  (input: OrganizationFeatures, options: { enabled: boolean }) => ({
     kind: 'preview',
     input,
     ...options,
@@ -187,7 +186,6 @@ describe('OrganizationFeaturesContent', () => {
     const input = { experimental_byok: [deletedId], gateway_settings: [deletedId] };
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, {
       enabled: true,
-      trpc: previewTransport,
     });
     expect(container.textContent).toContain('Unsaved changes');
     expect(container.textContent).not.toContain('Stored configuration');
@@ -259,7 +257,6 @@ describe('OrganizationFeaturesContent', () => {
     expect(mockPreviewOptions.mock.calls.every(([, options]) => !options.enabled)).toBe(true);
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, {
       enabled: false,
-      trpc: previewTransport,
     });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual([
       'No organizations enabled.',
@@ -279,7 +276,6 @@ describe('OrganizationFeaturesContent', () => {
 
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, {
       enabled: false,
-      trpc: previewTransport,
     });
     expect(mockPreviewOptions.mock.calls.every(([, options]) => !options.enabled)).toBe(true);
     expect(container.querySelector('[role="status"]')?.textContent).toBe(

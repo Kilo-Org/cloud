@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
-import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 // The snapshot cache belongs to the handler module, so every test loads its own
 // instance through `loadHandlers` and starts from a cold cache. The factories
@@ -23,7 +23,7 @@ jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
   isModelRestrictionExempt: jest.fn(async () => false),
   getModelInferenceProviders: jest.fn(async () => undefined),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
   resolveOrganizationMemberModelPolicy: jest.fn(
     async (): Promise<EffectiveOrganizationModelPolicy> => ({
       requireModelInCurrentSnapshot: true,

@@ -253,6 +253,8 @@ export type AcceptInviteResult = Result<
     invitation: typeof organization_invitations.$inferSelect;
     organizationId: string;
     role: OrganizationRole;
+    /** True when this call inserted the membership, false when it already existed. */
+    membershipInserted: boolean;
   },
   string
 >;

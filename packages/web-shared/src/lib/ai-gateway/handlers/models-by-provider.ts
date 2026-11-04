@@ -9,7 +9,7 @@ import {
   isModelAllowedForProviderKey,
   isModelRouteAllowed,
   resolveOrganizationMemberModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 export async function handleModelsByProviderRequest() {
   await connection();

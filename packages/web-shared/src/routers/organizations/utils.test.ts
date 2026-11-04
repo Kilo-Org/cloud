@@ -280,6 +280,8 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     await expect(getOrganizationsAccessRoles(ctxFor(parentOwner), [child.id])).resolves.toEqual(
       new Map([[child.id, 'owner']])
     );
+    const fetched = await ensureOrganizationAccessAndFetchOrg(ctxFor(parentOwner), child.id);
+    expect(fetched.id).toBe(child.id);
   });
 
   test('denies inherited access when the target organization is soft-deleted', async () => {

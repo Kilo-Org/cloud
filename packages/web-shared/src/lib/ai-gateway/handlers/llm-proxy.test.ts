@@ -83,7 +83,7 @@ import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/
 import {
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -166,9 +166,9 @@ jest.mock(
     getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
   allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+    '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
   ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),

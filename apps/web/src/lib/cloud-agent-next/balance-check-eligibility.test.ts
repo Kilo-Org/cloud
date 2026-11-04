@@ -21,7 +21,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: (...args: unknown[]) => mockCanRouteToVercel(...args),
 }));
 
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
   resolveOrganizationMemberModelDecision: (...args: unknown[]) =>
     mockResolveOrganizationMemberModelDecision(...args),
 }));

@@ -675,6 +675,50 @@ describe('organization guardrails router', () => {
       expect(updated.config).toMatchObject({ version_spec: null, min_version: null });
     });
 
+    it('renames a guardrail with an unconvertible legacy minimum without clearing it', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const [row] = await db
+        .insert(organization_guardrails)
+        .values({
+          organization_id: organizationId,
+          type: 'mcp',
+          identity_key: 'npm:legacy-invalid',
+          name: 'Legacy invalid',
+          description: null,
+          config: {
+            kind: 'package',
+            ecosystem: 'npm',
+            identifier: 'legacy-invalid',
+            version_spec: null,
+            min_version: 'latest',
+          },
+          source: { registry: 'custom', id: null },
+          created_by_kilo_user_id: owner.id,
+        })
+        .returning();
+
+      const updated = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: row.id,
+        name: 'Renamed legacy invalid',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-invalid' },
+      });
+
+      expect(updated.name).toBe('Renamed legacy invalid');
+      expect(updated.config).toMatchObject({
+        version_spec: null,
+        version_spec_invalid: true,
+        min_version: 'latest',
+      });
+
+      const [stored] = await db
+        .select()
+        .from(organization_guardrails)
+        .where(eq(organization_guardrails.id, row.id));
+      expect(stored.config).toMatchObject({ version_spec: null, min_version: 'latest' });
+      expect(stored.config).not.toHaveProperty('version_spec_invalid');
+    });
+
     it('keeps a range when a pre-range admin tab resubmits the floor it was shown', async () => {
       const caller = await createCallerForUser(owner.id);
       const added = await caller.organizations.mcpGuardrails.add({

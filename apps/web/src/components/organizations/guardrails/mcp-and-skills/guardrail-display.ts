@@ -39,6 +39,7 @@ export function configIdentity(
 
 export function versionSpecLabel(config: OrganizationGuardrailConfig): string {
   if (config.kind === 'remote') return 'Not applicable';
+  if (config.version_spec_invalid) return 'Needs attention';
   return config.version_spec ?? 'Any version';
 }
 

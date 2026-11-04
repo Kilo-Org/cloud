@@ -71,6 +71,7 @@ export function CustomMcpForm({
   const versionSpecId = useId();
   const versionSpecHelpId = useId();
   const versionSpecErrorId = useId();
+  const versionSpecWarningId = useId();
   const errorId = useId();
   const [kind, setKind] = useState<CustomKind>(() => initialKind(guardrail));
   const [value, setValue] = useState(() => (guardrail ? configIdentity(guardrail.config) : ''));
@@ -79,6 +80,11 @@ export function CustomMcpForm({
     guardrail?.config.kind === 'package' ? (guardrail.config.version_spec ?? '') : ''
   );
   const [versionSpecError, setVersionSpecError] = useState<string | undefined>();
+  const [versionSpecDirty, setVersionSpecDirty] = useState(false);
+  const versionSpecInvalid =
+    guardrail?.config.kind === 'package' && guardrail.config.version_spec_invalid === true;
+  const preserveInvalidVersionSpec =
+    guardrail !== undefined && versionSpecInvalid && !versionSpecDirty;
   const copy: { label: string; placeholder: string; help?: string } = VALUE_COPY[kind];
   const hasHelp = copy.help !== undefined;
   const canSubmit = value.trim().length > 0;
@@ -92,7 +98,7 @@ export function CustomMcpForm({
   const mutation = guardrail ? updateMutation : addMutation;
 
   const submit = async () => {
-    if (kind !== 'remote') {
+    if (kind !== 'remote' && !preserveInvalidVersionSpec) {
       const { normalizeVersionSpec } = await import('@/lib/organizations/guardrails/version-spec');
       const normalized = normalizeVersionSpec(versionSpec);
       if (!normalized.ok) {
@@ -110,7 +116,7 @@ export function CustomMcpForm({
       organizationId,
       ...(trimmedName ? { name: trimmedName } : {}),
       target,
-      ...(kind === 'remote' ? {} : { versionSpec }),
+      ...(kind === 'remote' || preserveInvalidVersionSpec ? {} : { versionSpec }),
     };
     if (guardrail) {
       updateMutation.mutate({ ...common, guardrailId: guardrail.id });
@@ -133,6 +139,7 @@ export function CustomMcpForm({
           value={kind}
           onValueChange={next => {
             setKind(next as CustomKind);
+            setVersionSpecDirty(true);
             setVersionSpecError(undefined);
             mutation.reset();
           }}
@@ -197,13 +204,20 @@ export function CustomMcpForm({
             value={versionSpec}
             placeholder={VERSION_SPEC_EXAMPLE}
             maxLength={MAX_SEMVER_LENGTH}
-            aria-invalid={versionSpecError ? true : undefined}
+            aria-invalid={
+              versionSpecError || (versionSpecInvalid && !versionSpecDirty) ? true : undefined
+            }
             aria-describedby={
-              [versionSpecHelpId, versionSpecError ? versionSpecErrorId : null]
+              [
+                versionSpecHelpId,
+                versionSpecError ? versionSpecErrorId : null,
+                versionSpecInvalid && !versionSpecDirty ? versionSpecWarningId : null,
+              ]
                 .filter(Boolean)
                 .join(' ') || undefined
             }
             onChange={event => {
+              setVersionSpecDirty(true);
               setVersionSpec(event.target.value);
               setVersionSpecError(undefined);
             }}
@@ -212,6 +226,12 @@ export function CustomMcpForm({
             A semver range checked against the version the client resolves. Leave blank to allow any
             version.
           </p>
+          {versionSpecInvalid && !versionSpecDirty && (
+            <p id={versionSpecWarningId} className="text-destructive text-sm">
+              This guardrail’s stored version rule can’t be converted to an allowed-versions range.
+              Enter a range to replace it, or leave it unchanged to keep the current restriction.
+            </p>
+          )}
           {versionSpecError && (
             <p id={versionSpecErrorId} role="alert" className="text-destructive text-sm">
               {versionSpecError}

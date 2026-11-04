@@ -5,7 +5,6 @@ import {
   resolveGuardrailsSettings,
   type AllowedMcpServer,
 } from './guardrails-policy';
-import { isValidVersionSpec } from './version-spec';
 
 const remote = { kind: 'remote' as const, url: 'https://mcp.example.com/mcp' };
 const pkg = {
@@ -371,10 +370,25 @@ describe('normalizeGuardrailConfig', () => {
     });
   });
 
-  it('marks an unusable legacy minimum as invalid rather than dropping it', () => {
-    const config = normalizeGuardrailConfig(packageConfig('latest'));
-    const versionSpec = config.kind === 'package' ? config.version_spec : null;
-    expect(versionSpec).not.toBeNull();
-    expect(isValidVersionSpec(versionSpec ?? '')).toBe(false);
+  it('marks an unusable legacy minimum as invalid without exposing a sentinel', () => {
+    expect(normalizeGuardrailConfig(packageConfig('latest'))).toMatchObject({
+      version_spec: null,
+      version_spec_invalid: true,
+      min_version: 'latest',
+    });
+  });
+
+  it('flags a stored range that is not valid', () => {
+    expect(
+      normalizeGuardrailConfig({
+        kind: 'package',
+        ecosystem: 'npm',
+        identifier: '@acme/server',
+        version_spec: 'not a range',
+      })
+    ).toMatchObject({
+      version_spec: 'not a range',
+      version_spec_invalid: true,
+    });
   });
 });

@@ -76,8 +76,6 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
   };
 }
 
-const INVALID_LEGACY_MIN_VERSION = 'invalid legacy minimum';
-
 /**
  * Fills in the range from a legacy minimum and keeps a conservative minimum for
  * pre-range clients. Both keys are transitional until client rollout completes.
@@ -89,6 +87,7 @@ export function normalizeGuardrailConfig(
   if (config.version_spec !== null && config.version_spec !== undefined) {
     return {
       ...config,
+      version_spec_invalid: isValidVersionSpec(config.version_spec) ? undefined : true,
       min_version: config.min_version ?? minimumVersionForSpec(config.version_spec),
     };
   }
@@ -97,13 +96,19 @@ export function normalizeGuardrailConfig(
     return {
       ...config,
       version_spec: legacy.value,
+      version_spec_invalid: undefined,
       min_version: config.min_version ?? minimumVersionForSpec(legacy.value),
     };
   }
   if (legacy.kind === 'invalid') {
-    return { ...config, version_spec: INVALID_LEGACY_MIN_VERSION };
+    return { ...config, version_spec: null, version_spec_invalid: true };
   }
-  return { ...config, version_spec: null, min_version: config.min_version ?? null };
+  return {
+    ...config,
+    version_spec: null,
+    version_spec_invalid: undefined,
+    min_version: config.min_version ?? null,
+  };
 }
 
 function toAllowedMcpServer(
@@ -216,7 +221,18 @@ export function evaluateMcpConnect(params: {
   const server = params.allowedServers.find(entry => entry.identityKey === target.identityKey);
   if (!server) return { decision: 'denied', reason: 'not_allowed' };
   const config = normalizeGuardrailConfig(server.config);
-  if (config.kind !== 'package' || !config.version_spec) {
+  if (config.kind !== 'package') {
+    return { decision: 'allowed' };
+  }
+  if (config.version_spec_invalid) {
+    return {
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    };
+  }
+  if (!config.version_spec) {
     return { decision: 'allowed' };
   }
   if (!isValidVersionSpec(config.version_spec)) {

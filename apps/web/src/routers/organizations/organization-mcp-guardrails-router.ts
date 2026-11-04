@@ -44,7 +44,6 @@ import {
 } from '@/lib/organizations/guardrails/mcp-identity';
 import {
   classifyLegacyMinVersion,
-  isValidVersionSpec,
   MAX_SEMVER_LENGTH,
   minimumVersionForSpec,
   normalizeVersionSpec,
@@ -556,14 +555,17 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
             ? existingConfig.version_spec
             : null
           : versionSpecForTarget(target, versionRequest);
-        config =
-          keepVersionSpec && versionSpec !== null && !isValidVersionSpec(versionSpec)
-            ? mcpConfigFromTarget(
-                target,
-                guardrail.config.kind === 'package' ? guardrail.config.version_spec : null,
-                guardrail.config.kind === 'package' ? (guardrail.config.min_version ?? null) : null
-              )
-            : configForTarget(target, versionSpec);
+        const preserveInvalid =
+          keepVersionSpec &&
+          existingConfig.kind === 'package' &&
+          existingConfig.version_spec_invalid === true;
+        config = preserveInvalid
+          ? mcpConfigFromTarget(
+              target,
+              guardrail.config.kind === 'package' ? guardrail.config.version_spec : null,
+              guardrail.config.kind === 'package' ? (guardrail.config.min_version ?? null) : null
+            )
+          : configForTarget(target, versionSpec);
         identityKey = identityKeyForAllowList(target);
         defaultName = defaultCustomName(target);
         if (identityKey !== guardrail.identity_key) {

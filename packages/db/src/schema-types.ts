@@ -1380,6 +1380,8 @@ export type OrganizationMcpGuardrailConfig =
       ecosystem: 'npm' | 'pypi';
       identifier: string;
       version_spec: string | null;
+      /** True when a stored range or legacy minimum cannot be parsed. */
+      version_spec_invalid?: boolean;
       /** Transitional floor for clients deployed before version ranges. */
       min_version?: string | null;
     };

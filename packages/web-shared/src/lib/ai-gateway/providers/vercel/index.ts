@@ -42,6 +42,20 @@ export function hasCompatibleVercelInferenceProvider(
   });
 }
 
+/** `providerIds` in routable form, without duplicates. */
+function routableVercelProviderIds(
+  providerIds: readonly string[],
+  isAllowed: (providerId: string) => boolean
+): string[] {
+  return [
+    ...new Set(
+      providerIds
+        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+        .filter(isAllowed)
+    ),
+  ];
+}
+
 export function getVercelInferenceProvidersExcludingIgnored(
   ignoredProviders: string[],
   onlyProviders: string[] | undefined,
@@ -52,13 +66,26 @@ export function getVercelInferenceProvidersExcludingIgnored(
     ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
     : null;
 
-  return [
-    ...new Set(
-      vercelInferenceProviders
-        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
-        .filter(provider => !ignored.has(provider) && (!only || only.has(provider)))
-    ),
-  ];
+  return routableVercelProviderIds(
+    vercelInferenceProviders,
+    providerId => !ignored.has(providerId) && (only === null || only.has(providerId))
+  );
+}
+
+/**
+ * Drops ignored providers from an `only` list. With no cached catalogue there is nothing to
+ * check the list against, so availability is never consulted: the ignore list is the only
+ * filter.
+ */
+function applyVercelIgnoreToOnlyProviders(
+  ignoredProviders: string[],
+  onlyProviders: string[]
+): string[] {
+  const ignored = new Set(ignoredProviders.map(openRouterToVercelInferenceProviderId));
+  return routableVercelProviderIds(
+    onlyProviders.map(openRouterToVercelInferenceProviderId),
+    providerId => !ignored.has(providerId)
+  );
 }
 
 export function isVercelRoutingOptOut(requestedModel: string, optOutModels: ReadonlySet<string>) {
@@ -196,11 +223,7 @@ export function convertProviderOptions(
     }
     if (!vercelInferenceProviders) {
       if (provider.only) {
-        return getVercelInferenceProvidersExcludingIgnored(
-          provider.ignore,
-          provider.only,
-          provider.only.map(openRouterToVercelInferenceProviderId)
-        );
+        return applyVercelIgnoreToOnlyProviders(provider.ignore, provider.only);
       }
       throw new Error('Vercel inference provider data became unavailable during request transform');
     }

@@ -328,7 +328,7 @@ export async function upstreamRequest({
     try {
       headers.set(key, value);
     } catch {
-      console.debug('[upstreamRequest] Skipping invalid extra header');
+      console.debug('[upstreamRequest] Skipping invalid extra header', { headerName: key });
     }
   });
 

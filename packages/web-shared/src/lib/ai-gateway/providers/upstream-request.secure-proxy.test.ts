@@ -147,7 +147,9 @@ describe('upstreamRequest through the secure proxy', () => {
 
       expect(body.kilo_secure_proxy.headers).not.toHaveProperty('mt-user-id');
       expect(body.prompt_cache_key).toBe(cacheKey);
-      expect(debug.mock.calls).toEqual([['[upstreamRequest] Skipping invalid extra header']]);
+      expect(debug.mock.calls).toEqual([
+        ['[upstreamRequest] Skipping invalid extra header', { headerName: 'Mt-User-Id' }],
+      ]);
     }
   );
 
@@ -165,6 +167,8 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(body.kilo_secure_proxy.headers.authorization).toBe('Bearer upstream-key');
     expect(body.kilo_secure_proxy.headers['x-valid-header']).toBe('kept');
     expect(body.kilo_secure_proxy.headers['x-definition-header']).toBe('definition');
-    expect(debug.mock.calls).toEqual([['[upstreamRequest] Skipping invalid extra header']]);
+    expect(debug.mock.calls).toEqual([
+      ['[upstreamRequest] Skipping invalid extra header', { headerName: key }],
+    ]);
   });
 });

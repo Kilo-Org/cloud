@@ -205,21 +205,17 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
 };
 
 const redactJsonBody = (text: string): RedactedBody | undefined => {
-  let raw: unknown = undefined;
-
   try {
-    raw = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+    // Parsing and the recursive walk both run on page-controlled text, so one
+    // Guard covers them: a stack overflow from a deeply nested body falls back
+    // To the unstructured pass instead of failing the tool call.
+    const raw: unknown = JSON.parse(text);
+    const parsed = jsonValueSchema.safeParse(raw);
 
-  const parsed = jsonValueSchema.safeParse(raw);
+    if (!parsed.success || !isJsonContainer(parsed.data)) {
+      return undefined;
+    }
 
-  if (!parsed.success || !isJsonContainer(parsed.data)) {
-    return undefined;
-  }
-
-  try {
     const redacted = redactJsonContainer(parsed.data);
 
     return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };

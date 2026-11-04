@@ -361,6 +361,6 @@ export async function handleAudioTranscriptionsRequest(
   });
   if (upstreamErrorResponse) return upstreamErrorResponse;
 
-  countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
+  countAndStoreTranscriptionUsage(response.clone(), usageContext, span, provider);
   return wrapInSafeNextResponse(response);
 }

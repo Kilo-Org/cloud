@@ -8,10 +8,7 @@ import {
   SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
   createRepositoryPreparation,
 } from '../control-plane/repository-preparation.js';
-import {
-  writeEnvironmentSetupRecord,
-  writeWorkspaceStamp,
-} from '../control-plane/workspace-stamp.js';
+import { writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
 import { git } from '../utils.js';
 import { runSetupScript } from '../setup-script.js';
 import { BuilderRefusedError, createBuilderClient } from './client.js';
@@ -123,7 +120,6 @@ async function main(): Promise<void> {
       stopProcesses: () => stopOtherProcesses(),
       cleanup: removeBuildCredentials,
       writeStamp: (directory, stamp) => writeWorkspaceStamp(directory, true, stamp),
-      writeSetupRecord: writeEnvironmentSetupRecord,
       signal: controller.signal,
       inherited,
       logPath,

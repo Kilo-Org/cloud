@@ -94,6 +94,9 @@ export function buildSessionAttachPayload(
       : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(profile.startCommands?.length ? { startCommands: profile.startCommands } : {}),
+    ...(profile.setupCommands?.length && profile.environmentSetupCommandCount
+      ? { environmentSetupCommandCount: profile.environmentSetupCommandCount }
+      : {}),
     ...(preparation ? { preparation } : {}),
   };
 }

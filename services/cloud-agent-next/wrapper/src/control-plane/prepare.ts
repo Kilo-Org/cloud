@@ -56,11 +56,8 @@ import type { ControlWorkload } from '../control/workload-cgroup.js';
 import { refreshAdoptedRepository } from './workspace-adoption.js';
 import {
   classifyWorkspace,
-  readEnvironmentSetupRecord,
   readWorkspaceStamp,
-  setupCommandsCoveredBySnapshot,
   writeWorkspaceStamp,
-  type EnvironmentSetupRecord,
   type WorkspaceInspection,
   type WorkspaceStamp,
 } from './workspace-stamp.js';
@@ -152,7 +149,6 @@ export type PrepareDeps = {
   hasGit?: (directory: string) => Promise<boolean>;
   readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
   writeStamp?: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
-  readSetupRecord?: (directory: string) => Promise<EnvironmentSetupRecord | null>;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   inheritedEnv?: NodeJS.ProcessEnv;
   homeRoots?: HomeRoots;
@@ -434,7 +430,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
 
   const hasGit = deps.hasGit ?? defaultHasGit;
   const readStamp = deps.readStamp ?? readWorkspaceStamp;
-  const readSetupRecord = deps.readSetupRecord ?? readEnvironmentSetupRecord;
   const writeStamp =
     deps.writeStamp ??
     (async (directory: string, stamp: WorkspaceStamp) =>
@@ -769,8 +764,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * else is cloned. An adopt failure fails the preparation; it never clears the
    * root to clone over the snapshot. Setup runs once, at the route directory,
    * after every root is in place. It runs after a clone or an adopt, with this
-   * session's admitted configuration, except the leading commands a current
-   * environment snapshot already ran. Start commands always follow it, and also
+   * session's admitted configuration, except the environment's own setup
+   * commands when every root was adopted from the environment snapshot that
+   * already ran them. Start commands always follow it, and also
    * run after a session disk snapshot restore. Each root is stamped, never the
    * route directory. A session never captures.
    */
@@ -909,13 +905,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const { adopted, cloning } = reconciled;
     setStep('setup');
     const setupCommands = spec.setupCommands ?? [];
+    // Every root adopted from the environment snapshot, which already ran the
+    // environment's setup. A clone or a mixed workspace runs it in full.
     const coveredSetupCommands =
-      spec.environmentSnapshotCurrent === true &&
+      spec.startedFromEnvironmentSnapshot === true &&
       reconciled.inspections.every(inspection => inspection === 'foreign')
-        ? setupCommandsCoveredBySnapshot(
-            await Promise.all(roots.map(root => readSetupRecord(root.directory))),
-            setupCommands
-          )
+        ? Math.min(spec.environmentSetupCommandCount ?? 0, setupCommands.length)
         : 0;
     log(
       `control-plane workspace setup session=${spec.sessionId} setupCommands=${setupCommands.length} coveredBySnapshot=${coveredSetupCommands} startCommands=${spec.startCommands?.length ?? 0}`

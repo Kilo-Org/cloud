@@ -220,6 +220,9 @@ function applyProfileResolution(
         envVars: resolved.envVars,
         setupCommands: resolved.setupCommands,
         ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
+        ...(resolved.environmentSetupCommandCount
+          ? { environmentSetupCommandCount: resolved.environmentSetupCommandCount }
+          : {}),
         encryptedSecrets: resolved.encryptedSecrets,
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,

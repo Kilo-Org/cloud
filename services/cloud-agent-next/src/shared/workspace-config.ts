@@ -17,6 +17,7 @@ export function workspaceConfigFromSpec(
     | 'secretEnvKeys'
     | 'setupCommands'
     | 'startCommands'
+    | 'environmentSetupCommandCount'
     | 'runtimeSkills'
     | 'runtimeAgents'
     | 'kiloCommands'
@@ -29,6 +30,9 @@ export function workspaceConfigFromSpec(
     ...(spec.secretEnvKeys === undefined ? {} : { secretEnvKeys: spec.secretEnvKeys }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
     ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
     ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
     ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
@@ -42,6 +46,7 @@ export function attachmentSpecFromRouteSpec(spec: ControlPlaneRouteSpec): Attach
     secretEnvKeys: _secretEnvKeys,
     setupCommands: _setupCommands,
     startCommands: _startCommands,
+    environmentSetupCommandCount: _environmentSetupCommandCount,
     runtimeSkills: _runtimeSkills,
     runtimeAgents: _runtimeAgents,
     kiloCommands: _kiloCommands,

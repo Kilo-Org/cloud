@@ -497,6 +497,7 @@ describe('mergeProfileConfiguration', () => {
       });
 
       expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(1);
       expect(result.startCommands).toEqual(['serve']);
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -505,6 +506,7 @@ describe('mergeProfileConfiguration', () => {
         platform: 'github',
       });
       expect(withoutEnvironment.startCommands).toBeUndefined();
+      expect(withoutEnvironment.environmentSetupCommandCount).toBeUndefined();
     });
 
     test('an empty environment still replaces profile setup commands, not profile vars', async () => {

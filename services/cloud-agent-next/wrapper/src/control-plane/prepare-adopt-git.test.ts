@@ -11,7 +11,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { createPreparationManager, type PrepareDeps } from './prepare.js';
-import { readWorkspaceStamp, writeEnvironmentSetupRecord } from './workspace-stamp.js';
+import { readWorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
 import { profileConfigPath } from './runtime-profile.js';
 import { gitCredentialRecordPath } from '../control/git-credentials.js';
@@ -335,18 +335,18 @@ describe('adopting an environment snapshot against a real repository', () => {
 
     async function snapshotBuiltWith(commands: string[]): Promise<void> {
       await manager('alloc-image').prepared.prepare(spec({ setupCommands: commands }));
-      await writeEnvironmentSetupRecord(directory, commands);
     }
 
-    it('skips the setup commands a current snapshot already ran, then runs start commands', async () => {
+    it('skips the environment setup commands after a snapshot adopt, then runs the session setup and start commands', async () => {
       await snapshotBuiltWith(['install']);
       const restored = manager('alloc-restored');
       await restored.prepared.prepare(
         spec({
           sessionId: 'ses_b',
           setupCommands: ['install', 'inline extra'],
+          environmentSetupCommandCount: 1,
           startCommands: ['serve'],
-          environmentSnapshotCurrent: true,
+          startedFromEnvironmentSnapshot: true,
         })
       );
 
@@ -361,25 +361,31 @@ describe('adopting an environment snapshot against a real repository', () => {
       );
     });
 
-    it('runs every setup command when the snapshot is not current', async () => {
-      await snapshotBuiltWith(['install']);
-      const restored = manager('alloc-restored');
-      await restored.prepared.prepare(
-        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
-      );
-
-      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['install', 'serve']);
-    });
-
-    it('runs every setup command when the snapshot recorded other commands', async () => {
+    it('skips the environment setup commands even when the snapshot ran other ones', async () => {
       await snapshotBuiltWith(['older install']);
       const restored = manager('alloc-restored');
       await restored.prepared.prepare(
         spec({
           sessionId: 'ses_b',
           setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
           startCommands: ['serve'],
-          environmentSnapshotCurrent: true,
+          startedFromEnvironmentSnapshot: true,
+        })
+      );
+
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
+    });
+
+    it('runs every setup command when the allocation did not start from the environment snapshot', async () => {
+      await snapshotBuiltWith(['install']);
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
         })
       );
 
@@ -391,8 +397,9 @@ describe('adopting an environment snapshot against a real repository', () => {
       await fresh.prepared.prepare(
         spec({
           setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
           startCommands: ['serve'],
-          environmentSnapshotCurrent: true,
+          startedFromEnvironmentSnapshot: true,
         })
       );
 

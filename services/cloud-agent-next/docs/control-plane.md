@@ -555,20 +555,20 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   over the same authenticated routes, clones the default
   branch into `/workspace/app`, runs setup with the directory HOME and `KILO_ENVIRONMENT_BUILD=1`
   (setup commands may use the rest of the build deadline), removes credentials and
-  reflogs, and writes the workspace stamp and, beside it in `.git`, the setup record
-  (`kilo-environment-setup.json`: the count and SHA-256 of the setup commands it ran). Start
-  commands never run in a build. The coordinator records the capture as issued before it
+  reflogs, and writes the workspace stamp. Start commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
-- **Setup skip.** The launch record keeps the offered snapshot's environment and revision. When
-  the allocation started from it and a route's environment and revision match, the Sandbox DO adds
-  the frame-only `environmentSnapshotCurrent: true` (`environmentPhaseSpec`). On an adopt where
-  every root is `foreign`, the wrapper then skips the leading setup commands whose count and hash
-  every root's setup record matches, and runs the rest of setup followed by `startCommands`. A
-  missing or different record, an older revision, a clone or a mixed workspace runs setup in full.
-  Only a wrapper whose hello advertised `startCommands` receives `startCommands` and the marker; an
-  older wrapper receives the start commands appended to `setupCommands`, so admission bounds the
-  combined list by the setup-command limit.
+- **Setup skip.** Session preflight puts the environment's setup commands first in
+  `setupCommands` and records their number as `environmentSetupCommandCount`; the session's own
+  setup commands follow. The launch record keeps the offered snapshot's environment and revision.
+  When the allocation started from it and a route's environment matches, at any revision, the
+  Sandbox DO adds the frame-only `startedFromEnvironmentSnapshot: true` (`environmentPhaseSpec`).
+  On an adopt where every root is `foreign`, the wrapper then skips the first
+  `environmentSetupCommandCount` setup commands and runs the session's own setup commands followed
+  by `startCommands`. A clone or a mixed workspace runs setup in full. Only a wrapper whose hello
+  advertised `startCommands` receives `startCommands`, the count and the marker; an older wrapper
+  receives the start commands appended to `setupCommands`, so admission bounds the combined list
+  by the setup-command limit.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
@@ -758,8 +758,8 @@ Adopt preserves each prepared root and selects the route's starting ref explicit
 3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
 4. Check out the target directly, without an intermediate checkout or deleting other local branches.
    Review refs retain their dedicated fetch and checkout path. Set the git author.
-5. Run the setup commands once for the workspace, minus the leading commands a current snapshot
-   already ran (see "Setup skip" above), then the start commands, then write the stamp of each root.
+5. Run the setup commands once for the workspace, minus the environment's own setup commands when
+   the workspace came from its snapshot (see "Setup skip" above), then the start commands, then write the stamp of each root.
 
 Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
 use the bounded git retry policy; missing branches, authentication failures and checkout conflicts

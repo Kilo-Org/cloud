@@ -19,6 +19,7 @@ const spec: ControlPlaneRouteSpec = {
   attemptId: 'attempt-1',
   directory: '/workspace',
   setupCommands: ['install'],
+  environmentSetupCommandCount: 1,
   startCommands: ['serve'],
 };
 
@@ -46,19 +47,22 @@ function phases(
 }
 
 describe('environmentPhaseSpec', () => {
-  it('marks a snapshot built at the route revision as current', () => {
-    expect(phases()).toMatchObject({
-      setupCommands: ['install'],
-      startCommands: ['serve'],
-      environmentSnapshotCurrent: true,
-    });
-  });
-
   it.each([
+    ['a snapshot built at the route revision', {}],
     [
       'an older snapshot revision',
       { launch: launch({ environmentSnapshot: { environmentId, revision: 2 } }) },
     ],
+  ] as const)('marks %s as the start of the allocation', (_name, overrides) => {
+    expect(phases(overrides)).toMatchObject({
+      setupCommands: ['install'],
+      environmentSetupCommandCount: 1,
+      startCommands: ['serve'],
+      startedFromEnvironmentSnapshot: true,
+    });
+  });
+
+  it.each([
     [
       'another environment',
       {
@@ -74,9 +78,9 @@ describe('environmentPhaseSpec', () => {
     ['an image start', { launch: launch({ startSource: 'image' }) }],
     ['another allocation', { allocationId: 'alloc-2' }],
     ['a route without an environment', { environment: null }],
-  ] as const)('does not mark %s as current', (_name, overrides) => {
+  ] as const)('does not mark %s as the start of the allocation', (_name, overrides) => {
     const result = phases(overrides);
-    expect(result).not.toHaveProperty('environmentSnapshotCurrent');
+    expect(result).not.toHaveProperty('startedFromEnvironmentSnapshot');
     expect(result).toMatchObject({ setupCommands: ['install'], startCommands: ['serve'] });
   });
 
@@ -84,7 +88,8 @@ describe('environmentPhaseSpec', () => {
     const result = phases({ runsStartCommands: false });
     expect(result.setupCommands).toEqual(['install', 'serve']);
     expect(result).not.toHaveProperty('startCommands');
-    expect(result).not.toHaveProperty('environmentSnapshotCurrent');
+    expect(result).not.toHaveProperty('environmentSetupCommandCount');
+    expect(result).not.toHaveProperty('startedFromEnvironmentSnapshot');
   });
 
   it('leaves setup untouched for an older wrapper when there are no start commands', () => {

@@ -113,8 +113,6 @@ export type BuildRunDeps = {
   stopProcesses: () => Promise<void>;
   cleanup: (input: CleanupInput) => Promise<string | null>;
   writeStamp: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
-  /** Records the setup commands the snapshot ran, so a session can skip them. */
-  writeSetupRecord: (directory: string, commands: readonly string[]) => Promise<void>;
   /** Aborted on a cancel reply or at the build deadline. */
   signal: AbortSignal;
   inherited: NodeJS.ProcessEnv;
@@ -295,7 +293,6 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     // One stamp per repository, with its own commit. The cwd of several
     // repositories is not a git root and is never stamped.
     for (const entry of pinned) {
-      await deps.writeSetupRecord(entry.directory, input.commands);
       await deps.writeStamp(entry.directory, {
         allocationId: input.allocationId,
         commit: entry.commit,

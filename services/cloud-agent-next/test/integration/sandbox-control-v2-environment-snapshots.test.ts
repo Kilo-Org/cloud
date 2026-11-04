@@ -181,6 +181,7 @@ type RouteOverrides = {
   env?: Record<string, string>;
   setupCommands?: string[];
   startCommands?: string[];
+  environmentSetupCommandCount?: number;
   userId?: string;
   orgId?: string | null;
   sessionId?: string;
@@ -202,6 +203,9 @@ function prepareInput(overrides: RouteOverrides = {}) {
     ...(overrides.env === undefined ? {} : { env: overrides.env }),
     ...(overrides.setupCommands === undefined ? {} : { setupCommands: overrides.setupCommands }),
     ...(overrides.startCommands === undefined ? {} : { startCommands: overrides.startCommands }),
+    ...(overrides.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: overrides.environmentSetupCommandCount }),
   };
   return {
     spec,
@@ -616,7 +620,7 @@ describe('environment snapshot launch', () => {
     );
   });
 
-  it('tells a start-command wrapper that a snapshot at the session revision already ran setup', async () => {
+  it('tells a start-command wrapper that it started from a snapshot at the session revision', async () => {
     const lookups = fakeEnvironmentBuild({
       ...RESOLVED,
       snapshot: {
@@ -632,16 +636,23 @@ describe('environment snapshot launch', () => {
     const { stub } = await setup('sbx__env_launch_current', provider, {
       ENVIRONMENT_BUILD: lookups.namespace,
     });
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    await stub.prepare(
+      prepareInput({
+        setupCommands: ['npm install', 'inline'],
+        environmentSetupCommandCount: 1,
+        startCommands: ['serve'],
+      })
+    );
     const { wrapper } = await connect('sbx__env_launch_current', provider, 1, {
       startCommands: true,
     });
     const frame = await prepareFrameOf(wrapper);
 
     expect(frame.spec).toMatchObject({
-      setupCommands: ['npm install'],
+      setupCommands: ['npm install', 'inline'],
+      environmentSetupCommandCount: 1,
       startCommands: ['serve'],
-      environmentSnapshotCurrent: true,
+      startedFromEnvironmentSnapshot: true,
     });
     expect(await readLaunchRecord(stub)).toMatchObject({
       environmentSnapshot: {
@@ -651,32 +662,49 @@ describe('environment snapshot launch', () => {
     });
   });
 
-  it('runs full setup from a snapshot of an older revision', async () => {
+  it('tells a start-command wrapper that it started from a snapshot of an older revision', async () => {
     const lookups = fakeEnvironmentBuild();
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__env_launch_stale_phases', provider, {
       ENVIRONMENT_BUILD: lookups.namespace,
     });
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    await stub.prepare(
+      prepareInput({
+        setupCommands: ['npm install'],
+        environmentSetupCommandCount: 1,
+        startCommands: ['serve'],
+      })
+    );
     const { wrapper } = await connect('sbx__env_launch_stale_phases', provider, 1, {
       startCommands: true,
     });
     const frame = await prepareFrameOf(wrapper);
 
-    expect(frame.spec).toMatchObject({ setupCommands: ['npm install'], startCommands: ['serve'] });
-    expect(frame.spec).not.toHaveProperty('environmentSnapshotCurrent');
+    expect(frame.spec).toMatchObject({
+      setupCommands: ['npm install'],
+      environmentSetupCommandCount: 1,
+      startCommands: ['serve'],
+      startedFromEnvironmentSnapshot: true,
+    });
   });
 
   it('appends start commands to setup for a wrapper that predates them', async () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__env_launch_old_wrapper_phases', provider);
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    await stub.prepare(
+      prepareInput({
+        setupCommands: ['npm install'],
+        environmentSetupCommandCount: 1,
+        startCommands: ['serve'],
+      })
+    );
     const { wrapper } = await connect('sbx__env_launch_old_wrapper_phases', provider);
     const frame = await prepareFrameOf(wrapper);
 
     expect(frame.spec.setupCommands).toEqual(['npm install', 'serve']);
     expect(frame.spec).not.toHaveProperty('startCommands');
-    expect(frame.spec).not.toHaveProperty('environmentSnapshotCurrent');
+    expect(frame.spec).not.toHaveProperty('environmentSetupCommandCount');
+    expect(frame.spec).not.toHaveProperty('startedFromEnvironmentSnapshot');
   });
 
   it('starts from the image without a lookup when the session has no environment', async () => {

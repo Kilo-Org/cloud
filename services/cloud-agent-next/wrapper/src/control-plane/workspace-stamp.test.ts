@@ -4,11 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   classifyWorkspace,
-  environmentSetupRecord,
-  readEnvironmentSetupRecord,
   readWorkspaceStamp,
-  setupCommandsCoveredBySnapshot,
-  writeEnvironmentSetupRecord,
   workspaceStampPath,
   writeWorkspaceStamp,
 } from './workspace-stamp.js';
@@ -100,43 +96,5 @@ describe('workspace stamp', () => {
     expect(
       classifyWorkspace({ ...input, hasGit: true, stamp: { ...mine, workspacePrepared: false } })
     ).toBe('unstamped');
-  });
-});
-
-describe('environment setup record', () => {
-  it('round-trips beside the stamp and leaves the strict stamp untouched', async () => {
-    await writeWorkspaceStamp(directory, true, { allocationId: 'alloc-build', commit: 'abc' });
-    await writeEnvironmentSetupRecord(directory, ['install']);
-
-    expect(await readEnvironmentSetupRecord(directory)).toEqual(
-      environmentSetupRecord(['install'])
-    );
-    expect(await readWorkspaceStamp(directory)).toEqual({
-      allocationId: 'alloc-build',
-      commit: 'abc',
-    });
-  });
-
-  it('reads a missing or malformed record as absent', async () => {
-    expect(await readEnvironmentSetupRecord(directory)).toBeNull();
-    await fs.writeFile(path.join(directory, '.git', 'kilo-environment-setup.json'), '{');
-    expect(await readEnvironmentSetupRecord(directory)).toBeNull();
-  });
-
-  it('covers only a matching leading run of commands recorded identically by every root', () => {
-    const record = environmentSetupRecord(['install', 'build']);
-
-    expect(setupCommandsCoveredBySnapshot([record], ['install', 'build', 'inline'])).toBe(2);
-    expect(setupCommandsCoveredBySnapshot([record, record], ['install', 'build'])).toBe(2);
-    expect(setupCommandsCoveredBySnapshot([record], ['install'])).toBe(0);
-    expect(setupCommandsCoveredBySnapshot([record], ['install', 'changed'])).toBe(0);
-    expect(setupCommandsCoveredBySnapshot([record, null], ['install', 'build'])).toBe(0);
-    expect(
-      setupCommandsCoveredBySnapshot(
-        [record, environmentSetupRecord(['install'])],
-        ['install', 'build']
-      )
-    ).toBe(0);
-    expect(setupCommandsCoveredBySnapshot([], ['install'])).toBe(0);
   });
 });

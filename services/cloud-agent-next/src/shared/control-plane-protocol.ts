@@ -1,4 +1,4 @@
-import { setupCommandsSchema } from './setup-script.js';
+import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -373,16 +373,22 @@ const routeSpecObjectSchema = z
      * the Sandbox DO appends them to `setupCommands`.
      */
     startCommands: setupCommandsSchema.optional(),
+    /**
+     * How many leading `setupCommands` are the repository environment's own.
+     * An adopted environment snapshot already ran them; the rest are the
+     * session's own setup commands.
+     */
+    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Only the Sandbox DO adds this to the frame, like `capture`: the allocation
-     * launched from an environment snapshot built at this route's environment
-     * revision. The wrapper may then skip the leading setup commands that the
-     * snapshot records as already run. It is never stored in a route spec.
+     * launched from a snapshot of this route's environment, at any revision. A
+     * wrapper that adopts that snapshot skips the environment's setup commands.
+     * It is never stored in a route spec.
      */
-    environmentSnapshotCurrent: z.literal(true).optional(),
+    startedFromEnvironmentSnapshot: z.literal(true).optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
      * omits it only after negotiating worktree sharing for a new allocation.
@@ -433,6 +439,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -447,6 +454,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -476,10 +484,10 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
         message: 'registration spec must not carry secret env key names',
       });
     }
-    if (spec.environmentSnapshotCurrent !== undefined) {
+    if (spec.startedFromEnvironmentSnapshot !== undefined) {
       context.addIssue({
         code: 'custom',
-        path: ['environmentSnapshotCurrent'],
+        path: ['startedFromEnvironmentSnapshot'],
         message: 'environment snapshot provenance is frame-only',
       });
     }
@@ -970,7 +978,7 @@ const controlPlaneHelloFrameSchema = z
     installsSkillsSh: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper runs `startCommands` after setup and
-     * honors `environmentSnapshotCurrent`. A wrapper that did not advertise it
+     * honors `startedFromEnvironmentSnapshot` and `environmentSetupCommandCount`. A wrapper that did not advertise it
      * receives the start commands appended to `setupCommands`.
      */
     startCommands: z.literal(true).optional(),

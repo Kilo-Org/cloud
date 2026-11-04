@@ -99,10 +99,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     (params: Record<string, string>) => {
       const newSearchParams = new URLSearchParams(searchParams.toString());
 
-      if (params.search !== undefined || params.sortBy !== undefined) {
-        params.page = '1';
-      }
-
       Object.entries(params).forEach(([key, value]) => {
         if (value) {
           newSearchParams.set(key, value);

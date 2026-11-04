@@ -185,6 +185,14 @@ export async function getInstallation(
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.SLACK))
     )
+    // A row that records the workspace in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a legacy row that carries the
+    // workspace id only in `platform_account_id`, so an update targets that row
+    // instead of colliding with it in the owner-scoped unique index.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
+    )
     .limit(1);
 
   return integration || null;
@@ -430,6 +438,10 @@ export async function upsertSlackInstallation(
     delete metadata.model_slug;
   }
   delete metadata.access_token;
+  // The row becomes the active record of this workspace, so the markers that
+  // identified it as a detached duplicate no longer describe it.
+  delete metadata.duplicate_slack_platform_installation_id;
+  delete metadata.duplicate_slack_platform_installation_detached_at;
 
   if (existing) {
     try {

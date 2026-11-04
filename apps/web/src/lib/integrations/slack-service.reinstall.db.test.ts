@@ -84,6 +84,9 @@ describe('Slack workspace re-authorization', () => {
       suspended_by: null,
       platform_installation_id: 'T0RESTORE',
     });
+    expect(row?.metadata).toMatchObject({ bot_user_id: 'U_BOT' });
+    expect(row?.metadata).not.toHaveProperty('duplicate_slack_platform_installation_id');
+    expect(row?.metadata).not.toHaveProperty('duplicate_slack_platform_installation_detached_at');
 
     await expect(
       getPlatformIntegration({
@@ -148,6 +151,59 @@ describe('Slack workspace re-authorization', () => {
       platform_installation_id: null,
     });
     expect(otherRow?.suspended_at).not.toBeNull();
+  });
+
+  it('re-authorizes through the canonical row when a legacy row also records the workspace', async () => {
+    const owner = await insertTestUser();
+    testUserIds.push(owner.id);
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'T0PAIRED',
+        platform_account_login: 'Paired Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+    const [canonical] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: 'T0PAIRED',
+        platform_account_id: 'T0PAIRED',
+        platform_account_login: 'Paired Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+
+    const updated = await upsertSlackInstallation({
+      owner: { type: 'user', id: owner.id },
+      teamId: 'T0PAIRED',
+      installation: {
+        botToken: '[REDACTED by s1-secret-redact]',
+        botUserId: 'U_BOT',
+        teamName: 'Paired Workspace',
+      },
+    });
+
+    expect(updated).toMatchObject({
+      id: canonical.id,
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      platform_installation_id: 'T0PAIRED',
+    });
+
+    const [legacyRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, legacy.id));
+    expect(legacyRow?.platform_installation_id).toBeNull();
   });
 
   it('removes the row that records the workspace', async () => {

@@ -16,11 +16,11 @@ establish a separately agreed test setup before comparing direct and queued runs
 For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
 than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
 exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
-Production retains no runtime cohort control;
-[rollout gates](eu-queues.md#production-merge-gate); production Frankfurt is
-queue-selected without an exposure control, and production SFO queues every
-eligible payer. No production change is part of this recipe. Keep the Worker
-processing mode, writer endpoint and queue policy fixed.
+Production queues every request in any function region,
+without a regional or exposure control; the
+[rollout gates](eu-queues.md#production-merge-gate) still apply before
+deployment. No production change is part of this recipe. Keep the Worker processing mode, writer endpoint and queue
+policy fixed.
 
 Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before

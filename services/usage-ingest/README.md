@@ -8,17 +8,16 @@ matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
 The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
-and `VERCEL_ENV` not `production`), for eligible production Frankfurt
-deployments, or for every eligible production SFO payer. Production Frankfurt
-accounting has no exposure control; it queues every payer with an identity. SFO
-queues every eligible payer. Neither production cohort has a runtime switch, so
-stopping new SFO or FRA queue selection requires reverting source and redeploying
-the gateway. FRA deployments other than staging and production `fra1` keep direct
-accounting. Background shadow publication and its flag have been removed. Reconcile
-and drain historically accepted shadow events before deploying processing; this
-change does not remove old messages. Do not deploy this gateway source to production
-until the processing consumer is independently verified. Selection being off does
-not stop processing of queued events. Follow the
+and `VERCEL_ENV` not `production`) or for production (`VERCEL_ENV=production` and
+`VERCEL_TARGET_ENV=production`).
+There is no per-region or exposure selector; every production function region
+that runs the gateway queues. Deployments whose labels match neither branch keep
+direct accounting or the existing primary-region handoff. Background shadow
+publication and its flag have been removed. Reconcile and drain historically
+accepted shadow events before deploying processing; this change does not remove
+old messages. Do not deploy this gateway source to production until the
+processing consumer is independently verified. Selection being off does not stop
+processing of queued events. Follow the
 [production merge gates](eu-queues.md#production-merge-gate).
 
 
@@ -461,12 +460,11 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before selecting staging
-or production SFO traffic; a missing Worker secret returns 503.
-The HTTP address alone selects no traffic: production SFO selection requires both
-production environment labels and a trusted `sfo1` function region and queues every
-eligible payer; there is no runtime cohort switch. Production FRA selection requires
-both production labels and `fra1`.
+Provision and verify the Worker-side publisher secret before enabling staging
+or production traffic; a missing Worker secret returns 503.
+The HTTP address alone selects no traffic: production selection requires both
+production environment labels, in any function region the
+gateway runs. There is no per-region, per-payer or exposure control.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.

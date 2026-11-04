@@ -69,18 +69,7 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 );
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
-export const USAGE_QUEUE_SFO_CONFIG = {
-  enabled:
-    getEnvVariable('VERCEL_ENV') === 'production' &&
-    getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
-    getEnvVariable('VERCEL_REGION') === 'sfo1',
-};
-export const USAGE_QUEUE_FRA_CONFIG = {
-  enabled:
-    getEnvVariable('VERCEL_ENV') === 'production' &&
-    getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
-    getEnvVariable('VERCEL_REGION') === 'fra1',
-};
+
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.

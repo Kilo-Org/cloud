@@ -340,11 +340,14 @@ describe('exchange', () => {
     }
   });
 
-  it('enforces the credential environment only when one is configured', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it.each([undefined, ''])('fails closed when ENVIRONMENT is %s', async environment => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const token = await legacyApiToken({ env: 'production' });
-    const response = await exchange(exchangeRequest(token), env({ ENVIRONMENT: undefined }));
+    const response = await exchange(exchangeRequest(token), env({ ENVIRONMENT: environment }));
     expect(await errorCode(response)).toEqual({ status: 503, code: 'auth_unavailable' });
+    expect(log).toHaveBeenCalledWith('Session sync auth configuration error', {
+      missing: 'ENVIRONMENT',
+    });
   });
 
   it('refuses to issue grants with a weak grant secret', async () => {

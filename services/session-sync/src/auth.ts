@@ -157,7 +157,7 @@ async function readExchangeBody(request: Request): Promise<ExchangeBody | Respon
 async function verifyCredential(
   token: string,
   secret: string,
-  environment: string | undefined
+  environment: string
 ): Promise<Credential | Response> {
   const auth = await verifyKiloTokenForPolicy(token, secret, {
     audience: KILO_API_AUDIENCE,
@@ -165,7 +165,7 @@ async function verifyCredential(
   }).catch(() => undefined);
   if (!auth) return invalidCredential();
   const { claims, claimNames } = auth;
-  if (environment && claims.env !== environment) return invalidCredential();
+  if (claims.env !== environment) return invalidCredential();
   if (claims.apiTokenPepper === undefined) {
     return unsupportedCredential('Service credentials cannot obtain sync grants');
   }
@@ -256,6 +256,11 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (request.method !== 'POST') {
     return failure(405, 'method_not_allowed', 'Use POST for credential exchange');
   }
+  const environment = env.ENVIRONMENT;
+  if (!environment) {
+    console.error('Session sync auth configuration error', { missing: 'ENVIRONMENT' });
+    return failure(503, 'auth_unavailable', 'Authentication is temporarily unavailable');
+  }
   const ipDenied = await rateLimit(
     env.EXCHANGE_IP_LIMITER,
     request.headers.get('CF-Connecting-IP') ?? 'local'
@@ -269,7 +274,7 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   try {
     const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
     const grantSecret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
-    const credential = await verifyCredential(token, nextAuthSecret, env.ENVIRONMENT);
+    const credential = await verifyCredential(token, nextAuthSecret, environment);
     if (credential instanceof Response) return credential;
     const accountDenied = await rateLimit(env.EXCHANGE_ACCOUNT_LIMITER, credential.userID);
     if (accountDenied) return accountDenied;

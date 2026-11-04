@@ -1,6 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 
+import migrations from '../../drizzle-tenant/migrations';
+import { usage } from '../db/tenant-sqlite-schema';
 import type { Env } from '../env';
 import {
   LIMITS,
@@ -33,13 +37,11 @@ function configured(value: string | undefined, fallback: number): number {
 export class SessionSyncTenantDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    ctx.storage.sql.exec(
-      'CREATE TABLE IF NOT EXISTS leases (session_id TEXT PRIMARY KEY, bytes INTEGER NOT NULL)'
-    );
-    ctx.storage.sql.exec(
-      'CREATE TABLE IF NOT EXISTS usage (id INTEGER PRIMARY KEY, sessions INTEGER NOT NULL, bytes INTEGER NOT NULL)'
-    );
-    ctx.storage.sql.exec('INSERT OR IGNORE INTO usage VALUES (1, 0, 0)');
+    const db = drizzle(ctx.storage, { logger: false });
+    void ctx.blockConcurrencyWhile(async () => {
+      await migrate(db, migrations);
+      db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
+    });
   }
 
   async reserve(input: unknown): Promise<Result<{ bytes: number }>> {

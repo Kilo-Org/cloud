@@ -1,7 +1,9 @@
 import { runInDurableObject, runDurableObjectAlarm } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { expect, it } from 'vitest';
 
+import tenantMigrations from '../../drizzle-tenant/migrations';
 import { session } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
@@ -438,5 +440,51 @@ it('does not release a session adopted before an orphan intent was cleared', asy
   });
   await runInDurableObject(stub, async (_instance, state) => {
     expect(await state.storage.get('pendingRegistration')).toBeUndefined();
+  });
+});
+
+it('adopts the old local tenant tables without rewriting leases or usage', async () => {
+  const tenant = personal(`tenant-migration-${crypto.randomUUID()}`).tenant;
+  const stub = getTenantStub(testEnv, tenant);
+  await runInDurableObject(stub, async (_instance, state) => {
+    const sql = state.storage.sql;
+    expect(
+      sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
+    ).toBe(1);
+    // Recreate the raw-table layout used by earlier, never-deployed local fixtures.
+    sql.exec('DROP TABLE leases');
+    sql.exec('DROP TABLE usage');
+    sql.exec('DROP TABLE __drizzle_migrations');
+    sql.exec('CREATE TABLE leases (session_id TEXT PRIMARY KEY, bytes INTEGER NOT NULL)');
+    sql.exec(
+      'CREATE TABLE usage (id INTEGER PRIMARY KEY, sessions INTEGER NOT NULL, bytes INTEGER NOT NULL)'
+    );
+    sql.exec('INSERT INTO leases VALUES (?, ?)', 'ses_existing_local', 128);
+    sql.exec('INSERT INTO usage VALUES (1, 1, 128)');
+    const db = drizzle(state.storage, { logger: false });
+    await migrate(db, tenantMigrations);
+    await migrate(db, tenantMigrations);
+    expect(sql.exec('SELECT session_id, bytes FROM leases').one()).toEqual({
+      session_id: 'ses_existing_local',
+      bytes: 128,
+    });
+    expect(sql.exec('SELECT id, sessions, bytes FROM usage').one()).toEqual({
+      id: 1,
+      sessions: 1,
+      bytes: 128,
+    });
+    expect(
+      sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
+    ).toBe(1);
+  });
+  expect(await stub.reserve({ tenant, sessionID: newSessionID(), bytes: 256 })).toEqual({
+    ok: true,
+    value: { bytes: 256 },
+  });
+  await runInDurableObject(stub, (_instance, state) => {
+    expect(state.storage.sql.exec('SELECT sessions, bytes FROM usage').one()).toEqual({
+      sessions: 2,
+      bytes: 384,
+    });
   });
 });

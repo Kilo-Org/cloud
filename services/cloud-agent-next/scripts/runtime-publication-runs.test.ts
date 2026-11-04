@@ -13,6 +13,7 @@ import {
 const sha = 'a'.repeat(40);
 const run = (status: string, conclusion: string | null, id = 1): PublicationRun => ({
   display_title: publicationRunTitle(sha),
+  head_branch: 'main',
   status,
   conclusion,
   html_url: 'https://github.com/Kilo-Org/cloud/actions/runs/' + id,
@@ -84,6 +85,37 @@ it('reads only the runs titled for the exact SHA', async () => {
       workflow_runs: [run('in_progress', null, 1), other],
     })) as unknown as typeof fetch);
   expect(runs).toEqual([run('in_progress', null, 1)]);
+});
+
+it('ignores runs titled for the SHA on other branches', async () => {
+  const dispatch = { ...run('completed', 'failure', 2), head_branch: 'feature' };
+  const runs = await readPublicationRuns(sha, 'Kilo-Org/cloud', 'token', (async () =>
+    Response.json({ workflow_runs: [dispatch] })) as unknown as typeof fetch);
+  expect(runs).toEqual([]);
+});
+
+it('reads later pages until the run list ends', async () => {
+  const other = {
+    ...run('completed', 'success', 2),
+    display_title: publicationRunTitle('b'.repeat(40)),
+  };
+  const request = vi.fn(async (input: string) =>
+    Response.json({
+      workflow_runs: input.endsWith('page=1') ? Array(100).fill(other) : [run('queued', null, 9)],
+    })
+  );
+  const runs = await readPublicationRuns(
+    sha,
+    'Kilo-Org/cloud',
+    'token',
+    request as unknown as typeof fetch
+  );
+  expect(runs).toEqual([run('queued', null, 9)]);
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenLastCalledWith(
+    'https://api.github.com/repos/Kilo-Org/cloud/actions/workflows/cloud-agent-runtime-publish.yml/runs?branch=main&per_page=100&page=2',
+    expect.anything()
+  );
 });
 
 describe('publication probe', () => {

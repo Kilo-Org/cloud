@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const PUBLICATION_WORKFLOW = 'cloud-agent-runtime-publish.yml';
 const CI_WORKFLOW = 'ci.yml';
 const NO_RUN_GRACE_MS = 10 * 60_000;
+const RUNS_PAGE_SIZE = 100;
+const MAX_PUBLICATION_RUN_PAGES = 10;
 
 /** Must match `run-name` in the publication workflow; the deploy finds its runs by this title. */
 export const publicationRunTitle = (sourceSha: string) =>
@@ -12,6 +14,7 @@ const publicationRunsSchema = z.object({
   workflow_runs: z.array(
     z.object({
       display_title: z.string(),
+      head_branch: z.string().nullable(),
       status: z.string(),
       conclusion: z.string().nullable(),
       html_url: z.string(),
@@ -53,15 +56,32 @@ async function readWorkflowRuns(
   return response.json();
 }
 
+/**
+ * Main publication runs titled for the SHA. A re-run keeps its original list position, so pages are
+ * read until the list ends. Dispatches on other refs fail admission and never publish.
+ */
 export async function readPublicationRuns(
   sourceSha: string,
   repository: string,
   token: string,
   request: typeof fetch = fetch
 ): Promise<PublicationRun[]> {
-  return publicationRunsSchema
-    .parse(await readWorkflowRuns(repository, token, PUBLICATION_WORKFLOW, 'per_page=100', request))
-    .workflow_runs.filter(run => run.display_title === publicationRunTitle(sourceSha));
+  const title = publicationRunTitle(sourceSha);
+  const matches: PublicationRun[] = [];
+  for (let page = 1; page <= MAX_PUBLICATION_RUN_PAGES; page++) {
+    const { workflow_runs: runs } = publicationRunsSchema.parse(
+      await readWorkflowRuns(
+        repository,
+        token,
+        PUBLICATION_WORKFLOW,
+        `branch=main&per_page=${RUNS_PAGE_SIZE}&page=${page}`,
+        request
+      )
+    );
+    matches.push(...runs.filter(run => run.display_title === title && run.head_branch === 'main'));
+    if (runs.length < RUNS_PAGE_SIZE) break;
+  }
+  return matches;
 }
 
 /** Main push CI runs for the SHA; only their success starts an automatic publication. */

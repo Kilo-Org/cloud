@@ -68,8 +68,8 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 /** The `GetProviderInput` fields that decide whether Kilo's own route uses the Vercel AI Gateway. */
 export type VercelRoutingInput = {
   requestedModel: string;
-  boundedSpending?: boolean;
-  organizationDisabledVercelAiGateway?: boolean;
+  boundedSpending: boolean;
+  organizationDisabledVercelAiGateway: boolean;
 };
 
 export async function shouldRouteToVercel(

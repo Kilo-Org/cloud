@@ -289,6 +289,12 @@ describe('convertProviderOptions', () => {
   });
 });
 
+const unrestrictedRouting = {
+  requestedModel: 'anthropic/claude-sonnet-4.5',
+  boundedSpending: false,
+  organizationDisabledVercelAiGateway: false,
+};
+
 describe('shouldRouteToVercel', () => {
   async function loadShouldRouteToVercel(options?: { optOut?: boolean; enabled?: boolean }) {
     jest.resetModules();
@@ -310,7 +316,7 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
-      shouldRouteToVercel({ requestedModel: 'anthropic/claude-sonnet-4.5' }, async () => ({
+      shouldRouteToVercel(unrestrictedRouting, async () => ({
         only: ['google-vertex'],
       }))
     ).resolves.toBe(false);
@@ -320,7 +326,7 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
     await expect(
-      shouldRouteToVercel({ requestedModel: 'anthropic/claude-sonnet-4.5' }, async () => ({
+      shouldRouteToVercel(unrestrictedRouting, async () => ({
         only: ['anthropic'],
       }))
     ).resolves.toBe(true);
@@ -333,29 +339,26 @@ describe('shouldRouteToVercel', () => {
       only: ['anthropic'],
     };
 
-    await expect(
-      shouldRouteToVercel({ requestedModel: 'anthropic/claude-sonnet-4.5' }, async () => provider)
-    ).resolves.toBe(true);
+    await expect(shouldRouteToVercel(unrestrictedRouting, async () => provider)).resolves.toBe(
+      true
+    );
   });
 
   it('routes eligible traffic to Vercel without per-user randomization when switched on', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
 
-    await expect(
-      shouldRouteToVercel({ requestedModel: 'anthropic/claude-sonnet-4.5' }, async () => undefined)
-    ).resolves.toBe(true);
+    await expect(shouldRouteToVercel(unrestrictedRouting, async () => undefined)).resolves.toBe(
+      true
+    );
   });
 
   it('does not route to Vercel or resolve provider policy when switched off', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel({ enabled: false });
     const getRoutingProviderConfig = jest.fn(async () => undefined);
 
-    await expect(
-      shouldRouteToVercel(
-        { requestedModel: 'anthropic/claude-sonnet-4.5' },
-        getRoutingProviderConfig
-      )
-    ).resolves.toBe(false);
+    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
+      false
+    );
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
@@ -363,12 +366,9 @@ describe('shouldRouteToVercel', () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
     const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
 
-    await expect(
-      shouldRouteToVercel(
-        { requestedModel: 'anthropic/claude-sonnet-4.5' },
-        getRoutingProviderConfig
-      )
-    ).resolves.toBe(false);
+    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
+      false
+    );
     expect(getRoutingProviderConfig).not.toHaveBeenCalled();
   });
 
@@ -378,10 +378,7 @@ describe('shouldRouteToVercel', () => {
 
     await expect(
       shouldRouteToVercel(
-        {
-          requestedModel: 'anthropic/claude-sonnet-4.5',
-          organizationDisabledVercelAiGateway: true,
-        },
+        { ...unrestrictedRouting, organizationDisabledVercelAiGateway: true },
         getRoutingProviderConfig
       )
     ).resolves.toBe(false);
@@ -394,7 +391,7 @@ describe('shouldRouteToVercel', () => {
 
     await expect(
       shouldRouteToVercel(
-        { requestedModel: 'anthropic/claude-sonnet-4.5', boundedSpending: true },
+        { ...unrestrictedRouting, boundedSpending: true },
         getRoutingProviderConfig
       )
     ).resolves.toBe(false);

@@ -14,6 +14,7 @@ import {
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { startEnkryptInputGuardrail } from './input-guardrail';
 
@@ -102,6 +103,24 @@ function finalKey(request: EnkryptGuardrailRequest) {
   return verdictCacheKeys(request, request.config, request.segments).at(-1);
 }
 
+const scanReport: EnkryptScanReport = {
+  scan: 'blocking',
+  detectors_enabled: ['injection_attack'],
+  detectors_blocking: ['injection_attack'],
+  verdict_cache: 'miss',
+  total_characters: 26,
+  total_segments: 2,
+  cached_characters: 0,
+  cached_segments: 0,
+  scanned_characters: 26,
+  decision: 'allowed',
+  error: null,
+  detectors_fired: [],
+  attempts: 1,
+  credits_cost: 3,
+  latency_ms: 120,
+};
+
 function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCall {
   return {
     organizationId: scan.organizationId,
@@ -152,7 +171,11 @@ describe('startEnkryptInputGuardrail', () => {
   );
 
   it('starts the request scan with a 30-second timeout', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [] });
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [],
+    });
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await guardrail.awaitVerdict();
@@ -164,7 +187,11 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('caches an allowed request by its full content while after() keeps the function alive', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
 
     startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
@@ -176,7 +203,11 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('caches the blocking and log-only scans under separate keys', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
 
     startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
     await runAfterTasks();
@@ -191,7 +222,7 @@ describe('startEnkryptInputGuardrail', () => {
     ['blocked', { action: 'block', message: 'blocked' }],
     ['unavailable', { action: 'unavailable', reason: 'timeout' }],
   ])('does not cache a %s request', async (_name, verdict) => {
-    mockedScanRequest.mockResolvedValue({ verdict, usageRecords: [call()] });
+    mockedScanRequest.mockResolvedValue({ verdict, report: scanReport, usageRecords: [call()] });
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await guardrail.awaitVerdict();
@@ -201,7 +232,11 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('keeps recording usage when the cache write fails', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
     mockedRedisSet.mockRejectedValue(new Error('timeout'));
 
     startEnkryptInputGuardrail(Promise.resolve(scan), signal);
@@ -213,6 +248,7 @@ describe('startEnkryptInputGuardrail', () => {
   it('records the wait for the verdict on the final call of the request only', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
+      report: scanReport,
       usageRecords: [call({ decision: 'error', creditsCost: null }), call()],
     };
     mockedScanRequest.mockResolvedValue(result);
@@ -229,7 +265,11 @@ describe('startEnkryptInputGuardrail', () => {
   });
 
   it('records no added latency when the request never awaited the verdict', async () => {
-    mockedScanRequest.mockResolvedValue({ verdict: { action: 'allow' }, usageRecords: [call()] });
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
 
     startEnkryptInputGuardrail(Promise.resolve(scan), signal);
     await runAfterTasks();
@@ -242,7 +282,7 @@ describe('startEnkryptInputGuardrail', () => {
     mockedScanRequest.mockImplementation(async resolved =>
       isLogOnly(resolved)
         ? logOnlyResult.promise
-        : { verdict: { action: 'allow' }, usageRecords: [call()] }
+        : { verdict: { action: 'allow' }, report: scanReport, usageRecords: [call()] }
     );
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
@@ -262,6 +302,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     logOnlyResult.resolve({
       verdict: { action: 'unavailable', reason: 'timeout' },
+      report: scanReport,
       usageRecords: [call({ decision: 'error', creditsCost: 1 })],
     });
     await runAfterTasks();
@@ -276,14 +317,18 @@ describe('startEnkryptInputGuardrail', () => {
     const blockingResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
     mockedScanRequest.mockImplementation(async resolved =>
       isLogOnly(resolved)
-        ? { verdict: { action: 'unavailable', reason: 'failed' }, usageRecords: [] }
+        ? {
+            verdict: { action: 'unavailable', reason: 'failed' },
+            report: scanReport,
+            usageRecords: [],
+          }
         : blockingResult.promise
     );
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
     const verdict = guardrail.awaitVerdict();
     await new Promise(resolve => setImmediate(resolve));
-    blockingResult.resolve({ verdict: { action: 'allow' }, usageRecords: [] });
+    blockingResult.resolve({ verdict: { action: 'allow' }, report: scanReport, usageRecords: [] });
 
     expect(await verdict).toEqual({ action: 'allow' });
   });
@@ -292,7 +337,11 @@ describe('startEnkryptInputGuardrail', () => {
     const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
     mockedScanRequest.mockImplementation(async resolved => {
       if (isLogOnly(resolved)) throw new RangeError('Maximum call stack size exceeded');
-      return { verdict: { action: 'block', message: 'blocked' }, usageRecords: [call()] };
+      return {
+        verdict: { action: 'block', message: 'blocked' },
+        report: scanReport,
+        usageRecords: [call()],
+      };
     });
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_000);
 
@@ -320,6 +369,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     logOnlyResult.resolve({
       verdict: { action: 'allow' },
+      report: scanReport,
       usageRecords: [call({ decision: 'error', creditsCost: null }), call({ decision: 'error' })],
     });
     await runAfterTasks();
@@ -329,6 +379,75 @@ describe('startEnkryptInputGuardrail', () => {
       [{ ...call({ decision: 'error' }), addedLatencyMs: 0 }],
     ]);
     expect(mockedRedisSet).not.toHaveBeenCalled();
+  });
+
+  it('reports the settings, verdict, wait, and each scan with its cache write', async () => {
+    mockedScanRequest.mockImplementation(async resolved =>
+      isLogOnly(resolved)
+        ? {
+            verdict: { action: 'allow' },
+            report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'timeout' },
+            usageRecords: [call({ decision: 'error' })],
+          }
+        : { verdict: { action: 'allow' }, report: scanReport, usageRecords: [call()] }
+    );
+    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+    await guardrail.awaitVerdict();
+
+    expect(await guardrail.report()).toEqual({
+      settings: {
+        status: 'ready',
+        scan_tool_results: true,
+        detectors: [
+          { detector: 'injection_attack', action: 'block' },
+          { detector: 'pii', action: 'log', pii_entities: ['secrets'] },
+        ],
+      },
+      verdict: 'allow',
+      unavailable_reason: null,
+      added_latency_ms: 237,
+      scans: [
+        { ...scanReport, verdict_cache_write: 'written' },
+        {
+          ...scanReport,
+          scan: 'log_only',
+          decision: 'error_logged',
+          error: 'timeout',
+          verdict_cache_write: 'skipped',
+        },
+      ],
+    });
+  });
+
+  it('reports a failed cache write', async () => {
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
+    mockedRedisSet.mockRejectedValue(new Error('timeout'));
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+
+    expect((await guardrail.report())?.scans).toEqual([
+      { ...scanReport, verdict_cache_write: 'failed' },
+    ]);
+  });
+
+  it('reports a rejected request whose scan could not be prepared', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const guardrail = startEnkryptInputGuardrail(Promise.reject(new Error('boom')), signal);
+
+    expect(await guardrail.report()).toEqual({
+      settings: null,
+      verdict: 'unavailable',
+      unavailable_reason: 'failed',
+      added_latency_ms: null,
+      scans: [],
+    });
   });
 
   it('skips the scan and records nothing without a guardrail', async () => {
@@ -341,5 +460,6 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedRecordUsage).not.toHaveBeenCalled();
     expect(mockedRedisMget).not.toHaveBeenCalled();
     expect(mockedRedisSet).not.toHaveBeenCalled();
+    expect(await guardrail.report()).toBeNull();
   });
 });

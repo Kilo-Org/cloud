@@ -243,7 +243,12 @@ describe('scanRequestWithVerdictCache', () => {
 
     const result = await scanRequestWithVerdictCache(makeRequest(conversation), dependencies);
 
-    expect(result).toEqual({ verdict: { action: 'allow' }, usageRecords: [], allowedKey: null });
+    expect(result).toEqual({
+      report: expect.any(Object),
+      verdict: { action: 'allow' },
+      usageRecords: [],
+      allowedKey: null,
+    });
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
@@ -408,9 +413,12 @@ describe('scanRequestWithVerdictCache', () => {
       const result = await scanRequestWithVerdictCache(makeRequest(history), dependencies);
 
       expect(result).toEqual({
+        report: expect.any(Object),
         verdict: {
           action: 'block',
-          message: expect.stringContaining('cannot scan more than 500,000 characters'),
+          message: expect.stringContaining(
+            `cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters`
+          ),
         },
         usageRecords: [],
         allowedKey: null,
@@ -424,7 +432,7 @@ describe('rememberAllowedRequest', () => {
   it('stores a marker without text for the cache lifetime', async () => {
     const store = memoryStore();
 
-    await rememberAllowedRequest('key', store);
+    await expect(rememberAllowedRequest('key', store)).resolves.toBe(true);
 
     expect(store.set).toHaveBeenCalledWith('key', '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS });
   });
@@ -433,7 +441,7 @@ describe('rememberAllowedRequest', () => {
     const store = memoryStore();
     store.set.mockRejectedValue(new Error('unreachable'));
 
-    await expect(rememberAllowedRequest('key', store)).resolves.toBeUndefined();
+    await expect(rememberAllowedRequest('key', store)).resolves.toBe(false);
     expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
       '[enkrypt-guardrail] verdict cache write failed',
       { error: 'unreachable' }

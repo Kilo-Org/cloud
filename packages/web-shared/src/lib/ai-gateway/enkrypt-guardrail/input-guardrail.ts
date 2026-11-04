@@ -13,6 +13,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { splitEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
+  guardrailSettings,
+  type EnkryptGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import {
   ENKRYPT_VERDICT_CACHE_ENABLED,
   rememberAllowedRequest,
   scanRequestWithVerdictCache,
@@ -25,6 +29,7 @@ import { redisClient } from '@kilocode/web-shared/lib/redis';
 const notScanned: EnkryptCachedScanResult = {
   verdict: { action: 'skip' },
   usageRecords: [],
+  report: null,
   allowedKey: null,
 };
 
@@ -37,7 +42,14 @@ export type EnkryptInputGuardrail = {
    * stored on one of the request's usage records.
    */
   awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
+  /**
+   * The settings and steps of the guardrail for this request, or null without a guardrail. Waits
+   * for every scan and verdict cache write, so call it after the response, like `after()` work.
+   */
+  report(): Promise<EnkryptGuardrailReport | null>;
 };
+
+type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
 
 type EnkryptGuardrailScans = {
   blocking: EnkryptGuardrailRequest | null;
@@ -108,6 +120,7 @@ export function startEnkryptInputGuardrail(
       return {
         verdict: { action: 'unavailable', reason: 'failed' },
         usageRecords: [],
+        report: null,
         allowedKey: null,
       };
     });
@@ -123,15 +136,13 @@ export function startEnkryptInputGuardrail(
       });
       return notScanned;
     });
-  for (const result of [blockingResult, logOnlyResult]) {
-    after(
-      result.then(async ({ allowedKey }) => {
-        if (allowedKey && verdictCacheStore) {
-          await rememberAllowedRequest(allowedKey, verdictCacheStore);
-        }
-      })
-    );
-  }
+  const cacheWrites = [blockingResult, logOnlyResult].map(result =>
+    result.then(async ({ allowedKey }): Promise<VerdictCacheWrite> => {
+      if (!allowedKey || !verdictCacheStore) return 'skipped';
+      return (await rememberAllowedRequest(allowedKey, verdictCacheStore)) ? 'written' : 'failed';
+    })
+  );
+  for (const cacheWrite of cacheWrites) after(cacheWrite);
   let addedLatencyMs: number | null = null;
   after(async () => {
     const [blocking, logOnly] = await Promise.all([blockingResult, logOnlyResult]);
@@ -164,6 +175,26 @@ export function startEnkryptInputGuardrail(
       const { verdict } = await blockingResult;
       addedLatencyMs = Math.round(performance.now() - waitStartedAt);
       return verdict;
+    },
+    async report() {
+      const [request, blocking, logOnly, writes] = await Promise.all([
+        scan.catch(() => null),
+        blockingResult,
+        logOnlyResult,
+        Promise.all(cacheWrites),
+      ]);
+      const { verdict } = blocking;
+      const scans = [blocking, logOnly].flatMap(({ report }, index) =>
+        report ? [{ ...report, verdict_cache_write: writes[index] ?? 'skipped' }] : []
+      );
+      if (verdict.action === 'skip' && scans.length === 0) return null;
+      return {
+        settings: request && guardrailSettings(request.config),
+        verdict: verdict.action,
+        unavailable_reason: verdict.action === 'unavailable' ? verdict.reason : null,
+        added_latency_ms: addedLatencyMs,
+        scans,
+      };
     },
   };
 }

@@ -935,6 +935,7 @@ export async function handleLlmProxyRequest(
 
   const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
+  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,

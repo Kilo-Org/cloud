@@ -43,7 +43,9 @@ export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'cover
   segments: string[];
 };
 
-export type EnkryptCachedScanResult = EnkryptGuardrailScanResult & {
+export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
+  /** Null when no scan ran. */
+  report: EnkryptGuardrailScanResult['report'] | null;
   /** Set when the request was allowed and its full content is not cached yet. */
   allowedKey: string | null;
 };
@@ -171,15 +173,18 @@ export async function scanRequestWithVerdictCache(
   return { ...result, allowedKey };
 }
 
+/** Returns whether the entry was stored. */
 export async function rememberAllowedRequest(
   key: string,
   store: EnkryptVerdictCacheStore
-): Promise<void> {
+): Promise<boolean> {
   try {
     await store.set(key, '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS });
+    return true;
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache write failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    return false;
   }
 }

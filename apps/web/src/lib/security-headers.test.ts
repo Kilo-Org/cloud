@@ -77,30 +77,21 @@ describe('security headers', () => {
     const env: Record<string, string | undefined> = {
       NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL: 'wss://next-agent.example.com/path',
       NEXT_PUBLIC_SESSION_INGEST_WS_URL: 'wss://ingest.example.com/path',
-      NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.example.com/api',
     };
 
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
       'wss://next-agent.example.com',
       'wss://ingest.example.com',
-      'https://gastown.example.com',
-      'wss://gastown.example.com',
     ]);
   });
 
-  it('derives ws:// Gastown origins for non-HTTPS development URLs', () => {
+  it('derives ws:// session-sync origins for non-HTTPS development URLs', () => {
     expect(
       getConfiguredConnectSrcOrigins({
         NODE_ENV: 'development',
-        NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
         NEXT_PUBLIC_SESSION_SYNC_URL: 'http://localhost:8791',
       })
-    ).toEqual([
-      'http://localhost:8787',
-      'ws://localhost:8787',
-      'http://localhost:8791',
-      'ws://localhost:8791',
-    ]);
+    ).toEqual(['http://localhost:8791', 'ws://localhost:8791']);
   });
 
   it.each(['production', 'test', undefined])(

@@ -1,23 +1,5 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`privileged inventory covers Worker admin gates the Worker admin procedure list is reviewed as a snapshot: worker-admin-procedures 1`] = `
-[
-  "gastown.adminBulkDeleteBeads -> worker.gastown.admin",
-  "gastown.adminDeleteBeadsByStatus -> worker.gastown.admin",
-  "gastown.adminForceCloseBead -> worker.gastown.admin",
-  "gastown.adminForceFailBead -> worker.gastown.admin",
-  "gastown.adminForceResetAgent -> worker.gastown.admin",
-  "gastown.adminForceRestartContainer -> worker.gastown.admin",
-  "gastown.adminGetAlarmStatus -> worker.gastown.admin",
-  "gastown.adminGetBead -> worker.gastown.admin",
-  "gastown.adminGetTownEvents -> worker.gastown.admin",
-  "gastown.adminListAgents -> worker.gastown.admin",
-  "gastown.adminListBeads -> worker.gastown.admin",
-  "gastown.debugAgentMetadata -> worker.gastown.debugAgentMetadata",
-  "wasteland.adminListWastelands -> worker.wasteland.admin",
-]
-`;
-
 exports[`privileged inventory covers discovered route handlers the privileged route-to-entry mapping is reviewed as a snapshot: privileged-rest-routes 1`] = `
 [
   "/admin/api/abuse/blacklisted-domains read -> rest.admin.abuse",

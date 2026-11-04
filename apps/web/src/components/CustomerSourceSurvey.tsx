@@ -16,11 +16,7 @@ export function shouldShowCustomerSourceSurvey(
   customerSource: string | null | undefined,
   pathname: string
 ): boolean {
-  return (
-    customerSource === null &&
-    pathname !== '/gastown/onboarding' &&
-    !ORGANIZATION_WELCOME_PATH.test(pathname)
-  );
+  return customerSource === null && !ORGANIZATION_WELCOME_PATH.test(pathname);
 }
 
 export function CustomerSourceSurvey() {

@@ -1,7 +1,8 @@
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { EnvironmentSummary } from '@kilocode/cloud-agent-profile';
 
 import type { NewSessionPanel as NewSessionPanelComponent } from './NewSessionPanel';
 
@@ -59,6 +60,8 @@ const mockRepository = {
   private: false,
   platformIntegrationId: 'integration-1',
 };
+let mockRepositories = [mockRepository];
+let mockEnvironments: EnvironmentSummary[] = [];
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
@@ -79,7 +82,7 @@ function mockQueryResult(options: { __testKind?: string }) {
     return { ...base, data: { isEligible: true, accessLevel: 'full', balance: 0 } };
   }
   if (kind.endsWith('listGitHubRepositories')) {
-    return { ...base, data: { repositories: [mockRepository], integrationInstalled: true } };
+    return { ...base, data: { repositories: mockRepositories, integrationInstalled: true } };
   }
   if (kind.endsWith('listGitLabRepositories')) {
     return { ...base, data: { repositories: [], integrationInstalled: true } };
@@ -96,7 +99,7 @@ function mockQueryResult(options: { __testKind?: string }) {
   if (kind === 'cloudEnvironments.list') {
     return {
       ...base,
-      data: mockEnvironmentListFailed ? undefined : [],
+      data: mockEnvironmentListFailed ? undefined : mockEnvironments,
       isError: mockEnvironmentListFailed,
     };
   }
@@ -216,10 +219,40 @@ jest.mock('./BrowseCommandsDialog', () => ({ BrowseCommandsDialog: () => null })
 jest.mock('./MobileToolbarPopover', () => ({ MobileToolbarPopover: () => null }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
 jest.mock('./AttachmentPreviewStrip', () => ({ AttachmentPreviewStrip: () => null }));
-jest.mock('./RepositoryEnvironmentChip', () => ({ RepositoryEnvironmentChip: () => null }));
+jest.mock('./RepositoryEnvironmentChip', () => ({
+  RepositoryEnvironmentChip: ({
+    onChooseEnvironment,
+  }: {
+    onChooseEnvironment: (environmentId: string) => void;
+  }) =>
+    createElement(
+      'button',
+      { onClick: () => onChooseEnvironment('environment-1') },
+      'Choose test environment'
+    ),
+}));
 jest.mock('./RepositoryProviderOnboardingPanel', () => ({
   RepositoryProviderOnboardingPanel: () => null,
 }));
+jest.mock('@radix-ui/react-popover', () => ({ Arrow: () => null }));
+jest.mock('@/components/ui/popover', () => {
+  const OpenContext = React.createContext(false);
+  return {
+    Popover: ({ open = false, children }: { open?: boolean; children: React.ReactNode }) =>
+      createElement(OpenContext.Provider, { value: open }, children),
+    PopoverAnchor: ({ children }: { children: React.ReactNode }) => children,
+    PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
+    PopoverContent: ({
+      id,
+      role,
+      children,
+    }: {
+      id?: string;
+      role?: string;
+      children: React.ReactNode;
+    }) => (React.useContext(OpenContext) ? createElement('div', { id, role }, children) : null),
+  };
+});
 
 type LinkedomParseHtml = (html: string) => {
   document: Document;
@@ -378,6 +411,8 @@ const scenarios = [
 describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
     mockUploadUrlRequest = undefined;
     Object.assign(globalThis, { XMLHttpRequest: MockXMLHttpRequest });
   });
@@ -472,4 +507,97 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
       }
     }
   );
+});
+
+describe.each([
+  {
+    field: 'repository',
+    message: 'Select a repository to start the session.',
+  },
+  {
+    field: 'environment',
+    message: 'Select an environment to start the session.',
+  },
+])('NewSessionPanel $field validation', ({ field, message }) => {
+  let dom: ReturnType<typeof installLinkedomDom>;
+  let root: ReturnType<typeof createRoot>;
+  let startButton: HTMLButtonElement;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockEnvironmentListFailed = false;
+    mockRepositories = field === 'repository' ? [] : [mockRepository];
+    mockEnvironments = ['environment-1', 'environment-2'].map(id => ({
+      id,
+      name: id,
+      repositories: [{ platform: 'github', repoFullName: mockRepository.fullName }],
+      createdAt: '2026-11-03T00:00:00.000Z',
+      updatedAt: '2026-11-03T00:00:00.000Z',
+      plainVarCount: 0,
+      secretCount: 0,
+      commandCount: 0,
+      sandboxAllocation: null,
+      configurationRevision: 1,
+    }));
+    dom = installLinkedomDom();
+    root = createRoot(dom.container);
+    act(() => root.render(createElement(NewSessionPanel)));
+    startButton = await waitForStartButton(dom.container);
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    jest.useRealTimers();
+    dom.cleanup();
+  });
+
+  it('announces validation only after submitting and dismisses after five seconds', () => {
+    expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+
+    act(() => startButton.click());
+
+    expect(dom.container.querySelector('[role="alert"]')?.textContent).toBe(message);
+    expect(startButton.getAttribute('aria-describedby')).toBe('new-session-start-validation');
+    expect(mockCreateLocalSession).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+
+    act(() => jest.advanceTimersByTime(4999));
+    expect(dom.container.querySelector('[role="alert"]')).not.toBeNull();
+    act(() => jest.advanceTimersByTime(1));
+    expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+    expect(startButton.hasAttribute('aria-describedby')).toBe(false);
+
+    act(() => startButton.click());
+    expect(dom.container.querySelector('[role="alert"]')?.textContent).toBe(message);
+  });
+
+  it('restarts the dismissal timer on another blocked submission', () => {
+    act(() => startButton.click());
+    act(() => jest.advanceTimersByTime(4000));
+    act(() => startButton.click());
+    act(() => jest.advanceTimersByTime(1000));
+    expect(dom.container.querySelector('[role="alert"]')?.textContent).toBe(message);
+    act(() => jest.advanceTimersByTime(4000));
+    expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  if (field === 'environment') {
+    it('dismisses immediately when an environment is chosen and permits submission', () => {
+      act(() => startButton.click());
+      expect(dom.container.querySelector('[role="alert"]')?.textContent).toBe(message);
+
+      const chooseButton = Array.from(dom.container.querySelectorAll('button')).find(
+        button => button.textContent === 'Choose test environment'
+      );
+      if (!chooseButton) throw new Error('Environment choice button missing');
+      act(() => chooseButton.click());
+
+      expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+      expect(startButton.hasAttribute('aria-describedby')).toBe(false);
+      act(() => startButton.click());
+      expect(mockCreateLocalSession).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    });
+  }
 });

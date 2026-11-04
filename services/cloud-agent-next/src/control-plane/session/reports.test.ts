@@ -97,6 +97,28 @@ describe('projectSettledMessageFailure', () => {
     expect(failure?.subtype).toBeUndefined();
   });
 
+  it('projects and reports an empty assistant reply as a retryable platform failure', () => {
+    const settled = message({ state: 'failed', acceptedAt: 1, reason: 'missing_assistant_reply' });
+
+    expect(projectSettledMessageFailure(settled, {})).toEqual({
+      stage: 'post_dispatch_no_activity',
+      code: 'missing_assistant_reply',
+      message: 'The model produced no reply. Retry the message to continue.',
+    });
+    expect(
+      buildControlPlaneMessageReport({
+        cloudAgentSessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+        message: settled,
+      })?.run
+    ).toMatchObject({
+      status: 'failed',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'missing_assistant_reply',
+      failureResponsibility: 'platform',
+      failureReason: 'assistant_no_reply',
+    });
+  });
+
   it('returns undefined for a non-terminal message', () => {
     expect(projectSettledMessageFailure(message({ state: 'queued' }), {})).toBeUndefined();
     expect(projectSettledMessageFailure(message({ state: 'accepted' }), {})).toBeUndefined();

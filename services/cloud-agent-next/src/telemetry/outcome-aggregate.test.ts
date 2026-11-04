@@ -36,6 +36,9 @@ import {
   type SessionSetupFailureRow,
 } from './outcome-aggregate.js';
 
+import { buildControlPlaneMessageReport } from '../control-plane/session/reports.js';
+import type { SessionMessage } from '../control-plane/session/messages.js';
+
 const window = { start: '2026-02-01T00:00:00.000Z', end: '2026-02-01T00:05:00.000Z' };
 const retentionCutoffIso = '2025-11-03T00:10:00.000Z';
 
@@ -303,6 +306,57 @@ describe('failure breakdown assembly', () => {
         stage: 'pre_dispatch',
         code: 'sandbox_connect_failed',
         reason: 'sandbox_connectivity',
+        count: 1,
+      },
+    ]);
+  });
+
+  it('counts an empty assistant reply as a platform failure with its own row', () => {
+    const report = buildControlPlaneMessageReport({
+      cloudAgentSessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+      message: {
+        messageId: 'm1',
+        intent: {
+          messageId: 'm1',
+          turn: { type: 'prompt', prompt: 'continue' },
+          agent: { mode: 'code', model: 'test/model' },
+        },
+        state: 'failed',
+        createdAt: 1,
+        acceptedAt: 2,
+        settledAt: 3,
+        reason: 'missing_assistant_reply',
+      } as SessionMessage,
+    });
+    if (report?.type !== 'run.state') throw new Error('expected a run report');
+    const runCounts = [
+      runRow({
+        generation: 'control',
+        role: 'follow_up',
+        origin: 'other',
+        status: report.run.status,
+        responsibility: report.run.failureResponsibility,
+        runCount: 1,
+        failureStage: report.run.failureStage,
+        failureCode: report.run.failureCode,
+        failureReason: report.run.failureReason,
+      }),
+    ];
+
+    const headline = assembleExecutionHeadlines(runCounts).find(
+      row =>
+        row.generation === 'control' && row.role === 'follow_up' && row.productOrigin === 'other'
+    );
+    expect(headline).toMatchObject({ completed: 0, platformFailed: 1 });
+    expect(assembleFailureRows(runCounts)).toEqual([
+      {
+        generation: 'control',
+        role: 'follow_up',
+        productOrigin: 'other',
+        responsibility: 'platform',
+        stage: 'post_dispatch_no_activity',
+        code: 'missing_assistant_reply',
+        reason: 'assistant_no_reply',
         count: 1,
       },
     ]);

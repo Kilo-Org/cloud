@@ -3,6 +3,7 @@ import {
   type ControlPlaneFailureReason,
 } from '../../shared/control-plane-protocol.js';
 import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../shared/credential-upgrade.js';
+import { MISSING_ASSISTANT_REPLY_MESSAGE } from '../../session/safe-failure-projection.js';
 
 const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   runtime_artifact_unauthorized: 'Runtime download was not authorized',
@@ -29,6 +30,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   agent_unresponsive: 'Kilo was not responding and was restarted',
   no_progress: 'The turn made no progress',
   no_outcome: 'The turn did not complete',
+  missing_assistant_reply: MISSING_ASSISTANT_REPLY_MESSAGE,
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',

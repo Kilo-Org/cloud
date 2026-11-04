@@ -32,14 +32,64 @@ const REPLACED_BODY_KEY_FRAGMENTS = [
   'session',
   'csrf',
   'xsrf',
+  'private_key',
+  'privatekey',
+  'private-key',
 ] as const;
 
 const BODY_MASK = '[REDACTED]';
+
+/**
+ * A PEM label line. RFC 7468 labels are uppercase, so the match stays
+ * case-sensitive. The optional words before `PRIVATE KEY` cover the typed
+ * labels (`RSA`, `EC`, `OPENSSH`, `ENCRYPTED`) and the `PGP PRIVATE KEY BLOCK`
+ * form, while `PUBLIC KEY` and certificate labels stay unmatched.
+ */
+const PRIVATE_KEY_MATERIAL_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY/u;
 
 const matchesAnyFragment = (name: string, fragments: readonly string[]): boolean => {
   const folded = name.toLowerCase();
 
   return fragments.some(fragment => folded.includes(fragment));
+};
+
+/**
+ * A private-key block: the BEGIN label line through the matching END line, or
+ * through the end of the text when the block is truncated, so text around the
+ * block survives the replacement. `BLOCK` covers the PGP armor label.
+ */
+const PRIVATE_KEY_BLOCK_PATTERN =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|$)/gu;
+
+/**
+ * Whether the text carries PEM private-key material, whatever the name of the
+ * field around it. A value that arrived percent-encoded is tested decoded too,
+ * so an urlencoded form stays covered; a malformed escape matches nothing.
+ */
+const containsPrivateKeyMaterial = (text: string): boolean => {
+  if (PRIVATE_KEY_MATERIAL_PATTERN.test(text)) {
+    return true;
+  }
+
+  if (!text.includes('%') && !text.includes('+')) {
+    return false;
+  }
+
+  try {
+    return PRIVATE_KEY_MATERIAL_PATTERN.test(decodeURIComponent(text.replaceAll('+', ' ')));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Replaces each PEM private-key block in text that has no structured body
+ * shape, keeping the text around it, or `undefined` when nothing matched.
+ */
+const redactUnstructuredBody = (text: string): RedactedBody | undefined => {
+  const masked = text.replaceAll(PRIVATE_KEY_BLOCK_PATTERN, BODY_MASK);
+
+  return masked === text ? undefined : { changed: true, text: masked };
 };
 
 /**
@@ -90,6 +140,11 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => jsonValueUnion as z.Z
 const isJsonContainer = (value: JsonValue): value is Exclude<JsonValue, null> =>
   value !== null && (Array.isArray(value) || value instanceof Object);
 
+/** A parsed JSON string leaf, as opposed to a number, boolean, null, array, or object. */
+const isJsonString = (value: JsonValue): value is string =>
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a value that already passed jsonValueSchema; the walk branches on the leaf kind and a schema parse per value would allocate for every string in the body
+  typeof value === 'string';
+
 /** A redacted rendering plus whether the walk replaced any value. */
 interface RedactedBody {
   readonly changed: boolean;
@@ -106,14 +161,20 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
     let changed = false;
 
     const elements = value.map(element => {
-      if (!isJsonContainer(element)) {
-        return element;
+      if (isJsonContainer(element)) {
+        const nested = redactJsonContainer(element);
+        changed ||= nested.changed;
+
+        return nested.value;
       }
 
-      const nested = redactJsonContainer(element);
-      changed ||= nested.changed;
+      if (isJsonString(element) && containsPrivateKeyMaterial(element)) {
+        changed = true;
 
-      return nested.value;
+        return BODY_MASK;
+      }
+
+      return element;
     });
 
     return { changed, value: elements };
@@ -132,6 +193,9 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
       const nested = redactJsonContainer(entry);
       changed ||= nested.changed;
       result[key] = nested.value;
+    } else if (isJsonString(entry) && containsPrivateKeyMaterial(entry)) {
+      result[key] = BODY_MASK;
+      changed = true;
     } else {
       result[key] = entry;
     }
@@ -141,44 +205,47 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
 };
 
 const redactJsonBody = (text: string): RedactedBody | undefined => {
-  let raw: unknown = undefined;
-
   try {
-    raw = JSON.parse(text);
+    // Parsing and the recursive walk both run on page-controlled text, so one
+    // Guard covers them: a stack overflow from a deeply nested body falls back
+    // To the unstructured pass instead of failing the tool call.
+    const raw: unknown = JSON.parse(text);
+    const parsed = jsonValueSchema.safeParse(raw);
+
+    if (!parsed.success || !isJsonContainer(parsed.data)) {
+      return undefined;
+    }
+
+    const redacted = redactJsonContainer(parsed.data);
+
+    return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };
   } catch {
     return undefined;
   }
-
-  const parsed = jsonValueSchema.safeParse(raw);
-
-  if (!parsed.success || !isJsonContainer(parsed.data)) {
-    return undefined;
-  }
-
-  const redacted = redactJsonContainer(parsed.data);
-
-  return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };
 };
 
 const redactBodyText = (text: string): RedactedBody | undefined => {
   const trimmed = text.trimStart();
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return redactJsonBody(text);
-    } catch {
-      return undefined;
+    const json = redactJsonBody(text);
+
+    if (json !== undefined) {
+      return json;
+    }
+  } else if (trimmed.includes('=')) {
+    const form = redactFormBody(text);
+
+    if (form !== undefined) {
+      // The pair pass leaves a segment without a separator alone, so the block
+      // Pass still runs over its output.
+      return { changed: true, text: redactUnstructuredBody(form)?.text ?? form };
     }
   }
 
-  if (trimmed.includes('=')) {
-    // The form passes report a body only when they replaced something.
-    const form = redactFormBody(text);
-
-    return form === undefined ? undefined : { changed: true, text: form };
-  }
-
-  return undefined;
+  // A body with no structured shape, such as a plain text or key-file download,
+  // Still gets the block replacement.
+  return redactUnstructuredBody(text);
 };
 
 /**
@@ -243,8 +310,10 @@ export const renderResponseBody = (body: string, base64Encoded: boolean | undefi
  * stray non-pair segment never disables the pass.
  */
 const redactFormBody = (text: string): string | undefined => {
-  // A line of `--<boundary>` delimiters marks a multipart body.
-  if (/^--[^\r\n]+\r?$/m.test(text)) {
+  // A line of `--<boundary>` delimiters plus a part header marks a multipart
+  // Body; text whose lines merely start with `--` stays urlencoded and still
+  // Gets the pair pass.
+  if (/^--[^\r\n]+\r?$/m.test(text) && /^content-disposition:/im.test(text)) {
     return redactMultipartBody(text);
   }
 
@@ -260,7 +329,10 @@ const redactFormBody = (text: string): string | undefined => {
 
     const name = pair.slice(0, separator);
 
-    if (!matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS)) {
+    if (
+      !matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS) &&
+      !containsPrivateKeyMaterial(pair.slice(separator + 1))
+    ) {
       return pair;
     }
 
@@ -272,7 +344,11 @@ const redactFormBody = (text: string): string | undefined => {
   return changed ? masked.join('&') : undefined;
 };
 
-const MULTIPART_FIELD_NAME_PATTERN = /name="([^"]*)"/u;
+/** A part header line: every `form-data` disposition starts a part, named or not. */
+const MULTIPART_PART_PATTERN = /^content-disposition:.*\bform-data\b/iu;
+
+/** The `name` parameter, quoted or as a bare token, so a file part without one is still a part. */
+const MULTIPART_FIELD_NAME_PATTERN = /;\s*name="?([^";\r\n]*)"?/iu;
 
 const redactMultipartBody = (text: string): string | undefined => {
   const lines = text.split('\r\n');
@@ -288,20 +364,33 @@ const redactMultipartBody = (text: string): string | undefined => {
   let index = 0;
 
   while (index < lines.length) {
-    const line = lines[index];
-    const disposition = line === undefined ? null : line.match(MULTIPART_FIELD_NAME_PATTERN);
-    const isMatch =
-      disposition !== null && matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS);
+    const line = lines[index] ?? '';
+    const isPart = MULTIPART_PART_PATTERN.test(line);
 
-    if (isMatch) {
-      // Skip the part's header lines to the blank separator, then replace the
-      // Whole value region up to the next delimiter line, keeping the delimiter.
+    let nextIndex = index + 1;
+
+    if (isPart) {
+      const name = MULTIPART_FIELD_NAME_PATTERN.exec(line)?.[1] ?? '';
+
+      // Skip the part's header lines to the blank separator, then the value
+      // Region up to the next delimiter line, keeping the delimiter. The header
+      // Scan stops at a delimiter too, so a part without a separator line cannot
+      // Consume the next part's header.
       let valueIndex = index + 1;
 
-      while (valueIndex < lines.length && lines[valueIndex] !== '') {
+      while (
+        valueIndex < lines.length &&
+        lines[valueIndex] !== '' &&
+        !isDelimiter(lines[valueIndex] ?? '')
+      ) {
         valueIndex += 1;
       }
-      valueIndex += 1;
+
+      const hasSeparator = lines[valueIndex] === '';
+
+      if (hasSeparator) {
+        valueIndex += 1;
+      }
 
       let endIndex = valueIndex;
 
@@ -309,16 +398,21 @@ const redactMultipartBody = (text: string): string | undefined => {
         endIndex += 1;
       }
 
-      if (endIndex > valueIndex) {
+      const hasValue = hasSeparator && endIndex > valueIndex;
+
+      if (
+        hasValue &&
+        (matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS) ||
+          containsPrivateKeyMaterial(lines.slice(valueIndex, endIndex).join('\r\n')))
+      ) {
         lines.splice(valueIndex, endIndex - valueIndex, BODY_MASK);
-        index = valueIndex;
         changed = true;
-      } else {
-        index = valueIndex;
       }
-    } else {
-      index += 1;
+
+      nextIndex = valueIndex;
     }
+
+    index = nextIndex;
   }
 
   return changed ? lines.join('\r\n') : undefined;

@@ -610,6 +610,33 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
+  it('rejects an inherited allowlist when no saved allocation selects a contained runtime', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
+    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
+    });
+
+    // Without containment the resolved control-plane placement is the retired
+    // Cloudflare sandbox, so the create stops there instead of reaching the
+    // egress-policy check that an isolated containers sandbox would satisfy.
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
+    });
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBeUndefined();
+    await expect(selectControlPlaneSandboxMock.mock.results[0].value).rejects.toThrow(
+      'This sandbox runtime has been retired. Select Cloudflare Containers.'
+    );
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
   it('resolves an inherited allowlist to the native containers replacement', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
@@ -622,8 +649,6 @@ describe('explicit sandbox session creation', () => {
 
     await runCreate(ctx, request);
 
-    // With no saved allocation selecting containers, the native replacement supplies
-    // one, so the inherited allowlist applies to a contained isolated sandbox.
     expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
     expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBe(
       'cloudflare-containers-standard-3'

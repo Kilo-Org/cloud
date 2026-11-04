@@ -1137,15 +1137,16 @@ export function TriggerForm({
                   onCheckedChange={checked => setSkipIfRunning(checked === true)}
                   disabled={isLoading}
                   className="mt-0.5"
+                  aria-describedby="skipIfRunningDescription"
                 />
                 <div className="space-y-1">
                   <Label htmlFor="skipIfRunning" className="cursor-pointer font-normal">
                     Skip if a previous run is still in progress
                   </Label>
-                  <p className="text-muted-foreground text-xs">
+                  <p id="skipIfRunningDescription" className="text-muted-foreground text-xs">
                     {isScheduled
                       ? 'Scheduled runs are skipped until the current run finishes.'
-                      : 'Webhook requests are acknowledged but not run until the current run finishes.'}
+                      : 'Webhook requests are acknowledged and skipped while a run is in progress.'}
                   </p>
                 </div>
               </div>

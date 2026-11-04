@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety, and the top-level catalog areas.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety.
 ---
 
 <!--

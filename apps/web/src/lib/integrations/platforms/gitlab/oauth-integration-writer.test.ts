@@ -166,6 +166,42 @@ describe('GitLab OAuth integration writer', () => {
     expect(JSON.stringify(credential)).not.toContain(input.oauthClientSecret);
   });
 
+  it('records the sync time of a stored project list and clears it for a missing list', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user', id: user.id } as const;
+    const input = {
+      owner,
+      authorizedByUserId: user.id,
+      providerBaseUrl: 'https://gitlab.example.com/root',
+      providerUser: { id: '12345', login: 'gitlab-user' },
+      accessToken: 'oauth-access-secret',
+      refreshToken: 'oauth-refresh-secret',
+      accessTokenExpiresAt: '2030-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api'],
+    };
+
+    const stored = await storeGitLabOAuthIntegration({
+      ...input,
+      repositories: [{ id: 42, name: 'project', full_name: 'group/project', private: true }],
+    });
+    const [withList] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, stored.integrationId));
+    expect(withList?.repositories).toHaveLength(1);
+    expect(withList?.repositories_synced_at).not.toBeNull();
+
+    await storeGitLabOAuthIntegration({ ...input, repositories: null });
+    const [withoutList] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, stored.integrationId));
+    expect(withoutList?.repositories).toBeNull();
+    expect(withoutList?.repositories_synced_at).toBeNull();
+  });
+
   it('replaces the OAuth credential identity on a same-instance reconnect', async () => {
     const user = await insertTestUser();
     const providerBaseUrl = 'https://gitlab.example.com/root';

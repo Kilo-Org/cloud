@@ -749,7 +749,7 @@ export function accountForMicrodollarUsage(
     openrouterRequestSpan,
     servingProvider
   );
-  after(accounting);
+  after(accounting.usagePromise);
   return accounting;
 }
 
@@ -1265,30 +1265,29 @@ export function countAndStoreFimUsage(
             return null;
           });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No FIM usage information', {
-            level: 'error',
-            tags: { source: 'fim_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    if (!usageStats) {
+      if (statusCode < 400) {
+        captureMessage('SUSPICIOUS: No FIM usage information', {
+          level: 'error',
+          tags: { source: 'fim_usage_processing' },
+          extra: { usageContext },
+        });
       }
+      return;
+    }
 
-      usageStats.market_cost = usageStats.cost_mUsd;
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
 
-      // Persist billing, then report the same request to bouncer's usage ledger.
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================
@@ -1407,30 +1406,30 @@ export function countAndStoreEditUsage(
           return null;
         });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No edit usage information', {
-            level: 'error',
-            tags: { source: 'edit_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (!usageStats) {
+      if (statusCode < 400) {
+        captureMessage('SUSPICIOUS: No edit usage information', {
+          level: 'error',
+          tags: { source: 'edit_usage_processing' },
+          extra: { usageContext },
+        });
       }
+      return;
+    }
 
-      usageStats.market_cost = usageStats.cost_mUsd;
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
 
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================
@@ -1628,30 +1627,30 @@ export function countAndStoreEmbeddingUsage(
         .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
         .catch(() => null);
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No embedding usage information', {
-            level: 'error',
-            tags: { source: 'embedding_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (!usageStats) {
+      if (statusCode < 400) {
+        captureMessage('SUSPICIOUS: No embedding usage information', {
+          level: 'error',
+          tags: { source: 'embedding_usage_processing' },
+          extra: { usageContext },
+        });
       }
+      return;
+    }
 
-      // Preserve the real upstream cost before free-model or BYOK zeroing.
-      usageStats.market_cost = usageStats.cost_mUsd;
+    // Preserve the real upstream cost before free-model or BYOK zeroing.
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-      }
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+    }
 
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 export function countAndStoreTranscriptionUsage(
@@ -1677,23 +1676,23 @@ export function countAndStoreTranscriptionUsage(
         }))
         .catch(() => null);
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No transcription usage information', {
-            level: 'error',
-            tags: { source: 'transcription_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (!usageStats) {
+      if (statusCode < 400) {
+        captureMessage('SUSPICIOUS: No transcription usage information', {
+          level: 'error',
+          tags: { source: 'transcription_usage_processing' },
+          extra: { usageContext },
+        });
       }
+      return;
+    }
 
-      return processTokenData(usageStats, usageContext);
-    })
-  );
+    return processTokenData(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================

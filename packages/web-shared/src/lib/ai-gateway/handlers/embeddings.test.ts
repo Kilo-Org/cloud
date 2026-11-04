@@ -22,6 +22,7 @@ import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/cl
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
 
+import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
@@ -123,7 +124,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
     jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
-      statsPromise: Promise.resolve(null),
+      // Metrics are mocked, so the parsed stats never need to settle.
+      statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
       usagePromise: Promise.resolve(null),
     });
     mockedFetch.mockResolvedValue(
@@ -223,6 +225,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       is_free: false,
       user_byok: false,
     });
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[3]).toBe(OPENROUTER);
   });
 
   it('emits gateway metrics before accounting a platform-funded upstream error', async () => {

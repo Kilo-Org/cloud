@@ -37,7 +37,7 @@ import {
   briefingChargeAccountingSchema,
 } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   accountBalanceMicrodollars,
   findOrganizationMemberBalanceRow,
@@ -48,6 +48,8 @@ import {
   briefingSummarySchema,
   briefingSummaryErrorSchema,
   redactBriefingExcerpt,
+  redactBriefingExcerptOrDrop,
+  redactBriefingTitle,
   type BriefingEstimate,
 } from '@kilocode/app-shared/agent-briefing';
 import {
@@ -87,12 +89,15 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
     omittedFromSummary: 0,
     sessions: facts.sessions.map(session => ({
       ...session,
-      title: redactBriefingExcerpt(session.title, 160),
-      sources: session.sources.map(source => ({
-        ...source,
-        title: redactBriefingExcerpt(source.title, 160),
-        ...(source.excerpt ? { excerpt: redactBriefingExcerpt(source.excerpt) } : {}),
-      })),
+      title: redactBriefingTitle(session.title),
+      sources: session.sources.map(({ excerpt, ...source }) => {
+        const safeExcerpt = excerpt ? redactBriefingExcerptOrDrop(excerpt) : undefined;
+        return {
+          ...source,
+          title: redactBriefingTitle(source.title),
+          ...(safeExcerpt ? { excerpt: safeExcerpt } : {}),
+        };
+      }),
     })),
   };
   while (Buffer.byteLength(JSON.stringify(input), 'utf8') > 28_000 && input.sessions.length) {

@@ -187,28 +187,16 @@ function buildLegacyGatewayOptions(input: BuildSessionModelOptionsInput): Sessio
     input.remoteModelOverride,
     input.gatewayModels
   );
-  const currentSelection = getCurrentRemoteSelection(input, remoteModelOverride);
-  let selectedOption = currentSelection
-    ? options.find(
-        option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
-      )
-    : undefined;
-
-  if (currentSelection && !selectedOption) {
-    selectedOption = createUnavailableOption(currentSelection.model);
-    options.unshift(selectedOption);
-  }
-
-  const selectedVariant =
-    currentSelection?.variant && selectedOption?.variants.includes(currentSelection.variant)
-      ? currentSelection.variant
-      : '';
+  const projection = projectSelection(
+    options,
+    getCurrentRemoteSelection(input, remoteModelOverride)
+  );
 
   return {
     source: 'remote-legacy-gateway',
-    options,
-    selectedValue: selectedOption?.id ?? '',
-    selectedVariant,
+    options: projection.options,
+    selectedValue: projection.selectedValue,
+    selectedVariant: projection.selectedVariant,
     pickerDisabled: input.gatewayModelsLoading,
     isLoading: input.gatewayModelsLoading,
   };
@@ -242,30 +230,45 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
       return option;
     })
   );
-  const currentSelection = getCurrentRemoteSelection(input);
-  let selectedOption = currentSelection
-    ? options.find(
-        option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
-      )
-    : undefined;
-
-  if (currentSelection && !selectedOption) {
-    selectedOption = createUnavailableOption(currentSelection.model);
-    options.unshift(selectedOption);
-  }
-
-  const selectedVariant =
-    currentSelection?.variant && selectedOption?.variants.includes(currentSelection.variant)
-      ? currentSelection.variant
-      : '';
+  const projection = projectSelection(options, getCurrentRemoteSelection(input));
 
   return {
     source: 'remote-cli-catalog',
-    options,
-    selectedValue: selectedOption?.id ?? '',
-    selectedVariant,
+    options: projection.options,
+    selectedValue: projection.selectedValue,
+    selectedVariant: projection.selectedVariant,
     pickerDisabled: false,
     isLoading: false,
+  };
+}
+
+/**
+ * Resolve a stored or observed selection against the option list it will be
+ * shown in: the matching row, plus an unavailable head row when the catalogue
+ * no longer lists the selected model. A variant survives only while the
+ * resolved row offers it.
+ */
+function projectSelection(options: SessionModelOption[], selection: ModelSelection | null) {
+  const matched = selection
+    ? options.find(option => option.modelRef && modelRefsEqual(option.modelRef, selection.model))
+    : undefined;
+
+  if (selection && !matched) {
+    // The catalogue no longer lists the selected model: keep it reachable as a
+    // head row, with no variant to carry.
+    const unavailable = createUnavailableOption(selection.model);
+    return {
+      options: [unavailable, ...options],
+      selectedValue: unavailable.id,
+      selectedVariant: '',
+    };
+  }
+
+  return {
+    options,
+    selectedValue: matched?.id ?? '',
+    selectedVariant:
+      selection?.variant && matched?.variants.includes(selection.variant) ? selection.variant : '',
   };
 }
 

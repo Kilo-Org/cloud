@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useRepositoryEnvironments,
   type EnvironmentRepository,
@@ -11,13 +11,14 @@ import {
   selectEnvironment,
   selectedEnvironment,
 } from '@/components/cloud-agent-next/environment-selection';
+import { safeLocalStorage } from '@/lib/localStorage';
 
-type Choice = { repositoryKey: string; environmentId: string | null };
+type Choice = { key: string; id: string | null };
 
 /**
  * The environment of a new session in the selected repository: the matches, the
  * user's choice among several.
- * The choice starts over when the repository changes.
+ * Remember the last choice for each repository and personal/organization scope.
  */
 export function useSessionEnvironment({
   organizationId,
@@ -27,21 +28,23 @@ export function useSessionEnvironment({
   repository: EnvironmentRepository | undefined;
 }) {
   const { matches, isLoading } = useRepositoryEnvironments({ organizationId, repository });
-  const currentKey = repository ? repositoryKey(repository) : '';
-  const [stored, setStored] = useState<Choice>({
-    repositoryKey: '',
-    environmentId: null,
-  });
-  const choice: Choice =
-    stored.repositoryKey === currentKey
-      ? stored
-      : { repositoryKey: currentKey, environmentId: null };
+  const key = repository
+    ? `cloud-agent:environment:${organizationId ?? 'personal'}:${repositoryKey(repository)}`
+    : '';
+  const [stored, setStored] = useState<Choice>({ key: '', id: null });
 
-  const selection = selectEnvironment(matches, choice.environmentId, isLoading);
+  useEffect(() => {
+    setStored({ key, id: key ? safeLocalStorage.getItem(key) : null });
+  }, [key]);
+
+  const selection = selectEnvironment(matches, stored.key === key ? stored.id : null, isLoading);
 
   const chooseEnvironment = useCallback(
-    (environmentId: string) => setStored({ repositoryKey: currentKey, environmentId }),
-    [currentKey]
+    (id: string) => {
+      setStored({ key, id });
+      if (key) safeLocalStorage.setItem(key, id);
+    },
+    [key]
   );
 
   return {

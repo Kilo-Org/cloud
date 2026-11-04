@@ -88,9 +88,14 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
   it('refuses a bot upload once the account holds its live-upload ceiling', async () => {
     const kiloUserId = `bot-user-${crypto.randomUUID()}`;
     await seedPendingRows(kiloUserId, CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT);
+    const notesFetch = jest.fn(async () => Buffer.from('notes'));
+    const moreFetch = jest.fn(async () => Buffer.from('more'));
 
     const result = await extractAndUploadAttachments(
-      createMessage([createAttachment('notes.md', 'notes'), createAttachment('more.txt', 'more')]),
+      createMessage([
+        { type: 'file', name: 'notes.md', mimeType: 'text/plain', fetchData: notesFetch },
+        { type: 'file', name: 'more.txt', mimeType: 'text/plain', fetchData: moreFetch },
+      ]),
       kiloUserId
     );
 
@@ -98,7 +103,10 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
       objectKeys: [],
       declinedFilenames: ['notes.md', 'more.txt'],
     });
-    // Nothing reaches the bucket and the pre-existing ceiling is untouched.
+    // Nothing is retrieved and nothing reaches the bucket: the ceiling answer
+    // arrives before any body work, and the existing rows are untouched.
+    expect(notesFetch).not.toHaveBeenCalled();
+    expect(moreFetch).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
     expect(await rowsFor(kiloUserId)).toHaveLength(CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT);
     expect((await rowsFor(kiloUserId)).every(row => row.status === 'pending')).toBe(true);

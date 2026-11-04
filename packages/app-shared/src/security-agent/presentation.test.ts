@@ -394,6 +394,17 @@ describe('getDismissalReasonLabel', () => {
   ])('labels %s', (reason, label) => {
     expect(getDismissalReasonLabel(reason)).toBe(label);
   });
+
+  it('humanizes inherited object names instead of returning a prototype member', () => {
+    // A bare table index returns `Object.prototype.constructor` (a function)
+    // or `Object.prototype` itself for these stored values.
+    expect(getDismissalReasonLabel('constructor')).toBe('constructor');
+    expect(getDismissalReasonLabel('toString')).toBe('toString');
+    expect(getDismissalReasonLabel('hasOwnProperty')).toBe('hasOwnProperty');
+    // No letter touches the underscores, so the generic humanizer leaves the
+    // padding; what matters is that it is a string, not Object.prototype.
+    expect(getDismissalReasonLabel('__proto__')).toBe('  proto  ');
+  });
 });
 
 describe('getFindingSourceLabel', () => {

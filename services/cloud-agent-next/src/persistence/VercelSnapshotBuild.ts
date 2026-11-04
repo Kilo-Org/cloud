@@ -27,7 +27,6 @@ import { getVercelRuntimeArtifacts } from '../byoc/vercel-runtime-artifacts.js';
 import {
   getVercelRuntimeIdentity,
   VERCEL_RUNTIME_BUN_VERSION,
-  VERCEL_RUNTIME_KILO_CLI_VERSION,
 } from '../byoc/vercel-runtime-identity.js';
 import {
   VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG,
@@ -56,6 +55,10 @@ import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { VERCEL_BASE_SYSTEM_SETUP, VERCEL_BASE_NODE_SETUP } from '../byoc/vercel-runtime-base.js';
+import {
+  installPinnedNpmPackageScript,
+  toolchainVerificationScript,
+} from '../shared/runtime-toolchain.js';
 import { withDORetry } from '../utils/do-retry.js';
 
 const BUILD_ALARM_DELAY_MS = 1_000;
@@ -65,7 +68,6 @@ const MAX_RETRIES = RETRY_DELAY_MS.length;
 const BUILDER_TIMEOUT_MS = 10 * 60_000;
 const SNAPSHOT_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1_000;
 const PINNED_BUN_VERSION = VERCEL_RUNTIME_BUN_VERSION;
-const PINNED_KILO_VERSION = VERCEL_RUNTIME_KILO_CLI_VERSION;
 
 const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
 
@@ -661,7 +663,13 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          `${VERCEL_BASE_NODE_SETUP}; sudo npm install -g @kilocode/cli@${PINNED_KILO_VERSION}; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac; git --version >/dev/null; kilo --version >/dev/null`,
+          [
+            VERCEL_BASE_NODE_SETUP,
+            installPinnedNpmPackageScript('kilo'),
+            toolchainVerificationScript(['bun', 'kilo']),
+            'case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac',
+            'git --version >/dev/null',
+          ].join('\n'),
         ]);
         return this.next(state, { step: 'upload_runtime_artifacts' });
       }
@@ -702,7 +710,17 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          `set -euo pipefail; sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js; sudo install -m 0755 /tmp/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh; sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json; test -f /usr/local/bin/kilocode-control-plane-wrapper.js; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; test "$(node --version | cut -c1-3)" = "v24"; control_hash="$(sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js | cut -d' ' -f1)"; jq -e --arg build ${JSON.stringify(state.runtime_build_id)} --arg bun ${JSON.stringify(PINNED_BUN_VERSION)} --arg control "$control_hash" '.runtimeBuildId == $build and .bunVersion == $bun and .controlWrapperSha256 == $control' /usr/local/share/kilo/runtime-manifest.json >/dev/null`,
+          [
+            'set -euo pipefail',
+            'sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js',
+            'sudo install -m 0755 /tmp/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh',
+            'sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json',
+            'test -f /usr/local/bin/kilocode-control-plane-wrapper.js',
+            toolchainVerificationScript(['bun', 'kilo']),
+            `test "$(node --version | cut -c1-3)" = "v24"`,
+            `control_hash="$(sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js | cut -d' ' -f1)"`,
+            `jq -e --arg build ${JSON.stringify(state.runtime_build_id)} --arg bun ${JSON.stringify(PINNED_BUN_VERSION)} --arg control "$control_hash" '.runtimeBuildId == $build and .bunVersion == $bun and .controlWrapperSha256 == $control' /usr/local/share/kilo/runtime-manifest.json >/dev/null`,
+          ].join('\n'),
         ]);
         return this.next(state, {
           step: 'snapshot_builder',

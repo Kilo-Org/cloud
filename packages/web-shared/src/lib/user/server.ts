@@ -409,7 +409,6 @@ export async function getUserFromBearerForCredentialExchange(
     user,
     opts: { adminOnly: false },
     isNewUser: false,
-    fromDb: db,
     deviceSessionId: auth.claims.deviceSessionId,
   });
   if (!result.user) return result;
@@ -627,7 +626,7 @@ function authError(
   };
 }
 
-type ValidateUserAuthorizationParams = {
+type UserAuthorizationRequest = {
   kiloUserId: string;
   user: User | undefined;
   opts: RequiredPermissions;
@@ -655,7 +654,7 @@ async function validateUserAuthorization({
   deviceSessionId,
   cloudAgentAuthority,
   webSession,
-}: ValidateUserAuthorizationParams): Promise<GetAuthResponse> {
+}: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId, {
       internalApiUse,

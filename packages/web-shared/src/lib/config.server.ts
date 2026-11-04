@@ -1,4 +1,3 @@
-import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
@@ -75,14 +74,8 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 );
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
-export const USAGE_QUEUE_ONLY_ENABLED =
-  USAGE_VERCEL_QUEUE_ENABLED ||
-  (getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
-    getEnvVariable('VERCEL_TARGET_ENV') === 'staging' &&
-    getEnvVariable('VERCEL_ENV') !== 'production');
 export const USAGE_QUEUE_SFO_CONFIG = {
   enabled:
-    getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
     getEnvVariable('VERCEL_ENV') === 'production' &&
     getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
     getEnvVariable('VERCEL_REGION') === 'sfo1',
@@ -91,7 +84,6 @@ export const USAGE_QUEUE_SFO_CONFIG = {
 };
 export const USAGE_QUEUE_FRA_CONFIG = {
   enabled:
-    getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
     getEnvVariable('VERCEL_ENV') === 'production' &&
     getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
     getEnvVariable('VERCEL_REGION') === 'fra1',

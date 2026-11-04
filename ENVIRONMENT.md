@@ -459,7 +459,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
-- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; Vercel objects use `vercel/<generation_id>.json`. [SERVER]
+- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; `<microdollar_usage id>.json` contains the version-1 gateway routing decision, optional `vercel: { metadata }`, and optional `enkrypt` (the organization's input guardrail settings and scan steps, without prompt text). [SERVER]
 - `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID` - Dedicated R2 access key ID for the AI provider metadata bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID`. `[SECRET]`
 
@@ -513,7 +513,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Cloud Agent Services
 
-- `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `false`. Existing sessions retain their persisted containment flags. [SERVER]
+- `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `true`. Existing sessions retain their persisted containment flags. Retired non-contained sessions must use a new session. [SERVER]
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
@@ -524,7 +524,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
-- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. Empty or unset disables snapshots. Personal accounts and `*` are excluded. Native-container enrollment is also required. Removing an organization stops its active builds and prevents restore of its existing snapshots. [SERVER]
+- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. `*` includes every organization and personal account; production and development default to `*`. Empty or unset disables snapshots. Native-container enrollment and repository authorization are also required. Personal-owned Bitbucket environments cannot build snapshots because managed Bitbucket access requires an organization; personal GitHub and GitLab environments are supported. Removing an owner from enrollment stops its active builds and prevents restore of its existing snapshots. [SERVER]
 - `SESSION_SNAPSHOT_ORG_IDS` - Comma-separated explicit organization IDs enrolled in private Cloud Agent session disk capture and restore, independent of environment snapshots. Empty or unset is off; `*` is not supported. Only isolated single-session native Cloudflare Containers are eligible. Capture uses the existing idle signal after two minutes. Snapshots may contain session secrets. Production and dev Wrangler defaults are empty. [SERVER]
 - `SESSION_SNAPSHOT_USER_IDS` - Comma-separated explicit user IDs enrolled in private Cloud Agent session disk snapshots, including personal sessions. Same scope and retention rules as `SESSION_SNAPSHOT_ORG_IDS`; empty or unset is off and `*` is not supported. Either matching allowlist enables the feature. [SERVER]
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
@@ -556,8 +556,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Other Services
 
-- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]
-- `DOCKER_PROXY_SOCKET` - Path to the Docker privileged proxy socket. [SERVER]
+- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
 
 ## Browser Extension (apps/extension)

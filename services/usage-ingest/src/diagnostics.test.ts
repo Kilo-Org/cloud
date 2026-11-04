@@ -14,7 +14,6 @@ function setup() {
   const send = vi.fn().mockResolvedValue(undefined);
   const metrics = vi.fn();
   const env = {
-    USAGE_INGEST_DIAGNOSTICS: 'all',
     USAGE_INGEST_PUBLISH_SECRET: 'synthetic-publisher',
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics },
     USAGE_INGEST_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
@@ -155,15 +154,33 @@ it('keeps an enqueue failure a safe 503 even when its diagnostic sink throws', a
   expect(send).toHaveBeenCalledTimes(1);
 });
 
-it.each([undefined, '', 'off', 'true'])(
-  'leaves publisher diagnostics off for %s',
-  async control => {
-    const { env, send, logs } = setup();
-    expect((await publish({ ...env, USAGE_INGEST_DIAGNOSTICS: control })).status).toBe(202);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(logs()).toEqual([]);
-  }
-);
+it('emits the full unavailable enqueue fields without a flag', async () => {
+  const { env, send, logs } = setup();
+  vi.spyOn(Date, 'now')
+    .mockReturnValueOnce(1000)
+    .mockReturnValueOnce(1000)
+    .mockReturnValueOnce(1250);
+  vi.spyOn(performance, 'now').mockReturnValueOnce(10).mockReturnValueOnce(47);
+  send.mockRejectedValue(new Error('sensitive-queue-error'));
+  expect((await publish(env)).status).toBe(503);
+  expect(logs()).toEqual([
+    {
+      level: 'info',
+      event: 'usage_ingest_enqueue_start',
+      usage_id: usage.core.id,
+      publisher_entry_at_ms: 1000,
+      before_send_at_ms: 1000,
+    },
+    {
+      level: 'warn',
+      event: 'usage_ingest_enqueue',
+      usage_id: usage.core.id,
+      outcome: 'unavailable',
+      after_send_at_ms: 1250,
+      send_duration_ms: 37,
+    },
+  ]);
+});
 
 function message() {
   return {

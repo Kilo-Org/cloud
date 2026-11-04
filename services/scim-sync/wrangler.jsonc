@@ -10,12 +10,11 @@
   // wrangler/miniflare catalog bump.
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
-  // No public URL: `/status` reaches the Durable Object, and an unauthenticated
+  // No public URL. `/status` reaches the Durable Object, and an unauthenticated
   // caller on a `*.workers.dev` hostname could create the instance and drive
-  // billable Durable Object requests. With no `routes`, cron trigger, or
-  // service binding either, nothing reaches this Worker once deployed: use
-  // `wrangler dev` locally, and expect a production deploy to prove only that
-  // the script and the `v1` migration were accepted. See README.md.
+  // billable Durable Object requests. With no `routes` or service binding
+  // either, nothing reaches this Worker over HTTP once deployed: use
+  // `wrangler dev` locally and read the poll output from Workers Logs.
   "workers_dev": false,
   "dev": {
     "port": 8819,
@@ -26,9 +25,39 @@
     "enabled": true,
   },
   "logpush": true,
+  // Watchdog only. The Durable Object reschedules its own alarm after every
+  // poll, so this exists to re-arm the chain if it ever dies (an eviction with
+  // exhausted alarm retries). `ensureScheduled` is a no-op when an alarm is
+  // already set.
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
   "vars": {
     "ENVIRONMENT": "production",
+    // Seconds between polls. Read on every alarm, so a change takes effect on
+    // the first tick after deploy. Clamped in code to 10..3600: a sub-second
+    // interval would keep the Durable Object from hibernating and bill
+    // continuously for its 128 MB allocation.
+    "SCIM_POLL_INTERVAL_SECONDS": "60",
+    // Optional `after` cursor. Empty omits `after`, and the Events API returns
+    // the oldest retained events first, not current ones. Nothing is
+    // persisted, so every poll re-reads this value and re-logs the same events
+    // until it is changed and redeployed; the last event ID is logged so it
+    // can be copied forward.
+    "WORKOS_EVENT_CURSOR": "",
   },
+  "secrets_store_secrets": [
+    {
+      "binding": "WORKOS_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "WORKOS_API_KEY",
+    },
+    {
+      "binding": "WORKOS_CLIENT_ID",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "WORKOS_CLIENT_ID",
+    },
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -55,7 +84,21 @@
       "workers_dev": false,
       "vars": {
         "ENVIRONMENT": "development",
+        "SCIM_POLL_INTERVAL_SECONDS": "60",
+        "WORKOS_EVENT_CURSOR": "",
       },
+      "secrets_store_secrets": [
+        {
+          "binding": "WORKOS_API_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "WORKOS_API_KEY",
+        },
+        {
+          "binding": "WORKOS_CLIENT_ID",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "WORKOS_CLIENT_ID",
+        },
+      ],
       "durable_objects": {
         "bindings": [
           {

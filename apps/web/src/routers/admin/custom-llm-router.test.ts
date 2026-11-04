@@ -340,6 +340,85 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       expect(row).toBeUndefined();
     });
+
+    it.each(['stealth/test-model', 'kilo-internal/test-model-free'])(
+      'rejects pricing for the free model id %s',
+      async publicId => {
+        const caller = await createCallerForUser(admin.id);
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: publicId,
+            definition: { ...validDefinition, pricing: pricingTiers },
+            credentials,
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('pricing must not be set'),
+        });
+      }
+    );
+
+    it('rejects adding pricing to an existing custom LLM with a free model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-free';
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: { ...validDefinition, pricing: pricingTiers },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('rejects copying a priced custom LLM to a free model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/test-model-priced',
+        definition: { ...validDefinition, pricing: pricingTiers },
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'kilo-internal/test-model-priced',
+          public_id: 'kilo-internal/test-model-priced-free',
+          display_name: 'Copied model',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('pricing must not be set'),
+      });
+    });
+
+    it('stores may_train_on_prompts with pricing', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/test-model-zdr',
+        definition: { ...validDefinition, pricing: pricingTiers, may_train_on_prompts: false },
+        credentials,
+      });
+
+      expect(result.definition.may_train_on_prompts).toBe(false);
+    });
+
+    it('rejects may_train_on_prompts without pricing', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/test-model-zdr',
+          definition: { ...validDefinition, may_train_on_prompts: false },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
   });
 
   describe('list', () => {
@@ -557,20 +636,20 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
     });
 
-    it('rejects a free model id', async () => {
-      const caller = await createCallerForUser(admin.id);
+    it.each(['stealth/custom-alpha', 'acme/model-free'])(
+      'accepts the free model id %s',
+      async publicId => {
+        const caller = await createCallerForUser(admin.id);
 
-      await expect(
-        caller.admin.customLlm.upsert({
-          public_id: 'stealth/custom-alpha',
+        const result = await caller.admin.customLlm.upsert({
+          public_id: publicId,
           definition: validDefinition,
           credentials,
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('free model id'),
-      });
-    });
+        });
+
+        expect(result.public_id).toBe(publicId);
+      }
+    );
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {
       await db

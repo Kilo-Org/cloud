@@ -21,7 +21,7 @@ import type {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
@@ -87,7 +87,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/cold-runtime',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -145,7 +145,7 @@ async function installSandbox(
     await instance.getAllocationState();
     const sandboxEnv = (instance as unknown as { env: Record<string, unknown> }).env;
     installFakeCredentialEnv(sandboxEnv, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -219,7 +219,7 @@ async function registerColdSession(): Promise<ColdSession> {
       kiloSessionId,
       sandboxId: cold.sandboxId,
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return cold;
 }
@@ -323,7 +323,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         sandboxId: cold.sandboxId,
       }),
       message,
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(cold.provider.launchEnvs).toHaveLength(1));
     const launchEnv = cold.provider.launchEnvs[0];
@@ -414,7 +414,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         sandboxId: cold.sandboxId,
       }),
       message: firstMessage,
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     await waitFor(() => expect(cold.provider.createCalls).toBeGreaterThanOrEqual(1));

@@ -6,6 +6,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   computeExpiration,
+  earliestUnexpiredExpiry,
   reconcileCreditExpirationsInTransaction,
   type ExpiringTransaction,
   type EntityForExpiration,
@@ -273,12 +274,7 @@ export async function processOrganizationExpirationsBatch(
     const expiredTransactionIds = new Set(
       expirationResult.newTransactions.map(transaction => transaction.original_transaction_id)
     );
-    const nextExpirationAt =
-      transactions
-        .filter(transaction => !expiredTransactionIds.has(transaction.id))
-        .map(transaction => transaction.expiry_date)
-        .filter(expiryDate => expiryDate !== null)
-        .sort()[0] ?? null;
+    const nextExpirationAt = earliestUnexpiredExpiry(transactions, expiredTransactionIds);
     const nextExpirationChanged =
       nextExpirationAt === null
         ? org.next_credit_expiration_at !== null

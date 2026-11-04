@@ -1,18 +1,19 @@
 # Runtime rollout and qualification
 
 The catalog at runtime-targets.json owns startup mode and native image selection. Its default is
-preinstalled on all-in-one. Named environments inherit that default unless the catalog names them.
+downloaded on runtime-free, with no named overrides or organization restriction. Named environments
+inherit that default unless the catalog names them.
 Keep startup variables out of checked-in Wrangler vars. Deployment renders the Worker vars and native
 images from the catalog. Manual mode, descriptor, cohort or image drift fails before Wrangler or its custom build.
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
-| preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
-| downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
+| preinstalled | all-in-one | `Dockerfile.containers` and pinned build variables |
+| downloaded | all-in-one | `Dockerfile.containers`, exact-SHA runtime descriptor |
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+Downloaded startup supports native Cloudflare Containers and BYOC Vercel. Preinstalled is the native default.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
@@ -22,34 +23,46 @@ their installed release until a new allocation starts. Base dependency changes s
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
-A downloaded target can scope its startup to an `interactiveOrgIds` list. Production uses it for one test organization.
-Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
-A new allocation selects it only when all its preparing routes belong to one listed organization, whatever
-their origin (web, webhook, Slack and other automation). Native allocations must also be isolated; Vercel
-allocations use the same organization rule. Other organizations, personal sessions, code reviews and
-shared native sandboxes retain preinstalled startup on the unchanged `app` image. SDK pins always stay
-preinstalled. A missing or mixed route identity stays on the baseline. These identity values are rollout
-metadata, not an authorization boundary.
+A downloaded target can optionally scope its startup to an `interactiveOrgIds` list, rendered as
+`RUNTIME_INTERACTIVE_ORG_IDS`. No current target sets this restriction, so new native and BYOC Vercel
+allocations use downloaded startup for every organization and personal account, including code reviews
+and shared native sandboxes. SDK pins always stay preinstalled.
+
+When a list is configured, a new allocation selects downloaded startup only when all its preparing
+routes belong to one listed organization, whatever their origin (web, webhook, Slack and other
+automation). Native allocations must also be isolated; Vercel allocations use the same organization
+rule. Other organizations, personal sessions, shared native sandboxes, and missing or mixed route
+identities then retain preinstalled startup on `app`. These identity values are rollout metadata,
+not an authorization boundary.
 
 The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
 are used together, including snapshot fallback. Existing allocations keep their running image and mode.
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
-rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
+rejected. A complete rollback must change the downloaded default; see Rollback below.
 
 Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
-remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of the interactive runtime cohort.
+remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of startup selection. Production
+and development set `*`, enrolling every organization and personal account; native-container enrollment
+and repository authorization are still required. Personal-owned Bitbucket environments cannot build
+snapshots because managed Bitbucket repository access requires an organization. Personal GitHub and
+GitLab environments are supported.
 Builds require a downloaded runtime-free deployment and a published runtime release. Existing
 all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
 start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot
 compatibility when the runtime-free base image and ABI stay unchanged.
 
-## Approval and rollout order
+## Deployment and qualification
 
-Production uses downloaded runtime-free for its `interactiveOrgIds` cohort; every other target and session
-uses preinstalled all-in-one. A downloaded catalog entry is the only
-switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff.
-Real-provider qualification runs on the production test-organization cohort. Record the Worker name,
-exact source SHA, bucket and instance type for each qualification deployment.
+The checked-in catalog selects downloaded runtime-free deployment-wide for all targets. A downloaded
+default or named target makes eligible successful main CI publish a handoff for that SHA, and downloaded
+deployment waits for that handoff. Use a dedicated test organization for real-provider qualification;
+the current catalog does not limit downloaded startup to that organization. Record the Worker name,
+exact source SHA, bucket and instance type for each qualification deployment. Broad enrollment does
+not itself establish that the provider checks below passed.
+
+Before deploying a release that removes SDK sandbox bindings, drain every session
+still running on a retired sandbox class. The new Worker cannot stop, inspect or
+reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
    Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that
@@ -58,13 +71,14 @@ exact source SHA, bucket and instance type for each qualification deployment.
 2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
-3. Enroll one test organization through `interactiveOrgIds` on production runtime-free. Complete the
-   checks below with sessions in that organization, including at least one web session and one
-   non-web session (for example a webhook trigger).
-4. Expanding the list or removing the cohort restriction requires that qualification evidence and a
-   separate reviewed catalog change.
+3. Complete the checks below with sessions in the test organization, including at least one web
+   session and one non-web session (for example a webhook trigger). Also verify a personal session
+   uses the deployment-wide downloaded default.
+4. Record qualification evidence separately from catalog configuration. Further mode, image or cohort
+   changes require a reviewed catalog change and the relevant provider evidence.
 
-For a clean checkout, preview deployment preparation without running Wrangler:
+From the service directory in a clean checkout, prepare the generated configuration without running
+Wrangler deployment:
 
     SOURCE_SHA=$(git rev-parse HEAD)
     pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
@@ -103,10 +117,22 @@ Provider metadata retention remains unmeasured until the approved real-provider 
 
 Use the current compatible Worker build with a reviewed catalog change. Image rollback changes
 runtime-free to all-in-one while mode stays downloaded. Mode rollback then selects preinstalled/all-in-one.
+For a complete rollback across all targets, set `runtime-targets.json` to:
+
+```json
+{
+  "default": { "mode": "preinstalled", "image": "all-in-one" },
+  "targets": {}
+}
+```
+
+Removing a production override does not roll back a downloaded default. A production-only rollback
+requires an explicit production override selecting preinstalled/all-in-one.
 The renderer applies each change to new allocations. It does not rewrite existing allocations or their
-deadlines. Do not deploy an older Worker that cannot read stored startup modes. A mode rollback also
-removes the rendered `RUNTIME_RELEASE_BUCKET` binding. A downloaded allocation that is still
-bootstrapping then gets 503 for artifact reads and restarts on the preinstalled path.
+deadlines. Do not deploy an older Worker that cannot read stored startup modes. A production mode
+rollback omits the deployment-injected `RUNTIME_RELEASE_BUCKET` binding; existing baseline bindings,
+such as development's, remain. A downloaded allocation still bootstrapping without the binding gets
+503 for artifact reads and remains subject to the existing bounded startup recovery.
 
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. A mode change uses a separate repository snapshot namespace.
@@ -126,6 +152,7 @@ The locally built runtime-free image passed the actual packaged CLI version prob
 hello/shutdown. A real CLI version mismatch failed the compatibility gate. This proves local payload/base
 execution, not provider restore semantics, minimum-instance timing or metadata retention.
 
-Publication is provisioned, and a manual publication created an exact-SHA handoff. Production enrolls
-one test organization for qualification. Real-provider qualification evidence remains pending, and
-no other organization is enrolled.
+Publication is provisioned, and a manual publication created an exact-SHA handoff. The checked-in
+catalog now selects downloaded runtime-free for all targets without an organization restriction.
+Real-provider qualification evidence remains pending; the broader configuration is not evidence that
+those checks passed.

@@ -2,7 +2,7 @@
   "name": "cloudflare-scim-sync",
   "version": "1.0.0",
   "private": true,
-  "description": "SCIM sync service: Worker and Durable Object scaffolding",
+  "description": "Polls the WorkOS Events API for directory-sync events and logs them",
   "type": "module",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -15,6 +15,10 @@
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
     "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@workos-inc/node": "catalog:",
+    "workers-tagged-logger": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

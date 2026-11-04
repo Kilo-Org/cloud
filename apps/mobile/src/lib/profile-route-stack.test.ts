@@ -34,6 +34,17 @@ function missing(names: readonly string[], current: number, parents = SECTION_PA
   );
 }
 
+function repair(names: readonly string[], current: number, openedOutsideProfileTree = false) {
+  return profileStackRepair({
+    routes: names.map(name => route(name)),
+    currentIndex: current,
+    openedOutsideProfileTree,
+    parents: SECTION_PARENTS,
+    listRouteName: LIST,
+    overviewRouteName: OVERVIEW,
+  });
+}
+
 describe('missingProfileStackParents', () => {
   it('asks for nothing when the list and the overview are beneath a section', () => {
     expect(missing(['(tabs)', 'agent-chat/new', LIST, OVERVIEW, AGENTS], 4)).toEqual({
@@ -118,16 +129,6 @@ describe('the rebuilt-entry marker', () => {
 });
 
 describe('profileStackRepair', () => {
-  const repair = (names: readonly string[], current: number, openedOutsideProfileTree = false) =>
-    profileStackRepair({
-      routes: names.map(name => route(name)),
-      currentIndex: current,
-      openedOutsideProfileTree,
-      parents: SECTION_PARENTS,
-      listRouteName: LIST,
-      overviewRouteName: OVERVIEW,
-    });
-
   it('builds both parents for a section that arrived on its own', () => {
     expect(repair(['(tabs)', AGENTS], 1)).toEqual({ list: true, overview: true });
   });
@@ -171,17 +172,7 @@ describe('profileExternalOpener', () => {
   });
 });
 
-describe('parentsToPush — a section whose overview is already beneath', () => {
-  const repair = (names: readonly string[], current: number, openedOutsideProfileTree = false) =>
-    profileStackRepair({
-      routes: names.map(name => route(name)),
-      currentIndex: current,
-      openedOutsideProfileTree,
-      parents: SECTION_PARENTS,
-      listRouteName: LIST,
-      overviewRouteName: OVERVIEW,
-    });
-
+describe('profileStackRepair — a section whose overview is already beneath', () => {
   it('pushes nothing when the overview is beneath, even without the list', () => {
     // The reader reached this section from an overview an agent session opened,
     // so Back belongs to the overview and then to the session: appending the
@@ -192,23 +183,7 @@ describe('parentsToPush — a section whose overview is already beneath', () => 
     });
   });
 
-  it('still pushes the list when it builds the overview it is missing', () => {
-    expect(repair(['(tabs)', 'agent-chat/new', AGENTS], 2)).toEqual({
-      list: true,
-      overview: true,
-    });
-  });
-
   it('pushes only the overview when the list is beneath but the overview is not', () => {
     expect(repair(['(tabs)', LIST, AGENTS], 2)).toEqual({ list: false, overview: true });
-  });
-});
-
-describe('parentsToPush — the create form', () => {
-  it('never asks for an overview it does not need', () => {
-    expect(parentsToPush(LIST_CHILD_PARENTS, { list: true, overview: true })).toEqual({
-      list: true,
-      overview: false,
-    });
   });
 });

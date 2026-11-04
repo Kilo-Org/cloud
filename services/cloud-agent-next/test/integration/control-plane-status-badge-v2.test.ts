@@ -23,7 +23,7 @@ import {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
@@ -68,7 +68,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -116,7 +116,7 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -163,7 +163,7 @@ async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   return { sandboxId, sandbox };
@@ -198,7 +198,7 @@ describe('sandbox status badge projection (B10)', () => {
     await session.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kilo, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const launchEnv = provider.launchEnvs[0]!;
@@ -221,7 +221,7 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active).toMatchObject({
       status: 'active',
       detailCode: 'sandbox_ready',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       inactivityTimeoutMs: CONTROL_PLANE_TIMERS.sandbox.idleMs,
     });
 
@@ -230,7 +230,7 @@ describe('sandbox status badge projection (B10)', () => {
     expect(stopped).toMatchObject({
       status: 'sleeping',
       detailCode: 'sandbox_stopped',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
     });
     await waitFor(async () =>
       expect(await session.getSession()).toMatchObject({ route: { state: 'unknown' } })
@@ -412,7 +412,7 @@ describe('compute billing status metadata read (B10)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kindaSession, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const stored = await stub.getMetadata();
@@ -420,6 +420,6 @@ describe('compute billing status metadata read (B10)', () => {
     expect(stored?.identity.userId).toBe(USER_ID);
     expect(stored?.identity.orgId).toBe(ORG_ID);
     expect(stored?.workspace?.sandboxId).toBe(sandboxId);
-    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare-containers');
   });
 });

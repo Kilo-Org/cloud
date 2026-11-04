@@ -21,20 +21,20 @@ afterEach(() => {
 it('bounds simultaneous queue work even before any pool gauge changes, and reuses slots', () => {
   const gate = createQueueWriterAdmission(pool());
   const held = Array.from({ length: 8 }, (_, index) =>
-    gate.tryAcquire(index % 2 ? 'queue' : 'queue_vercel')
+    gate.tryAcquire(index % 2 ? 'queue' : 'queue_vercel', 'usage-id')
   );
   expect(held.every(slot => slot.admitted)).toBe(true);
-  expect(gate.tryAcquire('queue')).toEqual({ admitted: false, reason: 'queue_limit' });
+  expect(gate.tryAcquire('queue', 'usage-id')).toEqual({ admitted: false, reason: 'queue_limit' });
   const first = held[0];
   if (!first.admitted) throw new Error('expected admitted slot');
   first.release();
   first.release();
-  const replacement = gate.tryAcquire('queue_vercel');
+  const replacement = gate.tryAcquire('queue_vercel', 'usage-id');
   expect(replacement.admitted).toBe(true);
   // Double release must not create an extra slot.
-  expect(gate.tryAcquire('queue')).toEqual({ admitted: false, reason: 'queue_limit' });
+  expect(gate.tryAcquire('queue', 'usage-id')).toEqual({ admitted: false, reason: 'queue_limit' });
   for (const slot of [...held, replacement]) if (slot.admitted) slot.release();
-  expect(gate.tryAcquire('queue').admitted).toBe(true);
+  expect(gate.tryAcquire('queue', 'usage-id').admitted).toBe(true);
 });
 
 it.each([
@@ -45,33 +45,34 @@ it.each([
 ])('derives %s-connection pool admission bound %s without changing the pool', (max, limit) => {
   const currentPool = pool(max);
   const gate = createQueueWriterAdmission(currentPool);
-  for (let index = 0; index < limit; index++) expect(gate.tryAcquire('queue').admitted).toBe(true);
-  expect(gate.tryAcquire('queue')).toEqual({ admitted: false, reason: 'queue_limit' });
+  for (let index = 0; index < limit; index++)
+    expect(gate.tryAcquire('queue', 'usage-id').admitted).toBe(true);
+  expect(gate.tryAcquire('queue', 'usage-id')).toEqual({ admitted: false, reason: 'queue_limit' });
   expect(currentPool.options.max).toBe(max);
 });
 
 it('distinguishes idle capacity, busy headroom and queued pool demand without acquiring DB clients', () => {
   const currentPool = { ...pool(), totalCount: 10, idleCount: 3 };
   const gate = createQueueWriterAdmission(currentPool);
-  const slot = gate.tryAcquire('queue');
+  const slot = gate.tryAcquire('queue', 'usage-id');
   expect(slot.admitted).toBe(true);
   if (slot.admitted) slot.release();
   currentPool.idleCount = 2;
-  expect(gate.tryAcquire('queue')).toEqual({ admitted: false, reason: 'pool_busy' });
+  expect(gate.tryAcquire('queue', 'usage-id')).toEqual({ admitted: false, reason: 'pool_busy' });
   currentPool.waitingCount = 1;
-  expect(gate.tryAcquire('queue')).toEqual({ admitted: false, reason: 'pool_waiting' });
+  expect(gate.tryAcquire('queue', 'usage-id')).toEqual({ admitted: false, reason: 'pool_waiting' });
   currentPool.waitingCount = 0;
   currentPool.idleCount = 10;
-  expect(gate.tryAcquire('queue').admitted).toBe(true);
+  expect(gate.tryAcquire('queue', 'usage-id').admitted).toBe(true);
 });
 
 it('samples admission and always reports rejection using only bounded fields and pool gauges', () => {
   const currentPool = pool();
   const gate = createQueueWriterAdmission(currentPool);
-  gate.tryAcquire('queue');
+  gate.tryAcquire('queue', 'usage-id');
   expect(console.info).not.toHaveBeenCalled();
   jest.mocked(Math.random).mockReturnValue(0);
-  gate.tryAcquire('queue_vercel');
+  gate.tryAcquire('queue_vercel', 'usage-id');
   expect(JSON.parse(jest.mocked(console.info).mock.calls[0][0])).toEqual({
     event: 'usage_writer_admission',
     writer_caller: 'queue_vercel',
@@ -85,7 +86,7 @@ it('samples admission and always reports rejection using only bounded fields and
   });
   jest.mocked(Math.random).mockReturnValue(1);
   currentPool.waitingCount = 1;
-  gate.tryAcquire('queue');
+  gate.tryAcquire('queue', 'usage-id');
   expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toEqual({
     event: 'usage_writer_admission',
     writer_caller: 'queue',
@@ -96,6 +97,7 @@ it('samples admission and always reports rejection using only bounded fields and
     pool_max: 10,
     pool: { total: 0, idle: 0, waiting: 1 },
     sample_rate: 1,
+    usage_id: 'usage-id',
   });
 });
 
@@ -110,10 +112,30 @@ it.each(['random', 'info', 'warn'] as const)(
     };
     if (failure === 'random') jest.mocked(Math.random).mockImplementation(fail);
     else jest.mocked(console[failure]).mockImplementation(fail);
-    const first = gate.tryAcquire('queue');
+    const first = gate.tryAcquire('queue', 'usage-id');
     expect(first.admitted).toBe(true);
-    expect(gate.tryAcquire('queue_vercel')).toEqual({ admitted: false, reason: 'queue_limit' });
+    expect(gate.tryAcquire('queue_vercel', 'usage-id')).toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
     if (first.admitted) first.release();
-    expect(gate.tryAcquire('queue').admitted).toBe(true);
+    expect(gate.tryAcquire('queue', 'usage-id').admitted).toBe(true);
+  }
+);
+
+it.each(['queue_limit', 'pool_waiting', 'pool_busy'] as const)(
+  'logs the usage id for %s rejection',
+  reason => {
+    const currentPool = pool(3);
+    const gate = createQueueWriterAdmission(currentPool);
+    if (reason === 'queue_limit') gate.tryAcquire('queue', 'held-id');
+    if (reason === 'pool_waiting') currentPool.waitingCount = 1;
+    if (reason === 'pool_busy') currentPool.totalCount = 1;
+    expect(gate.tryAcquire('queue', 'rejected-id')).toEqual({ admitted: false, reason });
+    expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+      reason,
+      usage_id: 'rejected-id',
+      sample_rate: 1,
+    });
   }
 );

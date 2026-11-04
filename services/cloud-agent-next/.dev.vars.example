@@ -55,14 +55,14 @@ PER_SESSION_SANDBOX_ORG_IDS=
 
 # Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTAINERS_ORG_IDS=
+CODE_REVIEW_CONTAINERS_ORG_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
 # Non-secret rollout control for per-session Kilo runtime isolation.
 RUNTIME_ISOLATION_ENABLED=true
 
-CREDENTIAL_CONTAINMENT_ENABLED=false
+CREDENTIAL_CONTAINMENT_ENABLED=true
 
 # Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
@@ -75,9 +75,9 @@ BYOC_VERCEL_IDS=
 
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.
-CLOUDFLARE_CONTAINERS_ORG_IDS=
-# Explicit organization IDs allowed to build and restore snapshots. Empty is off; no wildcard.
-ENVIRONMENT_SNAPSHOT_ORG_IDS=
+CLOUDFLARE_CONTAINERS_ORG_IDS=*
+# Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
+ENVIRONMENT_SNAPSHOT_ORG_IDS=*
 # Explicit organization or user IDs allowed to capture and restore per-session disks. No wildcard.
 SESSION_SNAPSHOT_ORG_IDS=
 SESSION_SNAPSHOT_USER_IDS=

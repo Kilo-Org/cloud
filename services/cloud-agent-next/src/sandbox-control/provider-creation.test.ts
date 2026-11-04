@@ -6,7 +6,6 @@ import {
 } from '../container-concurrency.js';
 import {
   parseSandboxBillingInput,
-  type MeteredSandboxInstance,
   type SandboxBillingAdmissionResult,
 } from '../container-usage-context.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
@@ -15,7 +14,6 @@ import {
   VercelSandboxRestError,
   type VercelSandboxCreateEnvelope,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { createCloudflareProviderAdapter } from './cloudflare-provider.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
@@ -52,21 +50,7 @@ const config: VercelSandboxRuntimeConfig = {
   extendDurationMs: 60_000,
 };
 
-function cloudflareProvider(
-  kind: 'cloudflare' | 'cloudflare-containers',
-  admit: () => Promise<SandboxBillingAdmissionResult>
-): ProviderAdapter {
-  if (kind === 'cloudflare') {
-    const sandbox: Partial<MeteredSandboxInstance> = {
-      isBillingBlocked: async () => false,
-      ensureBillingAdmission: admit,
-    } satisfies Pick<MeteredSandboxInstance, 'isBillingBlocked' | 'ensureBillingAdmission'>;
-    return createCloudflareProviderAdapter({
-      sandboxId: SANDBOX_ID,
-      getSandbox: () => sandbox as MeteredSandboxInstance,
-      destroy: async () => {},
-    });
-  }
+function cloudflareProvider(admit: () => Promise<SandboxBillingAdmissionResult>): ProviderAdapter {
   const container: object = {
     isBillingBlocked: async () => false,
     ensureBillingAdmission: admit,
@@ -167,7 +151,7 @@ describe('native image forwarding', () => {
   });
 });
 
-describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+describe('cloudflare-containers creation causes', () => {
   it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
     const failed = {
@@ -180,18 +164,11 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
       .mockReturnValueOnce(failed)
       .mockReturnValueOnce(failed)
       .mockReturnValue(recovered);
-    const provider =
-      kind === 'cloudflare'
-        ? createCloudflareProviderAdapter({
-            sandboxId: SANDBOX_ID,
-            getSandbox: resolveHandle,
-            destroy: async () => {},
-          })
-        : createCloudflareContainersProviderAdapter({
-            logicalSandboxId: SANDBOX_ID,
-            allocationName: SANDBOX_ID,
-            getContainer: resolveHandle,
-          });
+    const provider = createCloudflareContainersProviderAdapter({
+      logicalSandboxId: SANDBOX_ID,
+      allocationName: SANDBOX_ID,
+      getContainer: resolveHandle,
+    });
 
     await expect(
       provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
@@ -216,19 +193,11 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
         isBillingBlocked: async () => false,
         configureBilling,
       }));
-      const provider =
-        kind === 'cloudflare'
-          ? createCloudflareProviderAdapter({
-              sandboxId: SANDBOX_ID,
-              getSandbox: () => resolveHandle() as unknown as MeteredSandboxInstance,
-              destroy: async () => {},
-            })
-          : createCloudflareContainersProviderAdapter({
-              logicalSandboxId: SANDBOX_ID,
-              allocationName: SANDBOX_ID,
-              getContainer: () =>
-                resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
-            });
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        getContainer: () => resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
+      });
 
       await expect(
         provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
@@ -244,7 +213,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     new ContainerCapacityUnavailableError(),
   ])('preserves RPC-wrapped capacity failure: %s', async failure => {
     const denial = new Error(`remote RPC: ${failure.message}`);
-    const provider = cloudflareProvider(kind, async () => {
+    const provider = cloudflareProvider(async () => {
       throw denial;
     });
     await expect(provider.create(intent)).rejects.toBe(denial);
@@ -252,7 +221,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
   it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
     'preserves %s independently of unsafe provider text',
     async code => {
-      const provider = cloudflareProvider(kind, async () => ({
+      const provider = cloudflareProvider(async () => ({
         success: false,
         code,
         message: 'raw-sensitive-provider-detail',
@@ -268,7 +237,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
   );
 
   it('does not promote a transport exception containing billing text to insufficient credits', async () => {
-    const provider = cloudflareProvider(kind, async () => {
+    const provider = cloudflareProvider(async () => {
       throw new Error('insufficient credits 402');
     });
     await expect(provider.create(intent)).rejects.toMatchObject({
@@ -283,7 +252,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
       code: 'stopping',
       message: 'stopping',
     };
-    const provider = cloudflareProvider(kind, async () => result);
+    const provider = cloudflareProvider(async () => result);
     await expect(provider.create(intent)).rejects.toMatchObject({ code: 'stopping' });
     result = { success: true };
     await expect(provider.create(intent)).resolves.toMatchObject({
@@ -293,7 +262,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
 
   it('classifies a locally invalid billing configuration without admitting work', async () => {
     const admit = vi.fn<() => Promise<SandboxBillingAdmissionResult>>();
-    const provider = cloudflareProvider(kind, admit);
+    const provider = cloudflareProvider(admit);
     await expect(
       provider.create({ ...intent, billing: { ...billing, subject: { type: 'user', id: '' } } })
     ).rejects.toMatchObject({

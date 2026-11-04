@@ -4,12 +4,17 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { api_kind, enkrypt_usage, enkrypt_usage_decision } from '@kilocode/db/schema';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   scheduleOrganizationLowBalanceAlert,
   scheduleOrganizationUsageAutoTopUp,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
+import type {
+  EnkryptUsageWrite,
+  EnkryptUsageWriteResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 
 /**
  * PLACEHOLDER: Enkrypt documents Guardrails credits only as a monthly plan allowance, with no price
@@ -29,7 +34,7 @@ export type EnkryptGuardrailCall = {
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
-  /** The request's wait for the verdict, on its final call only; see the ledger column. */
+  /** The request's wait for the verdict, on one call per request only; see the ledger column. */
   addedLatencyMs: number | null;
 };
 
@@ -39,79 +44,103 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
 }
 
 /**
+ * In a US region the write is handed to Frankfurt, next to the primary, so its transaction neither
+ * pays cross-region round trips nor holds a primary pool connection for them. A failed handoff
+ * falls back to a local write; the usage id makes a repeated delivery a no-op. Gateway callers must
+ * defer it with `after()`.
+ */
+export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
+  const usageWrite: EnkryptUsageWrite = {
+    ...usageRecord,
+    id: randomUUID(),
+    occurredAt: new Date().toISOString(),
+  };
+  if (isUSRegion() && (await recordEnkryptUsageInPrimaryRegion(usageWrite))) return;
+  await recordEnkryptUsageLocally(usageWrite);
+}
+
+/**
  * Writes the ledger row and debits the organization in one transaction, apart from inference
  * usage accounting. The debit is an atomic increment, so concurrent debits cannot lose updates,
  * and the ledger row's id is the consumption source id that makes a Kilo Pass debit idempotent.
- * Runs on the primary, so gateway callers must defer it with `after()`.
+ * A ledger row that already exists means this record was delivered before, so nothing is debited.
+ * Runs on the primary; gateway code calls `recordEnkryptUsage` instead.
  */
-export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const id = randomUUID();
-  const occurredAt = new Date().toISOString();
-  const chargedMicrodollars = enkryptCreditsToMicrodollars(usageRecord.creditsCost);
+export async function recordEnkryptUsageLocally(
+  usageWrite: EnkryptUsageWrite
+): Promise<EnkryptUsageWriteResponse['status']> {
+  const { id, occurredAt } = usageWrite;
+  const chargedMicrodollars = enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
-  const organizationUsage = await db.transaction(async tx => {
+  const outcome = await db.transaction(async tx => {
     let [apiKind] = await tx
       .select({ id: api_kind.api_kind_id })
       .from(api_kind)
-      .where(eq(api_kind.api_kind, usageRecord.apiKind));
+      .where(eq(api_kind.api_kind, usageWrite.apiKind));
     if (!apiKind) {
       [apiKind] = await tx
         .insert(api_kind)
-        .values({ api_kind: usageRecord.apiKind })
+        .values({ api_kind: usageWrite.apiKind })
         .onConflictDoNothing({ target: api_kind.api_kind })
         .returning({ id: api_kind.api_kind_id });
       if (!apiKind) {
         [apiKind] = await tx
           .select({ id: api_kind.api_kind_id })
           .from(api_kind)
-          .where(eq(api_kind.api_kind, usageRecord.apiKind));
+          .where(eq(api_kind.api_kind, usageWrite.apiKind));
       }
     }
     let [decision] = await tx
       .select({ id: enkrypt_usage_decision.decision_id })
       .from(enkrypt_usage_decision)
-      .where(eq(enkrypt_usage_decision.decision, usageRecord.decision));
+      .where(eq(enkrypt_usage_decision.decision, usageWrite.decision));
     if (!decision) {
       [decision] = await tx
         .insert(enkrypt_usage_decision)
-        .values({ decision: usageRecord.decision })
+        .values({ decision: usageWrite.decision })
         .onConflictDoNothing({ target: enkrypt_usage_decision.decision })
         .returning({ id: enkrypt_usage_decision.decision_id });
       if (!decision) {
         [decision] = await tx
           .select({ id: enkrypt_usage_decision.decision_id })
           .from(enkrypt_usage_decision)
-          .where(eq(enkrypt_usage_decision.decision, usageRecord.decision));
+          .where(eq(enkrypt_usage_decision.decision, usageWrite.decision));
       }
     }
     if (!apiKind || !decision) throw new Error('Enkrypt usage lookup resolution failed');
 
-    await tx.insert(enkrypt_usage).values({
-      id,
-      organization_id: usageRecord.organizationId,
-      kilo_user_id: usageRecord.kiloUserId,
-      session_id: usageRecord.sessionId,
-      api_kind_id: apiKind.id,
-      decision_id: decision.id,
-      enkrypt_credits_cost: usageRecord.creditsCost,
-      charged_microdollars: chargedMicrodollars,
-      added_latency_ms: usageRecord.addedLatencyMs,
-      created_at: occurredAt,
-    });
-    if (chargedMicrodollars === 0) return null;
+    const [inserted] = await tx
+      .insert(enkrypt_usage)
+      .values({
+        id,
+        organization_id: usageWrite.organizationId,
+        kilo_user_id: usageWrite.kiloUserId,
+        session_id: usageWrite.sessionId,
+        api_kind_id: apiKind.id,
+        decision_id: decision.id,
+        enkrypt_credits_cost: usageWrite.creditsCost,
+        charged_microdollars: chargedMicrodollars,
+        added_latency_ms: usageWrite.addedLatencyMs,
+        created_at: occurredAt,
+      })
+      .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })
+      .returning({ id: enkrypt_usage.id });
+    if (!inserted) return { status: 'duplicate' as const, organizationUsage: null };
+    if (chargedMicrodollars === 0) return { status: 'recorded' as const, organizationUsage: null };
     const consumption = await recordOrganizationConsumption(tx, {
-      organizationId: usageRecord.organizationId,
-      kiloUserId: usageRecord.kiloUserId,
+      organizationId: usageWrite.organizationId,
+      kiloUserId: usageWrite.kiloUserId,
       amountMicrodollars: chargedMicrodollars,
       occurredAt,
       source: 'enkrypt-guardrail',
       sourceId: id,
     });
-    return consumption.organizationUsage;
+    return { status: 'recorded' as const, organizationUsage: consumption.organizationUsage };
   });
 
-  if (organizationUsage) {
-    scheduleOrganizationLowBalanceAlert(usageRecord.organizationId, organizationUsage);
-    scheduleOrganizationUsageAutoTopUp(organizationUsage);
+  if (outcome.organizationUsage) {
+    scheduleOrganizationLowBalanceAlert(usageWrite.organizationId, outcome.organizationUsage);
+    scheduleOrganizationUsageAutoTopUp(outcome.organizationUsage);
   }
+  return outcome.status;
 }

@@ -140,7 +140,7 @@ export function EnkryptDetectorList({
 
       <DetectorSection
         title="Block or log"
-        description="Enkrypt flags these without blocking. Choose whether a detection blocks the request or is only logged, in which case the request still reaches the model."
+        description="Enkrypt flags these without blocking. Choose whether a detection blocks the request or is only logged, in which case the request reaches the model without waiting for the detector."
       >
         {ENKRYPT_REVISE_DETECTOR_IDS.map(id => (
           <DetectorRow

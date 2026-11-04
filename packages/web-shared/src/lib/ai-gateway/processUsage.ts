@@ -1514,6 +1514,8 @@ export async function processTokenData(
     return null;
   }
 
+  usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+
   const timer = createTimer();
   const generationProvider = getGenerationLookupProvider(usageStats, usageContext, servingProvider);
   const generation =

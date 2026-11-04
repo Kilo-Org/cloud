@@ -46,7 +46,13 @@ const mockUploadEndpoint = { mutationOptions: () => ({}) };
 const mockTrpc = {
   cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
   organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
+  cliSessionsV2: {
+    worktreeParent: {
+      queryOptions: (input: unknown) => ({ queryKey: [['worktreeParent'], input] }),
+    },
+  },
 };
+const mockTrpcClient = { cliSessionsV2: { worktreeParent: { query: jest.fn() } } };
 
 class MockResizeObserver {
   constructor(callback: ResizeObserverCallback) {
@@ -85,10 +91,16 @@ jest.mock('next/navigation', () => ({
     }),
 }));
 jest.mock('@tanstack/react-query', () => ({
+  skipToken: Symbol('skip'),
+  queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
+  useQuery: () => ({ data: undefined }),
   useQueryClient: () => mockQueryClient,
 }));
-jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => mockTrpc,
+  useRawTRPCClient: () => mockTrpcClient,
+}));
 jest.mock('./useSavedWorktreeChanges', () => ({
   useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
 }));

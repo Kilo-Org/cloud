@@ -17,6 +17,11 @@ export type PrepareRoot = {
   directory: string;
   /** Names the repository in a failure and a progress line; absent for a route with one legacy root. */
   repoFullName: string | undefined;
+  /**
+   * Whether this root shares its route with others. A lone root needs no name
+   * in its progress: "Cloning repository" already says which checkout it is.
+   */
+  namesRepositoryInProgress: boolean;
   /** The route spec narrowed to this root: its directory, remote and branch. */
   spec: ControlPlaneRouteSpec;
 };
@@ -55,12 +60,23 @@ export function prepareRoots(
 ): PrepareRoot[] {
   // Each root has its own branch; the route's belong to the launch repository.
   const { roots, branch: _branch, branchMode: _branchMode, ...route } = spec;
-  if (roots === undefined) return [{ directory: spec.directory, repoFullName: undefined, spec }];
+  if (roots === undefined) {
+    return [
+      {
+        directory: spec.directory,
+        repoFullName: undefined,
+        namesRepositoryInProgress: false,
+        spec,
+      },
+    ];
+  }
+  const namesRepositoryInProgress = roots.length > 1;
   return roots.map(root => {
     const token = aliasForHost(hostOf(root.git.url), spec, credentials);
     return {
       directory: root.directory,
       repoFullName: root.repoFullName,
+      namesRepositoryInProgress,
       spec: {
         ...route,
         directory: root.directory,
@@ -123,13 +139,18 @@ export function hasEnvironmentRoots(
   return roots.length > 0 && roots.every(isEnvironmentRoot);
 }
 
-/** A progress detail that says which repository it is about, when the route has several. */
+/**
+ * A progress detail that says which repository it is about, when the route has
+ * several. The action is always part of the line: a bare repository name does
+ * not say whether it is being cloned, restored or checked out.
+ */
 export function rootProgressDetail(
   root: PrepareRoot,
-  detail: string | undefined
+  detail: string | undefined,
+  action: string
 ): string | undefined {
-  if (!isEnvironmentRoot(root)) return detail;
-  return detail === undefined ? root.repoFullName : `${root.repoFullName}: ${detail}`;
+  if (!root.namesRepositoryInProgress || !isEnvironmentRoot(root)) return detail;
+  return `${root.repoFullName}: ${detail ?? action}`;
 }
 
 /**

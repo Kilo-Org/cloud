@@ -17,6 +17,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  Square: 'Square',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -206,6 +207,17 @@ describe('PreparationGroup incomplete restore', () => {
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: false });
     expect(mounted.renderer.root.findAllByType('Check')).toHaveLength(1);
     mounted.unmount();
+  });
+
+  it('reads a preparation cancellation as a stopped session', async () => {
+    const stopped = await mount(
+      restoreAttempt({ status: 'failed', safeError: 'preparation_cancelled' })
+    );
+    expect(stopped.group().props.accessibilityLabel).toBe('Session stopped');
+    expect(stopped.renderer.root.findAllByType('Square')).toHaveLength(1);
+    expect(stopped.renderedTextValues()).toContain('Session stopped');
+    expect(stopped.renderedTextValues()).not.toContain('preparation_cancelled');
+    stopped.unmount();
   });
 
   it('keeps the running and failed titles and icons', async () => {

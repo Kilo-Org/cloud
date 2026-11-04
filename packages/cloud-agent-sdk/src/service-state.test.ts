@@ -1045,6 +1045,87 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('v2 attempt_failed with the cancellation reason reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+        }),
+      ]);
+    });
+
+    it('keeps a workspace stop interrupted after the preparation failure arrives', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'message-1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'preparation_cancelled',
+        action: 'attempt_failed',
+        safeError: 'preparation_cancelled',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+        }),
+      ]);
+    });
+
     it('clearPreparationAttempts empties the rows and a new attempt starts fresh', () => {
       const state = createServiceState(makeConfig());
       state.process({
@@ -1809,6 +1890,36 @@ describe('createServiceState', () => {
         cloudStatus: { type: 'error', message: 'Sandbox failed' },
       });
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Sandbox failed' });
+    });
+
+    it.each(['preparation_cancelled', 'Environment preparation was stopped'])(
+      'a preparation cancellation status %s reads as a stop, not an error',
+      message => {
+        const state = createServiceState(makeConfig());
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'preparing', step: 'cloning' },
+        });
+        state.process({
+          type: 'cloud.status',
+          cloudStatus: { type: 'error', message },
+        });
+        expect(state.getCloudStatus()).toBeNull();
+        expect(state.getStatus()).toEqual({ type: 'interrupted' });
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+      }
+    );
+
+    it('a preparation cancellation replayed by a durable refresh reads as a stop', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'idle' },
+        cloudStatus: { type: 'error', message: 'preparation_cancelled' },
+      });
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
     it('reset clears cloudStatus back to null', () => {
@@ -3058,6 +3169,31 @@ describe('createServiceState', () => {
 
       expect(state.getCloudStatus()).toBeNull();
       expect(state.getStatus()).toEqual({ type: 'interrupted' });
+    });
+
+    it('a terminal preparation cancellation reads as an interrupt', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation was stopped',
+        reason: 'execution',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Environment preparation was stopped',
+        reason: 'interrupted',
+      });
+      expect(onError).not.toHaveBeenCalled();
     });
 
     it('cloud.message.failed with reason=interrupted settles the accepted turn', () => {

@@ -1,4 +1,4 @@
-import { AlertCircle, Check } from 'lucide-react';
+import { AlertCircle, Check, Square } from 'lucide-react';
 import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import {
@@ -75,6 +75,14 @@ function RowLabel({ summary }: { summary: PreparationRowSummary }) {
       </>
     );
   }
+  if (summary.kind === 'stopped') {
+    return (
+      <>
+        <span>Preparation stopped</span>
+        {summary.duration && <span className="shrink-0 tabular-nums">· {summary.duration}</span>}
+      </>
+    );
+  }
   if (summary.kind === 'incomplete') {
     return <span className="text-status-destructive min-w-0 truncate">{summary.text}</span>;
   }
@@ -116,6 +124,9 @@ function AttemptIcon({
 }) {
   if (summary.kind === 'incomplete') {
     return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
+  }
+  if (summary.kind === 'stopped') {
+    return <Square className="text-muted-foreground h-3 w-3 shrink-0" />;
   }
   if (status === 'running') return <StatusSpinner className="h-3 w-3 shrink-0" />;
   if (status === 'completed') return <Check className="h-3 w-3 shrink-0" />;

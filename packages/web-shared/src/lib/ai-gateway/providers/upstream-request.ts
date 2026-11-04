@@ -512,6 +512,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
   }
 
   if (!response.ok) {
+    await response.body?.cancel();
     captureMessage(`Timed out fetching openrouter generation`, {
       level: 'info',
       tags: { source: `${provider.type}_generation_fetch` },

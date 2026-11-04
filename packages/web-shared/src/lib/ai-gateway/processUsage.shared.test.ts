@@ -320,7 +320,6 @@ describe('selectUsageCostFields', () => {
         level: 'error',
         tags: { source: 'test_source' },
         extra: {
-          kiloUserId: 'opaque-user-id',
           messageId: 'test-message-id',
           model: 'test-model',
           upstream_id: null,

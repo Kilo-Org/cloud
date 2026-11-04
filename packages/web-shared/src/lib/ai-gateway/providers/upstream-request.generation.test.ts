@@ -71,16 +71,26 @@ describe('fetchGeneration', () => {
     expect(retryResponse?.(new Response(null, { status: 200 }))).toBe(false);
   });
 
-  it('does not include a failed generation response body in the report', async () => {
+  it('cancels a failed generation response without including its body in the report', async () => {
     const privateResponseText = 'synthetic-response-secret@example.test';
+    const cancel = jest.fn();
     mockFetchWithBackoff.mockResolvedValue(
-      new Response(privateResponseText, { status: 503, statusText: 'Service Unavailable' })
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(privateResponseText));
+          },
+          cancel,
+        }),
+        { status: 503, statusText: 'Service Unavailable' }
+      )
     );
 
     const result = fetchGeneration('message-id', provider);
     await jest.advanceTimersByTimeAsync(200);
 
     await expect(result).resolves.toBeUndefined();
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(captureMessage).toHaveBeenCalledWith(
       'Timed out fetching openrouter generation',
       expect.objectContaining({

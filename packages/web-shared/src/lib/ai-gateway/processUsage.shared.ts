@@ -79,7 +79,7 @@ export function computeOpenRouterCosts(
  */
 export function computeOpenRouterCostFields(
   usage: OpenRouterCostFields,
-  coreProps: NotYetCostedUsageStats & { kiloUserId?: string },
+  coreProps: NotYetCostedUsageStats,
   source: string,
   requireIsByok: boolean,
   provider: ProviderType
@@ -100,7 +100,6 @@ export function computeOpenRouterCostFields(
       level: 'error',
       tags: { source },
       extra: {
-        ...(coreProps.kiloUserId === undefined ? {} : { kiloUserId: coreProps.kiloUserId }),
         messageId: coreProps.messageId,
         model: coreProps.model,
         upstream_id: coreProps.upstream_id,

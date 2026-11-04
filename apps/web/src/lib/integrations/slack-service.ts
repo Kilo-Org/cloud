@@ -221,6 +221,17 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
 }
 
 /**
+ * The complement of `isOwnedBy` as a filter. `NOT` over the nullable owner columns
+ * would drop rows, so each owner is compared with `IS NOT DISTINCT FROM` and the
+ * other owner column with `IS NULL`.
+ */
+function isOwnedByAnotherOwner(owner: Owner) {
+  return owner.type === 'user'
+    ? sql`NOT (${platform_integrations.owned_by_user_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_organization_id} IS NULL)`
+    : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
+}
+
+/**
  * Find a Slack `platform_integrations` row for `teamId` that belongs to a
  * different Kilo owner. Callers use this before persisting a workspace
  * installation so a workspace owned elsewhere is rejected without writing to
@@ -251,15 +262,19 @@ export async function getConflictingSlackInstallation(
     return isOwnedBy(canonical, owner) ? null : canonical;
   }
 
-  const legacy = await database
+  const [conflicting] = await database
     .select()
     .from(platform_integrations)
     .where(
-      and(eq(platform_integrations.platform, PLATFORM.SLACK), legacySlackWorkspaceCondition(teamId))
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        legacySlackWorkspaceCondition(teamId),
+        isOwnedByAnotherOwner(owner)
+      )
     )
-    .limit(2);
+    .limit(1);
 
-  return legacy.find(integration => !isOwnedBy(integration, owner)) ?? null;
+  return conflicting ?? null;
 }
 
 function isSlackWorkspaceUniqueViolation(error: unknown): boolean {

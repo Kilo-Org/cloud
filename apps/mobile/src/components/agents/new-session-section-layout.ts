@@ -25,18 +25,28 @@
  *
  * The width rule measures the room the heading itself gets, in points of text.
  * The heading takes at most `NEW_SESSION_SECTION_LABEL_WIDTH_RATIO` of the row,
- * and a word of the longest localized name needs about 144 dp at the base text
- * size; a system font scale multiplies the word and not the share. A window
- * whose label share still holds that word keeps the row — a 360 dp phone does
- * up to scale 1.125 — and everything narrower or larger-scaled keeps the
+ * the row is the window less the form content's horizontal padding
+ * (`NEW_SESSION_SECTION_ROW_INSET`), and a word of the longest localized name
+ * needs about 144 dp at the base text size; a system font scale multiplies the
+ * word and not the share. A window whose label share still holds that word
+ * keeps the row — the 360 dp compact cell does at the base scale, and its share
+ * runs out just above it — and everything narrower or larger-scaled keeps the
  * stacked form and scrolls the picker into view. An unknown width, height or
  * scale keeps the stacked form for the same reason: the compact row is the
  * exception, never the default.
+ *
+ * The inset is the form's own `px-4`, 14 dp per side at NativeWind's rem: the
+ * 360 dp compact cell measures a 331.81 dp row. A landscape window also loses
+ * its safe-area side insets, which this does not subtract — the row there is
+ * over 850 dp, so the share stays far above the word's need.
  */
 const NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT = 720;
 
 /** The largest share of its row the inline heading may take. */
 export const NEW_SESSION_SECTION_LABEL_WIDTH_RATIO = 0.45;
+
+/** Horizontal padding the form puts between the window edge and the row. */
+const NEW_SESSION_SECTION_ROW_INSET = 28;
 
 /**
  * Room one word of the longest localized heading needs, in points at the base
@@ -60,7 +70,8 @@ export function resolveNewSessionInlineSections(
   ) {
     return false;
   }
-  const labelRoom = (windowWidth * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO) / fontScale;
+  const rowWidth = windowWidth - NEW_SESSION_SECTION_ROW_INSET;
+  const labelRoom = (rowWidth * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO) / fontScale;
   return (
     labelRoom >= NEW_SESSION_SECTION_LABEL_MIN_TEXT_WIDTH &&
     windowHeight < NEW_SESSION_INLINE_SECTION_MAX_WINDOW_HEIGHT

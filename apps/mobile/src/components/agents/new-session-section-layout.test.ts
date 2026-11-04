@@ -11,8 +11,9 @@ describe('resolveNewSessionInlineSections', () => {
     // `Repository` heading with the picker cut by the pinned footer.
     expect(resolveNewSessionInlineSections(360, 640, 1)).toBe(true);
     // The heading's share there is what the rule is measured against: 45% of
-    // the row, which is the 162 points of text the 144-point word needs.
-    expect(360 * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO).toBeCloseTo(162, 5);
+    // the 331.81 dp row the cell measures, which is 149 points of text — the
+    // room the 144-point word needs.
+    expect((360 - 28) * NEW_SESSION_SECTION_LABEL_WIDTH_RATIO).toBeCloseTo(149.4, 5);
   });
 
   it('keeps the stacked heading on the windows that already reach the picker', () => {
@@ -35,12 +36,14 @@ describe('resolveNewSessionInlineSections', () => {
   });
 
   it('keeps the stacked heading where the share cannot hold one word', () => {
-    // The narrowest common phone is the smallest row whose 45% share still
-    // holds a word of the longest localized heading; below it, and on the
-    // split-screen and cover-display windows the repo names, the form scrolls
-    // the picker into view instead.
-    expect(resolveNewSessionInlineSections(320, 640, 1)).toBe(true);
-    expect(resolveNewSessionInlineSections(319, 640, 1)).toBe(false);
+    // The row is the window less the form's 28 dp of horizontal padding, so
+    // 348 dp is the smallest window whose 45% share still holds a word of the
+    // longest localized heading; below it, and on the split-screen and
+    // cover-display windows the repo names, the form scrolls the picker into
+    // view instead.
+    expect(resolveNewSessionInlineSections(348, 640, 1)).toBe(true);
+    expect(resolveNewSessionInlineSections(347, 640, 1)).toBe(false);
+    expect(resolveNewSessionInlineSections(320, 640, 1)).toBe(false);
     expect(resolveNewSessionInlineSections(240, 640, 1)).toBe(false);
     expect(resolveNewSessionInlineSections(160, 640, 1)).toBe(false);
   });
@@ -50,7 +53,10 @@ describe('resolveNewSessionInlineSections', () => {
     // shrinks with the scale, so the row stops holding a word past 1.125 and
     // the stacked form returns.
     expect(resolveNewSessionInlineSections(360, 640, 1)).toBe(true);
-    expect(resolveNewSessionInlineSections(360, 640, 1.125)).toBe(true);
+    // (360 - 28) * 0.45 is 149.4 dp, so the last scale that still holds a
+    // 144 dp word is ~1.037; Android's first step above 1.0 (1.15) stacks.
+    expect(resolveNewSessionInlineSections(360, 640, 1.03)).toBe(true);
+    expect(resolveNewSessionInlineSections(360, 640, 1.15)).toBe(false);
     expect(resolveNewSessionInlineSections(360, 640, 1.25)).toBe(false);
     expect(resolveNewSessionInlineSections(360, 640, 1.8)).toBe(false);
     // A wider phone keeps the row further up the scale before it stops.

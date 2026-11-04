@@ -70,9 +70,15 @@ export function PreferenceRow({
   const flip = () => {
     onValueChange(!(resolveValue?.() ?? value));
   };
+  // The label column keeps 8 dp from the switch, not 12. The longest row title
+  // ("Keep screen on while on session page") lands within a few pixels of the
+  // column width at 360 dp: Android then measures the title against that
+  // boundary, reports a two-line frame while it paints one line, and the
+  // description drops a whole line below the title. The extra 4 dp keeps the
+  // title clear of the boundary, so the frame is the line the row paints.
   return (
     <View
-      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 rounded-lg bg-secondary p-3')}
     >
       <Pressable
         className={cn(

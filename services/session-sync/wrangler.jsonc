@@ -1,0 +1,92 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Local development configuration. Production bindings are not provisioned yet;
+  // deploy-workers.yml excludes this service until they are. See README.md.
+  "name": "session-sync",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8817,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "USER_TENANT_SESSIONS": "10000",
+    "USER_TENANT_BYTES": "107374182400",
+    "ORGANIZATION_TENANT_SESSIONS": "200000",
+    "ORGANIZATION_TENANT_BYTES": "2199023255552",
+  },
+  "ratelimits": [
+    {
+      "name": "EXCHANGE_IP_LIMITER",
+      "namespace_id": "1020",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "EXCHANGE_ACCOUNT_LIMITER",
+      "namespace_id": "1021",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "USER_REQUEST_LIMITER",
+      "namespace_id": "1022",
+      "simple": { "limit": 1200, "period": 60 },
+    },
+    {
+      "name": "USER_BLOB_LIMITER",
+      "namespace_id": "1023",
+      "simple": { "limit": 300, "period": 60 },
+    },
+    {
+      "name": "USER_DATA_BLOCK_LIMITER",
+      "namespace_id": "1033",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
+  "analytics_engine_datasets": [
+    { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },
+  ],
+  // NEXTAUTH_SECRET and SESSION_SYNC_SECRET come from .dev.vars locally.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Local-only placeholder, not a provisioned Hyperdrive configuration.
+      "id": "session-sync-local",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_SYNC_DO",
+        "class_name": "SessionSyncDO",
+      },
+      { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionSyncDO"],
+    },
+    { "tag": "v2", "new_sqlite_classes": ["SessionSyncTenantDO"] },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SESSION_SYNC_R2",
+      "bucket_name": "session-sync-local",
+    },
+  ],
+}

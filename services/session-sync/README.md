@@ -317,11 +317,11 @@ Accept the measured cost envelope before production-scale load.
 
 ## Isolated staging configuration
 
-`wrangler.jsonc` remains local-only. Staging uses a separately rendered
-`.wrangler/wrangler.staging.json`, following the config-rendering pattern in
-`cloud-agent-next/test/e2e/deploy/render-e2e-worker-config.mjs`. Neither rendering
-nor the dry-run command creates resources or deploys. Automatic deployment
-continues to exclude this service.
+The top level of `wrangler.jsonc` is production and `env.local` is local development.
+Staging uses a separately rendered `.wrangler/wrangler.staging.json`, following the
+config-rendering pattern in `cloud-agent-next/test/e2e/deploy/render-e2e-worker-config.mjs`.
+The renderer copies only service code and runtime settings, never the production bindings.
+Neither rendering nor the dry-run command creates resources or deploys.
 
 ### Missing live prerequisites
 

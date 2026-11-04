@@ -22,9 +22,10 @@ interface CreditCategoryDetailPageProps {
 
 export default async function CreditCategoryDetailPage({ params }: CreditCategoryDetailPageProps) {
   const { key } = await params;
-  const decodedKey = decodeURIComponent(key);
+  // The dynamic segment arrives percent-encoded; Next rejects malformed encodings with 400 first.
+  const categoryKey = decodeURIComponent(key);
 
-  const category = promoCreditCategories.find(cat => cat.credit_category === decodedKey);
+  const category = promoCreditCategories.find(cat => cat.credit_category === categoryKey);
 
   const breadcrumbs = (
     <>
@@ -33,7 +34,7 @@ export default async function CreditCategoryDetailPage({ params }: CreditCategor
       </BreadcrumbItem>
       <BreadcrumbSeparator />
       <BreadcrumbItem>
-        <BreadcrumbPage>{decodedKey}</BreadcrumbPage>
+        <BreadcrumbPage>{categoryKey}</BreadcrumbPage>
       </BreadcrumbItem>
     </>
   );
@@ -51,9 +52,9 @@ export default async function CreditCategoryDetailPage({ params }: CreditCategor
             </div>
           )}
         </div>
-        <CreditCategoryStats creditCategoryKey={decodedKey} />
+        <CreditCategoryStats creditCategoryKey={categoryKey} />
 
-        <CreditCategoryUsersTable creditCategoryKey={decodedKey} />
+        <CreditCategoryUsersTable creditCategoryKey={categoryKey} />
       </div>
     </AdminPage>
   );

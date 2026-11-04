@@ -4,7 +4,6 @@ import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import {
-  USAGE_QUEUE_ONLY_ENABLED,
   USAGE_QUEUE_SFO_CONFIG,
   USAGE_QUEUE_FRA_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
@@ -352,7 +351,7 @@ async function enqueueUsageWithinLifetime(
 type UsageAccountingTransport = 'queue' | 'direct';
 
 function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
-  return USAGE_QUEUE_ONLY_ENABLED ||
+  return (process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production') ||
     isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext) ||
     isFraUsageQueueSelected(USAGE_QUEUE_FRA_CONFIG, usageContext)
     ? 'queue'
@@ -457,15 +456,25 @@ async function recordUsageDirectly(
 }
 
 /**
- * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
- * primary is on.
+ * Direct (unselected or safe before-send fallback) usage write dispatch.
+ *
+ * Selected usage normally goes through `enqueueUsage` and the configured queue
+ * transport; the production Cloudflare consumer then calls the existing
+ * Frankfurt `/api/internal/usage/record` writer. This path is for unselected
+ * accounting, plus the two pre-publication fallbacks where nothing was sent:
+ * missing/unparseable publisher configuration and failed lifetime registration.
+ * It is not used after any publication attempt, because the event may already
+ * be queued.
+ *
+ * SFO instances hand this write to Frankfurt through
+ * `recordUsageInPrimaryRegion`; Frankfurt instances write locally.
  *
  * `kilocode-ai-gateway` executes in both Frankfurt and SFO while the primary is
  * Frankfurt-only. This write holds row locks on `kilocode_users`,
  * `organizations` and `organization_user_usage` across several sequential
  * statements, so from SFO the lock hold is dominated by transatlantic round
  * trips rather than by database work — which is what turns a contended counter
- * row into a queue and, downstream, exhausts the connection pool.
+ * row into a lock backlog and, downstream, exhausts the connection pool.
  *
  * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
  * would be pure overhead and a pointless new failure mode.

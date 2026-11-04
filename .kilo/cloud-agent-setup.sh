@@ -48,13 +48,16 @@ fi
 workload_parent=${KILO_WORKLOAD_CGROUP_ROOT:-/sys/fs/cgroup/kilo-workloads}
 KILO_STARTUP_CGROUP="$workload_parent/kilo-dev-$(basename "$repo")"
 build_mode=0
-if [[ ! -f $workload_parent/memory.max ]]; then
+if [[ ${KILO_ENVIRONMENT_BUILD:-} == 1 ]]; then
   # The environment builder runs without the session wrapper, so it has no
   # delegated workload cgroup and stops every process before capture. Install
   # packages and warm Docker's image store for the snapshot; session setup
   # starts the daemons from the captured filesystem.
   build_mode=1
   KILO_STARTUP_CGROUP=
+elif [[ ! -f $workload_parent/memory.max ]]; then
+  printf 'Memory-safe setup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
+  exit 1
 fi
 export KILO_WORKLOAD_CGROUP_ROOT=$workload_parent KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
 if (( ! build_mode )); then
@@ -333,7 +336,7 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
   fi
 fi
-if (( ! build_mode )) && pgrep -a -x dockerd | grep -qF -- "--bip=$bridge_gateway/16"; then
+if pgrep -a -x dockerd | grep -qF -- "--bip=$bridge_gateway/16"; then
   # Without IP forwarding, bridge containers reach only the host. Workerd pins sandbox
   # containers to public resolvers, so redirect all their DNS to a forwarder on the gateway.
   if ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then

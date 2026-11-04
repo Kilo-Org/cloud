@@ -59,15 +59,17 @@ the line number.
 ## Environment builds
 
 The same script runs as an environment's setup command in the snapshot builder.
-That builder has no session wrapper, so it has no `kilo-workloads` cgroup. The
-script detects the missing cgroup and switches to build mode: it installs
-packages, pulls images and warms the sandbox image build, then stops the Docker
-daemon it started and exits. It skips the memory cap, DNS redirect, database
-migration and fake-user seed. A snapshot captures files, not running daemons,
-and the session's own setup run repeats the full path from that filesystem.
+The builder sets `KILO_ENVIRONMENT_BUILD=1` for every setup command; the script
+uses it to switch to build mode. That builder has no session wrapper, so it has
+no `kilo-workloads` cgroup. Build mode installs packages, pulls images and warms
+the sandbox image build, then stops the Docker daemon it started and exits. It
+skips the memory cap, database migration and fake-user seed. Without
+`KILO_ENVIRONMENT_BUILD=1`, a missing `kilo-workloads` cgroup still fails setup.
+A snapshot captures files, not running daemons, and the session's own setup run
+repeats the full path from that filesystem.
 
-Environment-build setup commands get a 20-minute hard timeout; the inactivity
-timeout remains 5 minutes. The build deadline is 30 minutes.
+Environment-build setup commands may use the rest of the 30-minute build
+deadline; the inactivity timeout remains 5 minutes.
 
 `.wrangler/kilo-startup/env` only sets defaults. Override a value by exporting
 it before running pnpm. Do not edit the file: setup rewrites it.

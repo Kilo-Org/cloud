@@ -38,8 +38,7 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
-import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useRequestLogsAvailable } from '@/hooks/useRequestLogsAvailable';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -99,12 +98,7 @@ export default function OrganizationAppSidebar({
 
   const hasOwnerLevelAccess = canManageOrganizationBilling(currentRole);
 
-  const trpc = useTRPC();
-  const { data: requestLogsAvailability } = useQuery({
-    ...trpc.organizations.requestLogs.isAvailable.queryOptions({ organizationId }),
-    enabled: hasOwnerLevelAccess,
-  });
-  const showRequestLogs = hasOwnerLevelAccess && requestLogsAvailability?.available === true;
+  const showRequestLogs = useRequestLogsAvailable(organizationId, hasOwnerLevelAccess);
 
   // Dashboard group
   const dashboardItems: Array<{

@@ -26,7 +26,7 @@ The external integration points are deliberately small:
 | Existing owner | Queue integration |
 |---|---|
 | Shared `usage-publisher.ts` | Import the package selector/publisher and delegate only on exact staging opt-in; existing Cloudflare code stays here |
-| Shared `config.server.ts` | Select queued accounting under the staging environment guard; the package selector chooses Vercel publication only |
+| Shared `processUsage.ts` | Select queued accounting with inline staging environment checks; the package selector chooses Vercel publication only |
 | Gateway `vercel.mjs` / `package.json` | Compose the queue deployment settings and run the queue prepare/test commands |
 | Gateway/shared manifests | Workspace dependency on this package; no direct Vercel SDK dependency |
 | Existing writer route/diagnostics/client | Recognize `queue_vercel` for caller correlation; no queue SDK dependency or persistence change |
@@ -47,9 +47,9 @@ deployments and compatible writer while they drain. If later work requires a
 selective cleanup instead, a cleanup PR can:
 
 1. Delete `packages/usage-queue` and `apps/ai-gateway/src/usage-queue`.
-2. Remove the package imports and delegation branch from shared `usage-publisher.ts`,
-   and remove the selector import/OR from `config.server.ts`. Their existing CF,
-   direct and production SFO behavior remains owned by those files.
+2. Remove the package imports and delegation branch from shared `usage-publisher.ts`.
+   Its existing Cloudflare publication remains; accounting selection stays in
+   `processUsage.ts`.
 3. Remove `usageQueueDeployment` from the gateway root config, restore its build
    command to `next build`, and remove the queue test script/CI step and the two
    workspace dependency entries. Remove the generated-route `.gitignore` entry.

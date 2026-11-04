@@ -18,9 +18,6 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<object>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-}));
 jest.mock('./usage-publisher', () => ({
   enqueueUsage: jest.fn(async () => ({ kind: 'accepted' })),
   getUsagePublisherExecutionRegion: () => 'fra1',

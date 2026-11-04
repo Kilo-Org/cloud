@@ -171,3 +171,105 @@ it('returns retryable tenant failures without resetting the session or losing re
   expect(await runDurableObjectAlarm(stub)).toBe(true);
   expect((await api.state(sessionID)).status).toBe(200);
 });
+
+it.each([false, true])(
+  'fences a committed shrink with a lost response (restart: %s)',
+  async restart => {
+    const principal = personal(`lost-shrink-${crypto.randomUUID()}`);
+    const api = client(principal);
+    const sessionID = newSessionID();
+    const sourceID = crypto.randomUUID();
+    const registered = await api.register(sessionID, sourceID);
+    expect(registered.status).toBe(201);
+    await registered.json();
+    const tenantStub = getTenantStub(testEnv, principal.tenant);
+    expect(
+      (
+        await tenantStub.reserve({
+          tenant: principal.tenant,
+          sessionID,
+          bytes: 3 * LIMITS.tenantLeaseBytes,
+        })
+      ).ok
+    ).toBe(true);
+    let stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    await runInDurableObject(stub, (instance, state) => {
+      drizzle(state.storage)
+        .update(session)
+        .set({ tenant_lease: 3 * LIMITS.tenantLeaseBytes })
+        .run();
+      const exposed = instance as unknown as { env: Env; lostShrinkInjected: boolean };
+      const namespace = exposed.env.SESSION_SYNC_TENANT_DO;
+      const realTenant = getTenantStub(exposed.env, principal.tenant);
+      let lost = false;
+      exposed.lostShrinkInjected = true;
+      exposed.env = {
+        ...exposed.env,
+        SESSION_SYNC_TENANT_DO: {
+          idFromName: namespace.idFromName.bind(namespace),
+          get: () => ({
+            reserve: async (input: unknown) => {
+              const result = await realTenant.reserve(input);
+              if (!lost) {
+                lost = true;
+                throw new Error('Synthetic lost shrink response after tenant commit');
+              }
+              return result;
+            },
+            release: (input: unknown) => realTenant.release(input),
+          }),
+        } as unknown as Env['SESSION_SYNC_TENANT_DO'],
+      };
+      return state.storage.setAlarm(Date.now() + 60_000);
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(drizzle(state.storage).select().from(session).get()!.tenant_lease).toBe(0);
+      expect(await state.storage.get('leaseReconcilePending')).toBe(true);
+    });
+    await runInDurableObject(tenantStub, (instance, state) => {
+      expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
+        0
+      );
+      const exposed = instance as unknown as { env: Env };
+      exposed.env = { ...exposed.env, USER_TENANT_BYTES: '0' };
+    });
+    if (restart) {
+      await expect(
+        runInDurableObject(stub, (_instance, state) => state.abort('Synthetic session restart'))
+      ).rejects.toThrow();
+      stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+      await runInDurableObject(stub, async (instance, state) => {
+        expect('lostShrinkInjected' in instance).toBe(false);
+        expect(await state.storage.get('leaseReconcilePending')).toBe(true);
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    }
+    const packet = batch(sourceID, 0, 1, [
+      { op: 'put', kind: 'message', id: 'm', value: 'must reserve again' },
+    ]);
+    const denied = await api.apply(sessionID, packet);
+    expect(denied.status).toBe(413);
+    expect(await denied.json()).toMatchObject({ error: { code: 'tenant_budget_exceeded' } });
+    expect(await (await api.state(sessionID)).json()).toMatchObject({
+      position: 0,
+      usage: { entities: 0, inlineBytes: 0 },
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('leaseReconcilePending')).toBeUndefined();
+    });
+    await runInDurableObject(tenantStub, instance => {
+      const exposed = instance as unknown as { env: Env };
+      exposed.env = { ...exposed.env, USER_TENANT_BYTES: String(LIMITS.userTenantBytes) };
+    });
+    const accepted = await api.apply(sessionID, packet);
+    expect(accepted.status).toBe(200);
+    await accepted.json();
+    await runInDurableObject(tenantStub, (_instance, state) => {
+      expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
+        LIMITS.tenantLeaseBytes
+      );
+    });
+  }
+);

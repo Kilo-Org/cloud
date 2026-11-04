@@ -172,6 +172,9 @@ the session admission and its whole lease. Tenant calls never run inside SQLite 
 Admission mutations are serialized without blocking session reads during tenant RPCs.
 Tenant outages return retryable `tenant_unavailable` (503), `Retry-After: 60`, and
 an epoch-ms `error.retryAt`; alarm-driven releases and shrinks retry without resetting the session.
+Before a shrink can release tenant capacity, the session durably lowers its local lease.
+A persisted reconciliation intent retries an uncertain shrink after an outage or object eviction;
+new writes cannot consume capacity that the tenant may already have released.
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.

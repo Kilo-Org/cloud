@@ -134,26 +134,25 @@ export type NotificationHistoryFilter = Readonly<{
  * catalog check can see them.
  */
 const CATEGORY_LABEL_KEYS = {
-  chatMessages: 'notifications.channel.chat',
   agentAttention: 'notifications.category.agentAttentionTitle',
   sessionStatus: 'notifications.category.sessionStatusTitle',
   balanceAlerts: 'notifications.channel.balance',
   spendAlerts: 'notifications.channel.spend',
   securityFindings: 'notifications.channel.security',
-} satisfies Record<NotificationHistoryCategory, string>;
+} satisfies Record<Exclude<NotificationHistoryCategory, 'chatMessages'>, string>;
 
 /**
- * Every chip in the order the settings screen lists the categories: "All"
- * first, then one per category the recorder can produce. A category the
- * recorder never writes (there is no recorded push kind for it) has no chip,
- * so no chip can only ever answer an empty page.
+ * Every supported recorded category behind the "All" chip, in settings order.
+ * Retired product categories have no filter.
  */
 export const NOTIFICATION_HISTORY_FILTERS: readonly NotificationHistoryFilter[] = [
   { category: null, labelKey: 'common.all' },
-  ...NOTIFICATION_HISTORY_CATEGORIES.map(category => ({
-    category,
-    labelKey: CATEGORY_LABEL_KEYS[category],
-  })),
+  ...NOTIFICATION_HISTORY_CATEGORIES.filter(category => category !== 'chatMessages').map(
+    category => ({
+      category,
+      labelKey: CATEGORY_LABEL_KEYS[category],
+    })
+  ),
 ];
 
 /**

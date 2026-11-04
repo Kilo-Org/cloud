@@ -187,10 +187,9 @@ describe('notificationHistoryTarget', () => {
 });
 
 describe('notificationHistoryFilters', () => {
-  it('offers every recorded category behind an "All" chip', () => {
+  it('offers supported recorded categories behind an "All" chip', () => {
     expect(NOTIFICATION_HISTORY_FILTERS.map(filter => filter.category)).toEqual([
       null,
-      'chatMessages',
       'agentAttention',
       'sessionStatus',
       'balanceAlerts',
@@ -207,7 +206,6 @@ describe('notificationHistoryFilters', () => {
 
     expect(filters.map(filter => filter.category)).toEqual([
       null,
-      'chatMessages',
       'agentAttention',
       'sessionStatus',
       'spendAlerts',

@@ -49,6 +49,7 @@ import {
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 const PROVIDER_LABEL_KEYS = {
@@ -101,16 +102,9 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
     enabled: isAuthenticated && afterIdle,
-    // The Linked accounts row must settle while the online manager reports
-    // offline: a paused read is pending without fetching, so `isLoading` is
-    // false and the section neither paints a row nor an error. This one either
-    // answers or fails once the control-plane deadline lands, and the error
-    // surface below then offers Retry.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // A paused read leaves the Linked accounts row with neither content nor an
+    // error surface.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const {
     data: orgs,
@@ -120,16 +114,9 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated && afterIdle,
-    // The Agents section resolves its scope from this list, so the read must
-    // settle the same way the linked-accounts one does: a read paused by the
-    // online manager is pending without fetching, and the inline error surface
-    // below never paints, leaving the organization section and the agent rows
-    // waiting on a request that never starts. Answer, or fail into Retry.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // The Agents section resolves its scope from this list, so a paused read
+    // leaves the organization section and its rows waiting.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)

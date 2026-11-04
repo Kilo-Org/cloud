@@ -1,9 +1,11 @@
 import {
   evaluateMcpConnect,
+  normalizeGuardrailConfig,
   normalizeMcpConnectTarget,
   resolveGuardrailsSettings,
   type AllowedMcpServer,
 } from './guardrails-policy';
+import { isValidVersionSpec } from './version-spec';
 
 const remote = { kind: 'remote' as const, url: 'https://mcp.example.com/mcp' };
 const pkg = {
@@ -240,6 +242,61 @@ describe('evaluateMcpConnect', () => {
       versionReason: 'invalid_policy',
       versionCheck: 'server',
     });
+    expect(evaluate({ allowedServers: invalidPolicy, target: packageTarget })).toEqual({
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    });
+  });
+
+  it('treats a legacy 0.0.0 minimum as any version', () => {
+    const legacyAny = [
+      allowed(
+        {
+          kind: 'package',
+          ecosystem: 'npm',
+          identifier: '@acme/server',
+          version_spec: null,
+          min_version: '0.0.0',
+        },
+        'npm:@acme/server'
+      ),
+    ];
+    expect(
+      evaluate({ allowedServers: legacyAny, target: packageTarget, version: '0.0.1' })
+    ).toEqual({ decision: 'allowed' });
+    expect(evaluate({ allowedServers: legacyAny, target: packageTarget })).toEqual({
+      decision: 'allowed',
+    });
+    expect(
+      evaluate({ allowedServers: legacyAny, target: packageTarget, version: '0.0.0' })
+    ).toEqual({ decision: 'allowed' });
+  });
+
+  it('fails closed when a legacy minimum cannot be converted', () => {
+    const legacy = [
+      allowed(
+        {
+          kind: 'package',
+          ecosystem: 'npm',
+          identifier: '@acme/server',
+          version_spec: null,
+          min_version: 'latest',
+        },
+        'npm:@acme/server'
+      ),
+    ];
+    const denied = {
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    };
+    expect(evaluate({ allowedServers: legacy, target: packageTarget })).toEqual(denied);
+    expect(evaluate({ allowedServers: legacy, target: packageTarget, version: '1.0.0' })).toEqual(
+      denied
+    );
   });
 
   it('enforces a legacy min_version when no range is stored', () => {
@@ -288,5 +345,36 @@ describe('evaluateMcpConnect', () => {
     expect(evaluate({ allowedServers, target: packageTarget }, 'shadow')).toEqual({
       decision: 'allowed',
     });
+  });
+});
+
+describe('normalizeGuardrailConfig', () => {
+  const packageConfig = (minVersion: string | null) => ({
+    kind: 'package' as const,
+    ecosystem: 'npm' as const,
+    identifier: '@acme/server',
+    version_spec: null,
+    min_version: minVersion,
+  });
+
+  it('keeps a 0.0.0 legacy minimum as an unrestricted policy', () => {
+    expect(normalizeGuardrailConfig(packageConfig('0.0.0'))).toMatchObject({
+      version_spec: null,
+      min_version: '0.0.0',
+    });
+  });
+
+  it('converts a usable legacy minimum to its range', () => {
+    expect(normalizeGuardrailConfig(packageConfig('1.2.3'))).toMatchObject({
+      version_spec: '>=1.2.3',
+      min_version: '1.2.3',
+    });
+  });
+
+  it('marks an unusable legacy minimum as invalid rather than dropping it', () => {
+    const config = normalizeGuardrailConfig(packageConfig('latest'));
+    const versionSpec = config.kind === 'package' ? config.version_spec : null;
+    expect(versionSpec).not.toBeNull();
+    expect(isValidVersionSpec(versionSpec ?? '')).toBe(false);
   });
 });

@@ -292,6 +292,20 @@ describe('organization guardrails router', () => {
       });
     });
 
+    it('treats a legacy 0.0.0 minimum as any version', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const added = await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'legacy-any' },
+        minVersion: '0.0.0',
+      });
+
+      expect(added.config).toMatchObject({ version_spec: null, min_version: null });
+    });
+
     it.each(['latest', '^1.2.3', '>=2.0.0'])(
       'rejects the invalid legacy minVersion %j instead of storing no restriction',
       async minVersion => {

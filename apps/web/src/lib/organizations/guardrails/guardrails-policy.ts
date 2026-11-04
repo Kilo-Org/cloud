@@ -17,7 +17,8 @@ import {
 } from './mcp-identity';
 import {
   checkVersion,
-  legacyMinVersionToSpec,
+  classifyLegacyMinVersion,
+  isValidVersionSpec,
   minimumVersionForSpec,
   type VersionCheckResult,
 } from './version-spec';
@@ -75,6 +76,8 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
   };
 }
 
+const INVALID_LEGACY_MIN_VERSION = 'invalid legacy minimum';
+
 /**
  * Fills in the range from a legacy minimum and keeps a conservative minimum for
  * pre-range clients. Both keys are transitional until client rollout completes.
@@ -83,12 +86,24 @@ export function normalizeGuardrailConfig(
   config: OrganizationGuardrailConfig
 ): OrganizationGuardrailConfig {
   if (config.kind !== 'package') return config;
-  const versionSpec = config.version_spec ?? legacyMinVersionToSpec(config.min_version);
-  return {
-    ...config,
-    version_spec: versionSpec,
-    min_version: config.min_version ?? minimumVersionForSpec(versionSpec),
-  };
+  if (config.version_spec !== null && config.version_spec !== undefined) {
+    return {
+      ...config,
+      min_version: config.min_version ?? minimumVersionForSpec(config.version_spec),
+    };
+  }
+  const legacy = classifyLegacyMinVersion(config.min_version);
+  if (legacy.kind === 'range') {
+    return {
+      ...config,
+      version_spec: legacy.value,
+      min_version: config.min_version ?? minimumVersionForSpec(legacy.value),
+    };
+  }
+  if (legacy.kind === 'invalid') {
+    return { ...config, version_spec: INVALID_LEGACY_MIN_VERSION };
+  }
+  return { ...config, version_spec: null, min_version: config.min_version ?? null };
 }
 
 function toAllowedMcpServer(
@@ -203,6 +218,14 @@ export function evaluateMcpConnect(params: {
   const config = normalizeGuardrailConfig(server.config);
   if (config.kind !== 'package' || !config.version_spec) {
     return { decision: 'allowed' };
+  }
+  if (!isValidVersionSpec(config.version_spec)) {
+    return {
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    };
   }
   const version = params.version?.trim() ?? '';
   if (version === '') {

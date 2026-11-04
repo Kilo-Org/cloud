@@ -43,7 +43,8 @@ import {
   type McpTarget,
 } from '@/lib/organizations/guardrails/mcp-identity';
 import {
-  legacyMinVersionToSpec,
+  classifyLegacyMinVersion,
+  isValidVersionSpec,
   MAX_SEMVER_LENGTH,
   minimumVersionForSpec,
   normalizeVersionSpec,
@@ -149,9 +150,13 @@ function requestedVersionSpec(input: VersionSpecRequest): RequestedVersionSpec {
   if (input.minVersion !== undefined) {
     const legacyMinVersion = input.minVersion?.trim() ?? '';
     if (legacyMinVersion === '') return { provided: true, value: null, legacyMinVersion };
-    const value = legacyMinVersionToSpec(legacyMinVersion);
-    if (value === null) badRequest('Enter a version such as 1.2.3.');
-    return { provided: true, value, legacyMinVersion };
+    const legacy = classifyLegacyMinVersion(legacyMinVersion);
+    if (legacy.kind === 'invalid') badRequest('Enter a version such as 1.2.3.');
+    return {
+      provided: true,
+      value: legacy.kind === 'range' ? legacy.value : null,
+      legacyMinVersion,
+    };
   }
   return { provided: false, value: null, legacyMinVersion: null };
 }
@@ -536,7 +541,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
       const guardrail = await findGuardrail(input.organizationId, input.guardrailId);
       const existingConfig = normalizeGuardrailConfig(guardrail.config);
       const versionRequest = requestedVersionSpec(input);
-      let config = existingConfig;
+      let config: OrganizationGuardrailConfig | undefined;
       let identityKey = guardrail.identity_key;
       let defaultName: string | null = null;
       if (input.target) {
@@ -551,7 +556,14 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
             ? existingConfig.version_spec
             : null
           : versionSpecForTarget(target, versionRequest);
-        config = configForTarget(target, versionSpec);
+        config =
+          keepVersionSpec && versionSpec !== null && !isValidVersionSpec(versionSpec)
+            ? mcpConfigFromTarget(
+                target,
+                guardrail.config.kind === 'package' ? guardrail.config.version_spec : null,
+                guardrail.config.kind === 'package' ? (guardrail.config.min_version ?? null) : null
+              )
+            : configForTarget(target, versionSpec);
         identityKey = identityKeyForAllowList(target);
         defaultName = defaultCustomName(target);
         if (identityKey !== guardrail.identity_key) {
@@ -594,7 +606,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
               description:
                 input.description === undefined ? guardrail.description : input.description || null,
               identity_key: identityKey,
-              config,
+              config: config ?? guardrail.config,
             })
             .where(eq(organization_guardrails.id, guardrail.id))
             .returning();

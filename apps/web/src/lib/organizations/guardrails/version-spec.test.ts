@@ -1,6 +1,8 @@
 import { lt } from 'semver';
 import {
   checkVersion,
+  classifyLegacyMinVersion,
+  isValidVersionSpec,
   legacyMinVersionToSpec,
   MAX_SEMVER_LENGTH,
   minimumVersionForSpec,
@@ -125,6 +127,36 @@ describe('legacyMinVersionToSpec', () => {
     ['latest', null],
   ])('converts %j', (input, expected) => {
     expect(legacyMinVersionToSpec(input)).toBe(expected);
+  });
+});
+
+describe('classifyLegacyMinVersion', () => {
+  it.each([
+    [undefined, { kind: 'none' }],
+    ['', { kind: 'none' }],
+    ['0', { kind: 'any' }],
+    ['0.0', { kind: 'any' }],
+    ['0.0.0', { kind: 'any' }],
+    ['0.0.0.0', { kind: 'any' }],
+    ['1.2.3', { kind: 'range', value: '>=1.2.3' }],
+    ['1.2.3.4', { kind: 'range', value: '>=1.2.4-0.4' }],
+    ['0.0.0-rc.1', { kind: 'range', value: '>=0.0.0-rc.1' }],
+    ['latest', { kind: 'invalid' }],
+    ['99999999999999999999', { kind: 'invalid' }],
+  ])('classifies %j', (input, expected) => {
+    expect(classifyLegacyMinVersion(input)).toEqual(expected);
+  });
+});
+
+describe('isValidVersionSpec', () => {
+  it.each([
+    ['>=1.2.3', true],
+    ['^1.2.0 || >=2.0.3', true],
+    ['>=0.0.0', false],
+    ['>=5.0.0 ||', false],
+    ['not a range', false],
+  ])('%j -> %s', (spec, expected) => {
+    expect(isValidVersionSpec(spec)).toBe(expected);
   });
 });
 

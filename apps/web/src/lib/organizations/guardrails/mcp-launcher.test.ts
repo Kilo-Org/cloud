@@ -15,6 +15,8 @@ describe('parseLauncherCommand', () => {
     [['npx', '-y', 'pkg@release.x'], 'npm', 'pkg', null],
     [['npx', '-y', 'pkg@next.x'], 'npm', 'pkg', null],
     [['npx', '-y', 'pkg@1.x+build'], 'npm', 'pkg', null],
+    [['npx', '-y', 'pkg@0.0.0'], 'npm', 'pkg', null],
+    [['npx', '-y', 'pkg@0.0.0+build.1'], 'npm', 'pkg', null],
     [['npx', '-y', 'pkg@v1.2.3'], 'npm', 'pkg', '>=1.2.3'],
     [['npx', '-y', 'pkg@1.2.3+build.5'], 'npm', 'pkg', '>=1.2.3'],
     [['npx', '-y', '@azure/mcp@3.0.0-beta.21'], 'npm', '@azure/mcp', '>=3.0.0-beta.21'],

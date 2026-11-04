@@ -1,5 +1,5 @@
 import type { McpPackageEcosystem } from './mcp-identity';
-import { resolvePackageVersion } from './version-spec';
+import { normalizeVersionSpec, resolvePackageVersion } from './version-spec';
 
 // A hint is offered only for a whole version. Each pattern has at most one group of each kind and
 // no repeated group, so matching runs in time linear in the input length. A leading `v` is
@@ -25,5 +25,7 @@ export function packageVersionSpecHint(
   const pattern = ecosystem === 'npm' ? NPM_VERSION : PYPI_VERSION;
   const match = pattern.exec(version.trim());
   const resolved = match ? resolvePackageVersion(match[1], ecosystem) : null;
-  return resolved === null ? null : `>=${resolved}`;
+  if (resolved === null) return null;
+  const spec = `>=${resolved}`;
+  return normalizeVersionSpec(spec).ok ? spec : null;
 }

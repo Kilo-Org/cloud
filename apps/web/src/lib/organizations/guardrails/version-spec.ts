@@ -211,6 +211,39 @@ export function minimumVersionForSpec(spec: string | null | undefined): string |
   return semverMinVersion(compiled.value)?.version ?? null;
 }
 
+export type LegacyMinVersion =
+  | { kind: 'none' }
+  | { kind: 'any' }
+  | { kind: 'range'; value: string }
+  | { kind: 'invalid' };
+
+/**
+ * Classifies a stored pre-range minimum before it is exposed as a range.
+ * `0.0.0` (and equivalent spellings) allowed every version, while an
+ * unparseable minimum must stay fail-closed as `invalid`.
+ */
+export function classifyLegacyMinVersion(input: string | null | undefined): LegacyMinVersion {
+  const trimmed = input?.trim() ?? '';
+  if (trimmed === '') return { kind: 'none' };
+  const spec = legacyMinVersionToSpec(trimmed);
+  if (spec === null) return { kind: 'invalid' };
+  const normalized = normalizeVersionSpec(spec);
+  if (normalized.ok) {
+    return normalized.value === null ? { kind: 'any' } : { kind: 'range', value: normalized.value };
+  }
+  let minimum: string | null = null;
+  try {
+    minimum = semverMinVersion(spec, { loose: true })?.version ?? null;
+  } catch {
+    minimum = null;
+  }
+  return minimum === '0.0.0' ? { kind: 'any' } : { kind: 'invalid' };
+}
+
+export function isValidVersionSpec(spec: string): boolean {
+  return compileVersionRange(spec).ok;
+}
+
 /**
  * Checks a resolved version against a stored range. Prereleases are excluded
  * unless the range names a prerelease comparator, matching standard semver.

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { sql } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -51,14 +52,8 @@ export const OPENAI_CHATGPT_REFRESH_INITIAL_BACKOFF_MS = 250;
  */
 export const OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS = 10_000;
 
-/**
- * Bound on one token request. The request runs inside the transaction that holds
- * the connection row lock, so a stalled token endpoint must give the row, the
- * pool connection and any sibling instance waiting on it back promptly. A normal
- * exchange answers in well under a second; three attempts with their backoff
- * stay inside the gateway request budget.
- */
 export const OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS = 5_000;
+export const OPENAI_CHATGPT_REFRESH_TIMEOUT_MS = 8_000;
 
 /** Shown when the connection can no longer be refreshed and must be reconnected. */
 export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
@@ -110,7 +105,7 @@ type RefreshDecision =
  * backs off from after the lock is released. `retryAfterMs` carries the
  * server's own `Retry-After` delay when the response provided one.
  */
-type RefreshAttempt = RefreshDecision | { kind: 'retry'; retryAfterMs?: number };
+type RefreshAttempt = RefreshDecision | { kind: 'retry'; retryAfterMs?: number } | { kind: 'busy' };
 
 /**
  * Single-flight per owner within one process: concurrent callers share the same
@@ -130,6 +125,34 @@ function backoffDelayMs(attempt: number): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason);
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([aborted, operation]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+async function setRemainingStatementTimeout(
+  tx: OpenAiChatGptDatabase,
+  signal: AbortSignal,
+  deadlineAt: number
+): Promise<void> {
+  signal.throwIfAborted();
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) {
+    throw new DOMException('ChatGPT refresh deadline exceeded', 'TimeoutError');
+  }
+  await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${remainingMs}'`));
+  signal.throwIfAborted();
 }
 
 function refreshRequestHeaders(): string {
@@ -276,7 +299,9 @@ function isRetryableRefreshFailure(response: Response, errorCode: string | undef
 async function attemptRefresh(
   tx: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
-  connection: OpenAiChatGptConnection
+  connection: OpenAiChatGptConnection,
+  deadlineSignal: AbortSignal,
+  deadlineAt: number
 ): Promise<RefreshAttempt> {
   const refreshToken = connection.refresh_token;
   if (!refreshToken) {
@@ -285,12 +310,21 @@ async function attemptRefresh(
     return { kind: 'terminal' };
   }
 
-  const signal = AbortSignal.timeout(OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS);
+  const signal = AbortSignal.any([
+    deadlineSignal,
+    AbortSignal.timeout(OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS),
+  ]);
   let response: Response;
   let body: unknown;
   try {
-    response = await postRefreshRequest(refreshToken, signal);
-    body = await readResponseBody(response);
+    ({ response, body } = await withAbort(
+      (async () => {
+        const response = await postRefreshRequest(refreshToken, signal);
+        signal.throwIfAborted();
+        return { response, body: await readResponseBody(response) };
+      })(),
+      signal
+    ));
   } catch (error) {
     // The budget running out is transient, exactly like a 429 or a 5xx: report a
     // retry so this transaction ends now and the caller's backoff, outside the
@@ -301,6 +335,7 @@ async function attemptRefresh(
     return { kind: 'retry' };
   }
 
+  signal.throwIfAborted();
   if (response.ok) {
     const accessToken = readStringField(body, 'access_token');
     const expiresIn = readExpiresIn(body);
@@ -320,6 +355,7 @@ async function attemptRefresh(
         error_at: undefined,
       };
 
+      await setRemainingStatementTimeout(tx, deadlineSignal, deadlineAt);
       await tx
         .update(openai_chatgpt_connections)
         .set({
@@ -330,13 +366,6 @@ async function attemptRefresh(
 
       return { kind: 'access_token', accessToken };
     }
-  }
-
-  // The budget can also run out while the body is still arriving; the read then
-  // yields nothing, which must be a stall rather than an OAuth answer to act on.
-  if (signal.aborted) {
-    logRefreshFailure(owner, REFRESH_REQUEST_TIMEOUT_ERROR_CODE);
-    return { kind: 'retry' };
   }
 
   const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;
@@ -357,9 +386,8 @@ async function attemptRefresh(
 /**
  * Re-reads the connection under the row lock so a sibling instance that already
  * refreshed is not refreshed again, then returns the fresh token, decides to
- * refresh, or reports why it cannot. A disabled row is no connection: the row
- * can be disabled by the ordinary BYOK toggle while the payload still says
- * `connected`.
+ * refresh, or reports why it cannot. A disabled connected row is no connection;
+ * an errored row retains its terminal outcome even after it has been disabled.
  *
  * A terminal failure is written back inside this same transaction, while the
  * row lock is still held. A reconnect that saves a new row between the rejected
@@ -367,20 +395,29 @@ async function attemptRefresh(
  */
 async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
-  owner: OpenAiChatGptOwner
+  owner: OpenAiChatGptOwner,
+  signal: AbortSignal,
+  deadlineAt: number
 ): Promise<RefreshAttempt> {
-  const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
-  if (!row || !row.is_enabled) return { kind: 'no_connection' };
+  const row = await readOpenAiChatGptConnectionRow(tx, owner, {
+    forUpdate: true,
+    skipLocked: true,
+  });
+  signal.throwIfAborted();
+  if (!row) return { kind: 'busy' };
 
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
-  if (!connection) return { kind: 'no_connection' };
+  if (connection?.status === 'error') return { kind: 'terminal' };
+  if (!connection || !row.is_enabled) return { kind: 'no_connection' };
 
   if (isUsableWithoutRefresh(connection, nowSeconds())) {
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  const attempt = await attemptRefresh(tx, owner, connection);
+  const attempt = await attemptRefresh(tx, owner, connection, signal, deadlineAt);
+  signal.throwIfAborted();
   if (attempt.kind === 'terminal') {
+    await setRemainingStatementTimeout(tx, signal, deadlineAt);
     await markOpenAiChatGptConnectionErrored(
       tx,
       owner,
@@ -394,51 +431,87 @@ async function resolveInsideLock(
 async function resolveOpenAiChatGptAccessTokenUncached(
   owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptAccessTokenOutcome> {
+  const controller = new AbortController();
+  const deadlineAt = Date.now() + OPENAI_CHATGPT_REFRESH_TIMEOUT_MS;
+  const timeout = setTimeout(
+    () => controller.abort(new DOMException('ChatGPT refresh deadline exceeded', 'TimeoutError')),
+    OPENAI_CHATGPT_REFRESH_TIMEOUT_MS
+  );
   try {
-    if (!OPENAI_CLIENT_ID || !OPENAI_CLIENT_SECRET) {
-      console.error(
-        '[openai-chatgpt] refresh failed: missing client configuration (%s)',
-        openAiChatGptOwnerKey(owner)
-      );
-      return { kind: 'failed' };
-    }
-
-    // Fast path: no lock, no network call while the stored token can still
-    // serve a request. A disabled row is skipped so it can never serve one.
-    // The replica is enough here: a lagging row still holds an unexpired token,
-    // and the refresh below re-reads the row on the primary under the lock.
-    const row = await readOpenAiChatGptConnectionRow(readDb, owner);
-    const current =
-      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
-    if (current && isUsableWithoutRefresh(current, nowSeconds())) {
-      return { kind: 'access_token', accessToken: current.access_token };
-    }
-
-    for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
-      // The row lock is held for one refresh request only. The backoff between
-      // attempts runs with it released, and each attempt re-reads the row, so a
-      // sibling instance that refreshed meanwhile is adopted rather than
-      // refreshed over.
-      const decision = await db.transaction(tx => resolveInsideLock(tx, owner));
-
-      // A terminal decision has already disabled the row inside that transaction.
-      if (decision.kind !== 'retry') return decision;
-
-      if (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {
-        await sleep(retryDelayMs(attempt, decision.retryAfterMs));
-      }
-    }
-
-    return { kind: 'failed' };
+    return await withAbort(
+      resolveBeforeDeadline(owner, controller.signal, deadlineAt),
+      controller.signal
+    );
   } catch (error) {
-    // A thrown error must never carry a credential: log only its type and the owner.
     console.error(
       '[openai-chatgpt] refresh errored: %s (%s)',
       error instanceof Error ? error.name : 'UnknownError',
       openAiChatGptOwnerKey(owner)
     );
     return { kind: 'failed' };
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+async function resolveBeforeDeadline(
+  owner: OpenAiChatGptOwner,
+  signal: AbortSignal,
+  deadlineAt: number
+): Promise<OpenAiChatGptAccessTokenOutcome> {
+  if (!OPENAI_CLIENT_ID || !OPENAI_CLIENT_SECRET) {
+    console.error(
+      '[openai-chatgpt] refresh failed: missing client configuration (%s)',
+      openAiChatGptOwnerKey(owner)
+    );
+    return { kind: 'failed' };
+  }
+
+  // The replica is enough for unexpired tokens; rotation re-reads the primary
+  // under the lock, so replica lag cannot cause a stale refresh to overwrite it.
+  const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+  signal.throwIfAborted();
+  const current =
+    row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
+  if (current && isUsableWithoutRefresh(current, nowSeconds())) {
+    return { kind: 'access_token', accessToken: current.access_token };
+  }
+
+  let attempt = 0;
+  while (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {
+    signal.throwIfAborted();
+    // Rotating a token requires primary serialization; busy rows never wait
+    // on that connection, and every retry releases it before backing off.
+    const decision = await db.transaction(async tx => {
+      await setRemainingStatementTimeout(tx, signal, deadlineAt);
+      const decision = await resolveInsideLock(tx, owner, signal, deadlineAt);
+      signal.throwIfAborted();
+      return decision;
+    });
+
+    if (decision.kind !== 'retry' && decision.kind !== 'busy') return decision;
+    if (decision.kind === 'retry') attempt++;
+    if (attempt === OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) break;
+
+    const delay =
+      decision.kind === 'busy'
+        ? OPENAI_CHATGPT_REFRESH_INITIAL_BACKOFF_MS
+        : retryDelayMs(attempt, decision.retryAfterMs);
+    await sleep(Math.min(delay, Math.max(0, deadlineAt - Date.now())));
+    signal.throwIfAborted();
+
+    const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+    signal.throwIfAborted();
+    if (!row) return { kind: 'no_connection' };
+    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+    if (connection?.status === 'error') return { kind: 'terminal' };
+    if (!row.is_enabled) return { kind: 'no_connection' };
+    if (connection && isUsableWithoutRefresh(connection, nowSeconds())) {
+      return { kind: 'access_token', accessToken: connection.access_token };
+    }
+  }
+
+  return { kind: 'failed' };
 }
 
 /**

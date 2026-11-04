@@ -19,6 +19,7 @@ jest.mock('@kilocode/web-shared/lib/auth/openai/config', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { encryptApiKey, decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   BYOK_ENCRYPTION_KEY,
@@ -31,9 +32,9 @@ import {
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   OPENAI_CHATGPT_RECONNECT_MESSAGE,
-  OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS,
   OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS,
   OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS,
+  OPENAI_CHATGPT_REFRESH_TIMEOUT_MS,
   resolveOpenAiChatGptAccessToken,
   type OpenAiChatGptAccessTokenOutcome,
 } from './refresh';
@@ -109,10 +110,12 @@ function expectedBasicAuth(): string {
  */
 function captureRetryDelays(): { values: number[]; restore: () => void } {
   const values: number[] = [];
+  const setTimeout = global.setTimeout;
   const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((
     callback: () => void,
     delay?: number
   ) => {
+    if (delay === OPENAI_CHATGPT_REFRESH_TIMEOUT_MS) return setTimeout(callback, delay);
     if (typeof delay === 'number') values.push(delay);
     callback();
     return 0 as unknown as ReturnType<typeof setTimeout>;
@@ -127,7 +130,11 @@ describe('resolveOpenAiChatGptAccessToken', () => {
 
   let storedRow: StoredRow | null = null;
   const txUpdateSetCalls: Array<Record<string, unknown>> = [];
+  const txWriteTimeouts: string[] = [];
   const markUpdateSetCalls: Array<Record<string, unknown>> = [];
+  const txRead = jest.fn();
+  const txExecute = jest.fn();
+  const txLock = jest.fn(() => ({ limit: txRead }));
 
   const selectChain = () => ({
     from: jest.fn(() => ({
@@ -140,9 +147,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
   const txSelectChain = () => ({
     from: jest.fn(() => ({
       where: jest.fn(() => ({
-        for: jest.fn(() => ({
-          limit: jest.fn(() => Promise.resolve(storedRow ? [storedRow] : [])),
-        })),
+        for: txLock,
       })),
     })),
   });
@@ -150,7 +155,13 @@ describe('resolveOpenAiChatGptAccessToken', () => {
   beforeEach(() => {
     storedRow = null;
     txUpdateSetCalls.length = 0;
+    txWriteTimeouts.length = 0;
     markUpdateSetCalls.length = 0;
+    txRead.mockReset();
+    txRead.mockImplementation(() => Promise.resolve(storedRow ? [storedRow] : []));
+    txExecute.mockReset();
+    txExecute.mockResolvedValue(undefined);
+    txLock.mockClear();
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -168,10 +179,13 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     mockDb.transaction.mockReset();
     mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
+        execute: txExecute,
         select: jest.fn(txSelectChain),
         update: jest.fn(() => ({
           set: jest.fn((values: Record<string, unknown>) => {
             txUpdateSetCalls.push(values);
+            const timeout = txExecute.mock.lastCall?.[0];
+            if (timeout) txWriteTimeouts.push(new PgDialect().sqlToQuery(timeout).sql);
             return { where: jest.fn(() => Promise.resolve(undefined)) };
           }),
         })),
@@ -343,20 +357,58 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(delays.values).toContain(7000);
   });
 
-  it('caps a Retry-After longer than the retry budget', async () => {
+  it('bounds Retry-After by the overall deadline without another request', async () => {
+    jest.useFakeTimers();
     storedRow = encryptedRow(buildConnection());
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': '600' }))
       .mockResolvedValueOnce(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 }));
 
-    const delays = captureRetryDelays();
     try {
-      await resolveOpenAiChatGptAccessToken(USER_OWNER);
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(OPENAI_CHATGPT_REFRESH_TIMEOUT_MS);
+      await expect(pending).resolves.toEqual({ kind: 'failed' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(txUpdateSetCalls).toHaveLength(0);
     } finally {
-      delays.restore();
+      jest.useRealTimers();
     }
+  });
 
-    expect(delays.values).toContain(OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS);
+  it('allows a slow transient response and healthy retry within the overall deadline', async () => {
+    jest.useFakeTimers();
+    storedRow = encryptedRow(buildConnection());
+    fetchMock
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () => resolve(jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': '1' })),
+              3000
+            )
+          )
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve =>
+            setTimeout(
+              () => resolve(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })),
+              2500
+            )
+          )
+      );
+    try {
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(6500);
+      await expect(pending).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(txUpdateSetCalls).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('fails the request without clearing the tokens after the retries are exhausted', async () => {
@@ -379,6 +431,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       events.push('lock:acquire');
       try {
         return await callback({
+          execute: txExecute,
           select: jest.fn(txSelectChain),
           update: jest.fn(() => ({
             set: jest.fn((values: Record<string, unknown>) => {
@@ -439,6 +492,124 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(txUpdateSetCalls).toHaveLength(0);
   });
 
+  it('re-reads a sibling token after a busy lock without holding another primary connection', async () => {
+    jest.useFakeTimers();
+    storedRow = encryptedRow(buildConnection());
+    txRead.mockResolvedValueOnce([]);
+    try {
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(100);
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(txLock).toHaveBeenCalledWith('update', { skipLocked: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      storedRow = encryptedRow(
+        buildConnection({
+          access_token: 'sibling-access-token',
+          expires_at: nowSeconds() + 3600,
+        })
+      );
+      await jest.advanceTimersByTimeAsync(150);
+      await expect(pending).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'sibling-access-token',
+      });
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockDb.select).toHaveBeenCalledTimes(2);
+      expect(txUpdateSetCalls).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries a busy lock when the replica still has the expired token', async () => {
+    storedRow = encryptedRow(buildConnection());
+    txRead.mockResolvedValueOnce([]);
+    fetchMock.mockResolvedValue(
+      jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+    );
+    const delays = captureRetryDelays();
+    try {
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+      });
+      expect(mockDb.transaction).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      delays.restore();
+    }
+  });
+
+  it.each([
+    ['error', 'terminal'],
+    ['connected', 'no_connection'],
+  ] as const)(
+    'preserves disabled sibling %s state observed by the replica',
+    async (status, kind) => {
+      jest.useFakeTimers();
+      storedRow = encryptedRow(buildConnection());
+      txRead.mockResolvedValueOnce([]);
+      try {
+        const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+        await jest.advanceTimersByTimeAsync(100);
+        storedRow = {
+          ...encryptedRow(
+            buildConnection({ status, access_token: '', refresh_token: undefined, expires_at: 0 })
+          ),
+          is_enabled: false,
+        };
+        await jest.advanceTimersByTimeAsync(150);
+        await expect(pending).resolves.toEqual({ kind });
+        expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+        expect(mockDb.select).toHaveBeenCalledTimes(2);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(txUpdateSetCalls).toHaveLength(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
+
+  it.each([
+    ['error', 'terminal'],
+    ['connected', 'no_connection'],
+  ] as const)(
+    'preserves disabled sibling %s state observed on the primary despite replica lag',
+    async (status, kind) => {
+      storedRow = encryptedRow(buildConnection());
+      txRead.mockResolvedValueOnce([
+        {
+          ...encryptedRow(
+            buildConnection({ status, access_token: '', refresh_token: undefined, expires_at: 0 })
+          ),
+          is_enabled: false,
+        },
+      ]);
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({ kind });
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+    }
+  );
+
+  it('bounds repeated busy locks by the deadline without disabling the connection', async () => {
+    jest.useFakeTimers();
+    storedRow = encryptedRow(buildConnection());
+    txRead.mockResolvedValue([]);
+    try {
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(OPENAI_CHATGPT_REFRESH_TIMEOUT_MS);
+      await expect(pending).resolves.toEqual({ kind: 'failed' });
+      expect(mockDb.transaction.mock.calls.length).toBeGreaterThan(3);
+      expect(mockDb.transaction.mock.calls.length).toBeLessThanOrEqual(32);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('disables the connection with the reconnect message on invalid_grant', async () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));
@@ -484,6 +655,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       events.push('lock:acquire');
       try {
         return await callback({
+          execute: txExecute,
           select: jest.fn(txSelectChain),
           update: jest.fn(() => ({
             set: jest.fn((values: Record<string, unknown>) => {
@@ -507,6 +679,36 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(events).toEqual(['lock:acquire', 'terminal:write', 'lock:release']);
     expect(markUpdateSetCalls).toHaveLength(0);
   });
+
+  it.each([
+    ['success', 'access_token'],
+    ['terminal', 'terminal'],
+  ] as const)(
+    'reduces the %s write statement timeout by time spent on HTTP',
+    async (responseKind, kind) => {
+      jest.useFakeTimers();
+      storedRow = encryptedRow(buildConnection());
+      const response =
+        responseKind === 'success'
+          ? jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+          : jsonResponse({ error: 'invalid_grant' }, 400);
+      fetchMock.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve(response), 4900))
+      );
+      try {
+        const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+        await jest.advanceTimersByTimeAsync(4900);
+        expect((await pending).kind).toBe(kind);
+        expect(
+          txExecute.mock.calls.map(([query]) => new PgDialect().sqlToQuery(query).sql)
+        ).toEqual(["SET LOCAL statement_timeout = '8000'", "SET LOCAL statement_timeout = '3100'"]);
+        expect(txWriteTimeouts).toEqual(["SET LOCAL statement_timeout = '3100'"]);
+        expect(txUpdateSetCalls).toHaveLength(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
 
   it('treats a disabled row as no connection and does not call OpenAI', async () => {
     storedRow = {
@@ -590,6 +792,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       events.push('lock:acquire');
       try {
         return await callback({
+          execute: txExecute,
           select: jest.fn(txSelectChain),
           update: jest.fn(() => ({
             set: jest.fn((values: Record<string, unknown>) => {
@@ -679,6 +882,104 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(outcome).toEqual({ kind: 'failed' });
     expect(fetchMock).toHaveBeenCalledTimes(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
     expect(txUpdateSetCalls).toHaveLength(0);
+  });
+
+  it.each(['headers', 'body'])(
+    'bounds stalled %s across retries and ignores late success',
+    async stage => {
+      jest.useFakeTimers();
+      storedRow = encryptedRow(buildConnection());
+      const signals: AbortSignal[] = [];
+      const lateResponses: Array<() => void> = [];
+      const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), ms);
+        return controller.signal;
+      });
+      fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+        if (!init.signal) throw new Error('Expected a cancellable token request');
+        signals.push(init.signal);
+        const successfulBody = { access_token: 'late-access-token', expires_in: 3600 };
+        if (stage === 'headers') {
+          return new Promise<Response>(resolve => {
+            lateResponses.push(() => resolve(jsonResponse(successfulBody)));
+          });
+        }
+        return Promise.resolve({
+          ...jsonResponse(null),
+          json: () =>
+            new Promise(resolve => {
+              lateResponses.push(() => resolve(successfulBody));
+            }),
+        });
+      });
+      try {
+        const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+        await jest.advanceTimersByTimeAsync(OPENAI_CHATGPT_REFRESH_TIMEOUT_MS - 1);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        await jest.advanceTimersByTimeAsync(1);
+        await expect(pending).resolves.toEqual({ kind: 'failed' });
+        expect(signals.every(signal => signal.aborted)).toBe(true);
+        expect(txUpdateSetCalls).toHaveLength(0);
+
+        storedRow = {
+          ...encryptedRow(buildConnection({ status: 'error', access_token: '', expires_at: 0 })),
+          is_enabled: false,
+        };
+        for (const respond of lateResponses) respond();
+        await jest.advanceTimersByTimeAsync(0);
+        expect(txUpdateSetCalls).toHaveLength(0);
+        await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+          kind: 'terminal',
+        });
+      } finally {
+        timeouts.mockRestore();
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    }
+  );
+
+  it('includes a stalled replica read in the deadline and never starts late primary work', async () => {
+    jest.useFakeTimers();
+    const read = Promise.withResolvers<StoredRow[]>();
+    mockDb.select.mockReturnValue({
+      from: () => ({ where: () => ({ limit: () => read.promise }) }),
+    });
+    try {
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(OPENAI_CHATGPT_REFRESH_TIMEOUT_MS);
+      await expect(pending).resolves.toEqual({ kind: 'failed' });
+      read.resolve([encryptedRow(buildConnection())]);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not refresh when a queued primary connection arrives after the deadline', async () => {
+    jest.useFakeTimers();
+    storedRow = encryptedRow(buildConnection());
+    const acquired = Promise.withResolvers<void>();
+    const transaction = mockDb.transaction.getMockImplementation();
+    mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+      await acquired.promise;
+      return transaction?.(callback);
+    });
+    try {
+      const pending = resolveOpenAiChatGptAccessToken(USER_OWNER);
+      await jest.advanceTimersByTimeAsync(OPENAI_CHATGPT_REFRESH_TIMEOUT_MS);
+      await expect(pending).resolves.toEqual({ kind: 'failed' });
+      acquired.resolve();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(txExecute).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('never logs the client secret, the access token or the refresh token', async () => {

@@ -7,9 +7,15 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { openai_chatgpt_connections } from '@kilocode/db/schema';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
   getOpenAiChatGptStoredConnection,
+  openAiChatGptOwnerWhere,
+  readOpenAiChatGptConnectionRow,
   saveOpenAiChatGptConnection,
   type OpenAiChatGptOwner,
 } from './store';
@@ -132,5 +138,90 @@ describe('terminal refresh failure against a real database', () => {
       refresh_token: 'reconnected-refresh-token',
       status: 'connected',
     });
+  });
+
+  it('adopts a sibling refresh after skipping its busy row lock', async () => {
+    await saveOpenAiChatGptConnection(owner, connection(), owner.kiloUserId as string);
+    const locked = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const siblingConnection = connection({
+      access_token: 'sibling-access-token',
+      refresh_token: 'sibling-refresh-token',
+      expires_at: nowSeconds() + 3600,
+    });
+    const sibling = db.transaction(async tx => {
+      await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+      locked.resolve();
+      await release.promise;
+      await tx
+        .update(openai_chatgpt_connections)
+        .set({
+          encrypted_connection: encryptApiKey(
+            JSON.stringify(siblingConnection),
+            BYOK_ENCRYPTION_KEY
+          ),
+          is_enabled: true,
+        })
+        .where(openAiChatGptOwnerWhere(owner));
+    });
+    await locked.promise;
+    const refresh = resolveOpenAiChatGptAccessToken(owner);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 350));
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      release.resolve();
+      await sibling;
+    }
+    await expect(refresh).resolves.toEqual({
+      kind: 'access_token',
+      accessToken: 'sibling-access-token',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await getOpenAiChatGptStoredConnection(owner))?.connection.refresh_token).toBe(
+      'sibling-refresh-token'
+    );
+  });
+
+  it('cannot clear a terminal state when an aborted refresh later succeeds', async () => {
+    await saveOpenAiChatGptConnection(owner, connection(), owner.kiloUserId as string);
+    const called = Promise.withResolvers<void>();
+    const late = Promise.withResolvers<Response>();
+    const controllers: AbortController[] = [];
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      return controller.signal;
+    });
+    fetchMock
+      .mockImplementationOnce(() => {
+        called.resolve();
+        return late.promise;
+      })
+      .mockResolvedValue(TERMINAL_REFRESH_RESPONSE);
+    try {
+      const refresh = resolveOpenAiChatGptAccessToken(owner);
+      await called.promise;
+      controllers[0].abort();
+      await expect(refresh).resolves.toEqual({ kind: 'terminal' });
+      late.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({
+          access_token: 'late-access-token',
+          refresh_token: 'late-refresh-token',
+          expires_in: 3600,
+        }),
+      } as unknown as Response);
+      await new Promise(resolve => setImmediate(resolve));
+      const stored = await getOpenAiChatGptStoredConnection(owner);
+      expect(stored?.isEnabled).toBe(false);
+      expect(stored?.connection.status).toBe('error');
+      expect(stored?.connection.access_token).toBe('');
+      expect(stored?.connection.refresh_token).toBeUndefined();
+    } finally {
+      timeouts.mockRestore();
+    }
   });
 });

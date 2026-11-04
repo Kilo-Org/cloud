@@ -80,7 +80,7 @@ export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
 export async function readOpenAiChatGptConnectionRow(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
-  options: { forUpdate?: boolean } = {}
+  options: { forUpdate?: boolean; skipLocked?: true } = {}
 ) {
   const query = fromDb
     .select({
@@ -90,7 +90,9 @@ export async function readOpenAiChatGptConnectionRow(
     .from(openai_chatgpt_connections)
     .where(openAiChatGptOwnerWhere(owner));
 
-  const rows = options.forUpdate ? await query.for('update').limit(1) : await query.limit(1);
+  const rows = options.forUpdate
+    ? await query.for('update', options.skipLocked ? { skipLocked: true } : undefined).limit(1)
+    : await query.limit(1);
   return rows[0] ?? null;
 }
 

@@ -25,6 +25,11 @@ import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.j
 /** Spec §7 "Setup commands": current per-command limits. */
 export const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 5 * 60_000;
 export const SETUP_COMMAND_HARD_TIMEOUT_MS = 8 * 60_000;
+/**
+ * Environment builds also install and warm sandbox images, so one setup command
+ * gets a larger hard cap. The build deadline is 30 minutes.
+ */
+export const ENVIRONMENT_BUILD_SETUP_HARD_TIMEOUT_MS = 20 * 60_000;
 /** Spec §7 "Clone or fetch": network errors get 3 attempts with backoff. */
 const CLONE_RETRY_ATTEMPTS = 3;
 const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];

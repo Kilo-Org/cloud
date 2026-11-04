@@ -5,7 +5,7 @@ import {
   type EnvironmentBuildResult,
 } from '../../../src/shared/environment-build-protocol.js';
 import {
-  SETUP_COMMAND_HARD_TIMEOUT_MS,
+  ENVIRONMENT_BUILD_SETUP_HARD_TIMEOUT_MS,
   SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
   createRepositoryPreparation,
 } from '../control-plane/repository-preparation.js';
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
         inheritEnv: false,
         ...(signal ? { signal } : {}),
         inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-        hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
+        hardTimeoutMs: ENVIRONMENT_BUILD_SETUP_HARD_TIMEOUT_MS,
         ...(onOutput ? { onOutput } : {}),
       }),
     sleep: (ms, signal) =>
